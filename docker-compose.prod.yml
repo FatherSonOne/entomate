@@ -1,0 +1,68 @@
+# ========================================
+# Entomate Docker Compose - Production Overrides
+# Week 8: Production Deployment
+# ========================================
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+version: '3.8'
+
+services:
+  # ========================================
+  # Backend API - Production Config
+  # ========================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - LOG_LEVEL=info
+      - LOG_FORMAT=json
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ========================================
+  # Frontend App - Production Config
+  # ========================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 32M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

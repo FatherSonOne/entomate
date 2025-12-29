@@ -1,0 +1,636 @@
+/**
+ * Action Node Handlers
+ *
+ * Nodes that perform actions: HTTP requests, notifications, database operations
+ */
+
+const BaseNode = require('./BaseNode');
+const { supabase } = require('../../../config/supabase');
+
+/**
+ * HTTP Request Node - Make HTTP requests to any API
+ */
+class HttpRequestNode extends BaseNode {
+  static async execute(config, inputData, context) {
+    const {
+      method = 'GET',
+      url,
+      headers = {},
+      queryParams = {},
+      body = null,
+      authentication = { type: 'none' },
+      timeout = 30000,
+      responseField = 'response'
+    } = config;
+
+    // Interpolate URL and other config values
+    const resolvedUrl = this.interpolate(url, inputData);
+    const resolvedHeaders = this.interpolateObject(headers, inputData);
+    const resolvedBody = body ? this.interpolateObject(body, inputData) : null;
+
+    // Build query string
+    const queryString = this.buildQueryString(queryParams, inputData);
+    const fullUrl = queryString ? `${resolvedUrl}?${queryString}` : resolvedUrl;
+
+    console.log(`[HttpRequestNode] ${method} ${fullUrl}`);
+
+    // Apply authentication
+    const authHeaders = await this.applyAuthentication(authentication, context);
+    const allHeaders = { ...resolvedHeaders, ...authHeaders };
+
+    // Set content type for body
+    if (resolvedBody && !allHeaders['Content-Type']) {
+      allHeaders['Content-Type'] = 'application/json';
+    }
+
+    try {
+      // Create abort controller for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+      const fetchOptions = {
+        method,
+        headers: allHeaders,
+        signal: controller.signal
+      };
+
+      if (resolvedBody && ['POST', 'PUT', 'PATCH'].includes(method)) {
+        fetchOptions.body = JSON.stringify(resolvedBody);
+      }
+
+      const response = await fetch(fullUrl, fetchOptions);
+      clearTimeout(timeoutId);
+
+      // Parse response
+      let responseData;
+      const contentType = response.headers.get('content-type');
+
+      if (contentType?.includes('application/json')) {
+        responseData = await response.json();
+      } else {
+        responseData = await response.text();
+      }
+
+      console.log(`[HttpRequestNode] Response: ${response.status} ${response.statusText}`);
+
+      return {
+        output: 'main',
+        data: {
+          ...inputData,
+          [responseField]: {
+            statusCode: response.status,
+            statusText: response.statusText,
+            headers: Object.fromEntries(response.headers),
+            data: responseData
+          }
+        }
+      };
+
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        throw new Error(`HTTP request timed out after ${timeout}ms`);
+      }
+      throw error;
+    }
+  }
+
+  static interpolateObject(obj, data) {
+    if (!obj) return obj;
+
+    const result = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (typeof value === 'string') {
+        result[key] = this.interpolate(value, data);
+      } else if (typeof value === 'object' && value !== null) {
+        result[key] = this.interpolateObject(value, data);
+      } else {
+        result[key] = value;
+      }
+    }
+    return result;
+  }
+
+  static buildQueryString(params, data) {
+    const interpolated = this.interpolateObject(params, data);
+    const entries = Object.entries(interpolated).filter(([_, v]) => v !== undefined && v !== null);
+    if (entries.length === 0) return '';
+    return entries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
+  }
+
+  static async applyAuthentication(auth, context) {
+    const headers = {};
+
+    switch (auth.type) {
+      case 'basic':
+        const credentials = Buffer.from(`${auth.username}:${auth.password}`).toString('base64');
+        headers['Authorization'] = `Basic ${credentials}`;
+        break;
+
+      case 'bearer':
+        headers['Authorization'] = `Bearer ${auth.token}`;
+        break;
+
+      case 'api_key':
+        if (auth.addTo === 'header') {
+          headers[auth.name || 'X-API-Key'] = auth.value;
+        }
+        break;
+
+      case 'credential':
+        // Load credential from database
+        if (auth.credentialId) {
+          try {
+            const { data: cred } = await supabase
+              .from('credentials')
+              .select('data')
+              .eq('id', auth.credentialId)
+              .single();
+
+            if (cred?.data) {
+              // Apply credential based on its type
+              return this.applyAuthentication({ ...auth, ...cred.data }, context);
+            }
+          } catch (err) {
+            console.warn('[HttpRequestNode] Failed to load credential:', err);
+          }
+        }
+        break;
+    }
+
+    return headers;
+  }
+}
+
+/**
+ * Execute Workflow Node - Run a sub-workflow
+ */
+class ExecuteWorkflowNode extends BaseNode {
+  static async execute(config, inputData, context) {
+    const {
+      workflowId,
+      waitForCompletion = true,
+      timeout = 60000,
+      inputMapping = {}
+    } = config;
+
+    console.log(`[ExecuteWorkflowNode] Executing sub-workflow: ${workflowId}`);
+
+    // Get the workflow
+    const { data: workflow, error } = await supabase
+      .from('workflows')
+      .select('*')
+      .eq('id', workflowId)
+      .single();
+
+    if (error || !workflow) {
+      throw new Error(`Sub-workflow not found: ${workflowId}`);
+    }
+
+    // Map input data
+    let mappedInput = inputData;
+    if (Object.keys(inputMapping).length > 0) {
+      mappedInput = {};
+      for (const [targetField, sourceExpr] of Object.entries(inputMapping)) {
+        mappedInput[targetField] = this.interpolate(sourceExpr, inputData);
+      }
+    }
+
+    // Get workflow executor (avoid circular dependency)
+    const WorkflowExecutor = require('../WorkflowExecutor');
+    const executor = new WorkflowExecutor();
+
+    if (waitForCompletion) {
+      // Execute and wait
+      const result = await Promise.race([
+        executor.execute(workflow, mappedInput, {
+          mode: 'sub_workflow',
+          triggeredBy: 'sub_workflow',
+          calledByWorkflowId: context.workflowId,
+          calledByExecutionId: context.executionId
+        }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Sub-workflow timeout')), timeout)
+        )
+      ]);
+
+      console.log(`[ExecuteWorkflowNode] Sub-workflow completed: ${result.success ? 'success' : 'failed'}`);
+
+      return {
+        output: 'main',
+        data: {
+          ...inputData,
+          subWorkflow: {
+            workflowId,
+            executionId: result.executionId,
+            success: result.success,
+            output: result.output,
+            error: result.error
+          }
+        }
+      };
+    } else {
+      // Fire and forget
+      executor.execute(workflow, mappedInput, {
+        mode: 'sub_workflow',
+        triggeredBy: 'sub_workflow'
+      }).catch(err => {
+        console.error('[ExecuteWorkflowNode] Background sub-workflow failed:', err);
+      });
+
+      return {
+        output: 'main',
+        data: {
+          ...inputData,
+          subWorkflow: {
+            workflowId,
+            started: true,
+            waitForCompletion: false
+          }
+        }
+      };
+    }
+  }
+}
+
+/**
+ * Send Slack Node - Post to Slack
+ */
+class SendSlackNode extends BaseNode {
+  static async execute(config, inputData, context) {
+    const { channel, message, blocks = null } = config;
+
+    const resolvedChannel = this.interpolate(channel, inputData);
+    const resolvedMessage = this.interpolate(message, inputData);
+
+    console.log(`[SendSlackNode] Posting to channel: ${resolvedChannel}`);
+
+    // Try to use chat service
+    try {
+      const chatService = require('../../chatService');
+
+      if (blocks) {
+        await chatService.postBlocks(resolvedChannel, blocks, resolvedMessage);
+      } else {
+        await chatService.postMessage(resolvedChannel, resolvedMessage);
+      }
+
+      return {
+        output: 'main',
+        data: {
+          ...inputData,
+          slack: {
+            success: true,
+            channel: resolvedChannel,
+            message: resolvedMessage
+          }
+        }
+      };
+    } catch (err) {
+      // Fallback to webhook if available
+      const webhookUrl = process.env.SLACK_WEBHOOK_URL;
+
+      if (webhookUrl) {
+        const response = await fetch(webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            channel: resolvedChannel,
+            text: resolvedMessage,
+            blocks
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`Slack webhook failed: ${response.statusText}`);
+        }
+
+        return {
+          output: 'main',
+          data: {
+            ...inputData,
+            slack: { success: true, channel: resolvedChannel }
+          }
+        };
+      }
+
+      console.warn('[SendSlackNode] Slack not configured, logging message');
+      return {
+        output: 'main',
+        data: {
+          ...inputData,
+          slack: { success: false, logged: true, message: resolvedMessage }
+        }
+      };
+    }
+  }
+}
+
+/**
+ * Send Email Node
+ */
+class SendEmailNode extends BaseNode {
+  static async execute(config, inputData, context) {
+    const { to, subject, body, html = false } = config;
+
+    const resolvedTo = this.interpolate(to, inputData);
+    const resolvedSubject = this.interpolate(subject, inputData);
+    const resolvedBody = this.interpolate(body, inputData);
+
+    console.log(`[SendEmailNode] Sending email to: ${resolvedTo}`);
+
+    try {
+      const emailService = require('../../emailService');
+      await emailService.send({
+        to: resolvedTo,
+        subject: resolvedSubject,
+        body: resolvedBody,
+        html
+      });
+
+      return {
+        output: 'main',
+        data: {
+          ...inputData,
+          email: { success: true, to: resolvedTo, subject: resolvedSubject }
+        }
+      };
+    } catch (err) {
+      console.warn('[SendEmailNode] Email service error:', err.message);
+
+      // Fallback to SendGrid if configured
+      if (process.env.SENDGRID_API_KEY) {
+        const sgMail = require('@sendgrid/mail');
+        sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
+        await sgMail.send({
+          to: resolvedTo,
+          from: process.env.SENDGRID_FROM_EMAIL || 'noreply@entomate.com',
+          subject: resolvedSubject,
+          text: html ? undefined : resolvedBody,
+          html: html ? resolvedBody : undefined
+        });
+
+        return {
+          output: 'main',
+          data: {
+            ...inputData,
+            email: { success: true, to: resolvedTo }
+          }
+        };
+      }
+
+      console.warn('[SendEmailNode] No email service configured, logging');
+      return {
+        output: 'main',
+        data: {
+          ...inputData,
+          email: { success: false, logged: true }
+        }
+      };
+    }
+  }
+}
+
+/**
+ * Create Task Node
+ */
+class CreateTaskNode extends BaseNode {
+  static async execute(config, inputData, context) {
+    const { title, description, priority = 'medium', dueDate, assignedTo, projectId } = config;
+
+    const resolvedTitle = this.interpolate(title, inputData);
+    const resolvedDescription = description ? this.interpolate(description, inputData) : null;
+    const resolvedDueDate = dueDate ? this.interpolate(dueDate, inputData) : null;
+    const resolvedAssignedTo = assignedTo ? this.interpolate(assignedTo, inputData) : null;
+
+    console.log(`[CreateTaskNode] Creating task: ${resolvedTitle}`);
+
+    const { data: task, error } = await supabase
+      .from('tasks')
+      .insert({
+        title: resolvedTitle,
+        description: resolvedDescription,
+        priority,
+        due_date: resolvedDueDate,
+        assigned_to: resolvedAssignedTo,
+        project_id: projectId || inputData.project_id,
+        status: 'open',
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(`Failed to create task: ${error.message}`);
+    }
+
+    console.log(`[CreateTaskNode] Task created: ${task.id}`);
+
+    return {
+      output: 'main',
+      data: {
+        ...inputData,
+        createdTask: task
+      }
+    };
+  }
+}
+
+/**
+ * Sync CRM Node
+ */
+class SyncCrmNode extends BaseNode {
+  static async execute(config, inputData, context) {
+    const { objectType = 'task', operation = 'create', fieldMapping = {} } = config;
+
+    console.log(`[SyncCrmNode] ${operation} ${objectType} in CRM`);
+
+    try {
+      const crmService = require('../../crmService');
+
+      // Map fields
+      const mappedData = {};
+      for (const [crmField, sourceExpr] of Object.entries(fieldMapping)) {
+        mappedData[crmField] = this.interpolate(sourceExpr, inputData);
+      }
+
+      let result;
+
+      switch (operation) {
+        case 'create':
+          result = await crmService.create(objectType, mappedData);
+          break;
+        case 'update':
+          result = await crmService.update(objectType, mappedData.id, mappedData);
+          break;
+        case 'upsert':
+          result = await crmService.upsert(objectType, mappedData);
+          break;
+        default:
+          throw new Error(`Unknown CRM operation: ${operation}`);
+      }
+
+      return {
+        output: 'main',
+        data: {
+          ...inputData,
+          crm: {
+            success: true,
+            operation,
+            objectType,
+            result
+          }
+        }
+      };
+
+    } catch (err) {
+      console.error('[SyncCrmNode] CRM sync error:', err);
+      return {
+        output: 'main',
+        data: {
+          ...inputData,
+          crm: {
+            success: false,
+            error: err.message
+          }
+        }
+      };
+    }
+  }
+}
+
+/**
+ * Respond to Webhook Node - Send response back
+ */
+class RespondWebhookNode extends BaseNode {
+  static async execute(config, inputData, context) {
+    const { statusCode = 200, headers = {}, body } = config;
+
+    // Store response in context for webhook handler to use
+    context.webhookResponse = {
+      statusCode,
+      headers,
+      body: body ? this.interpolateObject(body, inputData) : inputData
+    };
+
+    console.log(`[RespondWebhookNode] Prepared response with status ${statusCode}`);
+
+    return {
+      output: 'main',
+      data: inputData
+    };
+  }
+}
+
+/**
+ * Set Variable Node
+ */
+class SetVariableNode extends BaseNode {
+  static async execute(config, inputData, context) {
+    const { variables = {} } = config;
+
+    const result = { ...inputData };
+
+    for (const [key, value] of Object.entries(variables)) {
+      const resolvedValue = typeof value === 'string'
+        ? this.interpolate(value, inputData)
+        : value;
+
+      this.setNestedValue(result, key, resolvedValue);
+    }
+
+    console.log(`[SetVariableNode] Set ${Object.keys(variables).length} variables`);
+
+    return {
+      output: 'main',
+      data: result
+    };
+  }
+}
+
+/**
+ * Code Node - Execute custom JavaScript
+ */
+class CodeNode extends BaseNode {
+  static async execute(config, inputData, context) {
+    const { code, language = 'javascript' } = config;
+
+    if (language !== 'javascript') {
+      throw new Error(`Unsupported language: ${language}`);
+    }
+
+    console.log('[CodeNode] Executing custom code');
+
+    try {
+      // Create a sandboxed execution environment
+      const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
+
+      // Allowed globals
+      const sandbox = {
+        console: {
+          log: (...args) => console.log('[CodeNode]', ...args),
+          warn: (...args) => console.warn('[CodeNode]', ...args),
+          error: (...args) => console.error('[CodeNode]', ...args)
+        },
+        JSON,
+        Date,
+        Math,
+        Array,
+        Object,
+        String,
+        Number,
+        Boolean,
+        RegExp,
+        Error,
+        Promise,
+        setTimeout: (fn, ms) => setTimeout(fn, Math.min(ms, 10000)), // Max 10s
+        $input: inputData,
+        $context: {
+          nodeId: context.nodeId,
+          workflowId: context.workflowId,
+          executionId: context.executionId
+        }
+      };
+
+      // Wrap code in async function that returns $output
+      const wrappedCode = `
+        const $input = this.$input;
+        const $context = this.$context;
+        let $output = {};
+
+        ${code}
+
+        return $output;
+      `;
+
+      const fn = new AsyncFunction(wrappedCode);
+      const result = await fn.call(sandbox);
+
+      console.log('[CodeNode] Code executed successfully');
+
+      return {
+        output: 'main',
+        data: {
+          ...inputData,
+          ...result
+        }
+      };
+
+    } catch (error) {
+      console.error('[CodeNode] Execution error:', error);
+      throw new Error(`Code execution failed: ${error.message}`);
+    }
+  }
+}
+
+module.exports = {
+  HttpRequestNode,
+  ExecuteWorkflowNode,
+  SendSlackNode,
+  SendEmailNode,
+  CreateTaskNode,
+  SyncCrmNode,
+  RespondWebhookNode,
+  SetVariableNode,
+  CodeNode
+};

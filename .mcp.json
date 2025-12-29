@@ -1,0 +1,28 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@anthropic-ai/mcp-server-filesystem", "F:/entomate"],
+      "description": "File system access for the Entomate project"
+    },
+    "memory": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@anthropic-ai/mcp-server-memory"],
+      "description": "Persistent memory for conversation context"
+    },
+    "fetch": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@anthropic-ai/mcp-server-fetch"],
+      "description": "Fetch URLs and web content"
+    },
+    "browser": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@anthropic-ai/claude-code-mcp-server-browser"],
+      "description": "Browser automation and web interaction"
+    }
+  }
+}

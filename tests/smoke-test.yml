@@ -1,0 +1,125 @@
+# ========================================
+# Entomate Smoke Test Configuration
+# Week 8: Production Deployment
+# ========================================
+#
+# Quick smoke test to verify all critical endpoints
+# Run before and after deployment
+#
+# Usage:
+#   artillery run tests/smoke-test.yml
+#   artillery run tests/smoke-test.yml -e staging
+#   artillery run tests/smoke-test.yml -e production
+
+config:
+  target: "http://localhost:3000"
+
+  environments:
+    staging:
+      target: "https://staging.yourdomain.com"
+    production:
+      target: "https://api.yourdomain.com"
+
+  phases:
+    - duration: 30
+      arrivalRate: 1
+      name: "Smoke test"
+
+  defaults:
+    headers:
+      Content-Type: "application/json"
+      Accept: "application/json"
+
+  ensure:
+    # All requests must succeed
+    - maxErrorRate: 0
+    # Response time < 2s for smoke test
+    - p99: 2000
+
+  plugins:
+    expect: {}
+
+scenarios:
+  # ========================================
+  # Critical Path: All Essential Endpoints
+  # ========================================
+  - name: "Complete Smoke Test"
+    flow:
+      # 1. Health checks
+      - get:
+          url: "/health"
+          expect:
+            - statusCode: 200
+
+      - get:
+          url: "/health/ready"
+          expect:
+            - statusCode: 200
+
+      - get:
+          url: "/health/status"
+          expect:
+            - statusCode: 200
+            - contentType: json
+
+      # 2. API health
+      - get:
+          url: "/api/health"
+          expect:
+            - statusCode: 200
+
+      # 3. Meetings endpoints
+      - get:
+          url: "/api/meetings"
+          expect:
+            - statusCode: 200
+
+      # 4. Projects endpoints
+      - get:
+          url: "/api/projects"
+          expect:
+            - statusCode: 200
+
+      # 5. Tasks endpoints
+      - get:
+          url: "/api/tasks"
+          expect:
+            - statusCode: 200
+
+      # 6. Dashboard endpoints
+      - get:
+          url: "/api/dashboard/summary"
+          expect:
+            - statusCode: 200
+
+      # 7. Search endpoint
+      - post:
+          url: "/api/search"
+          json:
+            query: "test"
+            limit: 5
+          expect:
+            - statusCode: 200
+
+      # 8. Automations endpoints
+      - get:
+          url: "/api/automations"
+          expect:
+            - statusCode: 200
+
+      - get:
+          url: "/api/automations/templates"
+          expect:
+            - statusCode: 200
+
+      # 9. Agents endpoint
+      - get:
+          url: "/api/agents/available"
+          expect:
+            - statusCode: 200
+
+      # 10. Goals endpoint
+      - get:
+          url: "/api/goals"
+          expect:
+            - statusCode: 200

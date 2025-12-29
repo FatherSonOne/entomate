@@ -1,0 +1,488 @@
+import React, { useState, useEffect } from 'react'
+import { Link, useParams } from 'react-router-dom'
+import {
+  ArrowLeft, FolderKanban, BarChart3, Users, CheckCircle2,
+  Clock, AlertTriangle, TrendingUp, RefreshCw, Calendar,
+  PieChart, Activity
+} from 'lucide-react'
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart as RechartsPie, Pie, Cell, Legend,
+  LineChart, Line, Area, AreaChart
+} from 'recharts'
+import { dashboardApi, projectsApi } from '../services/api'
+import KanbanBoard from '../components/KanbanBoard'
+
+const COLORS = ['#10B981', '#F59E0B', '#EF4444', '#6366F1', '#8B5CF6']
+const STATUS_COLORS = {
+  open: '#6B7280',
+  in_progress: '#3B82F6',
+  done: '#10B981'
+}
+
+export default function ProjectDashboard() {
+  const { id } = useParams()
+  const [project, setProject] = useState(null)
+  const [dashboardData, setDashboardData] = useState(null)
+  const [teamWorkload, setTeamWorkload] = useState([])
+  const [insights, setInsights] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [activeTab, setActiveTab] = useState('overview')
+
+  useEffect(() => {
+    if (id) {
+      loadProjectDashboard()
+    } else {
+      loadGlobalDashboard()
+    }
+  }, [id])
+
+  const loadProjectDashboard = async () => {
+    try {
+      setLoading(true)
+      const [projectData, dashData, workloadData] = await Promise.all([
+        projectsApi.get(id).catch(() => null),
+        dashboardApi.getProject(id).catch(() => null),
+        dashboardApi.getTeamWorkload().catch(() => ({ workload: [] }))
+      ])
+
+      setProject(projectData)
+      setDashboardData(dashData)
+      setTeamWorkload(workloadData.workload || [])
+    } catch (error) {
+      console.error('Failed to load project dashboard:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadGlobalDashboard = async () => {
+    try {
+      setLoading(true)
+      const [insightsData, workloadData, overdueData] = await Promise.all([
+        dashboardApi.getInsights().catch(() => null),
+        dashboardApi.getTeamWorkload().catch(() => ({ workload: [] })),
+        dashboardApi.getOverdue().catch(() => ({ overdue: [], count: 0 }))
+      ])
+
+      // Map insights data to dashboard format
+      setDashboardData({
+        taskStats: insightsData?.statusCounts || { open: 0, in_progress: 0, done: 0 },
+        priorityStats: insightsData?.priorityCounts || { high: 0, medium: 0, low: 0 },
+        overdueCount: overdueData?.count || insightsData?.metrics?.overdueItems || 0
+      })
+      setTeamWorkload(workloadData.workload || [])
+
+      // Generate insights from data
+      const generatedInsights = []
+      if (insightsData?.metrics?.overdueItems > 0) {
+        generatedInsights.push({
+          type: 'warning',
+          message: `You have ${insightsData.metrics.overdueItems} overdue action items that need attention.`
+        })
+      }
+      if (insightsData?.metrics?.overallCompletion > 75) {
+        generatedInsights.push({
+          type: 'success',
+          message: `Great progress! Your overall completion rate is ${insightsData.metrics.overallCompletion}%.`
+        })
+      }
+      if (insightsData?.priorityCounts?.high > 5) {
+        generatedInsights.push({
+          type: 'warning',
+          message: `You have ${insightsData.priorityCounts.high} high-priority tasks. Consider delegating or prioritizing.`
+        })
+      }
+      if (generatedInsights.length === 0 && insightsData?.metrics?.totalProjects > 0) {
+        generatedInsights.push({
+          type: 'info',
+          message: `You have ${insightsData.metrics.totalProjects} projects with ${insightsData.metrics.totalItems} total action items.`
+        })
+      }
+      setInsights(generatedInsights)
+    } catch (error) {
+      console.error('Failed to load dashboard:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    if (id) {
+      await loadProjectDashboard()
+    } else {
+      await loadGlobalDashboard()
+    }
+    setRefreshing(false)
+  }
+
+  // Prepare chart data
+  const getTaskStatusData = () => {
+    if (!dashboardData?.taskStats) return []
+    const stats = dashboardData.taskStats
+    return [
+      { name: 'To Do', value: stats.open || 0, color: STATUS_COLORS.open },
+      { name: 'In Progress', value: stats.in_progress || 0, color: STATUS_COLORS.in_progress },
+      { name: 'Done', value: stats.done || 0, color: STATUS_COLORS.done }
+    ]
+  }
+
+  const getPriorityData = () => {
+    if (!dashboardData?.priorityStats) return []
+    const stats = dashboardData.priorityStats
+    return [
+      { name: 'High', value: stats.high || 0, color: '#EF4444' },
+      { name: 'Medium', value: stats.medium || 0, color: '#F59E0B' },
+      { name: 'Low', value: stats.low || 0, color: '#10B981' }
+    ]
+  }
+
+  const getTeamWorkloadData = () => {
+    return teamWorkload.map(member => ({
+      name: member.team_member || 'Unassigned',
+      tasks: member.total_assigned || 0,
+      completed: member.completed_items || 0,
+      pending: (member.pending_items || 0) + (member.in_progress_items || 0)
+    }))
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-48 mb-4"></div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="h-24 bg-gray-200 rounded"></div>
+            ))}
+          </div>
+          <div className="h-64 bg-gray-200 rounded"></div>
+        </div>
+      </div>
+    )
+  }
+
+  const taskStatusData = getTaskStatusData()
+  const priorityData = getPriorityData()
+  const workloadData = getTeamWorkloadData()
+  const totalTasks = taskStatusData.reduce((sum, item) => sum + item.value, 0)
+  const completionRate = totalTasks > 0
+    ? Math.round((taskStatusData.find(s => s.name === 'Done')?.value || 0) / totalTasks * 100)
+    : 0
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-4">
+          {id && (
+            <Link to="/projects" className="p-2 hover:bg-gray-100 rounded-lg">
+              <ArrowLeft className="w-5 h-5" />
+            </Link>
+          )}
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">
+              {id ? (project?.name || 'Project Dashboard') : 'Project Dashboard'}
+            </h1>
+            <p className="text-gray-600">
+              {id ? 'Project analytics and task management' : 'Overview of all projects and tasks'}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="btn btn-secondary"
+        >
+          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          Refresh
+        </button>
+      </div>
+
+      {/* Tabs */}
+      <div className="border-b border-gray-200">
+        <nav className="flex gap-4">
+          {[
+            { id: 'overview', label: 'Overview', icon: BarChart3 },
+            { id: 'kanban', label: 'Kanban Board', icon: FolderKanban },
+            { id: 'team', label: 'Team Workload', icon: Users }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
+                activeTab === tab.id
+                  ? 'border-primary-500 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <tab.icon className="w-4 h-4" />
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {/* Overview Tab */}
+      {activeTab === 'overview' && (
+        <div className="space-y-6">
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="card p-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm text-gray-500">Total Tasks</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">{totalTasks}</p>
+                </div>
+                <div className="p-2 rounded-lg bg-blue-100">
+                  <CheckCircle2 className="w-5 h-5 text-blue-600" />
+                </div>
+              </div>
+            </div>
+
+            <div className="card p-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm text-gray-500">Completion Rate</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">{completionRate}%</p>
+                </div>
+                <div className="p-2 rounded-lg bg-green-100">
+                  <TrendingUp className="w-5 h-5 text-green-600" />
+                </div>
+              </div>
+              <div className="mt-3 h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-green-500 rounded-full transition-all"
+                  style={{ width: `${completionRate}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="card p-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm text-gray-500">In Progress</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">
+                    {taskStatusData.find(s => s.name === 'In Progress')?.value || 0}
+                  </p>
+                </div>
+                <div className="p-2 rounded-lg bg-blue-100">
+                  <Activity className="w-5 h-5 text-blue-600" />
+                </div>
+              </div>
+            </div>
+
+            <div className="card p-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm text-gray-500">Overdue</p>
+                  <p className={`text-2xl font-bold mt-1 ${
+                    (dashboardData?.overdueCount || 0) > 0 ? 'text-red-600' : 'text-gray-900'
+                  }`}>
+                    {dashboardData?.overdueCount || 0}
+                  </p>
+                </div>
+                <div className={`p-2 rounded-lg ${
+                  (dashboardData?.overdueCount || 0) > 0 ? 'bg-red-100' : 'bg-gray-100'
+                }`}>
+                  <AlertTriangle className={`w-5 h-5 ${
+                    (dashboardData?.overdueCount || 0) > 0 ? 'text-red-600' : 'text-gray-600'
+                  }`} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Charts Row */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Task Status Pie Chart */}
+            <div className="card p-5">
+              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <PieChart className="w-5 h-5 text-primary-500" />
+                Task Status Distribution
+              </h3>
+              {taskStatusData.length > 0 && totalTasks > 0 ? (
+                <ResponsiveContainer width="100%" height={250}>
+                  <RechartsPie>
+                    <Pie
+                      data={taskStatusData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    >
+                      {taskStatusData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </RechartsPie>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-[250px] flex items-center justify-center text-gray-400">
+                  No task data available
+                </div>
+              )}
+            </div>
+
+            {/* Priority Distribution */}
+            <div className="card p-5">
+              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-amber-500" />
+                Tasks by Priority
+              </h3>
+              {priorityData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={priorityData} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" />
+                    <YAxis dataKey="name" type="category" width={80} />
+                    <Tooltip />
+                    <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                      {priorityData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-[250px] flex items-center justify-center text-gray-400">
+                  No priority data available
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* AI Insights */}
+          {!id && insights.length > 0 && (
+            <div className="card p-5">
+              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-primary-500" />
+                AI Insights
+              </h3>
+              <div className="space-y-3">
+                {insights.map((insight, index) => (
+                  <div
+                    key={index}
+                    className={`p-4 rounded-lg ${
+                      insight.type === 'warning' ? 'bg-amber-50 border border-amber-200' :
+                      insight.type === 'success' ? 'bg-green-50 border border-green-200' :
+                      'bg-blue-50 border border-blue-200'
+                    }`}
+                  >
+                    <p className={`text-sm ${
+                      insight.type === 'warning' ? 'text-amber-700' :
+                      insight.type === 'success' ? 'text-green-700' :
+                      'text-blue-700'
+                    }`}>
+                      {insight.message}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Kanban Tab */}
+      {activeTab === 'kanban' && (
+        <KanbanBoard projectId={id} onTaskUpdate={handleRefresh} />
+      )}
+
+      {/* Team Workload Tab */}
+      {activeTab === 'team' && (
+        <div className="space-y-6">
+          {/* Team Workload Chart */}
+          <div className="card p-5">
+            <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <Users className="w-5 h-5 text-primary-500" />
+              Team Task Distribution
+            </h3>
+            {workloadData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={workloadData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="pending" name="Pending" fill="#F59E0B" stackId="stack" radius={[0, 0, 0, 0]} />
+                  <Bar dataKey="completed" name="Completed" fill="#10B981" stackId="stack" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-gray-400">
+                No team workload data available
+              </div>
+            )}
+          </div>
+
+          {/* Team Members Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {teamWorkload.map((member, index) => {
+              const memberCompletionRate = member.total_assigned > 0
+                ? Math.round((member.completed_items || 0) / member.total_assigned * 100)
+                : 0
+
+              return (
+                <div key={index} className="card p-5">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white font-semibold">
+                      {(member.team_member || 'U')[0].toUpperCase()}
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-gray-900">{member.team_member || 'Unassigned'}</h4>
+                      <p className="text-sm text-gray-500">{member.total_assigned} tasks</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500">Completion</span>
+                      <span className="font-medium">{memberCompletionRate}%</span>
+                    </div>
+                    <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-green-500 rounded-full transition-all"
+                        style={{ width: `${memberCompletionRate}%` }}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 pt-2">
+                      <div className="text-center p-2 bg-gray-50 rounded">
+                        <p className="text-lg font-semibold text-gray-700">{member.pending_items || 0}</p>
+                        <p className="text-xs text-gray-500">To Do</p>
+                      </div>
+                      <div className="text-center p-2 bg-blue-50 rounded">
+                        <p className="text-lg font-semibold text-blue-600">{member.in_progress_items || 0}</p>
+                        <p className="text-xs text-gray-500">Active</p>
+                      </div>
+                      <div className="text-center p-2 bg-green-50 rounded">
+                        <p className="text-lg font-semibold text-green-600">{member.completed_items || 0}</p>
+                        <p className="text-xs text-gray-500">Done</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+
+            {teamWorkload.length === 0 && (
+              <div className="col-span-full card p-8 text-center">
+                <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <h3 className="text-lg font-medium text-gray-900 mb-1">No team data</h3>
+                <p className="text-gray-500">Assign tasks to team members to see workload distribution</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

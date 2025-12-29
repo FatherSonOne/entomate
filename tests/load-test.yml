@@ -1,0 +1,151 @@
+# ========================================
+# Entomate Load Test Configuration
+# Week 8: Production Deployment
+# ========================================
+#
+# Artillery.io load testing configuration
+#
+# Installation:
+#   npm install -g artillery
+#
+# Usage:
+#   artillery run tests/load-test.yml
+#   artillery run tests/load-test.yml --output report.json
+#   artillery report report.json --output report.html
+#
+# Targets:
+#   Development: http://localhost:3000
+#   Staging: https://staging.yourdomain.com
+#   Production: https://api.yourdomain.com
+
+config:
+  target: "http://localhost:3000"
+
+  phases:
+    # Warm-up phase
+    - duration: 60
+      arrivalRate: 5
+      name: "Warm up"
+
+    # Ramp up load
+    - duration: 120
+      arrivalRate: 5
+      rampTo: 50
+      name: "Ramp up load"
+
+    # Sustained load
+    - duration: 300
+      arrivalRate: 50
+      name: "Sustained load"
+
+    # Spike test
+    - duration: 60
+      arrivalRate: 100
+      name: "Spike test"
+
+    # Cool down
+    - duration: 60
+      arrivalRate: 10
+      name: "Cool down"
+
+  defaults:
+    headers:
+      Content-Type: "application/json"
+      Accept: "application/json"
+
+  # Performance thresholds
+  ensure:
+    # 95th percentile response time < 500ms
+    - p95: 500
+    # 99th percentile response time < 1000ms
+    - p99: 1000
+    # Error rate < 1%
+    - maxErrorRate: 1
+
+  plugins:
+    expect: {}
+
+scenarios:
+  # ========================================
+  # Health Check Flow
+  # ========================================
+  - name: "Health Check"
+    weight: 20
+    flow:
+      - get:
+          url: "/health"
+          expect:
+            - statusCode: 200
+      - get:
+          url: "/health/status"
+          expect:
+            - statusCode: 200
+            - contentType: json
+
+  # ========================================
+  # API Health Check
+  # ========================================
+  - name: "API Health"
+    weight: 10
+    flow:
+      - get:
+          url: "/api/health"
+          expect:
+            - statusCode: 200
+            - contentType: json
+
+  # ========================================
+  # List Meetings
+  # ========================================
+  - name: "List Meetings"
+    weight: 25
+    flow:
+      - get:
+          url: "/api/meetings"
+          expect:
+            - statusCode: 200
+            - contentType: json
+
+  # ========================================
+  # Dashboard Summary
+  # ========================================
+  - name: "Dashboard Summary"
+    weight: 20
+    flow:
+      - get:
+          url: "/api/dashboard/summary"
+          expect:
+            - statusCode: 200
+            - contentType: json
+
+  # ========================================
+  # Search Flow
+  # ========================================
+  - name: "Search"
+    weight: 15
+    flow:
+      - post:
+          url: "/api/search"
+          json:
+            query: "meeting notes"
+            limit: 10
+          expect:
+            - statusCode: 200
+            - contentType: json
+
+  # ========================================
+  # Automations List
+  # ========================================
+  - name: "List Automations"
+    weight: 10
+    flow:
+      - get:
+          url: "/api/automations"
+          expect:
+            - statusCode: 200
+            - contentType: json
+      - get:
+          url: "/api/automations/templates"
+          expect:
+            - statusCode: 200
+            - contentType: json

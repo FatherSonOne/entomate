@@ -1,0 +1,914 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================
+   ENTOMATE DESIGN SYSTEM
+   Multiple Dev Tool Inspired Themes
+   High-contrast, professional developer aesthetics
+   ============================================ */
+
+/* Base Theme Variables - Cursor Inspired (Default) */
+:root {
+  /* Background Layers - Clean white backgrounds */
+  --bg-base: #ffffff;
+  --bg-surface: #fafbfc;
+  --bg-elevated: #ffffff;
+  --bg-muted: #f6f8fa;
+  --bg-subtle: #f1f3f4;
+
+  /* Text Hierarchy - High contrast */
+  --text-primary: #24292f;
+  --text-secondary: #57606a;
+  --text-tertiary: #7c858e;
+  --text-muted: #8b949e;
+
+  /* Border & Dividers - Subtle but visible */
+  --border-subtle: #d1d9e0;
+  --border-default: #d1d9e0;
+  --border-strong: #afb8c1;
+
+  /* Primary Accent - Cursor blue */
+  --accent-primary: #007acc;
+  --accent-primary-light: #4c9eff;
+  --accent-primary-dim: rgba(0, 122, 204, 0.1);
+  --accent-primary-glow: rgba(0, 122, 204, 0.3);
+
+  /* Secondary Accent - Green */
+  --accent-secondary: #28a745;
+  --accent-secondary-light: #34d058;
+  --accent-secondary-dim: rgba(40, 167, 69, 0.1);
+
+  /* Tertiary Accent - Purple */
+  --accent-tertiary: #6f42c1;
+  --accent-tertiary-light: #8b5cf6;
+  --accent-tertiary-dim: rgba(111, 66, 193, 0.1);
+
+  /* Data Visualization Palette */
+  --data-cyan: #79c0ff;
+  --data-pink: #f85149;
+  --data-orange: #d29922;
+  --data-purple: #bc8cff;
+  --data-green: #56d364;
+  --data-yellow: #d29922;
+  --data-blue: #79c0ff;
+
+  /* Semantic Colors */
+  --semantic-success: #238636;
+  --semantic-success-dim: rgba(35, 134, 54, 0.1);
+  --semantic-warning: #bb8009;
+  --semantic-warning-dim: rgba(187, 128, 9, 0.1);
+  --semantic-error: #da3633;
+  --semantic-error-dim: rgba(218, 54, 51, 0.1);
+  --semantic-info: #79c0ff;
+  --semantic-info-dim: rgba(121, 192, 255, 0.1);
+
+  /* Gradient Definitions */
+  --gradient-primary: linear-gradient(90deg, #007acc, #79c0ff);
+  --gradient-ai: linear-gradient(90deg, #6f42c1, #bc8cff);
+  --gradient-success: linear-gradient(90deg, #238636, #56d364);
+
+  /* Highlight color */
+  --highlight-color: #007acc;
+  --highlight-color-rgb: 0, 122, 204;
+}
+
+/* ============================================
+   THEME VARIANTS - Multiple Dev Tool Designs
+   ============================================ */
+
+/* Supabase Theme - Clean SaaS Green */
+[data-theme="supabase"] {
+  --bg-base: #ffffff;
+  --bg-surface: #fafafa;
+  --bg-elevated: #ffffff;
+  --bg-muted: #f5f5f5;
+  --bg-subtle: #f0f0f0;
+
+  --text-primary: #0f1419;
+  --text-secondary: #5c6c7f;
+  --text-tertiary: #8892a0;
+  --text-muted: #aab0b6;
+
+  --border-subtle: #e5e7eb;
+  --border-default: #d1d5db;
+  --border-strong: #9ca3af;
+
+  --accent-primary: #3ecf8e;
+  --accent-primary-light: #5ddb9f;
+  --accent-primary-dim: rgba(62, 207, 142, 0.1);
+  --accent-primary-glow: rgba(62, 207, 142, 0.3);
+
+  --accent-secondary: #1f2937;
+  --accent-secondary-light: #374151;
+  --accent-secondary-dim: rgba(31, 41, 55, 0.1);
+
+  --accent-tertiary: #6366f1;
+  --accent-tertiary-light: #818cf8;
+  --accent-tertiary-dim: rgba(99, 102, 241, 0.1);
+
+  --data-cyan: #06b6d4;
+  --data-pink: #ec4899;
+  --data-orange: #f97316;
+  --data-purple: #a855f7;
+  --data-green: #3ecf8e;
+  --data-yellow: #eab308;
+  --data-blue: #3b82f6;
+
+  --semantic-success: #3ecf8e;
+  --semantic-success-dim: rgba(62, 207, 142, 0.1);
+  --semantic-warning: #eab308;
+  --semantic-warning-dim: rgba(234, 179, 8, 0.1);
+  --semantic-error: #ef4444;
+  --semantic-error-dim: rgba(239, 68, 68, 0.1);
+  --semantic-info: #3b82f6;
+  --semantic-info-dim: rgba(59, 130, 246, 0.1);
+
+  --gradient-primary: linear-gradient(90deg, #3ecf8e, #5ddb9f);
+  --gradient-ai: linear-gradient(90deg, #a855f7, #c084fc);
+  --gradient-success: linear-gradient(90deg, #3ecf8e, #5ddb9f);
+
+  --highlight-color: #3ecf8e;
+  --highlight-color-rgb: 62, 207, 142;
+}
+
+/* VS Code Theme - Dark Professional */
+[data-theme="vscode"] {
+  --bg-base: #1e1e1e;
+  --bg-surface: #252526;
+  --bg-elevated: #2d2d30;
+  --bg-muted: #37373d;
+  --bg-subtle: #3e3e42;
+
+  --text-primary: #cccccc;
+  --text-secondary: #9cdcfe;
+  --text-tertiary: #808080;
+  --text-muted: #6c6c6c;
+
+  --border-subtle: #3e3e42;
+  --border-default: #454545;
+  --border-strong: #5c5c5c;
+
+  --accent-primary: #007acc;
+  --accent-primary-light: #4c9eff;
+  --accent-primary-dim: rgba(0, 122, 204, 0.2);
+  --accent-primary-glow: rgba(0, 122, 204, 0.4);
+
+  --accent-secondary: #4ec9b0;
+  --accent-secondary-light: #6dd6c2;
+  --accent-secondary-dim: rgba(78, 201, 176, 0.2);
+
+  --accent-tertiary: #c586c0;
+  --accent-tertiary-light: #d291d1;
+  --accent-tertiary-dim: rgba(197, 134, 192, 0.2);
+
+  --data-cyan: #4ec9b0;
+  --data-pink: #f48771;
+  --data-orange: #ce9178;
+  --data-purple: #c586c0;
+  --data-green: #6a9955;
+  --data-yellow: #dcdcaa;
+  --data-blue: #007acc;
+
+  --semantic-success: #6a9955;
+  --semantic-success-dim: rgba(106, 153, 85, 0.2);
+  --semantic-warning: #dcdcaa;
+  --semantic-warning-dim: rgba(220, 220, 170, 0.2);
+  --semantic-error: #f44747;
+  --semantic-error-dim: rgba(244, 71, 71, 0.2);
+  --semantic-info: #007acc;
+  --semantic-info-dim: rgba(0, 122, 204, 0.2);
+
+  --gradient-primary: linear-gradient(90deg, #007acc, #4c9eff);
+  --gradient-ai: linear-gradient(90deg, #c586c0, #d291d1);
+  --gradient-success: linear-gradient(90deg, #6a9955, #8ab573);
+
+  --highlight-color: #007acc;
+  --highlight-color-rgb: 0, 122, 204;
+}
+
+/* GitHub Theme - Modern Web App */
+[data-theme="github"] {
+  --bg-base: #ffffff;
+  --bg-surface: #f6f8fa;
+  --bg-elevated: #ffffff;
+  --bg-muted: #fafbfc;
+  --bg-subtle: #f1f3f4;
+
+  --text-primary: #24292f;
+  --text-secondary: #586069;
+  --text-tertiary: #6a737d;
+  --text-muted: #959da5;
+
+  --border-subtle: #e1e4e8;
+  --border-default: #d1d5db;
+  --border-strong: #c7ccd1;
+
+  --accent-primary: #0366d6;
+  --accent-primary-light: #2188ff;
+  --accent-primary-dim: rgba(3, 102, 214, 0.1);
+  --accent-primary-glow: rgba(3, 102, 214, 0.3);
+
+  --accent-secondary: #28a745;
+  --accent-secondary-light: #34d058;
+  --accent-secondary-dim: rgba(40, 167, 69, 0.1);
+
+  --accent-tertiary: #6f42c1;
+  --accent-tertiary-light: #8b5cf6;
+  --accent-tertiary-dim: rgba(111, 66, 193, 0.1);
+
+  --data-cyan: #79c0ff;
+  --data-pink: #f85149;
+  --data-orange: #d29922;
+  --data-purple: #b392f0;
+  --data-green: #56d364;
+  --data-yellow: #d29922;
+  --data-blue: #79c0ff;
+
+  --semantic-success: #28a745;
+  --semantic-success-dim: rgba(40, 167, 69, 0.1);
+  --semantic-warning: #ffd33d;
+  --semantic-warning-dim: rgba(255, 211, 61, 0.1);
+  --semantic-error: #d73a49;
+  --semantic-error-dim: rgba(215, 58, 73, 0.1);
+  --semantic-info: #0366d6;
+  --semantic-info-dim: rgba(3, 102, 214, 0.1);
+
+  --gradient-primary: linear-gradient(90deg, #0366d6, #2188ff);
+  --gradient-ai: linear-gradient(90deg, #6f42c1, #b392f0);
+  --gradient-success: linear-gradient(90deg, #28a745, #56d364);
+
+  --highlight-color: #0366d6;
+  --highlight-color-rgb: 3, 102, 214;
+}
+
+/* Dark Professional Theme - Modern Dark Mode */
+[data-theme="dark-pro"] {
+  --bg-base: #0f0f23;
+  --bg-surface: #1a1a2e;
+  --bg-elevated: #16213e;
+  --bg-muted: #0f3460;
+  --bg-subtle: #1a1a2e;
+
+  --text-primary: #ffffff;
+  --text-secondary: #b794f6;
+  --text-tertiary: #9f7aea;
+  --text-muted: #718096;
+
+  --border-subtle: #2d3748;
+  --border-default: #4a5568;
+  --border-strong: #718096;
+
+  --accent-primary: #3182ce;
+  --accent-primary-light: #63b3ed;
+  --accent-primary-dim: rgba(49, 130, 206, 0.2);
+  --accent-primary-glow: rgba(49, 130, 206, 0.4);
+
+  --accent-secondary: #38b2ac;
+  --accent-secondary-light: #68d391;
+  --accent-secondary-dim: rgba(56, 178, 172, 0.2);
+
+  --accent-tertiary: #d53f8c;
+  --accent-tertiary-light: #f687b3;
+  --accent-tertiary-dim: rgba(213, 63, 140, 0.2);
+
+  --data-cyan: #38b2ac;
+  --data-pink: #d53f8c;
+  --data-orange: #dd6b20;
+  --data-purple: #9f7aea;
+  --data-green: #38a169;
+  --data-yellow: #d69e2e;
+  --data-blue: #3182ce;
+
+  --semantic-success: #38a169;
+  --semantic-success-dim: rgba(56, 161, 105, 0.2);
+  --semantic-warning: #d69e2e;
+  --semantic-warning-dim: rgba(214, 158, 46, 0.2);
+  --semantic-error: #e53e3e;
+  --semantic-error-dim: rgba(229, 62, 62, 0.2);
+  --semantic-info: #3182ce;
+  --semantic-info-dim: rgba(49, 130, 206, 0.2);
+
+  --gradient-primary: linear-gradient(90deg, #3182ce, #63b3ed);
+  --gradient-ai: linear-gradient(90deg, #9f7aea, #b794f6);
+  --gradient-success: linear-gradient(90deg, #38a169, #68d391);
+
+  --highlight-color: #3182ce;
+  --highlight-color-rgb: 49, 130, 206;
+}
+
+/* Legacy Light Mode - Fallback */
+.light {
+  --bg-base: #FFFFFF;
+  --bg-surface: #FAFAFA;
+  --bg-elevated: #FFFFFF;
+  --bg-muted: #F4F4F5;
+  --bg-subtle: #E4E4E7;
+
+  --text-primary: #18181B;
+  --text-secondary: #52525B;
+  --text-tertiary: #71717A;
+  --text-muted: #A1A1AA;
+
+  --border-subtle: #E4E4E7;
+  --border-default: #D4D4D8;
+  --border-strong: #A1A1AA;
+
+  --accent-primary: #16A34A;
+  --accent-primary-light: #22C55E;
+  --accent-secondary: #1D4ED8;
+  --accent-secondary-light: #2563EB;
+}
+
+/* Custom base styles */
+@layer base {
+  html {
+    @apply scroll-smooth;
+  }
+
+  /* Light mode (default) */
+  body {
+    background-color: var(--bg-base);
+    color: var(--text-primary);
+    @apply antialiased transition-colors duration-300;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  }
+
+  /* Dark mode */
+  .dark body { /* Legacy - now uses variables */
+    @apply bg-nothing-950 text-nothing-100;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+  }
+
+  /* CMF Nothing style: visible structure elements */
+  .dark ::selection {
+    background: rgba(var(--highlight-color-rgb), 0.3);
+  }
+
+  ::selection {
+    background: rgba(var(--highlight-color-rgb), 0.2);
+  }
+}
+
+/* Custom component styles */
+@layer components {
+  /* ============================================
+     CMF NOTHING STYLE: Buttons
+     - Clean, minimal with highlight accents
+     - Visible borders, subtle shadows
+     ============================================ */
+  .btn {
+    @apply px-4 py-2 rounded-lg font-medium transition-all duration-200 inline-flex items-center justify-center gap-2;
+  }
+
+  .btn-primary {
+    background-color: var(--highlight-color);
+    @apply text-white hover:opacity-90 active:opacity-80 shadow-sm;
+  }
+
+  .btn-secondary {
+    @apply bg-white text-nothing-700 border border-nothing-300 hover:bg-nothing-50 active:bg-nothing-100;
+  }
+
+  .dark .btn-secondary {
+    @apply bg-nothing-800 text-nothing-200 border-nothing-600 hover:bg-nothing-700 active:bg-nothing-600;
+  }
+
+  .btn-danger {
+    @apply bg-red-600 text-white hover:bg-red-700 active:bg-red-800;
+  }
+
+  .btn-ghost {
+    @apply text-nothing-600 hover:bg-nothing-100 active:bg-nothing-200;
+  }
+
+  .dark .btn-ghost {
+    @apply text-nothing-400 hover:bg-nothing-800 active:bg-nothing-700;
+  }
+
+  .btn-icon {
+    @apply p-2 rounded-lg;
+  }
+
+  /* Highlight button - uses the dynamic accent color */
+  .btn-highlight {
+    background-color: var(--highlight-color);
+    @apply text-white hover:opacity-90 shadow-highlight-glow;
+  }
+
+  /* ============================================
+     CARDS - Data Dashboard Style
+     Subtle borders, dark surfaces
+     ============================================ */
+  .card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    @apply rounded-lg transition-all duration-200;
+  }
+
+  .card:hover {
+    border-color: var(--border-default);
+  }
+
+  /* Card with highlight border */
+  .card-highlight {
+    border-color: var(--highlight-color);
+    box-shadow: 0 0 0 1px var(--highlight-color), 0 0 20px rgba(var(--highlight-color-rgb), 0.15);
+  }
+
+  /* Card with glow effect on hover */
+  .card-glow:hover {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 25px rgba(var(--highlight-color-rgb), 0.2);
+  }
+
+  /* Elevated card variant */
+  .card-elevated {
+    background: var(--bg-elevated);
+    border-color: var(--border-default);
+  }
+
+  /* ============================================
+     CMF NOTHING STYLE: Inputs
+     - Minimal, clean with focus highlight
+     ============================================ */
+  .input {
+    @apply w-full px-4 py-2.5 border border-nothing-300 rounded-lg text-nothing-900 placeholder-nothing-400
+           focus:outline-none focus:ring-2 focus:border-transparent transition-all bg-white;
+    --tw-ring-color: var(--highlight-color);
+  }
+
+  .dark .input {
+    @apply bg-nothing-800 border-nothing-600 text-nothing-100 placeholder-nothing-500;
+  }
+
+  .label {
+    @apply block text-sm font-medium text-nothing-700 mb-1.5;
+  }
+
+  .dark .label {
+    @apply text-nothing-300;
+  }
+
+  /* ============================================
+     DATA-RICH BADGES & PILLS
+     Dark background with colored text
+     ============================================ */
+  .badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium font-mono;
+  }
+
+  .badge-success {
+    background: rgba(62, 207, 142, 0.15);
+    color: var(--data-green);
+  }
+
+  .badge-warning {
+    background: rgba(250, 204, 21, 0.15);
+    color: var(--data-yellow);
+  }
+
+  .badge-error {
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--semantic-error);
+  }
+
+  .badge-info {
+    background: rgba(59, 130, 246, 0.15);
+    color: var(--data-blue);
+  }
+
+  .badge-gray {
+    background: var(--bg-muted);
+    color: var(--text-secondary);
+  }
+
+  .badge-cyan {
+    background: rgba(34, 211, 238, 0.15);
+    color: var(--data-cyan);
+  }
+
+  .badge-pink {
+    background: rgba(236, 72, 153, 0.15);
+    color: var(--data-pink);
+  }
+
+  .badge-purple {
+    background: rgba(168, 85, 247, 0.15);
+    color: var(--data-purple);
+  }
+
+  .badge-orange {
+    background: rgba(249, 115, 22, 0.15);
+    color: var(--data-orange);
+  }
+
+  /* Badge with highlight color */
+  .badge-highlight {
+    background-color: rgba(var(--highlight-color-rgb), 0.12);
+    color: var(--highlight-color);
+  }
+
+  /* Pill style (more rounded, used for types) */
+  .pill {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono;
+    background: var(--bg-muted);
+    color: var(--text-primary);
+  }
+
+  .pill-dot {
+    @apply w-1.5 h-1.5 rounded-full;
+  }
+
+  /* ============================================
+     PROGRESS BARS WITH GRADIENTS
+     ============================================ */
+  .progress-bar {
+    @apply h-2 rounded-full overflow-hidden;
+    background: var(--bg-muted);
+  }
+
+  .progress-bar-fill {
+    @apply h-full rounded-full transition-all duration-500;
+  }
+
+  .progress-gradient-primary {
+    background: var(--gradient-primary);
+    box-shadow: 0 0 12px rgba(236, 72, 153, 0.4);
+  }
+
+  .progress-gradient-ai {
+    background: var(--gradient-ai);
+    box-shadow: 0 0 12px rgba(168, 85, 247, 0.4);
+  }
+
+  .progress-gradient-success {
+    background: var(--gradient-success);
+    box-shadow: 0 0 12px rgba(62, 207, 142, 0.4);
+  }
+
+  .progress-solid-green {
+    background: var(--data-green);
+    box-shadow: 0 0 8px rgba(62, 207, 142, 0.5);
+  }
+
+  .progress-solid-pink {
+    background: var(--data-pink);
+    box-shadow: 0 0 8px rgba(236, 72, 153, 0.5);
+  }
+
+  /* ============================================
+     DATA LIST ITEMS (dense, hover effect)
+     ============================================ */
+  .data-list-item {
+    @apply flex items-center justify-between p-3 transition-colors;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .data-list-item:hover {
+    background: var(--bg-elevated);
+  }
+
+  .data-list-item:last-child {
+    border-bottom: none;
+  }
+
+  /* ============================================
+     DATA CARDS (subtle border, elevated on hover)
+     ============================================ */
+  .data-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    @apply rounded-lg transition-all duration-200;
+  }
+
+  .data-card:hover {
+    border-color: var(--border-default);
+    background: var(--bg-elevated);
+  }
+
+  .data-card-header {
+    @apply px-4 py-3 font-medium text-sm;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  /* ============================================
+     STAT DISPLAY (big mono numbers)
+     ============================================ */
+  .stat-value {
+    @apply text-2xl font-mono font-bold;
+    color: var(--text-primary);
+  }
+
+  .stat-label {
+    @apply text-xs font-medium uppercase tracking-wider;
+    color: var(--text-tertiary);
+  }
+
+  .stat-unit {
+    @apply text-sm font-mono;
+    color: var(--text-secondary);
+  }
+
+  /* ============================================
+     CMF NOTHING STYLE: Sidebar Navigation
+     - Clean lines, highlight on active
+     ============================================ */
+  .nav-item {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-nothing-600
+           hover:bg-nothing-100 hover:text-nothing-900 transition-colors;
+  }
+
+  .dark .nav-item {
+    @apply text-nothing-400 hover:bg-nothing-800 hover:text-nothing-100;
+  }
+
+  .nav-item-active {
+    background-color: rgba(var(--highlight-color-rgb), 0.1);
+    color: var(--highlight-color);
+    @apply hover:bg-opacity-20;
+  }
+
+  .dark .nav-item-active {
+    background-color: rgba(var(--highlight-color-rgb), 0.15);
+    color: var(--highlight-color);
+  }
+
+  /* ============================================
+     CMF NOTHING STYLE: Tables
+     ============================================ */
+  .table {
+    @apply w-full text-left;
+  }
+
+  .table th {
+    @apply px-4 py-3 text-xs font-semibold text-nothing-500 uppercase tracking-wider
+           bg-nothing-50 border-b border-nothing-200;
+  }
+
+  .dark .table th {
+    @apply bg-nothing-900 text-nothing-400 border-nothing-700;
+  }
+
+  .table td {
+    @apply px-4 py-3 border-b border-nothing-100;
+  }
+
+  .dark .table td {
+    @apply border-nothing-800;
+  }
+
+  .table tr:hover td {
+    @apply bg-nothing-50;
+  }
+
+  .dark .table tr:hover td {
+    @apply bg-nothing-800/50;
+  }
+
+  /* ============================================
+     Priority & Status Indicators
+     ============================================ */
+  .priority-high {
+    @apply text-red-600;
+  }
+  .dark .priority-high {
+    @apply text-red-400;
+  }
+
+  .priority-medium {
+    @apply text-yellow-600;
+  }
+  .dark .priority-medium {
+    @apply text-yellow-400;
+  }
+
+  .priority-low {
+    @apply text-green-600;
+  }
+  .dark .priority-low {
+    @apply text-green-400;
+  }
+
+  .status-open {
+    @apply bg-blue-100 text-blue-800;
+  }
+  .dark .status-open {
+    @apply bg-blue-900/30 text-blue-400;
+  }
+
+  .status-in_progress {
+    @apply bg-yellow-100 text-yellow-800;
+  }
+  .dark .status-in_progress {
+    @apply bg-yellow-900/30 text-yellow-400;
+  }
+
+  .status-done {
+    @apply bg-green-100 text-green-800;
+  }
+  .dark .status-done {
+    @apply bg-green-900/30 text-green-400;
+  }
+
+  .status-blocked {
+    @apply bg-red-100 text-red-800;
+  }
+  .dark .status-blocked {
+    @apply bg-red-900/30 text-red-400;
+  }
+
+  /* Sentiment indicators */
+  .sentiment-positive {
+    @apply text-green-600;
+  }
+  .dark .sentiment-positive {
+    @apply text-green-400;
+  }
+
+  .sentiment-neutral {
+    @apply text-nothing-600;
+  }
+  .dark .sentiment-neutral {
+    @apply text-nothing-400;
+  }
+
+  .sentiment-negative {
+    @apply text-red-600;
+  }
+  .dark .sentiment-negative {
+    @apply text-red-400;
+  }
+
+  /* ============================================
+     CMF NOTHING STYLE: Theme Toggle
+     ============================================ */
+  .theme-toggle {
+    @apply relative w-14 h-7 rounded-full transition-colors duration-300 cursor-pointer;
+    background-color: var(--highlight-color);
+  }
+
+  .theme-toggle-knob {
+    @apply absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-white shadow-md
+           transition-transform duration-300 flex items-center justify-center;
+  }
+
+  .theme-toggle.light .theme-toggle-knob {
+    @apply translate-x-0;
+  }
+
+  .theme-toggle.dark .theme-toggle-knob {
+    @apply translate-x-7;
+  }
+
+  /* ============================================
+     CMF NOTHING STYLE: Color Selector
+     ============================================ */
+  .color-swatch {
+    @apply w-10 h-10 rounded-full cursor-pointer transition-all duration-200
+           border-2 border-transparent hover:scale-110;
+  }
+
+  .color-swatch.active {
+    @apply ring-2 ring-offset-2 ring-nothing-900;
+  }
+
+  .dark .color-swatch.active {
+    @apply ring-nothing-100;
+  }
+
+  /* ============================================
+     CMF NOTHING STYLE: Sidebar
+     ============================================ */
+  .sidebar {
+    @apply bg-white border-r border-nothing-200 transition-colors duration-300;
+  }
+
+  .dark .sidebar {
+    @apply bg-nothing-900 border-nothing-800;
+  }
+
+  /* ============================================
+     CMF NOTHING STYLE: Header
+     ============================================ */
+  .header {
+    @apply bg-white border-b border-nothing-200 transition-colors duration-300;
+  }
+
+  .dark .header {
+    @apply bg-nothing-900 border-nothing-800;
+  }
+}
+
+/* Custom utilities */
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #d1d5db transparent;
+  }
+
+  .dark .scrollbar-thin {
+    scrollbar-color: #52525b transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: #d1d5db;
+    border-radius: 3px;
+  }
+
+  .dark .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: #52525b;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: #9ca3af;
+  }
+
+  .dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: #71717a;
+  }
+
+  /* Animation for recording indicator */
+  @keyframes recording-pulse {
+    0%, 100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.5;
+      transform: scale(1.1);
+    }
+  }
+
+  .animate-recording {
+    animation: recording-pulse 1.5s ease-in-out infinite;
+  }
+
+  /* Loading spinner */
+  .spinner {
+    @apply w-5 h-5 border-2 border-nothing-200 rounded-full;
+    border-top-color: var(--highlight-color);
+    animation: spin 0.8s linear infinite;
+  }
+
+  .dark .spinner {
+    @apply border-nothing-700;
+    border-top-color: var(--highlight-color);
+  }
+
+  /* Transition classes */
+  .transition-height {
+    transition: height 0.3s ease-in-out;
+  }
+
+  /* CMF Nothing style: Glow effect on focus/hover */
+  .glow-highlight {
+    box-shadow: 0 0 15px rgba(var(--highlight-color-rgb), 0.3);
+  }
+
+  .glow-highlight-strong {
+    box-shadow: 0 0 25px rgba(var(--highlight-color-rgb), 0.5);
+  }
+
+  /* CMF Nothing style: Dot pattern background */
+  .dot-pattern {
+    background-image: radial-gradient(circle, var(--highlight-color) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+
+  .dark .dot-pattern {
+    opacity: 0.3;
+  }
+
+  /* Text with highlight color */
+  .text-highlight {
+    color: var(--highlight-color);
+  }
+
+  /* Border with highlight color */
+  .border-highlight {
+    border-color: var(--highlight-color);
+  }
+
+  /* Background with highlight color */
+  .bg-highlight {
+    background-color: var(--highlight-color);
+  }
+
+  .bg-highlight-light {
+    background-color: rgba(var(--highlight-color-rgb), 0.1);
+  }
+}

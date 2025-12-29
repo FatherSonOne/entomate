@@ -1,0 +1,199 @@
+{
+  "entities": [
+    {
+      "name": "entomate_project",
+      "entityType": "project",
+      "observations": [
+        "Entomate is an AI-powered meeting intelligence platform",
+        "Tech stack: Node.js/Express backend, React frontend, Supabase database",
+        "Uses AI agents for task assignment, priority, deadline, and follow-up detection",
+        "Has automation engine with scheduling and retry logic",
+        "Production deployment uses Docker and AWS ECS Fargate"
+      ]
+    },
+    {
+      "name": "agent_orchestration",
+      "entityType": "workflow_pattern",
+      "observations": [
+        "Use 5 specialized agents: ARCHITECT, BUILDER, QUALITY CHECKER, DEPLOYMENT SPECIALIST, LEARNING RECORDER",
+        "Switch agents mid-response based on task context",
+        "New Feature workflow: ARCHITECT -> BUILDER -> QUALITY -> DEPLOY -> LEARNING",
+        "Bug Fix workflow: QUALITY -> BUILDER -> QUALITY -> DEPLOY -> LEARNING",
+        "Database Change workflow: ARCHITECT -> BUILDER -> QUALITY -> BUILDER -> DEPLOY -> LEARNING"
+      ]
+    },
+    {
+      "name": "architect_agent",
+      "entityType": "agent",
+      "observations": [
+        "Use for high-level planning and structure decisions",
+        "Triggers: Starting new feature, refactoring, planning database changes",
+        "Output: Comprehensive technical plan with numbered steps",
+        "Creates implementation plans including: database changes, files to create/modify, services, UI components"
+      ]
+    },
+    {
+      "name": "builder_agent",
+      "entityType": "agent",
+      "observations": [
+        "Use for writing actual implementation code",
+        "Triggers: Building features, creating components, writing services",
+        "Output: Complete, ready-to-use code for specific files",
+        "Must match existing code patterns and include error handling"
+      ]
+    },
+    {
+      "name": "quality_checker_agent",
+      "entityType": "agent",
+      "observations": [
+        "Use for testing, debugging, and code review",
+        "Triggers: After writing code, encountering errors, before commits",
+        "Checks: TypeScript errors, error handling, bugs, performance, security, accessibility",
+        "Output: Specific issues found and how to fix them"
+      ]
+    },
+    {
+      "name": "deployment_specialist_agent",
+      "entityType": "agent",
+      "observations": [
+        "Use for Git workflow and deployment preparation",
+        "Triggers: Ready to deploy, CI/CD setup, environment variables",
+        "Output: Step-by-step terminal commands for git, push, verify",
+        "Includes pre/post deployment verification steps"
+      ]
+    },
+    {
+      "name": "learning_recorder_agent",
+      "entityType": "agent",
+      "observations": [
+        "Use for documenting patterns and building knowledge",
+        "Triggers: After solving difficult problems, discovering useful patterns, end of sessions",
+        "Output: Documentation with learnings, patterns to reuse, pitfalls to avoid",
+        "Updates knowledge base in CLAUDE.md or PATTERNS.md"
+      ]
+    },
+    {
+      "name": "sql_migration_protocol",
+      "entityType": "best_practice",
+      "observations": [
+        "PAUSE when SQL migrations are needed",
+        "Provide SQL script in copy/paste format",
+        "User runs SQL manually in Supabase dashboard",
+        "Continue with TypeScript type updates after confirmation",
+        "Include RLS policies and indexes in migrations"
+      ]
+    },
+    {
+      "name": "code_patterns",
+      "entityType": "best_practice",
+      "observations": [
+        "API routes: router + middleware + try/catch + proper responses",
+        "Services: class-based with async methods and error logging",
+        "React components: hooks for state, loading/error states, async data fetching",
+        "Always include proper error handling and logging",
+        "Use consistent naming conventions throughout"
+      ]
+    },
+    {
+      "name": "context_preservation",
+      "entityType": "best_practice",
+      "observations": [
+        "Always reference previous agent outputs in subsequent steps",
+        "Batch similar tasks together for efficiency",
+        "Maintain state between sessions using CLAUDE.md",
+        "Create session notes at end of development sessions",
+        "Document completed work in version control"
+      ]
+    },
+    {
+      "name": "pre_deployment_checklist",
+      "entityType": "checklist",
+      "observations": [
+        "TypeScript builds without errors",
+        "No console.errors in code",
+        "Environment variables documented",
+        "Database migrations tested",
+        "RLS policies secure",
+        "Mobile responsive",
+        "Loading states present",
+        "Error handling complete"
+      ]
+    },
+    {
+      "name": "week7_patterns",
+      "entityType": "learned_pattern",
+      "observations": [
+        "Scheduled automation with node-cron in automationScheduler.js",
+        "3-step wizard UI for automation builder (AutomationBuilder.jsx)",
+        "Dry-run testing returns preview results without executing",
+        "Follow-up detection uses pattern matching + AI enhancement",
+        "Retry logic with exponential backoff for failed actions"
+      ]
+    },
+    {
+      "name": "week8_patterns",
+      "entityType": "learned_pattern",
+      "observations": [
+        "Rate limiting per endpoint type (auth=10/15min, AI=10/min, general=100/min)",
+        "Helmet security headers configuration",
+        "Winston structured logging with JSON format",
+        "Sentry error tracking integration",
+        "Docker multi-stage builds for smaller images",
+        "Artillery for load and smoke testing",
+        "Terraform for AWS ECS/Fargate infrastructure"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "from": "entomate_project",
+      "to": "agent_orchestration",
+      "relationType": "uses"
+    },
+    {
+      "from": "agent_orchestration",
+      "to": "architect_agent",
+      "relationType": "includes"
+    },
+    {
+      "from": "agent_orchestration",
+      "to": "builder_agent",
+      "relationType": "includes"
+    },
+    {
+      "from": "agent_orchestration",
+      "to": "quality_checker_agent",
+      "relationType": "includes"
+    },
+    {
+      "from": "agent_orchestration",
+      "to": "deployment_specialist_agent",
+      "relationType": "includes"
+    },
+    {
+      "from": "agent_orchestration",
+      "to": "learning_recorder_agent",
+      "relationType": "includes"
+    },
+    {
+      "from": "entomate_project",
+      "to": "sql_migration_protocol",
+      "relationType": "follows"
+    },
+    {
+      "from": "entomate_project",
+      "to": "code_patterns",
+      "relationType": "follows"
+    },
+    {
+      "from": "entomate_project",
+      "to": "week7_patterns",
+      "relationType": "learned"
+    },
+    {
+      "from": "entomate_project",
+      "to": "week8_patterns",
+      "relationType": "learned"
+    }
+  ]
+}
