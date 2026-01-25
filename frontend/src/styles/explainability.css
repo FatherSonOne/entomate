@@ -1,0 +1,781 @@
+/**
+ * AI Explainability Layer - CSS Styles
+ * Comprehensive styling for transparent AI decision explanations
+ */
+
+/* ========================================
+   Explanation Card
+   ======================================== */
+
+.explanation-card {
+  background: #F9FAFB;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  padding: 16px;
+  margin: 16px 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.explanation-card.expanded {
+  background: #FFFFFF;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+}
+
+/* ========================================
+   Header
+   ======================================== */
+
+.recommendation-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.recommendation-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ========================================
+   Confidence Badge
+   ======================================== */
+
+.confidence-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.confidence-badge.high {
+  background: #D1FAE5;
+  color: #065F46;
+}
+
+.confidence-badge.medium {
+  background: #FEF3C7;
+  color: #92400E;
+}
+
+.confidence-badge.low {
+  background: #FEE2E2;
+  color: #991B1B;
+}
+
+.confidence-icon {
+  font-size: 12px;
+}
+
+.confidence-score {
+  font-weight: 600;
+}
+
+/* ========================================
+   Concise Factors View
+   ======================================== */
+
+.factors-concise {
+  margin-bottom: 16px;
+}
+
+.factors-concise h4 {
+  font-size: 14px;
+  font-weight: 500;
+  color: #6B7280;
+  margin-bottom: 12px;
+}
+
+/* ========================================
+   Factor List
+   ======================================== */
+
+.factor-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.factor-list.compact {
+  gap: 4px;
+}
+
+/* ========================================
+   Compact Factor (Concise View)
+   ======================================== */
+
+.factor-compact {
+  display: flex;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #E5E7EB;
+  gap: 12px;
+}
+
+.factor-compact:last-child {
+  border-bottom: none;
+}
+
+.factor-name {
+  font-weight: 500;
+  color: #111827;
+  font-size: 14px;
+}
+
+.factor-summary {
+  color: #6B7280;
+  font-size: 14px;
+  flex: 1;
+  margin-left: auto;
+}
+
+/* ========================================
+   Impact Icons
+   ======================================== */
+
+.impact-icon {
+  margin: 0 4px;
+  font-size: 18px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+}
+
+.impact-icon.impact-strong {
+  color: #10B981;
+}
+
+.impact-icon.impact-moderate {
+  color: #F59E0B;
+}
+
+.impact-icon.impact-weak {
+  color: #EF4444;
+}
+
+/* ========================================
+   Expanded View
+   ======================================== */
+
+.explanation-expanded {
+  animation: expandIn 0.3s ease-in-out;
+  overflow: hidden;
+}
+
+@keyframes expandIn {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 2000px;
+  }
+}
+
+.factors-detailed {
+  margin-bottom: 20px;
+}
+
+.factors-detailed h4 {
+  font-size: 15px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 16px;
+}
+
+/* ========================================
+   Detailed Factor
+   ======================================== */
+
+.factor-detailed {
+  margin: 12px 0;
+  padding: 16px;
+  background: #F9FAFB;
+  border-radius: 8px;
+  border: 1px solid #E5E7EB;
+}
+
+.factor-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+  gap: 8px;
+}
+
+.factor-rank {
+  font-weight: 600;
+  color: #6B7280;
+  min-width: 20px;
+}
+
+.factor-weight {
+  color: #9CA3AF;
+  font-size: 13px;
+  margin-left: 4px;
+}
+
+.factor-score {
+  margin-left: auto;
+  font-weight: 600;
+  font-size: 16px;
+  color: #111827;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.factor-details {
+  margin-top: 12px;
+  padding-left: 28px;
+}
+
+.detail-item {
+  font-size: 14px;
+  color: #4B5563;
+  padding: 4px 0;
+  line-height: 1.5;
+}
+
+/* ========================================
+   Progress Bar
+   ======================================== */
+
+.progress-bar-container {
+  margin: 10px 0;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: #E5E7EB;
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 4px;
+}
+
+.progress-bar-fill.high {
+  background: linear-gradient(90deg, #10B981 0%, #059669 100%);
+}
+
+.progress-bar-fill.medium {
+  background: linear-gradient(90deg, #F59E0B 0%, #D97706 100%);
+}
+
+.progress-bar-fill.low {
+  background: linear-gradient(90deg, #EF4444 0%, #DC2626 100%);
+}
+
+.progress-label {
+  font-size: 10px;
+  color: white;
+  font-weight: 600;
+}
+
+/* ========================================
+   Divider
+   ======================================== */
+
+.divider {
+  height: 1px;
+  background: #E5E7EB;
+  margin: 24px 0;
+}
+
+/* ========================================
+   Alternatives
+   ======================================== */
+
+.alternatives {
+  margin-top: 20px;
+}
+
+.alternatives h4 {
+  font-size: 15px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 16px;
+}
+
+.alternatives-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.no-alternatives {
+  color: #9CA3AF;
+  font-size: 14px;
+  font-style: italic;
+  padding: 12px;
+  text-align: center;
+}
+
+.alternative-item {
+  padding: 14px;
+  background: #F9FAFB;
+  border-radius: 8px;
+  border: 1px solid #E5E7EB;
+  transition: all 0.2s ease;
+}
+
+.alternative-item:hover {
+  background: #F3F4F6;
+  border-color: #D1D5DB;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.alternative-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+  gap: 8px;
+}
+
+.alternative-rank {
+  font-weight: 600;
+  color: #6B7280;
+  min-width: 20px;
+}
+
+.alternative-name {
+  font-weight: 500;
+  color: #111827;
+  flex: 1;
+}
+
+.alternative-score {
+  color: #6B7280;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.alternative-reason {
+  font-size: 14px;
+  color: #6B7280;
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.alternative-reason strong {
+  color: #4B5563;
+}
+
+/* ========================================
+   Action Buttons
+   ======================================== */
+
+.explanation-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.btn-primary,
+.btn-secondary,
+.btn-expand,
+.btn-select-alternative {
+  padding: 10px 16px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background: #3B82F6;
+  color: white;
+  flex: 1;
+  min-width: 140px;
+}
+
+.btn-primary:hover {
+  background: #2563EB;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+}
+
+.btn-primary:active {
+  background: #1D4ED8;
+}
+
+.btn-secondary {
+  background: #6B7280;
+  color: white;
+  flex: 1;
+  min-width: 120px;
+}
+
+.btn-secondary:hover {
+  background: #4B5563;
+  box-shadow: 0 2px 4px rgba(107, 114, 128, 0.3);
+}
+
+.btn-secondary:active {
+  background: #374151;
+}
+
+.btn-expand {
+  background: transparent;
+  color: #3B82F6;
+  padding: 10px 16px;
+  border: 1px solid #3B82F6;
+  margin-left: auto;
+}
+
+.btn-expand:hover {
+  background: #EFF6FF;
+  border-color: #2563EB;
+}
+
+.btn-expand:active {
+  background: #DBEAFE;
+}
+
+.btn-select-alternative {
+  background: #FFFFFF;
+  color: #3B82F6;
+  border: 1px solid #3B82F6;
+  font-size: 13px;
+  padding: 8px 14px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.btn-select-alternative:hover {
+  background: #EFF6FF;
+  border-color: #2563EB;
+}
+
+.btn-select-alternative:active {
+  background: #DBEAFE;
+}
+
+/* ========================================
+   Responsive Design
+   ======================================== */
+
+@media (max-width: 768px) {
+  .explanation-card {
+    padding: 14px;
+  }
+
+  .recommendation-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .explanation-actions {
+    flex-direction: column;
+  }
+
+  .btn-expand {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .factor-header {
+    flex-wrap: wrap;
+  }
+
+  .factor-score {
+    width: 100%;
+    margin-top: 8px;
+    justify-content: flex-start;
+  }
+
+  .alternative-header {
+    flex-wrap: wrap;
+  }
+
+  .confidence-badge {
+    font-size: 12px;
+    padding: 5px 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .explanation-card {
+    padding: 12px;
+    margin: 12px 0;
+  }
+
+  .recommendation-title {
+    font-size: 15px;
+  }
+
+  .factor-name {
+    font-size: 13px;
+  }
+
+  .factor-summary {
+    font-size: 13px;
+  }
+
+  .detail-item {
+    font-size: 13px;
+  }
+
+  .btn-primary,
+  .btn-secondary,
+  .btn-expand {
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+}
+
+/* ========================================
+   Dark Mode Support (Optional)
+   ======================================== */
+
+@media (prefers-color-scheme: dark) {
+  .explanation-card {
+    background: #1F2937;
+    border-color: #374151;
+  }
+
+  .explanation-card.expanded {
+    background: #111827;
+  }
+
+  .recommendation-title {
+    color: #F9FAFB;
+  }
+
+  .factor-compact {
+    border-color: #374151;
+  }
+
+  .factor-name {
+    color: #F9FAFB;
+  }
+
+  .factor-summary {
+    color: #9CA3AF;
+  }
+
+  .factor-detailed {
+    background: #1F2937;
+    border-color: #374151;
+  }
+
+  .factor-rank {
+    color: #9CA3AF;
+  }
+
+  .factor-score {
+    color: #F9FAFB;
+  }
+
+  .detail-item {
+    color: #D1D5DB;
+  }
+
+  .alternative-item {
+    background: #1F2937;
+    border-color: #374151;
+  }
+
+  .alternative-item:hover {
+    background: #374151;
+    border-color: #4B5563;
+  }
+
+  .alternative-name {
+    color: #F9FAFB;
+  }
+
+  .alternative-reason {
+    color: #9CA3AF;
+  }
+
+  .alternative-reason strong {
+    color: #D1D5DB;
+  }
+
+  .divider {
+    background: #374151;
+  }
+
+  .factors-concise h4,
+  .factors-detailed h4,
+  .alternatives h4 {
+    color: #F9FAFB;
+  }
+}
+
+/* ========================================
+   Feedback Component
+   ======================================== */
+
+.explanation-feedback {
+  margin-top: 16px;
+  padding: 16px;
+  background: #F9FAFB;
+  border-radius: 8px;
+  border: 1px solid #E5E7EB;
+}
+
+.feedback-header h5 {
+  font-size: 14px;
+  font-weight: 500;
+  color: #111827;
+  margin-bottom: 12px;
+}
+
+.feedback-buttons {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.feedback-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border: 2px solid #E5E7EB;
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  font-weight: 500;
+  color: #6B7280;
+}
+
+.feedback-btn:hover {
+  border-color: #D1D5DB;
+  background: #F9FAFB;
+}
+
+.feedback-btn.active.positive {
+  border-color: #10B981;
+  background: #D1FAE5;
+  color: #065F46;
+}
+
+.feedback-btn.active.negative {
+  border-color: #EF4444;
+  background: #FEE2E2;
+  color: #991B1B;
+}
+
+.feedback-details {
+  animation: slideIn 0.3s ease-in-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.feedback-textarea {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #E5E7EB;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  margin-bottom: 8px;
+}
+
+.feedback-textarea:focus {
+  outline: none;
+  border-color: #3B82F6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.feedback-submit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: #3B82F6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.2s ease;
+}
+
+.feedback-submit:hover {
+  background: #2563EB;
+}
+
+.feedback-submit:disabled {
+  background: #9CA3AF;
+  cursor: not-allowed;
+}
+
+.feedback-success {
+  text-align: center;
+  color: #10B981;
+  font-weight: 500;
+  padding: 12px;
+}
+
+/* ========================================
+   Print Styles
+   ======================================== */
+
+@media print {
+  .explanation-card {
+    break-inside: avoid;
+    box-shadow: none;
+    border: 1px solid #000;
+  }
+
+  .explanation-actions {
+    display: none;
+  }
+
+  .btn-expand {
+    display: none;
+  }
+
+  .explanation-expanded {
+    display: block !important;
+    max-height: none !important;
+  }
+}

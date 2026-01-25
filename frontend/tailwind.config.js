@@ -8,21 +8,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        // CMF Nothing inspired neutral palette
-        nothing: {
-          50: '#fafafa',
-          100: '#f4f4f5',
-          200: '#e4e4e7',
-          300: '#d4d4d8',
-          400: '#a1a1aa',
-          500: '#71717a',
-          600: '#52525b',
-          700: '#3f3f46',
-          800: '#27272a',
-          900: '#18181b',
-          950: '#0a0a0b',
-        },
-        // CSS Variable-based semantic colors (Nothing x Supabase)
+        // CSS Variable-based semantic colors (Multi-Brand Theme System)
         surface: {
           base: 'var(--bg-base)',
           DEFAULT: 'var(--bg-surface)',
@@ -91,6 +77,25 @@ export default {
           800: '#166534',
           900: '#14532d',
         },
+        // Terminal Theme Colors
+        terminal: {
+          primary: '#00ff41',
+          amber: '#ffb000',
+          ai: '#a000ff',
+          error: '#ff0040',
+          info: '#00ccff',
+          bg: {
+            base: '#000000',
+            surface: '#0a0a0a',
+            elevated: '#111111',
+          },
+          text: {
+            primary: '#00ff41',
+            secondary: '#00cc33',
+            tertiary: '#008822',
+            muted: '#004411',
+          }
+        },
       },
       backgroundImage: {
         'gradient-primary': 'var(--gradient-primary)',
@@ -99,20 +104,68 @@ export default {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
       },
       fontFamily: {
-        // CMF Nothing uses dot-matrix inspired fonts
+        // Brand-specific fonts (CSS variables with fallbacks)
+        'brand-display': ['var(--font-display)', 'Space Grotesk', 'Inter', 'sans-serif'],
+        'brand-heading': ['var(--font-heading)', 'Inter', 'sans-serif'],
+        'brand-body': ['var(--font-body)', 'Inter', 'sans-serif'],
+        'brand-mono': ['var(--font-mono)', 'JetBrains Mono', 'monospace'],
+        // Default fonts (for components not yet migrated)
         mono: ['JetBrains Mono', 'Fira Code', 'SF Mono', 'Consolas', 'monospace'],
         sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
         display: ['Space Grotesk', 'Inter', 'sans-serif'],
+        // Terminal theme fonts (legacy)
+        terminal: ['JetBrains Mono', 'Fira Code', 'Courier New', 'monospace'],
+        'terminal-display': ['Share Tech Mono', 'JetBrains Mono', 'monospace'],
       },
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'spin-slow': 'spin 2s linear infinite',
         'glow': 'glow 2s ease-in-out infinite alternate',
+        // Terminal theme animations
+        'page-enter': 'pageSlideIn 280ms cubic-bezier(0.25, 0, 0.75, 1)',
+        'page-fade': 'pageFadeIn 280ms cubic-bezier(0.25, 0, 0.75, 1)',
+        'list-enter': 'listItemEnter 250ms cubic-bezier(0.25, 0, 0.75, 1)',
+        'list-exit': 'listItemExit 200ms ease-out',
+        'shimmer': 'shimmer 1.8s linear infinite',
+        'skeleton-pulse': 'skeletonPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'glitch': 'glitch 400ms ease-in-out',
+        'cursor-blink': 'cursorBlink 530ms step-end infinite',
+        'pulse-glow': 'pulseGlow 2s ease-in-out infinite',
+        'toast-enter': 'toastSlideIn 250ms ease-out',
+        'toast-exit': 'toastSlideOut 200ms ease-in',
+        'toast-shake': 'toastShake 400ms ease-in-out',
+        'modal-enter': 'modalEnter 280ms ease-out',
+        'modal-exit': 'modalExit 220ms ease-in',
+        'backdrop-fade': 'backdropFadeIn 200ms ease',
+        'icon-rotate': 'iconRotate 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+        'icon-bounce': 'iconBounce 400ms ease-in-out',
+        'bar-grow': 'barGrow 600ms cubic-bezier(0.16, 1, 0.3, 1)',
       },
       keyframes: {
         glow: {
           '0%': { boxShadow: '0 0 5px var(--highlight-color), 0 0 10px var(--highlight-color)' },
           '100%': { boxShadow: '0 0 10px var(--highlight-color), 0 0 20px var(--highlight-color), 0 0 30px var(--highlight-color)' },
+        },
+        // Terminal theme keyframes (defined in animations.css, referenced here for Tailwind)
+        pageSlideIn: {
+          from: { opacity: '0', transform: 'translateX(12px)' },
+          to: { opacity: '1', transform: 'translateX(0)' },
+        },
+        pageFadeIn: {
+          from: { opacity: '0', transform: 'scale(0.98)' },
+          to: { opacity: '1', transform: 'scale(1)' },
+        },
+        listItemEnter: {
+          from: { opacity: '0', transform: 'translateY(8px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        shimmer: {
+          '0%': { backgroundPosition: '-468px 0' },
+          '100%': { backgroundPosition: '468px 0' },
+        },
+        pulseGlow: {
+          '0%, 100%': { textShadow: '0 0 8px var(--terminal-primary-glow)', opacity: '1' },
+          '50%': { textShadow: '0 0 20px var(--terminal-primary-glow)', opacity: '0.9' },
         }
       },
       boxShadow: {
@@ -123,6 +176,19 @@ export default {
         'glow-ai': '0 0 30px var(--accent-tertiary-dim)',
         'elevated': '0 4px 24px rgba(0, 0, 0, 0.3)',
         'command': '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+        // Terminal theme shadows
+        'terminal-glow': '0 0 20px rgba(0, 255, 65, 0.4)',
+        'terminal-glow-sm': '0 0 12px rgba(0, 255, 65, 0.4)',
+        'terminal-glow-lg': '0 0 40px rgba(0, 255, 65, 0.3)',
+      },
+      transitionDuration: {
+        'fast': '150ms',
+        'normal': '250ms',
+        'medium': '350ms',
+        'slow': '500ms',
+      },
+      transitionTimingFunction: {
+        'terminal': 'cubic-bezier(0.25, 0, 0.75, 1)',
       }
     },
   },

@@ -5,7 +5,7 @@ import {
   ChevronDown, ChevronUp, XCircle, Eye, Wrench, Calendar,
   TrendingUp, AlertTriangle, BarChart2, FileText, MessageSquare,
   GitBranch, Database, Globe, Layers, Presentation, UserPlus,
-  AlertOctagon, Users
+  AlertOctagon, Users, Workflow, Activity
 } from 'lucide-react'
 
 // Map icon name strings to Lucide components for workflow templates
@@ -34,7 +34,7 @@ const ICON_MAP = {
 
 // Render icon - handles both emoji strings and Lucide icon names
 const renderTemplateIcon = (iconName, className = "w-6 h-6") => {
-  if (!iconName) return <span className="text-2xl">💼</span>
+  if (!iconName) return <Workflow className={className} />
 
   // Check if it's an emoji (starts with non-alphanumeric or is a single character)
   if (/^[\u{1F300}-\u{1F9FF}]/u.test(iconName) || iconName.length <= 2) {
@@ -44,14 +44,15 @@ const renderTemplateIcon = (iconName, className = "w-6 h-6") => {
   // Look up Lucide icon component
   const IconComponent = ICON_MAP[iconName]
   if (IconComponent) {
-    return <IconComponent className={`${className} text-emerald-600`} />
+    return <IconComponent className={className} />
   }
 
   // Fallback to default
-  return <span className="text-2xl">💼</span>
+  return <Workflow className={className} />
 }
 import { automationsApi } from '../services/api'
 import AutomationBuilder from '../components/AutomationBuilder'
+import { GuideCard, PageHeader, Skeleton } from '../components/SharedUI'
 
 export default function Automations() {
   const [automations, setAutomations] = useState([])
@@ -66,6 +67,7 @@ export default function Automations() {
   const [schedulerStatus, setSchedulerStatus] = useState([])
   const [testingId, setTestingId] = useState(null)
   const [testResult, setTestResult] = useState(null)
+  const [wizardStep, setWizardStep] = useState(0) // 0: Choose Template, 1: Configure, 2: Monitor
 
   useEffect(() => {
     loadData()
@@ -80,6 +82,9 @@ export default function Automations() {
       ])
       setAutomations(automationsData.automations || [])
       setTemplates(templatesData.templates || [])
+      if (automationsData.automations && automationsData.automations.length > 0) {
+        setWizardStep(2) // If automations exist, show monitor step
+      }
     } catch (error) {
       console.error('Failed to load data:', error)
     } finally {
@@ -124,6 +129,7 @@ export default function Automations() {
         enabled: true
       })
       setShowCreate(false)
+      setWizardStep(1)
       loadData()
     } catch (error) {
       console.error('Failed to create automation:', error)
@@ -183,6 +189,7 @@ export default function Automations() {
     try {
       await automationsApi.create(automationData)
       setShowBuilder(false)
+      setWizardStep(1)
       loadData()
     } catch (error) {
       console.error('Failed to create automation:', error)
@@ -225,21 +232,21 @@ export default function Automations() {
 
   const getTriggerIcon = (type) => {
     switch (type) {
-      case 'meeting_ended': return '🎙️'
-      case 'meeting_processed': return '📝'
-      case 'deal_created': return '💰'
-      case 'task_completed': return '✅'
-      case 'action_item_created': return '📋'
-      case 'scheduled': return '🕐'
-      default: return '⚡'
+      case 'meeting_ended': return <Presentation size={20} />
+      case 'meeting_processed': return <FileText size={20} />
+      case 'deal_created': return <TrendingUp size={20} />
+      case 'task_completed': return <CheckCircle2 size={20} />
+      case 'action_item_created': return <BarChart2 size={20} />
+      case 'scheduled': return <Clock size={20} />
+      default: return <Zap size={20} />
     }
   }
 
   const getCategoryIcon = (category) => {
     switch (category) {
-      case 'ai': return <Sparkles className="w-4 h-4 text-purple-500" />
-      case 'integration': return <RefreshCw className="w-4 h-4 text-blue-500" />
-      default: return <Zap className="w-4 h-4 text-yellow-500" />
+      case 'ai': return <Sparkles className="w-4 h-4" />
+      case 'integration': return <RefreshCw className="w-4 h-4" />
+      default: return <Zap className="w-4 h-4" />
     }
   }
 
@@ -252,74 +259,78 @@ export default function Automations() {
   const crmTemplates = templates.filter(t => t.category === 'crm')
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Automations & AI Agents</h1>
-          <p className="text-gray-600">Automate workflows with triggers, actions, and AI agents</p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => { setShowHistory(!showHistory); if (!showHistory) loadExecutionLogs(); }}
-            className={`btn ${showHistory ? 'btn-primary' : 'btn-secondary'}`}
-          >
-            <History className="w-4 h-4" />
-            History
-          </button>
-          <button
-            onClick={() => { loadSchedulerStatus(); }}
-            className="btn btn-secondary"
-            title="View scheduled automations"
-          >
-            <Calendar className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setShowCreate(!showCreate)}
-            className="btn btn-secondary"
-          >
-            <Plus className="w-4 h-4" />
-            From Template
-          </button>
-          <button
-            onClick={() => setShowBuilder(true)}
-            className="btn btn-primary"
-          >
-            <Wrench className="w-4 h-4" />
-            Build Custom
-          </button>
-        </div>
-      </div>
+    <div className="animate-fade-in max-w-7xl mx-auto">
+      <PageHeader 
+        title="Workflow Automations" 
+        subtitle="Build intelligent workflows with triggers, conditions, and AI-powered actions."
+        actions={
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setShowHistory(!showHistory); if (!showHistory) loadExecutionLogs(); }}
+              className={`btn ${showHistory ? 'btn-primary' : 'btn-secondary'}`}
+            >
+              <History size={16} />
+              History
+            </button>
+            <button
+              onClick={() => {
+                setShowCreate(!showCreate)
+                setWizardStep(0)
+              }}
+              className="btn btn-secondary"
+            >
+              <Plus size={16} />
+              Template
+            </button>
+            <button
+              onClick={() => {
+                setShowBuilder(true)
+                setWizardStep(1)
+              }}
+              className="btn btn-primary"
+            >
+              <Wrench size={16} />
+              Custom Build
+            </button>
+          </div>
+        }
+      />
+
+      <GuideCard 
+        title="Automation Workflow" 
+        steps={['Choose Template', 'Configure Actions', 'Monitor Performance']} 
+        activeStep={wizardStep} 
+      />
 
       {/* Execution History */}
       {showHistory && (
-        <div className="card">
-          <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-            <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-              <History className="w-5 h-5" />
-              Recent Execution History
+        <div className="card mb-6 animate-fade-in">
+          <div className="p-4 border-b border-line-subtle flex items-center justify-between">
+            <h3 className="font-bold text-content-primary flex items-center gap-2">
+              <History size={20} />
+              Execution History
             </h3>
             <button onClick={loadExecutionLogs} className="btn btn-ghost btn-sm">
-              <RefreshCw className={`w-4 h-4 ${loadingLogs ? 'animate-spin' : ''}`} />
+              <RefreshCw size={16} className={loadingLogs ? 'animate-spin' : ''} />
             </button>
           </div>
-          <div className="max-h-64 overflow-y-auto">
+          <div className="max-h-96 overflow-y-auto">
             {loadingLogs ? (
-              <div className="p-4 text-center text-gray-500">Loading...</div>
+              <Skeleton className="h-20" count={3} />
             ) : executionLogs.length === 0 ? (
-              <div className="p-4 text-center text-gray-500">No execution history yet</div>
+              <div className="p-8 text-center text-content-tertiary">No execution history yet</div>
             ) : (
-              <div className="divide-y divide-gray-100">
+              <div className="divide-y divide-line-subtle">
                 {executionLogs.map((log, idx) => (
-                  <div key={idx} className="p-3 flex items-center gap-3">
+                  <div key={idx} className="p-3 flex items-center gap-3 hover:bg-surface-muted transition-colors">
                     {log.success ? (
-                      <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0" />
+                      <CheckCircle2 size={18} className="text-green-500 flex-shrink-0" />
                     ) : (
-                      <XCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                      <XCircle size={18} className="text-red-500 flex-shrink-0" />
                     )}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900">{log.automationName || 'Unknown'}</p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-sm font-medium text-content-primary">{log.automationName || 'Unknown'}</p>
+                      <p className="text-xs text-content-tertiary font-mono">
                         {new Date(log.created_at).toLocaleString()}
                         {log.duration_ms && ` • ${log.duration_ms}ms`}
                       </p>
@@ -337,38 +348,40 @@ export default function Automations() {
 
       {/* Automation Builder */}
       {showBuilder && (
-        <AutomationBuilder
-          onSave={handleBuilderSave}
-          onCancel={() => setShowBuilder(false)}
-          onTest={handleBuilderTest}
-        />
+        <div className="mb-6 animate-fade-in">
+          <AutomationBuilder
+            onSave={handleBuilderSave}
+            onCancel={() => setShowBuilder(false)}
+            onTest={handleBuilderTest}
+          />
+        </div>
       )}
 
       {/* Scheduler Status */}
       {schedulerStatus.length > 0 && (
-        <div className="card">
-          <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-            <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-blue-500" />
+        <div className="card mb-6 animate-fade-in">
+          <div className="p-4 border-b border-line-subtle flex items-center justify-between">
+            <h3 className="font-bold text-content-primary flex items-center gap-2">
+              <Calendar size={20} className="text-accent-secondary" />
               Scheduled Automations
             </h3>
             <button onClick={() => setSchedulerStatus([])} className="btn btn-ghost btn-sm">
-              <XCircle className="w-4 h-4" />
+              <XCircle size={16} />
             </button>
           </div>
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-line-subtle">
             {schedulerStatus.map((scheduled) => (
               <div key={scheduled.id} className="p-3 flex items-center gap-3">
-                <Clock className="w-5 h-5 text-blue-500 flex-shrink-0" />
+                <Clock size={18} className="text-accent-secondary flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900">{scheduled.name}</p>
-                  <p className="text-xs text-gray-500 font-mono">
+                  <p className="text-sm font-medium text-content-primary">{scheduled.name}</p>
+                  <p className="text-xs text-content-tertiary font-mono">
                     {scheduled.cronExpression}
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs text-gray-500">Next run:</p>
-                  <p className="text-sm text-gray-700">
+                  <p className="text-xs text-content-tertiary">Next run:</p>
+                  <p className="text-sm text-content-secondary font-mono">
                     {scheduled.nextRun ? new Date(scheduled.nextRun).toLocaleString() : 'N/A'}
                   </p>
                 </div>
@@ -380,9 +393,9 @@ export default function Automations() {
 
       {/* Create from templates */}
       {showCreate && (
-        <div className="card p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-900">Choose a Template</h3>
+        <div className="card p-6 mb-6 animate-fade-in">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="font-bold text-content-primary text-lg">Choose a Template</h3>
             <div className="flex gap-2 flex-wrap">
               <button
                 onClick={() => setSelectedCategory('all')}
@@ -394,19 +407,19 @@ export default function Automations() {
                 onClick={() => setSelectedCategory('ai')}
                 className={`btn btn-sm ${selectedCategory === 'ai' ? 'btn-primary' : 'btn-ghost'}`}
               >
-                <Sparkles className="w-3 h-3" /> AI
+                <Sparkles size={14} /> AI
               </button>
               <button
                 onClick={() => setSelectedCategory('integration')}
                 className={`btn btn-sm ${selectedCategory === 'integration' ? 'btn-primary' : 'btn-ghost'}`}
               >
-                <RefreshCw className="w-3 h-3" /> Integration
+                <RefreshCw size={14} /> Integration
               </button>
               <button
                 onClick={() => setSelectedCategory('crm')}
                 className={`btn btn-sm ${selectedCategory === 'crm' ? 'btn-primary' : 'btn-ghost'}`}
               >
-                💼 CRM
+                <Users size={14} /> CRM
               </button>
             </div>
           </div>
@@ -414,24 +427,28 @@ export default function Automations() {
           {/* AI Agent Templates Section */}
           {(selectedCategory === 'all' || selectedCategory === 'ai') && aiTemplates.length > 0 && (
             <div className="mb-6">
-              <h4 className="text-sm font-medium text-purple-600 mb-3 flex items-center gap-2">
-                <Bot className="w-4 h-4" />
+              <h4 className="text-sm font-bold text-accent-tertiary mb-3 flex items-center gap-2">
+                <Bot size={16} />
                 AI-Powered Automations
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {aiTemplates.map((template) => (
                   <div
                     key={template.id}
-                    className="border border-purple-200 bg-purple-50 rounded-lg p-4 hover:border-purple-400 cursor-pointer transition-colors"
+                    className="card p-4 hover:border-accent-tertiary cursor-pointer transition-all group"
                     onClick={() => handleCreateFromTemplate(template)}
                   >
                     <div className="flex items-start gap-3">
-                      <span className="text-2xl">{template.icon || '🤖'}</span>
-                      <div>
-                        <h4 className="font-medium text-gray-900">{template.name}</h4>
-                        <p className="text-sm text-gray-600 mt-1">{template.description}</p>
-                        <div className="flex items-center gap-2 mt-2">
-                          <span className="badge badge-purple text-xs">AI Agent</span>
+                      <div className="p-2 bg-accent-tertiary/10 rounded-md group-hover:bg-accent-tertiary group-hover:text-white transition-colors">
+                        <Bot size={20} />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-bold text-content-primary mb-1">{template.name}</h4>
+                        <p className="text-sm text-content-secondary mb-2">{template.description}</p>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs px-2 py-1 bg-accent-tertiary/10 text-accent-tertiary rounded-sm border border-accent-tertiary/20 font-mono">
+                            AI Agent
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -444,30 +461,34 @@ export default function Automations() {
           {/* CRM Templates Section */}
           {(selectedCategory === 'all' || selectedCategory === 'crm') && crmTemplates.length > 0 && (
             <div className="mb-6">
-              <h4 className="text-sm font-medium text-emerald-600 mb-3 flex items-center gap-2">
-                <Users className="w-4 h-4" />
-                CRM Workflows (Logos Vision)
+              <h4 className="text-sm font-bold text-accent-secondary mb-3 flex items-center gap-2">
+                <Users size={16} />
+                CRM Workflows
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {crmTemplates.map((template) => (
                   <div
                     key={template.id}
-                    className="border border-emerald-200 bg-emerald-50 rounded-lg p-4 hover:border-emerald-400 cursor-pointer transition-colors"
+                    className="card p-4 hover:border-accent-secondary cursor-pointer transition-all group"
                     onClick={() => handleCreateFromTemplate(template)}
                   >
                     <div className="flex items-start gap-3">
-                      {renderTemplateIcon(template.icon)}
-                      <div>
-                        <h4 className="font-medium text-gray-900">{template.name}</h4>
-                        <p className="text-sm text-gray-600 mt-1">{template.description}</p>
-                        <div className="flex items-center gap-2 mt-2 flex-wrap">
-                          <span className="badge badge-success text-xs">CRM</span>
+                      <div className="p-2 bg-accent-secondary/10 rounded-md group-hover:bg-accent-secondary group-hover:text-white transition-colors">
+                        {renderTemplateIcon(template.icon, "w-5 h-5")}
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-bold text-content-primary mb-1">{template.name}</h4>
+                        <p className="text-sm text-content-secondary mb-2">{template.description}</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs px-2 py-1 bg-accent-secondary/10 text-accent-secondary rounded-sm border border-accent-secondary/20 font-mono">
+                            CRM
+                          </span>
                           {template.isWorkflowTemplate && (
-                            <span className="text-xs text-emerald-600">
+                            <span className="text-xs text-content-tertiary font-mono">
                               {template.nodeCount} nodes
                             </span>
                           )}
-                          <span className="text-xs text-gray-400">
+                          <span className="text-xs text-content-tertiary font-mono">
                             {template.actions?.length || 0} action{(template.actions?.length || 0) !== 1 ? 's' : ''}
                           </span>
                         </div>
@@ -482,27 +503,29 @@ export default function Automations() {
           {/* Standard Templates Section */}
           {(selectedCategory === 'all' || selectedCategory === 'integration') && integrationTemplates.length > 0 && (
             <div>
-              <h4 className="text-sm font-medium text-blue-600 mb-3 flex items-center gap-2">
-                <RefreshCw className="w-4 h-4" />
+              <h4 className="text-sm font-bold text-accent-primary mb-3 flex items-center gap-2">
+                <RefreshCw size={16} />
                 Integration Automations
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {integrationTemplates.map((template) => (
                   <div
                     key={template.id}
-                    className="border border-gray-200 rounded-lg p-4 hover:border-primary-500 hover:bg-primary-50 cursor-pointer transition-colors"
+                    className="card p-4 hover:border-accent-primary cursor-pointer transition-all group"
                     onClick={() => handleCreateFromTemplate(template)}
                   >
                     <div className="flex items-start gap-3">
-                      <span className="text-2xl">{template.icon || getTriggerIcon(template.trigger_type || template.triggerType)}</span>
-                      <div>
-                        <h4 className="font-medium text-gray-900">{template.name}</h4>
-                        <p className="text-sm text-gray-500 mt-1">{template.description}</p>
-                        <div className="flex items-center gap-2 mt-2">
-                          <span className="badge badge-info text-xs">
+                      <div className="p-2 bg-accent-primary/10 rounded-md group-hover:bg-accent-primary group-hover:text-white transition-colors">
+                        {getTriggerIcon(template.trigger_type || template.triggerType)}
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-bold text-content-primary mb-1">{template.name}</h4>
+                        <p className="text-sm text-content-secondary mb-2">{template.description}</p>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs px-2 py-1 bg-accent-primary/10 text-accent-primary rounded-sm border border-accent-primary/20 font-mono">
                             {(template.trigger_type || template.triggerType)?.replace(/_/g, ' ')}
                           </span>
-                          <span className="text-xs text-gray-400">
+                          <span className="text-xs text-content-tertiary font-mono">
                             {template.actions?.length || 0} action{(template.actions?.length || 0) !== 1 ? 's' : ''}
                           </span>
                         </div>
@@ -525,67 +548,68 @@ export default function Automations() {
 
       {/* Automations list */}
       <div className="card">
-        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="font-semibold text-gray-900">Active Automations</h2>
-          <span className="text-sm text-gray-500">
-            {automations.filter(a => a.enabled).length} active of {automations.length}
+        <div className="p-4 border-b border-line-subtle flex items-center justify-between">
+          <h2 className="font-bold text-content-primary">Active Automations</h2>
+          <span className="text-sm text-content-tertiary font-mono">
+            {automations.filter(a => a.enabled).length} active / {automations.length} total
           </span>
         </div>
 
         {loading ? (
-          <div className="p-8 text-center">
-            <div className="spinner mx-auto mb-4" />
-            <p className="text-gray-500">Loading automations...</p>
-          </div>
+          <Skeleton className="h-24" count={4} />
         ) : automations.length === 0 ? (
-          <div className="p-8 text-center">
-            <Zap className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <h3 className="text-lg font-medium text-gray-900 mb-1">No automations yet</h3>
-            <p className="text-gray-500 mb-4">Create your first automation from a template above</p>
+          <div className="p-12 text-center border-dashed border-2 m-4 rounded-lg">
+            <Zap className="w-16 h-16 text-content-muted mx-auto mb-4 opacity-50" />
+            <h3 className="text-xl font-bold text-content-primary mb-2">No automations yet</h3>
+            <p className="text-content-secondary mb-6">Create your first automation from a template or build a custom workflow</p>
             <button
               onClick={() => setShowCreate(true)}
               className="btn btn-primary"
             >
-              <Plus className="w-4 h-4" />
+              <Plus size={16} />
               Create Automation
             </button>
           </div>
         ) : (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-line-subtle">
             {automations.map((automation) => (
-              <div key={automation.id} className="p-4">
+              <div key={automation.id} className="p-4 hover:bg-surface-muted transition-colors group">
                 <div className="flex items-start gap-4">
-                  <span className="text-2xl">{getTriggerIcon(automation.trigger_type)}</span>
+                  <div className="p-2 bg-accent-primary/10 rounded-md group-hover:bg-accent-primary group-hover:text-white transition-colors">
+                    {getTriggerIcon(automation.trigger_type)}
+                  </div>
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-medium text-gray-900">{automation.name}</h3>
-                      <span className={`badge ${
-                        automation.enabled ? 'badge-success' : 'badge-gray'
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <h3 className="font-bold text-content-primary">{automation.name}</h3>
+                      <span className={`text-xs px-2 py-1 rounded-sm border font-mono ${
+                        automation.enabled 
+                          ? 'text-green-500 bg-green-500/10 border-green-500/20' 
+                          : 'text-content-tertiary bg-surface-muted border-line-subtle'
                       }`}>
                         {automation.enabled ? 'Active' : 'Paused'}
                       </span>
                       {automation.actions?.some(a => ['auto_assign', 'auto_prioritize', 'suggest_deadline', 'run_agent'].includes(a.type)) && (
-                        <span className="badge badge-purple flex items-center gap-1">
-                          <Bot className="w-3 h-3" /> AI
+                        <span className="text-xs px-2 py-1 bg-accent-tertiary/10 text-accent-tertiary rounded-sm border border-accent-tertiary/20 font-mono flex items-center gap-1">
+                          <Bot size={12} /> AI
                         </span>
                       )}
                     </div>
                     {automation.description && (
-                      <p className="text-sm text-gray-500 mt-1">{automation.description}</p>
+                      <p className="text-sm text-content-secondary mb-2">{automation.description}</p>
                     )}
-                    <div className="flex items-center gap-4 mt-2 text-xs text-gray-400 flex-wrap">
+                    <div className="flex items-center gap-4 text-xs text-content-tertiary flex-wrap font-mono">
                       <span className="flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        Trigger: {automation.trigger_type?.replace(/_/g, ' ')}
+                        <Clock size={12} />
+                        {automation.trigger_type?.replace(/_/g, ' ')}
                       </span>
                       <span>
                         {automation.actions?.length || 0} action{(automation.actions?.length || 0) !== 1 ? 's' : ''}
                       </span>
                       {automation.execution_count > 0 && (
                         <span className="flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" />
-                          Run {automation.execution_count} time{automation.execution_count !== 1 ? 's' : ''}
+                          <Activity size={12} />
+                          {automation.execution_count}x
                         </span>
                       )}
                       {automation.last_executed_at && (
@@ -599,15 +623,13 @@ export default function Automations() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleToggle(automation.id, automation.enabled)}
-                      className={`btn btn-icon ${
-                        automation.enabled ? 'btn-secondary' : 'btn-ghost'
-                      }`}
+                      className="btn btn-icon btn-ghost"
                       title={automation.enabled ? 'Pause' : 'Resume'}
                     >
                       {automation.enabled ? (
-                        <Pause className="w-4 h-4" />
+                        <Pause size={16} />
                       ) : (
-                        <Play className="w-4 h-4" />
+                        <Play size={16} />
                       )}
                     </button>
 
@@ -620,7 +642,7 @@ export default function Automations() {
                       {testingId === automation.id ? (
                         <div className="spinner w-4 h-4" />
                       ) : (
-                        <Eye className="w-4 h-4" />
+                        <Eye size={16} />
                       )}
                     </button>
 
@@ -629,41 +651,43 @@ export default function Automations() {
                       className="btn btn-icon btn-ghost"
                       title="Run now"
                     >
-                      <Zap className="w-4 h-4" />
+                      <Zap size={16} />
                     </button>
 
                     <button
                       onClick={() => handleDelete(automation.id)}
-                      className="btn btn-icon btn-ghost text-red-600 hover:bg-red-50"
+                      className="btn btn-icon btn-ghost text-red-500 hover:bg-red-500/10"
                       title="Delete"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 size={16} />
                     </button>
                   </div>
                 </div>
 
                 {/* Test Result */}
                 {testResult && testResult.id === automation.id && (
-                  <div className={`mt-3 p-3 rounded-lg ${
-                    testResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
+                  <div className={`mt-3 p-3 rounded-lg border ${
+                    testResult.success 
+                      ? 'bg-green-500/10 border-green-500/20' 
+                      : 'bg-red-500/10 border-red-500/20'
                   }`}>
                     <div className="flex items-start gap-2">
                       {testResult.success ? (
-                        <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0" />
+                        <CheckCircle2 size={18} className="text-green-500 flex-shrink-0" />
                       ) : (
-                        <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                        <AlertCircle size={18} className="text-red-500 flex-shrink-0" />
                       )}
                       <div className="flex-1">
-                        <p className={`font-medium text-sm ${testResult.success ? 'text-green-700' : 'text-red-700'}`}>
+                        <p className={`font-medium text-sm ${testResult.success ? 'text-green-500' : 'text-red-500'}`}>
                           {testResult.success ? 'Test passed!' : 'Test failed'}
                         </p>
                         {testResult.error && (
-                          <p className="text-xs text-red-600 mt-1">{testResult.error}</p>
+                          <p className="text-xs text-red-500 mt-1 font-mono">{testResult.error}</p>
                         )}
                         {testResult.actionResults && (
                           <div className="mt-2 space-y-1">
                             {testResult.actionResults.map((result, idx) => (
-                              <div key={idx} className="text-xs text-gray-600">
+                              <div key={idx} className="text-xs text-content-secondary font-mono">
                                 • {result.type}: {result.preview || 'OK'}
                               </div>
                             ))}
@@ -672,9 +696,9 @@ export default function Automations() {
                       </div>
                       <button
                         onClick={() => setTestResult(null)}
-                        className="text-gray-400 hover:text-gray-600"
+                        className="text-content-tertiary hover:text-content-primary"
                       >
-                        <XCircle className="w-4 h-4" />
+                        <XCircle size={16} />
                       </button>
                     </div>
                   </div>
@@ -683,81 +707,6 @@ export default function Automations() {
             ))}
           </div>
         )}
-      </div>
-
-      {/* AI Agents Info */}
-      <div className="card p-5 bg-gradient-to-br from-purple-50 to-blue-50">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
-            <Bot className="w-6 h-6 text-purple-600" />
-          </div>
-          <div>
-            <h3 className="font-semibold text-gray-900 mb-2">AI-Powered Agents</h3>
-            <p className="text-sm text-gray-600 mb-3">
-              Our AI agents can automatically analyze tasks and make intelligent decisions:
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="bg-white/60 rounded-lg p-3">
-                <h4 className="font-medium text-gray-900 text-sm mb-1">Assignment Agent</h4>
-                <p className="text-xs text-gray-500">
-                  Determines the best person to assign tasks based on skills and workload
-                </p>
-              </div>
-              <div className="bg-white/60 rounded-lg p-3">
-                <h4 className="font-medium text-gray-900 text-sm mb-1">Priority Agent</h4>
-                <p className="text-xs text-gray-500">
-                  Analyzes context to set appropriate priority levels
-                </p>
-              </div>
-              <div className="bg-white/60 rounded-lg p-3">
-                <h4 className="font-medium text-gray-900 text-sm mb-1">Deadline Agent</h4>
-                <p className="text-xs text-gray-500">
-                  Suggests realistic due dates based on task complexity
-                </p>
-              </div>
-              <div className="bg-white/60 rounded-lg p-3">
-                <h4 className="font-medium text-gray-900 text-sm mb-1">Follow-up Detector</h4>
-                <p className="text-xs text-gray-500">
-                  Identifies follow-up tasks from meeting discussions
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* How it works */}
-      <div className="card p-5">
-        <h3 className="font-semibold text-gray-900 mb-4">How Automations Work</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="text-center">
-            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <span className="text-xl">1</span>
-            </div>
-            <h4 className="font-medium text-gray-900 mb-1">Trigger</h4>
-            <p className="text-sm text-gray-500">
-              An event happens (meeting ends, deal created, action item created)
-            </p>
-          </div>
-          <div className="text-center">
-            <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <span className="text-xl">2</span>
-            </div>
-            <h4 className="font-medium text-gray-900 mb-1">Conditions</h4>
-            <p className="text-sm text-gray-500">
-              Check if conditions are met (optional filters)
-            </p>
-          </div>
-          <div className="text-center">
-            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <span className="text-xl">3</span>
-            </div>
-            <h4 className="font-medium text-gray-900 mb-1">Actions</h4>
-            <p className="text-sm text-gray-500">
-              Execute actions (AI analysis, CRM sync, notifications)
-            </p>
-          </div>
-        </div>
       </div>
     </div>
   )

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  Plus, Search, Filter, CheckSquare, Clock, AlertCircle, Trash2
+  Plus, Search, Filter, CheckSquare, Clock, AlertCircle, Trash2, Circle, CheckCircle2, Target
 } from 'lucide-react'
 import { tasksApi } from '../services/api'
+import { GuideCard, PageHeader, Skeleton } from '../components/SharedUI'
 
 export default function Tasks() {
   const [tasks, setTasks] = useState([])
@@ -13,6 +14,7 @@ export default function Tasks() {
   const [showCreate, setShowCreate] = useState(false)
   const [newTask, setNewTask] = useState({ title: '', priority: 'medium', dueDate: '' })
   const [creating, setCreating] = useState(false)
+  const [wizardStep, setWizardStep] = useState(0) // 0: Create, 1: Prioritize, 2: Complete
 
   useEffect(() => {
     loadTasks()
@@ -27,6 +29,9 @@ export default function Tasks() {
       }
       const data = await tasksApi.list(params)
       setTasks(data.tasks || [])
+      if (data.tasks && data.tasks.length > 0) {
+        setWizardStep(2) // If tasks exist, show complete step
+      }
     } catch (error) {
       console.error('Failed to load tasks:', error)
     } finally {
@@ -43,6 +48,7 @@ export default function Tasks() {
       await tasksApi.create(newTask)
       setNewTask({ title: '', priority: 'medium', dueDate: '' })
       setShowCreate(false)
+      setWizardStep(1)
       loadTasks()
     } catch (error) {
       console.error('Failed to create task:', error)
@@ -89,27 +95,53 @@ export default function Tasks() {
     return new Date(dueDate) < new Date()
   }
 
+  const getPriorityColor = (priority) => {
+    switch (priority) {
+      case 'high': return 'text-red-500 bg-red-500/10 border-red-500/20'
+      case 'medium': return 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20'
+      case 'low': return 'text-green-500 bg-green-500/10 border-green-500/20'
+      default: return 'text-content-tertiary bg-surface-muted border-line-subtle'
+    }
+  }
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'done': return 'text-green-500 bg-green-500/10 border-green-500/20'
+      case 'in_progress': return 'text-accent-primary bg-accent-primary/10 border-accent-primary/20'
+      case 'blocked': return 'text-red-500 bg-red-500/10 border-red-500/20'
+      default: return 'text-content-tertiary bg-surface-muted border-line-subtle'
+    }
+  }
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Tasks</h1>
-          <p className="text-gray-600">Manage all your tasks in one place</p>
-        </div>
-        <button
-          onClick={() => setShowCreate(!showCreate)}
-          className="btn btn-primary"
-        >
-          <Plus className="w-4 h-4" />
-          New Task
-        </button>
-      </div>
+    <div className="animate-fade-in max-w-7xl mx-auto">
+      <PageHeader 
+        title="Task Management" 
+        subtitle="Create, prioritize, and track all your tasks in one place."
+        actions={
+          <button
+            onClick={() => {
+              setShowCreate(!showCreate)
+              setWizardStep(0)
+            }}
+            className="btn btn-primary"
+          >
+            <Plus size={16} />
+            New Task
+          </button>
+        }
+      />
+
+      <GuideCard 
+        title="Task Workflow" 
+        steps={['Create Task', 'Set Priority', 'Complete & Review']} 
+        activeStep={wizardStep} 
+      />
 
       {/* Create form */}
       {showCreate && (
-        <div className="card p-5">
-          <h3 className="font-semibold text-gray-900 mb-4">Create New Task</h3>
+        <div className="card p-6 mb-6 animate-fade-in">
+          <h3 className="font-bold text-content-primary text-lg mb-4">Create New Task</h3>
           <form onSubmit={handleCreate} className="space-y-4">
             <div>
               <label className="label">Task Title</label>
@@ -162,24 +194,24 @@ export default function Tasks() {
       )}
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-col sm:flex-row gap-4 mb-6">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-content-tertiary" />
           <input
             type="text"
-            placeholder="Search tasks..."
+            placeholder="Search tasks by title..."
             className="input pl-10"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {['all', 'open', 'in_progress', 'done'].map((status) => (
             <button
               key={status}
               onClick={() => setStatusFilter(status)}
-              className={`btn ${
-                statusFilter === status ? 'btn-primary' : 'btn-secondary'
+              className={`btn btn-sm ${
+                statusFilter === status ? 'btn-primary' : 'btn-ghost'
               }`}
             >
               {status === 'all' ? 'All' :
@@ -193,67 +225,76 @@ export default function Tasks() {
       {/* Tasks list */}
       <div className="card">
         {loading ? (
-          <div className="p-8 text-center">
-            <div className="spinner mx-auto mb-4" />
-            <p className="text-gray-500">Loading tasks...</p>
-          </div>
+          <Skeleton className="h-16" count={8} />
         ) : filteredTasks.length === 0 ? (
-          <div className="p-8 text-center">
-            <CheckSquare className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <h3 className="text-lg font-medium text-gray-900 mb-1">No tasks found</h3>
-            <p className="text-gray-500">
+          <div className="p-12 text-center border-dashed border-2 m-4 rounded-lg">
+            <CheckSquare className="w-16 h-16 text-content-muted mx-auto mb-4 opacity-50" />
+            <h3 className="text-xl font-bold text-content-primary mb-2">No tasks found</h3>
+            <p className="text-content-secondary mb-6">
               {searchQuery || statusFilter !== 'all'
                 ? 'Try adjusting your filters'
                 : 'Create your first task to get started'
               }
             </p>
+            <button
+              onClick={() => {
+                setShowCreate(true)
+                setWizardStep(0)
+              }}
+              className="btn btn-primary"
+            >
+              <Plus size={16} />
+              Create Task
+            </button>
           </div>
         ) : (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-line-subtle">
             {filteredTasks.map((task) => (
               <div
                 key={task.id}
-                className={`p-4 flex items-center gap-4 ${
-                  task.status === 'done' ? 'bg-gray-50' : ''
+                className={`p-4 flex items-center gap-4 hover:bg-surface-muted transition-colors group ${
+                  task.status === 'done' ? 'opacity-60' : ''
                 }`}
               >
                 <button
                   onClick={() => task.status === 'done' ? handleReopen(task.id) : handleComplete(task.id)}
-                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
                     task.status === 'done'
                       ? 'bg-green-500 border-green-500 text-white'
-                      : 'border-gray-300 hover:border-primary-500'
+                      : 'border-content-muted hover:border-accent-primary'
                   }`}
                 >
-                  {task.status === 'done' && (
-                    <CheckSquare className="w-4 h-4" />
+                  {task.status === 'done' ? (
+                    <CheckCircle2 size={16} />
+                  ) : (
+                    <Circle size={16} className="opacity-0 group-hover:opacity-100" />
                   )}
                 </button>
 
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 mb-1">
                     <p className={`font-medium ${
-                      task.status === 'done' ? 'text-gray-400 line-through' : 'text-gray-900'
+                      task.status === 'done' ? 'text-content-tertiary line-through' : 'text-content-primary'
                     }`}>
                       {task.title}
                     </p>
                     {task.due_date && isOverdue(task.due_date) && task.status !== 'done' && (
-                      <AlertCircle className="w-4 h-4 text-red-500" />
+                      <AlertCircle size={16} className="text-red-500" />
                     )}
                   </div>
-                  <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
+                  <div className="flex items-center gap-3 text-xs text-content-tertiary font-mono">
                     {task.due_date && (
                       <span className={`flex items-center gap-1 ${
                         isOverdue(task.due_date) && task.status !== 'done' ? 'text-red-500' : ''
                       }`}>
-                        <Clock className="w-4 h-4" />
+                        <Clock size={12} />
                         {new Date(task.due_date).toLocaleDateString()}
                       </span>
                     )}
                     {task.project_id && (
                       <Link
                         to={`/projects/${task.project_id}`}
-                        className="text-primary-600 hover:underline"
+                        className="text-accent-primary hover:underline"
                       >
                         View Project
                       </Link>
@@ -261,29 +302,20 @@ export default function Tasks() {
                   </div>
                 </div>
 
-                <span className={`badge ${
-                  task.priority === 'high' ? 'badge-error' :
-                  task.priority === 'medium' ? 'badge-warning' :
-                  'badge-success'
-                }`}>
+                <span className={`text-xs px-2 py-1 rounded-sm border font-mono ${getPriorityColor(task.priority)}`}>
                   {task.priority}
                 </span>
 
-                <span className={`badge ${
-                  task.status === 'done' ? 'badge-success' :
-                  task.status === 'in_progress' ? 'badge-warning' :
-                  task.status === 'blocked' ? 'badge-error' :
-                  'badge-info'
-                }`}>
+                <span className={`text-xs px-2 py-1 rounded-sm border font-mono ${getStatusColor(task.status)}`}>
                   {task.status === 'in_progress' ? 'In Progress' :
                    task.status.charAt(0).toUpperCase() + task.status.slice(1)}
                 </span>
 
                 <button
                   onClick={() => handleDelete(task.id)}
-                  className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  className="p-2 opacity-0 group-hover:opacity-100 hover:bg-red-500/10 hover:text-red-500 rounded-md transition-all"
                 >
-                  <Trash2 className="w-5 h-5" />
+                  <Trash2 size={16} />
                 </button>
               </div>
             ))}

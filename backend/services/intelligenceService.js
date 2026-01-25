@@ -6,10 +6,22 @@
 
 const { supabase, supabaseAdmin } = require('../config/supabase');
 
+// Import specialized intelligence services
+const MeetingPrepService = require('./intelligence/MeetingPrepService');
+const DealRiskService = require('./intelligence/DealRiskService');
+const ActionItemTrackerService = require('./intelligence/ActionItemTrackerService');
+const RelationshipIntelligenceService = require('./intelligence/RelationshipIntelligenceService');
+
 class IntelligenceService {
   constructor() {
     this.hubClient = null;
     this.initializeHub();
+
+    // Initialize specialized services
+    this.meetingPrepService = MeetingPrepService;
+    this.dealRiskService = DealRiskService;
+    this.actionItemService = ActionItemTrackerService;
+    this.relationshipService = RelationshipIntelligenceService;
   }
 
   /**
@@ -698,6 +710,74 @@ class IntelligenceService {
     } catch (error) {
       console.error('[IntelligenceService] markBriefingViewed error:', error);
       return { success: false, message: error.message };
+    }
+  }
+
+  /**
+   * Get comprehensive intelligence dashboard for Enhanced Intelligence Dashboard
+   * Orchestrates all 4 intelligence services
+   * @param {string} userId - User ID
+   * @param {Object} options - Dashboard options
+   * @returns {Promise<Object>} Complete dashboard intelligence
+   */
+  async getDashboardIntelligence(userId, options = {}) {
+    try {
+      const {
+        dealRiskFilter = ['medium', 'high', 'critical'],
+        timeHorizon = {
+          meetings: 24,  // hours
+          risks: 7       // days
+        }
+      } = options;
+
+      console.log(`[IntelligenceService] Getting dashboard intelligence for user: ${userId}`);
+
+      // Fetch all intelligence data in parallel for performance
+      const [
+        meetingPrep,
+        dealRisks,
+        actionItems,
+        // Relationships are deal-specific, so we'll get them on-demand
+      ] = await Promise.all([
+        this.meetingPrepService.getUpcomingMeetingPrep(userId, { hours: timeHorizon.meetings }),
+        this.dealRiskService.getAtRiskDeals(userId, { riskLevel: dealRiskFilter, limit: 10 }),
+        this.actionItemService.getActionItemStatus(userId),
+      ]);
+
+      return {
+        success: true,
+        data: {
+          meetingPrep: {
+            cards: meetingPrep,
+            count: meetingPrep.length
+          },
+          dealRisks: {
+            cards: dealRisks,
+            count: dealRisks.length
+          },
+          actionItems: {
+            summary: actionItems.summary,
+            trends: actionItems.trends,
+            benchmarks: actionItems.benchmarks,
+            criticalItems: actionItems.criticalOverdue,
+            blockingChains: actionItems.blockingChains
+          },
+          relationships: {
+            // Relationships are fetched per-deal via separate endpoint
+            // This keeps the main dashboard load fast
+            count: 0,
+            message: 'Use /api/intelligence/relationships/:dealId for deal-specific insights'
+          },
+          lastUpdated: new Date().toISOString()
+        }
+      };
+    } catch (error) {
+      console.error('[IntelligenceService] getDashboardIntelligence error:', error);
+      return {
+        success: false,
+        error: error.message,
+        data: null
+      };
     }
   }
 }

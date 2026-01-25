@@ -122,7 +122,9 @@ app.get('/', (req, res) => {
       projects: '/api/projects',
       tasks: '/api/tasks',
       dashboard: '/api/dashboard',
-      search: '/api/search'
+      search: '/api/search',
+      learning: '/api/learning',
+      explainability: '/api/explainability'
     }
   });
 });
@@ -242,6 +244,12 @@ app.use('/api/secrets', require('./routes/secrets'));
 
 // Inbound Webhooks (for workflow triggers)
 app.use('/hooks', require('./routes/webhooks'));
+
+// Learning System (AI Feedback & Pattern Detection)
+app.use('/api/learning', require('./routes/learning'));
+
+// AI Explainability Layer
+app.use('/api/explainability', require('./routes/explainability'));
 
 // ========================================
 // QUICK WIN ROUTES

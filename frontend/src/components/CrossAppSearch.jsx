@@ -15,6 +15,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '@clerk/clerk-react'
 import {
   Search, X, Loader2, User, Video, DollarSign, Bell, Bot, GitBranch,
   CheckSquare, Clock, ArrowRight, ExternalLink, Building2, AlertCircle
@@ -46,7 +47,8 @@ const APP_COLORS = {
 /**
  * Search API helper
  */
-async function searchCrossApp(query, options = {}) {
+async function searchCrossApp(query, options = {}, getToken) {
+  const token = await getToken()
   const params = new URLSearchParams({
     q: query,
     limit: options.limit || 20,
@@ -56,7 +58,7 @@ async function searchCrossApp(query, options = {}) {
   const response = await fetch(`${API_BASE_URL}/api/cross-search?${params}`, {
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem('auth_token')}` : ''
+      'Authorization': token ? `Bearer ${token}` : ''
     }
   })
 
@@ -70,11 +72,12 @@ async function searchCrossApp(query, options = {}) {
 /**
  * Get recent searches
  */
-async function getRecentSearches() {
+async function getRecentSearches(getToken) {
   try {
+    const token = await getToken()
     const response = await fetch(`${API_BASE_URL}/api/cross-search/recent`, {
       headers: {
-        'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem('auth_token')}` : ''
+        'Authorization': token ? `Bearer ${token}` : ''
       }
     })
 
@@ -101,6 +104,8 @@ export default function CrossAppSearch({ isOpen, onClose }) {
   const debounceRef = useRef(null)
   const navigate = useNavigate()
 
+  const { getToken } = useAuth()
+
   // Load recent searches when opening
   useEffect(() => {
     if (isOpen) {
@@ -109,10 +114,10 @@ export default function CrossAppSearch({ isOpen, onClose }) {
       setGrouped([])
       setSelectedIndex(0)
       setError(null)
-      getRecentSearches().then(setRecentSearches)
+      getRecentSearches(getToken).then(setRecentSearches)
       setTimeout(() => inputRef.current?.focus(), 50)
     }
-  }, [isOpen])
+  }, [isOpen, getToken])
 
   // Debounced search
   const performSearch = useCallback(async (searchQuery) => {
@@ -127,7 +132,7 @@ export default function CrossAppSearch({ isOpen, onClose }) {
     setError(null)
 
     try {
-      const data = await searchCrossApp(searchQuery)
+      const data = await searchCrossApp(searchQuery, {}, getToken)
       setResults(data.results || [])
       setGrouped(data.grouped || [])
       setSearchStats({
@@ -143,7 +148,7 @@ export default function CrossAppSearch({ isOpen, onClose }) {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [getToken])
 
   // Handle query change with debounce
   const handleQueryChange = (e) => {

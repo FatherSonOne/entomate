@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Search, FolderKanban, Calendar, DollarSign, Trash2 } from 'lucide-react'
+import { Plus, Search, FolderKanban, Calendar, DollarSign, Trash2, Target, TrendingUp, Archive } from 'lucide-react'
 import { projectsApi } from '../services/api'
+import { GuideCard, PageHeader, Skeleton } from '../components/SharedUI'
 
 export default function Projects() {
   const [projects, setProjects] = useState([])
@@ -10,6 +11,7 @@ export default function Projects() {
   const [showCreate, setShowCreate] = useState(false)
   const [newProject, setNewProject] = useState({ name: '', description: '' })
   const [creating, setCreating] = useState(false)
+  const [wizardStep, setWizardStep] = useState(0) // 0: Create, 1: Organize, 2: Track
 
   useEffect(() => {
     loadProjects()
@@ -20,6 +22,9 @@ export default function Projects() {
       setLoading(true)
       const data = await projectsApi.list({ limit: 50 })
       setProjects(data.projects || [])
+      if (data.projects && data.projects.length > 0) {
+        setWizardStep(2) // If projects exist, show track step
+      }
     } catch (error) {
       console.error('Failed to load projects:', error)
     } finally {
@@ -36,6 +41,7 @@ export default function Projects() {
       await projectsApi.create(newProject)
       setNewProject({ name: '', description: '' })
       setShowCreate(false)
+      setWizardStep(1)
       loadProjects()
     } catch (error) {
       console.error('Failed to create project:', error)
@@ -64,35 +70,53 @@ export default function Projects() {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'active': return 'badge-success'
-      case 'planning': return 'badge-info'
-      case 'completed': return 'badge-gray'
-      case 'archived': return 'badge-gray'
-      default: return 'badge-gray'
+      case 'active': return 'text-green-500 bg-green-500/10 border-green-500/20'
+      case 'planning': return 'text-accent-primary bg-accent-primary/10 border-accent-primary/20'
+      case 'completed': return 'text-content-tertiary bg-surface-muted border-line-subtle'
+      case 'archived': return 'text-content-muted bg-surface-base border-line-subtle'
+      default: return 'text-content-tertiary bg-surface-muted border-line-subtle'
+    }
+  }
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'active': return <TrendingUp size={14} />
+      case 'planning': return <Target size={14} />
+      case 'completed': return <Archive size={14} />
+      case 'archived': return <Archive size={14} />
+      default: return <FolderKanban size={14} />
     }
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Projects</h1>
-          <p className="text-gray-600">Manage your projects and track progress</p>
-        </div>
-        <button
-          onClick={() => setShowCreate(!showCreate)}
-          className="btn btn-primary"
-        >
-          <Plus className="w-4 h-4" />
-          New Project
-        </button>
-      </div>
+    <div className="animate-fade-in max-w-7xl mx-auto">
+      <PageHeader 
+        title="Project Portfolio" 
+        subtitle="Organize work into projects, track progress, and manage deliverables."
+        actions={
+          <button
+            onClick={() => {
+              setShowCreate(!showCreate)
+              setWizardStep(0)
+            }}
+            className="btn btn-primary"
+          >
+            <Plus size={16} />
+            New Project
+          </button>
+        }
+      />
+
+      <GuideCard 
+        title="Project Workflow" 
+        steps={['Create Project', 'Organize Tasks', 'Track Progress']} 
+        activeStep={wizardStep} 
+      />
 
       {/* Create form */}
       {showCreate && (
-        <div className="card p-5">
-          <h3 className="font-semibold text-gray-900 mb-4">Create New Project</h3>
+        <div className="card p-6 mb-6 animate-fade-in">
+          <h3 className="font-bold text-content-primary text-lg mb-4">Create New Project</h3>
           <form onSubmit={handleCreate} className="space-y-4">
             <div>
               <label className="label">Project Name</label>
@@ -109,7 +133,7 @@ export default function Projects() {
               <label className="label">Description</label>
               <textarea
                 className="input min-h-[100px]"
-                placeholder="Project description..."
+                placeholder="Project description and goals..."
                 value={newProject.description}
                 onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
               />
@@ -131,11 +155,11 @@ export default function Projects() {
       )}
 
       {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+      <div className="relative mb-6">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-content-tertiary" />
         <input
           type="text"
-          placeholder="Search projects..."
+          placeholder="Search projects by name..."
           className="input pl-10"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
@@ -144,16 +168,26 @@ export default function Projects() {
 
       {/* Projects grid */}
       {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="spinner" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Skeleton className="h-40" count={6} />
         </div>
       ) : filteredProjects.length === 0 ? (
-        <div className="card p-8 text-center">
-          <FolderKanban className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-          <h3 className="text-lg font-medium text-gray-900 mb-1">No projects found</h3>
-          <p className="text-gray-500">
-            {searchQuery ? 'Try a different search term' : 'Create your first project to get started'}
+        <div className="card p-12 text-center border-dashed border-2">
+          <FolderKanban className="w-16 h-16 text-content-muted mx-auto mb-4 opacity-50" />
+          <h3 className="text-xl font-bold text-content-primary mb-2">No projects yet</h3>
+          <p className="text-content-secondary mb-6">
+            {searchQuery ? 'Try a different search term' : 'Create your first project to organize your work'}
           </p>
+          <button
+            onClick={() => {
+              setShowCreate(true)
+              setWizardStep(0)
+            }}
+            className="btn btn-primary"
+          >
+            <Plus size={16} />
+            Create Project
+          </button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -161,42 +195,45 @@ export default function Projects() {
             <Link
               key={project.id}
               to={`/projects/${project.id}`}
-              className="card p-5 hover:shadow-md transition-shadow"
+              className="card p-5 hover:border-accent-primary group transition-all"
             >
               <div className="flex items-start justify-between mb-3">
-                <div className="w-10 h-10 rounded-lg bg-accent-100 flex items-center justify-center">
-                  <FolderKanban className="w-5 h-5 text-accent-600" />
+                <div className="p-2 bg-accent-primary/10 rounded-md group-hover:bg-accent-primary group-hover:text-white transition-colors">
+                  <FolderKanban size={20} />
                 </div>
-                <span className={`badge ${getStatusColor(project.status)}`}>
+                <span className={`text-xs px-2 py-1 rounded-sm border font-mono flex items-center gap-1 ${getStatusColor(project.status)}`}>
+                  {getStatusIcon(project.status)}
                   {project.status}
                 </span>
               </div>
 
-              <h3 className="font-semibold text-gray-900 mb-1">{project.name}</h3>
+              <h3 className="font-bold text-content-primary mb-2 line-clamp-1 group-hover:text-accent-primary transition-colors">
+                {project.name}
+              </h3>
               {project.description && (
-                <p className="text-sm text-gray-500 line-clamp-2 mb-3">{project.description}</p>
+                <p className="text-sm text-content-secondary line-clamp-2 mb-4">{project.description}</p>
               )}
 
-              <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                <div className="flex items-center gap-3 text-xs text-gray-500">
+              <div className="flex items-center justify-between pt-3 border-t border-line-subtle">
+                <div className="flex items-center gap-3 text-xs text-content-tertiary font-mono">
                   {project.deal_value && (
                     <span className="flex items-center gap-1">
-                      <DollarSign className="w-3 h-3" />
+                      <DollarSign size={12} />
                       {project.deal_value.toLocaleString()}
                     </span>
                   )}
                   {project.end_date && (
                     <span className="flex items-center gap-1">
-                      <Calendar className="w-3 h-3" />
+                      <Calendar size={12} />
                       {new Date(project.end_date).toLocaleDateString()}
                     </span>
                   )}
                 </div>
                 <button
                   onClick={(e) => handleDelete(project.id, e)}
-                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                  className="p-1.5 opacity-0 group-hover:opacity-100 hover:bg-red-500/10 hover:text-red-500 rounded-md transition-all"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 size={14} />
                 </button>
               </div>
             </Link>

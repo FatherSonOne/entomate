@@ -7,6 +7,7 @@
 const BaseAgent = require('./baseAgent');
 const ai = require('../../config/ai');
 const { supabase } = require('../../config/supabase');
+const LearningEngine = require('../learning/LearningEngine');
 
 class AssignmentAgent extends BaseAgent {
   constructor() {
@@ -145,19 +146,51 @@ Return ONLY this JSON (no markdown, no explanation):
       const response = await ai.chat(prompt);
       const jsonMatch = response.match(/\{[\s\S]*\}/);
 
+      let suggestion;
       if (jsonMatch) {
-        const suggestion = JSON.parse(jsonMatch[0]);
+        suggestion = JSON.parse(jsonMatch[0]);
         this.log('AI suggestion generated', { recommended: suggestion.recommended });
-        return suggestion;
+      } else {
+        // Fallback if AI response parsing fails
+        suggestion = {
+          recommended: analysis.teamMembers[0].name,
+          reason: 'Default assignment',
+          confidence: 0.5,
+          alternatives: analysis.teamMembers.slice(1, 3).map(m => m.name)
+        };
       }
 
-      // Fallback if AI response parsing fails
-      return {
-        recommended: analysis.teamMembers[0].name,
-        reason: 'Default assignment',
-        confidence: 0.5,
-        alternatives: analysis.teamMembers.slice(1, 3).map(m => m.name)
-      };
+      // Apply learning patterns if userId available
+      if (context.userId) {
+        try {
+          const learnedSuggestion = await LearningEngine.applyLearning(
+            context.userId,
+            'assignment',
+            suggestion,
+            {
+              task: {
+                title: analysis.taskDescription,
+                description: analysis.taskDescription,
+                priority: analysis.taskPriority
+              }
+            }
+          );
+
+          if (learnedSuggestion._learningMetadata) {
+            this.log('Learning patterns applied', {
+              patternsApplied: learnedSuggestion._learningMetadata.patternsApplied
+            });
+          }
+
+          return learnedSuggestion;
+        } catch (learningError) {
+          this.log('Learning application failed, using original suggestion', {
+            error: learningError.message
+          });
+        }
+      }
+
+      return suggestion;
 
     } catch (error) {
       this.log('Error generating suggestion', { error: error.message });

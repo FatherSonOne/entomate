@@ -45,7 +45,18 @@
       "Bash(gh auth status:*)",
       "Bash(where:*)",
       "Bash(git config:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git remote add:*)",
+      "Bash(git push:*)",
+      "Bash(npm start)",
+      "Bash(type:*)",
+      "Bash(git checkout:*)",
+      "Bash(npm run dev:*)",
+      "Bash(node:*)",
+      "Bash(ls:*)",
+      "Bash(git mv AI-AUDIT-DELIVERABLES.md AI-FUNCTIONALITY-AUDIT-SUMMARY.md API-TESTING-SUMMARY.md COMPREHENSIVE_UI_AUDIT_REPORT.md Entomate_Production_GUIDE.md Entomate_Stack.md ENTOMATE-PLANNING-GUIDE.md ENV_SETUP.md gemini-developer-guide.md gemini-phase1-guide.md implementation-summary.md INTELLIGENCE-DASHBOARD-IMPLEMENTATION.md INTELLIGENCE-DASHBOARD-STATUS.md phase1-checklist.md QA_AUDIT_SUMMARY.md QUICK-INTEGRATION-GUIDE.md TERMINAL_THEME_HANDOFF.md UI_TEST_CASES_SPECIFICATION.md docs/)",
+      "Bash(git mv:*)"
     ]
   }
 }

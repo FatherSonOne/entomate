@@ -3,6 +3,23 @@ import axios from 'axios'
 // Use relative URL to leverage Vite proxy, or fall back to full URL if configured
 const API_BASE_URL = import.meta.env.VITE_API_URL || ''
 
+// Token getter function - will be set by ClerkAuthProvider
+let tokenGetter = null
+
+/**
+ * Set the token getter function
+ * This should be called from a component that has access to Clerk's useAuth hook
+ */
+export const setTokenGetter = (getter) => {
+  tokenGetter = getter
+}
+
+// Token cache to avoid multiple calls
+// Clerk tokens expire quickly (~60s), so cache for only 30 seconds
+let tokenCache = null
+let tokenCacheTime = 0
+const TOKEN_CACHE_DURATION = 30 * 1000 // 30 seconds
+
 // Network status tracking
 let isOnline = navigator.onLine
 let backendAvailable = true
@@ -74,18 +91,32 @@ const api = axios.create({
   }
 })
 
-// Request interceptor
+// Request interceptor - async to support Clerk token retrieval
 api.interceptors.request.use(
-  (config) => {
+  async (config) => {
     // Check if we're offline
     if (!navigator.onLine) {
       return Promise.reject(new Error('You are offline. Please check your internet connection.'))
     }
 
-    // Add auth token if available
-    const token = localStorage.getItem('auth_token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
+    // Get Clerk auth token
+    try {
+      // Check cache first
+      const now = Date.now()
+      if (tokenCache && (now - tokenCacheTime) < TOKEN_CACHE_DURATION) {
+        config.headers.Authorization = `Bearer ${tokenCache}`
+      } else if (tokenGetter) {
+        // Get fresh token using the token getter
+        const token = await tokenGetter()
+        if (token) {
+          tokenCache = token
+          tokenCacheTime = now
+          config.headers.Authorization = `Bearer ${token}`
+        }
+      }
+    } catch (error) {
+      // If token retrieval fails, continue without auth header
+      console.debug('Failed to get auth token:', error.message)
     }
 
     // Add retry tracking
@@ -117,7 +148,28 @@ api.interceptors.response.use(
       }
     }
 
-    // Retry logic
+    // Handle 401 - clear token cache and retry once with fresh token
+    if (error.response?.status === 401 && config && !config._tokenRefreshAttempted) {
+      config._tokenRefreshAttempted = true
+      // Clear token cache to force a fresh token
+      tokenCache = null
+      tokenCacheTime = 0
+
+      // Retry the request with a fresh token
+      try {
+        if (tokenGetter) {
+          const newToken = await tokenGetter()
+          if (newToken) {
+            config.headers.Authorization = `Bearer ${newToken}`
+            return api(config)
+          }
+        }
+      } catch (refreshError) {
+        console.debug('Token refresh failed:', refreshError.message)
+      }
+    }
+
+    // Retry logic for other errors
     if (config && isRetryableError(error) && config._retryCount < RETRY_CONFIG.maxRetries) {
       config._retryCount += 1
       const delay = getRetryDelay(config._retryCount - 1)
@@ -329,16 +381,29 @@ export const searchApi = {
   ask: (data) => api.post('/search/ask', data),
 
   // Ask question with streaming response (SSE)
-  askStream: (data, callbacks = {}) => {
+  askStream: async (data, callbacks = {}) => {
     const { onChunk, onCitations, onFollowUp, onComplete, onError } = callbacks
     // Use relative URL to work with Vite proxy
     const streamUrl = API_BASE_URL ? `${API_BASE_URL}/api/search/ask/stream` : '/api/search/ask/stream'
 
-    return fetch(streamUrl, {
+      // Get token for streaming request
+      let authHeader = ''
+      if (tokenGetter) {
+        try {
+          const token = await tokenGetter()
+          if (token) {
+            authHeader = `Bearer ${token}`
+          }
+        } catch (error) {
+          console.debug('Failed to get token for streaming request:', error.message)
+        }
+      }
+
+      return fetch(streamUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem('auth_token')}` : ''
+        'Authorization': authHeader
       },
       body: JSON.stringify(data)
     }).then(response => {
@@ -643,6 +708,10 @@ export const agentsApi = {
   provideFeedback: (executionId, rating, notes = '') =>
     api.post(`/agents/executions/${executionId}/feedback`, { rating, notes }),
 
+  // Get explanation for an agent execution
+  getExplanation: (executionId) =>
+    api.get(`/agents/executions/${executionId}/explanation`),
+
   // Trigger all matching agents
   trigger: (triggerType, data = {}) =>
     api.post('/agents/trigger', { trigger_type: triggerType, data }),
@@ -763,4 +832,132 @@ export const workflowsApi = {
   getTemplates: () => api.get('/workflows/templates')
 }
 
-export default api
+// ========================================
+// EXPLAINABILITY API (AI Decision Transparency)
+// ========================================
+export const explainabilityApi = {
+  // Create explanation
+  createExplanation: (data) => api.post('/explainability/explanations', data),
+
+  // Get explanation by execution ID
+  getExplanation: (executionId) => api.get(`/explainability/explanations/${executionId}`),
+
+  // Get recent explanations
+  getRecentExplanations: (agentType = null, limit = 10) =>
+    api.get('/explainability/explanations/recent', { params: { agentType, limit } }),
+
+  // Get explanation statistics
+  getStats: (days = 30) => api.get('/explainability/stats', { params: { days } }),
+
+  // Generate natural language summary
+  generateSummary: (executionId) =>
+    api.post(`/explainability/explanations/${executionId}/summary`)
+}
+
+// ========================================
+// LEARNING API (Agent Feedback & Pattern Detection)
+// ========================================
+export const learningApi = {
+  // Capture user override with feedback
+  captureOverride: (data) => api.post('/learning/feedback/override', data),
+
+  // Check if user wants feedback prompts
+  shouldPromptForFeedback: (agentType) =>
+    api.get('/learning/feedback/should-prompt', { params: { agentType } }),
+
+  // Set feedback preference
+  setFeedbackPreference: (agentType, enabled) =>
+    api.put('/learning/feedback/preference', { agentType, enabled }),
+
+  // Get recent overrides
+  getRecentOverrides: (agentType = null, limit = 10) =>
+    api.get('/learning/overrides/recent', { params: { agentType, limit } }),
+
+  // Get override statistics
+  getOverrideStats: (days = 30) =>
+    api.get('/learning/overrides/stats', { params: { days } }),
+
+  // Get learning patterns
+  getPatterns: (status = null, agentType = null) =>
+    api.get('/learning/patterns', { params: { status, agentType } }),
+
+  // Approve pattern
+  approvePattern: (patternId, customization = null) =>
+    api.post(`/learning/patterns/${patternId}/approve`, { customization }),
+
+  // Reject pattern
+  rejectPattern: (patternId, reason = null) =>
+    api.post(`/learning/patterns/${patternId}/reject`, { reason }),
+
+  // Deactivate pattern
+  deactivatePattern: (patternId) =>
+    api.post(`/learning/patterns/${patternId}/deactivate`),
+
+  // Get learning report
+  getReport: (period = 'month') =>
+    api.get('/learning/report', { params: { period } }),
+
+  // Track outcome for an override
+  trackOutcome: (overrideId, outcome) =>
+    api.post(`/learning/outcomes/${overrideId}`, outcome),
+
+  // Get comprehensive effectiveness report
+  getEffectivenessReport: (days = 30) =>
+    api.get('/learning/effectiveness-report', { params: { days } }),
+
+  // Get pattern validation metrics
+  getPatternValidation: (patternId) =>
+    api.get(`/learning/patterns/${patternId}/validation`)
+}
+
+// ========================================
+// INTELLIGENCE API (Enhanced Intelligence Dashboard)
+// ========================================
+export const intelligenceApi = {
+  // Get comprehensive dashboard intelligence
+  getDashboard: (options = {}) => api.get('/intelligence/dashboard', { params: options }),
+
+  // Get meeting prep for specific meeting
+  getMeetingPrep: (meetingId) => api.get(`/intelligence/meeting-prep/${meetingId}`),
+
+  // Generate meeting brief (AI)
+  generateMeetingBrief: (meetingId) => api.post(`/intelligence/meeting-prep/${meetingId}/brief`),
+
+  // Get deal risk analysis
+  getDealRisks: (options = {}) => api.get('/intelligence/deal-risks', { params: options }),
+
+  // Get action item status
+  getActionItems: () => api.get('/intelligence/action-items'),
+
+  // Send nudge for action item
+  sendNudge: (itemId, channel = 'in_app') =>
+    api.post(`/intelligence/action-items/${itemId}/nudge`, { channel }),
+
+  // Get relationship insights for deal
+  getRelationships: (dealId) => api.get(`/intelligence/relationships/${dealId}`)
+}
+
+// Create default export with all APIs
+const apiClient = {
+  // Base axios instance
+  ...api,
+
+  // API modules
+  meetings: meetingsApi,
+  projects: projectsApi,
+  tasks: tasksApi,
+  automations: automationsApi,
+  search: searchApi,
+  dashboard: dashboardApi,
+  reports: reportsApi,
+  calendar: calendarApi,
+  integrations: integrationsApi,
+  agents: agentsApi,
+  templates: templatesApi,
+  workflows: workflowsApi,
+  explainability: explainabilityApi,
+  learning: learningApi,
+  intelligence: intelligenceApi
+}
+
+export default apiClient

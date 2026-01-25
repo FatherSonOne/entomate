@@ -1,0 +1,23 @@
+{
+  "name": "entomate-ai-audit",
+  "version": "1.0.0",
+  "description": "Comprehensive AI functionality audit for Entomate",
+  "main": "ai-functionality-audit.js",
+  "scripts": {
+    "audit": "node ai-functionality-audit.js",
+    "audit:windows": "run-ai-audit.bat",
+    "audit:unix": "bash run-ai-audit.sh"
+  },
+  "keywords": [
+    "ai",
+    "audit",
+    "testing",
+    "validation",
+    "entomate"
+  ],
+  "author": "Entomate Team",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.0"
+  }
+}

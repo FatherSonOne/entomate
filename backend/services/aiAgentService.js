@@ -3,11 +3,16 @@
  * Autonomous agents that listen, decide, and act
  */
 
-const { supabase } = require('../config/supabase');
+const { supabase, supabaseAdmin } = require('../config/supabase');
+
+// Use admin client to bypass RLS for agent operations
+const db = supabaseAdmin || supabase;
 const geminiService = require('../config/gemini');
 const crmService = require('./crmService');
 const chatService = require('./chatService');
 const automationEngine = require('./automationEngine');
+const agentTemplates = require('./agentTemplates');
+const explainabilityService = require('./explainability/ExplainabilityService');
 
 class AIAgent {
   constructor(agentData) {
@@ -69,13 +74,35 @@ class AIAgent {
       await this.updateStats(true);
 
       execution.duration_ms = Date.now() - startTime;
-      await this.logExecution(execution);
+      const executionRecord = await this.logExecution(execution);
+
+      // Step 6: Generate explanation for transparency
+      let explanation = null;
+      try {
+        explanation = await explainabilityService.generateExplanation(
+          this.agentType,
+          {
+            task: triggerEvent.data,
+            candidate: execution.decisions[0]?.action?.config,
+            option: execution.decisions[0]?.action
+          },
+          execution.context_gathered
+        );
+
+        // Store explanation in database
+        if (executionRecord && executionRecord.id) {
+          await explainabilityService.storeExplanation(executionRecord.id, explanation);
+        }
+      } catch (error) {
+        console.error(`Agent "${this.name}" explanation error:`, error);
+      }
 
       return {
         success: true,
         agent: this.name,
         actionsExecuted: execution.actions_executed.length,
-        decisions: execution.decisions
+        decisions: execution.decisions,
+        explanation: explanation
       };
 
     } catch (error) {
@@ -119,7 +146,7 @@ class AIAgent {
         case 'meeting_processed':
           // Get meeting context
           if (triggerEvent.data.meeting_id) {
-            const { data: meeting } = await supabase
+            const { data: meeting } = await db
               .from('meetings')
               .select('*, action_items(*)')
               .eq('id', triggerEvent.data.meeting_id)
@@ -132,7 +159,7 @@ class AIAgent {
         case 'task_overdue':
           // Get task and project context
           if (triggerEvent.data.task_id) {
-            const { data: task } = await supabase
+            const { data: task } = await db
               .from('tasks')
               .select('*, projects(*)')
               .eq('id', triggerEvent.data.task_id)
@@ -311,7 +338,7 @@ Respond in JSON format:
     this.memory.patterns[patternKey] = (this.memory.patterns[patternKey] || 0) + 1;
 
     // Save memory to database
-    await supabase
+    await db
       .from('ai_agents')
       .update({ memory: this.memory, updated_at: new Date().toISOString() })
       .eq('id', this.id);
@@ -321,7 +348,7 @@ Respond in JSON format:
    * Update agent statistics
    */
   async updateStats(success) {
-    const { data: agent } = await supabase
+    const { data: agent } = await db
       .from('ai_agents')
       .select('execution_count, success_rate')
       .eq('id', this.id)
@@ -332,7 +359,7 @@ Respond in JSON format:
       const oldSuccessRate = agent.success_rate || 0;
       const newSuccessRate = ((oldSuccessRate * (newCount - 1)) + (success ? 1 : 0)) / newCount;
 
-      await supabase
+      await db
         .from('ai_agents')
         .update({
           execution_count: newCount,
@@ -347,7 +374,18 @@ Respond in JSON format:
    * Log execution to database
    */
   async logExecution(execution) {
-    await supabase.from('agent_executions').insert(execution);
+    const { data, error } = await db
+      .from('agent_executions')
+      .insert(execution)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error logging execution:', error);
+      return null;
+    }
+
+    return data;
   }
 
   /**
@@ -389,172 +427,15 @@ Respond in JSON format:
  */
 class AIAgentService {
   constructor() {
-    this.predefinedAgents = this.getPredefinedAgents();
+    // Don't cache templates - load fresh each time to avoid stale data
   }
 
   /**
    * Get pre-defined agent templates
+   * Now loads from agentTemplates service which includes all cross-app ecosystem templates
    */
   getPredefinedAgents() {
-    return [
-      {
-        id: 'deal-kickoff-coordinator',
-        name: 'Deal Kickoff Coordinator',
-        description: 'Automatically sets up projects, tasks, and notifications when a new high-value deal is created',
-        agent_type: 'predefined',
-        icon: 'rocket',
-        triggers: [
-          {
-            type: 'deal_created',
-            conditions: [
-              { field: 'deal_value', operator: 'gt', value: 50000 }
-            ]
-          }
-        ],
-        actions: [
-          {
-            type: 'create_project',
-            description: 'Create implementation project',
-            config: {
-              name: '{{deal_name}} - Implementation',
-              description: 'Project created from deal: {{deal_name}}'
-            }
-          },
-          {
-            type: 'create_task',
-            description: 'Schedule kickoff meeting',
-            config: {
-              title: 'Schedule kickoff meeting with {{contact_name}}',
-              priority: 'high',
-              due_in_days: 2
-            }
-          },
-          {
-            type: 'create_task',
-            description: 'Prepare discovery questions',
-            config: {
-              title: 'Prepare discovery questions for {{deal_name}}',
-              priority: 'medium',
-              due_in_days: 1
-            }
-          },
-          {
-            type: 'post_to_chat',
-            description: 'Announce new deal',
-            config: {
-              message: '🎉 New deal created: {{deal_name}} (${{deal_value}}) - Kickoff scheduled!'
-            }
-          }
-        ]
-      },
-      {
-        id: 'meeting-followup-bot',
-        name: 'Meeting Follow-up Bot',
-        description: 'Sends recaps, creates tasks from action items, and tracks completion after meetings',
-        agent_type: 'predefined',
-        icon: 'message-circle',
-        triggers: [
-          { type: 'meeting_processed' }
-        ],
-        actions: [
-          {
-            type: 'sync_to_crm',
-            description: 'Sync action items to CRM'
-          },
-          {
-            type: 'post_to_chat',
-            description: 'Post meeting recap to team channel'
-          },
-          {
-            type: 'create_task',
-            description: 'Create follow-up reminder',
-            config: {
-              title: 'Follow up on meeting: {{meeting_title}}',
-              priority: 'medium',
-              due_in_days: 3
-            }
-          }
-        ]
-      },
-      {
-        id: 'project-health-monitor',
-        name: 'Project Health Monitor',
-        description: 'Monitors project health and alerts on delays, budget overruns, or risks',
-        agent_type: 'predefined',
-        icon: 'activity',
-        triggers: [
-          { type: 'task_overdue' },
-          { type: 'scheduled', config: { schedule: '0 9 * * 1' } } // Monday 9am
-        ],
-        actions: [
-          {
-            type: 'post_to_chat',
-            description: 'Alert on overdue tasks',
-            config: {
-              message: '⚠️ Project alert: {{task_count}} overdue tasks in {{project_name}}'
-            }
-          },
-          {
-            type: 'create_task',
-            description: 'Create escalation task',
-            config: {
-              title: 'Review overdue items in {{project_name}}',
-              priority: 'high',
-              due_in_days: 1
-            }
-          }
-        ]
-      },
-      {
-        id: 'lead-nurture-agent',
-        name: 'Lead Nurture Agent',
-        description: 'Tracks leads, schedules follow-ups, and suggests content to share',
-        agent_type: 'predefined',
-        icon: 'user-plus',
-        triggers: [
-          { type: 'deal_created', conditions: [{ field: 'stage', operator: 'equals', value: 'lead' }] }
-        ],
-        actions: [
-          {
-            type: 'create_task',
-            description: 'Initial follow-up call',
-            config: {
-              title: 'Initial follow-up call with {{contact_name}}',
-              priority: 'high',
-              due_in_days: 1
-            }
-          },
-          {
-            type: 'create_task',
-            description: 'Send introduction email',
-            config: {
-              title: 'Send introduction email to {{contact_email}}',
-              priority: 'medium',
-              due_in_days: 0
-            }
-          }
-        ]
-      },
-      {
-        id: 'sales-forecast-agent',
-        name: 'Sales Forecast Agent',
-        description: 'Analyzes deal pipeline and predicts revenue, identifies at-risk deals',
-        agent_type: 'predefined',
-        icon: 'trending-up',
-        triggers: [
-          { type: 'scheduled', config: { schedule: '0 8 * * 5' } } // Friday 8am
-        ],
-        actions: [
-          {
-            type: 'post_to_chat',
-            description: 'Weekly forecast summary',
-            config: {
-              message: '📊 Weekly Sales Forecast:\n- Pipeline: ${{pipeline_value}}\n- Forecast: ${{forecast_value}}\n- At-risk: {{at_risk_count}} deals'
-            }
-          }
-        ]
-      }
-    ];
+    return agentTemplates.getAllTemplates();
   }
 
   /**
@@ -565,7 +446,7 @@ class AIAgentService {
 
     try {
       // Find enabled agents for this trigger
-      const { data: agents, error } = await supabase
+      const { data: agents, error } = await db
         .from('ai_agents')
         .select('*')
         .eq('enabled', true);
@@ -616,19 +497,27 @@ class AIAgentService {
    * Create a new agent
    */
   async createAgent(agentData, userId) {
-    const { data, error } = await supabase
+    // Build insert data - only include created_by if it's a valid UUID
+    const insertData = {
+      name: agentData.name,
+      description: agentData.description,
+      agent_type: agentData.agent_type || 'custom',
+      icon: agentData.icon || 'bot',
+      triggers: agentData.triggers || [],
+      actions: agentData.actions || [],
+      config: agentData.config || {},
+      enabled: agentData.enabled !== false
+    };
+
+    // Only add created_by if it looks like a valid UUID (Clerk IDs are strings, not UUIDs)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (userId && uuidRegex.test(userId)) {
+      insertData.created_by = userId;
+    }
+
+    const { data, error } = await db
       .from('ai_agents')
-      .insert({
-        name: agentData.name,
-        description: agentData.description,
-        agent_type: agentData.agent_type || 'custom',
-        icon: agentData.icon || 'bot',
-        triggers: agentData.triggers || [],
-        actions: agentData.actions || [],
-        config: agentData.config || {},
-        enabled: agentData.enabled !== false,
-        created_by: userId
-      })
+      .insert(insertData)
       .select()
       .single();
 
@@ -640,7 +529,7 @@ class AIAgentService {
    * Create agent from predefined template
    */
   async createFromTemplate(templateId, userId, customizations = {}) {
-    const template = this.predefinedAgents.find(a => a.id === templateId);
+    const template = this.getPredefinedAgents().find(a => a.id === templateId);
     if (!template) {
       throw new Error(`Template not found: ${templateId}`);
     }
@@ -658,7 +547,7 @@ class AIAgentService {
    * Get agent by ID
    */
   async getAgent(agentId) {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('ai_agents')
       .select('*')
       .eq('id', agentId)
@@ -672,7 +561,7 @@ class AIAgentService {
    * List all agents
    */
   async listAgents(filters = {}) {
-    let query = supabase.from('ai_agents').select('*');
+    let query = db.from('ai_agents').select('*');
 
     if (filters.enabled !== undefined) {
       query = query.eq('enabled', filters.enabled);
@@ -694,7 +583,7 @@ class AIAgentService {
    * Update agent
    */
   async updateAgent(agentId, updates) {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('ai_agents')
       .update({
         ...updates,
@@ -712,7 +601,7 @@ class AIAgentService {
    * Delete agent
    */
   async deleteAgent(agentId) {
-    const { error } = await supabase
+    const { error } = await db
       .from('ai_agents')
       .delete()
       .eq('id', agentId);
@@ -733,7 +622,7 @@ class AIAgentService {
    * Get agent execution logs
    */
   async getExecutionLogs(agentId, limit = 50) {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('agent_executions')
       .select('*')
       .eq('agent_id', agentId)
@@ -741,14 +630,14 @@ class AIAgentService {
       .limit(limit);
 
     if (error) throw error;
-    return data;
+    return data || [];
   }
 
   /**
    * Provide feedback on agent execution
    */
   async provideFeedback(executionId, rating, notes) {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('agent_executions')
       .update({
         feedback_rating: rating,
@@ -760,6 +649,13 @@ class AIAgentService {
 
     if (error) throw error;
     return data;
+  }
+
+  /**
+   * Get explanation for an agent execution
+   */
+  async getExplanation(executionId) {
+    return await explainabilityService.getExplanation(executionId);
   }
 
   /**

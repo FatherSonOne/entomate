@@ -6,6 +6,7 @@
 
 const BaseAgent = require('./baseAgent');
 const ai = require('../../config/ai');
+const LearningEngine = require('../learning/LearningEngine');
 
 class FollowupAgent extends BaseAgent {
   constructor() {
@@ -283,12 +284,46 @@ class FollowupAgent extends BaseAgent {
 
       this.log('Follow-up suggestions generated', { count: followups.length });
 
-      return {
+      const suggestion = {
         followups,
         meetingTitle: analysis.meetingTitle,
         analyzedDate: new Date().toISOString(),
         totalDetections: patternDetections.length
       };
+
+      // Apply learning patterns if userId available
+      if (context.userId) {
+        try {
+          const learnedSuggestion = await LearningEngine.applyLearning(
+            context.userId,
+            'followup',
+            suggestion,
+            {
+              task: {
+                title: analysis.meetingTitle,
+                description: textToAnalyze.substring(0, 200)
+              },
+              meeting: {
+                type: 'general'
+              }
+            }
+          );
+
+          if (learnedSuggestion._learningMetadata) {
+            this.log('Learning patterns applied', {
+              patternsApplied: learnedSuggestion._learningMetadata.patternsApplied
+            });
+          }
+
+          return learnedSuggestion;
+        } catch (learningError) {
+          this.log('Learning application failed, using original suggestion', {
+            error: learningError.message
+          });
+        }
+      }
+
+      return suggestion;
 
     } catch (error) {
       this.log('Error generating follow-ups', { error: error.message });

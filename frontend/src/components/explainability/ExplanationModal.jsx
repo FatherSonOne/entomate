@@ -1,0 +1,192 @@
+import React from 'react';
+import { X, Brain, TrendingUp, Award, HelpCircle } from 'lucide-react';
+import FactorBreakdown from './FactorBreakdown';
+
+/**
+ * Explanation Modal Component
+ * Full-screen detailed explanation of AI decision
+ */
+export default function ExplanationModal({ explanation, onClose, agentType }) {
+  if (!explanation) return null;
+
+  const { recommendation, confidence, factors, alternatives, metadata } = explanation;
+
+  const getConfidenceColor = (conf) => {
+    if (conf >= 80) return 'text-green-600 bg-green-100';
+    if (conf >= 60) return 'text-yellow-600 bg-yellow-100';
+    return 'text-orange-600 bg-orange-100';
+  };
+
+  const getConfidenceLabel = (conf) => {
+    if (conf >= 80) return 'High Confidence';
+    if (conf >= 60) return 'Medium Confidence';
+    return 'Low Confidence';
+  };
+
+  const getAgentDisplayName = (type) => {
+    const names = {
+      assignment: 'Assignment Agent',
+      priority: 'Priority Agent',
+      deadline: 'Deadline Agent',
+      followup: 'Follow-up Agent'
+    };
+    return names[type] || 'AI Agent';
+  };
+
+  const getAgentIcon = (type) => {
+    const icons = {
+      assignment: '👥',
+      priority: '🎯',
+      deadline: '📅',
+      followup: '🔔'
+    };
+    return icons[type] || '🤖';
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="sticky top-0 bg-gradient-to-r from-indigo-600 to-blue-600 px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4 text-white">
+            <div className="text-4xl">{getAgentIcon(agentType)}</div>
+            <div>
+              <h2 className="text-2xl font-bold">AI Decision Explanation</h2>
+              <p className="text-indigo-100">{getAgentDisplayName(agentType)}</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-white hover:text-gray-200 p-2 rounded-full hover:bg-white hover:bg-opacity-20"
+          >
+            <X size={24} />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="px-6 py-6 space-y-6">
+          {/* Recommendation Summary */}
+          <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg p-6 border border-indigo-200">
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <Brain size={32} className="text-indigo-600" />
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Recommendation</h3>
+                  <p className="text-gray-600">What the AI suggests and why</p>
+                </div>
+              </div>
+              <span className={`px-4 py-2 rounded-full text-sm font-medium ${getConfidenceColor(confidence)}`}>
+                {confidence}% {getConfidenceLabel(confidence)}
+              </span>
+            </div>
+
+            <div className="bg-white bg-opacity-60 rounded-lg p-4">
+              <div className="text-lg font-semibold text-gray-900 mb-2">
+                {recommendation?.name || recommendation?.value || JSON.stringify(recommendation)}
+              </div>
+              {metadata?.summary && (
+                <p className="text-gray-700">{metadata.summary}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Decision Factors */}
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <TrendingUp size={24} className="text-indigo-600" />
+              <h3 className="text-xl font-bold text-gray-900">Decision Factors</h3>
+            </div>
+            <div className="text-sm text-gray-600 mb-4">
+              The AI considered {factors.length} factors to make this decision. Each factor is weighted based on importance and scored based on how well the option performs.
+            </div>
+            <FactorBreakdown factors={factors} showDetails={true} compact={false} />
+          </div>
+
+          {/* Alternatives Considered */}
+          {alternatives && alternatives.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <Award size={24} className="text-indigo-600" />
+                <h3 className="text-xl font-bold text-gray-900">Alternatives Considered</h3>
+              </div>
+              <div className="text-sm text-gray-600 mb-4">
+                The AI evaluated {alternatives.length + 1} total options. Here's why the other options scored lower:
+              </div>
+              <div className="space-y-3">
+                {alternatives.map((alt, index) => (
+                  <div
+                    key={index}
+                    className="bg-gray-50 rounded-lg p-4 border border-gray-200"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-400 font-bold">#{index + 2}</span>
+                        <span className="font-semibold text-gray-900">
+                          {alt.option?.name || alt.option?.value || JSON.stringify(alt.option)}
+                        </span>
+                      </div>
+                      <span className="text-sm font-semibold text-gray-600">
+                        Score: {alt.score} / 100
+                      </span>
+                    </div>
+
+                    {/* Why Lower */}
+                    <div className="mb-3">
+                      <div className="text-xs font-medium text-gray-500 mb-1">Why ranked lower:</div>
+                      <p className="text-sm text-gray-700">{alt.whyLower}</p>
+                    </div>
+
+                    {/* Alternative Factors */}
+                    {alt.factors && alt.factors.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-gray-200">
+                        <div className="text-xs font-medium text-gray-500 mb-2">Factor Comparison:</div>
+                        <FactorBreakdown factors={alt.factors} showDetails={false} compact={true} />
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* How to Improve AI */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+            <div className="flex items-start gap-3">
+              <HelpCircle size={24} className="text-blue-600 flex-shrink-0 mt-1" />
+              <div>
+                <h4 className="font-semibold text-blue-900 mb-2">Help the AI Learn</h4>
+                <p className="text-sm text-blue-700 mb-3">
+                  If you disagree with this recommendation, you can override it. The AI will learn from your corrections and improve its future recommendations.
+                </p>
+                <div className="text-xs text-blue-600">
+                  Learn more about{' '}
+                  <a href="#" className="underline font-medium">
+                    AI Learning & Feedback
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Metadata */}
+          {metadata && (
+            <div className="text-xs text-gray-500 border-t border-gray-200 pt-4">
+              <div>Generated: {new Date(metadata.generatedAt || explanation.created_at).toLocaleString()}</div>
+              <div>Explanation Version: {metadata.version || '1.0'}</div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-medium"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

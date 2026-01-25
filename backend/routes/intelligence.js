@@ -178,4 +178,241 @@ router.post('/briefing/viewed', async (req, res) => {
   }
 });
 
+// ============================================================
+// ENHANCED INTELLIGENCE DASHBOARD ENDPOINTS
+// ============================================================
+
+/**
+ * GET /api/intelligence/dashboard
+ * Get comprehensive enhanced intelligence dashboard
+ * Includes: Meeting Prep, Deal Risks, Action Items, Relationship Insights
+ */
+router.get('/dashboard', async (req, res) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required'
+      });
+    }
+
+    const options = {
+      dealRiskFilter: req.query.riskFilter?.split(',') || ['medium', 'high', 'critical'],
+      timeHorizon: {
+        meetings: parseInt(req.query.meetingHours) || 24,
+        risks: parseInt(req.query.riskDays) || 7
+      }
+    };
+
+    console.log('[Intelligence] Fetching enhanced dashboard...');
+
+    const result = await intelligenceService.getDashboardIntelligence(userId, options);
+
+    res.json(result);
+  } catch (error) {
+    console.error('[Intelligence] Dashboard error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch dashboard intelligence',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/intelligence/meeting-prep/:meetingId
+ * Get detailed meeting preparation intelligence for a specific meeting
+ */
+router.get('/meeting-prep/:meetingId', async (req, res) => {
+  try {
+    const { meetingId } = req.params;
+
+    console.log('[Intelligence] Fetching meeting prep for:', meetingId);
+
+    const prep = await intelligenceService.meetingPrepService.getMeetingPrep(meetingId);
+
+    if (!prep) {
+      return res.status(404).json({
+        success: false,
+        error: 'Meeting not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: prep
+    });
+  } catch (error) {
+    console.error('[Intelligence] Meeting prep error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate meeting prep',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/intelligence/meeting-prep/:meetingId/brief
+ * Generate full AI meeting brief document
+ */
+router.post('/meeting-prep/:meetingId/brief', async (req, res) => {
+  try {
+    const { meetingId } = req.params;
+
+    console.log('[Intelligence] Generating meeting brief for:', meetingId);
+
+    const brief = await intelligenceService.meetingPrepService.generateMeetingBrief(meetingId);
+
+    res.json({
+      success: true,
+      data: {
+        brief,
+        generatedAt: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('[Intelligence] Brief generation error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate meeting brief',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/intelligence/deal-risks
+ * Get at-risk deals with AI-powered risk scoring
+ */
+router.get('/deal-risks', async (req, res) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required'
+      });
+    }
+
+    const options = {
+      riskLevel: req.query.riskLevel?.split(','),
+      limit: parseInt(req.query.limit) || 10
+    };
+
+    console.log('[Intelligence] Fetching deal risks...');
+
+    const risks = await intelligenceService.dealRiskService.getAtRiskDeals(userId, options);
+
+    res.json({
+      success: true,
+      data: risks
+    });
+  } catch (error) {
+    console.error('[Intelligence] Deal risks error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch deal risks',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/intelligence/action-items
+ * Get comprehensive action item tracking and analytics
+ */
+router.get('/action-items', async (req, res) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required'
+      });
+    }
+
+    console.log('[Intelligence] Fetching action item status...');
+
+    const status = await intelligenceService.actionItemService.getActionItemStatus(userId);
+
+    res.json({
+      success: true,
+      data: status
+    });
+  } catch (error) {
+    console.error('[Intelligence] Action items error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch action item status',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/intelligence/action-items/:itemId/nudge
+ * Send intelligent nudge for an overdue/blocked action item
+ */
+router.post('/action-items/:itemId/nudge', async (req, res) => {
+  try {
+    const { itemId } = req.params;
+    const { channel = 'in_app' } = req.body;
+
+    console.log('[Intelligence] Sending nudge for action item:', itemId);
+
+    const result = await intelligenceService.actionItemService.sendNudge(itemId, channel);
+
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('[Intelligence] Nudge error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to send nudge',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/intelligence/relationships/:dealId
+ * Get relationship intelligence and stakeholder analysis for a deal
+ */
+router.get('/relationships/:dealId', async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const { dealId } = req.params;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required'
+      });
+    }
+
+    console.log('[Intelligence] Fetching relationship insights for deal:', dealId);
+
+    const insights = await intelligenceService.relationshipService.getRelationshipInsights(dealId, userId);
+
+    res.json({
+      success: true,
+      data: insights
+    });
+  } catch (error) {
+    console.error('[Intelligence] Relationships error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch relationship insights',
+      details: error.message
+    });
+  }
+});
+
 module.exports = router;

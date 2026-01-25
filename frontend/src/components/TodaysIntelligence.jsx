@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
+import { useAuth } from '@clerk/clerk-react'
 import {
   Sun,
   Moon,
@@ -28,6 +29,7 @@ import {
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
 export default function TodaysIntelligence() {
+  const { getToken } = useAuth()
   const [briefing, setBriefing] = useState(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -55,12 +57,11 @@ export default function TodaysIntelligence() {
       else setLoading(true)
       setError(null)
 
+      const token = await getToken()
       const response = await fetch(`${API_BASE_URL}/api/intelligence/today`, {
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': localStorage.getItem('auth_token')
-            ? `Bearer ${localStorage.getItem('auth_token')}`
-            : ''
+          'Authorization': token ? `Bearer ${token}` : ''
         }
       })
 
@@ -77,7 +78,7 @@ export default function TodaysIntelligence() {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [])
+  }, [getToken])
 
   useEffect(() => {
     loadBriefing()
@@ -87,13 +88,12 @@ export default function TodaysIntelligence() {
     try {
       setStartingDay(true)
 
+      const token = await getToken()
       await fetch(`${API_BASE_URL}/api/intelligence/briefing/viewed`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': localStorage.getItem('auth_token')
-            ? `Bearer ${localStorage.getItem('auth_token')}`
-            : ''
+          'Authorization': token ? `Bearer ${token}` : ''
         }
       })
 

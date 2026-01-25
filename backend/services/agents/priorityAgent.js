@@ -6,6 +6,7 @@
 
 const BaseAgent = require('./baseAgent');
 const ai = require('../../config/ai');
+const LearningEngine = require('../learning/LearningEngine');
 
 class PriorityAgent extends BaseAgent {
   constructor() {
@@ -120,18 +121,50 @@ Return ONLY this JSON:
       const response = await ai.chat(prompt);
       const jsonMatch = response.match(/\{[\s\S]*\}/);
 
+      let suggestion;
       if (jsonMatch) {
-        const suggestion = JSON.parse(jsonMatch[0]);
+        suggestion = JSON.parse(jsonMatch[0]);
         this.log('AI priority suggestion', { priority: suggestion.recommended });
-        return suggestion;
+      } else {
+        suggestion = {
+          recommended: 'medium',
+          reason: 'Default priority',
+          confidence: 0.5,
+          factors: []
+        };
       }
 
-      return {
-        recommended: 'medium',
-        reason: 'Default priority',
-        confidence: 0.5,
-        factors: []
-      };
+      // Apply learning patterns if userId available
+      if (context.userId) {
+        try {
+          const learnedSuggestion = await LearningEngine.applyLearning(
+            context.userId,
+            'priority',
+            suggestion,
+            {
+              task: {
+                title: analysis.taskDescription,
+                description: analysis.taskDescription,
+                priority: suggestion.recommended
+              }
+            }
+          );
+
+          if (learnedSuggestion._learningMetadata) {
+            this.log('Learning patterns applied', {
+              patternsApplied: learnedSuggestion._learningMetadata.patternsApplied
+            });
+          }
+
+          return learnedSuggestion;
+        } catch (learningError) {
+          this.log('Learning application failed, using original suggestion', {
+            error: learningError.message
+          });
+        }
+      }
+
+      return suggestion;
 
     } catch (error) {
       this.log('Error generating priority', { error: error.message });

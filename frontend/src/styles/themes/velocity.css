@@ -1,0 +1,94 @@
+/* ============================================
+   VELOCITY BRAND THEME
+   Speed/Performance-Focused: Dynamic, Fast, High-Performance
+   ============================================ */
+
+[data-brand="velocity"] {
+  /* Core Brand Palette */
+  --brand-primary: #EF4444; /* Racing Red */
+  --brand-secondary: #FBBF24; /* Velocity Yellow */
+  --brand-tertiary: #94A3B8; /* Chrome Silver */
+  --brand-accent: #18181B; /* Carbon Black */
+
+  /* Typography */
+  --font-display: 'Bebas Neue', sans-serif;
+  --font-heading: 'Rajdhani', sans-serif;
+  --font-body: 'Rubik', sans-serif;
+  --font-mono: 'Roboto Mono', monospace;
+
+  /* Border Radius - Beveled edges */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* Shadows - Directional motion shadows */
+  --shadow-sm: 4px -4px 0 rgba(0, 0, 0, 0.1);
+  --shadow-md: 8px -8px 0 rgba(0, 0, 0, 0.1);
+  --shadow-lg: 12px -12px 0 rgba(0, 0, 0, 0.15);
+  --shadow-glow: 0 0 20px rgba(239, 68, 68, 0.4);
+
+  /* Accent Variations */
+  --accent-primary: var(--brand-primary);
+  --accent-primary-light: #f87171;
+  --accent-primary-dim: rgba(239, 68, 68, 0.15);
+  --accent-primary-glow: rgba(239, 68, 68, 0.4);
+
+  --accent-secondary: var(--brand-secondary);
+  --accent-secondary-light: #fcd34d;
+  --accent-secondary-dim: rgba(251, 191, 36, 0.15);
+
+  --accent-tertiary: var(--brand-tertiary);
+  --accent-tertiary-light: #cbd5e1;
+  --accent-tertiary-dim: rgba(148, 163, 184, 0.15);
+}
+
+/* Light Mode - Pure white */
+[data-brand="velocity"].light,
+[data-brand="velocity"]:not(.dark) {
+  --bg-base: #FFFFFF;
+  --bg-surface: #FFFFFF;
+  --bg-elevated: rgba(255, 255, 255, 0.95);
+  --bg-muted: #F4F4F5;
+  --bg-subtle: #FAFAFA;
+
+  --text-primary: #18181B;
+  --text-secondary: #52525B;
+  --text-tertiary: #A1A1AA;
+  --text-muted: #D4D4D8;
+
+  --border-subtle: rgba(239, 68, 68, 0.1);
+  --border-default: rgba(239, 68, 68, 0.2);
+  --border-strong: rgba(239, 68, 68, 0.3);
+
+  --grid-color: rgba(0, 0, 0, 0.03);
+  --grid-size: 16px;
+}
+
+/* Dark Mode - Carbon fiber */
+[data-brand="velocity"].dark {
+  --bg-base: #0A0A0F; /* Carbon fiber */
+  --bg-surface: #18181B;
+  --bg-elevated: rgba(24, 24, 27, 0.9);
+  --bg-muted: #27272A;
+  --bg-subtle: #18181B;
+
+  --text-primary: #FAFAFA;
+  --text-secondary: #D4D4D8;
+  --text-tertiary: #A1A1AA;
+  --text-muted: #71717A;
+
+  --border-subtle: rgba(239, 68, 68, 0.2);
+  --border-default: rgba(239, 68, 68, 0.3);
+  --border-strong: rgba(239, 68, 68, 0.4);
+
+  --grid-color: rgba(255, 255, 255, 0.05);
+  --grid-size: 16px;
+}
+
+/* Speed line animation */
+@keyframes speed-line {
+  0% { transform: translateX(-100%); opacity: 0; }
+  50% { opacity: 1; }
+  100% { transform: translateX(100%); opacity: 0; }
+}

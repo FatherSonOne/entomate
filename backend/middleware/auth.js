@@ -1,8 +1,14 @@
-const { supabase, supabaseAdmin } = require('../config/supabase');
+const { verifyToken } = require('@clerk/clerk-sdk-node');
+const { createClerkClient } = require('@clerk/clerk-sdk-node');
+
+// Initialize Clerk client for user lookups
+const clerkClient = createClerkClient({
+  secretKey: process.env.CLERK_SECRET_KEY
+});
 
 /**
  * Authentication Middleware
- * Verifies JWT token from Supabase Auth
+ * Verifies JWT token from Clerk
  */
 const authenticate = async (req, res, next) => {
   try {
@@ -17,30 +23,41 @@ const authenticate = async (req, res, next) => {
 
     const token = authHeader.split(' ')[1];
 
-    // Verify the JWT token with Supabase
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+    // Verify the JWT token with Clerk
+    const payload = await verifyToken(token, {
+      secretKey: process.env.CLERK_SECRET_KEY
+    });
 
-    if (error || !user) {
+    if (!payload || !payload.sub) {
       return res.status(401).json({
         error: 'Unauthorized',
         message: 'Invalid or expired token'
       });
     }
 
+    const userId = payload.sub;
+    const sessionId = payload.sid;
+
+    // Get user details from Clerk
+    const user = await clerkClient.users.getUser(userId);
+
     // Attach user to request object
     req.user = {
       id: user.id,
-      email: user.email,
-      role: user.user_metadata?.role || 'member',
-      teamId: user.user_metadata?.team_id || 'default'
+      email: user.emailAddresses[0]?.emailAddress || null,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: user.publicMetadata?.role || 'member',
+      teamId: user.publicMetadata?.team_id || 'default',
+      sessionId: sessionId
     };
 
     next();
   } catch (error) {
-    console.error('Authentication error:', error);
-    return res.status(500).json({
-      error: 'Authentication failed',
-      message: error.message
+    console.error('Authentication error:', error.message);
+    return res.status(401).json({
+      error: 'Unauthorized',
+      message: 'Invalid or expired token'
     });
   }
 };
@@ -59,17 +76,36 @@ const optionalAuth = async (req, res, next) => {
     }
 
     const token = authHeader.split(' ')[1];
-    const { data: { user }, error } = await supabase.auth.getUser(token);
 
-    if (error || !user) {
-      req.user = { id: 'anonymous', email: null, role: 'guest', teamId: 'default' };
-    } else {
+    try {
+      const payload = await verifyToken(token, {
+        secretKey: process.env.CLERK_SECRET_KEY
+      });
+
+      if (!payload || !payload.sub) {
+        req.user = { id: 'anonymous', email: null, role: 'guest', teamId: 'default' };
+        return next();
+      }
+
+      const userId = payload.sub;
+      const sessionId = payload.sid;
+
+      // Get user details from Clerk
+      const user = await clerkClient.users.getUser(userId);
+
       req.user = {
         id: user.id,
-        email: user.email,
-        role: user.user_metadata?.role || 'member',
-        teamId: user.user_metadata?.team_id || 'default'
+        email: user.emailAddresses[0]?.emailAddress || null,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.publicMetadata?.role || 'member',
+        teamId: user.publicMetadata?.team_id || 'default',
+        sessionId: sessionId
       };
+    } catch (error) {
+      // Token invalid or expired, treat as anonymous
+      console.debug('Optional auth failed:', error.message);
+      req.user = { id: 'anonymous', email: null, role: 'guest', teamId: 'default' };
     }
 
     next();

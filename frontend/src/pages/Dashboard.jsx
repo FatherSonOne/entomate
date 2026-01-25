@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Mic, FolderKanban, CheckSquare, Zap, ArrowRight, Server, BrainCircuit } from 'lucide-react'
 import MeetingRecorder from '../components/MeetingRecorder'
-import DailyBriefing from '../components/DailyBriefing'
+import IntelligenceDashboard from '../components/intelligence/IntelligenceDashboard'
 import { meetingsApi, tasksApi, projectsApi, checkHealth } from '../services/api'
 
 // Dev-Core Stat Card: Emphasizes mono font and high contrast
@@ -79,9 +79,9 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-4">
-      {/* Dev-Core: Briefing is more compact and integrated */}
-      <DailyBriefing />
-      
+      {/* Enhanced Intelligence Dashboard - AI-powered meeting prep, deal risks, action items, and relationships */}
+      <IntelligenceDashboard />
+
       {/* Dev-Core: High-density stat grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         {statCardsData.map(card => <StatCard key={card.label} {...card} />)}

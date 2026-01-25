@@ -77,8 +77,8 @@ export default function Layout() {
         }`}
       >
         <div className="flex flex-col h-full">
-          {/* Logo - CMF Nothing style with highlight accent */}
-          <div className="flex items-center justify-between h-16 px-4 border-b border-nothing-200 dark:border-nothing-800">
+          {/* Logo - Multi-Brand Theme System */}
+          <div className="flex items-center justify-between h-16 px-4 border-b border-line-default">
             <div className="flex items-center gap-2">
               <div
                 className="w-8 h-8 rounded-lg flex items-center justify-center"
@@ -86,10 +86,10 @@ export default function Layout() {
               >
                 <span className="text-white font-bold text-lg font-mono">E</span>
               </div>
-              <span className="text-xl font-bold text-nothing-900 dark:text-nothing-100">Entomate</span>
+              <span className="text-xl font-bold text-content-primary">Entomate</span>
             </div>
             <button
-              className="lg:hidden p-1 text-nothing-500 hover:text-nothing-700 dark:text-nothing-400 dark:hover:text-nothing-200"
+              className="lg:hidden p-1 text-content-secondary hover:text-content-primary"
               onClick={() => setSidebarOpen(false)}
             >
               <X className="w-5 h-5" />
@@ -117,7 +117,7 @@ export default function Layout() {
           </nav>
 
           {/* Settings link */}
-          <div className="p-3 border-t border-nothing-200 dark:border-nothing-800">
+          <div className="p-3 border-t border-line-default">
             <NavLink
               to="/settings"
               className={`nav-item ${isActive('/settings') ? 'nav-item-active' : ''}`}
@@ -132,10 +132,10 @@ export default function Layout() {
 
       {/* Main content */}
       <div className="lg:pl-64">
-        {/* Top bar - CMF Nothing style header */}
+        {/* Top bar - Multi-Brand Theme System */}
         <header className="header sticky top-0 z-30 flex items-center h-16 px-4 lg:px-6">
           <button
-            className="p-2 -ml-2 text-nothing-500 hover:text-nothing-700 dark:text-nothing-400 dark:hover:text-nothing-200 lg:hidden"
+            className="p-2 -ml-2 text-content-secondary hover:text-content-primary lg:hidden"
             onClick={() => setSidebarOpen(true)}
           >
             <Menu className="w-6 h-6" />
@@ -149,11 +149,11 @@ export default function Layout() {
             {/* Command palette button */}
             <button
               onClick={() => setCommandPaletteOpen(true)}
-              className="hidden sm:flex items-center gap-2 px-3 py-1.5 text-sm text-nothing-500 dark:text-nothing-400 bg-nothing-100 dark:bg-nothing-800 hover:bg-nothing-200 dark:hover:bg-nothing-700 rounded-lg transition-colors"
+              className="hidden sm:flex items-center gap-2 px-3 py-1.5 text-sm text-content-secondary bg-surface-muted hover:bg-surface-subtle rounded-lg transition-colors"
             >
               <Search className="w-4 h-4" />
               <span>Search...</span>
-              <kbd className="ml-2 px-1.5 py-0.5 text-xs bg-white dark:bg-nothing-900 border border-nothing-300 dark:border-nothing-600 rounded">
+              <kbd className="ml-2 px-1.5 py-0.5 text-xs bg-surface border border-line-default rounded">
                 {getModKey()}K
               </kbd>
             </button>
@@ -161,13 +161,13 @@ export default function Layout() {
             {/* Keyboard shortcuts hint */}
             <button
               onClick={() => setShortcutsHelpOpen(true)}
-              className="hidden md:flex p-2 text-nothing-400 hover:text-nothing-600 dark:hover:text-nothing-200 hover:bg-nothing-100 dark:hover:bg-nothing-800 rounded-lg"
+              className="hidden md:flex p-2 text-content-tertiary hover:text-content-secondary hover:bg-surface-muted rounded-lg"
               title="Keyboard shortcuts"
             >
               <Command className="w-5 h-5" />
             </button>
 
-            {/* Theme Toggle - CMF Nothing style */}
+            {/* Theme Toggle - Multi-Brand Theme System */}
             <ThemeToggle compact />
 
             <button className="btn btn-primary" onClick={() => navigate('/meetings?new=true')}>

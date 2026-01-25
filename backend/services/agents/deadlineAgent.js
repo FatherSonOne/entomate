@@ -6,6 +6,7 @@
 
 const BaseAgent = require('./baseAgent');
 const ai = require('../../config/ai');
+const LearningEngine = require('../learning/LearningEngine');
 
 class DeadlineAgent extends BaseAgent {
   constructor() {
@@ -156,21 +157,54 @@ Return ONLY this JSON:
       const response = await ai.chat(prompt);
       const jsonMatch = response.match(/\{[\s\S]*\}/);
 
+      let suggestion;
       if (jsonMatch) {
-        const suggestion = JSON.parse(jsonMatch[0]);
+        suggestion = JSON.parse(jsonMatch[0]);
         this.log('AI deadline suggestion', { deadline: suggestion.recommended });
-        return {
+        suggestion = {
           ...suggestion,
+          complexity: analysis.complexity
+        };
+      } else {
+        suggestion = {
+          recommended: heuristicDeadline.toISOString().split('T')[0],
+          reason: `Default deadline based on ${analysis.priority} priority`,
+          confidence: 0.6,
           complexity: analysis.complexity
         };
       }
 
-      return {
-        recommended: heuristicDeadline.toISOString().split('T')[0],
-        reason: `Default deadline based on ${analysis.priority} priority`,
-        confidence: 0.6,
-        complexity: analysis.complexity
-      };
+      // Apply learning patterns if userId available
+      if (context.userId) {
+        try {
+          const learnedSuggestion = await LearningEngine.applyLearning(
+            context.userId,
+            'deadline',
+            suggestion,
+            {
+              task: {
+                title: analysis.taskDescription,
+                description: analysis.taskDescription,
+                priority: analysis.priority
+              }
+            }
+          );
+
+          if (learnedSuggestion._learningMetadata) {
+            this.log('Learning patterns applied', {
+              patternsApplied: learnedSuggestion._learningMetadata.patternsApplied
+            });
+          }
+
+          return learnedSuggestion;
+        } catch (learningError) {
+          this.log('Learning application failed, using original suggestion', {
+            error: learningError.message
+          });
+        }
+      }
+
+      return suggestion;
 
     } catch (error) {
       this.log('Error generating deadline', { error: error.message });

@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react'
+import { useAuth } from '@clerk/clerk-react'
 import {
   Key, Plus, Trash2, Edit2, Copy, Eye, EyeOff, Shield, Clock,
   AlertCircle, CheckCircle2, Search, Filter, RefreshCw, X,
   ChevronDown, ChevronRight, Lock, Unlock, History, ExternalLink
 } from 'lucide-react'
 
-// Secrets API service
-const secretsApi = {
+// Secrets API service factory - creates API with token getter
+const createSecretsApi = (getToken) => ({
   baseUrl: import.meta.env.VITE_API_URL || 'http://localhost:3000',
 
   async request(endpoint, options = {}) {
-    const token = localStorage.getItem('auth_token')
+    const token = await getToken()
     const response = await fetch(`${this.baseUrl}/api/secrets${endpoint}`, {
       ...options,
       headers: {
@@ -59,7 +60,10 @@ const secretsApi = {
     const queryString = new URLSearchParams(params).toString()
     return secretsApi.request(`/${id}/audit?${queryString}`)
   }
-}
+})
+
+// Create secretsApi instance - will be initialized in component
+let secretsApi = null
 
 // Environment badge colors
 const ENVIRONMENT_COLORS = {
@@ -92,6 +96,13 @@ export default function SecretsManager({
   compact = false,
   className = ''
 }) {
+  const { getToken } = useAuth()
+  
+  // Initialize secretsApi with token getter
+  if (!secretsApi) {
+    secretsApi = createSecretsApi(getToken)
+  }
+  
   // State
   const [secrets, setSecrets] = useState([])
   const [loading, setLoading] = useState(true)

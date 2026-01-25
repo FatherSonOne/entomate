@@ -1,0 +1,93 @@
+/* ============================================
+   HORIZON BRAND THEME
+   Aspirational/Progressive: Optimistic, Growth-Oriented, Forward-Thinking
+   ============================================ */
+
+[data-brand="horizon"] {
+  /* Core Brand Palette */
+  --brand-primary: #F59E0B; /* Sunrise Gold */
+  --brand-secondary: #0EA5E9; /* Sky Blue */
+  --brand-tertiary: #FB7185; /* Dawn Pink */
+  --brand-accent: #0D9488; /* Deep Teal */
+
+  /* Typography */
+  --font-display: 'Sora', sans-serif;
+  --font-heading: 'Plus Jakarta Sans', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Border Radius - Soft, approachable */
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+
+  /* Shadows - Elevated, multi-layer */
+  --shadow-sm: 0 2px 16px rgba(245, 158, 11, 0.15);
+  --shadow-md: 0 8px 32px rgba(245, 158, 11, 0.2);
+  --shadow-lg: 0 16px 48px rgba(245, 158, 11, 0.25);
+  --shadow-glow: 0 0 32px rgba(245, 158, 11, 0.3);
+
+  /* Accent Variations */
+  --accent-primary: var(--brand-primary);
+  --accent-primary-light: #fbbf24;
+  --accent-primary-dim: rgba(245, 158, 11, 0.15);
+  --accent-primary-glow: rgba(245, 158, 11, 0.35);
+
+  --accent-secondary: var(--brand-secondary);
+  --accent-secondary-light: #38bdf8;
+  --accent-secondary-dim: rgba(14, 165, 233, 0.15);
+
+  --accent-tertiary: var(--brand-tertiary);
+  --accent-tertiary-light: #fda4af;
+  --accent-tertiary-dim: rgba(251, 113, 133, 0.15);
+}
+
+/* Light Mode - Soft cream */
+[data-brand="horizon"].light,
+[data-brand="horizon"]:not(.dark) {
+  --bg-base: #FFFBF0; /* Soft cream */
+  --bg-surface: #FFFEFA;
+  --bg-elevated: rgba(255, 254, 250, 0.95);
+  --bg-muted: #FEF3C7;
+  --bg-subtle: #FEF9E7;
+
+  --text-primary: #78350F;
+  --text-secondary: #92400E;
+  --text-tertiary: #B45309;
+  --text-muted: #D97706;
+
+  --border-subtle: rgba(245, 158, 11, 0.15);
+  --border-default: rgba(245, 158, 11, 0.25);
+  --border-strong: rgba(245, 158, 11, 0.4);
+
+  --grid-color: rgba(245, 158, 11, 0.05);
+  --grid-size: 40px;
+}
+
+/* Dark Mode - Twilight navy */
+[data-brand="horizon"].dark {
+  --bg-base: #0C1222; /* Twilight navy */
+  --bg-surface: #1E293B;
+  --bg-elevated: rgba(30, 41, 59, 0.9);
+  --bg-muted: #334155;
+  --bg-subtle: #1E293B;
+
+  --text-primary: #FEF9E7;
+  --text-secondary: #FEF3C7;
+  --text-tertiary: #FDE68A;
+  --text-muted: #FCD34D;
+
+  --border-subtle: rgba(245, 158, 11, 0.2);
+  --border-default: rgba(245, 158, 11, 0.3);
+  --border-strong: rgba(245, 158, 11, 0.5);
+
+  --grid-color: rgba(245, 158, 11, 0.08);
+  --grid-size: 40px;
+}
+
+/* Sunrise animation */
+@keyframes sunrise {
+  0% { transform: translateY(20px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}

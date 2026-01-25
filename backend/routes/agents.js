@@ -6,6 +6,7 @@ const { getAllAgents, getAgent } = require('../services/agents');
 const { authenticate, authorize } = require('../middleware/auth');
 const { asyncHandler } = require('../middleware/errorHandler');
 const { aiLimiter } = require('../middleware/rateLimiter');
+const explanationAnalytics = require('../services/explainability/ExplanationAnalytics');
 
 /**
  * GET /api/agents
@@ -33,13 +34,34 @@ router.get('/', authenticate, asyncHandler(async (req, res) => {
  * Get predefined agent templates
  */
 router.get('/templates', authenticate, (req, res) => {
-  const templates = aiAgentService.getPredefinedAgents();
-
-  res.json({
-    success: true,
-    data: templates,
-    count: templates.length
-  });
+  try {
+    // Force reload templates by clearing require cache if needed
+    delete require.cache[require.resolve('../services/agentTemplates')];
+    const agentTemplates = require('../services/agentTemplates');
+    const templates = agentTemplates.getAllTemplates();
+    
+    console.log(`[Agents] Returning ${templates.length} templates`);
+    console.log(`[Agents] Template IDs:`, templates.map(t => t.id).join(', '));
+    
+    const response = {
+      success: true,
+      data: templates,
+      count: templates.length,
+      _debug: {
+        source: 'agentTemplates.getAllTemplates()',
+        timestamp: new Date().toISOString()
+      }
+    };
+    
+    res.json(response);
+  } catch (error) {
+    console.error('[Agents] Error getting templates:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      data: []
+    });
+  }
 });
 
 /**
@@ -241,6 +263,85 @@ router.post('/executions/:executionId/feedback', authenticate, asyncHandler(asyn
     success: true,
     data: execution,
     message: 'Feedback submitted successfully'
+  });
+}));
+
+/**
+ * GET /api/agents/executions/:executionId/explanation
+ * Get AI explanation for an agent execution
+ */
+router.get('/executions/:executionId/explanation', authenticate, asyncHandler(async (req, res) => {
+  const explanation = await aiAgentService.getExplanation(req.params.executionId);
+
+  if (!explanation) {
+    return res.status(404).json({
+      success: false,
+      error: 'Explanation not found for this execution'
+    });
+  }
+
+  // Track view
+  if (req.user?.id) {
+    explanationAnalytics.trackView(req.params.executionId, req.user.id);
+  }
+
+  res.json({
+    success: true,
+    data: explanation
+  });
+}));
+
+/**
+ * GET /api/agents/analytics/explanations
+ * Get explanation analytics and metrics
+ */
+router.get('/analytics/explanations', authenticate, asyncHandler(async (req, res) => {
+  const report = await explanationAnalytics.getAnalyticsReport();
+
+  res.json({
+    success: true,
+    data: report
+  });
+}));
+
+/**
+ * POST /api/agents/analytics/track
+ * Track user interaction with explanations
+ */
+router.post('/analytics/track', authenticate, asyncHandler(async (req, res) => {
+  const { eventType, executionId, metadata } = req.body;
+  const userId = req.user?.id;
+
+  if (!eventType || !executionId) {
+    return res.status(400).json({
+      success: false,
+      error: 'eventType and executionId are required'
+    });
+  }
+
+  switch (eventType) {
+    case 'expansion':
+      await explanationAnalytics.trackExpansion(executionId, userId);
+      break;
+    case 'alternative_selected':
+      await explanationAnalytics.trackAlternativeSelection(executionId, userId, metadata?.alternativeId);
+      break;
+    case 'acceptance':
+      await explanationAnalytics.trackAcceptance(executionId, userId, metadata?.recommendationId);
+      break;
+    case 'override':
+      await explanationAnalytics.trackOverride(executionId, userId, metadata?.originalId, metadata?.selectedId);
+      break;
+    default:
+      return res.status(400).json({
+        success: false,
+        error: `Unknown event type: ${eventType}`
+      });
+  }
+
+  res.json({
+    success: true,
+    message: 'Event tracked successfully'
   });
 }));
 
