@@ -145,8 +145,8 @@ export default function AutomationBuilder({ onSave, onCancel, onTest, initialDat
   return (
     <div className="card">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-        <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+      <div className="p-4 border-b border-line-default flex items-center justify-between">
+        <h3 className="font-semibold text-content-primary flex items-center gap-2">
           <Zap className="w-5 h-5 text-primary-500" />
           {initialData ? 'Edit Automation' : 'Create Automation'}
         </h3>
@@ -156,7 +156,7 @@ export default function AutomationBuilder({ onSave, onCancel, onTest, initialDat
       </div>
 
       {/* Progress Steps */}
-      <div className="p-4 border-b border-gray-100 bg-gray-50">
+      <div className="p-4 border-b border-line-subtle bg-surface-muted">
         <div className="flex items-center justify-center gap-4">
           {[
             { num: 1, label: 'Trigger' },
@@ -170,11 +170,11 @@ export default function AutomationBuilder({ onSave, onCancel, onTest, initialDat
                 step === num
                   ? 'bg-primary-500 text-white'
                   : step > num
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-gray-200 text-gray-500'
+                    ? 'bg-semantic-success-dim text-semantic-success'
+                    : 'bg-surface-muted text-content-tertiary'
               }`}
             >
-              <span className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-xs font-medium">
+              <span className="w-5 h-5 rounded-full bg-surface/20 flex items-center justify-center text-xs font-medium">
                 {step > num ? '✓' : num}
               </span>
               <span className="text-sm font-medium">{label}</span>
@@ -186,7 +186,7 @@ export default function AutomationBuilder({ onSave, onCancel, onTest, initialDat
       {/* Step 1: Choose Trigger */}
       {step === 1 && (
         <div className="p-5">
-          <h4 className="font-medium text-gray-900 mb-4">What should trigger this automation?</h4>
+          <h4 className="font-medium text-content-primary mb-4">What should trigger this automation?</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {TRIGGER_TYPES.map((trigger) => (
               <button
@@ -195,14 +195,14 @@ export default function AutomationBuilder({ onSave, onCancel, onTest, initialDat
                 className={`p-4 border-2 rounded-lg text-left transition-all ${
                   triggerType === trigger.id
                     ? 'border-primary-500 bg-primary-50'
-                    : 'border-gray-200 hover:border-primary-300'
+                    : 'border-line-default hover:border-primary-300'
                 }`}
               >
                 <div className="flex items-start gap-3">
                   <span className="text-2xl">{trigger.icon}</span>
                   <div>
-                    <h5 className="font-medium text-gray-900">{trigger.name}</h5>
-                    <p className="text-sm text-gray-500 mt-1">{trigger.description}</p>
+                    <h5 className="font-medium text-content-primary">{trigger.name}</h5>
+                    <p className="text-sm text-content-tertiary mt-1">{trigger.description}</p>
                   </div>
                 </div>
               </button>
@@ -212,13 +212,13 @@ export default function AutomationBuilder({ onSave, onCancel, onTest, initialDat
           {/* Scheduled trigger config */}
           {triggerType === 'scheduled' && (
             <div className="mt-4 p-4 border border-yellow-200 bg-yellow-50 rounded-lg">
-              <h5 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+              <h5 className="font-medium text-content-primary mb-3 flex items-center gap-2">
                 <Clock className="w-4 h-4" />
                 Schedule Configuration
               </h5>
               <div className="space-y-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Preset</label>
+                  <label className="block text-sm font-medium text-content-secondary mb-1">Preset</label>
                   <select
                     value=""
                     onChange={(e) => setTriggerConfig({ ...triggerConfig, cron: e.target.value })}
@@ -231,7 +231,7 @@ export default function AutomationBuilder({ onSave, onCancel, onTest, initialDat
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-content-secondary mb-1">
                     Cron Expression
                   </label>
                   <input
@@ -241,12 +241,12 @@ export default function AutomationBuilder({ onSave, onCancel, onTest, initialDat
                     placeholder="0 9 * * *"
                     className="input w-full font-mono"
                   />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-content-tertiary mt-1">
                     Format: minute hour day month weekday (e.g., "0 9 * * 1-5" = weekdays at 9 AM)
                   </p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Timezone</label>
+                  <label className="block text-sm font-medium text-content-secondary mb-1">Timezone</label>
                   <select
                     value={triggerConfig.timezone || 'UTC'}
                     onChange={(e) => setTriggerConfig({ ...triggerConfig, timezone: e.target.value })}
@@ -283,7 +283,7 @@ export default function AutomationBuilder({ onSave, onCancel, onTest, initialDat
       {step === 2 && (
         <div className="p-5">
           <div className="flex items-center justify-between mb-4">
-            <h4 className="font-medium text-gray-900">What actions should run?</h4>
+            <h4 className="font-medium text-content-primary">What actions should run?</h4>
             <button
               onClick={() => setShowActionPicker(true)}
               className="btn btn-secondary btn-sm"
@@ -295,9 +295,9 @@ export default function AutomationBuilder({ onSave, onCancel, onTest, initialDat
 
           {/* Action list */}
           {actions.length === 0 ? (
-            <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-lg">
-              <Zap className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-              <p className="text-gray-500">No actions added yet</p>
+            <div className="text-center py-8 border-2 border-dashed border-line-default rounded-lg">
+              <Zap className="w-8 h-8 text-content-muted mx-auto mb-2" />
+              <p className="text-content-tertiary">No actions added yet</p>
               <button
                 onClick={() => setShowActionPicker(true)}
                 className="btn btn-primary btn-sm mt-3"
@@ -311,20 +311,20 @@ export default function AutomationBuilder({ onSave, onCancel, onTest, initialDat
               {actions.map((action, idx) => {
                 const actionType = getActionType(action.type)
                 return (
-                  <div key={action.id} className="border border-gray-200 rounded-lg p-4">
+                  <div key={action.id} className="border border-line-default rounded-lg p-4">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-3">
-                        <span className="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center text-xs font-medium">
+                        <span className="w-6 h-6 bg-surface-muted rounded-full flex items-center justify-center text-xs font-medium">
                           {idx + 1}
                         </span>
                         <div className="flex items-center gap-2">
                           {actionType?.icon}
-                          <span className="font-medium text-gray-900">{actionType?.name}</span>
+                          <span className="font-medium text-content-primary">{actionType?.name}</span>
                         </div>
                       </div>
                       <button
                         onClick={() => handleRemoveAction(action.id)}
-                        className="btn btn-icon btn-ghost text-red-500 hover:bg-red-50"
+                        className="btn btn-icon btn-ghost text-semantic-error hover:bg-semantic-error-dim"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -345,9 +345,9 @@ export default function AutomationBuilder({ onSave, onCancel, onTest, initialDat
           {/* Action picker modal */}
           {showActionPicker && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 max-h-[80vh] overflow-hidden">
-                <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-                  <h4 className="font-semibold text-gray-900">Choose an Action</h4>
+              <div className="bg-surface rounded-xl shadow-xl max-w-lg w-full mx-4 max-h-[80vh] overflow-hidden">
+                <div className="p-4 border-b border-line-default flex items-center justify-between">
+                  <h4 className="font-semibold text-content-primary">Choose an Action</h4>
                   <button onClick={() => setShowActionPicker(false)} className="btn btn-icon btn-ghost">
                     <X className="w-4 h-4" />
                   </button>
@@ -355,7 +355,7 @@ export default function AutomationBuilder({ onSave, onCancel, onTest, initialDat
                 <div className="p-4 overflow-y-auto max-h-96">
                   {['ai', 'notification', 'integration', 'action'].map(category => (
                     <div key={category} className="mb-4">
-                      <h5 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+                      <h5 className="text-xs font-medium text-content-tertiary uppercase tracking-wide mb-2">
                         {category === 'ai' ? 'AI-Powered' : category.charAt(0).toUpperCase() + category.slice(1)}
                       </h5>
                       <div className="space-y-2">
@@ -363,15 +363,15 @@ export default function AutomationBuilder({ onSave, onCancel, onTest, initialDat
                           <button
                             key={actionType.id}
                             onClick={() => handleAddAction(actionType)}
-                            className="w-full p-3 border border-gray-200 rounded-lg text-left hover:border-primary-300 hover:bg-primary-50 transition-colors"
+                            className="w-full p-3 border border-line-default rounded-lg text-left hover:border-primary-300 hover:bg-accent-primary-dim transition-colors"
                           >
                             <div className="flex items-center gap-3">
-                              <span className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
+                              <span className="w-8 h-8 bg-surface-muted rounded-lg flex items-center justify-center">
                                 {actionType.icon}
                               </span>
                               <div>
-                                <h6 className="font-medium text-gray-900">{actionType.name}</h6>
-                                <p className="text-xs text-gray-500">{actionType.description}</p>
+                                <h6 className="font-medium text-content-primary">{actionType.name}</h6>
+                                <p className="text-xs text-content-tertiary">{actionType.description}</p>
                               </div>
                             </div>
                           </button>
@@ -403,12 +403,12 @@ export default function AutomationBuilder({ onSave, onCancel, onTest, initialDat
       {/* Step 3: Review & Save */}
       {step === 3 && (
         <div className="p-5">
-          <h4 className="font-medium text-gray-900 mb-4">Review & Save</h4>
+          <h4 className="font-medium text-content-primary mb-4">Review & Save</h4>
 
           {/* Name & Description */}
           <div className="space-y-4 mb-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-content-secondary mb-1">
                 Automation Name *
               </label>
               <input
@@ -420,7 +420,7 @@ export default function AutomationBuilder({ onSave, onCancel, onTest, initialDat
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-content-secondary mb-1">
                 Description (optional)
               </label>
               <textarea
@@ -434,29 +434,29 @@ export default function AutomationBuilder({ onSave, onCancel, onTest, initialDat
           </div>
 
           {/* Summary */}
-          <div className="bg-gray-50 rounded-lg p-4 mb-6">
-            <h5 className="font-medium text-gray-900 mb-3">Automation Summary</h5>
+          <div className="bg-surface-muted rounded-lg p-4 mb-6">
+            <h5 className="font-medium text-content-primary mb-3">Automation Summary</h5>
 
             <div className="flex items-center gap-3 mb-3">
               <span className="text-xl">{getTriggerType(triggerType)?.icon}</span>
               <div>
-                <p className="text-sm font-medium text-gray-900">
+                <p className="text-sm font-medium text-content-primary">
                   Trigger: {getTriggerType(triggerType)?.name}
                 </p>
                 {triggerType === 'scheduled' && triggerConfig.cron && (
-                  <p className="text-xs text-gray-500 font-mono">{triggerConfig.cron}</p>
+                  <p className="text-xs text-content-tertiary font-mono">{triggerConfig.cron}</p>
                 )}
               </div>
             </div>
 
-            <div className="border-l-2 border-gray-300 pl-4 ml-3 space-y-2">
+            <div className="border-l-2 border-line-strong pl-4 ml-3 space-y-2">
               {actions.map((action, idx) => {
                 const actionType = getActionType(action.type)
                 return (
                   <div key={action.id} className="flex items-center gap-2 text-sm">
-                    <ArrowRight className="w-3 h-3 text-gray-400" />
+                    <ArrowRight className="w-3 h-3 text-content-tertiary" />
                     {actionType?.icon}
-                    <span className="text-gray-700">{actionType?.name}</span>
+                    <span className="text-content-secondary">{actionType?.name}</span>
                   </div>
                 )
               })}
@@ -485,25 +485,25 @@ export default function AutomationBuilder({ onSave, onCancel, onTest, initialDat
 
             {testResult && (
               <div className={`mt-3 p-3 rounded-lg ${
-                testResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
+                testResult.success ? 'bg-semantic-success-dim border border-semantic-success' : 'bg-semantic-error-dim border border-semantic-error'
               }`}>
                 <div className="flex items-start gap-2">
                   {testResult.success ? (
-                    <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0" />
+                    <CheckCircle2 className="w-5 h-5 text-semantic-success flex-shrink-0" />
                   ) : (
-                    <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                    <AlertCircle className="w-5 h-5 text-semantic-error flex-shrink-0" />
                   )}
                   <div className="flex-1">
-                    <p className={`font-medium ${testResult.success ? 'text-green-700' : 'text-red-700'}`}>
+                    <p className={`font-medium ${testResult.success ? 'text-semantic-success' : 'text-semantic-error'}`}>
                       {testResult.success ? 'Test passed!' : 'Test failed'}
                     </p>
                     {testResult.error && (
-                      <p className="text-sm text-red-600 mt-1">{testResult.error}</p>
+                      <p className="text-sm text-semantic-error mt-1">{testResult.error}</p>
                     )}
                     {testResult.actionResults && (
                       <div className="mt-2 space-y-1">
                         {testResult.actionResults.map((result, idx) => (
-                          <div key={idx} className="text-sm text-gray-600">
+                          <div key={idx} className="text-sm text-content-secondary">
                             • {result.type}: {result.preview || 'OK'}
                           </div>
                         ))}
@@ -545,7 +545,7 @@ function ActionConfigForm({ actionType, config, onChange }) {
     case 'run_agent':
       return (
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Agent</label>
+          <label className="block text-sm font-medium text-content-secondary mb-1">Agent</label>
           <select
             value={config.agent || 'assignment'}
             onChange={(e) => onChange({ agent: e.target.value })}
@@ -563,7 +563,7 @@ function ActionConfigForm({ actionType, config, onChange }) {
       return (
         <div className="space-y-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+            <label className="block text-sm font-medium text-content-secondary mb-1">Message</label>
             <input
               type="text"
               value={config.message || ''}
@@ -573,7 +573,7 @@ function ActionConfigForm({ actionType, config, onChange }) {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Recipients</label>
+            <label className="block text-sm font-medium text-content-secondary mb-1">Recipients</label>
             <select
               value={config.recipients || 'all'}
               onChange={(e) => onChange({ recipients: e.target.value })}
@@ -591,7 +591,7 @@ function ActionConfigForm({ actionType, config, onChange }) {
       return (
         <div className="space-y-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">To</label>
+            <label className="block text-sm font-medium text-content-secondary mb-1">To</label>
             <input
               type="email"
               value={config.to || ''}
@@ -601,7 +601,7 @@ function ActionConfigForm({ actionType, config, onChange }) {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+            <label className="block text-sm font-medium text-content-secondary mb-1">Subject</label>
             <input
               type="text"
               value={config.subject || ''}
@@ -611,7 +611,7 @@ function ActionConfigForm({ actionType, config, onChange }) {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Body</label>
+            <label className="block text-sm font-medium text-content-secondary mb-1">Body</label>
             <textarea
               value={config.body || ''}
               onChange={(e) => onChange({ body: e.target.value })}
@@ -627,7 +627,7 @@ function ActionConfigForm({ actionType, config, onChange }) {
       return (
         <div className="space-y-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Channel</label>
+            <label className="block text-sm font-medium text-content-secondary mb-1">Channel</label>
             <input
               type="text"
               value={config.channel || ''}
@@ -637,7 +637,7 @@ function ActionConfigForm({ actionType, config, onChange }) {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+            <label className="block text-sm font-medium text-content-secondary mb-1">Message</label>
             <textarea
               value={config.message || ''}
               onChange={(e) => onChange({ message: e.target.value })}
@@ -652,7 +652,7 @@ function ActionConfigForm({ actionType, config, onChange }) {
     case 'sync_to_crm':
       return (
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Object Type</label>
+          <label className="block text-sm font-medium text-content-secondary mb-1">Object Type</label>
           <select
             value={config.objectType || 'deal'}
             onChange={(e) => onChange({ objectType: e.target.value })}
@@ -669,7 +669,7 @@ function ActionConfigForm({ actionType, config, onChange }) {
       return (
         <div className="space-y-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Task Title</label>
+            <label className="block text-sm font-medium text-content-secondary mb-1">Task Title</label>
             <input
               type="text"
               value={config.title || ''}
@@ -679,7 +679,7 @@ function ActionConfigForm({ actionType, config, onChange }) {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+            <label className="block text-sm font-medium text-content-secondary mb-1">Priority</label>
             <select
               value={config.priority || 'medium'}
               onChange={(e) => onChange({ priority: e.target.value })}
@@ -697,7 +697,7 @@ function ActionConfigForm({ actionType, config, onChange }) {
     case 'update_status':
       return (
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">New Status</label>
+          <label className="block text-sm font-medium text-content-secondary mb-1">New Status</label>
           <select
             value={config.status || 'in_progress'}
             onChange={(e) => onChange({ status: e.target.value })}
@@ -715,7 +715,7 @@ function ActionConfigForm({ actionType, config, onChange }) {
     case 'auto_prioritize':
     case 'suggest_deadline':
       return (
-        <p className="text-sm text-gray-500 italic">
+        <p className="text-sm text-content-tertiary italic">
           This AI action will automatically analyze the context and make suggestions.
         </p>
       )
@@ -729,13 +729,13 @@ function ActionConfigForm({ actionType, config, onChange }) {
               id="autoCreate"
               checked={config.autoCreate !== false}
               onChange={(e) => onChange({ autoCreate: e.target.checked })}
-              className="rounded border-gray-300"
+              className="rounded border-line-strong"
             />
-            <label htmlFor="autoCreate" className="text-sm text-gray-700">
+            <label htmlFor="autoCreate" className="text-sm text-content-secondary">
               Automatically create follow-up tasks (for high-confidence detections)
             </label>
           </div>
-          <p className="text-xs text-gray-500 italic">
+          <p className="text-xs text-content-tertiary italic">
             AI will analyze meeting content to identify follow-up opportunities and can automatically create tasks for items with 70%+ confidence.
           </p>
         </div>

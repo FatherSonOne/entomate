@@ -115,8 +115,8 @@ export default function MeetingDetail() {
   if (!meeting) {
     return (
       <div className="text-center py-12">
-        <h2 className="text-xl font-semibold text-gray-900">Meeting not found</h2>
-        <Link to="/meetings" className="text-primary-600 hover:underline mt-2 inline-block">
+        <h2 className="text-xl font-semibold text-content-primary">Meeting not found</h2>
+        <Link to="/meetings" className="text-accent-primary hover:underline mt-2 inline-block">
           Back to meetings
         </Link>
       </div>
@@ -137,16 +137,16 @@ export default function MeetingDetail() {
       <div className="flex items-start gap-4">
         <Link
           to="/meetings"
-          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          className="p-2 hover:bg-surface-muted rounded-lg transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-2">
             <span className="text-2xl">{getSentimentEmoji(meeting.sentiment_label)}</span>
-            <h1 className="text-2xl font-bold text-gray-900">{meeting.title}</h1>
+            <h1 className="text-2xl font-bold text-content-primary">{meeting.title}</h1>
           </div>
-          <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
+          <div className="flex flex-wrap items-center gap-4 text-sm text-content-tertiary">
             <span className="flex items-center gap-1">
               <Clock className="w-4 h-4" />
               {new Date(meeting.created_at).toLocaleDateString('en-US', {
@@ -194,21 +194,21 @@ export default function MeetingDetail() {
         <div className="lg:col-span-2 space-y-6">
           {/* Summary */}
           <div className="card p-5">
-            <h2 className="font-semibold text-gray-900 mb-3">Summary</h2>
-            <p className="text-gray-700">{meeting.summary || 'No summary available'}</p>
+            <h2 className="font-semibold text-content-primary mb-3">Summary</h2>
+            <p className="text-content-secondary">{meeting.summary || 'No summary available'}</p>
           </div>
 
           {/* Key Points */}
           {meeting.key_points?.length > 0 && (
             <div className="card p-5">
-              <h2 className="font-semibold text-gray-900 mb-3">Key Points</h2>
+              <h2 className="font-semibold text-content-primary mb-3">Key Points</h2>
               <ul className="space-y-2">
                 {meeting.key_points.map((point, index) => (
                   <li key={index} className="flex items-start gap-2">
                     <span className="w-6 h-6 rounded-full bg-primary-100 text-primary-700 text-sm flex items-center justify-center flex-shrink-0">
                       {index + 1}
                     </span>
-                    <span className="text-gray-700">{point}</span>
+                    <span className="text-content-secondary">{point}</span>
                   </li>
                 ))}
               </ul>
@@ -218,12 +218,12 @@ export default function MeetingDetail() {
           {/* Decisions */}
           {meeting.decisions?.length > 0 && (
             <div className="card p-5">
-              <h2 className="font-semibold text-gray-900 mb-3">Decisions Made</h2>
+              <h2 className="font-semibold text-content-primary mb-3">Decisions Made</h2>
               <ul className="space-y-2">
                 {meeting.decisions.map((decision, index) => (
                   <li key={index} className="flex items-start gap-2">
-                    <CheckSquare className="w-5 h-5 text-green-600 flex-shrink-0" />
-                    <span className="text-gray-700">{decision}</span>
+                    <CheckSquare className="w-5 h-5 text-semantic-success flex-shrink-0" />
+                    <span className="text-content-secondary">{decision}</span>
                   </li>
                 ))}
               </ul>
@@ -232,12 +232,12 @@ export default function MeetingDetail() {
 
           {/* Transcript */}
           <div className="card p-5">
-            <h2 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <h2 className="font-semibold text-content-primary mb-3 flex items-center gap-2">
               <FileText className="w-5 h-5" />
               Full Transcript
             </h2>
-            <div className="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto scrollbar-thin">
-              <pre className="whitespace-pre-wrap text-sm text-gray-700 font-mono">
+            <div className="bg-surface-muted rounded-lg p-4 max-h-96 overflow-y-auto scrollbar-thin">
+              <pre className="whitespace-pre-wrap text-sm text-content-secondary font-mono">
                 {meeting.transcript || 'No transcript available'}
               </pre>
             </div>
@@ -248,7 +248,7 @@ export default function MeetingDetail() {
         <div className="space-y-6">
           {/* Action Items */}
           <div className="card p-5">
-            <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <h2 className="font-semibold text-content-primary mb-4 flex items-center gap-2">
               <CheckSquare className="w-5 h-5" />
               Action Items ({meeting.actionItems?.length || 0})
             </h2>
@@ -261,7 +261,7 @@ export default function MeetingDetail() {
 
           {/* Ask AI */}
           <div className="card p-5">
-            <h2 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <h2 className="font-semibold text-content-primary mb-3 flex items-center gap-2">
               <MessageSquare className="w-5 h-5" />
               Ask About This Meeting
             </h2>
@@ -291,9 +291,9 @@ export default function MeetingDetail() {
 
             {answer && (
               <div className="mt-4 p-3 bg-primary-50 rounded-lg">
-                <p className="text-sm text-gray-900">{answer.answer}</p>
+                <p className="text-sm text-content-primary">{answer.answer}</p>
                 {answer.confidence && (
-                  <p className="text-xs text-gray-500 mt-2">
+                  <p className="text-xs text-content-tertiary mt-2">
                     Confidence: {Math.round(answer.confidence * 100)}%
                   </p>
                 )}
@@ -306,31 +306,31 @@ export default function MeetingDetail() {
       {/* Share to Chat Modal */}
       {showShareModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
+          <div className="bg-surface rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">
+              <h3 className="text-lg font-semibold text-content-primary">
                 Share Meeting Recap
               </h3>
               <button
                 onClick={() => setShowShareModal(false)}
-                className="p-1 hover:bg-gray-100 rounded"
+                className="p-1 hover:bg-surface-muted rounded"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <p className="text-sm text-gray-600 mb-4">
+            <p className="text-sm text-content-secondary mb-4">
               Post a formatted recap of "{meeting.title}" to your team chat.
             </p>
 
             {meeting.chat_posted && (
-              <div className="mb-4 p-3 bg-blue-50 text-blue-700 text-sm rounded-lg">
+              <div className="mb-4 p-3 bg-semantic-info-dim text-semantic-info text-sm rounded-lg">
                 This meeting has already been posted to: {meeting.posted_to_channels?.join(', ') || 'chat'}
               </div>
             )}
 
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-content-secondary mb-2">
                 Select Channel
               </label>
               <ChatChannelSelector
@@ -344,8 +344,8 @@ export default function MeetingDetail() {
             {shareResult && (
               <div className={`mb-4 p-3 rounded-lg text-sm ${
                 shareResult.success
-                  ? 'bg-green-50 text-green-700'
-                  : 'bg-red-50 text-red-700'
+                  ? 'bg-semantic-success-dim text-semantic-success'
+                  : 'bg-semantic-error-dim text-semantic-error'
               }`}>
                 {shareResult.message}
               </div>

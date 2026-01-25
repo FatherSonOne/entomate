@@ -144,14 +144,14 @@ export default function CommandPalette({ isOpen, onClose, onShowShortcuts }) {
 
       {/* Dialog */}
       <div className="flex min-h-full items-start justify-center p-4 pt-[15vh]">
-        <div className="relative w-full max-w-xl transform rounded-xl bg-white shadow-2xl ring-1 ring-black/5 transition-all">
+        <div className="relative w-full max-w-xl transform rounded-xl bg-surface shadow-2xl ring-1 ring-black/5 transition-all">
           {/* Search input */}
-          <div className="flex items-center border-b border-gray-200 px-4">
-            <Search className="w-5 h-5 text-gray-400" />
+          <div className="flex items-center border-b border-line-default px-4">
+            <Search className="w-5 h-5 text-content-tertiary" />
             <input
               ref={inputRef}
               type="text"
-              className="flex-1 border-0 bg-transparent py-4 px-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-0"
+              className="flex-1 border-0 bg-transparent py-4 px-3 text-content-primary placeholder-gray-400 focus:outline-none focus:ring-0"
               placeholder="Type a command or search..."
               value={query}
               onChange={(e) => {
@@ -161,7 +161,7 @@ export default function CommandPalette({ isOpen, onClose, onShowShortcuts }) {
             />
             <button
               onClick={onClose}
-              className="rounded p-1 text-gray-400 hover:text-gray-600"
+              className="rounded p-1 text-content-tertiary hover:text-content-secondary"
             >
               <X className="w-5 h-5" />
             </button>
@@ -170,14 +170,14 @@ export default function CommandPalette({ isOpen, onClose, onShowShortcuts }) {
           {/* Commands list */}
           <div ref={listRef} className="max-h-80 overflow-y-auto p-2">
             {flatCommands.length === 0 ? (
-              <div className="py-8 text-center text-gray-500">
-                <Search className="w-10 h-10 mx-auto mb-2 text-gray-300" />
+              <div className="py-8 text-center text-content-tertiary">
+                <Search className="w-10 h-10 mx-auto mb-2 text-content-muted" />
                 <p>No commands found</p>
               </div>
             ) : (
               Object.entries(groupedCommands).map(([category, cmds]) => (
                 <div key={category} className="mb-2">
-                  <div className="px-3 py-1.5 text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  <div className="px-3 py-1.5 text-xs font-medium text-content-tertiary uppercase tracking-wide">
                     {category}
                   </div>
                   {cmds.map((cmd) => {
@@ -192,15 +192,15 @@ export default function CommandPalette({ isOpen, onClose, onShowShortcuts }) {
                         className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
                           isSelected
                             ? 'bg-primary-50 text-primary-900'
-                            : 'text-gray-700 hover:bg-gray-100'
+                            : 'text-content-secondary hover:bg-surface-muted'
                         }`}
                         onClick={() => executeCommand(cmd)}
                         onMouseEnter={() => setSelectedIndex(currentIndex)}
                       >
-                        <Icon className={`w-5 h-5 ${isSelected ? 'text-primary-600' : 'text-gray-400'}`} />
+                        <Icon className={`w-5 h-5 ${isSelected ? 'text-accent-primary' : 'text-content-tertiary'}`} />
                         <span className="flex-1">{cmd.name}</span>
                         {cmd.shortcut && (
-                          <kbd className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-gray-100 text-gray-500 rounded border border-gray-200">
+                          <kbd className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-surface-muted text-content-tertiary rounded border border-line-default">
                             {formatShortcut(cmd.shortcut)}
                           </kbd>
                         )}
@@ -216,18 +216,18 @@ export default function CommandPalette({ isOpen, onClose, onShowShortcuts }) {
           </div>
 
           {/* Footer hint */}
-          <div className="flex items-center justify-between px-4 py-2 border-t border-gray-200 text-xs text-gray-500">
+          <div className="flex items-center justify-between px-4 py-2 border-t border-line-default text-xs text-content-tertiary">
             <div className="flex items-center gap-4">
               <span className="flex items-center gap-1">
-                <kbd className="px-1.5 py-0.5 bg-gray-100 rounded border border-gray-200">↑↓</kbd>
+                <kbd className="px-1.5 py-0.5 bg-surface-muted rounded border border-line-default">↑↓</kbd>
                 to navigate
               </span>
               <span className="flex items-center gap-1">
-                <kbd className="px-1.5 py-0.5 bg-gray-100 rounded border border-gray-200">↵</kbd>
+                <kbd className="px-1.5 py-0.5 bg-surface-muted rounded border border-line-default">↵</kbd>
                 to select
               </span>
               <span className="flex items-center gap-1">
-                <kbd className="px-1.5 py-0.5 bg-gray-100 rounded border border-gray-200">esc</kbd>
+                <kbd className="px-1.5 py-0.5 bg-surface-muted rounded border border-line-default">esc</kbd>
                 to close
               </span>
             </div>

@@ -27,10 +27,10 @@ const TABS = {
 // Execution status indicator
 function ExecutionStatus({ status, duration }) {
   const statusConfig = {
-    idle: { color: 'text-gray-400 bg-gray-100', icon: Clock, label: 'Idle' },
-    running: { color: 'text-blue-600 bg-blue-100', icon: Loader2, label: 'Running' },
-    completed: { color: 'text-green-600 bg-green-100', icon: CheckCircle2, label: 'Completed' },
-    failed: { color: 'text-red-600 bg-red-100', icon: AlertCircle, label: 'Failed' }
+    idle: { color: 'text-content-tertiary bg-surface-muted', icon: Clock, label: 'Idle' },
+    running: { color: 'text-semantic-info bg-semantic-info-dim', icon: Loader2, label: 'Running' },
+    completed: { color: 'text-semantic-success bg-semantic-success-dim', icon: CheckCircle2, label: 'Completed' },
+    failed: { color: 'text-semantic-error bg-semantic-error-dim', icon: AlertCircle, label: 'Failed' }
   }
 
   const config = statusConfig[status] || statusConfig.idle
@@ -144,15 +144,15 @@ export default function WorkflowDebugPanel({
   }
 
   return (
-    <div className={`flex flex-col bg-white border-t border-gray-200 ${
+    <div className={`flex flex-col bg-surface border-t border-line-default ${
       isExpanded ? 'h-80' : 'h-12'
     } transition-all duration-200`}>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 h-12 border-b border-gray-200 bg-gray-50 flex-shrink-0">
+      <div className="flex items-center justify-between px-4 h-12 border-b border-line-default bg-surface-muted flex-shrink-0">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <Bug className="w-5 h-5 text-gray-500" />
-            <span className="font-medium text-gray-900">Debug</span>
+            <Bug className="w-5 h-5 text-content-tertiary" />
+            <span className="font-medium text-content-primary">Debug</span>
           </div>
 
           {/* Execution controls */}
@@ -168,7 +168,7 @@ export default function WorkflowDebugPanel({
             <button
               onClick={handleExecute}
               disabled={executionStatus === 'running'}
-              className="flex items-center gap-1 px-3 py-1 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50"
+              className="flex items-center gap-1 px-3 py-1 text-sm bg-semantic-success-dim text-semantic-success rounded hover:bg-green-200 disabled:opacity-50"
             >
               <Play className="w-3 h-3" />
               Execute
@@ -176,7 +176,7 @@ export default function WorkflowDebugPanel({
             {executionStatus === 'running' && (
               <button
                 onClick={onStop}
-                className="flex items-center gap-1 px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200"
+                className="flex items-center gap-1 px-3 py-1 text-sm bg-semantic-error-dim text-semantic-error rounded hover:bg-red-200"
               >
                 <Square className="w-3 h-3" />
                 Stop
@@ -192,7 +192,7 @@ export default function WorkflowDebugPanel({
 
         <div className="flex items-center gap-2">
           {/* Tabs */}
-          <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
+          <div className="flex items-center bg-surface-muted rounded-lg p-0.5">
             {Object.entries(TABS).map(([key, config]) => {
               const Icon = config.icon
               return (
@@ -201,8 +201,8 @@ export default function WorkflowDebugPanel({
                   onClick={() => setActiveTab(key)}
                   className={`flex items-center gap-1.5 px-3 py-1 text-sm rounded ${
                     activeTab === key
-                      ? 'bg-white shadow-sm text-gray-900'
-                      : 'text-gray-500 hover:text-gray-700'
+                      ? 'bg-surface shadow-sm text-content-primary'
+                      : 'text-content-tertiary hover:text-content-secondary'
                   }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -215,13 +215,13 @@ export default function WorkflowDebugPanel({
           {/* Controls */}
           <button
             onClick={() => onToggleExpand?.()}
-            className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded"
+            className="p-1.5 text-content-tertiary hover:text-content-secondary hover:bg-surface-muted rounded"
           >
             {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
           </button>
           <button
             onClick={() => setIsMinimized(true)}
-            className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded"
+            className="p-1.5 text-content-tertiary hover:text-content-secondary hover:bg-surface-muted rounded"
           >
             <Minimize2 className="w-4 h-4" />
           </button>
@@ -250,11 +250,11 @@ export default function WorkflowDebugPanel({
                   isPinned={!!pinnedData[selectedOutput.nodeId]}
                 />
               ) : (
-                <div className="flex items-center justify-center h-full text-gray-500">
+                <div className="flex items-center justify-center h-full text-content-tertiary">
                   <div className="text-center">
                     <FileJson className="w-8 h-8 mx-auto mb-2 opacity-50" />
                     <p>Select a node to view its output</p>
-                    <p className="text-xs text-gray-400 mt-1">
+                    <p className="text-xs text-content-tertiary mt-1">
                       Run a test execution first
                     </p>
                   </div>

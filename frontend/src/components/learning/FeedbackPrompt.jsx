@@ -163,9 +163,9 @@ export default function FeedbackPrompt({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 relative">
+      <div className="bg-surface rounded-lg shadow-xl max-w-md w-full p-6 relative">
         {/* Auto-close indicator */}
-        <div className="absolute top-2 right-2 text-xs text-gray-400">
+        <div className="absolute top-2 right-2 text-xs text-content-tertiary">
           Auto-closes in {autoCloseTimer}s
         </div>
 
@@ -173,25 +173,25 @@ export default function FeedbackPrompt({
         <div className="mb-4">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-2xl">🤔</span>
-            <h3 className="text-lg font-semibold text-gray-900">
+            <h3 className="text-lg font-semibold text-content-primary">
               Help the AI Learn
             </h3>
           </div>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-content-secondary">
             {getChangeDescription()}
           </p>
         </div>
 
         {/* Feedback Options */}
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-content-secondary mb-2">
             Reason (optional):
           </label>
           <div className="space-y-2">
             {getFeedbackOptions().map((option) => (
               <label
                 key={option.value}
-                className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded"
+                className="flex items-center gap-2 cursor-pointer hover:bg-surface-muted p-2 rounded"
               >
                 <input
                   type="radio"
@@ -202,14 +202,14 @@ export default function FeedbackPrompt({
                     setFeedbackReason(e.target.value);
                     setFeedbackText(option.label);
                   }}
-                  className="text-indigo-600 focus:ring-indigo-500"
+                  className="text-accent-primary focus:ring-indigo-500"
                 />
-                <span className="text-sm text-gray-700">{option.label}</span>
+                <span className="text-sm text-content-secondary">{option.label}</span>
               </label>
             ))}
 
             {/* Other option with text input */}
-            <label className="flex items-start gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+            <label className="flex items-start gap-2 cursor-pointer hover:bg-surface-muted p-2 rounded">
               <input
                 type="radio"
                 name="feedbackReason"
@@ -219,17 +219,17 @@ export default function FeedbackPrompt({
                   setFeedbackReason(e.target.value);
                   setFeedbackText('');
                 }}
-                className="mt-1 text-indigo-600 focus:ring-indigo-500"
+                className="mt-1 text-accent-primary focus:ring-indigo-500"
               />
               <div className="flex-1">
-                <span className="text-sm text-gray-700 block mb-1">Other:</span>
+                <span className="text-sm text-content-secondary block mb-1">Other:</span>
                 {feedbackReason === 'other' && (
                   <input
                     type="text"
                     value={otherText}
                     onChange={(e) => setOtherText(e.target.value)}
                     placeholder="Enter your reason..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full px-3 py-2 border border-line-strong rounded-md text-sm focus:ring-indigo-500 focus:border-indigo-500"
                     autoFocus
                   />
                 )}
@@ -245,9 +245,9 @@ export default function FeedbackPrompt({
               type="checkbox"
               checked={dontAskAgain}
               onChange={(e) => setDontAskAgain(e.target.checked)}
-              className="rounded text-indigo-600 focus:ring-indigo-500"
+              className="rounded text-accent-primary focus:ring-indigo-500"
             />
-            <span className="text-sm text-gray-600">
+            <span className="text-sm text-content-secondary">
               Don't ask me again for {getAgentDisplayName()}
             </span>
           </label>
@@ -258,7 +258,7 @@ export default function FeedbackPrompt({
           <button
             onClick={handleSkip}
             disabled={isSubmitting}
-            className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm"
+            className="flex-1 px-4 py-2 bg-surface-muted text-content-secondary rounded-md hover:bg-surface-muted disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm"
           >
             Skip
           </button>
@@ -272,7 +272,7 @@ export default function FeedbackPrompt({
         </div>
 
         {/* Info text */}
-        <p className="mt-4 text-xs text-gray-500 text-center">
+        <p className="mt-4 text-xs text-content-tertiary text-center">
           Your feedback helps the AI learn your preferences and improve recommendations over time.
         </p>
       </div>

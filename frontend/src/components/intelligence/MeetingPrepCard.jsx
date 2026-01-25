@@ -26,16 +26,16 @@ export default function MeetingPrepCard({ data, onAction }) {
 
   // Sentiment trend icon
   const getSentimentIcon = () => {
-    if (sentiment.trend === 'improving') return <TrendingUp className="w-4 h-4 text-green-600" />
-    if (sentiment.trend === 'declining') return <TrendingDown className="w-4 h-4 text-red-600" />
-    return <Minus className="w-4 h-4 text-gray-600" />
+    if (sentiment.trend === 'improving') return <TrendingUp className="w-4 h-4 text-semantic-success" />
+    if (sentiment.trend === 'declining') return <TrendingDown className="w-4 h-4 text-semantic-error" />
+    return <Minus className="w-4 h-4 text-content-secondary" />
   }
 
   // Sentiment color
   const getSentimentColor = () => {
-    if (sentiment.current === 'positive') return 'text-green-600'
-    if (sentiment.current === 'negative') return 'text-red-600'
-    return 'text-gray-600'
+    if (sentiment.current === 'positive') return 'text-semantic-success'
+    if (sentiment.current === 'negative') return 'text-semantic-error'
+    return 'text-content-secondary'
   }
 
   // Compact content
@@ -45,15 +45,15 @@ export default function MeetingPrepCard({ data, onAction }) {
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <Calendar className="w-4 h-4 text-indigo-500 flex-shrink-0" />
-            <h4 className="font-semibold text-gray-900 truncate">{meeting.title}</h4>
+            <Calendar className="w-4 h-4 text-accent-primary flex-shrink-0" />
+            <h4 className="font-semibold text-content-primary truncate">{meeting.title}</h4>
           </div>
-          <p className="text-sm text-gray-500">{meetingTime}</p>
+          <p className="text-sm text-content-tertiary">{meetingTime}</p>
         </div>
         {dealContext && (
           <div className="text-right flex-shrink-0">
-            <p className="text-sm font-medium text-gray-900">{dealContext.name}</p>
-            <p className="text-xs text-gray-500">
+            <p className="text-sm font-medium text-content-primary">{dealContext.name}</p>
+            <p className="text-xs text-content-tertiary">
               ${dealContext.value.toLocaleString()} • {dealContext.stage}
             </p>
           </div>
@@ -62,7 +62,7 @@ export default function MeetingPrepCard({ data, onAction }) {
 
       {/* Attendees preview */}
       {meeting.attendees && meeting.attendees.length > 0 && (
-        <div className="flex items-center gap-2 text-xs text-gray-600">
+        <div className="flex items-center gap-2 text-xs text-content-secondary">
           <Users className="w-3 h-3" />
           <span>
             {meeting.attendees.slice(0, 3).map(a => a.name || a.email).join(', ')}
@@ -72,23 +72,23 @@ export default function MeetingPrepCard({ data, onAction }) {
       )}
 
       {/* Key context */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-        <h5 className="text-xs font-semibold text-blue-900 mb-2 flex items-center gap-1">
+      <div className="bg-semantic-info-dim border border-semantic-info rounded-lg p-3">
+        <h5 className="text-xs font-semibold text-semantic-info mb-2 flex items-center gap-1">
           <AlertCircle className="w-3 h-3" />
           Key Context
         </h5>
         <div className="space-y-1.5">
           {history && (
             <div className="flex items-center justify-between text-xs">
-              <span className="text-blue-800">Last contact:</span>
-              <span className="font-medium text-blue-900">
+              <span className="text-semantic-info">Last contact:</span>
+              <span className="font-medium text-semantic-info">
                 {history.daysSinceLastContact} days ago
               </span>
             </div>
           )}
           {sentiment && (
             <div className="flex items-center justify-between text-xs">
-              <span className="text-blue-800">Sentiment:</span>
+              <span className="text-semantic-info">Sentiment:</span>
               <div className="flex items-center gap-1">
                 {getSentimentIcon()}
                 <span className={`font-medium ${getSentimentColor()}`}>
@@ -100,14 +100,14 @@ export default function MeetingPrepCard({ data, onAction }) {
           )}
           {actionItems && actionItems.overdue > 0 && (
             <div className="flex items-center justify-between text-xs">
-              <span className="text-blue-800">Overdue items:</span>
-              <span className="font-medium text-red-600">{actionItems.overdue}</span>
+              <span className="text-semantic-info">Overdue items:</span>
+              <span className="font-medium text-semantic-error">{actionItems.overdue}</span>
             </div>
           )}
           {insights && insights.competitorMentions && insights.competitorMentions.length > 0 && (
             <div className="flex items-center justify-between text-xs">
-              <span className="text-blue-800">Competitor mentioned:</span>
-              <span className="font-medium text-amber-600">
+              <span className="text-semantic-info">Competitor mentioned:</span>
+              <span className="font-medium text-semantic-warning">
                 {insights.competitorMentions[0]}
               </span>
             </div>
@@ -118,11 +118,11 @@ export default function MeetingPrepCard({ data, onAction }) {
       {/* Talking points preview */}
       {talkingPoints && talkingPoints.length > 0 && (
         <div>
-          <h5 className="text-xs font-semibold text-gray-700 mb-2">Suggested Talking Points:</h5>
+          <h5 className="text-xs font-semibold text-content-secondary mb-2">Suggested Talking Points:</h5>
           <ul className="space-y-1">
             {talkingPoints.slice(0, 3).map((point, index) => (
-              <li key={index} className="text-sm text-gray-600 flex items-start gap-2">
-                <span className="text-primary-600 mt-1">•</span>
+              <li key={index} className="text-sm text-content-secondary flex items-start gap-2">
+                <span className="text-accent-primary mt-1">•</span>
                 <span className="flex-1">{point}</span>
               </li>
             ))}
@@ -138,7 +138,7 @@ export default function MeetingPrepCard({ data, onAction }) {
       {/* Full attendee list */}
       {meeting.attendees && meeting.attendees.length > 0 && (
         <div>
-          <h5 className="text-xs font-semibold text-gray-700 mb-2">All Attendees ({meeting.attendees.length})</h5>
+          <h5 className="text-xs font-semibold text-content-secondary mb-2">All Attendees ({meeting.attendees.length})</h5>
           <div className="space-y-2">
             {meeting.attendees.map((attendee, index) => (
               <div key={index} className="flex items-center gap-2 text-sm">
@@ -146,9 +146,9 @@ export default function MeetingPrepCard({ data, onAction }) {
                   {(attendee.name || attendee.email || '?')[0].toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-gray-900">{attendee.name || attendee.email}</p>
+                  <p className="font-medium text-content-primary">{attendee.name || attendee.email}</p>
                   {attendee.title && (
-                    <p className="text-xs text-gray-500">{attendee.title}</p>
+                    <p className="text-xs text-content-tertiary">{attendee.title}</p>
                   )}
                 </div>
               </div>
@@ -160,23 +160,23 @@ export default function MeetingPrepCard({ data, onAction }) {
       {/* Sentiment history */}
       {sentiment && sentiment.history && sentiment.history.length > 0 && (
         <div>
-          <h5 className="text-xs font-semibold text-gray-700 mb-2">Sentiment Trend</h5>
+          <h5 className="text-xs font-semibold text-content-secondary mb-2">Sentiment Trend</h5>
           <div className="space-y-2">
             {sentiment.history.map((item, index) => (
               <div key={index} className="flex items-center gap-3">
-                <span className="text-xs text-gray-500 w-20">
+                <span className="text-xs text-content-tertiary w-20">
                   {new Date(item.date).toLocaleDateString()}
                 </span>
-                <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div className="flex-1 h-2 bg-surface-muted rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full ${
                       item.sentiment === 'positive' ? 'bg-green-500' :
-                      item.sentiment === 'negative' ? 'bg-red-500' : 'bg-gray-400'
+                      item.sentiment === 'negative' ? 'bg-semantic-error' : 'bg-gray-400'
                     }`}
                     style={{ width: `${item.score}%` }}
                   />
                 </div>
-                <span className="text-xs font-medium text-gray-700 w-12 text-right">
+                <span className="text-xs font-medium text-content-secondary w-12 text-right">
                   {item.score}%
                 </span>
               </div>
@@ -188,17 +188,17 @@ export default function MeetingPrepCard({ data, onAction }) {
       {/* Overdue action items */}
       {actionItems && actionItems.items && actionItems.items.length > 0 && (
         <div>
-          <h5 className="text-xs font-semibold text-gray-700 mb-2">
+          <h5 className="text-xs font-semibold text-content-secondary mb-2">
             Action Items ({actionItems.overdue} overdue)
           </h5>
           <div className="space-y-2">
             {actionItems.items.map((item, index) => (
-              <div key={index} className="bg-amber-50 border border-amber-200 rounded p-2 text-sm">
-                <p className="text-gray-900">{item.task}</p>
-                <div className="flex items-center gap-2 mt-1 text-xs text-gray-600">
+              <div key={index} className="bg-semantic-warning-dim border border-semantic-warning rounded p-2 text-sm">
+                <p className="text-content-primary">{item.task}</p>
+                <div className="flex items-center gap-2 mt-1 text-xs text-content-secondary">
                   <span>{item.owner}</span>
                   <span>•</span>
-                  <span className="text-red-600">Due: {new Date(item.dueDate).toLocaleDateString()}</span>
+                  <span className="text-semantic-error">Due: {new Date(item.dueDate).toLocaleDateString()}</span>
                 </div>
               </div>
             ))}
@@ -209,11 +209,11 @@ export default function MeetingPrepCard({ data, onAction }) {
       {/* All talking points */}
       {talkingPoints && talkingPoints.length > 3 && (
         <div>
-          <h5 className="text-xs font-semibold text-gray-700 mb-2">All Talking Points</h5>
+          <h5 className="text-xs font-semibold text-content-secondary mb-2">All Talking Points</h5>
           <ul className="space-y-1.5">
             {talkingPoints.map((point, index) => (
-              <li key={index} className="text-sm text-gray-600 flex items-start gap-2">
-                <span className="text-primary-600 mt-1">•</span>
+              <li key={index} className="text-sm text-content-secondary flex items-start gap-2">
+                <span className="text-accent-primary mt-1">•</span>
                 <span className="flex-1">{point}</span>
               </li>
             ))}

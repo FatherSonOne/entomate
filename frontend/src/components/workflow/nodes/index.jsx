@@ -17,11 +17,11 @@ import {
 
 // Node category colors
 const categoryColors = {
-  trigger: { bg: 'bg-green-50', border: 'border-green-300', icon: 'text-green-600' },
+  trigger: { bg: 'bg-semantic-success-dim', border: 'border-semantic-success', icon: 'text-semantic-success' },
   logic: { bg: 'bg-yellow-50', border: 'border-yellow-300', icon: 'text-yellow-600' },
-  action: { bg: 'bg-blue-50', border: 'border-blue-300', icon: 'text-blue-600' },
-  ai: { bg: 'bg-purple-50', border: 'border-purple-300', icon: 'text-purple-600' },
-  data: { bg: 'bg-gray-50', border: 'border-gray-300', icon: 'text-gray-600' }
+  action: { bg: 'bg-semantic-info-dim', border: 'border-blue-300', icon: 'text-semantic-info' },
+  ai: { bg: 'bg-accent-tertiary-dim', border: 'border-purple-300', icon: 'text-accent-tertiary' },
+  data: { bg: 'bg-surface-muted', border: 'border-line-strong', icon: 'text-content-secondary' }
 }
 
 // Node type icons
@@ -118,7 +118,7 @@ const BaseNode = memo(({ data, selected, type }) => {
       {/* Node header */}
       <div className={`px-3 py-2 border-b ${colors.border} flex items-center gap-2`}>
         <IconComponent className={`w-4 h-4 ${colors.icon} flex-shrink-0`} />
-        <span className="text-sm font-medium text-gray-900 truncate">
+        <span className="text-sm font-medium text-content-primary truncate">
           {data.label || type.replace(/_/g, ' ')}
         </span>
       </div>
@@ -126,23 +126,23 @@ const BaseNode = memo(({ data, selected, type }) => {
       {/* Node content */}
       {data.description && (
         <div className="px-3 py-2">
-          <p className="text-xs text-gray-500 line-clamp-2">{data.description}</p>
+          <p className="text-xs text-content-tertiary line-clamp-2">{data.description}</p>
         </div>
       )}
 
       {/* Status indicator */}
       {data.status && (
         <div className={`px-3 py-1 text-xs flex items-center gap-1 ${
-          data.status === 'success' ? 'text-green-600' :
-          data.status === 'error' ? 'text-red-600' :
-          data.status === 'running' ? 'text-blue-600' :
-          'text-gray-400'
+          data.status === 'success' ? 'text-semantic-success' :
+          data.status === 'error' ? 'text-semantic-error' :
+          data.status === 'running' ? 'text-semantic-info' :
+          'text-content-tertiary'
         }`}>
           <span className={`w-2 h-2 rounded-full ${
             data.status === 'success' ? 'bg-green-500' :
-            data.status === 'error' ? 'bg-red-500' :
+            data.status === 'error' ? 'bg-semantic-error' :
             data.status === 'running' ? 'bg-blue-500 animate-pulse' :
-            'bg-gray-300'
+            'bg-surface-muted'
           }`} />
           {data.status}
         </div>
@@ -165,7 +165,7 @@ const BaseNode = memo(({ data, selected, type }) => {
                 position={Position.Right}
                 id="false"
                 style={{ top: '70%' }}
-                className="!w-3 !h-3 !bg-red-500 !border-2 !border-white"
+                className="!w-3 !h-3 !bg-semantic-error !border-2 !border-white"
               />
             </>
           )}
@@ -208,7 +208,7 @@ const BaseNode = memo(({ data, selected, type }) => {
                 position={Position.Right}
                 id="no_match"
                 style={{ top: '70%' }}
-                className="!w-3 !h-3 !bg-red-500 !border-2 !border-white"
+                className="!w-3 !h-3 !bg-semantic-error !border-2 !border-white"
               />
             </>
           )}

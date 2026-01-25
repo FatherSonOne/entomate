@@ -162,10 +162,10 @@ export default function MeetingSummaryWidget({
   // Render loading state
   if (loading) {
     return (
-      <div className={`bg-white rounded-lg border border-gray-200 p-6 ${className}`}>
+      <div className={`bg-surface rounded-lg border border-line-default p-6 ${className}`}>
         <div className="flex items-center justify-center py-8">
-          <Loader2 className="w-6 h-6 animate-spin text-primary-600" />
-          <span className="ml-2 text-gray-500">Generating AI summary...</span>
+          <Loader2 className="w-6 h-6 animate-spin text-accent-primary" />
+          <span className="ml-2 text-content-tertiary">Generating AI summary...</span>
         </div>
       </div>
     )
@@ -174,15 +174,15 @@ export default function MeetingSummaryWidget({
   // Render error state
   if (error) {
     return (
-      <div className={`bg-white rounded-lg border border-red-200 p-6 ${className}`}>
-        <div className="flex items-center text-red-600 mb-4">
+      <div className={`bg-surface rounded-lg border border-semantic-error p-6 ${className}`}>
+        <div className="flex items-center text-semantic-error mb-4">
           <AlertCircle className="w-5 h-5 mr-2" />
           <span className="font-medium">Failed to load summary</span>
         </div>
-        <p className="text-sm text-gray-600 mb-4">{error}</p>
+        <p className="text-sm text-content-secondary mb-4">{error}</p>
         <button
           onClick={handleRefresh}
-          className="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
+          className="text-sm text-accent-primary hover:text-accent-primary font-medium flex items-center gap-1"
         >
           <RefreshCw className="w-4 h-4" />
           Try again
@@ -194,8 +194,8 @@ export default function MeetingSummaryWidget({
   // No data state
   if (!meetingData) {
     return (
-      <div className={`bg-white rounded-lg border border-gray-200 p-6 ${className}`}>
-        <div className="text-center py-8 text-gray-500">
+      <div className={`bg-surface rounded-lg border border-line-default p-6 ${className}`}>
+        <div className="text-center py-8 text-content-tertiary">
           <Sparkles className="w-8 h-8 mx-auto mb-2 opacity-50" />
           <p>No meeting data available</p>
         </div>
@@ -209,17 +209,17 @@ export default function MeetingSummaryWidget({
   const allSynced = getAllSynced()
 
   return (
-    <div className={`bg-white rounded-lg border border-gray-200 ${className}`}>
+    <div className={`bg-surface rounded-lg border border-line-default ${className}`}>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-line-subtle">
         <div className="flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-primary-600" />
-          <h3 className="font-semibold text-gray-900">AI Meeting Summary</h3>
+          <Sparkles className="w-5 h-5 text-accent-primary" />
+          <h3 className="font-semibold text-content-primary">AI Meeting Summary</h3>
         </div>
         <button
           onClick={handleRefresh}
           disabled={refreshing}
-          className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors disabled:opacity-50"
+          className="p-1.5 text-content-tertiary hover:text-content-secondary hover:bg-surface-muted rounded transition-colors disabled:opacity-50"
           title="Refresh summary"
           aria-label="Refresh summary"
         >
@@ -231,17 +231,17 @@ export default function MeetingSummaryWidget({
         {/* Key Decisions Section */}
         {decisions.length > 0 && (
           <section>
-            <h4 className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-3">
-              <Target className="w-4 h-4 text-blue-600" />
+            <h4 className="flex items-center gap-2 text-sm font-semibold text-content-secondary mb-3">
+              <Target className="w-4 h-4 text-semantic-info" />
               Key Decisions
             </h4>
             <ul className="space-y-2">
               {decisions.map((decision, index) => (
                 <li
                   key={index}
-                  className="flex items-start gap-2 text-sm text-gray-700"
+                  className="flex items-start gap-2 text-sm text-content-secondary"
                 >
-                  <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <CheckCircle className="w-4 h-4 text-semantic-success mt-0.5 flex-shrink-0" />
                   <span>{decision}</span>
                 </li>
               ))}
@@ -252,21 +252,21 @@ export default function MeetingSummaryWidget({
         {/* Action Items Section */}
         {actionItems.length > 0 && (
           <section>
-            <h4 className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-3">
-              <Users className="w-4 h-4 text-purple-600" />
+            <h4 className="flex items-center gap-2 text-sm font-semibold text-content-secondary mb-3">
+              <Users className="w-4 h-4 text-accent-tertiary" />
               Action Items ({actionItems.length})
             </h4>
             <div className="space-y-2">
               {actionItems.slice(0, compact ? 3 : 5).map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-start justify-between p-2 bg-gray-50 rounded-lg"
+                  className="flex items-start justify-between p-2 bg-surface-muted rounded-lg"
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-gray-800 font-medium truncate">
+                    <p className="text-sm text-content-primary font-medium truncate">
                       {item.task_description}
                     </p>
-                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                    <div className="flex items-center gap-3 mt-1 text-xs text-content-tertiary">
                       {item.assigned_to_name && (
                         <span className="flex items-center gap-1">
                           <Users className="w-3 h-3" />
@@ -286,7 +286,7 @@ export default function MeetingSummaryWidget({
                 </div>
               ))}
               {actionItems.length > (compact ? 3 : 5) && (
-                <p className="text-xs text-gray-500 text-center pt-1">
+                <p className="text-xs text-content-tertiary text-center pt-1">
                   +{actionItems.length - (compact ? 3 : 5)} more items
                 </p>
               )}
@@ -297,17 +297,17 @@ export default function MeetingSummaryWidget({
         {/* Next Steps Section */}
         {nextSteps.length > 0 && (
           <section>
-            <h4 className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-3">
-              <ArrowRight className="w-4 h-4 text-orange-600" />
+            <h4 className="flex items-center gap-2 text-sm font-semibold text-content-secondary mb-3">
+              <ArrowRight className="w-4 h-4 text-semantic-warning" />
               Next Steps
             </h4>
             <ul className="space-y-2">
               {nextSteps.map((step, index) => (
                 <li
                   key={index}
-                  className="flex items-start gap-2 text-sm text-gray-700"
+                  className="flex items-start gap-2 text-sm text-content-secondary"
                 >
-                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center text-xs font-medium">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-semantic-warning-dim text-orange-700 flex items-center justify-center text-xs font-medium">
                     {index + 1}
                   </span>
                   <span>{step}</span>
@@ -319,7 +319,7 @@ export default function MeetingSummaryWidget({
 
         {/* Empty State */}
         {decisions.length === 0 && actionItems.length === 0 && nextSteps.length === 0 && (
-          <div className="text-center py-6 text-gray-500">
+          <div className="text-center py-6 text-content-tertiary">
             <Sparkles className="w-8 h-8 mx-auto mb-2 opacity-50" />
             <p className="text-sm">No summary data extracted from this meeting</p>
           </div>
@@ -328,25 +328,25 @@ export default function MeetingSummaryWidget({
 
       {/* Footer with CRM Publish */}
       {actionItems.length > 0 && (
-        <div className="px-4 py-3 border-t border-gray-100 bg-gray-50 rounded-b-lg">
+        <div className="px-4 py-3 border-t border-line-subtle bg-surface-muted rounded-b-lg">
           {publishError && (
-            <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700 flex items-center gap-2">
+            <div className="mb-3 p-2 bg-semantic-error-dim border border-semantic-error rounded text-xs text-semantic-error flex items-center gap-2">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
               {publishError}
             </div>
           )}
 
           {publishSuccess && !publishError && (
-            <div className="mb-3 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-700 flex items-center gap-2">
+            <div className="mb-3 p-2 bg-semantic-success-dim border border-semantic-success rounded text-xs text-semantic-success flex items-center gap-2">
               <CheckCircle className="w-4 h-4 flex-shrink-0" />
               Successfully published to Logos CRM
             </div>
           )}
 
           <div className="flex items-center justify-between">
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-content-tertiary">
               {allSynced ? (
-                <span className="flex items-center gap-1 text-green-600">
+                <span className="flex items-center gap-1 text-semantic-success">
                   <CheckCircle className="w-3 h-3" />
                   All items synced to CRM
                 </span>
@@ -363,8 +363,8 @@ export default function MeetingSummaryWidget({
               className={`
                 flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors
                 ${allSynced
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50'
+                  ? 'bg-surface-muted text-content-tertiary cursor-not-allowed'
+                  : 'bg-accent-primary text-white hover:opacity-90 disabled:opacity-50'
                 }
               `}
             >
@@ -399,8 +399,8 @@ export default function MeetingSummaryWidget({
 function PriorityBadge({ priority }) {
   const config = {
     high: {
-      bg: 'bg-red-100',
-      text: 'text-red-700',
+      bg: 'bg-semantic-error-dim',
+      text: 'text-semantic-error',
       label: 'High'
     },
     medium: {
@@ -409,8 +409,8 @@ function PriorityBadge({ priority }) {
       label: 'Medium'
     },
     low: {
-      bg: 'bg-green-100',
-      text: 'text-green-700',
+      bg: 'bg-semantic-success-dim',
+      text: 'text-semantic-success',
       label: 'Low'
     }
   }

@@ -174,20 +174,20 @@ export default function Calendar() {
 
   const getItemColor = (item) => {
     if (item.type === 'action_item') {
-      if (item.priority === 'high') return 'bg-red-100 text-red-700 border-red-200'
+      if (item.priority === 'high') return 'bg-semantic-error-dim text-semantic-error border-semantic-error'
       if (item.priority === 'medium') return 'bg-yellow-100 text-yellow-700 border-yellow-200'
-      return 'bg-green-100 text-green-700 border-green-200'
+      return 'bg-semantic-success-dim text-semantic-success border-semantic-success'
     }
     if (item.type === 'goal') {
-      return 'bg-purple-100 text-purple-700 border-purple-200'
+      return 'bg-accent-tertiary-dim text-accent-tertiary border-accent-tertiary'
     }
-    return 'bg-blue-100 text-blue-700 border-blue-200'
+    return 'bg-semantic-info-dim text-semantic-info border-semantic-info'
   }
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-accent-primary" />
       </div>
     )
   }
@@ -197,11 +197,11 @@ export default function Calendar() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <CalendarIcon className="h-7 w-7 text-primary-600" />
+          <h1 className="text-2xl font-bold text-content-primary flex items-center gap-2">
+            <CalendarIcon className="h-7 w-7 text-accent-primary" />
             Calendar
           </h1>
-          <p className="text-gray-500 mt-1">
+          <p className="text-content-tertiary mt-1">
             View deadlines, events, and sync with Google Calendar
           </p>
         </div>
@@ -222,7 +222,7 @@ export default function Calendar() {
               </button>
               <button
                 onClick={handleDisconnect}
-                className="btn btn-secondary flex items-center gap-2 text-red-600"
+                className="btn btn-secondary flex items-center gap-2 text-semantic-error"
               >
                 <Unlink className="h-4 w-4" />
                 Disconnect
@@ -237,7 +237,7 @@ export default function Calendar() {
               Connect Google Calendar
             </button>
           ) : (
-            <div className="text-sm text-gray-500 bg-gray-100 px-3 py-2 rounded-lg">
+            <div className="text-sm text-content-tertiary bg-surface-muted px-3 py-2 rounded-lg">
               Add GOOGLE_CLIENT_ID to enable
             </div>
           )}
@@ -249,15 +249,15 @@ export default function Calendar() {
         <div className="lg:col-span-2">
           <div className="card">
             {/* Calendar Header */}
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+            <div className="p-4 border-b border-line-default flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <button onClick={prevMonth} className="p-2 hover:bg-gray-100 rounded-lg">
+                <button onClick={prevMonth} className="p-2 hover:bg-surface-muted rounded-lg">
                   <ChevronLeft className="h-5 w-5" />
                 </button>
                 <h2 className="text-lg font-semibold">
                   {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                 </h2>
-                <button onClick={nextMonth} className="p-2 hover:bg-gray-100 rounded-lg">
+                <button onClick={nextMonth} className="p-2 hover:bg-surface-muted rounded-lg">
                   <ChevronRight className="h-5 w-5" />
                 </button>
               </div>
@@ -271,7 +271,7 @@ export default function Calendar() {
               {/* Weekday headers */}
               <div className="grid grid-cols-7 gap-1 mb-2">
                 {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                  <div key={day} className="text-center text-sm font-medium text-gray-500 py-2">
+                  <div key={day} className="text-center text-sm font-medium text-content-tertiary py-2">
                     {day}
                   </div>
                 ))}
@@ -293,15 +293,15 @@ export default function Calendar() {
                       onClick={() => setSelectedDate(day)}
                       className={`
                         min-h-[80px] p-1 text-left rounded-lg border transition-colors
-                        ${isCurrentMonth ? 'bg-white' : 'bg-gray-50'}
-                        ${isToday ? 'border-primary-500' : 'border-gray-100'}
+                        ${isCurrentMonth ? 'bg-surface' : 'bg-surface-muted'}
+                        ${isToday ? 'border-primary-500' : 'border-line-subtle'}
                         ${isSelected ? 'ring-2 ring-primary-500' : ''}
-                        hover:bg-gray-50
+                        hover:bg-surface-muted
                       `}
                     >
                       <div className={`
                         text-sm font-medium mb-1
-                        ${isToday ? 'text-primary-600' : isCurrentMonth ? 'text-gray-900' : 'text-gray-400'}
+                        ${isToday ? 'text-accent-primary' : isCurrentMonth ? 'text-content-primary' : 'text-content-tertiary'}
                       `}>
                         {day.getDate()}
                       </div>
@@ -315,7 +315,7 @@ export default function Calendar() {
                           </div>
                         ))}
                         {hasItems && dayEvents.length + dayItems.length > 3 && (
-                          <div className="text-xs text-gray-400 px-1">
+                          <div className="text-xs text-content-tertiary px-1">
                             +{dayEvents.length + dayItems.length - 3} more
                           </div>
                         )}
@@ -333,7 +333,7 @@ export default function Calendar() {
           {/* Selected Date Details */}
           {selectedDate && (
             <div className="card p-4">
-              <h3 className="font-semibold text-gray-900 mb-3">
+              <h3 className="font-semibold text-content-primary mb-3">
                 {formatDate(selectedDate)}
               </h3>
               <div className="space-y-2">
@@ -366,7 +366,7 @@ export default function Calendar() {
                 ))}
                 {getEventsForDate(selectedDate).length === 0 &&
                   getUpcomingForDate(selectedDate).length === 0 && (
-                    <p className="text-sm text-gray-400 text-center py-4">
+                    <p className="text-sm text-content-tertiary text-center py-4">
                       No events on this day
                     </p>
                   )}
@@ -376,8 +376,8 @@ export default function Calendar() {
 
           {/* Upcoming Items */}
           <div className="card p-4">
-            <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-              <Clock className="h-4 w-4 text-gray-400" />
+            <h3 className="font-semibold text-content-primary mb-3 flex items-center gap-2">
+              <Clock className="h-4 w-4 text-content-tertiary" />
               Upcoming (14 days)
             </h3>
             <div className="space-y-2 max-h-[400px] overflow-y-auto">
@@ -399,7 +399,7 @@ export default function Calendar() {
                   </div>
                 ))
               ) : (
-                <p className="text-sm text-gray-400 text-center py-4">
+                <p className="text-sm text-content-tertiary text-center py-4">
                   No upcoming items
                 </p>
               )}
@@ -408,29 +408,29 @@ export default function Calendar() {
 
           {/* Quick Stats */}
           <div className="card p-4">
-            <h3 className="font-semibold text-gray-900 mb-3">Quick Stats</h3>
+            <h3 className="font-semibold text-content-primary mb-3">Quick Stats</h3>
             <div className="grid grid-cols-2 gap-3">
-              <div className="text-center p-3 bg-blue-50 rounded-lg">
-                <p className="text-2xl font-bold text-blue-600">{events.length}</p>
-                <p className="text-xs text-gray-500">Calendar Events</p>
+              <div className="text-center p-3 bg-semantic-info-dim rounded-lg">
+                <p className="text-2xl font-bold text-semantic-info">{events.length}</p>
+                <p className="text-xs text-content-tertiary">Calendar Events</p>
               </div>
               <div className="text-center p-3 bg-orange-50 rounded-lg">
-                <p className="text-2xl font-bold text-orange-600">
+                <p className="text-2xl font-bold text-semantic-warning">
                   {upcoming.filter(u => u.type === 'action_item').length}
                 </p>
-                <p className="text-xs text-gray-500">Due Tasks</p>
+                <p className="text-xs text-content-tertiary">Due Tasks</p>
               </div>
-              <div className="text-center p-3 bg-purple-50 rounded-lg">
-                <p className="text-2xl font-bold text-purple-600">
+              <div className="text-center p-3 bg-accent-tertiary-dim rounded-lg">
+                <p className="text-2xl font-bold text-accent-tertiary">
                   {upcoming.filter(u => u.type === 'goal').length}
                 </p>
-                <p className="text-xs text-gray-500">Goal Deadlines</p>
+                <p className="text-xs text-content-tertiary">Goal Deadlines</p>
               </div>
-              <div className="text-center p-3 bg-red-50 rounded-lg">
-                <p className="text-2xl font-bold text-red-600">
+              <div className="text-center p-3 bg-semantic-error-dim rounded-lg">
+                <p className="text-2xl font-bold text-semantic-error">
                   {upcoming.filter(u => new Date(u.date) < new Date()).length}
                 </p>
-                <p className="text-xs text-gray-500">Overdue</p>
+                <p className="text-xs text-content-tertiary">Overdue</p>
               </div>
             </div>
           </div>
@@ -439,12 +439,12 @@ export default function Calendar() {
 
       {/* Connection Status */}
       {!status.connected && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="bg-semantic-info-dim border border-semantic-info rounded-lg p-4">
           <div className="flex items-start gap-3">
             <AlertCircle className="h-5 w-5 text-blue-500 mt-0.5" />
             <div>
-              <h3 className="font-medium text-blue-900">Connect Google Calendar</h3>
-              <p className="text-sm text-blue-700 mt-1">
+              <h3 className="font-medium text-semantic-info">Connect Google Calendar</h3>
+              <p className="text-sm text-semantic-info mt-1">
                 Connect your Google Calendar to sync action items, goal deadlines, and meeting schedules.
                 Events will appear in your calendar with reminders.
               </p>

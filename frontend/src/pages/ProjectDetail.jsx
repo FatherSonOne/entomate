@@ -82,8 +82,8 @@ export default function ProjectDetail() {
   if (!project) {
     return (
       <div className="text-center py-12">
-        <h2 className="text-xl font-semibold text-gray-900">Project not found</h2>
-        <Link to="/projects" className="text-primary-600 hover:underline mt-2 inline-block">
+        <h2 className="text-xl font-semibold text-content-primary">Project not found</h2>
+        <Link to="/projects" className="text-accent-primary hover:underline mt-2 inline-block">
           Back to projects
         </Link>
       </div>
@@ -92,10 +92,10 @@ export default function ProjectDetail() {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'done': return 'bg-green-100 text-green-800'
+      case 'done': return 'bg-semantic-success-dim text-semantic-success'
       case 'in_progress': return 'bg-yellow-100 text-yellow-800'
-      case 'blocked': return 'bg-red-100 text-red-800'
-      default: return 'bg-blue-100 text-blue-800'
+      case 'blocked': return 'bg-semantic-error-dim text-semantic-error'
+      default: return 'bg-semantic-info-dim text-semantic-info'
     }
   }
 
@@ -111,13 +111,13 @@ export default function ProjectDetail() {
       <div className="flex items-start gap-4">
         <Link
           to="/projects"
-          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          className="p-2 hover:bg-surface-muted rounded-lg transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div className="flex-1">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-gray-900">{project.name}</h1>
+            <h1 className="text-2xl font-bold text-content-primary">{project.name}</h1>
             <Link
               to={`/projects/${id}/dashboard`}
               className="btn btn-secondary"
@@ -127,9 +127,9 @@ export default function ProjectDetail() {
             </Link>
           </div>
           {project.description && (
-            <p className="text-gray-600 mt-1">{project.description}</p>
+            <p className="text-content-secondary mt-1">{project.description}</p>
           )}
-          <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
+          <div className="flex items-center gap-4 mt-2 text-sm text-content-tertiary">
             <span className={`badge ${
               project.status === 'active' ? 'badge-success' :
               project.status === 'completed' ? 'badge-gray' :
@@ -151,28 +151,28 @@ export default function ProjectDetail() {
       {project.stats && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div className="card p-4 text-center">
-            <div className="text-2xl font-bold text-gray-900">{project.stats.totalTasks}</div>
-            <div className="text-sm text-gray-500">Total Tasks</div>
+            <div className="text-2xl font-bold text-content-primary">{project.stats.totalTasks}</div>
+            <div className="text-sm text-content-tertiary">Total Tasks</div>
           </div>
           <div className="card p-4 text-center">
-            <div className="text-2xl font-bold text-green-600">{project.stats.completedTasks}</div>
-            <div className="text-sm text-gray-500">Completed</div>
+            <div className="text-2xl font-bold text-semantic-success">{project.stats.completedTasks}</div>
+            <div className="text-sm text-content-tertiary">Completed</div>
           </div>
           <div className="card p-4 text-center">
             <div className="text-2xl font-bold text-yellow-600">{project.stats.inProgressTasks}</div>
-            <div className="text-sm text-gray-500">In Progress</div>
+            <div className="text-sm text-content-tertiary">In Progress</div>
           </div>
           <div className="card p-4 text-center">
-            <div className="text-2xl font-bold text-blue-600">{project.stats.openTasks}</div>
-            <div className="text-sm text-gray-500">Open</div>
+            <div className="text-2xl font-bold text-semantic-info">{project.stats.openTasks}</div>
+            <div className="text-sm text-content-tertiary">Open</div>
           </div>
         </div>
       )}
 
       {/* Tasks */}
       <div className="card">
-        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="font-semibold text-gray-900">Tasks</h2>
+        <div className="p-4 border-b border-line-default flex items-center justify-between">
+          <h2 className="font-semibold text-content-primary">Tasks</h2>
           <button
             onClick={() => setShowAddTask(!showAddTask)}
             className="btn btn-primary btn-sm"
@@ -184,7 +184,7 @@ export default function ProjectDetail() {
 
         {/* Add task form */}
         {showAddTask && (
-          <div className="p-4 bg-gray-50 border-b border-gray-200">
+          <div className="p-4 bg-surface-muted border-b border-line-default">
             <form onSubmit={handleAddTask} className="flex gap-3">
               <input
                 type="text"
@@ -220,9 +220,9 @@ export default function ProjectDetail() {
         {/* Task list */}
         {project.tasks?.length === 0 ? (
           <div className="p-8 text-center">
-            <CheckSquare className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-            <p className="text-gray-500">No tasks yet</p>
-            <p className="text-sm text-gray-400">Add a task to get started</p>
+            <CheckSquare className="w-10 h-10 text-content-muted mx-auto mb-2" />
+            <p className="text-content-tertiary">No tasks yet</p>
+            <p className="text-sm text-content-tertiary">Add a task to get started</p>
           </div>
         ) : (
           <div className="divide-y divide-gray-100">
@@ -230,7 +230,7 @@ export default function ProjectDetail() {
               <div
                 key={task.id}
                 className={`p-4 flex items-center gap-3 ${
-                  task.status === 'done' ? 'bg-gray-50' : ''
+                  task.status === 'done' ? 'bg-surface-muted' : ''
                 }`}
               >
                 <button
@@ -238,7 +238,7 @@ export default function ProjectDetail() {
                   className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
                     task.status === 'done'
                       ? 'bg-green-500 border-green-500 text-white'
-                      : 'border-gray-300 hover:border-primary-500'
+                      : 'border-line-strong hover:border-primary-500'
                   }`}
                 >
                   {task.status === 'done' && (
@@ -248,11 +248,11 @@ export default function ProjectDetail() {
 
                 <div className="flex-1 min-w-0">
                   <p className={`font-medium ${
-                    task.status === 'done' ? 'text-gray-400 line-through' : 'text-gray-900'
+                    task.status === 'done' ? 'text-content-tertiary line-through' : 'text-content-primary'
                   }`}>
                     {task.title}
                   </p>
-                  <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                  <div className="flex items-center gap-3 mt-1 text-xs text-content-tertiary">
                     {task.due_date && (
                       <span className="flex items-center gap-1">
                         <Clock className="w-3 h-3" />
@@ -278,7 +278,7 @@ export default function ProjectDetail() {
 
                 <button
                   onClick={() => handleDeleteTask(task.id)}
-                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                  className="p-1.5 text-content-tertiary hover:text-semantic-error hover:bg-semantic-error-dim rounded transition-colors"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -291,18 +291,18 @@ export default function ProjectDetail() {
       {/* Related Meetings */}
       {project.meetings?.length > 0 && (
         <div className="card">
-          <div className="p-4 border-b border-gray-200">
-            <h2 className="font-semibold text-gray-900">Related Meetings</h2>
+          <div className="p-4 border-b border-line-default">
+            <h2 className="font-semibold text-content-primary">Related Meetings</h2>
           </div>
           <div className="divide-y divide-gray-100">
             {project.meetings.map((meeting) => (
               <Link
                 key={meeting.id}
                 to={`/meetings/${meeting.id}`}
-                className="block p-4 hover:bg-gray-50"
+                className="block p-4 hover:bg-surface-muted"
               >
-                <h4 className="font-medium text-gray-900">{meeting.title}</h4>
-                <p className="text-sm text-gray-500 mt-0.5">
+                <h4 className="font-medium text-content-primary">{meeting.title}</h4>
+                <p className="text-sm text-content-tertiary mt-0.5">
                   {new Date(meeting.created_at).toLocaleDateString()}
                 </p>
               </Link>

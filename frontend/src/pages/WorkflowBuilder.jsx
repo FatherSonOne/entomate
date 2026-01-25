@@ -94,10 +94,10 @@ export default function WorkflowBuilder() {
 
   if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-gray-50">
+      <div className="h-screen flex items-center justify-center bg-surface-muted">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 text-primary-600 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Loading workflow...</p>
+          <Loader2 className="w-8 h-8 text-accent-primary animate-spin mx-auto mb-4" />
+          <p className="text-content-secondary">Loading workflow...</p>
         </div>
       </div>
     )
@@ -105,11 +105,11 @@ export default function WorkflowBuilder() {
 
   if (error) {
     return (
-      <div className="h-screen flex items-center justify-center bg-gray-50">
+      <div className="h-screen flex items-center justify-center bg-surface-muted">
         <div className="text-center max-w-md">
-          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Failed to Load Workflow</h2>
-          <p className="text-gray-600 mb-4">{error}</p>
+          <AlertCircle className="w-12 h-12 text-semantic-error mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-content-primary mb-2">Failed to Load Workflow</h2>
+          <p className="text-content-secondary mb-4">{error}</p>
           <div className="flex gap-2 justify-center">
             <button
               onClick={loadWorkflow}
@@ -133,12 +133,12 @@ export default function WorkflowBuilder() {
     <div className="h-screen flex flex-col overflow-hidden">
       {/* Error banner */}
       {saveError && (
-        <div className="bg-red-50 border-b border-red-200 px-4 py-2 flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-red-500" />
-          <span className="text-sm text-red-700">{saveError}</span>
+        <div className="bg-semantic-error-dim border-b border-semantic-error px-4 py-2 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-semantic-error" />
+          <span className="text-sm text-semantic-error">{saveError}</span>
           <button
             onClick={() => setSaveError(null)}
-            className="ml-auto text-red-500 hover:text-red-700"
+            className="ml-auto text-semantic-error hover:text-semantic-error"
           >
             Dismiss
           </button>

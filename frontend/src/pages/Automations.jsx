@@ -324,9 +324,9 @@ export default function Automations() {
                 {executionLogs.map((log, idx) => (
                   <div key={idx} className="p-3 flex items-center gap-3 hover:bg-surface-muted transition-colors">
                     {log.success ? (
-                      <CheckCircle2 size={18} className="text-green-500 flex-shrink-0" />
+                      <CheckCircle2 size={18} className="text-semantic-success flex-shrink-0" />
                     ) : (
-                      <XCircle size={18} className="text-red-500 flex-shrink-0" />
+                      <XCircle size={18} className="text-semantic-error flex-shrink-0" />
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-content-primary">{log.automationName || 'Unknown'}</p>
@@ -336,7 +336,7 @@ export default function Automations() {
                       </p>
                     </div>
                     {log.error_message && (
-                      <span className="text-xs text-red-500 truncate max-w-32">{log.error_message}</span>
+                      <span className="text-xs text-semantic-error truncate max-w-32">{log.error_message}</span>
                     )}
                   </div>
                 ))}
@@ -656,7 +656,7 @@ export default function Automations() {
 
                     <button
                       onClick={() => handleDelete(automation.id)}
-                      className="btn btn-icon btn-ghost text-red-500 hover:bg-red-500/10"
+                      className="btn btn-icon btn-ghost text-semantic-error hover:bg-semantic-error/10"
                       title="Delete"
                     >
                       <Trash2 size={16} />
@@ -669,20 +669,20 @@ export default function Automations() {
                   <div className={`mt-3 p-3 rounded-lg border ${
                     testResult.success 
                       ? 'bg-green-500/10 border-green-500/20' 
-                      : 'bg-red-500/10 border-red-500/20'
+                      : 'bg-semantic-error/10 border-red-500/20'
                   }`}>
                     <div className="flex items-start gap-2">
                       {testResult.success ? (
-                        <CheckCircle2 size={18} className="text-green-500 flex-shrink-0" />
+                        <CheckCircle2 size={18} className="text-semantic-success flex-shrink-0" />
                       ) : (
-                        <AlertCircle size={18} className="text-red-500 flex-shrink-0" />
+                        <AlertCircle size={18} className="text-semantic-error flex-shrink-0" />
                       )}
                       <div className="flex-1">
-                        <p className={`font-medium text-sm ${testResult.success ? 'text-green-500' : 'text-red-500'}`}>
+                        <p className={`font-medium text-sm ${testResult.success ? 'text-semantic-success' : 'text-semantic-error'}`}>
                           {testResult.success ? 'Test passed!' : 'Test failed'}
                         </p>
                         {testResult.error && (
-                          <p className="text-xs text-red-500 mt-1 font-mono">{testResult.error}</p>
+                          <p className="text-xs text-semantic-error mt-1 font-mono">{testResult.error}</p>
                         )}
                         {testResult.actionResults && (
                           <div className="mt-2 space-y-1">

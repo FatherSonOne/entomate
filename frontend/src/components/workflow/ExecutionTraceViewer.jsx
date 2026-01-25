@@ -15,10 +15,10 @@ import { workflowsApi } from '../../services/api'
 
 // Status colors and icons
 const statusConfig = {
-  completed: { color: 'text-green-600 bg-green-100', icon: CheckCircle2, label: 'Completed' },
-  failed: { color: 'text-red-600 bg-red-100', icon: XCircle, label: 'Failed' },
-  running: { color: 'text-blue-600 bg-blue-100', icon: Loader2, label: 'Running' },
-  pending: { color: 'text-gray-400 bg-gray-100', icon: Clock, label: 'Pending' },
+  completed: { color: 'text-semantic-success bg-semantic-success-dim', icon: CheckCircle2, label: 'Completed' },
+  failed: { color: 'text-semantic-error bg-semantic-error-dim', icon: XCircle, label: 'Failed' },
+  running: { color: 'text-semantic-info bg-semantic-info-dim', icon: Loader2, label: 'Running' },
+  pending: { color: 'text-content-tertiary bg-surface-muted', icon: Clock, label: 'Pending' },
   skipped: { color: 'text-yellow-600 bg-yellow-100', icon: ArrowRight, label: 'Skipped' }
 }
 
@@ -74,7 +74,7 @@ function ExecutionStep({ step, index, isLast, onSelect, selected }) {
     <div className={`relative ${!isLast ? 'pb-6' : ''}`}>
       {/* Connection line */}
       {!isLast && (
-        <div className="absolute left-4 top-8 bottom-0 w-0.5 bg-gray-200" />
+        <div className="absolute left-4 top-8 bottom-0 w-0.5 bg-surface-muted" />
       )}
 
       {/* Step content */}
@@ -94,20 +94,20 @@ function ExecutionStep({ step, index, isLast, onSelect, selected }) {
           <div className="flex items-center gap-2">
             <button
               onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
-              className="p-0.5 hover:bg-gray-100 rounded"
+              className="p-0.5 hover:bg-surface-muted rounded"
             >
               {expanded ? (
-                <ChevronDown className="w-4 h-4 text-gray-500" />
+                <ChevronDown className="w-4 h-4 text-content-tertiary" />
               ) : (
-                <ChevronRight className="w-4 h-4 text-gray-500" />
+                <ChevronRight className="w-4 h-4 text-content-tertiary" />
               )}
             </button>
-            <span className="font-medium text-gray-900">{step.nodeName || step.nodeId}</span>
-            <span className="text-xs text-gray-400 font-mono">{step.nodeType}</span>
+            <span className="font-medium text-content-primary">{step.nodeName || step.nodeId}</span>
+            <span className="text-xs text-content-tertiary font-mono">{step.nodeType}</span>
           </div>
 
           {/* Timing info */}
-          <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
+          <div className="flex items-center gap-4 mt-1 text-xs text-content-tertiary">
             <span className="flex items-center gap-1">
               <Clock className="w-3 h-3" />
               {formatTime(step.startedAt)}
@@ -126,7 +126,7 @@ function ExecutionStep({ step, index, isLast, onSelect, selected }) {
 
           {/* Error message */}
           {step.error && (
-            <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+            <div className="mt-2 p-2 bg-semantic-error-dim border border-semantic-error rounded text-xs text-semantic-error">
               <div className="font-medium">Error:</div>
               <div className="font-mono">{step.error}</div>
             </div>
@@ -138,7 +138,7 @@ function ExecutionStep({ step, index, isLast, onSelect, selected }) {
               {/* Input data */}
               {step.inputData && (
                 <div>
-                  <div className="text-xs font-medium text-gray-700 mb-1 flex items-center gap-1">
+                  <div className="text-xs font-medium text-content-secondary mb-1 flex items-center gap-1">
                     <Database className="w-3 h-3" />
                     Input Data
                   </div>
@@ -149,7 +149,7 @@ function ExecutionStep({ step, index, isLast, onSelect, selected }) {
               {/* Output data */}
               {step.outputData && (
                 <div>
-                  <div className="text-xs font-medium text-gray-700 mb-1 flex items-center gap-1">
+                  <div className="text-xs font-medium text-content-secondary mb-1 flex items-center gap-1">
                     <Zap className="w-3 h-3" />
                     Output Data
                   </div>
@@ -160,7 +160,7 @@ function ExecutionStep({ step, index, isLast, onSelect, selected }) {
               {/* Config */}
               {step.config && Object.keys(step.config).length > 0 && (
                 <div>
-                  <div className="text-xs font-medium text-gray-700 mb-1">Configuration</div>
+                  <div className="text-xs font-medium text-content-secondary mb-1">Configuration</div>
                   <JsonViewer data={step.config} maxHeight={100} />
                 </div>
               )}
@@ -248,7 +248,7 @@ export default function ExecutionTraceViewer({
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <Loader2 className="w-6 h-6 text-primary-600 animate-spin" />
+        <Loader2 className="w-6 h-6 text-accent-primary animate-spin" />
       </div>
     )
   }
@@ -256,8 +256,8 @@ export default function ExecutionTraceViewer({
   if (error) {
     return (
       <div className="p-4 text-center">
-        <AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-2" />
-        <p className="text-gray-700 mb-2">{error}</p>
+        <AlertCircle className="w-8 h-8 text-semantic-error mx-auto mb-2" />
+        <p className="text-content-secondary mb-2">{error}</p>
         <button onClick={loadExecution} className="btn btn-secondary btn-sm">
           <RefreshCw className="w-4 h-4" />
           Retry
@@ -268,7 +268,7 @@ export default function ExecutionTraceViewer({
 
   if (!execution) {
     return (
-      <div className="p-4 text-center text-gray-500">
+      <div className="p-4 text-center text-content-tertiary">
         No execution data available
       </div>
     )
@@ -277,20 +277,20 @@ export default function ExecutionTraceViewer({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200">
+      <div className="p-4 border-b border-line-default">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-gray-900">Execution Trace</h3>
+          <h3 className="font-semibold text-content-primary">Execution Trace</h3>
           <div className="flex items-center gap-2">
             <button
               onClick={loadExecution}
-              className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+              className="p-1.5 text-content-tertiary hover:text-content-secondary hover:bg-surface-muted rounded"
               title="Refresh"
             >
               <RefreshCw className="w-4 h-4" />
             </button>
             <button
               onClick={handleExport}
-              className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+              className="p-1.5 text-content-tertiary hover:text-content-secondary hover:bg-surface-muted rounded"
               title="Export"
             >
               <Download className="w-4 h-4" />
@@ -301,46 +301,46 @@ export default function ExecutionTraceViewer({
         {/* Execution summary */}
         <div className="flex items-center gap-4 text-sm">
           <span className={`px-2 py-0.5 rounded-full ${
-            execution.status === 'completed' ? 'bg-green-100 text-green-700' :
-            execution.status === 'failed' ? 'bg-red-100 text-red-700' :
-            execution.status === 'running' ? 'bg-blue-100 text-blue-700' :
-            'bg-gray-100 text-gray-700'
+            execution.status === 'completed' ? 'bg-semantic-success-dim text-semantic-success' :
+            execution.status === 'failed' ? 'bg-semantic-error-dim text-semantic-error' :
+            execution.status === 'running' ? 'bg-semantic-info-dim text-semantic-info' :
+            'bg-surface-muted text-content-secondary'
           }`}>
             {execution.status}
           </span>
-          <span className="text-gray-500">
+          <span className="text-content-tertiary">
             {formatDuration(execution.duration_ms)}
           </span>
-          <span className="text-gray-400 text-xs">
+          <span className="text-content-tertiary text-xs">
             {new Date(execution.started_at).toLocaleString()}
           </span>
         </div>
 
         {/* Stats */}
         <div className="flex items-center gap-4 mt-3 text-xs">
-          <span className="text-gray-600">{stats.total} nodes</span>
-          <span className="text-green-600">{stats.completed} completed</span>
-          {stats.failed > 0 && <span className="text-red-600">{stats.failed} failed</span>}
+          <span className="text-content-secondary">{stats.total} nodes</span>
+          <span className="text-semantic-success">{stats.completed} completed</span>
+          {stats.failed > 0 && <span className="text-semantic-error">{stats.failed} failed</span>}
           {stats.skipped > 0 && <span className="text-yellow-600">{stats.skipped} skipped</span>}
         </div>
       </div>
 
       {/* Filters */}
-      <div className="p-3 border-b border-gray-100 flex items-center gap-2">
+      <div className="p-3 border-b border-line-subtle flex items-center gap-2">
         <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-content-tertiary" />
           <input
             type="text"
             placeholder="Search nodes..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="w-full pl-8 pr-3 py-1.5 text-sm border border-line-default rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
         <select
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          className="px-2 py-1.5 text-sm border border-gray-200 rounded-md"
+          className="px-2 py-1.5 text-sm border border-line-default rounded-md"
         >
           <option value="all">All</option>
           <option value="completed">Completed</option>
@@ -352,7 +352,7 @@ export default function ExecutionTraceViewer({
       {/* Execution steps */}
       <div className="flex-1 overflow-y-auto p-4">
         {filteredSteps.length === 0 ? (
-          <div className="text-center text-gray-500 py-8">
+          <div className="text-center text-content-tertiary py-8">
             No matching steps found
           </div>
         ) : (
@@ -373,12 +373,12 @@ export default function ExecutionTraceViewer({
 
       {/* Error details (if execution failed) */}
       {execution.status === 'failed' && execution.error_message && (
-        <div className="p-4 border-t border-red-200 bg-red-50">
+        <div className="p-4 border-t border-semantic-error bg-semantic-error-dim">
           <div className="flex items-start gap-2">
-            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+            <AlertCircle className="w-5 h-5 text-semantic-error flex-shrink-0" />
             <div>
-              <div className="font-medium text-red-700">Execution Failed</div>
-              <div className="text-sm text-red-600 mt-1 font-mono">
+              <div className="font-medium text-semantic-error">Execution Failed</div>
+              <div className="text-sm text-semantic-error mt-1 font-mono">
                 {execution.error_message}
               </div>
             </div>

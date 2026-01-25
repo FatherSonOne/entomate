@@ -139,13 +139,13 @@ export default function TodaysIntelligence() {
   const getInsightColors = (type) => {
     switch (type) {
       case 'alert':
-        return 'bg-red-50 border-red-200 text-red-800'
+        return 'bg-semantic-error-dim border-semantic-error text-semantic-error'
       case 'warning':
-        return 'bg-amber-50 border-amber-200 text-amber-800'
+        return 'bg-semantic-warning-dim border-semantic-warning text-semantic-warning'
       case 'success':
-        return 'bg-green-50 border-green-200 text-green-800'
+        return 'bg-semantic-success-dim border-semantic-success text-semantic-success'
       default:
-        return 'bg-blue-50 border-blue-200 text-blue-800'
+        return 'bg-semantic-info-dim border-semantic-info text-semantic-info'
     }
   }
 
@@ -153,15 +153,15 @@ export default function TodaysIntelligence() {
     return (
       <div className="card p-6">
         <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 rounded w-1/3"></div>
-          <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+          <div className="h-8 bg-surface-muted rounded w-1/3"></div>
+          <div className="h-4 bg-surface-muted rounded w-2/3"></div>
           <div className="grid grid-cols-4 gap-4 mt-4">
-            <div className="h-20 bg-gray-200 rounded"></div>
-            <div className="h-20 bg-gray-200 rounded"></div>
-            <div className="h-20 bg-gray-200 rounded"></div>
-            <div className="h-20 bg-gray-200 rounded"></div>
+            <div className="h-20 bg-surface-muted rounded"></div>
+            <div className="h-20 bg-surface-muted rounded"></div>
+            <div className="h-20 bg-surface-muted rounded"></div>
+            <div className="h-20 bg-surface-muted rounded"></div>
           </div>
-          <div className="h-32 bg-gray-200 rounded mt-4"></div>
+          <div className="h-32 bg-surface-muted rounded mt-4"></div>
         </div>
       </div>
     )
@@ -172,11 +172,11 @@ export default function TodaysIntelligence() {
       <div className="card p-6">
         <div className="text-center py-8">
           <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
-          <p className="text-gray-600 font-medium">Failed to load intelligence briefing</p>
-          <p className="text-sm text-gray-400 mt-1">{error}</p>
+          <p className="text-content-secondary font-medium">Failed to load intelligence briefing</p>
+          <p className="text-sm text-content-tertiary mt-1">{error}</p>
           <button
             onClick={() => loadBriefing()}
-            className="mt-4 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+            className="mt-4 px-4 py-2 bg-accent-primary text-white rounded-lg hover:opacity-90 transition-colors"
           >
             Retry
           </button>
@@ -193,15 +193,15 @@ export default function TodaysIntelligence() {
   return (
     <div className="card overflow-hidden">
       {/* Header with gradient */}
-      <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 p-6 text-white">
+      <div className="bg-gradient-to-r from-accent-primary via-accent-tertiary to-accent-primary p-6 text-white">
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
               <GreetingIcon className="w-5 h-5" />
-              <span className="text-indigo-100 text-sm">{briefing.formattedDate}</span>
+              <span className="text-content-tertiary text-sm">{briefing.formattedDate}</span>
             </div>
             <h2 className="text-2xl font-bold">{briefing.greeting}!</h2>
-            <p className="text-indigo-100 mt-1 flex items-center gap-1">
+            <p className="text-content-tertiary mt-1 flex items-center gap-1">
               <Zap className="w-4 h-4" />
               Today's Intelligence Briefing
             </p>
@@ -210,7 +210,7 @@ export default function TodaysIntelligence() {
             <button
               onClick={() => loadBriefing(true)}
               disabled={refreshing}
-              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+              className="p-2 hover:bg-surface/10 rounded-lg transition-colors"
               title="Refresh briefing"
               aria-label="Refresh briefing"
             >
@@ -221,45 +221,45 @@ export default function TodaysIntelligence() {
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-gray-100 border-b border-gray-100">
+      <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-gray-100 border-b border-line-subtle">
         <div className="p-4 text-center">
           <div className="flex items-center justify-center gap-1 mb-1">
-            <Calendar className="w-4 h-4 text-indigo-500" />
+            <Calendar className="w-4 h-4 text-accent-primary" />
           </div>
-          <p className="text-2xl font-bold text-gray-900">{stats.todaysMeetingsCount}</p>
-          <p className="text-xs text-gray-500">Today's Meetings</p>
+          <p className="text-2xl font-bold text-content-primary">{stats.todaysMeetingsCount}</p>
+          <p className="text-xs text-content-tertiary">Today's Meetings</p>
         </div>
         <div className="p-4 text-center">
           <div className="flex items-center justify-center gap-1 mb-1">
-            <AlertTriangle className="w-4 h-4 text-red-500" />
+            <AlertTriangle className="w-4 h-4 text-semantic-error" />
           </div>
-          <p className={`text-2xl font-bold ${stats.overdueItemsCount > 0 ? 'text-red-600' : 'text-gray-900'}`}>
+          <p className={`text-2xl font-bold ${stats.overdueItemsCount > 0 ? 'text-semantic-error' : 'text-content-primary'}`}>
             {stats.overdueItemsCount}
           </p>
-          <p className="text-xs text-gray-500">Overdue Items</p>
+          <p className="text-xs text-content-tertiary">Overdue Items</p>
         </div>
         <div className="p-4 text-center">
           <div className="flex items-center justify-center gap-1 mb-1">
             <DollarSign className="w-4 h-4 text-amber-500" />
           </div>
-          <p className={`text-2xl font-bold ${stats.urgentDealsCount > 0 ? 'text-amber-600' : 'text-gray-900'}`}>
+          <p className={`text-2xl font-bold ${stats.urgentDealsCount > 0 ? 'text-semantic-warning' : 'text-content-primary'}`}>
             {stats.urgentDealsCount}
           </p>
-          <p className="text-xs text-gray-500">Urgent Deals</p>
+          <p className="text-xs text-content-tertiary">Urgent Deals</p>
         </div>
         <div className="p-4 text-center">
           <div className="flex items-center justify-center gap-1 mb-1">
-            <UserPlus className="w-4 h-4 text-green-500" />
+            <UserPlus className="w-4 h-4 text-semantic-success" />
           </div>
-          <p className="text-2xl font-bold text-gray-900">{stats.newContactsCount}</p>
-          <p className="text-xs text-gray-500">New Contacts</p>
+          <p className="text-2xl font-bold text-content-primary">{stats.newContactsCount}</p>
+          <p className="text-xs text-content-tertiary">New Contacts</p>
         </div>
       </div>
 
       {/* AI Insights */}
       {insights && insights.length > 0 && (
-        <div className="p-4 border-b border-gray-100 bg-gray-50">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+        <div className="p-4 border-b border-line-subtle bg-surface-muted">
+          <h3 className="text-sm font-semibold text-content-secondary mb-3 flex items-center gap-2">
             <Zap className="w-4 h-4 text-purple-500" />
             AI Insights
           </h3>
@@ -288,7 +288,7 @@ export default function TodaysIntelligence() {
         {/* Today's Meetings */}
         <CollapsibleSection
           title="Today's Meetings"
-          icon={<Calendar className="w-4 h-4 text-indigo-500" />}
+          icon={<Calendar className="w-4 h-4 text-accent-primary" />}
           count={meetings.count}
           isExpanded={expandedSections.meetings}
           onToggle={() => toggleSection('meetings')}
@@ -299,13 +299,13 @@ export default function TodaysIntelligence() {
                 <Link
                   key={meeting.id}
                   to={`/meetings/${meeting.id}`}
-                  className="block p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                  className="block p-3 bg-surface-muted rounded-lg hover:bg-surface-muted transition-colors"
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-900 truncate">{meeting.title}</p>
+                      <p className="font-medium text-content-primary truncate">{meeting.title}</p>
                       {meeting.attendeeContext && meeting.attendeeContext.length > 0 && (
-                        <div className="flex items-center gap-1 mt-1 text-xs text-gray-500">
+                        <div className="flex items-center gap-1 mt-1 text-xs text-content-tertiary">
                           <Users className="w-3 h-3" />
                           {meeting.attendeeContext.slice(0, 3).map((a, i) => (
                             <span key={i}>
@@ -318,7 +318,7 @@ export default function TodaysIntelligence() {
                         </div>
                       )}
                       {meeting.relatedDeals && meeting.relatedDeals.length > 0 && (
-                        <div className="flex items-center gap-1 mt-1 text-xs text-amber-600">
+                        <div className="flex items-center gap-1 mt-1 text-xs text-semantic-warning">
                           <DollarSign className="w-3 h-3" />
                           Related: {meeting.relatedDeals.map(d => d.name).join(', ')}
                         </div>
@@ -326,16 +326,16 @@ export default function TodaysIntelligence() {
                     </div>
                     {meeting.sentiment_label && (
                       <span className={`ml-2 px-2 py-1 rounded text-xs font-medium ${
-                        meeting.sentiment_label === 'Positive' ? 'bg-green-100 text-green-700' :
-                        meeting.sentiment_label === 'Negative' ? 'bg-red-100 text-red-700' :
-                        'bg-gray-100 text-gray-700'
+                        meeting.sentiment_label === 'Positive' ? 'bg-semantic-success-dim text-semantic-success' :
+                        meeting.sentiment_label === 'Negative' ? 'bg-semantic-error-dim text-semantic-error' :
+                        'bg-surface-muted text-content-secondary'
                       }`}>
                         {meeting.sentiment_label}
                       </span>
                     )}
                   </div>
                   {meeting.duration_minutes && (
-                    <div className="flex items-center gap-2 mt-2 text-xs text-gray-400">
+                    <div className="flex items-center gap-2 mt-2 text-xs text-content-tertiary">
                       <Clock className="w-3 h-3" />
                       {meeting.duration_minutes} min
                     </div>
@@ -344,7 +344,7 @@ export default function TodaysIntelligence() {
               ))}
             </div>
           ) : (
-            <div className="text-center py-4 text-gray-500">
+            <div className="text-center py-4 text-content-tertiary">
               <Calendar className="w-8 h-8 mx-auto mb-2 opacity-50" />
               <p className="text-sm">No meetings scheduled for today</p>
             </div>
@@ -354,9 +354,9 @@ export default function TodaysIntelligence() {
         {/* Overdue Action Items */}
         <CollapsibleSection
           title="Overdue Action Items"
-          icon={<AlertTriangle className="w-4 h-4 text-red-500" />}
+          icon={<AlertTriangle className="w-4 h-4 text-semantic-error" />}
           count={overdueItems.count}
-          countColor={overdueItems.count > 0 ? 'text-red-600' : undefined}
+          countColor={overdueItems.count > 0 ? 'text-semantic-error' : undefined}
           isExpanded={expandedSections.overdue}
           onToggle={() => toggleSection('overdue')}
         >
@@ -366,16 +366,16 @@ export default function TodaysIntelligence() {
                 <div
                   key={item.id}
                   className={`flex items-center gap-3 p-3 rounded-lg ${
-                    item.priority === 'high' ? 'bg-red-50' : 'bg-amber-50'
+                    item.priority === 'high' ? 'bg-semantic-error-dim' : 'bg-semantic-warning-dim'
                   }`}
                 >
                   <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                    item.priority === 'high' ? 'bg-red-500' :
+                    item.priority === 'high' ? 'bg-semantic-error' :
                     item.priority === 'medium' ? 'bg-amber-500' : 'bg-green-500'
                   }`} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-gray-700 truncate">{item.task_description}</p>
-                    <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+                    <p className="text-sm text-content-secondary truncate">{item.task_description}</p>
+                    <div className="flex items-center gap-2 mt-1 text-xs text-content-tertiary">
                       {item.assigned_to_name && (
                         <span className="flex items-center gap-1">
                           <Users className="w-3 h-3" />
@@ -387,7 +387,7 @@ export default function TodaysIntelligence() {
                       )}
                     </div>
                   </div>
-                  <span className="text-xs font-medium text-red-600 flex-shrink-0">
+                  <span className="text-xs font-medium text-semantic-error flex-shrink-0">
                     {item.daysOverdue}d overdue
                   </span>
                 </div>
@@ -395,15 +395,15 @@ export default function TodaysIntelligence() {
               {overdueItems.count > 5 && (
                 <Link
                   to="/tasks?filter=overdue"
-                  className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700 mt-2"
+                  className="inline-flex items-center gap-1 text-sm text-accent-primary hover:text-accent-primary mt-2"
                 >
                   View all {overdueItems.count} overdue items <ArrowRight className="w-4 h-4" />
                 </Link>
               )}
             </div>
           ) : (
-            <div className="text-center py-4 text-gray-500">
-              <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-green-500" />
+            <div className="text-center py-4 text-content-tertiary">
+              <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-semantic-success" />
               <p className="text-sm">No overdue items - great job!</p>
             </div>
           )}
@@ -419,10 +419,10 @@ export default function TodaysIntelligence() {
           onToggle={() => toggleSection('deals')}
         >
           {deals.source === 'not_configured' ? (
-            <div className="text-center py-4 text-gray-500">
+            <div className="text-center py-4 text-content-tertiary">
               <DollarSign className="w-8 h-8 mx-auto mb-2 opacity-50" />
               <p className="text-sm">Logos CRM not configured</p>
-              <p className="text-xs text-gray-400 mt-1">Connect to see deal intelligence</p>
+              <p className="text-xs text-content-tertiary mt-1">Connect to see deal intelligence</p>
             </div>
           ) : deals.deals && deals.deals.length > 0 ? (
             <div className="space-y-2">
@@ -430,30 +430,30 @@ export default function TodaysIntelligence() {
                 <div
                   key={deal.id}
                   className={`flex items-center gap-3 p-3 rounded-lg ${
-                    deal.urgencyLevel === 'critical' ? 'bg-red-50' :
-                    deal.urgencyLevel === 'high' ? 'bg-amber-50' : 'bg-gray-50'
+                    deal.urgencyLevel === 'critical' ? 'bg-semantic-error-dim' :
+                    deal.urgencyLevel === 'high' ? 'bg-semantic-warning-dim' : 'bg-surface-muted'
                   }`}
                 >
                   <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                    deal.urgencyLevel === 'critical' ? 'bg-red-500' :
+                    deal.urgencyLevel === 'critical' ? 'bg-semantic-error' :
                     deal.urgencyLevel === 'high' ? 'bg-amber-500' : 'bg-blue-500'
                   }`} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-700 truncate">{deal.name}</p>
-                    <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+                    <p className="text-sm font-medium text-content-secondary truncate">{deal.name}</p>
+                    <div className="flex items-center gap-2 mt-1 text-xs text-content-tertiary">
                       {deal.companyName && <span>{deal.companyName}</span>}
-                      {deal.stage && <span className="px-1.5 py-0.5 bg-gray-200 rounded">{deal.stage}</span>}
+                      {deal.stage && <span className="px-1.5 py-0.5 bg-surface-muted rounded">{deal.stage}</span>}
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0">
                     {deal.value > 0 && (
-                      <p className="text-sm font-medium text-gray-900">
+                      <p className="text-sm font-medium text-content-primary">
                         ${deal.value.toLocaleString()}
                       </p>
                     )}
                     <span className={`text-xs font-medium ${
-                      deal.urgencyLevel === 'critical' ? 'text-red-600' :
-                      deal.urgencyLevel === 'high' ? 'text-amber-600' : 'text-gray-500'
+                      deal.urgencyLevel === 'critical' ? 'text-semantic-error' :
+                      deal.urgencyLevel === 'high' ? 'text-semantic-warning' : 'text-content-tertiary'
                     }`}>
                       Score: {deal.urgencyScore}/10
                     </span>
@@ -462,8 +462,8 @@ export default function TodaysIntelligence() {
               ))}
             </div>
           ) : (
-            <div className="text-center py-4 text-gray-500">
-              <TrendingUp className="w-8 h-8 mx-auto mb-2 text-green-500" />
+            <div className="text-center py-4 text-content-tertiary">
+              <TrendingUp className="w-8 h-8 mx-auto mb-2 text-semantic-success" />
               <p className="text-sm">All deals are on track</p>
             </div>
           )}
@@ -472,33 +472,33 @@ export default function TodaysIntelligence() {
         {/* New Contacts from Logos CRM */}
         <CollapsibleSection
           title="New Contacts (Last 24h)"
-          icon={<UserPlus className="w-4 h-4 text-green-500" />}
+          icon={<UserPlus className="w-4 h-4 text-semantic-success" />}
           count={recentContacts.count}
           badge={recentContacts.source === 'logos_crm' ? 'Logos CRM' : undefined}
           isExpanded={expandedSections.contacts}
           onToggle={() => toggleSection('contacts')}
         >
           {recentContacts.source === 'not_configured' ? (
-            <div className="text-center py-4 text-gray-500">
+            <div className="text-center py-4 text-content-tertiary">
               <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
               <p className="text-sm">Shared Hub not configured</p>
-              <p className="text-xs text-gray-400 mt-1">Connect to see synced contacts</p>
+              <p className="text-xs text-content-tertiary mt-1">Connect to see synced contacts</p>
             </div>
           ) : recentContacts.contacts && recentContacts.contacts.length > 0 ? (
             <div className="space-y-2">
               {recentContacts.contacts.slice(0, 5).map((contact) => (
                 <div
                   key={contact.id}
-                  className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
+                  className="flex items-center gap-3 p-3 bg-surface-muted rounded-lg"
                 >
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white font-medium text-sm flex-shrink-0">
                     {(contact.name || contact.email || '?')[0].toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-700 truncate">
+                    <p className="text-sm font-medium text-content-secondary truncate">
                       {contact.name || contact.email}
                     </p>
-                    <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-500">
+                    <div className="flex items-center gap-2 mt-0.5 text-xs text-content-tertiary">
                       {contact.job_title && <span>{contact.job_title}</span>}
                       {contact.company_name && (
                         <span className="truncate">at {contact.company_name}</span>
@@ -510,7 +510,7 @@ export default function TodaysIntelligence() {
                       {contact.tags.slice(0, 2).map((tag, i) => (
                         <span
                           key={i}
-                          className="px-1.5 py-0.5 bg-green-100 text-green-700 text-xs rounded"
+                          className="px-1.5 py-0.5 bg-semantic-success-dim text-semantic-success text-xs rounded"
                         >
                           {tag}
                         </span>
@@ -520,13 +520,13 @@ export default function TodaysIntelligence() {
                 </div>
               ))}
               {recentContacts.count > 5 && (
-                <p className="text-xs text-gray-500 mt-2">
+                <p className="text-xs text-content-tertiary mt-2">
                   +{recentContacts.count - 5} more contacts synced
                 </p>
               )}
             </div>
           ) : (
-            <div className="text-center py-4 text-gray-500">
+            <div className="text-center py-4 text-content-tertiary">
               <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
               <p className="text-sm">No new contacts in the last 24 hours</p>
             </div>
@@ -535,7 +535,7 @@ export default function TodaysIntelligence() {
       </div>
 
       {/* Start Day Button */}
-      <div className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 border-t border-gray-100">
+      <div className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 border-t border-line-subtle">
         <button
           onClick={handleStartDay}
           disabled={startingDay}
@@ -557,7 +557,7 @@ export default function TodaysIntelligence() {
             </>
           )}
         </button>
-        <p className="text-xs text-gray-500 text-center mt-2">
+        <p className="text-xs text-content-tertiary text-center mt-2">
           Mark this briefing as reviewed and collapse sections
         </p>
       </div>
@@ -579,29 +579,29 @@ function CollapsibleSection({
   children
 }) {
   return (
-    <div className="border-b border-gray-100 last:border-b-0">
+    <div className="border-b border-line-subtle last:border-b-0">
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors text-left"
+        className="w-full flex items-center justify-between p-4 hover:bg-surface-muted transition-colors text-left"
         aria-expanded={isExpanded}
       >
         <div className="flex items-center gap-2">
           {icon}
-          <span className="font-semibold text-gray-700">{title}</span>
+          <span className="font-semibold text-content-secondary">{title}</span>
           {badge && (
-            <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full">
+            <span className="px-2 py-0.5 bg-accent-tertiary-dim text-accent-tertiary text-xs rounded-full">
               {badge}
             </span>
           )}
         </div>
         <div className="flex items-center gap-2">
-          <span className={`text-sm font-medium ${countColor || 'text-gray-500'}`}>
+          <span className={`text-sm font-medium ${countColor || 'text-content-tertiary'}`}>
             {count}
           </span>
           {isExpanded ? (
-            <ChevronUp className="w-5 h-5 text-gray-400" />
+            <ChevronUp className="w-5 h-5 text-content-tertiary" />
           ) : (
-            <ChevronDown className="w-5 h-5 text-gray-400" />
+            <ChevronDown className="w-5 h-5 text-content-tertiary" />
           )}
         </div>
       </button>

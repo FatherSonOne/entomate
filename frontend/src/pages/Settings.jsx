@@ -87,18 +87,18 @@ export default function Settings() {
 
   const getStatusIcon = (statusValue) => {
     if (statusValue === 'connected') {
-      return <CheckCircle2 className="w-5 h-5 text-green-500" />
+      return <CheckCircle2 className="w-5 h-5 text-semantic-success" />
     } else if (statusValue === 'not configured') {
       return <AlertCircle className="w-5 h-5 text-yellow-500" />
     } else {
-      return <XCircle className="w-5 h-5 text-red-500" />
+      return <XCircle className="w-5 h-5 text-semantic-error" />
     }
   }
 
   const getStatusColor = (statusValue) => {
-    if (statusValue === 'connected') return 'text-green-600'
+    if (statusValue === 'connected') return 'text-semantic-success'
     if (statusValue === 'not configured') return 'text-yellow-600'
-    return 'text-red-600'
+    return 'text-semantic-error'
   }
 
   return (
@@ -182,8 +182,8 @@ export default function Settings() {
             {/* AI Provider */}
             <div className="p-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
-                  <Cpu className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                <div className="w-10 h-10 bg-accent-tertiary-dim dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
+                  <Cpu className="w-5 h-5 text-accent-tertiary dark:text-purple-400" />
                 </div>
                 <div>
                   <h3 className="font-medium text-content-primary">
@@ -203,8 +203,8 @@ export default function Settings() {
             {/* Database */}
             <div className="p-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
-                  <Database className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                <div className="w-10 h-10 bg-semantic-info-dim dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                  <Database className="w-5 h-5 text-semantic-info dark:text-blue-400" />
                 </div>
                 <div>
                   <h3 className="font-medium text-content-primary">Supabase Database</h3>
@@ -223,8 +223,8 @@ export default function Settings() {
             <div className="p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
-                    <SettingsIcon className="w-5 h-5 text-green-600 dark:text-green-400" />
+                  <div className="w-10 h-10 bg-semantic-success-dim dark:bg-green-900/30 rounded-lg flex items-center justify-center">
+                    <SettingsIcon className="w-5 h-5 text-semantic-success dark:text-green-400" />
                   </div>
                   <div>
                     <h3 className="font-medium text-content-primary">CRM Integration</h3>
@@ -253,7 +253,7 @@ export default function Settings() {
               </div>
               {crmTestResult && (
                 <div className={`mt-2 ml-13 p-2 rounded text-sm ${
-                  crmTestResult.connected ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+                  crmTestResult.connected ? 'bg-semantic-success-dim text-semantic-success' : 'bg-semantic-error-dim text-semantic-error'
                 }`}>
                   {crmTestResult.connected
                     ? `Connected to ${crmTestResult.provider || 'CRM'}`
@@ -266,8 +266,8 @@ export default function Settings() {
             <div className="p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900/30 rounded-lg flex items-center justify-center">
-                    <MessageSquare className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                  <div className="w-10 h-10 bg-semantic-warning-dim dark:bg-orange-900/30 rounded-lg flex items-center justify-center">
+                    <MessageSquare className="w-5 h-5 text-semantic-warning dark:text-orange-400" />
                   </div>
                   <div>
                     <h3 className="font-medium text-content-primary">Chat Integration</h3>
@@ -296,7 +296,7 @@ export default function Settings() {
               </div>
               {chatTestResult && (
                 <div className={`mt-2 ml-13 p-2 rounded text-sm ${
-                  chatTestResult.connected ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+                  chatTestResult.connected ? 'bg-semantic-success-dim text-semantic-success' : 'bg-semantic-error-dim text-semantic-error'
                 }`}>
                   {chatTestResult.connected
                     ? `Connected to ${chatTestResult.team || chatTestResult.provider || 'Chat'}${chatTestResult.user ? ` as ${chatTestResult.user}` : ''}`
@@ -320,7 +320,7 @@ export default function Settings() {
             </p>
             <div className="space-y-2">
               <div className="bg-surface p-3 rounded border border-line-default">
-                <p className="text-sm font-medium text-green-700 dark:text-green-400 mb-1">OpenAI (Recommended)</p>
+                <p className="text-sm font-medium text-semantic-success dark:text-green-400 mb-1">OpenAI (Recommended)</p>
                 <code className="text-xs bg-surface-muted px-2 py-1 rounded block mb-1 text-content-primary">
                   OPENAI_API_KEY=sk-your-key-here
                 </code>

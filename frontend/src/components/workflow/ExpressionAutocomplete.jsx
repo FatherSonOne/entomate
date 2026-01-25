@@ -16,32 +16,32 @@ import {
 const CATEGORIES = {
   Nodes: {
     icon: Database,
-    color: 'text-blue-600',
-    bgColor: 'bg-blue-50',
+    color: 'text-semantic-info',
+    bgColor: 'bg-semantic-info-dim',
     description: 'Output from workflow nodes'
   },
   Secrets: {
     icon: Key,
-    color: 'text-amber-600',
-    bgColor: 'bg-amber-50',
+    color: 'text-semantic-warning',
+    bgColor: 'bg-semantic-warning-dim',
     description: 'Stored secret values'
   },
   Environment: {
     icon: Globe,
-    color: 'text-green-600',
-    bgColor: 'bg-green-50',
+    color: 'text-semantic-success',
+    bgColor: 'bg-semantic-success-dim',
     description: 'Environment variables'
   },
   Trigger: {
     icon: Zap,
-    color: 'text-purple-600',
-    bgColor: 'bg-purple-50',
+    color: 'text-accent-tertiary',
+    bgColor: 'bg-accent-tertiary-dim',
     description: 'Trigger payload data'
   },
   Workflow: {
     icon: Layers,
-    color: 'text-indigo-600',
-    bgColor: 'bg-indigo-50',
+    color: 'text-accent-primary',
+    bgColor: 'bg-accent-primary-dim',
     description: 'Workflow metadata'
   },
   String: {
@@ -52,14 +52,14 @@ const CATEGORIES = {
   },
   DateTime: {
     icon: Calendar,
-    color: 'text-orange-600',
+    color: 'text-semantic-warning',
     bgColor: 'bg-orange-50',
     description: 'Date and time functions'
   },
   Number: {
     icon: Hash,
-    color: 'text-red-600',
-    bgColor: 'bg-red-50',
+    color: 'text-semantic-error',
+    bgColor: 'bg-semantic-error-dim',
     description: 'Number functions'
   },
   Array: {
@@ -111,7 +111,7 @@ function SuggestionItem({ item, isSelected, onClick, onHover }) {
     <div
       className={`
         flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors
-        ${isSelected ? 'bg-primary-50 text-primary-900' : 'hover:bg-gray-50'}
+        ${isSelected ? 'bg-primary-50 text-primary-900' : 'hover:bg-surface-muted'}
       `}
       onClick={onClick}
       onMouseEnter={onHover}
@@ -121,12 +121,12 @@ function SuggestionItem({ item, isSelected, onClick, onHover }) {
       {/* Type icon */}
       <div className={`
         flex-shrink-0 w-6 h-6 rounded flex items-center justify-center
-        ${category.bgColor || 'bg-gray-100'}
+        ${category.bgColor || 'bg-surface-muted'}
       `}>
         {item.type === 'function' ? (
-          <CategoryIcon className={`w-3.5 h-3.5 ${category.color || 'text-gray-600'}`} />
+          <CategoryIcon className={`w-3.5 h-3.5 ${category.color || 'text-content-secondary'}`} />
         ) : (
-          <Icon className={`w-3.5 h-3.5 ${category.color || 'text-gray-600'}`} />
+          <Icon className={`w-3.5 h-3.5 ${category.color || 'text-content-secondary'}`} />
         )}
       </div>
 
@@ -137,26 +137,26 @@ function SuggestionItem({ item, isSelected, onClick, onHover }) {
             {item.label}
           </span>
           {item.nodeType && (
-            <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
+            <span className="text-xs text-content-tertiary bg-surface-muted px-1.5 py-0.5 rounded">
               {item.nodeType}
             </span>
           )}
         </div>
         {item.description && (
-          <p className="text-xs text-gray-500 truncate">{item.description}</p>
+          <p className="text-xs text-content-tertiary truncate">{item.description}</p>
         )}
       </div>
 
       {/* Preview value */}
       {item.preview && (
-        <div className="flex-shrink-0 text-xs text-gray-400 font-mono max-w-[100px] truncate">
+        <div className="flex-shrink-0 text-xs text-content-tertiary font-mono max-w-[100px] truncate">
           {item.preview}
         </div>
       )}
 
       {/* Indicator for objects/arrays that can be expanded */}
       {(item.type === 'object' || item.type === 'node') && (
-        <ChevronRight className="w-3 h-3 text-gray-400" />
+        <ChevronRight className="w-3 h-3 text-content-tertiary" />
       )}
     </div>
   )
@@ -172,11 +172,11 @@ function CategoryHeader({ name, count }) {
   return (
     <div className={`
       sticky top-0 flex items-center gap-2 px-3 py-1.5 text-xs font-medium
-      border-b border-gray-100 ${category.bgColor || 'bg-gray-50'}
+      border-b border-line-subtle ${category.bgColor || 'bg-surface-muted'}
     `}>
-      <Icon className={`w-3.5 h-3.5 ${category.color || 'text-gray-600'}`} />
-      <span className={category.color || 'text-gray-600'}>{name}</span>
-      <span className="text-gray-400">({count})</span>
+      <Icon className={`w-3.5 h-3.5 ${category.color || 'text-content-secondary'}`} />
+      <span className={category.color || 'text-content-secondary'}>{name}</span>
+      <span className="text-content-tertiary">({count})</span>
     </div>
   )
 }
@@ -295,7 +295,7 @@ export default function ExpressionAutocomplete({
   return (
     <div
       ref={containerRef}
-      className="fixed z-50 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden"
+      className="fixed z-50 bg-surface rounded-lg shadow-xl border border-line-default overflow-hidden"
       style={{
         top: position.top,
         left: position.left,
@@ -307,15 +307,15 @@ export default function ExpressionAutocomplete({
     >
       {/* Search filter */}
       {suggestions.length > 10 && (
-        <div className="p-2 border-b border-gray-100">
+        <div className="p-2 border-b border-line-subtle">
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-content-tertiary" />
             <input
               type="text"
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               placeholder="Filter suggestions..."
-              className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full pl-8 pr-3 py-1.5 text-sm border border-line-default rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
               autoFocus={false}
             />
           </div>
@@ -395,19 +395,19 @@ export default function ExpressionAutocomplete({
       </div>
 
       {/* Footer with keyboard hints */}
-      <div className="px-3 py-1.5 bg-gray-50 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
+      <div className="px-3 py-1.5 bg-surface-muted border-t border-line-subtle flex items-center justify-between text-xs text-content-tertiary">
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1">
-            <kbd className="px-1 py-0.5 bg-gray-200 rounded text-[10px]">Up</kbd>
-            <kbd className="px-1 py-0.5 bg-gray-200 rounded text-[10px]">Down</kbd>
+            <kbd className="px-1 py-0.5 bg-surface-muted rounded text-[10px]">Up</kbd>
+            <kbd className="px-1 py-0.5 bg-surface-muted rounded text-[10px]">Down</kbd>
             navigate
           </span>
           <span className="flex items-center gap-1">
-            <kbd className="px-1 py-0.5 bg-gray-200 rounded text-[10px]">Tab</kbd>
+            <kbd className="px-1 py-0.5 bg-surface-muted rounded text-[10px]">Tab</kbd>
             select
           </span>
           <span className="flex items-center gap-1">
-            <kbd className="px-1 py-0.5 bg-gray-200 rounded text-[10px]">Esc</kbd>
+            <kbd className="px-1 py-0.5 bg-surface-muted rounded text-[10px]">Esc</kbd>
             dismiss
           </span>
         </div>

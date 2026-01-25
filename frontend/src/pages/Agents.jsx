@@ -319,7 +319,7 @@ export default function Agents() {
                     >
                       {selectedAgent.enabled ? <Pause size={16} /> : <Play size={16} />}
                     </button>
-                    <button className="p-2 rounded-sm border border-line-default hover:text-red-500 hover:border-red-500/50 transition-colors">
+                    <button className="p-2 rounded-sm border border-line-default hover:text-semantic-error hover:border-red-500/50 transition-colors">
                       <Trash2 size={16} />
                     </button>
                   </div>
@@ -344,11 +344,11 @@ export default function Agents() {
                     <label className="text-xs font-mono uppercase text-content-tertiary block mb-2">Live Logs</label>
                     <div className="bg-black/90 text-green-400 p-3 rounded-sm font-mono text-xs h-48 overflow-y-auto custom-scrollbar">
                       {executionLogs.length === 0 ? (
-                        <span className="text-gray-500">// Waiting for execution...</span>
+                        <span className="text-content-tertiary">// Waiting for execution...</span>
                       ) : (
                         executionLogs.map(log => (
                           <div key={log.id} className="mb-1 border-b border-gray-800 pb-1 last:border-0">
-                            <span className="text-gray-500">[{new Date(log.created_at).toLocaleTimeString()}]</span> {log.trigger_type}
+                            <span className="text-content-tertiary">[{new Date(log.created_at).toLocaleTimeString()}]</span> {log.trigger_type}
                             <span className={log.success ? 'text-green-400' : 'text-red-400'}> {log.success ? 'OK' : 'ERR'}</span>
                           </div>
                         ))
@@ -388,10 +388,10 @@ export default function Agents() {
 
             {/* Error Message */}
             {deployError && (
-              <div className="mx-4 mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-md flex items-start gap-2">
-                <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+              <div className="mx-4 mt-4 p-3 bg-semantic-error/10 border border-red-500/20 rounded-md flex items-start gap-2">
+                <AlertCircle className="w-5 h-5 text-semantic-error flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <p className="text-sm text-red-500 font-medium">Deployment Failed</p>
+                  <p className="text-sm text-semantic-error font-medium">Deployment Failed</p>
                   <p className="text-xs text-red-400 mt-1">{deployError}</p>
                 </div>
                 <button
@@ -562,7 +562,7 @@ export default function Agents() {
                            ...customizations,
                            triggers: customizations.triggers.filter((_, i) => i !== idx)
                          })}
-                         className="text-red-500 hover:text-red-600"
+                         className="text-semantic-error hover:text-semantic-error"
                        >
                          <X size={16} />
                        </button>
@@ -589,7 +589,7 @@ export default function Agents() {
                            ...customizations,
                            actions: customizations.actions.filter((_, i) => i !== idx)
                          })}
-                         className="text-red-500 hover:text-red-600"
+                         className="text-semantic-error hover:text-semantic-error"
                        >
                          <X size={16} />
                        </button>
@@ -668,9 +668,9 @@ export default function Agents() {
              <div className="bg-surface-muted p-4 rounded-md border border-line-subtle">
                <div className="flex items-center justify-between mb-2">
                  <span className="text-xs text-content-tertiary uppercase">Success Rate</span>
-                 <TrendingUp size={16} className="text-green-500" />
+                 <TrendingUp size={16} className="text-semantic-success" />
                </div>
-               <div className="text-2xl font-bold font-mono text-green-500">
+               <div className="text-2xl font-bold font-mono text-semantic-success">
                  {((selectedAgent.success_rate || 0) * 100).toFixed(1)}%
                </div>
              </div>
@@ -699,7 +699,7 @@ export default function Agents() {
              </h4>
              <div className="space-y-4 max-h-[600px] overflow-y-auto custom-scrollbar">
                {executionLogs.length === 0 ? (
-                 <div className="bg-black/90 text-gray-500 p-4 rounded-md font-mono text-xs">
+                 <div className="bg-black/90 text-content-tertiary p-4 rounded-md font-mono text-xs">
                    // No execution logs available
                  </div>
                ) : (
@@ -713,7 +713,7 @@ export default function Agents() {
                        <div className="flex justify-between items-start mb-3">
                          <div>
                            <div className="flex items-center gap-2">
-                             <span className={`text-xs font-bold ${log.success ? 'text-green-500' : 'text-red-500'}`}>
+                             <span className={`text-xs font-bold ${log.success ? 'text-semantic-success' : 'text-semantic-error'}`}>
                                {log.success ? '✓ SUCCESS' : '✗ FAILED'}
                              </span>
                              <span className="text-xs text-content-tertiary">
@@ -768,7 +768,7 @@ export default function Agents() {
 
                        {/* Error Message */}
                        {!log.success && log.error_message && (
-                         <div className="mt-2 p-2 bg-red-500/10 border border-red-500/20 rounded text-xs text-red-400">
+                         <div className="mt-2 p-2 bg-semantic-error/10 border border-red-500/20 rounded text-xs text-red-400">
                            {log.error_message}
                          </div>
                        )}

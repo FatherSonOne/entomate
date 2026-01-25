@@ -75,7 +75,7 @@ function HighlightedExpression({ expression, validation }) {
 
   return (
     <span className="font-mono text-sm">
-      <span className="text-gray-400">{'{'+'{'}</span>
+      <span className="text-content-tertiary">{'{'+'{'}</span>
       {tokens.map((token, idx) => {
         const isInvalid = token.type === 'identifier' &&
           invalidRefs.some(err => err.includes(token.value))
@@ -83,7 +83,7 @@ function HighlightedExpression({ expression, validation }) {
           <ExpressionToken key={idx} token={token} isInvalid={isInvalid} />
         )
       })}
-      <span className="text-gray-400">{'}'+'}'}</span>
+      <span className="text-content-tertiary">{'}'+'}'}</span>
     </span>
   )
 }
@@ -114,7 +114,7 @@ function PreviewTooltip({ value, visible, position }) {
       className="fixed z-50 bg-gray-900 text-white text-xs rounded-lg shadow-xl p-3 max-w-sm"
       style={{ top: position.top, left: position.left }}
     >
-      <div className="flex items-center gap-2 mb-1 text-gray-400">
+      <div className="flex items-center gap-2 mb-1 text-content-tertiary">
         <Eye className="w-3 h-3" />
         <span>Preview</span>
       </div>
@@ -136,7 +136,7 @@ function ValidationIndicator({ validation, compact = false }) {
   if (valid && !warnings.length) {
     if (compact) return null
     return (
-      <div className="flex items-center gap-1 text-xs text-green-600">
+      <div className="flex items-center gap-1 text-xs text-semantic-success">
         <CheckCircle className="w-3 h-3" />
         <span>Valid</span>
       </div>
@@ -145,7 +145,7 @@ function ValidationIndicator({ validation, compact = false }) {
 
   if (!valid) {
     return (
-      <div className="flex items-center gap-1 text-xs text-red-600">
+      <div className="flex items-center gap-1 text-xs text-semantic-error">
         <AlertCircle className="w-3 h-3" />
         <span>{errors[0]?.message || 'Invalid expression'}</span>
       </div>
@@ -154,7 +154,7 @@ function ValidationIndicator({ validation, compact = false }) {
 
   if (warnings.length > 0) {
     return (
-      <div className="flex items-center gap-1 text-xs text-amber-600">
+      <div className="flex items-center gap-1 text-xs text-semantic-warning">
         <Info className="w-3 h-3" />
         <span>{warnings[0]?.message}</span>
       </div>
@@ -517,9 +517,9 @@ const ExpressionEditor = forwardRef(function ExpressionEditor({
     <div ref={containerRef} className={`expression-editor ${className}`}>
       {/* Label */}
       {label && (
-        <label className="flex items-center gap-1 text-xs font-medium text-gray-700 mb-1">
+        <label className="flex items-center gap-1 text-xs font-medium text-content-secondary mb-1">
           {label}
-          {required && <span className="text-red-500">*</span>}
+          {required && <span className="text-semantic-error">*</span>}
         </label>
       )}
 
@@ -557,8 +557,8 @@ const ExpressionEditor = forwardRef(function ExpressionEditor({
             w-full px-3 py-2 text-sm border rounded-md font-mono
             focus:outline-none focus:ring-2 focus:ring-primary-500
             ${expressions.length > 0 ? 'caret-gray-900 text-transparent selection:bg-primary-200' : ''}
-            ${disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}
-            ${!overallValidation.valid ? 'border-red-300' : 'border-gray-200'}
+            ${disabled ? 'bg-surface-muted cursor-not-allowed' : 'bg-surface'}
+            ${!overallValidation.valid ? 'border-semantic-error' : 'border-line-default'}
             ${multiline ? 'resize-y min-h-[80px]' : ''}
           `}
           style={{
@@ -575,7 +575,7 @@ const ExpressionEditor = forwardRef(function ExpressionEditor({
           <button
             type="button"
             onClick={handleQuickInsert}
-            className="p-1 text-gray-400 hover:text-primary-600 rounded"
+            className="p-1 text-content-tertiary hover:text-accent-primary rounded"
             title="Insert expression"
             tabIndex={-1}
           >
@@ -587,7 +587,7 @@ const ExpressionEditor = forwardRef(function ExpressionEditor({
             <button
               type="button"
               onClick={handleTogglePreview}
-              className={`p-1 rounded ${showPreviewTooltip ? 'text-primary-600' : 'text-gray-400 hover:text-primary-600'}`}
+              className={`p-1 rounded ${showPreviewTooltip ? 'text-accent-primary' : 'text-content-tertiary hover:text-accent-primary'}`}
               title="Toggle preview"
               tabIndex={-1}
             >
@@ -603,7 +603,7 @@ const ExpressionEditor = forwardRef(function ExpressionEditor({
           <ValidationIndicator validation={overallValidation} compact />
         )}
         {help && !overallValidation.errors.length && (
-          <p id="expression-help" className="text-xs text-gray-500">{help}</p>
+          <p id="expression-help" className="text-xs text-content-tertiary">{help}</p>
         )}
       </div>
 

@@ -98,11 +98,11 @@ const nodeCategories = [
 // Color mappings
 const colorClasses = {
   green: {
-    bg: 'bg-green-50',
-    border: 'border-green-200',
-    text: 'text-green-700',
-    icon: 'text-green-600',
-    hover: 'hover:bg-green-100'
+    bg: 'bg-semantic-success-dim',
+    border: 'border-semantic-success',
+    text: 'text-semantic-success',
+    icon: 'text-semantic-success',
+    hover: 'hover:bg-semantic-success-dim'
   },
   yellow: {
     bg: 'bg-yellow-50',
@@ -112,25 +112,25 @@ const colorClasses = {
     hover: 'hover:bg-yellow-100'
   },
   blue: {
-    bg: 'bg-blue-50',
-    border: 'border-blue-200',
-    text: 'text-blue-700',
-    icon: 'text-blue-600',
-    hover: 'hover:bg-blue-100'
+    bg: 'bg-semantic-info-dim',
+    border: 'border-semantic-info',
+    text: 'text-semantic-info',
+    icon: 'text-semantic-info',
+    hover: 'hover:bg-semantic-info-dim'
   },
   purple: {
-    bg: 'bg-purple-50',
-    border: 'border-purple-200',
-    text: 'text-purple-700',
-    icon: 'text-purple-600',
-    hover: 'hover:bg-purple-100'
+    bg: 'bg-accent-tertiary-dim',
+    border: 'border-accent-tertiary',
+    text: 'text-accent-tertiary',
+    icon: 'text-accent-tertiary',
+    hover: 'hover:bg-accent-tertiary-dim'
   },
   gray: {
-    bg: 'bg-gray-50',
-    border: 'border-gray-200',
-    text: 'text-gray-700',
-    icon: 'text-gray-600',
-    hover: 'hover:bg-gray-100'
+    bg: 'bg-surface-muted',
+    border: 'border-line-default',
+    text: 'text-content-secondary',
+    icon: 'text-content-secondary',
+    hover: 'hover:bg-surface-muted'
   }
 }
 
@@ -176,18 +176,18 @@ export default function NodePalette({ onAddNode }) {
   })).filter(category => category.nodes.length > 0)
 
   return (
-    <div className="w-64 bg-white border-r border-gray-200 flex flex-col h-full">
+    <div className="w-64 bg-surface border-r border-line-default flex flex-col h-full">
       {/* Header */}
-      <div className="p-3 border-b border-gray-200">
-        <h3 className="text-sm font-semibold text-gray-900 mb-2">Nodes</h3>
+      <div className="p-3 border-b border-line-default">
+        <h3 className="text-sm font-semibold text-content-primary mb-2">Nodes</h3>
         <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-content-tertiary" />
           <input
             type="text"
             placeholder="Search nodes..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            className="w-full pl-8 pr-3 py-1.5 text-sm border border-line-default rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
           />
         </div>
       </div>
@@ -206,12 +206,12 @@ export default function NodePalette({ onAddNode }) {
                 className={`w-full flex items-center gap-2 px-3 py-2 ${colors.bg} ${colors.hover} transition-colors`}
               >
                 {isExpanded ? (
-                  <ChevronDown className="w-4 h-4 text-gray-500" />
+                  <ChevronDown className="w-4 h-4 text-content-tertiary" />
                 ) : (
-                  <ChevronRight className="w-4 h-4 text-gray-500" />
+                  <ChevronRight className="w-4 h-4 text-content-tertiary" />
                 )}
                 <span className={`text-sm font-medium ${colors.text}`}>{category.label}</span>
-                <span className="text-xs text-gray-400 ml-auto">{category.nodes.length}</span>
+                <span className="text-xs text-content-tertiary ml-auto">{category.nodes.length}</span>
               </button>
 
               {/* Nodes */}
@@ -229,15 +229,15 @@ export default function NodePalette({ onAddNode }) {
                         className={`
                           flex items-center gap-2 px-3 py-2 mx-1 rounded-md cursor-grab
                           border ${colors.border} ${colors.bg}
-                          hover:shadow-sm hover:border-gray-300 transition-all
+                          hover:shadow-sm hover:border-line-strong transition-all
                           active:cursor-grabbing
                         `}
                         title={node.description}
                       >
                         <IconComponent className={`w-4 h-4 ${colors.icon} flex-shrink-0`} />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{node.label}</p>
-                          <p className="text-xs text-gray-500 truncate">{node.description}</p>
+                          <p className="text-sm font-medium text-content-primary truncate">{node.label}</p>
+                          <p className="text-xs text-content-tertiary truncate">{node.description}</p>
                         </div>
                       </div>
                     )
@@ -249,7 +249,7 @@ export default function NodePalette({ onAddNode }) {
         })}
 
         {filteredCategories.length === 0 && (
-          <div className="text-center py-8 text-gray-500">
+          <div className="text-center py-8 text-content-tertiary">
             <Search className="w-8 h-8 mx-auto mb-2 opacity-50" />
             <p className="text-sm">No nodes found</p>
           </div>
@@ -257,8 +257,8 @@ export default function NodePalette({ onAddNode }) {
       </div>
 
       {/* Help text */}
-      <div className="p-3 border-t border-gray-200 bg-gray-50">
-        <p className="text-xs text-gray-500">
+      <div className="p-3 border-t border-line-default bg-surface-muted">
+        <p className="text-xs text-content-tertiary">
           Drag nodes to the canvas or click to add at center
         </p>
       </div>

@@ -47,7 +47,7 @@ function KeyDisplay({ keys }) {
     <div className="flex items-center gap-1">
       {keys.map((key, idx) => {
         if (key === 'then') {
-          return <span key={idx} className="text-gray-400 text-xs mx-0.5">then</span>
+          return <span key={idx} className="text-content-tertiary text-xs mx-0.5">then</span>
         }
 
         const displayKey = key === 'mod' ? modKey : key
@@ -55,7 +55,7 @@ function KeyDisplay({ keys }) {
         return (
           <kbd
             key={idx}
-            className="inline-flex items-center justify-center min-w-[24px] h-6 px-1.5 text-xs font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded shadow-sm"
+            className="inline-flex items-center justify-center min-w-[24px] h-6 px-1.5 text-xs font-medium bg-surface-muted text-content-secondary border border-line-strong rounded shadow-sm"
           >
             {displayKey}
           </kbd>
@@ -83,21 +83,21 @@ export default function KeyboardShortcutsHelp({ isOpen, onClose }) {
 
       {/* Dialog */}
       <div className="flex min-h-full items-center justify-center p-4">
-        <div className="relative w-full max-w-2xl transform rounded-xl bg-white shadow-2xl ring-1 ring-black/5">
+        <div className="relative w-full max-w-2xl transform rounded-xl bg-surface shadow-2xl ring-1 ring-black/5">
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-line-default">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
-                <Command className="w-5 h-5 text-primary-600" />
+                <Command className="w-5 h-5 text-accent-primary" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">Keyboard Shortcuts</h2>
-                <p className="text-sm text-gray-500">Navigate faster with these shortcuts</p>
+                <h2 className="text-lg font-semibold text-content-primary">Keyboard Shortcuts</h2>
+                <p className="text-sm text-content-tertiary">Navigate faster with these shortcuts</p>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="rounded-lg p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+              className="rounded-lg p-2 text-content-tertiary hover:text-content-secondary hover:bg-surface-muted"
             >
               <X className="w-5 h-5" />
             </button>
@@ -108,18 +108,18 @@ export default function KeyboardShortcutsHelp({ isOpen, onClose }) {
             <div className="grid md:grid-cols-2 gap-6">
               {shortcutGroups.map((group) => (
                 <div key={group.title}>
-                  <h3 className="text-sm font-medium text-gray-900 mb-3">{group.title}</h3>
+                  <h3 className="text-sm font-medium text-content-primary mb-3">{group.title}</h3>
                   <div className="space-y-2">
                     {group.shortcuts.map((shortcut, idx) => {
                       const Icon = shortcut.icon
                       return (
                         <div
                           key={idx}
-                          className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-gray-50"
+                          className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-surface-muted"
                         >
                           <div className="flex items-center gap-2">
-                            {Icon && <Icon className="w-4 h-4 text-gray-400" />}
-                            <span className="text-sm text-gray-700">{shortcut.description}</span>
+                            {Icon && <Icon className="w-4 h-4 text-content-tertiary" />}
+                            <span className="text-sm text-content-secondary">{shortcut.description}</span>
                           </div>
                           <KeyDisplay keys={shortcut.keys} />
                         </div>
@@ -132,12 +132,12 @@ export default function KeyboardShortcutsHelp({ isOpen, onClose }) {
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-xl">
+          <div className="px-6 py-4 border-t border-line-default bg-surface-muted rounded-b-xl">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-gray-500">
-                Press <kbd className="px-1.5 py-0.5 bg-white border border-gray-300 rounded text-xs">Esc</kbd> to close
+              <p className="text-sm text-content-tertiary">
+                Press <kbd className="px-1.5 py-0.5 bg-surface border border-line-strong rounded text-xs">Esc</kbd> to close
               </p>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-content-tertiary">
                 {getModKey()} = {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? 'Command' : 'Control'}
               </p>
             </div>

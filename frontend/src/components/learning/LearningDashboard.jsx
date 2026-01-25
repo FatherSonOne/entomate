@@ -121,62 +121,62 @@ export default function LearningDashboard() {
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">
-          <Brain size={32} className="text-indigo-600" />
-          <h1 className="text-3xl font-bold text-gray-900">AI Learning Insights</h1>
+          <Brain size={32} className="text-accent-primary" />
+          <h1 className="text-3xl font-bold text-content-primary">AI Learning Insights</h1>
         </div>
-        <p className="text-gray-600">
+        <p className="text-content-secondary">
           View and manage how the AI learns from your feedback
         </p>
       </div>
 
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-surface rounded-lg shadow p-6">
           <div className="flex items-center justify-between mb-2">
-            <div className="text-sm font-medium text-gray-600">Active Patterns</div>
-            <CheckCircle size={20} className="text-green-500" />
+            <div className="text-sm font-medium text-content-secondary">Active Patterns</div>
+            <CheckCircle size={20} className="text-semantic-success" />
           </div>
-          <div className="text-3xl font-bold text-gray-900">{activePatterns.length}</div>
-          <div className="text-xs text-gray-500 mt-1">Improving AI accuracy</div>
+          <div className="text-3xl font-bold text-content-primary">{activePatterns.length}</div>
+          <div className="text-xs text-content-tertiary mt-1">Improving AI accuracy</div>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-surface rounded-lg shadow p-6">
           <div className="flex items-center justify-between mb-2">
-            <div className="text-sm font-medium text-gray-600">Pending Approval</div>
+            <div className="text-sm font-medium text-content-secondary">Pending Approval</div>
             <Clock size={20} className="text-yellow-500" />
           </div>
-          <div className="text-3xl font-bold text-gray-900">{pendingPatterns.length}</div>
-          <div className="text-xs text-gray-500 mt-1">New patterns detected</div>
+          <div className="text-3xl font-bold text-content-primary">{pendingPatterns.length}</div>
+          <div className="text-xs text-content-tertiary mt-1">New patterns detected</div>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-surface rounded-lg shadow p-6">
           <div className="flex items-center justify-between mb-2">
-            <div className="text-sm font-medium text-gray-600">Total Overrides</div>
+            <div className="text-sm font-medium text-content-secondary">Total Overrides</div>
             <Activity size={20} className="text-blue-500" />
           </div>
-          <div className="text-3xl font-bold text-gray-900">{overrideStats?.total || 0}</div>
-          <div className="text-xs text-gray-500 mt-1">Last 30 days</div>
+          <div className="text-3xl font-bold text-content-primary">{overrideStats?.total || 0}</div>
+          <div className="text-xs text-content-tertiary mt-1">Last 30 days</div>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-surface rounded-lg shadow p-6">
           <div className="flex items-center justify-between mb-2">
-            <div className="text-sm font-medium text-gray-600">Feedback Rate</div>
-            <BarChart3 size={20} className="text-indigo-500" />
+            <div className="text-sm font-medium text-content-secondary">Feedback Rate</div>
+            <BarChart3 size={20} className="text-accent-primary" />
           </div>
-          <div className="text-3xl font-bold text-gray-900">{overrideStats?.feedbackRate || 0}%</div>
-          <div className="text-xs text-gray-500 mt-1">User feedback provided</div>
+          <div className="text-3xl font-bold text-content-primary">{overrideStats?.feedbackRate || 0}%</div>
+          <div className="text-xs text-content-tertiary mt-1">User feedback provided</div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200 mb-6">
+      <div className="border-b border-line-default mb-6">
         <div className="flex space-x-8">
           <button
             onClick={() => setActiveTab('active')}
             className={`pb-4 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'active'
-                ? 'border-indigo-500 text-indigo-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ? 'border-indigo-500 text-accent-primary'
+                : 'border-transparent text-content-tertiary hover:text-content-secondary hover:border-line-strong'
             }`}
           >
             Active Patterns ({activePatterns.length})
@@ -185,8 +185,8 @@ export default function LearningDashboard() {
             onClick={() => setActiveTab('pending')}
             className={`pb-4 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'pending'
-                ? 'border-indigo-500 text-indigo-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ? 'border-indigo-500 text-accent-primary'
+                : 'border-transparent text-content-tertiary hover:text-content-secondary hover:border-line-strong'
             }`}
           >
             Pending Approval ({pendingPatterns.length})
@@ -200,8 +200,8 @@ export default function LearningDashboard() {
             onClick={() => setActiveTab('stats')}
             className={`pb-4 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'stats'
-                ? 'border-indigo-500 text-indigo-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ? 'border-indigo-500 text-accent-primary'
+                : 'border-transparent text-content-tertiary hover:text-content-secondary hover:border-line-strong'
             }`}
           >
             Statistics
@@ -210,8 +210,8 @@ export default function LearningDashboard() {
             onClick={() => setActiveTab('effectiveness')}
             className={`pb-4 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'effectiveness'
-                ? 'border-indigo-500 text-indigo-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ? 'border-indigo-500 text-accent-primary'
+                : 'border-transparent text-content-tertiary hover:text-content-secondary hover:border-line-strong'
             }`}
           >
             Effectiveness Report
@@ -223,10 +223,10 @@ export default function LearningDashboard() {
       {activeTab === 'active' && (
         <div className="space-y-4">
           {activePatterns.length === 0 ? (
-            <div className="bg-white rounded-lg shadow p-12 text-center">
-              <Target size={48} className="mx-auto text-gray-400 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No Active Patterns</h3>
-              <p className="text-gray-600">
+            <div className="bg-surface rounded-lg shadow p-12 text-center">
+              <Target size={48} className="mx-auto text-content-tertiary mb-4" />
+              <h3 className="text-lg font-medium text-content-primary mb-2">No Active Patterns</h3>
+              <p className="text-content-secondary">
                 As you provide feedback on AI recommendations, patterns will be detected and appear here.
               </p>
             </div>
@@ -248,21 +248,21 @@ export default function LearningDashboard() {
       {activeTab === 'pending' && (
         <div className="space-y-4">
           {pendingPatterns.length === 0 ? (
-            <div className="bg-white rounded-lg shadow p-12 text-center">
-              <CheckCircle size={48} className="mx-auto text-gray-400 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No Pending Patterns</h3>
-              <p className="text-gray-600">
+            <div className="bg-surface rounded-lg shadow p-12 text-center">
+              <CheckCircle size={48} className="mx-auto text-content-tertiary mb-4" />
+              <h3 className="text-lg font-medium text-content-primary mb-2">No Pending Patterns</h3>
+              <p className="text-content-secondary">
                 When new patterns are detected, they'll appear here for your approval.
               </p>
             </div>
           ) : (
             <>
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <div className="bg-semantic-info-dim border border-semantic-info rounded-lg p-4 mb-4">
                 <div className="flex items-start gap-3">
-                  <AlertCircle size={20} className="text-blue-600 mt-0.5" />
+                  <AlertCircle size={20} className="text-semantic-info mt-0.5" />
                   <div className="flex-1">
-                    <h4 className="font-medium text-blue-900 mb-1">New Patterns Detected</h4>
-                    <p className="text-sm text-blue-700">
+                    <h4 className="font-medium text-semantic-info mb-1">New Patterns Detected</h4>
+                    <p className="text-sm text-semantic-info">
                       The AI has detected {pendingPatterns.length} new learning{' '}
                       {pendingPatterns.length === 1 ? 'pattern' : 'patterns'} from your recent feedback.
                       Review and approve them to improve AI accuracy.
@@ -291,19 +291,19 @@ export default function LearningDashboard() {
         <div className="space-y-6">
           {/* Override Stats by Agent Type */}
           {overrideStats && overrideStats.byAgentType && (
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Overrides by Agent Type</h3>
+            <div className="bg-surface rounded-lg shadow p-6">
+              <h3 className="text-lg font-semibold text-content-primary mb-4">Overrides by Agent Type</h3>
               <div className="space-y-3">
                 {Object.entries(overrideStats.byAgentType).map(([agentType, count]) => (
                   <div key={agentType}>
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center gap-2">
                         <span className="text-xl">{getAgentIcon(agentType)}</span>
-                        <span className="font-medium text-gray-700">{getAgentName(agentType)}</span>
+                        <span className="font-medium text-content-secondary">{getAgentName(agentType)}</span>
                       </div>
-                      <span className="text-sm font-semibold text-gray-900">{count} overrides</span>
+                      <span className="text-sm font-semibold text-content-primary">{count} overrides</span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="w-full bg-surface-muted rounded-full h-2">
                       <div
                         className="bg-indigo-600 h-2 rounded-full"
                         style={{ width: `${(count / overrideStats.total) * 100}%` }}
@@ -316,20 +316,20 @@ export default function LearningDashboard() {
           )}
 
           {/* Feedback Statistics */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Feedback Statistics</h3>
+          <div className="bg-surface rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold text-content-primary mb-4">Feedback Statistics</h3>
             <dl className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
-                <dt className="text-sm font-medium text-gray-500 mb-1">Total Overrides</dt>
-                <dd className="text-2xl font-bold text-gray-900">{overrideStats?.total || 0}</dd>
+                <dt className="text-sm font-medium text-content-tertiary mb-1">Total Overrides</dt>
+                <dd className="text-2xl font-bold text-content-primary">{overrideStats?.total || 0}</dd>
               </div>
               <div>
-                <dt className="text-sm font-medium text-gray-500 mb-1">With Feedback</dt>
-                <dd className="text-2xl font-bold text-gray-900">{overrideStats?.withFeedback || 0}</dd>
+                <dt className="text-sm font-medium text-content-tertiary mb-1">With Feedback</dt>
+                <dd className="text-2xl font-bold text-content-primary">{overrideStats?.withFeedback || 0}</dd>
               </div>
               <div>
-                <dt className="text-sm font-medium text-gray-500 mb-1">Feedback Rate</dt>
-                <dd className="text-2xl font-bold text-gray-900">{overrideStats?.feedbackRate || 0}%</dd>
+                <dt className="text-sm font-medium text-content-tertiary mb-1">Feedback Rate</dt>
+                <dd className="text-2xl font-bold text-content-primary">{overrideStats?.feedbackRate || 0}%</dd>
               </div>
             </dl>
           </div>
@@ -337,10 +337,10 @@ export default function LearningDashboard() {
           {/* Link to Effectiveness Report */}
           <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg shadow p-6 border border-indigo-100">
             <div className="flex items-center gap-3 mb-2">
-              <Zap size={24} className="text-indigo-600" />
-              <h3 className="text-lg font-semibold text-gray-900">Detailed Learning Impact</h3>
+              <Zap size={24} className="text-accent-primary" />
+              <h3 className="text-lg font-semibold text-content-primary">Detailed Learning Impact</h3>
             </div>
-            <p className="text-gray-700 mb-4">
+            <p className="text-content-secondary mb-4">
               View comprehensive effectiveness metrics including pattern performance, time saved, and recommendations.
             </p>
             <button

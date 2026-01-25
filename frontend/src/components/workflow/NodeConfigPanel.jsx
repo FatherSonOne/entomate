@@ -18,7 +18,7 @@ const FieldRenderers = {
       value={value || ''}
       onChange={(e) => onChange(field.name, e.target.value)}
       placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
-      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+      className="w-full px-3 py-2 text-sm border border-line-default rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
     />
   ),
 
@@ -28,7 +28,7 @@ const FieldRenderers = {
       onChange={(e) => onChange(field.name, e.target.value)}
       placeholder={field.placeholder}
       rows={field.rows || 3}
-      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono"
+      className="w-full px-3 py-2 text-sm border border-line-default rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono"
     />
   ),
 
@@ -40,7 +40,7 @@ const FieldRenderers = {
       min={field.min}
       max={field.max}
       step={field.step || 1}
-      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+      className="w-full px-3 py-2 text-sm border border-line-default rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
     />
   ),
 
@@ -48,7 +48,7 @@ const FieldRenderers = {
     <select
       value={value || field.default || ''}
       onChange={(e) => onChange(field.name, e.target.value)}
-      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+      className="w-full px-3 py-2 text-sm border border-line-default rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
     >
       {field.options?.map(opt => (
         <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -62,9 +62,9 @@ const FieldRenderers = {
         type="checkbox"
         checked={value ?? field.default ?? false}
         onChange={(e) => onChange(field.name, e.target.checked)}
-        className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+        className="w-4 h-4 rounded border-line-strong text-accent-primary focus:ring-primary-500"
       />
-      <span className="text-sm text-gray-700">{field.checkboxLabel || 'Enable'}</span>
+      <span className="text-sm text-content-secondary">{field.checkboxLabel || 'Enable'}</span>
     </label>
   ),
 
@@ -90,10 +90,10 @@ const FieldRenderers = {
           onChange={handleChange}
           rows={field.rows || 5}
           className={`w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono ${
-            error ? 'border-red-300' : 'border-gray-200'
+            error ? 'border-semantic-error' : 'border-line-default'
           }`}
         />
-        {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+        {error && <p className="text-xs text-semantic-error mt-1">{error}</p>}
       </div>
     )
   },
@@ -124,18 +124,18 @@ const FieldRenderers = {
               value={pair.key || ''}
               onChange={(e) => updatePair(index, 'key', e.target.value)}
               placeholder="Key"
-              className="flex-1 px-2 py-1 text-sm border border-gray-200 rounded-md"
+              className="flex-1 px-2 py-1 text-sm border border-line-default rounded-md"
             />
             <input
               type="text"
               value={pair.value || ''}
               onChange={(e) => updatePair(index, 'value', e.target.value)}
               placeholder="Value"
-              className="flex-1 px-2 py-1 text-sm border border-gray-200 rounded-md"
+              className="flex-1 px-2 py-1 text-sm border border-line-default rounded-md"
             />
             <button
               onClick={() => removePair(index)}
-              className="p-1 text-red-500 hover:bg-red-50 rounded"
+              className="p-1 text-semantic-error hover:bg-semantic-error-dim rounded"
             >
               <Minus className="w-4 h-4" />
             </button>
@@ -143,7 +143,7 @@ const FieldRenderers = {
         ))}
         <button
           onClick={addPair}
-          className="flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700"
+          className="flex items-center gap-1 text-sm text-accent-primary hover:text-accent-primary"
         >
           <Plus className="w-4 h-4" />
           Add {field.itemLabel || 'item'}
@@ -184,12 +184,12 @@ const FieldRenderers = {
     return (
       <div className="space-y-3">
         {conditions.map((cond, index) => (
-          <div key={index} className="p-3 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
+          <div key={index} className="p-3 bg-surface-muted rounded-lg border border-line-default space-y-2">
             {index > 0 && (
               <select
                 value={cond.combineWith || 'AND'}
                 onChange={(e) => updateCondition(index, 'combineWith', e.target.value)}
-                className="px-2 py-1 text-xs border border-gray-200 rounded"
+                className="px-2 py-1 text-xs border border-line-default rounded"
               >
                 <option value="AND">AND</option>
                 <option value="OR">OR</option>
@@ -201,12 +201,12 @@ const FieldRenderers = {
                 value={cond.field || ''}
                 onChange={(e) => updateCondition(index, 'field', e.target.value)}
                 placeholder="Field path"
-                className="flex-1 px-2 py-1 text-sm border border-gray-200 rounded-md"
+                className="flex-1 px-2 py-1 text-sm border border-line-default rounded-md"
               />
               <select
                 value={cond.operator || 'equals'}
                 onChange={(e) => updateCondition(index, 'operator', e.target.value)}
-                className="px-2 py-1 text-sm border border-gray-200 rounded-md"
+                className="px-2 py-1 text-sm border border-line-default rounded-md"
               >
                 {operators.map(op => (
                   <option key={op.value} value={op.value}>{op.label}</option>
@@ -219,12 +219,12 @@ const FieldRenderers = {
                 value={cond.value || ''}
                 onChange={(e) => updateCondition(index, 'value', e.target.value)}
                 placeholder="Value"
-                className="w-full px-2 py-1 text-sm border border-gray-200 rounded-md"
+                className="w-full px-2 py-1 text-sm border border-line-default rounded-md"
               />
             )}
             <button
               onClick={() => removeCondition(index)}
-              className="text-xs text-red-500 hover:text-red-700"
+              className="text-xs text-semantic-error hover:text-semantic-error"
             >
               Remove condition
             </button>
@@ -232,7 +232,7 @@ const FieldRenderers = {
         ))}
         <button
           onClick={addCondition}
-          className="flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700"
+          className="flex items-center gap-1 text-sm text-accent-primary hover:text-accent-primary"
         >
           <Plus className="w-4 h-4" />
           Add condition
@@ -402,8 +402,8 @@ export default function NodeConfigPanel({
 
   if (!node) {
     return (
-      <div className="w-80 bg-gray-50 border-l border-gray-200 flex items-center justify-center">
-        <div className="text-center text-gray-500 p-6">
+      <div className="w-80 bg-surface-muted border-l border-line-default flex items-center justify-center">
+        <div className="text-center text-content-tertiary p-6">
           <Settings className="w-12 h-12 mx-auto mb-3 opacity-30" />
           <p className="text-sm">Select a node to configure</p>
         </div>
@@ -428,13 +428,13 @@ export default function NodeConfigPanel({
   }
 
   return (
-    <div className="w-80 bg-white border-l border-gray-200 flex flex-col h-full">
+    <div className="w-80 bg-surface border-l border-line-default flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between p-3 border-b border-gray-200">
-        <h3 className="text-sm font-semibold text-gray-900">Node Configuration</h3>
+      <div className="flex items-center justify-between p-3 border-b border-line-default">
+        <h3 className="text-sm font-semibold text-content-primary">Node Configuration</h3>
         <button
           onClick={onClose}
-          className="p-1 hover:bg-gray-100 rounded text-gray-500"
+          className="p-1 hover:bg-surface-muted rounded text-content-tertiary"
         >
           <X className="w-4 h-4" />
         </button>
@@ -445,46 +445,46 @@ export default function NodeConfigPanel({
         {/* Basic info */}
         <div className="space-y-3">
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Node Label</label>
+            <label className="block text-xs font-medium text-content-secondary mb-1">Node Label</label>
             <input
               type="text"
               value={node.data?.label || ''}
               onChange={handleLabelChange}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full px-3 py-2 text-sm border border-line-default rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Description</label>
+            <label className="block text-xs font-medium text-content-secondary mb-1">Description</label>
             <textarea
               value={node.data?.description || ''}
               onChange={handleDescriptionChange}
               rows={2}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full px-3 py-2 text-sm border border-line-default rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
           </div>
         </div>
 
         {/* Node type badge */}
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500">Type:</span>
-          <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded-full">
+          <span className="text-xs text-content-tertiary">Type:</span>
+          <span className="px-2 py-0.5 text-xs bg-surface-muted text-content-secondary rounded-full">
             {node.type?.replace(/_/g, ' ')}
           </span>
         </div>
 
         {/* Configuration fields */}
         {schema.length > 0 && (
-          <div className="space-y-4 pt-2 border-t border-gray-100">
-            <h4 className="text-xs font-medium text-gray-700 uppercase tracking-wider">Configuration</h4>
+          <div className="space-y-4 pt-2 border-t border-line-subtle">
+            <h4 className="text-xs font-medium text-content-secondary uppercase tracking-wider">Configuration</h4>
             {schema.map((field) => {
               const Renderer = FieldRenderers[field.type] || FieldRenderers.text
               return (
                 <div key={field.name}>
-                  <label className="flex items-center gap-1 text-xs font-medium text-gray-700 mb-1">
+                  <label className="flex items-center gap-1 text-xs font-medium text-content-secondary mb-1">
                     {field.label}
-                    {field.required && <span className="text-red-500">*</span>}
+                    {field.required && <span className="text-semantic-error">*</span>}
                     {field.help && (
-                      <HelpCircle className="w-3 h-3 text-gray-400 cursor-help" title={field.help} />
+                      <HelpCircle className="w-3 h-3 text-content-tertiary cursor-help" title={field.help} />
                     )}
                   </label>
                   <Renderer
@@ -499,10 +499,10 @@ export default function NodeConfigPanel({
         )}
 
         {/* Advanced section */}
-        <div className="pt-2 border-t border-gray-100">
+        <div className="pt-2 border-t border-line-subtle">
           <button
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
+            className="flex items-center gap-1 text-xs text-content-tertiary hover:text-content-secondary"
           >
             {showAdvanced ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             Advanced Options
@@ -510,13 +510,13 @@ export default function NodeConfigPanel({
           {showAdvanced && (
             <div className="mt-3 space-y-3">
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Notes</label>
+                <label className="block text-xs font-medium text-content-secondary mb-1">Notes</label>
                 <textarea
                   value={config.notes || ''}
                   onChange={(e) => handleFieldChange('notes', e.target.value)}
                   rows={2}
                   placeholder="Internal notes about this node..."
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md"
+                  className="w-full px-3 py-2 text-sm border border-line-default rounded-md"
                 />
               </div>
               <div className="flex items-center gap-2">
@@ -525,9 +525,9 @@ export default function NodeConfigPanel({
                   id="continueOnFail"
                   checked={config.continueOnFail || false}
                   onChange={(e) => handleFieldChange('continueOnFail', e.target.checked)}
-                  className="w-4 h-4 rounded border-gray-300"
+                  className="w-4 h-4 rounded border-line-strong"
                 />
-                <label htmlFor="continueOnFail" className="text-sm text-gray-700">
+                <label htmlFor="continueOnFail" className="text-sm text-content-secondary">
                   Continue on failure
                 </label>
               </div>
@@ -537,9 +537,9 @@ export default function NodeConfigPanel({
                   id="disabled"
                   checked={config.disabled || false}
                   onChange={(e) => handleFieldChange('disabled', e.target.checked)}
-                  className="w-4 h-4 rounded border-gray-300"
+                  className="w-4 h-4 rounded border-line-strong"
                 />
-                <label htmlFor="disabled" className="text-sm text-gray-700">
+                <label htmlFor="disabled" className="text-sm text-content-secondary">
                   Disable this node
                 </label>
               </div>
@@ -549,7 +549,7 @@ export default function NodeConfigPanel({
       </div>
 
       {/* Actions footer */}
-      <div className="p-3 border-t border-gray-200 space-y-2">
+      <div className="p-3 border-t border-line-default space-y-2">
         <div className="flex gap-2">
           <button
             onClick={() => onTest?.(node.id)}
@@ -576,7 +576,7 @@ export default function NodeConfigPanel({
           </button>
           <button
             onClick={() => onDelete?.(node.id)}
-            className="btn btn-ghost btn-sm text-red-600 hover:bg-red-50"
+            className="btn btn-ghost btn-sm text-semantic-error hover:bg-semantic-error-dim"
           >
             <Trash2 className="w-4 h-4" />
           </button>

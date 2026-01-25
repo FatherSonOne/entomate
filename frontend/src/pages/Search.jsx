@@ -404,11 +404,11 @@ export default function Search() {
 
   const getTypeIcon = (type) => {
     switch (type) {
-      case 'meeting': return <MessageSquare className="w-5 h-5 text-purple-600" />
-      case 'project': return <FolderKanban className="w-5 h-5 text-blue-600" />
-      case 'task': return <CheckSquare className="w-5 h-5 text-green-600" />
-      case 'action_item': return <FileText className="w-5 h-5 text-orange-600" />
-      default: return <SearchIcon className="w-5 h-5 text-gray-600" />
+      case 'meeting': return <MessageSquare className="w-5 h-5 text-accent-tertiary" />
+      case 'project': return <FolderKanban className="w-5 h-5 text-semantic-info" />
+      case 'task': return <CheckSquare className="w-5 h-5 text-semantic-success" />
+      case 'action_item': return <FileText className="w-5 h-5 text-semantic-warning" />
+      default: return <SearchIcon className="w-5 h-5 text-content-secondary" />
     }
   }
 
@@ -425,8 +425,8 @@ export default function Search() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">AI Search & Assistant</h1>
-        <p className="text-gray-600">Find anything using semantic search or ask AI questions about your meetings</p>
+        <h1 className="text-2xl font-bold text-content-primary">AI Search & Assistant</h1>
+        <p className="text-content-secondary">Find anything using semantic search or ask AI questions about your meetings</p>
       </div>
 
       {/* Search form */}
@@ -436,7 +436,7 @@ export default function Search() {
             {searchType === 'semantic' ? (
               <Sparkles className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-primary-500 z-10" />
             ) : (
-              <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 z-10" />
+              <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-content-tertiary z-10" />
             )}
             <input
               ref={searchInputRef}
@@ -455,7 +455,7 @@ export default function Search() {
               <select
                 value={searchType}
                 onChange={(e) => setSearchType(e.target.value)}
-                className="input py-1.5 px-2 text-sm bg-gray-100 border-0"
+                className="input py-1.5 px-2 text-sm bg-surface-muted border-0"
               >
                 <option value="semantic">Semantic</option>
                 <option value="keyword">Keyword</option>
@@ -477,12 +477,12 @@ export default function Search() {
             {showSuggestions && (suggestions.length > 0 || (query.length < 2 && trending.length > 0)) && (
               <div
                 ref={suggestionsRef}
-                className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 z-50 overflow-hidden"
+                className="absolute top-full left-0 right-0 mt-1 bg-surface rounded-lg shadow-lg border border-line-default z-50 overflow-hidden"
               >
                 {/* Trending topics (shown when no query or short query) */}
                 {query.length < 2 && trending.length > 0 && (
-                  <div className="p-2 border-b border-gray-100">
-                    <div className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-500 uppercase">
+                  <div className="p-2 border-b border-line-subtle">
+                    <div className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-content-tertiary uppercase">
                       <Flame className="w-3 h-3 text-orange-500" />
                       Trending Searches
                     </div>
@@ -493,14 +493,14 @@ export default function Search() {
                         className={`w-full flex items-center gap-3 px-3 py-2 text-left rounded-md transition-colors ${
                           selectedSuggestionIndex === suggestions.length + idx
                             ? 'bg-primary-50 text-primary-900'
-                            : 'hover:bg-gray-50'
+                            : 'hover:bg-surface-muted'
                         }`}
                         onClick={() => selectSuggestion(item.text)}
                         onMouseEnter={() => setSelectedSuggestionIndex(suggestions.length + idx)}
                       >
                         <TrendingUp className="w-4 h-4 text-orange-500" />
                         <span className="flex-1 truncate">{item.text}</span>
-                        <span className="text-xs text-gray-400">{item.count}x</span>
+                        <span className="text-xs text-content-tertiary">{item.count}x</span>
                       </button>
                     ))}
                   </div>
@@ -510,7 +510,7 @@ export default function Search() {
                 {suggestions.length > 0 && (
                   <div className="p-2">
                     {query.length >= 2 && (
-                      <div className="px-2 py-1 text-xs font-medium text-gray-500 uppercase flex items-center gap-1">
+                      <div className="px-2 py-1 text-xs font-medium text-content-tertiary uppercase flex items-center gap-1">
                         {loadingSuggestions ? (
                           <Loader2 className="w-3 h-3 animate-spin" />
                         ) : (
@@ -525,7 +525,7 @@ export default function Search() {
                                    item.type === 'recent' ? Clock : SearchIcon
                       const iconColor = item.type === 'meeting' ? 'text-purple-500' :
                                         item.type === 'project' ? 'text-blue-500' :
-                                        item.type === 'recent' ? 'text-gray-400' : 'text-gray-400'
+                                        item.type === 'recent' ? 'text-content-tertiary' : 'text-content-tertiary'
 
                       return (
                         <button
@@ -534,14 +534,14 @@ export default function Search() {
                           className={`w-full flex items-center gap-3 px-3 py-2 text-left rounded-md transition-colors ${
                             selectedSuggestionIndex === idx
                               ? 'bg-primary-50 text-primary-900'
-                              : 'hover:bg-gray-50'
+                              : 'hover:bg-surface-muted'
                           }`}
                           onClick={() => selectSuggestion(item.text)}
                           onMouseEnter={() => setSelectedSuggestionIndex(idx)}
                         >
                           <Icon className={`w-4 h-4 ${iconColor}`} />
                           <span className="flex-1 truncate">{item.text}</span>
-                          <span className="text-xs text-gray-400 capitalize">{item.type}</span>
+                          <span className="text-xs text-content-tertiary capitalize">{item.type}</span>
                         </button>
                       )
                     })}
@@ -550,23 +550,23 @@ export default function Search() {
 
                 {/* Empty state */}
                 {query.length >= 2 && suggestions.length === 0 && !loadingSuggestions && (
-                  <div className="p-4 text-center text-gray-500 text-sm">
+                  <div className="p-4 text-center text-content-tertiary text-sm">
                     No suggestions found. Press Enter to search.
                   </div>
                 )}
 
                 {/* Keyboard hint */}
-                <div className="px-3 py-2 bg-gray-50 border-t border-gray-100 text-xs text-gray-500 flex items-center gap-4">
+                <div className="px-3 py-2 bg-surface-muted border-t border-line-subtle text-xs text-content-tertiary flex items-center gap-4">
                   <span className="flex items-center gap-1">
-                    <kbd className="px-1 py-0.5 bg-white border border-gray-200 rounded">↑↓</kbd>
+                    <kbd className="px-1 py-0.5 bg-surface border border-line-default rounded">↑↓</kbd>
                     navigate
                   </span>
                   <span className="flex items-center gap-1">
-                    <kbd className="px-1 py-0.5 bg-white border border-gray-200 rounded">↵</kbd>
+                    <kbd className="px-1 py-0.5 bg-surface border border-line-default rounded">↵</kbd>
                     select
                   </span>
                   <span className="flex items-center gap-1">
-                    <kbd className="px-1 py-0.5 bg-white border border-gray-200 rounded">esc</kbd>
+                    <kbd className="px-1 py-0.5 bg-surface border border-line-default rounded">esc</kbd>
                     close
                   </span>
                 </div>
@@ -580,7 +580,7 @@ export default function Search() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setShowHistory(!showHistory)}
-              className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
+              className="text-sm text-content-tertiary hover:text-content-secondary flex items-center gap-1"
             >
               <History className="w-4 h-4" />
               Recent
@@ -588,7 +588,7 @@ export default function Search() {
             </button>
             <button
               onClick={() => setShowSaved(!showSaved)}
-              className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
+              className="text-sm text-content-tertiary hover:text-content-secondary flex items-center gap-1"
             >
               <Bookmark className="w-4 h-4" />
               Saved
@@ -598,7 +598,7 @@ export default function Search() {
           {query && (
             <button
               onClick={() => setSaveModalOpen(true)}
-              className="text-sm text-primary-600 hover:text-primary-700 flex items-center gap-1"
+              className="text-sm text-accent-primary hover:text-accent-primary flex items-center gap-1"
             >
               <BookmarkPlus className="w-4 h-4" />
               Save Search
@@ -608,12 +608,12 @@ export default function Search() {
 
         {/* Recent searches */}
         {showHistory && searchHistory.length > 0 && (
-          <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+          <div className="mt-3 p-3 bg-surface-muted rounded-lg">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-gray-500">Recent Searches</span>
+              <span className="text-xs font-medium text-content-tertiary">Recent Searches</span>
               <button
                 onClick={handleClearHistory}
-                className="text-xs text-red-500 hover:text-red-600"
+                className="text-xs text-semantic-error hover:text-semantic-error"
               >
                 Clear
               </button>
@@ -623,9 +623,9 @@ export default function Search() {
                 <button
                   key={index}
                   onClick={(e) => handleSearch(e, item.query, item.search_type)}
-                  className="text-sm px-3 py-1 bg-white rounded-full border border-gray-200 hover:border-primary-300 hover:bg-primary-50 flex items-center gap-1"
+                  className="text-sm px-3 py-1 bg-surface rounded-full border border-line-default hover:border-primary-300 hover:bg-accent-primary-dim flex items-center gap-1"
                 >
-                  <Clock className="w-3 h-3 text-gray-400" />
+                  <Clock className="w-3 h-3 text-content-tertiary" />
                   {item.query}
                 </button>
               ))}
@@ -635,24 +635,24 @@ export default function Search() {
 
         {/* Saved searches */}
         {showSaved && savedSearches.length > 0 && (
-          <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-            <span className="text-xs font-medium text-gray-500 block mb-2">Saved Searches</span>
+          <div className="mt-3 p-3 bg-surface-muted rounded-lg">
+            <span className="text-xs font-medium text-content-tertiary block mb-2">Saved Searches</span>
             <div className="flex flex-wrap gap-2">
               {savedSearches.map((item) => (
                 <div
                   key={item.id}
-                  className="text-sm px-3 py-1 bg-white rounded-full border border-gray-200 flex items-center gap-2"
+                  className="text-sm px-3 py-1 bg-surface rounded-full border border-line-default flex items-center gap-2"
                 >
                   <button
                     onClick={(e) => handleSearch(e, item.query, item.search_type)}
-                    className="flex items-center gap-1 hover:text-primary-600"
+                    className="flex items-center gap-1 hover:text-accent-primary"
                   >
                     <Bookmark className="w-3 h-3 text-primary-500" />
                     {item.name}
                   </button>
                   <button
                     onClick={() => handleDeleteSavedSearch(item.id)}
-                    className="text-gray-400 hover:text-red-500"
+                    className="text-content-tertiary hover:text-semantic-error"
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -665,15 +665,15 @@ export default function Search() {
 
       {/* Ask AI section */}
       <div className="card">
-        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-          <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+        <div className="p-4 border-b border-line-default flex items-center justify-between">
+          <h3 className="font-semibold text-content-primary flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-primary-500" />
             Ask AI About Your Meetings
           </h3>
           {messages.length > 0 && (
             <button
               onClick={clearConversation}
-              className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
+              className="text-sm text-content-tertiary hover:text-content-secondary flex items-center gap-1"
             >
               <RefreshCw className="w-4 h-4" />
               New Chat
@@ -685,8 +685,8 @@ export default function Search() {
         <div className="max-h-96 overflow-y-auto p-4">
           {messages.length === 0 ? (
             <div className="text-center py-8">
-              <MessageSquare className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500">Ask me anything about your meetings!</p>
+              <MessageSquare className="w-12 h-12 text-content-muted mx-auto mb-3" />
+              <p className="text-content-tertiary">Ask me anything about your meetings!</p>
               <div className="mt-4 flex flex-wrap justify-center gap-2">
                 {[
                   "What did we discuss about budget?",
@@ -713,27 +713,27 @@ export default function Search() {
                   <div
                     className={`max-w-[80%] rounded-lg p-3 ${
                       msg.role === 'user'
-                        ? 'bg-primary-600 text-white'
-                        : 'bg-gray-100 text-gray-900'
+                        ? 'bg-accent-primary text-white'
+                        : 'bg-surface-muted text-content-primary'
                     }`}
                   >
                     <p className="whitespace-pre-wrap">{msg.content}</p>
 
                     {msg.confidence !== undefined && (
-                      <p className={`text-xs mt-2 ${msg.role === 'user' ? 'text-primary-200' : 'text-gray-500'}`}>
+                      <p className={`text-xs mt-2 ${msg.role === 'user' ? 'text-primary-200' : 'text-content-tertiary'}`}>
                         Confidence: {Math.round(msg.confidence * 100)}%
                       </p>
                     )}
 
                     {msg.citations && msg.citations.length > 0 && (
-                      <div className="mt-3 pt-2 border-t border-gray-200">
-                        <p className="text-xs text-gray-500 mb-1">Sources:</p>
+                      <div className="mt-3 pt-2 border-t border-line-default">
+                        <p className="text-xs text-content-tertiary mb-1">Sources:</p>
                         <div className="flex flex-wrap gap-1">
                           {msg.citations.map((cite, cidx) => (
                             <Link
                               key={cidx}
                               to={`/meetings/${cite.id}`}
-                              className="text-xs text-primary-600 hover:underline bg-white px-2 py-0.5 rounded"
+                              className="text-xs text-accent-primary hover:underline bg-surface px-2 py-0.5 rounded"
                             >
                               {cite.title}
                             </Link>
@@ -743,14 +743,14 @@ export default function Search() {
                     )}
 
                     {msg.followUp && msg.followUp.length > 0 && (
-                      <div className="mt-3 pt-2 border-t border-gray-200">
-                        <p className="text-xs text-gray-500 mb-1">Follow-up:</p>
+                      <div className="mt-3 pt-2 border-t border-line-default">
+                        <p className="text-xs text-content-tertiary mb-1">Follow-up:</p>
                         <div className="flex flex-wrap gap-1">
                           {msg.followUp.map((q, qidx) => (
                             <button
                               key={qidx}
                               onClick={() => setAskQuestion(q)}
-                              className="text-xs bg-white text-gray-700 px-2 py-0.5 rounded hover:bg-gray-50"
+                              className="text-xs bg-surface text-content-secondary px-2 py-0.5 rounded hover:bg-surface-muted"
                             >
                               {q}
                             </button>
@@ -764,7 +764,7 @@ export default function Search() {
               {/* Show streaming content while typing */}
               {askingQuestion && streamingContent && (
                 <div className="flex justify-start">
-                  <div className="max-w-[80%] rounded-lg p-3 bg-gray-100 text-gray-900">
+                  <div className="max-w-[80%] rounded-lg p-3 bg-surface-muted text-content-primary">
                     <p className="whitespace-pre-wrap">{streamingContent}<span className="inline-block w-2 h-4 bg-primary-500 animate-pulse ml-1"></span></p>
                   </div>
                 </div>
@@ -772,9 +772,9 @@ export default function Search() {
               {/* Show loading spinner only when waiting for first chunk */}
               {askingQuestion && !streamingContent && (
                 <div className="flex justify-start">
-                  <div className="bg-gray-100 rounded-lg p-3 flex items-center gap-2">
+                  <div className="bg-surface-muted rounded-lg p-3 flex items-center gap-2">
                     <Loader2 className="w-5 h-5 animate-spin text-primary-500" />
-                    <span className="text-sm text-gray-500">Thinking...</span>
+                    <span className="text-sm text-content-tertiary">Thinking...</span>
                   </div>
                 </div>
               )}
@@ -784,7 +784,7 @@ export default function Search() {
         </div>
 
         {/* Input */}
-        <div className="p-4 border-t border-gray-200">
+        <div className="p-4 border-t border-line-default">
           <form onSubmit={handleAskQuestion} className="flex gap-3">
             <input
               type="text"
@@ -812,13 +812,13 @@ export default function Search() {
       {/* Results */}
       {hasSearched && (
         <div className="card">
-          <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+          <div className="p-4 border-b border-line-default flex items-center justify-between">
             <div>
-              <h3 className="font-semibold text-gray-900">
+              <h3 className="font-semibold text-content-primary">
                 {loading ? 'Searching...' : `${results.length} result${results.length !== 1 ? 's' : ''} found`}
               </h3>
               {executionTime && !loading && (
-                <p className="text-xs text-gray-500">Search completed in {executionTime}ms</p>
+                <p className="text-xs text-content-tertiary">Search completed in {executionTime}ms</p>
               )}
             </div>
             <div className="flex items-center gap-2">
@@ -862,13 +862,13 @@ export default function Search() {
           {loading ? (
             <div className="p-8 text-center">
               <div className="spinner mx-auto mb-4" />
-              <p className="text-gray-500">Searching...</p>
+              <p className="text-content-tertiary">Searching...</p>
             </div>
           ) : results.length === 0 ? (
             <div className="p-8 text-center">
-              <SearchIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-              <h3 className="text-lg font-medium text-gray-900 mb-1">No results found</h3>
-              <p className="text-gray-500">Try a different search term or switch search type</p>
+              <SearchIcon className="w-12 h-12 text-content-muted mx-auto mb-3" />
+              <h3 className="text-lg font-medium text-content-primary mb-1">No results found</h3>
+              <p className="text-content-tertiary">Try a different search term or switch search type</p>
             </div>
           ) : (
             <div className="divide-y divide-gray-100">
@@ -876,7 +876,7 @@ export default function Search() {
                 <Link
                   key={`${result.type}-${result.id}-${index}`}
                   to={getTypeLink(result)}
-                  className="block p-4 hover:bg-gray-50"
+                  className="block p-4 hover:bg-surface-muted"
                 >
                   <div className="flex items-start gap-3">
                     <div className="mt-0.5">
@@ -884,20 +884,20 @@ export default function Search() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <h4 className="font-medium text-gray-900">{result.title}</h4>
+                        <h4 className="font-medium text-content-primary">{result.title}</h4>
                         <span className="badge badge-gray text-xs">{result.type}</span>
                         {result.similarity && (
-                          <span className="text-xs text-primary-600">
+                          <span className="text-xs text-accent-primary">
                             {Math.round(result.similarity * 100)}% match
                           </span>
                         )}
                       </div>
                       {result.preview && (
-                        <p className="text-sm text-gray-500 line-clamp-2 mt-1">
+                        <p className="text-sm text-content-tertiary line-clamp-2 mt-1">
                           {result.preview}
                         </p>
                       )}
-                      <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">
+                      <div className="flex items-center gap-3 mt-2 text-xs text-content-tertiary">
                         {result.metadata?.date && (
                           <span>{new Date(result.metadata.date).toLocaleDateString()}</span>
                         )}
@@ -935,23 +935,23 @@ export default function Search() {
       {/* Quick tips (only show when no search) */}
       {!hasSearched && (
         <div className="card p-5">
-          <h3 className="font-semibold text-gray-900 mb-3">Search Tips</h3>
+          <h3 className="font-semibold text-content-primary mb-3">Search Tips</h3>
           <div className="grid md:grid-cols-2 gap-4">
             <div>
-              <h4 className="text-sm font-medium text-primary-600 mb-2 flex items-center gap-1">
+              <h4 className="text-sm font-medium text-accent-primary mb-2 flex items-center gap-1">
                 <Sparkles className="w-4 h-4" /> Semantic Search
               </h4>
-              <ul className="space-y-1 text-sm text-gray-600">
+              <ul className="space-y-1 text-sm text-content-secondary">
                 <li>Finds results by meaning, not just keywords</li>
                 <li>Try: "budget discussions" to find all finance-related meetings</li>
                 <li>Try: "project delays" to find meetings about timeline issues</li>
               </ul>
             </div>
             <div>
-              <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-1">
+              <h4 className="text-sm font-medium text-content-secondary mb-2 flex items-center gap-1">
                 <SearchIcon className="w-4 h-4" /> Keyword Search
               </h4>
-              <ul className="space-y-1 text-sm text-gray-600">
+              <ul className="space-y-1 text-sm text-content-secondary">
                 <li>Exact match search across all content</li>
                 <li>Best for specific names, project codes, or phrases</li>
                 <li>Searches meeting titles, summaries, and transcripts</li>
@@ -965,17 +965,17 @@ export default function Search() {
       <div className="card">
         <button
           onClick={() => setShowAnalytics(!showAnalytics)}
-          className="w-full p-4 flex items-center justify-between text-left hover:bg-gray-50"
+          className="w-full p-4 flex items-center justify-between text-left hover:bg-surface-muted"
         >
           <div className="flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-primary-500" />
-            <span className="font-semibold text-gray-900">Search Analytics</span>
+            <span className="font-semibold text-content-primary">Search Analytics</span>
           </div>
-          {showAnalytics ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+          {showAnalytics ? <ChevronUp className="w-5 h-5 text-content-tertiary" /> : <ChevronDown className="w-5 h-5 text-content-tertiary" />}
         </button>
 
         {showAnalytics && (
-          <div className="p-4 border-t border-gray-200">
+          <div className="p-4 border-t border-line-default">
             {/* Period selector */}
             <div className="flex items-center justify-between mb-4">
               <div className="flex gap-2">
@@ -991,7 +991,7 @@ export default function Search() {
                     className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
                       analyticsPeriod === period.value
                         ? 'bg-primary-100 text-primary-700'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        : 'bg-surface-muted text-content-secondary hover:bg-surface-muted'
                     }`}
                   >
                     {period.label}
@@ -1001,7 +1001,7 @@ export default function Search() {
               <button
                 onClick={() => loadAnalytics(analyticsPeriod)}
                 disabled={analyticsLoading}
-                className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
+                className="text-sm text-content-tertiary hover:text-content-secondary flex items-center gap-1"
               >
                 <RefreshCw className={`w-4 h-4 ${analyticsLoading ? 'animate-spin' : ''}`} />
                 Refresh
@@ -1011,14 +1011,14 @@ export default function Search() {
             {analyticsLoading ? (
               <div className="py-8 text-center">
                 <Loader2 className="w-8 h-8 animate-spin text-primary-500 mx-auto mb-2" />
-                <p className="text-sm text-gray-500">Loading analytics...</p>
+                <p className="text-sm text-content-tertiary">Loading analytics...</p>
               </div>
             ) : analytics ? (
               <div className="space-y-6">
                 {/* Key Metrics */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="bg-gradient-to-br from-primary-50 to-primary-100 rounded-lg p-4">
-                    <div className="flex items-center gap-2 text-primary-600 mb-1">
+                    <div className="flex items-center gap-2 text-accent-primary mb-1">
                       <SearchIcon className="w-4 h-4" />
                       <span className="text-xs font-medium">Total Searches</span>
                     </div>
@@ -1026,35 +1026,35 @@ export default function Search() {
                   </div>
 
                   <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4">
-                    <div className="flex items-center gap-2 text-green-600 mb-1">
+                    <div className="flex items-center gap-2 text-semantic-success mb-1">
                       <Target className="w-4 h-4" />
                       <span className="text-xs font-medium">Success Rate</span>
                     </div>
-                    <p className="text-2xl font-bold text-green-900">{analytics.successRate || 0}%</p>
+                    <p className="text-2xl font-bold text-semantic-success">{analytics.successRate || 0}%</p>
                   </div>
 
                   <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4">
-                    <div className="flex items-center gap-2 text-blue-600 mb-1">
+                    <div className="flex items-center gap-2 text-semantic-info mb-1">
                       <Zap className="w-4 h-4" />
                       <span className="text-xs font-medium">Avg. Speed</span>
                     </div>
-                    <p className="text-2xl font-bold text-blue-900">{analytics.avgExecutionTime || 0}ms</p>
+                    <p className="text-2xl font-bold text-semantic-info">{analytics.avgExecutionTime || 0}ms</p>
                   </div>
 
                   <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4">
-                    <div className="flex items-center gap-2 text-purple-600 mb-1">
+                    <div className="flex items-center gap-2 text-accent-tertiary mb-1">
                       <TrendingUp className="w-4 h-4" />
                       <span className="text-xs font-medium">Avg. Results</span>
                     </div>
-                    <p className="text-2xl font-bold text-purple-900">{analytics.avgResultsPerSearch || 0}</p>
+                    <p className="text-2xl font-bold text-accent-tertiary">{analytics.avgResultsPerSearch || 0}</p>
                   </div>
                 </div>
 
                 {/* Charts Row */}
                 <div className="grid md:grid-cols-2 gap-4">
                   {/* Search Types */}
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h4 className="text-sm font-medium text-gray-700 mb-3">Searches by Type</h4>
+                  <div className="bg-surface-muted rounded-lg p-4">
+                    <h4 className="text-sm font-medium text-content-secondary mb-3">Searches by Type</h4>
                     {analytics.searchesByType && analytics.searchesByType.length > 0 ? (
                       <div className="space-y-2">
                         {analytics.searchesByType.map(item => {
@@ -1062,8 +1062,8 @@ export default function Search() {
                           const percentage = Math.round((item.count / total) * 100)
                           return (
                             <div key={item.type} className="flex items-center gap-3">
-                              <span className="text-sm text-gray-600 w-20 capitalize">{item.type}</span>
-                              <div className="flex-1 bg-gray-200 rounded-full h-2">
+                              <span className="text-sm text-content-secondary w-20 capitalize">{item.type}</span>
+                              <div className="flex-1 bg-surface-muted rounded-full h-2">
                                 <div
                                   className={`h-2 rounded-full ${
                                     item.type === 'semantic' ? 'bg-primary-500' : 'bg-gray-500'
@@ -1071,19 +1071,19 @@ export default function Search() {
                                   style={{ width: `${percentage}%` }}
                                 />
                               </div>
-                              <span className="text-sm text-gray-500 w-16 text-right">{item.count} ({percentage}%)</span>
+                              <span className="text-sm text-content-tertiary w-16 text-right">{item.count} ({percentage}%)</span>
                             </div>
                           )
                         })}
                       </div>
                     ) : (
-                      <p className="text-sm text-gray-500">No data yet</p>
+                      <p className="text-sm text-content-tertiary">No data yet</p>
                     )}
                   </div>
 
                   {/* Daily Trend */}
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h4 className="text-sm font-medium text-gray-700 mb-3">Daily Trend</h4>
+                  <div className="bg-surface-muted rounded-lg p-4">
+                    <h4 className="text-sm font-medium text-content-secondary mb-3">Daily Trend</h4>
                     {analytics.dailyTrend && analytics.dailyTrend.length > 0 ? (
                       <div className="flex items-end gap-1 h-20">
                         {analytics.dailyTrend.map((day, idx) => {
@@ -1104,7 +1104,7 @@ export default function Search() {
                         })}
                       </div>
                     ) : (
-                      <p className="text-sm text-gray-500">No data yet</p>
+                      <p className="text-sm text-content-tertiary">No data yet</p>
                     )}
                   </div>
                 </div>
@@ -1112,9 +1112,9 @@ export default function Search() {
                 {/* Top Queries & Zero Results */}
                 <div className="grid md:grid-cols-2 gap-4">
                   {/* Top Queries */}
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
-                      <TrendingUp className="w-4 h-4 text-green-500" />
+                  <div className="bg-surface-muted rounded-lg p-4">
+                    <h4 className="text-sm font-medium text-content-secondary mb-3 flex items-center gap-2">
+                      <TrendingUp className="w-4 h-4 text-semantic-success" />
                       Top Searches
                     </h4>
                     {analytics.topQueries && analytics.topQueries.length > 0 ? (
@@ -1123,24 +1123,24 @@ export default function Search() {
                           <div key={idx} className="flex items-center justify-between">
                             <button
                               onClick={(e) => handleSearch(e, item.query, searchType)}
-                              className="text-sm text-gray-700 hover:text-primary-600 truncate max-w-[200px]"
+                              className="text-sm text-content-secondary hover:text-accent-primary truncate max-w-[200px]"
                             >
                               {item.query}
                             </button>
-                            <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">
+                            <span className="text-xs bg-surface-muted text-content-secondary px-2 py-0.5 rounded-full">
                               {item.count}
                             </span>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <p className="text-sm text-gray-500">No searches yet</p>
+                      <p className="text-sm text-content-tertiary">No searches yet</p>
                     )}
                   </div>
 
                   {/* Zero Result Queries */}
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                  <div className="bg-surface-muted rounded-lg p-4">
+                    <h4 className="text-sm font-medium text-content-secondary mb-3 flex items-center gap-2">
                       <AlertCircle className="w-4 h-4 text-orange-500" />
                       Zero Results
                     </h4>
@@ -1148,18 +1148,18 @@ export default function Search() {
                       <div className="space-y-2">
                         {analytics.zeroResultQueries.map((item, idx) => (
                           <div key={idx} className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600 truncate max-w-[200px]">
+                            <span className="text-sm text-content-secondary truncate max-w-[200px]">
                               {item.query}
                             </span>
-                            <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full">
+                            <span className="text-xs bg-semantic-warning-dim text-semantic-warning px-2 py-0.5 rounded-full">
                               {item.count}x
                             </span>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <p className="text-sm text-gray-500 flex items-center gap-1">
-                        <span className="text-green-500">All searches found results</span>
+                      <p className="text-sm text-content-tertiary flex items-center gap-1">
+                        <span className="text-semantic-success">All searches found results</span>
                       </p>
                     )}
                   </div>
@@ -1167,9 +1167,9 @@ export default function Search() {
 
                 {/* Peak Hour */}
                 {analytics.peakHour !== undefined && analytics.totalSearches > 0 && (
-                  <div className="bg-blue-50 rounded-lg p-3 flex items-center gap-3">
+                  <div className="bg-semantic-info-dim rounded-lg p-3 flex items-center gap-3">
                     <Clock className="w-5 h-5 text-blue-500" />
-                    <span className="text-sm text-blue-700">
+                    <span className="text-sm text-semantic-info">
                       Peak search activity: <strong>{analytics.peakHour}:00 - {analytics.peakHour + 1}:00</strong>
                     </span>
                   </div>
@@ -1177,9 +1177,9 @@ export default function Search() {
               </div>
             ) : (
               <div className="py-8 text-center">
-                <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500">No analytics data available</p>
-                <p className="text-sm text-gray-400">Start searching to see your analytics</p>
+                <BarChart3 className="w-12 h-12 text-content-muted mx-auto mb-3" />
+                <p className="text-content-tertiary">No analytics data available</p>
+                <p className="text-sm text-content-tertiary">Start searching to see your analytics</p>
               </div>
             )}
           </div>
@@ -1189,7 +1189,7 @@ export default function Search() {
       {/* Save search modal */}
       {saveModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+          <div className="bg-surface rounded-lg p-6 w-full max-w-md">
             <h3 className="text-lg font-semibold mb-4">Save Search</h3>
             <input
               type="text"
@@ -1199,7 +1199,7 @@ export default function Search() {
               onChange={(e) => setSaveName(e.target.value)}
               autoFocus
             />
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-sm text-content-tertiary mb-4">
               Query: "{query}" ({searchType} search)
             </p>
             <div className="flex gap-3 justify-end">

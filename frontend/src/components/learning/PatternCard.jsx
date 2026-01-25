@@ -20,9 +20,9 @@ export default function PatternCard({
   const patternData = pattern.pattern_data || {};
 
   const getConfidenceColor = (confidence) => {
-    if (confidence >= 80) return 'text-green-600 bg-green-100';
+    if (confidence >= 80) return 'text-semantic-success bg-semantic-success-dim';
     if (confidence >= 60) return 'text-yellow-600 bg-yellow-100';
-    return 'text-orange-600 bg-orange-100';
+    return 'text-semantic-warning bg-semantic-warning-dim';
   };
 
   const getConfidenceLabel = (confidence) => {
@@ -48,7 +48,7 @@ export default function PatternCard({
   };
 
   return (
-    <div className="bg-white rounded-lg shadow border border-gray-200 p-6 hover:shadow-md transition-shadow">
+    <div className="bg-surface rounded-lg shadow border border-line-default p-6 hover:shadow-md transition-shadow">
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-start gap-3 flex-1">
@@ -59,7 +59,7 @@ export default function PatternCard({
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
               <span className="text-lg">{getPatternIcon(pattern.pattern_type)}</span>
-              <h3 className="font-semibold text-gray-900">
+              <h3 className="font-semibold text-content-primary">
                 {getAgentName(pattern.agent_type)} Pattern
               </h3>
               <span
@@ -71,10 +71,10 @@ export default function PatternCard({
               </span>
             </div>
 
-            <p className="text-sm text-gray-700 font-medium mb-2">{patternData.description}</p>
+            <p className="text-sm text-content-secondary font-medium mb-2">{patternData.description}</p>
 
             {/* Pattern Details */}
-            <div className="text-xs text-gray-600 space-y-1">
+            <div className="text-xs text-content-secondary space-y-1">
               {patternData.context && (
                 <div className="flex items-center gap-1">
                   <Target size={12} />
@@ -106,7 +106,7 @@ export default function PatternCard({
         {/* Status Badge */}
         <div>
           {status === 'active' ? (
-            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-semantic-success-dim text-semantic-success">
               <CheckCircle size={12} />
               Active
             </span>
@@ -121,29 +121,29 @@ export default function PatternCard({
 
       {/* Feedback Reasons (if available) */}
       {patternData.topFeedbackReason && (
-        <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-          <div className="text-xs font-medium text-blue-900 mb-1">Most Common Feedback:</div>
-          <div className="text-sm text-blue-700">"{formatFeedbackReason(patternData.topFeedbackReason)}"</div>
+        <div className="mb-4 p-3 bg-semantic-info-dim rounded-lg">
+          <div className="text-xs font-medium text-semantic-info mb-1">Most Common Feedback:</div>
+          <div className="text-sm text-semantic-info">"{formatFeedbackReason(patternData.topFeedbackReason)}"</div>
         </div>
       )}
 
       {/* Pattern Type Specific Details */}
       {pattern.pattern_type === 'preference' && patternData.preferredOption && (
-        <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-          <div className="text-xs font-medium text-gray-700 mb-1">Pattern Details:</div>
-          <div className="text-sm text-gray-900">
-            Prefer <span className="font-semibold text-indigo-600">{patternData.preferredOption}</span>
+        <div className="mb-4 p-3 bg-surface-muted rounded-lg">
+          <div className="text-xs font-medium text-content-secondary mb-1">Pattern Details:</div>
+          <div className="text-sm text-content-primary">
+            Prefer <span className="font-semibold text-accent-primary">{patternData.preferredOption}</span>
             {patternData.alternativeOption && (
-              <> over <span className="font-semibold text-gray-600">{patternData.alternativeOption}</span></>
+              <> over <span className="font-semibold text-content-secondary">{patternData.alternativeOption}</span></>
             )}
           </div>
         </div>
       )}
 
       {pattern.pattern_type === 'boost' && patternData.boostAmount && (
-        <div className="mb-4 p-3 bg-purple-50 rounded-lg">
-          <div className="text-xs font-medium text-purple-900 mb-1">Impact:</div>
-          <div className="text-sm text-purple-700">
+        <div className="mb-4 p-3 bg-accent-tertiary-dim rounded-lg">
+          <div className="text-xs font-medium text-accent-tertiary mb-1">Impact:</div>
+          <div className="text-sm text-accent-tertiary">
             {patternData.direction === 'increase' ? 'Increase' : 'Decrease'} {patternData.factor} by{' '}
             {Math.abs(patternData.boostAmount)}%
           </div>
@@ -151,16 +151,16 @@ export default function PatternCard({
       )}
 
       {pattern.pattern_type === 'constraint' && patternData.excludedOptions && (
-        <div className="mb-4 p-3 bg-red-50 rounded-lg">
-          <div className="text-xs font-medium text-red-900 mb-1">Constraints:</div>
-          <div className="text-sm text-red-700">
+        <div className="mb-4 p-3 bg-semantic-error-dim rounded-lg">
+          <div className="text-xs font-medium text-semantic-error mb-1">Constraints:</div>
+          <div className="text-sm text-semantic-error">
             Avoid: {patternData.excludedOptions.join(', ')}
           </div>
         </div>
       )}
 
       {/* Actions */}
-      <div className="flex gap-2 mt-4 pt-4 border-t border-gray-200">
+      <div className="flex gap-2 mt-4 pt-4 border-t border-line-default">
         {status === 'pending' && (
           <>
             <button
@@ -172,7 +172,7 @@ export default function PatternCard({
             </button>
             <button
               onClick={() => onReject && onReject(pattern)}
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 font-medium text-sm flex items-center justify-center gap-1"
+              className="px-4 py-2 bg-surface-muted text-content-secondary rounded-md hover:bg-surface-muted font-medium text-sm flex items-center justify-center gap-1"
             >
               <X size={16} />
               Reject
@@ -184,14 +184,14 @@ export default function PatternCard({
           <>
             <button
               onClick={() => onCustomize && onCustomize(pattern)}
-              className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 font-medium text-sm flex items-center justify-center gap-1"
+              className="flex-1 px-4 py-2 bg-surface-muted text-content-secondary rounded-md hover:bg-surface-muted font-medium text-sm flex items-center justify-center gap-1"
             >
               <Settings size={16} />
               Customize
             </button>
             <button
               onClick={() => onDeactivate && onDeactivate(pattern)}
-              className="px-4 py-2 bg-red-100 text-red-700 rounded-md hover:bg-red-200 font-medium text-sm flex items-center justify-center gap-1"
+              className="px-4 py-2 bg-semantic-error-dim text-semantic-error rounded-md hover:bg-red-200 font-medium text-sm flex items-center justify-center gap-1"
             >
               <X size={16} />
               Deactivate

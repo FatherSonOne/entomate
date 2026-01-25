@@ -71,8 +71,8 @@ export default function Meetings() {
       {/* Page header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Meetings</h1>
-          <p className="text-gray-600">View and manage your meeting recordings</p>
+          <h1 className="text-2xl font-bold text-content-primary">Meetings</h1>
+          <p className="text-content-secondary">View and manage your meeting recordings</p>
         </div>
         <button
           onClick={() => setShowRecorder(!showRecorder)}
@@ -91,7 +91,7 @@ export default function Meetings() {
       {/* Search and filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-content-tertiary" />
           <input
             type="text"
             placeholder="Search meetings..."
@@ -111,13 +111,13 @@ export default function Meetings() {
         {loading ? (
           <div className="p-8 text-center">
             <div className="spinner mx-auto mb-4" />
-            <p className="text-gray-500">Loading meetings...</p>
+            <p className="text-content-tertiary">Loading meetings...</p>
           </div>
         ) : filteredMeetings.length === 0 ? (
           <div className="p-8 text-center">
-            <MessageSquare className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <h3 className="text-lg font-medium text-gray-900 mb-1">No meetings found</h3>
-            <p className="text-gray-500">
+            <MessageSquare className="w-12 h-12 text-content-muted mx-auto mb-3" />
+            <h3 className="text-lg font-medium text-content-primary mb-1">No meetings found</h3>
+            <p className="text-content-tertiary">
               {searchQuery ? 'Try a different search term' : 'Record your first meeting to get started'}
             </p>
           </div>
@@ -127,13 +127,13 @@ export default function Meetings() {
               <Link
                 key={meeting.id}
                 to={`/meetings/${meeting.id}`}
-                className="block p-4 sm:p-5 hover:bg-gray-50 transition-colors"
+                className="block p-4 sm:p-5 hover:bg-surface-muted transition-colors"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-xl">{getSentimentEmoji(meeting.sentiment_label)}</span>
-                      <h3 className="text-lg font-semibold text-gray-900 truncate">
+                      <h3 className="text-lg font-semibold text-content-primary truncate">
                         {meeting.title}
                       </h3>
                       <span className={`badge ${getSentimentColor(meeting.sentiment_label)}`}>
@@ -142,12 +142,12 @@ export default function Meetings() {
                     </div>
 
                     {meeting.summary && (
-                      <p className="text-gray-600 line-clamp-2 mb-3">
+                      <p className="text-content-secondary line-clamp-2 mb-3">
                         {meeting.summary}
                       </p>
                     )}
 
-                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-content-tertiary">
                       <span className="flex items-center gap-1">
                         <Clock className="w-4 h-4" />
                         {new Date(meeting.created_at).toLocaleDateString('en-US', {
@@ -178,7 +178,7 @@ export default function Meetings() {
 
                   <button
                     onClick={(e) => handleDelete(meeting.id, e)}
-                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    className="p-2 text-content-tertiary hover:text-semantic-error hover:bg-semantic-error-dim rounded-lg transition-colors"
                   >
                     <Trash2 className="w-5 h-5" />
                   </button>

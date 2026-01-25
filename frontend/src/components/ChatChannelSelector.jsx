@@ -57,14 +57,14 @@ export default function ChatChannelSelector({
 
   const getChannelIcon = (channel) => {
     if (channel.type === 'private') {
-      return <Lock className="w-4 h-4 text-gray-400" />
+      return <Lock className="w-4 h-4 text-content-tertiary" />
     }
-    return <Hash className="w-4 h-4 text-gray-400" />
+    return <Hash className="w-4 h-4 text-content-tertiary" />
   }
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-gray-500 py-2">
+      <div className="flex items-center gap-2 text-content-tertiary py-2">
         <Loader2 className="w-4 h-4 animate-spin" />
         <span className="text-sm">Loading channels...</span>
       </div>
@@ -76,7 +76,7 @@ export default function ChatChannelSelector({
       {/* Status indicator */}
       {showStatus && status && (
         <div className={`flex items-center gap-2 text-sm ${
-          status.configured ? 'text-green-600' : 'text-gray-500'
+          status.configured ? 'text-semantic-success' : 'text-content-tertiary'
         }`}>
           {status.configured ? (
             <>
@@ -113,12 +113,12 @@ export default function ChatChannelSelector({
             </option>
           ))}
         </select>
-        <MessageSquare className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+        <MessageSquare className="w-4 h-4 text-content-tertiary absolute left-3 top-1/2 -translate-y-1/2" />
       </div>
 
       {/* Error/warning message */}
       {error && (
-        <p className="text-xs text-amber-600 flex items-center gap-1">
+        <p className="text-xs text-semantic-warning flex items-center gap-1">
           <AlertCircle className="w-3 h-3" />
           {error}
         </p>
@@ -126,26 +126,26 @@ export default function ChatChannelSelector({
 
       {/* Channel list for visual display */}
       {channels.length > 0 && (
-        <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg">
+        <div className="max-h-48 overflow-y-auto border border-line-default rounded-lg">
           {channels.map((channel) => (
             <button
               key={channel.id}
               onClick={() => onChannelSelect(channel.id)}
               disabled={disabled}
-              className={`w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-50 transition-colors ${
+              className={`w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-surface-muted transition-colors ${
                 selectedChannel === channel.id ? 'bg-primary-50 text-primary-700' : ''
               } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               {getChannelIcon(channel)}
               <span className="flex-1 text-sm font-medium">{channel.name}</span>
               {channel.memberCount && (
-                <span className="text-xs text-gray-400">{channel.memberCount} members</span>
+                <span className="text-xs text-content-tertiary">{channel.memberCount} members</span>
               )}
               {channel.guild && (
-                <span className="text-xs text-gray-400">{channel.guild}</span>
+                <span className="text-xs text-content-tertiary">{channel.guild}</span>
               )}
               {selectedChannel === channel.id && (
-                <Check className="w-4 h-4 text-primary-600" />
+                <Check className="w-4 h-4 text-accent-primary" />
               )}
             </button>
           ))}
@@ -154,10 +154,10 @@ export default function ChatChannelSelector({
 
       {/* Empty state */}
       {channels.length === 0 && !loading && (
-        <div className="text-center py-4 text-gray-500">
+        <div className="text-center py-4 text-content-tertiary">
           <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
           <p className="text-sm">No channels available</p>
-          <p className="text-xs text-gray-400 mt-1">
+          <p className="text-xs text-content-tertiary mt-1">
             Configure a chat integration to see channels
           </p>
         </div>

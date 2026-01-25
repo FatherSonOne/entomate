@@ -26,14 +26,14 @@ export default function ExpandableCard({
   }
 
   return (
-    <div className={`bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden transition-all hover:shadow-md ${className}`}>
+    <div className={`bg-surface border border-line-default rounded-lg shadow-sm overflow-hidden transition-all hover:shadow-md ${className}`}>
       {/* Card Header */}
       {title && (
-        <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
+        <div className="px-4 py-3 border-b border-line-subtle bg-surface-muted">
           <div className="flex items-center gap-2">
-            <h3 className="font-semibold text-gray-900 text-sm">{title}</h3>
+            <h3 className="font-semibold text-content-primary text-sm">{title}</h3>
             {badge && (
-              <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full font-medium">
+              <span className="px-2 py-0.5 bg-accent-tertiary-dim text-accent-tertiary text-xs rounded-full font-medium">
                 {badge}
               </span>
             )}
@@ -48,7 +48,7 @@ export default function ExpandableCard({
 
       {/* Expanded Content (Conditionally Visible) */}
       {isExpanded && expandedContent && (
-        <div className="px-4 pb-4 border-t border-gray-100 bg-gray-50 animate-fadeIn">
+        <div className="px-4 pb-4 border-t border-line-subtle bg-surface-muted animate-fadeIn">
           <div className="pt-4">
             {expandedContent}
           </div>
@@ -57,7 +57,7 @@ export default function ExpandableCard({
 
       {/* Card Actions */}
       {(actions.length > 0 || expandedContent) && (
-        <div className="px-4 py-3 border-t border-gray-100 bg-white flex items-center gap-2 flex-wrap">
+        <div className="px-4 py-3 border-t border-line-subtle bg-surface flex items-center gap-2 flex-wrap">
           {actions.map((action, index) => (
             <button
               key={index}
@@ -65,8 +65,8 @@ export default function ExpandableCard({
               disabled={action.disabled}
               className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                 action.primary
-                  ? 'bg-primary-600 text-white hover:bg-primary-700 disabled:bg-gray-300'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:bg-gray-100 disabled:text-gray-400'
+                  ? 'bg-accent-primary text-white hover:opacity-90 disabled:bg-surface-muted disabled:text-content-muted'
+                  : 'bg-surface-muted text-content-secondary hover:bg-surface-elevated disabled:bg-surface-muted disabled:text-content-muted'
               } disabled:cursor-not-allowed`}
               aria-label={action.label}
             >
@@ -78,7 +78,7 @@ export default function ExpandableCard({
           {expandedContent && (
             <button
               onClick={toggleExpanded}
-              className="ml-auto px-3 py-1.5 text-xs font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors flex items-center gap-1"
+              className="ml-auto px-3 py-1.5 text-xs font-medium text-accent-primary hover:text-accent-primary hover:bg-accent-primary-dim rounded-lg transition-colors flex items-center gap-1"
               aria-expanded={isExpanded}
               aria-label={isExpanded ? 'Hide details' : 'Show details'}
             >

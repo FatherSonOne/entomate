@@ -88,7 +88,7 @@ export default function Reports() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-accent-primary" />
       </div>
     )
   }
@@ -97,32 +97,32 @@ export default function Reports() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <FileText className="h-7 w-7 text-primary-600" />
+        <h1 className="text-2xl font-bold text-content-primary flex items-center gap-2">
+          <FileText className="h-7 w-7 text-accent-primary" />
           Reports & Export
         </h1>
-        <p className="text-gray-500 mt-1">
+        <p className="text-content-tertiary mt-1">
           Generate PDF reports and export data to CSV
         </p>
       </div>
 
       {/* PDF Reports Section */}
       <div className="card p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <FileText className="h-5 w-5 text-red-500" />
+        <h2 className="text-lg font-semibold text-content-primary mb-4 flex items-center gap-2">
+          <FileText className="h-5 w-5 text-semantic-error" />
           PDF Reports
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Meeting Recap */}
-          <div className="border border-gray-200 rounded-lg p-4 hover:border-primary-300 transition-colors">
+          <div className="border border-line-default rounded-lg p-4 hover:border-primary-300 transition-colors">
             <div className="flex items-start gap-3 mb-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Calendar className="h-5 w-5 text-blue-600" />
+              <div className="p-2 bg-semantic-info-dim rounded-lg">
+                <Calendar className="h-5 w-5 text-semantic-info" />
               </div>
               <div>
-                <h3 className="font-medium text-gray-900">Meeting Recap</h3>
-                <p className="text-sm text-gray-500">
+                <h3 className="font-medium text-content-primary">Meeting Recap</h3>
+                <p className="text-sm text-content-tertiary">
                   PDF summary with action items and decisions
                 </p>
               </div>
@@ -156,14 +156,14 @@ export default function Reports() {
           </div>
 
           {/* Goals Report */}
-          <div className="border border-gray-200 rounded-lg p-4 hover:border-primary-300 transition-colors">
+          <div className="border border-line-default rounded-lg p-4 hover:border-primary-300 transition-colors">
             <div className="flex items-start gap-3 mb-3">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <Target className="h-5 w-5 text-purple-600" />
+              <div className="p-2 bg-accent-tertiary-dim rounded-lg">
+                <Target className="h-5 w-5 text-accent-tertiary" />
               </div>
               <div>
-                <h3 className="font-medium text-gray-900">Goals & OKRs</h3>
-                <p className="text-sm text-gray-500">
+                <h3 className="font-medium text-content-primary">Goals & OKRs</h3>
+                <p className="text-sm text-content-tertiary">
                   Progress report for all goals
                 </p>
               </div>
@@ -194,20 +194,20 @@ export default function Reports() {
           </div>
 
           {/* Weekly Summary */}
-          <div className="border border-gray-200 rounded-lg p-4 hover:border-primary-300 transition-colors">
+          <div className="border border-line-default rounded-lg p-4 hover:border-primary-300 transition-colors">
             <div className="flex items-start gap-3 mb-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <Clock className="h-5 w-5 text-green-600" />
+              <div className="p-2 bg-semantic-success-dim rounded-lg">
+                <Clock className="h-5 w-5 text-semantic-success" />
               </div>
               <div>
-                <h3 className="font-medium text-gray-900">Weekly Summary</h3>
-                <p className="text-sm text-gray-500">
+                <h3 className="font-medium text-content-primary">Weekly Summary</h3>
+                <p className="text-sm text-content-tertiary">
                   Overview of the past 7 days
                 </p>
               </div>
             </div>
             <div className="space-y-2">
-              <div className="text-sm text-gray-400 py-2">
+              <div className="text-sm text-content-tertiary py-2">
                 Includes meetings, tasks, and overdue items
               </div>
               <button
@@ -229,27 +229,27 @@ export default function Reports() {
 
       {/* CSV Export Section */}
       <div className="card p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <FileSpreadsheet className="h-5 w-5 text-green-500" />
+        <h2 className="text-lg font-semibold text-content-primary mb-4 flex items-center gap-2">
+          <FileSpreadsheet className="h-5 w-5 text-semantic-success" />
           CSV Export
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Meetings Export */}
-          <div className="border border-gray-200 rounded-lg p-4 hover:border-primary-300 transition-colors">
+          <div className="border border-line-default rounded-lg p-4 hover:border-primary-300 transition-colors">
             <div className="flex items-start gap-3 mb-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Calendar className="h-5 w-5 text-blue-600" />
+              <div className="p-2 bg-semantic-info-dim rounded-lg">
+                <Calendar className="h-5 w-5 text-semantic-info" />
               </div>
               <div>
-                <h3 className="font-medium text-gray-900">Meetings</h3>
-                <p className="text-sm text-gray-500">
+                <h3 className="font-medium text-content-primary">Meetings</h3>
+                <p className="text-sm text-content-tertiary">
                   Export all meetings data
                 </p>
               </div>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-400">{meetings.length} meetings</span>
+              <span className="text-sm text-content-tertiary">{meetings.length} meetings</span>
               <button
                 onClick={() => handleDownload('meetings-csv')}
                 disabled={generating === 'meetings-csv'}
@@ -265,20 +265,20 @@ export default function Reports() {
           </div>
 
           {/* Action Items Export */}
-          <div className="border border-gray-200 rounded-lg p-4 hover:border-primary-300 transition-colors">
+          <div className="border border-line-default rounded-lg p-4 hover:border-primary-300 transition-colors">
             <div className="flex items-start gap-3 mb-3">
-              <div className="p-2 bg-orange-100 rounded-lg">
-                <CheckSquare className="h-5 w-5 text-orange-600" />
+              <div className="p-2 bg-semantic-warning-dim rounded-lg">
+                <CheckSquare className="h-5 w-5 text-semantic-warning" />
               </div>
               <div>
-                <h3 className="font-medium text-gray-900">Action Items</h3>
-                <p className="text-sm text-gray-500">
+                <h3 className="font-medium text-content-primary">Action Items</h3>
+                <p className="text-sm text-content-tertiary">
                   Export all action items
                 </p>
               </div>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-400">All statuses</span>
+              <span className="text-sm text-content-tertiary">All statuses</span>
               <button
                 onClick={() => handleDownload('action-items-csv')}
                 disabled={generating === 'action-items-csv'}
@@ -294,20 +294,20 @@ export default function Reports() {
           </div>
 
           {/* Goals Export */}
-          <div className="border border-gray-200 rounded-lg p-4 hover:border-primary-300 transition-colors">
+          <div className="border border-line-default rounded-lg p-4 hover:border-primary-300 transition-colors">
             <div className="flex items-start gap-3 mb-3">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <Target className="h-5 w-5 text-purple-600" />
+              <div className="p-2 bg-accent-tertiary-dim rounded-lg">
+                <Target className="h-5 w-5 text-accent-tertiary" />
               </div>
               <div>
-                <h3 className="font-medium text-gray-900">Goals</h3>
-                <p className="text-sm text-gray-500">
+                <h3 className="font-medium text-content-primary">Goals</h3>
+                <p className="text-sm text-content-tertiary">
                   Export all goals data
                 </p>
               </div>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-400">{goals.length} goals</span>
+              <span className="text-sm text-content-tertiary">{goals.length} goals</span>
               <button
                 onClick={() => handleDownload('goals-csv')}
                 disabled={generating === 'goals-csv'}
@@ -328,63 +328,63 @@ export default function Reports() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="card p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Calendar className="h-5 w-5 text-blue-600" />
+            <div className="p-2 bg-semantic-info-dim rounded-lg">
+              <Calendar className="h-5 w-5 text-semantic-info" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900">{meetings.length}</p>
-              <p className="text-sm text-gray-500">Meetings</p>
+              <p className="text-2xl font-bold text-content-primary">{meetings.length}</p>
+              <p className="text-sm text-content-tertiary">Meetings</p>
             </div>
           </div>
         </div>
 
         <div className="card p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <Target className="h-5 w-5 text-purple-600" />
+            <div className="p-2 bg-accent-tertiary-dim rounded-lg">
+              <Target className="h-5 w-5 text-accent-tertiary" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900">{goals.length}</p>
-              <p className="text-sm text-gray-500">Goals</p>
+              <p className="text-2xl font-bold text-content-primary">{goals.length}</p>
+              <p className="text-sm text-content-tertiary">Goals</p>
             </div>
           </div>
         </div>
 
         <div className="card p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <CheckSquare className="h-5 w-5 text-green-600" />
+            <div className="p-2 bg-semantic-success-dim rounded-lg">
+              <CheckSquare className="h-5 w-5 text-semantic-success" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-2xl font-bold text-content-primary">
                 {goals.filter(g => g.status === 'completed').length}
               </p>
-              <p className="text-sm text-gray-500">Completed</p>
+              <p className="text-sm text-content-tertiary">Completed</p>
             </div>
           </div>
         </div>
 
         <div className="card p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-orange-100 rounded-lg">
-              <BarChart3 className="h-5 w-5 text-orange-600" />
+            <div className="p-2 bg-semantic-warning-dim rounded-lg">
+              <BarChart3 className="h-5 w-5 text-semantic-warning" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-2xl font-bold text-content-primary">
                 {goals.length > 0
                   ? Math.round(goals.reduce((sum, g) => sum + (g.progress || 0), 0) / goals.length)
                   : 0}%
               </p>
-              <p className="text-sm text-gray-500">Avg Progress</p>
+              <p className="text-sm text-content-tertiary">Avg Progress</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Info */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h3 className="font-medium text-blue-900 mb-2">About Reports</h3>
-        <ul className="text-sm text-blue-700 space-y-1">
+      <div className="bg-semantic-info-dim border border-semantic-info rounded-lg p-4">
+        <h3 className="font-medium text-semantic-info mb-2">About Reports</h3>
+        <ul className="text-sm text-semantic-info space-y-1">
           <li>• PDF reports are generated on-demand and downloaded to your device</li>
           <li>• CSV exports can be opened in Excel, Google Sheets, or any spreadsheet app</li>
           <li>• Weekly summaries include data from the past 7 days</li>

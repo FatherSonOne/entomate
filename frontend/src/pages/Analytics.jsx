@@ -52,11 +52,11 @@ export default function Analytics() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <BarChart3 className="h-7 w-7 text-primary-600" />
+          <h1 className="text-2xl font-bold text-content-primary flex items-center gap-2">
+            <BarChart3 className="h-7 w-7 text-accent-primary" />
             Analytics
           </h1>
-          <p className="text-gray-500 mt-1">
+          <p className="text-content-tertiary mt-1">
             Track performance and measure success
           </p>
         </div>
@@ -78,7 +78,7 @@ export default function Analytics() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-gray-200 pb-2">
+      <div className="flex gap-2 border-b border-line-default pb-2">
         {['overview', 'meetings', 'tasks', 'ai', 'team'].map((tab) => (
           <button
             key={tab}
@@ -86,7 +86,7 @@ export default function Analytics() {
             className={`px-4 py-2 rounded-lg text-sm font-medium capitalize ${
               activeTab === tab
                 ? 'bg-primary-100 text-primary-700'
-                : 'text-gray-600 hover:bg-gray-100'
+                : 'text-content-secondary hover:bg-surface-muted'
             }`}
           >
             {tab}
@@ -148,7 +148,7 @@ export default function Analytics() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Task Completion */}
             <div className="card p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">Task Status</h3>
+              <h3 className="font-semibold text-content-primary mb-4">Task Status</h3>
               <div className="space-y-3">
                 <StatusBar label="Completed" value={dashboard.tasks.completed} total={dashboard.tasks.total} color="green" />
                 <StatusBar label="In Progress" value={dashboard.tasks.inProgress} total={dashboard.tasks.total} color="blue" />
@@ -159,28 +159,28 @@ export default function Analytics() {
 
             {/* Meeting Sentiment */}
             <div className="card p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">Meeting Sentiment</h3>
+              <h3 className="font-semibold text-content-primary mb-4">Meeting Sentiment</h3>
               <div className="flex items-center justify-center gap-8">
                 <div className="text-center">
-                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-2">
+                  <div className="w-16 h-16 bg-semantic-success-dim rounded-full flex items-center justify-center mb-2">
                     <span className="text-2xl">😊</span>
                   </div>
-                  <p className="text-2xl font-bold text-green-600">{dashboard.meetings.sentiment.positive}</p>
-                  <p className="text-sm text-gray-500">Positive</p>
+                  <p className="text-2xl font-bold text-semantic-success">{dashboard.meetings.sentiment.positive}</p>
+                  <p className="text-sm text-content-tertiary">Positive</p>
                 </div>
                 <div className="text-center">
-                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-2">
+                  <div className="w-16 h-16 bg-surface-muted rounded-full flex items-center justify-center mb-2">
                     <span className="text-2xl">😐</span>
                   </div>
-                  <p className="text-2xl font-bold text-gray-600">{dashboard.meetings.sentiment.neutral}</p>
-                  <p className="text-sm text-gray-500">Neutral</p>
+                  <p className="text-2xl font-bold text-content-secondary">{dashboard.meetings.sentiment.neutral}</p>
+                  <p className="text-sm text-content-tertiary">Neutral</p>
                 </div>
                 <div className="text-center">
-                  <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-2">
+                  <div className="w-16 h-16 bg-semantic-error-dim rounded-full flex items-center justify-center mb-2">
                     <span className="text-2xl">😟</span>
                   </div>
-                  <p className="text-2xl font-bold text-red-600">{dashboard.meetings.sentiment.negative}</p>
-                  <p className="text-sm text-gray-500">Negative</p>
+                  <p className="text-2xl font-bold text-semantic-error">{dashboard.meetings.sentiment.negative}</p>
+                  <p className="text-sm text-content-tertiary">Negative</p>
                 </div>
               </div>
             </div>
@@ -188,29 +188,29 @@ export default function Analytics() {
 
           {/* Projects Summary */}
           <div className="card p-6">
-            <h3 className="font-semibold text-gray-900 mb-4">Projects Overview</h3>
+            <h3 className="font-semibold text-content-primary mb-4">Projects Overview</h3>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <div className="text-center p-4 bg-gray-50 rounded-lg">
-                <p className="text-3xl font-bold text-gray-900">{dashboard.projects.total}</p>
-                <p className="text-sm text-gray-500">Total</p>
+              <div className="text-center p-4 bg-surface-muted rounded-lg">
+                <p className="text-3xl font-bold text-content-primary">{dashboard.projects.total}</p>
+                <p className="text-sm text-content-tertiary">Total</p>
               </div>
-              <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <p className="text-3xl font-bold text-blue-600">{dashboard.projects.byStatus.active}</p>
-                <p className="text-sm text-gray-500">Active</p>
+              <div className="text-center p-4 bg-semantic-info-dim rounded-lg">
+                <p className="text-3xl font-bold text-semantic-info">{dashboard.projects.byStatus.active}</p>
+                <p className="text-sm text-content-tertiary">Active</p>
               </div>
-              <div className="text-center p-4 bg-green-50 rounded-lg">
-                <p className="text-3xl font-bold text-green-600">{dashboard.projects.byStatus.completed}</p>
-                <p className="text-sm text-gray-500">Completed</p>
+              <div className="text-center p-4 bg-semantic-success-dim rounded-lg">
+                <p className="text-3xl font-bold text-semantic-success">{dashboard.projects.byStatus.completed}</p>
+                <p className="text-sm text-content-tertiary">Completed</p>
               </div>
               <div className="text-center p-4 bg-yellow-50 rounded-lg">
                 <p className="text-3xl font-bold text-yellow-600">{dashboard.projects.byStatus.planning}</p>
-                <p className="text-sm text-gray-500">Planning</p>
+                <p className="text-sm text-content-tertiary">Planning</p>
               </div>
-              <div className="text-center p-4 bg-purple-50 rounded-lg">
-                <p className="text-3xl font-bold text-purple-600">
+              <div className="text-center p-4 bg-accent-tertiary-dim rounded-lg">
+                <p className="text-3xl font-bold text-accent-tertiary">
                   ${(dashboard.projects.totalDealValue / 1000).toFixed(0)}k
                 </p>
-                <p className="text-sm text-gray-500">Deal Value</p>
+                <p className="text-sm text-content-tertiary">Deal Value</p>
               </div>
             </div>
           </div>
@@ -250,12 +250,12 @@ export default function Analytics() {
           {/* Trends Chart */}
           {trends && trends.trends.length > 0 && (
             <div className="card p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">Meetings Over Time</h3>
+              <h3 className="font-semibold text-content-primary mb-4">Meetings Over Time</h3>
               <div className="h-64 flex items-end gap-2">
                 {trends.trends.map((point, i) => (
                   <div
                     key={i}
-                    className="flex-1 bg-primary-500 rounded-t hover:bg-primary-600 transition-colors relative group"
+                    className="flex-1 bg-primary-500 rounded-t hover:bg-accent-primary transition-colors relative group"
                     style={{
                       height: `${Math.max((point.count / Math.max(...trends.trends.map(t => t.count))) * 100, 5)}%`
                     }}
@@ -266,7 +266,7 @@ export default function Analytics() {
                   </div>
                 ))}
               </div>
-              <div className="flex justify-between mt-2 text-xs text-gray-400">
+              <div className="flex justify-between mt-2 text-xs text-content-tertiary">
                 <span>{trends.trends[0]?.date}</span>
                 <span>{trends.trends[trends.trends.length - 1]?.date}</span>
               </div>
@@ -307,7 +307,7 @@ export default function Analytics() {
 
           {/* Priority Distribution */}
           <div className="card p-6">
-            <h3 className="font-semibold text-gray-900 mb-4">Tasks by Priority</h3>
+            <h3 className="font-semibold text-content-primary mb-4">Tasks by Priority</h3>
             <div className="space-y-3">
               <StatusBar
                 label="High Priority"
@@ -364,31 +364,31 @@ export default function Analytics() {
 
           {/* Time Saved Breakdown */}
           <div className="card p-6">
-            <h3 className="font-semibold text-gray-900 mb-4">Time Saved Breakdown</h3>
+            <h3 className="font-semibold text-content-primary mb-4">Time Saved Breakdown</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center p-4 bg-purple-50 rounded-lg">
-                <p className="text-2xl font-bold text-purple-600">
+              <div className="text-center p-4 bg-accent-tertiary-dim rounded-lg">
+                <p className="text-2xl font-bold text-accent-tertiary">
                   {Math.round(aiEffectiveness.timeSaved.breakdown.transcription / 60)}h
                 </p>
-                <p className="text-sm text-gray-500">Transcription</p>
+                <p className="text-sm text-content-tertiary">Transcription</p>
               </div>
-              <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <p className="text-2xl font-bold text-blue-600">
+              <div className="text-center p-4 bg-semantic-info-dim rounded-lg">
+                <p className="text-2xl font-bold text-semantic-info">
                   {Math.round(aiEffectiveness.timeSaved.breakdown.summarization / 60)}h
                 </p>
-                <p className="text-sm text-gray-500">Summarization</p>
+                <p className="text-sm text-content-tertiary">Summarization</p>
               </div>
-              <div className="text-center p-4 bg-green-50 rounded-lg">
-                <p className="text-2xl font-bold text-green-600">
+              <div className="text-center p-4 bg-semantic-success-dim rounded-lg">
+                <p className="text-2xl font-bold text-semantic-success">
                   {Math.round(aiEffectiveness.timeSaved.breakdown.actionItems / 60)}h
                 </p>
-                <p className="text-sm text-gray-500">Action Items</p>
+                <p className="text-sm text-content-tertiary">Action Items</p>
               </div>
               <div className="text-center p-4 bg-yellow-50 rounded-lg">
                 <p className="text-2xl font-bold text-yellow-600">
                   {Math.round(aiEffectiveness.timeSaved.breakdown.automations / 60)}h
                 </p>
-                <p className="text-sm text-gray-500">Automations</p>
+                <p className="text-sm text-content-tertiary">Automations</p>
               </div>
             </div>
           </div>
@@ -396,44 +396,44 @@ export default function Analytics() {
           {/* Automation Stats */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="card p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">Automation Performance</h3>
+              <h3 className="font-semibold text-content-primary mb-4">Automation Performance</h3>
               <div className="space-y-4">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Total Executions</span>
+                  <span className="text-content-secondary">Total Executions</span>
                   <span className="font-medium">{aiEffectiveness.automations.totalExecutions}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Successful</span>
-                  <span className="font-medium text-green-600">{aiEffectiveness.automations.successful}</span>
+                  <span className="text-content-secondary">Successful</span>
+                  <span className="font-medium text-semantic-success">{aiEffectiveness.automations.successful}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Failed</span>
-                  <span className="font-medium text-red-600">{aiEffectiveness.automations.failed}</span>
+                  <span className="text-content-secondary">Failed</span>
+                  <span className="font-medium text-semantic-error">{aiEffectiveness.automations.failed}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Avg Duration</span>
+                  <span className="text-content-secondary">Avg Duration</span>
                   <span className="font-medium">{aiEffectiveness.automations.avgDuration}ms</span>
                 </div>
               </div>
             </div>
 
             <div className="card p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">AI Agents Performance</h3>
+              <h3 className="font-semibold text-content-primary mb-4">AI Agents Performance</h3>
               <div className="space-y-4">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Total Executions</span>
+                  <span className="text-content-secondary">Total Executions</span>
                   <span className="font-medium">{aiEffectiveness.aiAgents.totalExecutions}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Successful</span>
-                  <span className="font-medium text-green-600">{aiEffectiveness.aiAgents.successful}</span>
+                  <span className="text-content-secondary">Successful</span>
+                  <span className="font-medium text-semantic-success">{aiEffectiveness.aiAgents.successful}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Success Rate</span>
+                  <span className="text-content-secondary">Success Rate</span>
                   <span className="font-medium">{aiEffectiveness.aiAgents.successRate}%</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Avg Feedback Rating</span>
+                  <span className="text-content-secondary">Avg Feedback Rating</span>
                   <span className="font-medium">
                     {aiEffectiveness.aiAgents.avgFeedbackRating
                       ? `${aiEffectiveness.aiAgents.avgFeedbackRating}/5`
@@ -450,11 +450,11 @@ export default function Analytics() {
       {activeTab === 'team' && teamPerformance && (
         <div className="space-y-6">
           <div className="card p-6">
-            <h3 className="font-semibold text-gray-900 mb-4">Team Performance</h3>
+            <h3 className="font-semibold text-content-primary mb-4">Team Performance</h3>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="text-left text-sm text-gray-500 border-b">
+                  <tr className="text-left text-sm text-content-tertiary border-b">
                     <th className="pb-3">Team Member</th>
                     <th className="pb-3 text-center">Tasks Created</th>
                     <th className="pb-3 text-center">Completed</th>
@@ -469,32 +469,32 @@ export default function Analytics() {
                       <td className="py-3">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-                            <span className="text-primary-600 font-medium text-sm">
+                            <span className="text-accent-primary font-medium text-sm">
                               {member.userName.charAt(0).toUpperCase()}
                             </span>
                           </div>
                           <div>
-                            <p className="font-medium text-gray-900">{member.userName}</p>
-                            <p className="text-xs text-gray-500">{member.email}</p>
+                            <p className="font-medium text-content-primary">{member.userName}</p>
+                            <p className="text-xs text-content-tertiary">{member.email}</p>
                           </div>
                         </div>
                       </td>
                       <td className="py-3 text-center">{member.tasksCreated}</td>
-                      <td className="py-3 text-center text-green-600 font-medium">
+                      <td className="py-3 text-center text-semantic-success font-medium">
                         {member.tasksCompleted}
                       </td>
                       <td className="py-3 text-center">
                         <span className={`font-medium ${
-                          member.completionRate >= 80 ? 'text-green-600' :
-                          member.completionRate >= 50 ? 'text-yellow-600' : 'text-red-600'
+                          member.completionRate >= 80 ? 'text-semantic-success' :
+                          member.completionRate >= 50 ? 'text-yellow-600' : 'text-semantic-error'
                         }`}>
                           {member.completionRate}%
                         </span>
                       </td>
-                      <td className="py-3 text-center text-red-600">
+                      <td className="py-3 text-center text-semantic-error">
                         {member.highPriorityCompleted}
                       </td>
-                      <td className="py-3 text-center text-gray-600">
+                      <td className="py-3 text-center text-content-secondary">
                         {member.avgCompletionDays !== null ? `${member.avgCompletionDays}d` : '-'}
                       </td>
                     </tr>
@@ -511,23 +511,23 @@ export default function Analytics() {
 
 function MetricCard({ icon: Icon, label, value, total, color }) {
   const colors = {
-    purple: 'bg-purple-100 text-purple-600',
-    blue: 'bg-blue-100 text-blue-600',
-    green: 'bg-green-100 text-green-600',
+    purple: 'bg-accent-tertiary-dim text-accent-tertiary',
+    blue: 'bg-semantic-info-dim text-semantic-info',
+    green: 'bg-semantic-success-dim text-semantic-success',
     yellow: 'bg-yellow-100 text-yellow-600',
-    red: 'bg-red-100 text-red-600',
-    gray: 'bg-gray-100 text-gray-600'
+    red: 'bg-semantic-error-dim text-semantic-error',
+    gray: 'bg-surface-muted text-content-secondary'
   };
 
   return (
     <div className="card p-4">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-gray-500">{label}</p>
-          <p className="text-2xl font-bold text-gray-900">
+          <p className="text-sm text-content-tertiary">{label}</p>
+          <p className="text-2xl font-bold text-content-primary">
             {value}
             {total !== undefined && (
-              <span className="text-sm text-gray-400 font-normal">/{total}</span>
+              <span className="text-sm text-content-tertiary font-normal">/{total}</span>
             )}
           </p>
         </div>
@@ -545,17 +545,17 @@ function StatusBar({ label, value, total, color }) {
     green: 'bg-green-500',
     blue: 'bg-blue-500',
     yellow: 'bg-yellow-500',
-    red: 'bg-red-500',
+    red: 'bg-semantic-error',
     gray: 'bg-gray-500'
   };
 
   return (
     <div>
       <div className="flex justify-between text-sm mb-1">
-        <span className="text-gray-600">{label}</span>
-        <span className="text-gray-900 font-medium">{value}</span>
+        <span className="text-content-secondary">{label}</span>
+        <span className="text-content-primary font-medium">{value}</span>
       </div>
-      <div className="w-full h-2 bg-gray-200 rounded-full">
+      <div className="w-full h-2 bg-surface-muted rounded-full">
         <div
           className={`h-full rounded-full ${colors[color]}`}
           style={{ width: `${percent}%` }}

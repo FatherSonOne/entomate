@@ -53,7 +53,7 @@ export default function Goals() {
   const getProgressColor = (progress) => {
     if (progress >= 70) return 'bg-green-500';
     if (progress >= 40) return 'bg-yellow-500';
-    return 'bg-red-500';
+    return 'bg-semantic-error';
   };
 
   const getStatusBadge = (status) => {
@@ -84,7 +84,7 @@ export default function Goals() {
     const hasChildren = goal.children && goal.children.length > 0;
 
     return (
-      <div className={`${level > 0 ? 'ml-8 border-l-2 border-gray-200 pl-4' : ''}`}>
+      <div className={`${level > 0 ? 'ml-8 border-l-2 border-line-default pl-4' : ''}`}>
         <div
           className={`card p-4 mb-3 cursor-pointer hover:shadow-md transition-shadow ${
             selectedGoal?.id === goal.id ? 'ring-2 ring-primary-500' : ''
@@ -99,38 +99,38 @@ export default function Goals() {
                     e.stopPropagation();
                     toggleExpand(goal.id);
                   }}
-                  className="mt-1 p-1 hover:bg-gray-100 rounded"
+                  className="mt-1 p-1 hover:bg-surface-muted rounded"
                 >
                   {isExpanded ? (
-                    <ChevronDown className="h-4 w-4 text-gray-400" />
+                    <ChevronDown className="h-4 w-4 text-content-tertiary" />
                   ) : (
-                    <ChevronRight className="h-4 w-4 text-gray-400" />
+                    <ChevronRight className="h-4 w-4 text-content-tertiary" />
                   )}
                 </button>
               )}
               <div className={`p-2 rounded-lg ${
-                goal.goal_type === 'company' ? 'bg-purple-100' :
-                goal.goal_type === 'team' ? 'bg-blue-100' : 'bg-green-100'
+                goal.goal_type === 'company' ? 'bg-accent-tertiary-dim' :
+                goal.goal_type === 'team' ? 'bg-semantic-info-dim' : 'bg-semantic-success-dim'
               }`}>
                 <GoalTypeIcon type={goal.goal_type} />
               </div>
               <div>
-                <h3 className="font-semibold text-gray-900">{goal.title}</h3>
+                <h3 className="font-semibold text-content-primary">{goal.title}</h3>
                 {goal.description && (
-                  <p className="text-sm text-gray-500 mt-1">{goal.description}</p>
+                  <p className="text-sm text-content-tertiary mt-1">{goal.description}</p>
                 )}
                 <div className="flex items-center gap-3 mt-2">
                   <span className={`badge ${getStatusBadge(goal.status)} text-xs`}>
                     {goal.status}
                   </span>
                   {goal.quarter && (
-                    <span className="text-xs text-gray-400 flex items-center gap-1">
+                    <span className="text-xs text-content-tertiary flex items-center gap-1">
                       <Calendar className="h-3 w-3" />
                       {goal.quarter}
                     </span>
                   )}
                   {goal.key_results?.length > 0 && (
-                    <span className="text-xs text-gray-400">
+                    <span className="text-xs text-content-tertiary">
                       {goal.key_results.length} Key Results
                     </span>
                   )}
@@ -138,10 +138,10 @@ export default function Goals() {
               </div>
             </div>
             <div className="text-right">
-              <div className="text-2xl font-bold text-gray-900">
+              <div className="text-2xl font-bold text-content-primary">
                 {Math.round(goal.progress || 0)}%
               </div>
-              <div className="w-24 h-2 bg-gray-200 rounded-full mt-1">
+              <div className="w-24 h-2 bg-surface-muted rounded-full mt-1">
                 <div
                   className={`h-full rounded-full ${getProgressColor(goal.progress)}`}
                   style={{ width: `${Math.min(goal.progress || 0, 100)}%` }}
@@ -152,18 +152,18 @@ export default function Goals() {
 
           {/* Key Results Preview */}
           {goal.key_results?.length > 0 && (
-            <div className="mt-4 pt-3 border-t border-gray-100">
+            <div className="mt-4 pt-3 border-t border-line-subtle">
               <div className="space-y-2">
                 {goal.key_results.slice(0, 3).map((kr) => (
                   <div key={kr.id} className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600 truncate flex-1">{kr.title}</span>
-                    <span className="text-gray-900 font-medium ml-4">
+                    <span className="text-content-secondary truncate flex-1">{kr.title}</span>
+                    <span className="text-content-primary font-medium ml-4">
                       {kr.current}/{kr.target} {kr.unit}
                     </span>
                   </div>
                 ))}
                 {goal.key_results.length > 3 && (
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-content-tertiary">
                     +{goal.key_results.length - 3} more
                   </p>
                 )}
@@ -197,11 +197,11 @@ export default function Goals() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Target className="h-7 w-7 text-primary-600" />
+          <h1 className="text-2xl font-bold text-content-primary flex items-center gap-2">
+            <Target className="h-7 w-7 text-accent-primary" />
             Goals & OKRs
           </h1>
-          <p className="text-gray-500 mt-1">
+          <p className="text-content-tertiary mt-1">
             Track company, team, and individual objectives
           </p>
         </div>
@@ -220,17 +220,17 @@ export default function Goals() {
           <div className="card p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Total Goals</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+                <p className="text-sm text-content-tertiary">Total Goals</p>
+                <p className="text-2xl font-bold text-content-primary">{stats.total}</p>
               </div>
-              <Target className="h-8 w-8 text-gray-400" />
+              <Target className="h-8 w-8 text-content-tertiary" />
             </div>
           </div>
           <div className="card p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Avg Progress</p>
-                <p className="text-2xl font-bold text-primary-600">{stats.averageProgress}%</p>
+                <p className="text-sm text-content-tertiary">Avg Progress</p>
+                <p className="text-2xl font-bold text-accent-primary">{stats.averageProgress}%</p>
               </div>
               <TrendingUp className="h-8 w-8 text-primary-400" />
             </div>
@@ -238,8 +238,8 @@ export default function Goals() {
           <div className="card p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">On Track</p>
-                <p className="text-2xl font-bold text-green-600">{stats.onTrack}</p>
+                <p className="text-sm text-content-tertiary">On Track</p>
+                <p className="text-2xl font-bold text-semantic-success">{stats.onTrack}</p>
               </div>
               <CheckCircle className="h-8 w-8 text-green-400" />
             </div>
@@ -247,8 +247,8 @@ export default function Goals() {
           <div className="card p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">At Risk</p>
-                <p className="text-2xl font-bold text-red-600">{stats.atRisk}</p>
+                <p className="text-sm text-content-tertiary">At Risk</p>
+                <p className="text-2xl font-bold text-semantic-error">{stats.atRisk}</p>
               </div>
               <AlertCircle className="h-8 w-8 text-red-400" />
             </div>
@@ -263,7 +263,7 @@ export default function Goals() {
           className={`px-3 py-1.5 rounded-lg text-sm ${
             viewMode === 'hierarchy'
               ? 'bg-primary-100 text-primary-700'
-              : 'text-gray-600 hover:bg-gray-100'
+              : 'text-content-secondary hover:bg-surface-muted'
           }`}
         >
           Hierarchy View
@@ -273,7 +273,7 @@ export default function Goals() {
           className={`px-3 py-1.5 rounded-lg text-sm ${
             viewMode === 'list'
               ? 'bg-primary-100 text-primary-700'
-              : 'text-gray-600 hover:bg-gray-100'
+              : 'text-content-secondary hover:bg-surface-muted'
           }`}
         >
           List View
@@ -288,8 +288,8 @@ export default function Goals() {
               {/* Company Goals */}
               {hierarchy.company?.length > 0 && (
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                    <Building2 className="h-5 w-5 text-purple-600" />
+                  <h2 className="text-lg font-semibold text-content-primary mb-3 flex items-center gap-2">
+                    <Building2 className="h-5 w-5 text-accent-tertiary" />
                     Company Goals
                   </h2>
                   {hierarchy.company.map((goal) => (
@@ -301,8 +301,8 @@ export default function Goals() {
               {/* Orphan Team Goals */}
               {hierarchy.teams?.length > 0 && (
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                    <Users className="h-5 w-5 text-blue-600" />
+                  <h2 className="text-lg font-semibold text-content-primary mb-3 flex items-center gap-2">
+                    <Users className="h-5 w-5 text-semantic-info" />
                     Team Goals
                   </h2>
                   {hierarchy.teams.map((goal) => (
@@ -314,8 +314,8 @@ export default function Goals() {
               {/* Orphan Individual Goals */}
               {hierarchy.individuals?.length > 0 && (
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                    <User className="h-5 w-5 text-green-600" />
+                  <h2 className="text-lg font-semibold text-content-primary mb-3 flex items-center gap-2">
+                    <User className="h-5 w-5 text-semantic-success" />
                     Individual Goals
                   </h2>
                   {hierarchy.individuals.map((goal) => (
@@ -334,9 +334,9 @@ export default function Goals() {
 
           {goals.length === 0 && (
             <div className="card p-8 text-center">
-              <Target className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No goals yet</h3>
-              <p className="text-gray-500 mb-4">
+              <Target className="h-12 w-12 text-content-tertiary mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-content-primary mb-2">No goals yet</h3>
+              <p className="text-content-tertiary mb-4">
                 Create your first goal to start tracking progress
               </p>
               <button
@@ -359,8 +359,8 @@ export default function Goals() {
             />
           ) : (
             <div className="card p-8 text-center">
-              <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-500">
+              <BarChart3 className="h-12 w-12 text-content-tertiary mx-auto mb-4" />
+              <p className="text-content-tertiary">
                 Select a goal to view details
               </p>
             </div>
@@ -426,30 +426,30 @@ function GoalDetailPanel({ goal, onUpdate, onClose }) {
   return (
     <div className="card p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-gray-900">{goal.title}</h3>
+        <h3 className="font-semibold text-content-primary">{goal.title}</h3>
         <button
           onClick={deleteGoal}
-          className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+          className="p-2 text-semantic-error hover:bg-semantic-error-dim rounded-lg"
         >
           <Trash2 className="h-4 w-4" />
         </button>
       </div>
 
       {goal.description && (
-        <p className="text-sm text-gray-500">{goal.description}</p>
+        <p className="text-sm text-content-tertiary">{goal.description}</p>
       )}
 
       {/* Progress */}
       <div>
         <div className="flex justify-between text-sm mb-1">
-          <span className="text-gray-500">Progress</span>
+          <span className="text-content-tertiary">Progress</span>
           <span className="font-medium">{Math.round(goal.progress || 0)}%</span>
         </div>
-        <div className="w-full h-3 bg-gray-200 rounded-full">
+        <div className="w-full h-3 bg-surface-muted rounded-full">
           <div
             className={`h-full rounded-full ${
               goal.progress >= 70 ? 'bg-green-500' :
-              goal.progress >= 40 ? 'bg-yellow-500' : 'bg-red-500'
+              goal.progress >= 40 ? 'bg-yellow-500' : 'bg-semantic-error'
             }`}
             style={{ width: `${Math.min(goal.progress || 0, 100)}%` }}
           />
@@ -458,27 +458,27 @@ function GoalDetailPanel({ goal, onUpdate, onClose }) {
 
       {/* Key Results */}
       <div>
-        <h4 className="font-medium text-gray-900 mb-3">Key Results</h4>
+        <h4 className="font-medium text-content-primary mb-3">Key Results</h4>
         <div className="space-y-3">
           {(goal.key_results || []).map((kr) => (
-            <div key={kr.id} className="bg-gray-50 rounded-lg p-3">
+            <div key={kr.id} className="bg-surface-muted rounded-lg p-3">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-gray-900">{kr.title}</span>
+                <span className="text-sm font-medium text-content-primary">{kr.title}</span>
                 <button
                   onClick={() => setEditingKR(editingKR === kr.id ? null : kr.id)}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-content-tertiary hover:text-content-secondary"
                 >
                   <Edit2 className="h-3 w-3" />
                 </button>
               </div>
               <div className="flex items-center gap-2">
-                <div className="flex-1 h-2 bg-gray-200 rounded-full">
+                <div className="flex-1 h-2 bg-surface-muted rounded-full">
                   <div
                     className="h-full bg-primary-500 rounded-full"
                     style={{ width: `${Math.min((kr.current / kr.target) * 100, 100)}%` }}
                   />
                 </div>
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-content-tertiary">
                   {kr.current}/{kr.target} {kr.unit}
                 </span>
               </div>
@@ -493,14 +493,14 @@ function GoalDetailPanel({ goal, onUpdate, onClose }) {
                       setEditingKR(null);
                     }}
                   />
-                  <span className="text-sm text-gray-500">/ {kr.target}</span>
+                  <span className="text-sm text-content-tertiary">/ {kr.target}</span>
                 </div>
               )}
             </div>
           ))}
 
           {/* Add Key Result */}
-          <div className="border-2 border-dashed border-gray-200 rounded-lg p-3">
+          <div className="border-2 border-dashed border-line-default rounded-lg p-3">
             <input
               type="text"
               value={newKRTitle}
@@ -529,7 +529,7 @@ function GoalDetailPanel({ goal, onUpdate, onClose }) {
       </div>
 
       {/* Metadata */}
-      <div className="pt-3 border-t border-gray-200 text-xs text-gray-400 space-y-1">
+      <div className="pt-3 border-t border-line-default text-xs text-content-tertiary space-y-1">
         <p>Quarter: {goal.quarter}</p>
         <p>Type: {goal.goal_type}</p>
         <p>Status: {goal.status}</p>
@@ -571,15 +571,15 @@ function CreateGoalModal({ goals, onClose, onCreated }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4">
+      <div className="bg-surface rounded-xl shadow-xl max-w-lg w-full mx-4">
         <form onSubmit={handleSubmit}>
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-xl font-bold text-gray-900">Create Goal</h2>
+          <div className="p-6 border-b border-line-default">
+            <h2 className="text-xl font-bold text-content-primary">Create Goal</h2>
           </div>
 
           <div className="p-6 space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-content-secondary mb-1">
                 Goal Title *
               </label>
               <input
@@ -593,7 +593,7 @@ function CreateGoalModal({ goals, onClose, onCreated }) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-content-secondary mb-1">
                 Description
               </label>
               <textarea
@@ -607,7 +607,7 @@ function CreateGoalModal({ goals, onClose, onCreated }) {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-content-secondary mb-1">
                   Goal Type
                 </label>
                 <select
@@ -626,7 +626,7 @@ function CreateGoalModal({ goals, onClose, onCreated }) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-content-secondary mb-1">
                   Quarter
                 </label>
                 <select
@@ -643,7 +643,7 @@ function CreateGoalModal({ goals, onClose, onCreated }) {
 
             {parentOptions.length > 0 && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-content-secondary mb-1">
                   Parent Goal (optional)
                 </label>
                 <select
@@ -660,7 +660,7 @@ function CreateGoalModal({ goals, onClose, onCreated }) {
             )}
           </div>
 
-          <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+          <div className="p-6 border-t border-line-default flex justify-end gap-3">
             <button type="button" onClick={onClose} className="btn btn-secondary">
               Cancel
             </button>

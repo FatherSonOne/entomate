@@ -43,18 +43,18 @@ function TreeNode({ name, value, path, depth = 0, searchTerm, onCopy }) {
 
   // Get display value
   const getDisplayValue = () => {
-    if (value === null) return <span className="text-gray-400">null</span>
-    if (value === undefined) return <span className="text-gray-400">undefined</span>
-    if (typeof value === 'boolean') return <span className="text-purple-600">{value.toString()}</span>
-    if (typeof value === 'number') return <span className="text-blue-600">{value}</span>
+    if (value === null) return <span className="text-content-tertiary">null</span>
+    if (value === undefined) return <span className="text-content-tertiary">undefined</span>
+    if (typeof value === 'boolean') return <span className="text-accent-tertiary">{value.toString()}</span>
+    if (typeof value === 'number') return <span className="text-semantic-info">{value}</span>
     if (typeof value === 'string') {
       if (value.length > 100) {
-        return <span className="text-green-600">"{value.substring(0, 100)}..."</span>
+        return <span className="text-semantic-success">"{value.substring(0, 100)}..."</span>
       }
-      return <span className="text-green-600">"{value}"</span>
+      return <span className="text-semantic-success">"{value}"</span>
     }
-    if (isArray) return <span className="text-gray-500">[{value.length}]</span>
-    if (isObject) return <span className="text-gray-500">{`{${Object.keys(value).length}}`}</span>
+    if (isArray) return <span className="text-content-tertiary">[{value.length}]</span>
+    if (isObject) return <span className="text-content-tertiary">{`{${Object.keys(value).length}}`}</span>
     return String(value)
   }
 
@@ -66,17 +66,17 @@ function TreeNode({ name, value, path, depth = 0, searchTerm, onCopy }) {
   return (
     <div className={`${matchesSearch ? 'bg-yellow-50' : ''}`}>
       <div
-        className={`flex items-center gap-1 py-0.5 px-1 hover:bg-gray-100 rounded cursor-pointer group`}
+        className={`flex items-center gap-1 py-0.5 px-1 hover:bg-surface-muted rounded cursor-pointer group`}
         style={{ paddingLeft: depth * 16 }}
         onClick={() => isObject && setExpanded(!expanded)}
       >
         {/* Expand/collapse icon */}
         {isObject ? (
-          <button className="p-0.5 hover:bg-gray-200 rounded">
+          <button className="p-0.5 hover:bg-surface-muted rounded">
             {expanded ? (
-              <ChevronDown className="w-3 h-3 text-gray-500" />
+              <ChevronDown className="w-3 h-3 text-content-tertiary" />
             ) : (
-              <ChevronRight className="w-3 h-3 text-gray-500" />
+              <ChevronRight className="w-3 h-3 text-content-tertiary" />
             )}
           </button>
         ) : (
@@ -84,8 +84,8 @@ function TreeNode({ name, value, path, depth = 0, searchTerm, onCopy }) {
         )}
 
         {/* Key name */}
-        <span className="text-gray-700 font-medium">{name}</span>
-        <span className="text-gray-400">:</span>
+        <span className="text-content-secondary font-medium">{name}</span>
+        <span className="text-content-tertiary">:</span>
 
         {/* Value */}
         <span className="flex-1 truncate text-sm font-mono">
@@ -95,10 +95,10 @@ function TreeNode({ name, value, path, depth = 0, searchTerm, onCopy }) {
         {/* Copy button */}
         <button
           onClick={handleCopy}
-          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 rounded"
+          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-surface-muted rounded"
           title="Copy value"
         >
-          <Copy className="w-3 h-3 text-gray-500" />
+          <Copy className="w-3 h-3 text-content-tertiary" />
         </button>
       </div>
 
@@ -132,7 +132,7 @@ function TreeNode({ name, value, path, depth = 0, searchTerm, onCopy }) {
 function TableView({ data, onCopy }) {
   if (!Array.isArray(data) || data.length === 0) {
     return (
-      <div className="text-center text-gray-500 py-4">
+      <div className="text-center text-content-tertiary py-4">
         No tabular data available
       </div>
     )
@@ -142,7 +142,7 @@ function TableView({ data, onCopy }) {
   const firstItem = data[0]
   if (typeof firstItem !== 'object' || firstItem === null) {
     return (
-      <div className="text-center text-gray-500 py-4">
+      <div className="text-center text-content-tertiary py-4">
         Data is not in tabular format
       </div>
     )
@@ -153,27 +153,27 @@ function TableView({ data, onCopy }) {
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200 text-sm">
-        <thead className="bg-gray-50">
+        <thead className="bg-surface-muted">
           <tr>
-            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-3 py-2 text-left text-xs font-medium text-content-tertiary uppercase tracking-wider">
               #
             </th>
             {columns.map(col => (
               <th
                 key={col}
-                className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                className="px-3 py-2 text-left text-xs font-medium text-content-tertiary uppercase tracking-wider"
               >
                 {col}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
+        <tbody className="bg-surface divide-y divide-gray-200">
           {data.map((row, index) => (
-            <tr key={index} className="hover:bg-gray-50">
-              <td className="px-3 py-2 text-gray-400">{index}</td>
+            <tr key={index} className="hover:bg-surface-muted">
+              <td className="px-3 py-2 text-content-tertiary">{index}</td>
               {columns.map(col => (
-                <td key={col} className="px-3 py-2 text-gray-900 font-mono">
+                <td key={col} className="px-3 py-2 text-content-primary font-mono">
                   {typeof row[col] === 'object'
                     ? JSON.stringify(row[col])
                     : String(row[col] ?? '')}
@@ -236,17 +236,17 @@ export default function NodeOutputInspector({
     (typeof output === 'object' && Object.keys(output).length === 0)
 
   return (
-    <div className={`flex flex-col bg-white border border-gray-200 rounded-lg shadow-sm ${className}`}>
+    <div className={`flex flex-col bg-surface border border-line-default rounded-lg shadow-sm ${className}`}>
       {/* Header */}
-      <div className="flex items-center justify-between p-3 border-b border-gray-200">
+      <div className="flex items-center justify-between p-3 border-b border-line-default">
         <div className="flex items-center gap-2">
-          <FileJson className="w-4 h-4 text-gray-500" />
-          <span className="font-medium text-gray-900">{nodeName || nodeId}</span>
-          <span className="text-xs text-gray-400">Output</span>
+          <FileJson className="w-4 h-4 text-content-tertiary" />
+          <span className="font-medium text-content-primary">{nodeName || nodeId}</span>
+          <span className="text-xs text-content-tertiary">Output</span>
         </div>
         <div className="flex items-center gap-1">
           {/* View mode toggle */}
-          <div className="flex items-center bg-gray-100 rounded-md p-0.5">
+          <div className="flex items-center bg-surface-muted rounded-md p-0.5">
             {Object.entries(VIEW_MODES).map(([mode, config]) => {
               const Icon = config.icon
               return (
@@ -255,8 +255,8 @@ export default function NodeOutputInspector({
                   onClick={() => setViewMode(mode)}
                   className={`p-1.5 rounded ${
                     viewMode === mode
-                      ? 'bg-white shadow-sm text-gray-900'
-                      : 'text-gray-500 hover:text-gray-700'
+                      ? 'bg-surface shadow-sm text-content-primary'
+                      : 'text-content-tertiary hover:text-content-secondary'
                   }`}
                   title={config.label}
                 >
@@ -269,21 +269,21 @@ export default function NodeOutputInspector({
           {/* Actions */}
           <button
             onClick={() => setShowRaw(!showRaw)}
-            className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+            className="p-1.5 text-content-tertiary hover:text-content-secondary hover:bg-surface-muted rounded"
             title={showRaw ? 'Hide raw' : 'Show raw'}
           >
             {showRaw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
           <button
             onClick={() => handleCopy()}
-            className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+            className="p-1.5 text-content-tertiary hover:text-content-secondary hover:bg-surface-muted rounded"
             title="Copy all"
           >
-            {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+            {copied ? <Check className="w-4 h-4 text-semantic-success" /> : <Copy className="w-4 h-4" />}
           </button>
           <button
             onClick={handleDownload}
-            className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+            className="p-1.5 text-content-tertiary hover:text-content-secondary hover:bg-surface-muted rounded"
             title="Download"
           >
             <Download className="w-4 h-4" />
@@ -293,8 +293,8 @@ export default function NodeOutputInspector({
               onClick={() => onPin(nodeId, output)}
               className={`p-1.5 rounded ${
                 isPinned
-                  ? 'text-primary-600 bg-primary-50'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                  ? 'text-accent-primary bg-primary-50'
+                  : 'text-content-tertiary hover:text-content-secondary hover:bg-surface-muted'
               }`}
               title={isPinned ? 'Unpin data' : 'Pin data'}
             >
@@ -303,7 +303,7 @@ export default function NodeOutputInspector({
           )}
           <button
             onClick={() => setExpanded(!expanded)}
-            className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+            className="p-1.5 text-content-tertiary hover:text-content-secondary hover:bg-surface-muted rounded"
             title={expanded ? 'Collapse' : 'Expand'}
           >
             {expanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
@@ -313,15 +313,15 @@ export default function NodeOutputInspector({
 
       {/* Search (for tree view) */}
       {viewMode === 'tree' && (
-        <div className="p-2 border-b border-gray-100">
+        <div className="p-2 border-b border-line-subtle">
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-content-tertiary" />
             <input
               type="text"
               placeholder="Search..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full pl-8 pr-3 py-1.5 text-sm border border-line-default rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
           </div>
         </div>
@@ -330,7 +330,7 @@ export default function NodeOutputInspector({
       {/* Content */}
       <div className={`flex-1 overflow-auto ${expanded ? 'max-h-[600px]' : 'max-h-[300px]'}`}>
         {isEmpty ? (
-          <div className="flex items-center justify-center h-32 text-gray-500">
+          <div className="flex items-center justify-center h-32 text-content-tertiary">
             No output data
           </div>
         ) : showRaw ? (
@@ -349,7 +349,7 @@ export default function NodeOutputInspector({
             />
           </div>
         ) : viewMode === 'json' ? (
-          <pre className="p-3 text-xs font-mono text-gray-800 overflow-auto">
+          <pre className="p-3 text-xs font-mono text-content-primary overflow-auto">
             {jsonString}
           </pre>
         ) : viewMode === 'table' ? (
@@ -358,7 +358,7 @@ export default function NodeOutputInspector({
       </div>
 
       {/* Footer with stats */}
-      <div className="px-3 py-2 border-t border-gray-100 bg-gray-50 text-xs text-gray-500 flex items-center justify-between">
+      <div className="px-3 py-2 border-t border-line-subtle bg-surface-muted text-xs text-content-tertiary flex items-center justify-between">
         <span>
           {typeof output === 'object' && output !== null
             ? `${Object.keys(output).length} ${Array.isArray(output) ? 'items' : 'keys'}`

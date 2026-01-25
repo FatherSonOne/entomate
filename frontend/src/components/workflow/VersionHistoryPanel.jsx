@@ -31,9 +31,9 @@ const formatRelativeTime = (timestamp) => {
 
 // Diff line component
 function DiffLine({ type, content, lineNumber }) {
-  const bgColor = type === 'add' ? 'bg-green-50' : type === 'remove' ? 'bg-red-50' : 'bg-white'
-  const textColor = type === 'add' ? 'text-green-700' : type === 'remove' ? 'text-red-700' : 'text-gray-700'
-  const lineColor = type === 'add' ? 'bg-green-100 text-green-600' : type === 'remove' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-400'
+  const bgColor = type === 'add' ? 'bg-semantic-success-dim' : type === 'remove' ? 'bg-semantic-error-dim' : 'bg-surface'
+  const textColor = type === 'add' ? 'text-semantic-success' : type === 'remove' ? 'text-semantic-error' : 'text-content-secondary'
+  const lineColor = type === 'add' ? 'bg-semantic-success-dim text-semantic-success' : type === 'remove' ? 'bg-semantic-error-dim text-semantic-error' : 'bg-surface-muted text-content-tertiary'
   const prefix = type === 'add' ? '+' : type === 'remove' ? '-' : ' '
 
   return (
@@ -98,43 +98,43 @@ function VersionItem({
   return (
     <div
       className={`border rounded-lg overflow-hidden ${
-        isSelected ? 'border-primary-500 ring-2 ring-primary-200' : 'border-gray-200'
+        isSelected ? 'border-primary-500 ring-2 ring-primary-200' : 'border-line-default'
       }`}
     >
       <div
-        className={`flex items-center gap-3 p-3 cursor-pointer hover:bg-gray-50 ${
-          isCurrent ? 'bg-green-50' : ''
+        className={`flex items-center gap-3 p-3 cursor-pointer hover:bg-surface-muted ${
+          isCurrent ? 'bg-semantic-success-dim' : ''
         }`}
         onClick={() => onSelect(version)}
       >
         <button
           onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
-          className="p-0.5 hover:bg-gray-200 rounded"
+          className="p-0.5 hover:bg-surface-muted rounded"
         >
           {expanded ? (
-            <ChevronDown className="w-4 h-4 text-gray-500" />
+            <ChevronDown className="w-4 h-4 text-content-tertiary" />
           ) : (
-            <ChevronRight className="w-4 h-4 text-gray-500" />
+            <ChevronRight className="w-4 h-4 text-content-tertiary" />
           )}
         </button>
 
         <div className="flex-shrink-0">
-          <GitCommit className={`w-5 h-5 ${isCurrent ? 'text-green-600' : 'text-gray-400'}`} />
+          <GitCommit className={`w-5 h-5 ${isCurrent ? 'text-semantic-success' : 'text-content-tertiary'}`} />
         </div>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="font-medium text-gray-900">v{version.version_number}</span>
+            <span className="font-medium text-content-primary">v{version.version_number}</span>
             {isCurrent && (
-              <span className="px-1.5 py-0.5 text-xs bg-green-100 text-green-700 rounded">
+              <span className="px-1.5 py-0.5 text-xs bg-semantic-success-dim text-semantic-success rounded">
                 Current
               </span>
             )}
           </div>
           {version.change_summary && (
-            <p className="text-sm text-gray-500 truncate">{version.change_summary}</p>
+            <p className="text-sm text-content-tertiary truncate">{version.change_summary}</p>
           )}
-          <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
+          <div className="flex items-center gap-3 mt-1 text-xs text-content-tertiary">
             <span className="flex items-center gap-1">
               <Clock className="w-3 h-3" />
               {formatRelativeTime(version.created_at)}
@@ -151,7 +151,7 @@ function VersionItem({
         <div className="flex items-center gap-1">
           <button
             onClick={(e) => { e.stopPropagation(); onPreview(version); }}
-            className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded"
+            className="p-1.5 text-content-tertiary hover:text-content-secondary hover:bg-surface-muted rounded"
             title="Preview"
           >
             <Eye className="w-4 h-4" />
@@ -159,7 +159,7 @@ function VersionItem({
           {!isCurrent && (
             <button
               onClick={(e) => { e.stopPropagation(); onRestore(version); }}
-              className="p-1.5 text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded"
+              className="p-1.5 text-accent-primary hover:text-accent-primary hover:bg-accent-primary-dim rounded"
               title="Restore this version"
             >
               <RotateCcw className="w-4 h-4" />
@@ -169,12 +169,12 @@ function VersionItem({
       </div>
 
       {expanded && (
-        <div className="p-3 border-t border-gray-100 bg-gray-50">
-          <div className="text-xs text-gray-500 mb-2">
+        <div className="p-3 border-t border-line-subtle bg-surface-muted">
+          <div className="text-xs text-content-tertiary mb-2">
             <strong>Created:</strong> {new Date(version.created_at).toLocaleString()}
           </div>
           {version.change_summary && (
-            <div className="text-xs text-gray-600">
+            <div className="text-xs text-content-secondary">
               <strong>Changes:</strong> {version.change_summary}
             </div>
           )}
@@ -189,14 +189,14 @@ function DiffViewer({ oldVersion, newVersion, loading }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
+        <Loader2 className="w-6 h-6 text-content-tertiary animate-spin" />
       </div>
     )
   }
 
   if (!oldVersion || !newVersion) {
     return (
-      <div className="text-center py-8 text-gray-500">
+      <div className="text-center py-8 text-content-tertiary">
         Select two versions to compare
       </div>
     )
@@ -207,21 +207,21 @@ function DiffViewer({ oldVersion, newVersion, loading }) {
 
   if (!hasChanges) {
     return (
-      <div className="text-center py-8 text-gray-500">
-        <Check className="w-8 h-8 mx-auto mb-2 text-green-500" />
+      <div className="text-center py-8 text-content-tertiary">
+        <Check className="w-8 h-8 mx-auto mb-2 text-semantic-success" />
         No changes between versions
       </div>
     )
   }
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
-      <div className="bg-gray-100 px-3 py-2 border-b border-gray-200 flex items-center gap-2">
-        <Diff className="w-4 h-4 text-gray-500" />
-        <span className="text-sm font-medium text-gray-700">
+    <div className="border border-line-default rounded-lg overflow-hidden">
+      <div className="bg-surface-muted px-3 py-2 border-b border-line-default flex items-center gap-2">
+        <Diff className="w-4 h-4 text-content-tertiary" />
+        <span className="text-sm font-medium text-content-secondary">
           v{oldVersion.version_number} → v{newVersion.version_number}
         </span>
-        <span className="text-xs text-gray-500 ml-auto">
+        <span className="text-xs text-content-tertiary ml-auto">
           {diffLines.filter(l => l.type === 'add').length} additions,{' '}
           {diffLines.filter(l => l.type === 'remove').length} deletions
         </span>
@@ -338,7 +338,7 @@ export default function VersionHistoryPanel({
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <Loader2 className="w-6 h-6 text-primary-600 animate-spin" />
+        <Loader2 className="w-6 h-6 text-accent-primary animate-spin" />
       </div>
     )
   }
@@ -346,8 +346,8 @@ export default function VersionHistoryPanel({
   if (error) {
     return (
       <div className="p-4 text-center">
-        <AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-2" />
-        <p className="text-gray-700 mb-2">{error}</p>
+        <AlertCircle className="w-8 h-8 text-semantic-error mx-auto mb-2" />
+        <p className="text-content-secondary mb-2">{error}</p>
         <button onClick={loadVersions} className="btn btn-secondary btn-sm">
           <RefreshCw className="w-4 h-4" />
           Retry
@@ -357,18 +357,18 @@ export default function VersionHistoryPanel({
   }
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className="flex flex-col h-full bg-surface">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200">
+      <div className="p-4 border-b border-line-default">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <History className="w-5 h-5 text-gray-500" />
-            <h3 className="font-semibold text-gray-900">Version History</h3>
+            <History className="w-5 h-5 text-content-tertiary" />
+            <h3 className="font-semibold text-content-primary">Version History</h3>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={loadVersions}
-              className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+              className="p-1.5 text-content-tertiary hover:text-content-secondary hover:bg-surface-muted rounded"
               title="Refresh"
             >
               <RefreshCw className="w-4 h-4" />
@@ -384,7 +384,7 @@ export default function VersionHistoryPanel({
             )}
           </div>
         </div>
-        <p className="text-xs text-gray-500 mt-1">
+        <p className="text-xs text-content-tertiary mt-1">
           {versions.length} version{versions.length !== 1 ? 's' : ''}
         </p>
       </div>
@@ -394,10 +394,10 @@ export default function VersionHistoryPanel({
         {showDiff && selectedVersion && compareVersion ? (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h4 className="font-medium text-gray-900">Version Comparison</h4>
+              <h4 className="font-medium text-content-primary">Version Comparison</h4>
               <button
                 onClick={() => setShowDiff(false)}
-                className="p-1 text-gray-500 hover:text-gray-700"
+                className="p-1 text-content-tertiary hover:text-content-secondary"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -410,9 +410,9 @@ export default function VersionHistoryPanel({
           </div>
         ) : versions.length === 0 ? (
           <div className="text-center py-8">
-            <History className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-            <p className="text-gray-500">No version history</p>
-            <p className="text-xs text-gray-400 mt-1">
+            <History className="w-8 h-8 text-content-muted mx-auto mb-2" />
+            <p className="text-content-tertiary">No version history</p>
+            <p className="text-xs text-content-tertiary mt-1">
               Versions are created when you save changes
             </p>
           </div>
@@ -435,8 +435,8 @@ export default function VersionHistoryPanel({
 
       {/* Footer */}
       {restoring && (
-        <div className="p-3 border-t border-gray-200 bg-primary-50 flex items-center gap-2">
-          <Loader2 className="w-4 h-4 text-primary-600 animate-spin" />
+        <div className="p-3 border-t border-line-default bg-primary-50 flex items-center gap-2">
+          <Loader2 className="w-4 h-4 text-accent-primary animate-spin" />
           <span className="text-sm text-primary-700">Restoring version...</span>
         </div>
       )}

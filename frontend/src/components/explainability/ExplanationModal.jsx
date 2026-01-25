@@ -12,9 +12,9 @@ export default function ExplanationModal({ explanation, onClose, agentType }) {
   const { recommendation, confidence, factors, alternatives, metadata } = explanation;
 
   const getConfidenceColor = (conf) => {
-    if (conf >= 80) return 'text-green-600 bg-green-100';
+    if (conf >= 80) return 'text-semantic-success bg-semantic-success-dim';
     if (conf >= 60) return 'text-yellow-600 bg-yellow-100';
-    return 'text-orange-600 bg-orange-100';
+    return 'text-semantic-warning bg-semantic-warning-dim';
   };
 
   const getConfidenceLabel = (conf) => {
@@ -45,19 +45,19 @@ export default function ExplanationModal({ explanation, onClose, agentType }) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-surface rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="sticky top-0 bg-gradient-to-r from-indigo-600 to-blue-600 px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4 text-white">
             <div className="text-4xl">{getAgentIcon(agentType)}</div>
             <div>
               <h2 className="text-2xl font-bold">AI Decision Explanation</h2>
-              <p className="text-indigo-100">{getAgentDisplayName(agentType)}</p>
+              <p className="text-content-tertiary">{getAgentDisplayName(agentType)}</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-white hover:text-gray-200 p-2 rounded-full hover:bg-white hover:bg-opacity-20"
+            className="text-white hover:text-gray-200 p-2 rounded-full hover:bg-surface hover:bg-opacity-20"
           >
             <X size={24} />
           </button>
@@ -69,10 +69,10 @@ export default function ExplanationModal({ explanation, onClose, agentType }) {
           <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg p-6 border border-indigo-200">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
-                <Brain size={32} className="text-indigo-600" />
+                <Brain size={32} className="text-accent-primary" />
                 <div>
-                  <h3 className="text-xl font-bold text-gray-900">Recommendation</h3>
-                  <p className="text-gray-600">What the AI suggests and why</p>
+                  <h3 className="text-xl font-bold text-content-primary">Recommendation</h3>
+                  <p className="text-content-secondary">What the AI suggests and why</p>
                 </div>
               </div>
               <span className={`px-4 py-2 rounded-full text-sm font-medium ${getConfidenceColor(confidence)}`}>
@@ -80,12 +80,12 @@ export default function ExplanationModal({ explanation, onClose, agentType }) {
               </span>
             </div>
 
-            <div className="bg-white bg-opacity-60 rounded-lg p-4">
-              <div className="text-lg font-semibold text-gray-900 mb-2">
+            <div className="bg-surface bg-opacity-60 rounded-lg p-4">
+              <div className="text-lg font-semibold text-content-primary mb-2">
                 {recommendation?.name || recommendation?.value || JSON.stringify(recommendation)}
               </div>
               {metadata?.summary && (
-                <p className="text-gray-700">{metadata.summary}</p>
+                <p className="text-content-secondary">{metadata.summary}</p>
               )}
             </div>
           </div>
@@ -93,10 +93,10 @@ export default function ExplanationModal({ explanation, onClose, agentType }) {
           {/* Decision Factors */}
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <TrendingUp size={24} className="text-indigo-600" />
-              <h3 className="text-xl font-bold text-gray-900">Decision Factors</h3>
+              <TrendingUp size={24} className="text-accent-primary" />
+              <h3 className="text-xl font-bold text-content-primary">Decision Factors</h3>
             </div>
-            <div className="text-sm text-gray-600 mb-4">
+            <div className="text-sm text-content-secondary mb-4">
               The AI considered {factors.length} factors to make this decision. Each factor is weighted based on importance and scored based on how well the option performs.
             </div>
             <FactorBreakdown factors={factors} showDetails={true} compact={false} />
@@ -106,40 +106,40 @@ export default function ExplanationModal({ explanation, onClose, agentType }) {
           {alternatives && alternatives.length > 0 && (
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <Award size={24} className="text-indigo-600" />
-                <h3 className="text-xl font-bold text-gray-900">Alternatives Considered</h3>
+                <Award size={24} className="text-accent-primary" />
+                <h3 className="text-xl font-bold text-content-primary">Alternatives Considered</h3>
               </div>
-              <div className="text-sm text-gray-600 mb-4">
+              <div className="text-sm text-content-secondary mb-4">
                 The AI evaluated {alternatives.length + 1} total options. Here's why the other options scored lower:
               </div>
               <div className="space-y-3">
                 {alternatives.map((alt, index) => (
                   <div
                     key={index}
-                    className="bg-gray-50 rounded-lg p-4 border border-gray-200"
+                    className="bg-surface-muted rounded-lg p-4 border border-line-default"
                   >
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
-                        <span className="text-gray-400 font-bold">#{index + 2}</span>
-                        <span className="font-semibold text-gray-900">
+                        <span className="text-content-tertiary font-bold">#{index + 2}</span>
+                        <span className="font-semibold text-content-primary">
                           {alt.option?.name || alt.option?.value || JSON.stringify(alt.option)}
                         </span>
                       </div>
-                      <span className="text-sm font-semibold text-gray-600">
+                      <span className="text-sm font-semibold text-content-secondary">
                         Score: {alt.score} / 100
                       </span>
                     </div>
 
                     {/* Why Lower */}
                     <div className="mb-3">
-                      <div className="text-xs font-medium text-gray-500 mb-1">Why ranked lower:</div>
-                      <p className="text-sm text-gray-700">{alt.whyLower}</p>
+                      <div className="text-xs font-medium text-content-tertiary mb-1">Why ranked lower:</div>
+                      <p className="text-sm text-content-secondary">{alt.whyLower}</p>
                     </div>
 
                     {/* Alternative Factors */}
                     {alt.factors && alt.factors.length > 0 && (
-                      <div className="mt-3 pt-3 border-t border-gray-200">
-                        <div className="text-xs font-medium text-gray-500 mb-2">Factor Comparison:</div>
+                      <div className="mt-3 pt-3 border-t border-line-default">
+                        <div className="text-xs font-medium text-content-tertiary mb-2">Factor Comparison:</div>
                         <FactorBreakdown factors={alt.factors} showDetails={false} compact={true} />
                       </div>
                     )}
@@ -150,15 +150,15 @@ export default function ExplanationModal({ explanation, onClose, agentType }) {
           )}
 
           {/* How to Improve AI */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+          <div className="bg-semantic-info-dim border border-semantic-info rounded-lg p-6">
             <div className="flex items-start gap-3">
-              <HelpCircle size={24} className="text-blue-600 flex-shrink-0 mt-1" />
+              <HelpCircle size={24} className="text-semantic-info flex-shrink-0 mt-1" />
               <div>
-                <h4 className="font-semibold text-blue-900 mb-2">Help the AI Learn</h4>
-                <p className="text-sm text-blue-700 mb-3">
+                <h4 className="font-semibold text-semantic-info mb-2">Help the AI Learn</h4>
+                <p className="text-sm text-semantic-info mb-3">
                   If you disagree with this recommendation, you can override it. The AI will learn from your corrections and improve its future recommendations.
                 </p>
-                <div className="text-xs text-blue-600">
+                <div className="text-xs text-semantic-info">
                   Learn more about{' '}
                   <a href="#" className="underline font-medium">
                     AI Learning & Feedback
@@ -170,7 +170,7 @@ export default function ExplanationModal({ explanation, onClose, agentType }) {
 
           {/* Metadata */}
           {metadata && (
-            <div className="text-xs text-gray-500 border-t border-gray-200 pt-4">
+            <div className="text-xs text-content-tertiary border-t border-line-default pt-4">
               <div>Generated: {new Date(metadata.generatedAt || explanation.created_at).toLocaleString()}</div>
               <div>Explanation Version: {metadata.version || '1.0'}</div>
             </div>
@@ -178,7 +178,7 @@ export default function ExplanationModal({ explanation, onClose, agentType }) {
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-end">
+        <div className="sticky bottom-0 bg-surface-muted border-t border-line-default px-6 py-4 flex justify-end">
           <button
             onClick={onClose}
             className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-medium"

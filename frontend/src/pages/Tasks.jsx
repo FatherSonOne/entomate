@@ -97,7 +97,7 @@ export default function Tasks() {
 
   const getPriorityColor = (priority) => {
     switch (priority) {
-      case 'high': return 'text-red-500 bg-red-500/10 border-red-500/20'
+      case 'high': return 'text-semantic-error bg-semantic-error/10 border-red-500/20'
       case 'medium': return 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20'
       case 'low': return 'text-green-500 bg-green-500/10 border-green-500/20'
       default: return 'text-content-tertiary bg-surface-muted border-line-subtle'
@@ -108,7 +108,7 @@ export default function Tasks() {
     switch (status) {
       case 'done': return 'text-green-500 bg-green-500/10 border-green-500/20'
       case 'in_progress': return 'text-accent-primary bg-accent-primary/10 border-accent-primary/20'
-      case 'blocked': return 'text-red-500 bg-red-500/10 border-red-500/20'
+      case 'blocked': return 'text-semantic-error bg-semantic-error/10 border-red-500/20'
       default: return 'text-content-tertiary bg-surface-muted border-line-subtle'
     }
   }
@@ -279,13 +279,13 @@ export default function Tasks() {
                       {task.title}
                     </p>
                     {task.due_date && isOverdue(task.due_date) && task.status !== 'done' && (
-                      <AlertCircle size={16} className="text-red-500" />
+                      <AlertCircle size={16} className="text-semantic-error" />
                     )}
                   </div>
                   <div className="flex items-center gap-3 text-xs text-content-tertiary font-mono">
                     {task.due_date && (
                       <span className={`flex items-center gap-1 ${
-                        isOverdue(task.due_date) && task.status !== 'done' ? 'text-red-500' : ''
+                        isOverdue(task.due_date) && task.status !== 'done' ? 'text-semantic-error' : ''
                       }`}>
                         <Clock size={12} />
                         {new Date(task.due_date).toLocaleDateString()}
@@ -313,7 +313,7 @@ export default function Tasks() {
 
                 <button
                   onClick={() => handleDelete(task.id)}
-                  className="p-2 opacity-0 group-hover:opacity-100 hover:bg-red-500/10 hover:text-red-500 rounded-md transition-all"
+                  className="p-2 opacity-0 group-hover:opacity-100 hover:bg-semantic-error/10 hover:text-semantic-error rounded-md transition-all"
                 >
                   <Trash2 size={16} />
                 </button>

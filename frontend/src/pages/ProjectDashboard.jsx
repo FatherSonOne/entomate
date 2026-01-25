@@ -152,13 +152,13 @@ export default function ProjectDashboard() {
     return (
       <div className="space-y-6">
         <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-48 mb-4"></div>
+          <div className="h-8 bg-surface-muted rounded w-48 mb-4"></div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             {[1, 2, 3, 4].map(i => (
-              <div key={i} className="h-24 bg-gray-200 rounded"></div>
+              <div key={i} className="h-24 bg-surface-muted rounded"></div>
             ))}
           </div>
-          <div className="h-64 bg-gray-200 rounded"></div>
+          <div className="h-64 bg-surface-muted rounded"></div>
         </div>
       </div>
     )
@@ -178,15 +178,15 @@ export default function ProjectDashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">
           {id && (
-            <Link to="/projects" className="p-2 hover:bg-gray-100 rounded-lg">
+            <Link to="/projects" className="p-2 hover:bg-surface-muted rounded-lg">
               <ArrowLeft className="w-5 h-5" />
             </Link>
           )}
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">
+            <h1 className="text-2xl font-bold text-content-primary">
               {id ? (project?.name || 'Project Dashboard') : 'Project Dashboard'}
             </h1>
-            <p className="text-gray-600">
+            <p className="text-content-secondary">
               {id ? 'Project analytics and task management' : 'Overview of all projects and tasks'}
             </p>
           </div>
@@ -202,7 +202,7 @@ export default function ProjectDashboard() {
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200">
+      <div className="border-b border-line-default">
         <nav className="flex gap-4">
           {[
             { id: 'overview', label: 'Overview', icon: BarChart3 },
@@ -214,8 +214,8 @@ export default function ProjectDashboard() {
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
                 activeTab === tab.id
-                  ? 'border-primary-500 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'border-primary-500 text-accent-primary'
+                  : 'border-transparent text-content-tertiary hover:text-content-secondary'
               }`}
             >
               <tab.icon className="w-4 h-4" />
@@ -233,11 +233,11 @@ export default function ProjectDashboard() {
             <div className="card p-5">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-sm text-gray-500">Total Tasks</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{totalTasks}</p>
+                  <p className="text-sm text-content-tertiary">Total Tasks</p>
+                  <p className="text-2xl font-bold text-content-primary mt-1">{totalTasks}</p>
                 </div>
-                <div className="p-2 rounded-lg bg-blue-100">
-                  <CheckCircle2 className="w-5 h-5 text-blue-600" />
+                <div className="p-2 rounded-lg bg-semantic-info-dim">
+                  <CheckCircle2 className="w-5 h-5 text-semantic-info" />
                 </div>
               </div>
             </div>
@@ -245,14 +245,14 @@ export default function ProjectDashboard() {
             <div className="card p-5">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-sm text-gray-500">Completion Rate</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{completionRate}%</p>
+                  <p className="text-sm text-content-tertiary">Completion Rate</p>
+                  <p className="text-2xl font-bold text-content-primary mt-1">{completionRate}%</p>
                 </div>
-                <div className="p-2 rounded-lg bg-green-100">
-                  <TrendingUp className="w-5 h-5 text-green-600" />
+                <div className="p-2 rounded-lg bg-semantic-success-dim">
+                  <TrendingUp className="w-5 h-5 text-semantic-success" />
                 </div>
               </div>
-              <div className="mt-3 h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div className="mt-3 h-2 bg-surface-muted rounded-full overflow-hidden">
                 <div
                   className="h-full bg-green-500 rounded-full transition-all"
                   style={{ width: `${completionRate}%` }}
@@ -263,13 +263,13 @@ export default function ProjectDashboard() {
             <div className="card p-5">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-sm text-gray-500">In Progress</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">
+                  <p className="text-sm text-content-tertiary">In Progress</p>
+                  <p className="text-2xl font-bold text-content-primary mt-1">
                     {taskStatusData.find(s => s.name === 'In Progress')?.value || 0}
                   </p>
                 </div>
-                <div className="p-2 rounded-lg bg-blue-100">
-                  <Activity className="w-5 h-5 text-blue-600" />
+                <div className="p-2 rounded-lg bg-semantic-info-dim">
+                  <Activity className="w-5 h-5 text-semantic-info" />
                 </div>
               </div>
             </div>
@@ -277,18 +277,18 @@ export default function ProjectDashboard() {
             <div className="card p-5">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-sm text-gray-500">Overdue</p>
+                  <p className="text-sm text-content-tertiary">Overdue</p>
                   <p className={`text-2xl font-bold mt-1 ${
-                    (dashboardData?.overdueCount || 0) > 0 ? 'text-red-600' : 'text-gray-900'
+                    (dashboardData?.overdueCount || 0) > 0 ? 'text-semantic-error' : 'text-content-primary'
                   }`}>
                     {dashboardData?.overdueCount || 0}
                   </p>
                 </div>
                 <div className={`p-2 rounded-lg ${
-                  (dashboardData?.overdueCount || 0) > 0 ? 'bg-red-100' : 'bg-gray-100'
+                  (dashboardData?.overdueCount || 0) > 0 ? 'bg-semantic-error-dim' : 'bg-surface-muted'
                 }`}>
                   <AlertTriangle className={`w-5 h-5 ${
-                    (dashboardData?.overdueCount || 0) > 0 ? 'text-red-600' : 'text-gray-600'
+                    (dashboardData?.overdueCount || 0) > 0 ? 'text-semantic-error' : 'text-content-secondary'
                   }`} />
                 </div>
               </div>
@@ -299,7 +299,7 @@ export default function ProjectDashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Task Status Pie Chart */}
             <div className="card p-5">
-              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <h3 className="font-semibold text-content-primary mb-4 flex items-center gap-2">
                 <PieChart className="w-5 h-5 text-primary-500" />
                 Task Status Distribution
               </h3>
@@ -324,7 +324,7 @@ export default function ProjectDashboard() {
                   </RechartsPie>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-[250px] flex items-center justify-center text-gray-400">
+                <div className="h-[250px] flex items-center justify-center text-content-tertiary">
                   No task data available
                 </div>
               )}
@@ -332,7 +332,7 @@ export default function ProjectDashboard() {
 
             {/* Priority Distribution */}
             <div className="card p-5">
-              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <h3 className="font-semibold text-content-primary mb-4 flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5 text-amber-500" />
                 Tasks by Priority
               </h3>
@@ -351,7 +351,7 @@ export default function ProjectDashboard() {
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-[250px] flex items-center justify-center text-gray-400">
+                <div className="h-[250px] flex items-center justify-center text-content-tertiary">
                   No priority data available
                 </div>
               )}
@@ -361,7 +361,7 @@ export default function ProjectDashboard() {
           {/* AI Insights */}
           {!id && insights.length > 0 && (
             <div className="card p-5">
-              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <h3 className="font-semibold text-content-primary mb-4 flex items-center gap-2">
                 <TrendingUp className="w-5 h-5 text-primary-500" />
                 AI Insights
               </h3>
@@ -370,15 +370,15 @@ export default function ProjectDashboard() {
                   <div
                     key={index}
                     className={`p-4 rounded-lg ${
-                      insight.type === 'warning' ? 'bg-amber-50 border border-amber-200' :
-                      insight.type === 'success' ? 'bg-green-50 border border-green-200' :
-                      'bg-blue-50 border border-blue-200'
+                      insight.type === 'warning' ? 'bg-semantic-warning-dim border border-semantic-warning' :
+                      insight.type === 'success' ? 'bg-semantic-success-dim border border-semantic-success' :
+                      'bg-semantic-info-dim border border-semantic-info'
                     }`}
                   >
                     <p className={`text-sm ${
-                      insight.type === 'warning' ? 'text-amber-700' :
-                      insight.type === 'success' ? 'text-green-700' :
-                      'text-blue-700'
+                      insight.type === 'warning' ? 'text-semantic-warning' :
+                      insight.type === 'success' ? 'text-semantic-success' :
+                      'text-semantic-info'
                     }`}>
                       {insight.message}
                     </p>
@@ -400,7 +400,7 @@ export default function ProjectDashboard() {
         <div className="space-y-6">
           {/* Team Workload Chart */}
           <div className="card p-5">
-            <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <h3 className="font-semibold text-content-primary mb-4 flex items-center gap-2">
               <Users className="w-5 h-5 text-primary-500" />
               Team Task Distribution
             </h3>
@@ -417,7 +417,7 @@ export default function ProjectDashboard() {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-[300px] flex items-center justify-center text-gray-400">
+              <div className="h-[300px] flex items-center justify-center text-content-tertiary">
                 No team workload data available
               </div>
             )}
@@ -437,17 +437,17 @@ export default function ProjectDashboard() {
                       {(member.team_member || 'U')[0].toUpperCase()}
                     </div>
                     <div>
-                      <h4 className="font-medium text-gray-900">{member.team_member || 'Unassigned'}</h4>
-                      <p className="text-sm text-gray-500">{member.total_assigned} tasks</p>
+                      <h4 className="font-medium text-content-primary">{member.team_member || 'Unassigned'}</h4>
+                      <p className="text-sm text-content-tertiary">{member.total_assigned} tasks</p>
                     </div>
                   </div>
 
                   <div className="space-y-3">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-500">Completion</span>
+                      <span className="text-content-tertiary">Completion</span>
                       <span className="font-medium">{memberCompletionRate}%</span>
                     </div>
-                    <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div className="h-2 bg-surface-muted rounded-full overflow-hidden">
                       <div
                         className="h-full bg-green-500 rounded-full transition-all"
                         style={{ width: `${memberCompletionRate}%` }}
@@ -455,17 +455,17 @@ export default function ProjectDashboard() {
                     </div>
 
                     <div className="grid grid-cols-3 gap-2 pt-2">
-                      <div className="text-center p-2 bg-gray-50 rounded">
-                        <p className="text-lg font-semibold text-gray-700">{member.pending_items || 0}</p>
-                        <p className="text-xs text-gray-500">To Do</p>
+                      <div className="text-center p-2 bg-surface-muted rounded">
+                        <p className="text-lg font-semibold text-content-secondary">{member.pending_items || 0}</p>
+                        <p className="text-xs text-content-tertiary">To Do</p>
                       </div>
-                      <div className="text-center p-2 bg-blue-50 rounded">
-                        <p className="text-lg font-semibold text-blue-600">{member.in_progress_items || 0}</p>
-                        <p className="text-xs text-gray-500">Active</p>
+                      <div className="text-center p-2 bg-semantic-info-dim rounded">
+                        <p className="text-lg font-semibold text-semantic-info">{member.in_progress_items || 0}</p>
+                        <p className="text-xs text-content-tertiary">Active</p>
                       </div>
-                      <div className="text-center p-2 bg-green-50 rounded">
-                        <p className="text-lg font-semibold text-green-600">{member.completed_items || 0}</p>
-                        <p className="text-xs text-gray-500">Done</p>
+                      <div className="text-center p-2 bg-semantic-success-dim rounded">
+                        <p className="text-lg font-semibold text-semantic-success">{member.completed_items || 0}</p>
+                        <p className="text-xs text-content-tertiary">Done</p>
                       </div>
                     </div>
                   </div>
@@ -475,9 +475,9 @@ export default function ProjectDashboard() {
 
             {teamWorkload.length === 0 && (
               <div className="col-span-full card p-8 text-center">
-                <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <h3 className="text-lg font-medium text-gray-900 mb-1">No team data</h3>
-                <p className="text-gray-500">Assign tasks to team members to see workload distribution</p>
+                <Users className="w-12 h-12 text-content-muted mx-auto mb-3" />
+                <h3 className="text-lg font-medium text-content-primary mb-1">No team data</h3>
+                <p className="text-content-tertiary">Assign tasks to team members to see workload distribution</p>
               </div>
             )}
           </div>

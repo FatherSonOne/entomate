@@ -231,7 +231,7 @@ export default function Projects() {
                 </div>
                 <button
                   onClick={(e) => handleDelete(project.id, e)}
-                  className="p-1.5 opacity-0 group-hover:opacity-100 hover:bg-red-500/10 hover:text-red-500 rounded-md transition-all"
+                  className="p-1.5 opacity-0 group-hover:opacity-100 hover:bg-semantic-error/10 hover:text-semantic-error rounded-md transition-all"
                 >
                   <Trash2 size={14} />
                 </button>
