@@ -141,17 +141,8 @@
 /* ============================================
    BRAND THEME SYSTEM
    10 Distinct Brand Directions (Override defaults above)
+   Imported directly in main.jsx for Vite compatibility
    ============================================ */
-@import './themes/synapse.css';
-@import './themes/blueprint.css';
-@import './themes/velocity.css';
-@import './themes/neon-district.css';
-@import './themes/serif-scholar.css';
-@import './themes/aurora.css';
-@import './themes/monolith.css';
-@import './themes/horizon.css';
-@import './themes/pastel-zen.css';
-@import './themes/playground.css';
 
 @layer base {
   html {
