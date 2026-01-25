@@ -41,6 +41,16 @@
   --accent-tertiary: var(--brand-tertiary);
   --accent-tertiary-light: #cbd5e1;
   --accent-tertiary-dim: rgba(148, 163, 184, 0.15);
+
+  /* Semantic Colors - Universal across light/dark */
+  --semantic-success: #10b981;
+  --semantic-success-dim: rgba(16, 185, 129, 0.1);
+  --semantic-warning: #f59e0b;
+  --semantic-warning-dim: rgba(245, 158, 11, 0.1);
+  --semantic-error: #ef4444;
+  --semantic-error-dim: rgba(239, 68, 68, 0.1);
+  --semantic-info: #3b82f6;
+  --semantic-info-dim: rgba(59, 130, 246, 0.1);
 }
 
 /* Light Mode - Pure white */
