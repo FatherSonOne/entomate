@@ -26,26 +26,11 @@
 @import './explainability.css';
 
 /* ============================================
-   BRAND THEME SYSTEM
-   10 Distinct Brand Directions
-   ============================================ */
-@import './themes/synapse.css';
-@import './themes/blueprint.css';
-@import './themes/velocity.css';
-@import './themes/neon-district.css';
-@import './themes/serif-scholar.css';
-@import './themes/aurora.css';
-@import './themes/monolith.css';
-@import './themes/horizon.css';
-@import './themes/pastel-zen.css';
-@import './themes/playground.css';
-
-/* ============================================
-   ENTOMATE DESIGN SYSTEM - THE ARCHITECT
-   Glassmorphism, Technical Grids, Structured Layout
+   DEFAULT THEME VARIABLES (Fallback)
+   These are overridden by brand themes
    ============================================ */
 
-/* Theme Variables */
+/* Default Theme Variables (Used as fallback when no brand is set) */
 :root {
   /* Background Layers - Architect Theme (Light) */
   --bg-base: #f4f4f5; /* Zinc-100 */
@@ -152,6 +137,21 @@
 
   --grid-color: rgba(255, 255, 255, 0.03);
 }
+
+/* ============================================
+   BRAND THEME SYSTEM
+   10 Distinct Brand Directions (Override defaults above)
+   ============================================ */
+@import './themes/synapse.css';
+@import './themes/blueprint.css';
+@import './themes/velocity.css';
+@import './themes/neon-district.css';
+@import './themes/serif-scholar.css';
+@import './themes/aurora.css';
+@import './themes/monolith.css';
+@import './themes/horizon.css';
+@import './themes/pastel-zen.css';
+@import './themes/playground.css';
 
 @layer base {
   html {
