@@ -334,6 +334,7 @@ export function ThemeProvider({ children }) {
 
     // Apply brand theme
     root.setAttribute('data-brand', activeTheme);
+    console.log('[ThemeContext] Applied brand:', activeTheme, 'isPreviewMode:', isPreviewMode);
 
     // Apply dark/light mode
     if (resolvedMode === 'dark') {
@@ -341,6 +342,7 @@ export function ThemeProvider({ children }) {
     } else {
       root.classList.remove('dark');
     }
+    console.log('[ThemeContext] Mode:', resolvedMode);
 
     // Apply highlight color as CSS variables (for legacy components)
     const color = HIGHLIGHT_COLORS[highlightColor] || HIGHLIGHT_COLORS.blue;
@@ -377,10 +379,14 @@ export function ThemeProvider({ children }) {
   };
 
   const setBrandTheme = (themeKey) => {
+    console.log('[ThemeContext] setBrandTheme called:', themeKey);
     if (BRAND_THEMES[themeKey]) {
       setBrandThemeState(themeKey);
+      console.log('[ThemeContext] Brand theme set to:', themeKey);
       // Exit preview mode when permanently setting theme
       cancelPreview();
+    } else {
+      console.error('[ThemeContext] Invalid theme key:', themeKey);
     }
   };
 
@@ -406,6 +412,7 @@ export function ThemeProvider({ children }) {
 
   // Preview management functions
   const enablePreview = (themeKey, duration = 60000) => { // 60 second default
+    console.log('[ThemeContext] enablePreview called:', themeKey);
     if (BRAND_THEMES[themeKey]) {
       // Clear any existing timeout
       if (previewTimeout) {
@@ -414,12 +421,16 @@ export function ThemeProvider({ children }) {
 
       setPreviewTheme(themeKey);
       setIsPreviewMode(true);
+      console.log('[ThemeContext] Preview enabled for:', themeKey);
 
       // Auto-cancel preview after duration
       const timeout = setTimeout(() => {
+        console.log('[ThemeContext] Preview timeout - canceling');
         cancelPreview();
       }, duration);
       setPreviewTimeout(timeout);
+    } else {
+      console.error('[ThemeContext] Invalid theme key:', themeKey);
     }
   };
 

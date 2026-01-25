@@ -77,8 +77,18 @@ export default function BrandExplorer({ isOpen, onClose }) {
   };
 
   const handleTryLive = () => {
+    console.log('[BrandExplorer] Try Live clicked for:', selectedBrand);
     enablePreview(selectedBrand, 60000); // 60 seconds
     setTryLiveCountdown(60);
+
+    // Debug: Check what's actually applied
+    setTimeout(() => {
+      const root = document.documentElement;
+      const brand = root.getAttribute('data-brand');
+      const mode = root.classList.contains('dark') ? 'dark' : 'light';
+      const bgBase = getComputedStyle(root).getPropertyValue('--bg-base');
+      console.log('[BrandExplorer] After Try Live - data-brand:', brand, 'mode:', mode, '--bg-base:', bgBase);
+    }, 100);
   };
 
   const handleCancelPreview = () => {

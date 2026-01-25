@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Theme Test</title>
+  <link rel="stylesheet" href="./src/styles/themes/synapse.css">
+  <link rel="stylesheet" href="./src/styles/themes/neon-district.css">
+  <link rel="stylesheet" href="./src/styles/themes/pastel-zen.css">
+  <style>
+    body {
+      font-family: var(--font-body, sans-serif);
+      background: var(--bg-base);
+      color: var(--text-primary);
+      padding: 20px;
+      transition: all 0.3s;
+    }
+    .box {
+      background: var(--bg-surface);
+      border: 2px solid var(--border-default);
+      padding: 20px;
+      margin: 10px 0;
+      border-radius: var(--radius-md, 8px);
+    }
+    button {
+      background: var(--accent-primary);
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      margin: 5px;
+      border-radius: var(--radius-md, 8px);
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body data-brand="synapse" class="light">
+  <h1>Theme Switching Test</h1>
+  
+  <div class="box">
+    <h2>Current Theme Info</h2>
+    <p>data-brand: <span id="current-brand">synapse</span></p>
+    <p>Mode: <span id="current-mode">light</span></p>
+  </div>
+
+  <div class="box">
+    <h3>Switch Theme:</h3>
+    <button onclick="switchTheme('synapse')">Synapse</button>
+    <button onclick="switchTheme('neon-district')">Neon District</button>
+    <button onclick="switchTheme('pastel-zen')">Pastel Zen</button>
+    <button onclick="switchTheme('playground')">Playground</button>
+  </div>
+
+  <div class="box">
+    <h3>Toggle Mode:</h3>
+    <button onclick="toggleMode()">Toggle Light/Dark</button>
+  </div>
+
+  <div class="box">
+    <p>This text should change color based on --text-primary</p>
+    <p style="color: var(--accent-primary)">This should be accent color</p>
+  </div>
+
+  <script>
+    function switchTheme(theme) {
+      document.body.setAttribute('data-brand', theme);
+      document.getElementById('current-brand').textContent = theme;
+      console.log('Switched to:', theme);
+      console.log('Computed bg-base:', getComputedStyle(document.body).getPropertyValue('--bg-base'));
+    }
+
+    function toggleMode() {
+      const isDark = document.body.classList.contains('dark');
+      if (isDark) {
+        document.body.classList.remove('dark');
+        document.body.classList.add('light');
+        document.getElementById('current-mode').textContent = 'light';
+      } else {
+        document.body.classList.remove('light');
+        document.body.classList.add('dark');
+        document.getElementById('current-mode').textContent = 'dark';
+      }
+    }
+  </script>
+</body>
+</html>
