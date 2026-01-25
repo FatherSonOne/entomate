@@ -1,6 +1,7 @@
 import React from 'react'
 import { Calendar, Users, DollarSign, TrendingUp, TrendingDown, Minus, AlertCircle } from 'lucide-react'
 import ExpandableCard from './ExpandableCard'
+import SentimentTrendMini from './SentimentTrendMini'
 
 /**
  * MeetingPrepCard - Meeting preparation intelligence card
@@ -157,32 +158,9 @@ export default function MeetingPrepCard({ data, onAction }) {
         </div>
       )}
 
-      {/* Sentiment history */}
+      {/* Sentiment Trend - Enhanced visualization */}
       {sentiment && sentiment.history && sentiment.history.length > 0 && (
-        <div>
-          <h5 className="text-xs font-semibold text-content-secondary mb-2">Sentiment Trend</h5>
-          <div className="space-y-2">
-            {sentiment.history.map((item, index) => (
-              <div key={index} className="flex items-center gap-3">
-                <span className="text-xs text-content-tertiary w-20">
-                  {new Date(item.date).toLocaleDateString()}
-                </span>
-                <div className="flex-1 h-2 bg-surface-muted rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full ${
-                      item.sentiment === 'positive' ? 'bg-green-500' :
-                      item.sentiment === 'negative' ? 'bg-semantic-error' : 'bg-gray-400'
-                    }`}
-                    style={{ width: `${item.score}%` }}
-                  />
-                </div>
-                <span className="text-xs font-medium text-content-secondary w-12 text-right">
-                  {item.score}%
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
+        <SentimentTrendMini sentiment={sentiment} />
       )}
 
       {/* Overdue action items */}

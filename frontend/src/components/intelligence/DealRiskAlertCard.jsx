@@ -1,6 +1,8 @@
 import React from 'react'
 import { AlertTriangle, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import ExpandableCard from './ExpandableCard'
+import RiskFactorBreakdown from './RiskFactorBreakdown'
+import PredictionGauge from './PredictionGauge'
 
 /**
  * DealRiskAlertCard - Deal risk alert card with risk scoring
@@ -144,74 +146,14 @@ export default function DealRiskAlertCard({ data, onAction }) {
   // Expanded content
   const expandedContent = (
     <div className="space-y-4">
-      {/* All risk factors with details */}
+      {/* Risk Factor Breakdown - Enhanced visualization */}
       {riskFactors && riskFactors.length > 0 && (
-        <div>
-          <h5 className="text-xs font-semibold text-content-secondary mb-3">
-            All Risk Factors (Weighted)
-          </h5>
-          <div className="space-y-3">
-            {riskFactors.map((factor, index) => (
-              <div key={index} className="bg-surface-muted border border-line-default rounded-lg p-3">
-                <div className="flex items-start justify-between gap-3 mb-2">
-                  <div className="flex items-start gap-2 flex-1">
-                    <span className={`font-semibold ${getImpactColor(factor.impact)}`}>
-                      {factor.impact === 'high' ? '🔴' : factor.impact === 'medium' ? '🟡' : '🟢'}
-                    </span>
-                    <div className="flex-1">
-                      <p className="font-medium text-content-primary">{factor.factor}</p>
-                      <p className="text-xs text-content-tertiary mt-0.5">
-                        Weight: {(factor.weight * 100).toFixed(0)}%
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold text-content-primary">{factor.score}/100</p>
-                    <p className={`text-xs font-medium ${getImpactColor(factor.impact)}`}>
-                      {factor.impact.charAt(0).toUpperCase() + factor.impact.slice(1)}
-                    </p>
-                  </div>
-                </div>
-                {factor.detail && (
-                  <p className="text-sm text-content-secondary ml-6">{factor.detail}</p>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
+        <RiskFactorBreakdown factors={riskFactors} />
       )}
 
-      {/* Predictions */}
+      {/* Predictions Gauge - Enhanced visualization */}
       {predictions && (
-        <div>
-          <h5 className="text-xs font-semibold text-content-secondary mb-2">Predictions</h5>
-          <div className="bg-semantic-info-dim border border-semantic-info rounded-lg p-3 space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-semantic-info">Churn risk (90 days):</span>
-              <span className="font-semibold text-semantic-info">
-                {(predictions.churnRisk * 100).toFixed(0)}%
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-semantic-info">Close probability:</span>
-              <span className="font-semibold text-semantic-info">
-                {(predictions.closeProbability * 100).toFixed(0)}%
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-semantic-info">Expected close:</span>
-              <span className="font-semibold text-semantic-info">
-                {new Date(predictions.expectedCloseDate).toLocaleDateString()}
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-semantic-info">Confidence:</span>
-              <span className="font-semibold text-semantic-info">
-                {(predictions.confidence * 100).toFixed(0)}%
-              </span>
-            </div>
-          </div>
-        </div>
+        <PredictionGauge predictions={predictions} riskScore={riskScore.score} />
       )}
 
       {/* All recommended actions */}

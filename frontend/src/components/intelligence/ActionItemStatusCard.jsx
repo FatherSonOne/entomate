@@ -1,6 +1,7 @@
 import React from 'react'
 import { CheckCircle2, Clock, AlertTriangle, XCircle, Users, ArrowRight } from 'lucide-react'
 import ExpandableCard from './ExpandableCard'
+import BlockingChainDiagram from './BlockingChainDiagram'
 
 /**
  * ActionItemStatusCard - Action item tracking card
@@ -210,50 +211,9 @@ export default function ActionItemStatusCard({ data, onAction }) {
         </div>
       )}
 
-      {/* Blocking chains visualization */}
+      {/* Blocking Chains - Enhanced visualization */}
       {blockingChains && blockingChains.length > 0 && (
-        <div>
-          <h5 className="text-xs font-semibold text-content-secondary mb-2">Blocking Chains Detected</h5>
-          {blockingChains.map((chain, index) => (
-            <div key={index} className="bg-semantic-warning-dim border border-semantic-warning rounded-lg p-3 mb-3">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-medium text-semantic-warning">
-                  Chain {index + 1}: {chain.totalBlocked} task(s) blocked
-                </p>
-                <span className="text-xs text-semantic-warning">
-                  Length: {chain.chainLength}
-                </span>
-              </div>
-              <div className="space-y-2">
-                {chain.nodes.map((node, nodeIndex) => (
-                  <div key={nodeIndex} className="relative">
-                    <div className="flex items-start gap-2">
-                      <div className={`w-2 h-2 rounded-full mt-2 ${
-                        node.status === 'overdue' ? 'bg-semantic-error' :
-                        node.status === 'waiting' ? 'bg-gray-400' : 'bg-green-500'
-                      }`} />
-                      <div className="flex-1">
-                        <p className="text-sm text-content-primary">{node.task}</p>
-                        <div className="flex items-center gap-2 mt-0.5 text-xs text-content-secondary">
-                          <span>{node.owner}</span>
-                          <span className={`font-medium ${
-                            node.status === 'overdue' ? 'text-semantic-error' :
-                            node.status === 'waiting' ? 'text-content-tertiary' : 'text-semantic-success'
-                          }`}>
-                            {node.status}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    {nodeIndex < chain.nodes.length - 1 && (
-                      <div className="ml-1 h-4 w-0.5 bg-semantic-warning" />
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
+        <BlockingChainDiagram chains={blockingChains} />
       )}
 
       {/* All overdue items */}

@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Plus, Search, Filter, CheckSquare, Clock, AlertCircle, Trash2, Circle, CheckCircle2, Target
 } from 'lucide-react'
 import { tasksApi } from '../services/api'
 import { GuideCard, PageHeader, Skeleton } from '../components/SharedUI'
+import { AgentRecommendationPanel } from '../components/intelligence'
+import { ExplanationModal } from '../components/explainability'
 
 export default function Tasks() {
   const [tasks, setTasks] = useState([])
@@ -15,6 +17,12 @@ export default function Tasks() {
   const [newTask, setNewTask] = useState({ title: '', priority: 'medium', dueDate: '' })
   const [creating, setCreating] = useState(false)
   const [wizardStep, setWizardStep] = useState(0) // 0: Create, 1: Prioritize, 2: Complete
+
+  // AI Recommendations state
+  const [recommendations, setRecommendations] = useState(null)
+  const [loadingRecommendations, setLoadingRecommendations] = useState(false)
+  const [showExplanation, setShowExplanation] = useState(false)
+  const [explanationData, setExplanationData] = useState(null)
 
   useEffect(() => {
     loadTasks()
@@ -84,6 +92,80 @@ export default function Tasks() {
     } catch (error) {
       console.error('Failed to delete task:', error)
     }
+  }
+
+  // Fetch AI recommendations when title changes
+  useEffect(() => {
+    const fetchRecommendations = async () => {
+      if (!newTask.title || newTask.title.length < 5) {
+        setRecommendations(null)
+        return
+      }
+
+      try {
+        setLoadingRecommendations(true)
+        // Call the agent recommendations API
+        const response = await fetch('/api/agents/recommendations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            taskTitle: newTask.title,
+            context: { existingTasks: tasks.length }
+          })
+        })
+        const data = await response.json()
+        if (data.success) {
+          setRecommendations(data.recommendations)
+        }
+      } catch (error) {
+        console.error('Failed to fetch recommendations:', error)
+      } finally {
+        setLoadingRecommendations(false)
+      }
+    }
+
+    // Debounce the API call
+    const timeoutId = setTimeout(fetchRecommendations, 800)
+    return () => clearTimeout(timeoutId)
+  }, [newTask.title, tasks.length])
+
+  const handleAcceptRecommendation = (type, value) => {
+    if (type === 'assignment') {
+      setNewTask({ ...newTask, assignedTo: value })
+    } else if (type === 'priority') {
+      setNewTask({ ...newTask, priority: value })
+    } else if (type === 'deadline') {
+      setNewTask({ ...newTask, dueDate: value })
+    }
+  }
+
+  const handleOverrideRecommendation = async (type, aiValue, userValue, reason) => {
+    // Capture feedback for the learning system
+    try {
+      await fetch('/api/learning/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agentType: type === 'assignment' ? 'assignment' : type === 'priority' ? 'priority' : 'deadline',
+          recommendation: aiValue,
+          userChoice: userValue,
+          reason,
+          context: { taskTitle: newTask.title }
+        })
+      })
+    } catch (error) {
+      console.error('Failed to capture feedback:', error)
+    }
+  }
+
+  const handleShowExplanation = (type, data) => {
+    setExplanationData({
+      agentType: type,
+      recommendation: data.value,
+      confidence: data.confidence,
+      factors: data.factors || []
+    })
+    setShowExplanation(true)
   }
 
   const filteredTasks = tasks.filter(task =>
@@ -177,6 +259,27 @@ export default function Tasks() {
                 />
               </div>
             </div>
+
+            {/* AI Recommendations Panel */}
+            {(recommendations || loadingRecommendations) && newTask.title.length >= 5 && (
+              <div className="animate-fade-in">
+                {loadingRecommendations ? (
+                  <div className="bg-surface-muted border border-line-default rounded-lg p-6 text-center">
+                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-accent-primary"></div>
+                    <p className="mt-2 text-sm text-content-secondary">Getting AI recommendations...</p>
+                  </div>
+                ) : recommendations ? (
+                  <AgentRecommendationPanel
+                    recommendations={recommendations}
+                    onAccept={handleAcceptRecommendation}
+                    onOverride={handleOverrideRecommendation}
+                    onExplain={handleShowExplanation}
+                    taskData={newTask}
+                  />
+                ) : null}
+              </div>
+            )}
+
             <div className="flex gap-3">
               <button type="submit" disabled={creating} className="btn btn-primary">
                 {creating ? 'Creating...' : 'Create Task'}
@@ -322,6 +425,21 @@ export default function Tasks() {
           </div>
         )}
       </div>
+
+      {/* Explanation Modal */}
+      {showExplanation && explanationData && (
+        <ExplanationModal
+          isOpen={showExplanation}
+          onClose={() => setShowExplanation(false)}
+          explanation={{
+            agentType: explanationData.agentType,
+            recommendation: explanationData.recommendation,
+            confidence: explanationData.confidence,
+            factors: explanationData.factors,
+            timestamp: new Date().toISOString()
+          }}
+        />
+      )}
     </div>
   )
 }

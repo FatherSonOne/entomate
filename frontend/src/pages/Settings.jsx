@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Settings as SettingsIcon, Database, Cpu, MessageSquare,
   RefreshCw, CheckCircle2, XCircle, AlertCircle, Loader2,
-  Palette, Sun, Moon
+  Palette, Sun, Moon, Brain, ArrowLeft
 } from 'lucide-react'
 import { integrationsApi, checkHealth } from '../services/api'
 import { useTheme, THEME_MODES } from '../context/ThemeContext'
+import LearningDashboard from '../components/learning/LearningDashboard'
 
 export default function Settings() {
+  const location = useLocation()
+  const navigate = useNavigate()
   const [status, setStatus] = useState(null)
   const [loading, setLoading] = useState(true)
   const [testing, setTesting] = useState(false)
@@ -15,12 +19,20 @@ export default function Settings() {
   const [testingChat, setTestingChat] = useState(false)
   const [crmTestResult, setCrmTestResult] = useState(null)
   const [chatTestResult, setChatTestResult] = useState(null)
+  const [activeSection, setActiveSection] = useState('settings')
 
   const { mode, setThemeMode } = useTheme()
 
   useEffect(() => {
     loadStatus()
   }, [])
+
+  useEffect(() => {
+    // Check if navigated from Dashboard with ai-learning section
+    if (location.state?.section === 'ai-learning') {
+      setActiveSection('ai-learning')
+    }
+  }, [location.state])
 
   const loadStatus = async () => {
     try {
@@ -101,12 +113,66 @@ export default function Settings() {
     return 'text-semantic-error'
   }
 
+  // If AI Learning section is active, show LearningDashboard
+  if (activeSection === 'ai-learning') {
+    return (
+      <div className="space-y-6">
+        {/* Header with back button */}
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => setActiveSection('settings')}
+            className="btn btn-ghost btn-sm"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Settings
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold text-content-primary">AI Learning System</h1>
+            <p className="text-content-secondary">Review and manage AI learning patterns</p>
+          </div>
+        </div>
+
+        <LearningDashboard />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-content-primary">Settings</h1>
         <p className="text-content-secondary">Configure your Entomate workspace</p>
+      </div>
+
+      {/* AI Learning Section */}
+      <div className="card">
+        <div className="p-4 border-b border-line-default">
+          <div className="flex items-center gap-2">
+            <Brain className="w-5 h-5 text-accent-tertiary" />
+            <h2 className="font-semibold text-content-primary">AI Learning</h2>
+          </div>
+          <p className="text-sm text-content-secondary mt-1">
+            Manage AI agent learning patterns and improve recommendations
+          </p>
+        </div>
+
+        <div className="p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <p className="text-sm text-content-secondary mb-4">
+                View and approve AI learning patterns to continuously improve agent recommendations for task assignment, priority detection, and deadline suggestions.
+              </p>
+              <button
+                onClick={() => setActiveSection('ai-learning')}
+                className="btn btn-primary"
+              >
+                <Brain className="w-4 h-4" />
+                Manage Learning Patterns
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Appearance Settings */}

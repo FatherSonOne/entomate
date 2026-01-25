@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Mic, FolderKanban, CheckSquare, Zap, ArrowRight, Server, BrainCircuit } from 'lucide-react'
 import MeetingRecorder from '../components/MeetingRecorder'
 import IntelligenceDashboard from '../components/intelligence/IntelligenceDashboard'
+import { LearningInsightsWidget } from '../components/intelligence'
 import { meetingsApi, tasksApi, projectsApi, checkHealth } from '../services/api'
 
 // Dev-Core Stat Card: Emphasizes mono font and high contrast
@@ -31,11 +32,13 @@ const StatCard = ({ label, value, icon: Icon, href, accent }) => {
 };
 
 export default function Dashboard() {
+  const navigate = useNavigate()
   const [stats, setStats] = useState({ meetings: 0, tasks: 0, projects: 0 })
   const [recentMeetings, setRecentMeetings] = useState([])
   const [pendingTasks, setPendingTasks] = useState([])
   const [systemStatus, setSystemStatus] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [learningInsights, setLearningInsights] = useState(null)
 
   useEffect(() => {
     const loadData = async () => {
@@ -55,6 +58,19 @@ export default function Dashboard() {
           tasks: tasks.count || 0,
           projects: projects.count || 0,
         });
+
+        // Fetch learning insights
+        try {
+          const learningResponse = await fetch('/api/learning/insights');
+          if (learningResponse.ok) {
+            const learningData = await learningResponse.json();
+            if (learningData.success) {
+              setLearningInsights(learningData.insights);
+            }
+          }
+        } catch (error) {
+          console.error('Failed to load learning insights:', error);
+        }
       } catch (error) {
         console.error('Failed to load dashboard data:', error);
       } finally {
@@ -77,6 +93,14 @@ export default function Dashboard() {
     return { status, isConnected };
   };
 
+  const handleReviewPatterns = () => {
+    navigate('/settings', { state: { section: 'ai-learning' } });
+  };
+
+  const handleNavigateToLearning = () => {
+    navigate('/settings', { state: { section: 'ai-learning' } });
+  };
+
   return (
     <div className="space-y-4">
       {/* Enhanced Intelligence Dashboard - AI-powered meeting prep, deal risks, action items, and relationships */}
@@ -86,6 +110,15 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         {statCardsData.map(card => <StatCard key={card.label} {...card} />)}
       </div>
+
+      {/* AI Learning Insights Widget */}
+      {learningInsights && (
+        <LearningInsightsWidget
+          insights={learningInsights}
+          onReview={handleReviewPatterns}
+          onNavigate={handleNavigateToLearning}
+        />
+      )}
 
       {systemStatus && (
         <div className="card p-2 border-l-2 border-line-default">

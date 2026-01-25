@@ -1,6 +1,7 @@
 import React from 'react'
 import { Users, Star, TrendingUp, TrendingDown, Minus, AlertTriangle, Calendar } from 'lucide-react'
 import ExpandableCard from './ExpandableCard'
+import StakeholderCard from './StakeholderCard'
 
 /**
  * RelationshipInsightCard - Stakeholder relationship intelligence
@@ -233,84 +234,20 @@ export default function RelationshipInsightCard({ data, onAction }) {
   // Expanded content
   const expandedContent = (
     <div className="space-y-4">
-      {/* All stakeholders */}
+      {/* All Stakeholders - Enhanced visualization */}
       {stakeholders && stakeholders.length > 0 && (
         <div>
           <h5 className="text-xs font-semibold text-content-secondary mb-3">
             All Stakeholders ({stakeholders.length})
           </h5>
-          <div className="space-y-3 max-h-96 overflow-y-auto">
-            {stakeholders.map((stakeholder, index) => {
-              const roleBadge = getRoleBadge(stakeholder.role)
-
-              return (
-                <div key={index} className="bg-surface-muted border border-line-default rounded-lg p-3">
-                  <div className="flex items-start justify-between gap-3 mb-2">
-                    <div className="flex-1">
-                      <p className="font-semibold text-content-primary">{stakeholder.name}</p>
-                      <p className="text-sm text-content-secondary">{stakeholder.title}</p>
-                      {stakeholder.company && (
-                        <p className="text-xs text-content-tertiary">{stakeholder.company}</p>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded border ${roleBadge.color} mb-1`}>
-                        {roleBadge.label}
-                      </span>
-                      {renderStars(stakeholder.influenceScore)}
-                    </div>
-                  </div>
-
-                  {/* Engagement metrics */}
-                  {stakeholder.engagement && (
-                    <div className="grid grid-cols-2 gap-2 mb-2 text-xs">
-                      <div className="flex items-center gap-1 text-content-secondary">
-                        <Calendar className="w-3 h-3" />
-                        <span>{stakeholder.engagement.meetingCount} meetings</span>
-                      </div>
-                      <div className="flex items-center gap-1 text-content-secondary">
-                        <span>Last: {stakeholder.engagement.daysSinceLastContact}d ago</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Relationship strength */}
-                  {stakeholder.relationshipStrength && (
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-xs text-content-secondary">Relationship:</span>
-                      <div className="flex-1 h-1.5 bg-surface-muted rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${
-                            stakeholder.relationshipStrength.score >= 75 ? 'bg-green-500' :
-                            stakeholder.relationshipStrength.score >= 50 ? 'bg-amber-500' : 'bg-red-500'
-                          }`}
-                          style={{ width: `${stakeholder.relationshipStrength.score}%` }}
-                        />
-                      </div>
-                      <span className="text-xs font-medium text-content-secondary">
-                        {stakeholder.relationshipStrength.score}/100
-                      </span>
-                      {getTrendIcon(stakeholder.relationshipStrength.trend)}
-                    </div>
-                  )}
-
-                  {/* Sentiment */}
-                  {stakeholder.sentiment && (
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-content-secondary">Sentiment:</span>
-                      <span className={`font-medium ${
-                        stakeholder.sentiment.current === 'positive' ? 'text-semantic-success' :
-                        stakeholder.sentiment.current === 'negative' ? 'text-semantic-error' : 'text-content-secondary'
-                      }`}>
-                        {stakeholder.sentiment.current.charAt(0).toUpperCase() + stakeholder.sentiment.current.slice(1)}
-                        ({stakeholder.sentiment.score})
-                        {stakeholder.sentiment.trend !== 'stable' && ` • ${stakeholder.sentiment.trend}`}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto">
+            {stakeholders.map((stakeholder, index) => (
+              <StakeholderCard
+                key={index}
+                stakeholder={stakeholder}
+                onAction={(action, id) => onAction(action, id)}
+              />
+            ))}
           </div>
         </div>
       )}
