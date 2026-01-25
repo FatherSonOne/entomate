@@ -104,15 +104,17 @@ export default {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
       },
       fontFamily: {
-        // Brand-specific fonts (CSS variables with fallbacks)
+        // Brand-aware font utilities (automatically use theme fonts)
+        display: ['var(--font-display)', 'Space Grotesk', 'Inter', 'sans-serif'],
+        sans: ['var(--font-body)', 'Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        mono: ['var(--font-mono)', 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Consolas', 'monospace'],
+
+        // Brand-specific aliases (for explicit brand font usage)
         'brand-display': ['var(--font-display)', 'Space Grotesk', 'Inter', 'sans-serif'],
         'brand-heading': ['var(--font-heading)', 'Inter', 'sans-serif'],
         'brand-body': ['var(--font-body)', 'Inter', 'sans-serif'],
         'brand-mono': ['var(--font-mono)', 'JetBrains Mono', 'monospace'],
-        // Default fonts (for components not yet migrated)
-        mono: ['JetBrains Mono', 'Fira Code', 'SF Mono', 'Consolas', 'monospace'],
-        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
-        display: ['Space Grotesk', 'Inter', 'sans-serif'],
+
         // Terminal theme fonts (legacy)
         terminal: ['JetBrains Mono', 'Fira Code', 'Courier New', 'monospace'],
         'terminal-display': ['Share Tech Mono', 'JetBrains Mono', 'monospace'],
