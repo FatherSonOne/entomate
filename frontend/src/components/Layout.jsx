@@ -25,6 +25,7 @@ import CommandPalette from './CommandPalette'
 import KeyboardShortcutsHelp from './KeyboardShortcutsHelp'
 import ThemeToggle from './ThemeToggle'
 import { useTheme } from '../context/ThemeContext'
+import '../styles/navigation.css'
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -78,7 +79,7 @@ export default function Layout() {
       >
         <div className="flex flex-col h-full">
           {/* Logo - Multi-Brand Theme System */}
-          <div className="flex items-center justify-between h-16 px-4 border-b border-line-default">
+          <div className="sidebar-logo flex items-center justify-between h-16 px-4">
             <div className="flex items-center gap-2">
               <div
                 className="w-8 h-8 rounded-lg flex items-center justify-center"
@@ -89,7 +90,7 @@ export default function Layout() {
               <span className="text-xl font-bold text-content-primary">Entomate</span>
             </div>
             <button
-              className="lg:hidden p-1 text-content-secondary hover:text-content-primary"
+              className="lg:hidden p-1 text-content-secondary hover:text-content-primary transition-colors"
               onClick={() => setSidebarOpen(false)}
             >
               <X className="w-5 h-5" />
@@ -97,7 +98,7 @@ export default function Layout() {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto scrollbar-thin">
+          <nav className="nav-container flex-1 overflow-y-auto nav-scrollbar">
             {navigation.map((item) => {
               const Icon = item.icon
               const active = isActive(item.href)
@@ -110,14 +111,14 @@ export default function Layout() {
                 >
                   <Icon className="w-5 h-5" />
                   <span>{item.name}</span>
-                  {active && <ChevronRight className="w-4 h-4 ml-auto" />}
+                  {active && <ChevronRight className="nav-item-chevron w-4 h-4 ml-auto" />}
                 </NavLink>
               )
             })}
           </nav>
 
           {/* Settings link */}
-          <div className="p-3 border-t border-line-default">
+          <div className="nav-footer">
             <NavLink
               to="/settings"
               className={`nav-item ${isActive('/settings') ? 'nav-item-active' : ''}`}
@@ -125,6 +126,7 @@ export default function Layout() {
             >
               <Settings className="w-5 h-5" />
               <span>Settings</span>
+              {isActive('/settings') && <ChevronRight className="nav-item-chevron w-4 h-4 ml-auto" />}
             </NavLink>
           </div>
         </div>
