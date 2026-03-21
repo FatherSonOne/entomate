@@ -35,6 +35,8 @@ export default function WorkflowToolbar({
   onOpenHistory,
   onExport,
   onImport,
+  onDuplicate,
+  onDelete,
   onBack,
   showGrid
 }) {
@@ -234,14 +236,14 @@ export default function WorkflowToolbar({
                 </button>
                 <hr className="my-1 border-line-subtle" />
                 <button
-                  onClick={() => { /* TODO: duplicate */ setShowMenu(false); }}
+                  onClick={() => { onDuplicate?.(); setShowMenu(false); }}
                   className="w-full flex items-center gap-2 px-3 py-2 text-sm text-content-secondary hover:bg-surface-muted"
                 >
                   <Copy className="w-4 h-4" />
                   Duplicate Workflow
                 </button>
                 <button
-                  onClick={() => { /* TODO: delete */ setShowMenu(false); }}
+                  onClick={() => { onDelete?.(); setShowMenu(false); }}
                   className="w-full flex items-center gap-2 px-3 py-2 text-sm text-semantic-error hover:bg-semantic-error-dim"
                 >
                   <Trash2 className="w-4 h-4" />

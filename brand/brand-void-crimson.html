@@ -1,0 +1,2020 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Entomate — Brand System v2.0 — Void × Crimson</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600;700&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+
+/* ============================================================
+   ENTOMATE BRAND SYSTEM v2.0 — VOID × CRIMSON
+   Primary:   Electric Crimson  #FF2D6B  (Hue 340°)
+   Secondary: Neon Mint         #00F5D4  (signal / action / alert)
+   Tertiary:  Amber             #FFB800  (AI / prediction)
+   Dark BG:   Pure Void — true black
+   Light BG:  Rose-tinted warm neutral — WCAG AA throughout
+   ============================================================ */
+
+/* ── DARK THEME ── */
+[data-theme="dark"] {
+  --en-primary:        #FF2D6B;
+  --en-primary-bright: #FF6699;
+  --en-primary-dark:   #CC1A50;
+  --en-primary-deep:   #8B0F36;
+  --en-primary-dim:    rgba(255, 45, 107, 0.12);
+  --en-primary-subtle: rgba(255, 45, 107, 0.06);
+  --en-secondary:      #00F5D4;
+  --en-secondary-bright: #40FFE4;
+  --en-secondary-dim:  rgba(0, 245, 212, 0.12);
+  --en-tertiary:       #FFB800;
+  --en-tertiary-bright: #FFD040;
+  --en-tertiary-dim:   rgba(255, 184, 0, 0.12);
+  --en-phosphor:       #A0FF32;
+  --en-phosphor-dim:   rgba(160, 255, 50, 0.10);
+  --en-bg-abyss:    #080808;
+  --en-bg-surface:  #101010;
+  --en-bg-elevated: #181818;
+  --en-bg-overlay:  #202020;
+  --en-text-primary:   #F8F0F2;
+  --en-text-secondary: #968890;
+  --en-text-tertiary:  #585055;
+  --en-text-muted:     #383035;
+  --en-text-inverse:   #080808;
+  --en-border-faint:   rgba(248, 240, 242, 0.06);
+  --en-border-subtle:  rgba(248, 240, 242, 0.10);
+  --en-border-default: rgba(248, 240, 242, 0.16);
+  --en-border-strong:  rgba(248, 240, 242, 0.36);
+  --en-border-active:  #FF2D6B;
+  --en-shadow-card:    0 1px 3px rgba(0,0,0,0.6), 0 0 0 1px rgba(248,240,242,0.06);
+  --en-shadow-hover:   0 4px 20px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,45,107,0.18);
+  --en-shadow-glow:    0 0 20px rgba(255,45,107,0.32), 0 0 48px rgba(255,45,107,0.10);
+  --en-icon-p-bg: rgba(255,45,107,0.10);  --en-icon-p-bd: rgba(255,45,107,0.22);
+  --en-icon-r-bg: rgba(0,245,212,0.10);   --en-icon-r-bd: rgba(0,245,212,0.22);
+  --en-icon-i-bg: rgba(255,184,0,0.10);   --en-icon-i-bd: rgba(255,184,0,0.22);
+  --en-shadow-vermillion-glow: 0 0 20px rgba(0,245,212,0.28), 0 0 60px rgba(0,245,212,0.08);
+  --en-shadow-periwinkle-glow: 0 0 20px rgba(255,184,0,0.28), 0 0 60px rgba(255,184,0,0.08);
+}
+
+/* ── LIGHT THEME ── */
+[data-theme="light"] {
+  --en-primary:        #CC0044;
+  --en-primary-bright: #E8005A;
+  --en-primary-dark:   #8B002E;
+  --en-primary-deep:   #5A001E;
+  --en-primary-dim:    rgba(204, 0, 68, 0.08);
+  --en-primary-subtle: rgba(204, 0, 68, 0.04);
+  --en-secondary:      #008C7A;
+  --en-secondary-bright: #00B89E;
+  --en-secondary-dim:  rgba(0, 140, 122, 0.08);
+  --en-tertiary:       #9B6800;
+  --en-tertiary-bright: #CC8800;
+  --en-tertiary-dim:   rgba(155, 104, 0, 0.08);
+  --en-phosphor:       #5A9B00;
+  --en-phosphor-dim:   rgba(90, 155, 0, 0.08);
+  --en-bg-abyss:    #FFF8FA;
+  --en-bg-surface:  #FFFFFF;
+  --en-bg-elevated: #FFF0F4;
+  --en-bg-overlay:  #FFE5EC;
+  --en-text-primary:   #08080A;
+  --en-text-secondary: #4A3840;
+  --en-text-tertiary:  #7A6870;
+  --en-text-muted:     #ADA0A8;
+  --en-text-inverse:   #FFF8FA;
+  --en-border-faint:   rgba(8, 8, 10, 0.06);
+  --en-border-subtle:  rgba(8, 8, 10, 0.10);
+  --en-border-default: rgba(8, 8, 10, 0.18);
+  --en-border-strong:  rgba(8, 8, 10, 0.40);
+  --en-border-active:  #CC0044;
+  --en-shadow-card:    0 1px 4px rgba(0,0,0,0.08), 0 0 0 1px rgba(8,8,10,0.07);
+  --en-shadow-hover:   0 4px 20px rgba(0,0,0,0.12), 0 0 0 1px rgba(204,0,68,0.25);
+  --en-shadow-glow:    0 4px 16px rgba(204,0,68,0.22);
+  --en-icon-p-bg: rgba(204,0,68,0.08);    --en-icon-p-bd: rgba(204,0,68,0.18);
+  --en-icon-r-bg: rgba(0,140,122,0.07);   --en-icon-r-bd: rgba(0,140,122,0.18);
+  --en-icon-i-bg: rgba(155,104,0,0.07);   --en-icon-i-bd: rgba(155,104,0,0.18);
+}
+
+:root {
+  /* ── TYPOGRAPHY ── */
+  --en-font-display: 'Syne', 'Space Grotesk', system-ui, sans-serif;
+  --en-font-body:    'Space Grotesk', 'Inter', system-ui, sans-serif;
+  --en-font-ui:      'Inter', system-ui, sans-serif;
+  --en-font-mono:    'JetBrains Mono', 'Fira Code', monospace;
+
+  /* ── SPACING SCALE ── */
+  --en-space-1: 4px;
+  --en-space-2: 8px;
+  --en-space-3: 12px;
+  --en-space-4: 16px;
+  --en-space-5: 20px;
+  --en-space-6: 24px;
+  --en-space-8: 32px;
+  --en-space-10: 40px;
+  --en-space-12: 48px;
+  --en-space-16: 64px;
+  --en-space-20: 80px;
+
+  /* ── RADIUS ── */
+  --en-radius-sm:  4px;
+  --en-radius-md:  8px;
+  --en-radius-lg:  12px;
+  --en-radius-xl:  20px;
+  --en-radius-2xl: 32px;
+  --en-radius-full: 9999px;
+
+  /* ── SHADOWS ── */
+  --en-shadow-sm:   0 1px 3px rgba(0,0,0,0.4);
+  --en-shadow-md:   0 4px 12px rgba(0,0,0,0.5);
+  --en-shadow-lg:   0 8px 32px rgba(0,0,0,0.6);
+
+  /* ── ANIMATION TIMING ── */
+  --en-ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+  --en-ease-in-out: cubic-bezier(0.45, 0, 0.55, 1);
+  --en-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --en-ease-snap:   cubic-bezier(0.77, 0, 0.175, 1);
+  --en-timing-instant: 80ms;
+  --en-timing-fast:    150ms;
+  --en-timing-normal:  250ms;
+  --en-timing-medium:  400ms;
+  --en-timing-slow:    600ms;
+  --en-timing-deliberate: 1000ms;
+}
+
+/* ============================================================
+   KEYFRAME ANIMATIONS
+   ============================================================ */
+
+/* Catalyst Pulse — the core brand animation */
+@keyframes catalyst-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); filter: drop-shadow(0 0 8px var(--en-primary)); }
+  50%       { opacity: 0.7; transform: scale(0.97); filter: drop-shadow(0 0 20px var(--en-primary)); }
+}
+
+/* Signal Scan — horizontal scan line for data processing */
+@keyframes signal-scan {
+  0%   { transform: translateY(-100%); opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { transform: translateY(300%); opacity: 0; }
+}
+
+/* Data Stream — cascading data particles */
+@keyframes data-stream {
+  0%   { transform: translateY(-20px); opacity: 0; }
+  20%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { transform: translateY(60px); opacity: 0; }
+}
+
+/* Node Orbit — orbital paths around intelligence nodes */
+@keyframes node-orbit {
+  from { transform: rotate(0deg) translateX(28px) rotate(0deg); }
+  to   { transform: rotate(360deg) translateX(28px) rotate(-360deg); }
+}
+
+/* Intelligence Ripple — spreading ripples like meeting insight propagating */
+@keyframes intel-ripple {
+  0%   { transform: scale(0.5); opacity: 0.8; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+
+/* Transform In — page/section entrance */
+@keyframes transform-in {
+  0%   { opacity: 0; transform: translateY(16px) scale(0.98); filter: blur(4px); }
+  100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+
+/* Phosphor Flicker — live data indicator */
+@keyframes phosphor-flicker {
+  0%, 100% { opacity: 1; }
+  92%       { opacity: 1; }
+  93%       { opacity: 0.4; }
+  94%       { opacity: 1; }
+  96%       { opacity: 0.6; }
+  97%       { opacity: 1; }
+}
+
+/* Extraction Beam — shows data being extracted/processed */
+@keyframes extraction-beam {
+  0%   { height: 0%; top: 0; opacity: 0.9; }
+  50%  { height: 100%; top: 0; opacity: 0.9; }
+  51%  { height: 100%; top: 0; opacity: 0; }
+  52%  { height: 0%; top: 100%; opacity: 0; }
+  100% { height: 0%; top: 100%; opacity: 0; }
+}
+
+/* Cascade Reveal — staggered list items */
+@keyframes cascade-reveal {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* Catalyst Spin — subtle continuous rotation for processing states */
+@keyframes catalyst-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* Intelligence Glow — pulsing glow for active AI elements */
+@keyframes intel-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(255,45,107,0.2), 0 0 16px rgba(255,45,107,0.06); }
+  50%       { box-shadow: 0 0 20px rgba(255,45,107,0.4), 0 0 40px rgba(255,45,107,0.15); }
+}
+
+/* Waveform — meeting audio visualization */
+@keyframes waveform-bar {
+  0%, 100% { transform: scaleY(0.3); }
+  50%       { transform: scaleY(1); }
+}
+
+/* Token Count Up — numbers incrementing */
+@keyframes count-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Grid Appear — hexagonal grid background */
+@keyframes grid-appear {
+  from { opacity: 0; }
+  to   { opacity: 0.06; }
+}
+
+/* Shimmer — loading state */
+@keyframes en-shimmer {
+  from { background-position: -200% 0; }
+  to   { background-position: 200% 0; }
+}
+
+/* ============================================================
+   BASE RESET & GLOBALS
+   ============================================================ */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  background: var(--en-bg-abyss);
+  color: var(--en-text-primary);
+  font-family: var(--en-font-body);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background: var(--en-bg-abyss);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--en-font-display);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+/* ============================================================
+   LAYOUT
+   ============================================================ */
+
+.brand-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--en-space-8);
+}
+
+.section {
+  margin-bottom: var(--en-space-20);
+  animation: transform-in 0.6s var(--en-ease-out) both;
+}
+
+.section-label {
+  font-family: var(--en-font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--en-primary);
+  margin-bottom: var(--en-space-2);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-label::before {
+  content: '';
+  display: block;
+  width: 24px;
+  height: 1px;
+  background: var(--en-primary);
+}
+
+.section-title {
+  font-size: clamp(24px, 3vw, 36px);
+  color: var(--en-text-primary);
+  margin-bottom: var(--en-space-2);
+}
+
+.section-desc {
+  color: var(--en-text-secondary);
+  font-size: 15px;
+  max-width: 600px;
+  margin-bottom: var(--en-space-8);
+}
+
+.grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--en-space-6); }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--en-space-6); }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--en-space-4); }
+.grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--en-space-4); }
+
+@media (max-width: 900px) {
+  .grid-4, .grid-5 { grid-template-columns: repeat(3, 1fr); }
+  .grid-3 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 600px) {
+  .grid-2, .grid-3, .grid-4, .grid-5 { grid-template-columns: 1fr; }
+}
+
+/* ============================================================
+   HERO / HEADER
+   ============================================================ */
+
+.brand-hero {
+  position: relative;
+  padding: 80px var(--en-space-8) 60px;
+  margin-bottom: var(--en-space-20);
+  overflow: hidden;
+  border-bottom: 1px solid var(--en-border-faint);
+}
+
+.brand-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255,45,107,0.07) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 40% at 80% 50%, rgba(255,184,0,0.05) 0%, transparent 70%);
+  pointer-events: none;
+  animation: grid-appear 2s var(--en-ease-out) both;
+}
+
+/* Hex grid background */
+.brand-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='52'%3E%3Cpath d='M30 2 L56 16 L56 36 L30 50 L4 36 L4 16 Z' fill='none' stroke='%23FF2D6B' stroke-width='0.5' stroke-opacity='0.08'/%3E%3C/svg%3E");
+  background-size: 60px 52px;
+  pointer-events: none;
+  animation: grid-appear 3s var(--en-ease-out) both;
+}
+
+.brand-hero-inner {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+}
+
+.brand-hero-eyebrow {
+  font-family: var(--en-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--en-primary);
+  margin-bottom: var(--en-space-4);
+  animation: transform-in 0.5s 0.1s var(--en-ease-out) both;
+}
+
+.brand-hero-title {
+  font-family: var(--en-font-display);
+  font-size: clamp(40px, 7vw, 80px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  background: linear-gradient(135deg, #F8F0F2 0%, #FF2D6B 45%, #FFB800 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: var(--en-space-4);
+  animation: transform-in 0.5s 0.2s var(--en-ease-out) both;
+}
+
+.brand-hero-sub {
+  font-size: 16px;
+  color: var(--en-text-secondary);
+  letter-spacing: 0.05em;
+  animation: transform-in 0.5s 0.3s var(--en-ease-out) both;
+}
+
+/* ============================================================
+   LOGO SHOWCASE
+   ============================================================ */
+
+.logo-card {
+  background: var(--en-bg-surface);
+  border: 1px solid var(--en-border-subtle);
+  border-radius: var(--en-radius-xl);
+  padding: var(--en-space-8);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--en-space-4);
+  transition: all 0.25s var(--en-ease-out);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.logo-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 30%, var(--en-primary-dim), transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.logo-card:hover::before { opacity: 1; }
+.logo-card:hover {
+  border-color: var(--en-border-default);
+  transform: translateY(-3px);
+  box-shadow: var(--en-shadow-card);
+}
+
+.logo-card-name {
+  font-family: var(--en-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--en-text-tertiary);
+}
+
+.logo-card-desc {
+  font-size: 12px;
+  color: var(--en-text-secondary);
+  text-align: center;
+  line-height: 1.4;
+}
+
+/* ── LOGO 1: Catalyst Node ── */
+.logo-catalyst {
+  animation: catalyst-pulse 3s ease-in-out infinite;
+}
+
+/* ── LOGO 2: Prism Transform ── */
+.logo-prism {
+  filter: drop-shadow(0 4px 16px rgba(255,184,0,0.4));
+}
+
+/* ── LOGO 3: Signal Capture ── */
+.logo-signal {
+  filter: drop-shadow(0 0 12px rgba(255,45,107,0.4));
+}
+
+/* ── LOGO 4: Meridian ── */
+.logo-meridian {
+  animation: catalyst-spin 12s linear infinite;
+}
+
+/* ── LOGO 5: Intelligence Mark ── */
+.logo-intel {
+  filter: drop-shadow(0 0 8px rgba(160,255,50,0.4));
+}
+
+/* ── LOGO 6: Neural Capture ── */
+.logo-neural-outer {
+  animation: catalyst-spin 20s linear infinite;
+}
+
+/* Full lockup wordmark */
+.wordmark {
+  font-family: var(--en-font-display);
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  background: linear-gradient(90deg, #FF2D6B 0%, #FF6699 50%, #FFB800 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.wordmark-tagline {
+  font-family: var(--en-font-mono);
+  font-size: 9px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--en-text-tertiary);
+  margin-top: -4px;
+}
+
+/* ============================================================
+   COLOR PALETTE
+   ============================================================ */
+
+.swatch-group {
+  margin-bottom: var(--en-space-6);
+}
+
+.swatch-group-label {
+  font-family: var(--en-font-mono);
+  font-size: 11px;
+  color: var(--en-text-tertiary);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-bottom: var(--en-space-3);
+}
+
+.swatch {
+  height: 72px;
+  border-radius: var(--en-radius-md);
+  position: relative;
+  cursor: pointer;
+  transition: transform 0.2s var(--en-ease-spring);
+  border: 1px solid rgba(255,255,255,0.04);
+}
+
+.swatch:hover { transform: scale(1.04) translateY(-2px); }
+
+.swatch-info {
+  position: absolute;
+  bottom: 6px;
+  left: 8px;
+}
+
+.swatch-name {
+  font-family: var(--en-font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.7);
+  display: block;
+  line-height: 1.2;
+}
+
+.swatch-hex {
+  font-family: var(--en-font-mono);
+  font-size: 9px;
+  color: rgba(255,255,255,0.45);
+}
+
+/* Gradient swatches */
+.swatch-gradient {
+  height: 100px;
+  border-radius: var(--en-radius-lg);
+  position: relative;
+  overflow: hidden;
+}
+
+.swatch-gradient-label {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  font-family: var(--en-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: rgba(255,255,255,0.8);
+  font-weight: 600;
+}
+
+/* ============================================================
+   TYPOGRAPHY
+   ============================================================ */
+
+.type-specimen {
+  background: var(--en-bg-surface);
+  border: 1px solid var(--en-border-faint);
+  border-radius: var(--en-radius-lg);
+  padding: var(--en-space-6);
+  margin-bottom: var(--en-space-4);
+  transition: border-color 0.2s;
+}
+
+.type-specimen:hover { border-color: var(--en-border-subtle); }
+
+.type-meta {
+  font-family: var(--en-font-mono);
+  font-size: 10px;
+  color: var(--en-primary);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-bottom: var(--en-space-2);
+}
+
+/* ============================================================
+   COMPONENT LIBRARY
+   ============================================================ */
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--en-space-2);
+  padding: 10px 20px;
+  border-radius: var(--en-radius-lg);
+  font-family: var(--en-font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s var(--en-ease-out);
+  text-decoration: none;
+  letter-spacing: 0.01em;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255,255,255,0);
+  transition: background 0.15s;
+}
+.btn:hover::after { background: rgba(255,255,255,0.06); }
+.btn:active::after { background: rgba(255,255,255,0.12); }
+
+.btn-primary {
+  background: var(--en-primary);
+  color: var(--en-text-inverse);
+  box-shadow: 0 0 0 1px rgba(255,45,107,0.25), 0 4px 12px rgba(255,45,107,0.2);
+}
+.btn-primary:hover { box-shadow: var(--en-shadow-glow, 0 0 20px rgba(255,45,107,0.25), 0 0 48px rgba(255,45,107,0.08)); transform: translateY(-1px); }
+
+.btn-secondary {
+  background: transparent;
+  color: var(--en-primary);
+  border: 1px solid var(--en-border-default);
+}
+.btn-secondary:hover { border-color: var(--en-primary); background: var(--en-primary-dim); }
+
+.btn-amber {
+  background: var(--en-secondary);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(0,245,212,0.3);
+}
+.btn-amber:hover { box-shadow: var(--en-shadow-vermillion-glow); transform: translateY(-1px); }
+
+.btn-violet {
+  background: var(--en-tertiary);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(255,184,0,0.3);
+}
+.btn-violet:hover { box-shadow: var(--en-shadow-periwinkle-glow); transform: translateY(-1px); }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--en-text-secondary);
+  border: 1px solid var(--en-border-faint);
+}
+.btn-ghost:hover { color: var(--en-text-primary); border-color: var(--en-border-subtle); }
+
+.btn-sm { padding: 6px 14px; font-size: 12px; border-radius: var(--en-radius-md); }
+.btn-lg { padding: 14px 28px; font-size: 15px; border-radius: var(--en-radius-xl); }
+
+/* Badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: var(--en-radius-full);
+  font-family: var(--en-font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.badge-primary { background: var(--en-primary-dim); color: var(--en-primary); border: 1px solid rgba(255,45,107,0.25); }
+.badge-amber   { background: var(--en-secondary-dim); color: var(--en-secondary); border: 1px solid rgba(0,245,212,0.3); }
+.badge-violet  { background: var(--en-tertiary-dim); color: var(--en-tertiary-bright); border: 1px solid rgba(255,184,0,0.3); }
+.badge-phosphor{ background: var(--en-phosphor-dim); color: var(--en-phosphor); border: 1px solid rgba(160,255,50,0.3); }
+.badge-error   { background: rgba(255,45,107,0.12); color: #FF2D6B; border: 1px solid rgba(255,45,107,0.3); }
+
+.badge-dot::before {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: phosphor-flicker 4s infinite;
+}
+
+/* Cards */
+.card {
+  background: var(--en-bg-surface);
+  border: 1px solid var(--en-border-faint);
+  border-radius: var(--en-radius-xl);
+  padding: var(--en-space-6);
+  transition: all 0.25s var(--en-ease-out);
+  position: relative;
+  overflow: hidden;
+}
+
+.card:hover {
+  border-color: var(--en-border-subtle);
+  transform: translateY(-2px);
+  box-shadow: var(--en-shadow-card);
+}
+
+.card-glow { animation: intel-glow 3s ease-in-out infinite; }
+
+.card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: var(--en-space-4);
+  gap: var(--en-space-3);
+}
+
+.card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--en-radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.card-icon-teal   { background: var(--en-icon-p-bg); border: 1px solid var(--en-icon-p-bd); }
+.card-icon-amber  { background: var(--en-icon-r-bg); border: 1px solid var(--en-icon-r-bd); }
+.card-icon-violet { background: var(--en-icon-i-bg); border: 1px solid var(--en-icon-i-bd); }
+.card-icon-phosphor{ background: var(--en-phosphor-dim); border: 1px solid rgba(160,255,50,0.22); }
+
+.card-title {
+  font-family: var(--en-font-display);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--en-text-primary);
+  letter-spacing: -0.01em;
+  flex: 1;
+}
+
+.card-value {
+  font-family: var(--en-font-display);
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--en-text-primary);
+  margin-bottom: 2px;
+}
+
+.card-label {
+  font-size: 12px;
+  color: var(--en-text-tertiary);
+}
+
+.card-trend {
+  font-family: var(--en-font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--en-phosphor);
+}
+
+/* ============================================================
+   ANIMATION DEMOS
+   ============================================================ */
+
+.anim-demo {
+  background: var(--en-bg-surface);
+  border: 1px solid var(--en-border-faint);
+  border-radius: var(--en-radius-xl);
+  padding: var(--en-space-6);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--en-space-3);
+  min-height: 160px;
+}
+
+.anim-demo-label {
+  font-family: var(--en-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--en-text-tertiary);
+  margin-top: auto;
+}
+
+/* Ripple Demo */
+.ripple-container {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ripple-core {
+  width: 16px;
+  height: 16px;
+  background: var(--en-primary);
+  border-radius: 50%;
+  position: relative;
+  z-index: 1;
+  box-shadow: 0 0 12px var(--en-primary);
+}
+
+.ripple-ring {
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--en-primary);
+  border-radius: 50%;
+  animation: intel-ripple 2s ease-out infinite;
+}
+
+.ripple-ring:nth-child(2) { animation-delay: 0.6s; }
+.ripple-ring:nth-child(3) { animation-delay: 1.2s; }
+
+/* Waveform Demo */
+.waveform {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 40px;
+}
+
+.waveform-bar {
+  width: 3px;
+  background: var(--en-primary);
+  border-radius: 2px;
+  transform-origin: bottom;
+  animation: waveform-bar 0.8s ease-in-out infinite alternate;
+}
+
+.waveform-bar:nth-child(1)  { height: 60%; animation-delay: 0s; }
+.waveform-bar:nth-child(2)  { height: 90%; animation-delay: 0.1s; }
+.waveform-bar:nth-child(3)  { height: 40%; animation-delay: 0.2s; }
+.waveform-bar:nth-child(4)  { height: 100%; animation-delay: 0.05s; }
+.waveform-bar:nth-child(5)  { height: 70%; animation-delay: 0.15s; }
+.waveform-bar:nth-child(6)  { height: 50%; animation-delay: 0.25s; }
+.waveform-bar:nth-child(7)  { height: 80%; animation-delay: 0.08s; }
+.waveform-bar:nth-child(8)  { height: 35%; animation-delay: 0.18s; }
+.waveform-bar:nth-child(9)  { height: 95%; animation-delay: 0.12s; }
+.waveform-bar:nth-child(10) { height: 55%; animation-delay: 0.22s; }
+.waveform-bar:nth-child(11) { height: 75%; animation-delay: 0.03s; }
+.waveform-bar:nth-child(12) { height: 45%; animation-delay: 0.17s; }
+
+/* Scan Demo */
+.scan-container {
+  width: 80px;
+  height: 60px;
+  background: var(--en-bg-elevated);
+  border: 1px solid var(--en-border-subtle);
+  border-radius: var(--en-radius-md);
+  position: relative;
+  overflow: hidden;
+}
+
+.scan-line {
+  position: absolute;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--en-primary), transparent);
+  box-shadow: 0 0 8px var(--en-primary);
+  animation: signal-scan 2s linear infinite;
+}
+
+/* Node Orbit Demo */
+.orbit-container {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.orbit-center {
+  width: 16px;
+  height: 16px;
+  background: var(--en-primary);
+  border-radius: 50%;
+  box-shadow: 0 0 16px var(--en-primary);
+}
+
+.orbit-ring {
+  position: absolute;
+  width: 64px;
+  height: 64px;
+  border: 1px solid var(--en-border-subtle);
+  border-radius: 50%;
+}
+
+.orbit-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  margin: -4px;
+  border-radius: 50%;
+  background: var(--en-secondary);
+  box-shadow: 0 0 8px var(--en-secondary);
+  animation: node-orbit 4s linear infinite;
+}
+
+.orbit-dot-2 {
+  background: var(--en-tertiary);
+  box-shadow: 0 0 8px var(--en-tertiary);
+  animation: node-orbit 6s linear infinite reverse;
+  width: 6px;
+  height: 6px;
+  margin: -3px;
+}
+
+/* Shimmer Loading */
+.shimmer-box {
+  height: 40px;
+  border-radius: var(--en-radius-md);
+  background: linear-gradient(
+    90deg,
+    var(--en-bg-elevated) 0%,
+    var(--en-bg-overlay) 50%,
+    var(--en-bg-elevated) 100%
+  );
+  background-size: 200% 100%;
+  animation: en-shimmer 1.5s ease-in-out infinite;
+  width: 100%;
+}
+
+/* Progress Bar */
+.progress {
+  height: 4px;
+  background: var(--en-bg-elevated);
+  border-radius: 2px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--en-primary-deep), var(--en-primary), var(--en-primary-bright));
+  background-size: 200% 100%;
+  animation: en-shimmer 2s ease-in-out infinite;
+}
+
+/* ============================================================
+   MEETING INTELLIGENCE CARD (Featured Component)
+   ============================================================ */
+
+.meeting-card {
+  background: var(--en-bg-surface);
+  border: 1px solid var(--en-border-subtle);
+  border-radius: var(--en-radius-2xl);
+  padding: var(--en-space-6);
+  position: relative;
+  overflow: hidden;
+  animation: intel-glow 4s ease-in-out infinite;
+}
+
+.meeting-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--en-primary), var(--en-tertiary), var(--en-secondary));
+}
+
+.meeting-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--en-space-5);
+}
+
+.meeting-title {
+  font-family: var(--en-font-display);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--en-text-primary);
+  letter-spacing: -0.02em;
+}
+
+.meeting-meta {
+  font-size: 12px;
+  color: var(--en-text-tertiary);
+  margin-top: 2px;
+}
+
+.meeting-ai-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--en-primary-dim);
+  border: 1px solid var(--en-border-default);
+  border-radius: var(--en-radius-full);
+  padding: 4px 10px 4px 8px;
+  font-family: var(--en-font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--en-primary);
+  letter-spacing: 0.08em;
+}
+
+.ai-dot {
+  width: 6px;
+  height: 6px;
+  background: var(--en-primary);
+  border-radius: 50%;
+  box-shadow: 0 0 6px var(--en-primary);
+  animation: phosphor-flicker 3s infinite;
+}
+
+.meeting-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--en-space-3);
+  margin-bottom: var(--en-space-5);
+}
+
+.meeting-stat {
+  background: var(--en-bg-elevated);
+  border: 1px solid var(--en-border-faint);
+  border-radius: var(--en-radius-md);
+  padding: var(--en-space-3);
+  text-align: center;
+}
+
+.meeting-stat-value {
+  font-family: var(--en-font-display);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.meeting-stat-label {
+  font-size: 10px;
+  color: var(--en-text-tertiary);
+  letter-spacing: 0.05em;
+  margin-top: 2px;
+}
+
+.action-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--en-space-2);
+}
+
+.action-item {
+  display: flex;
+  align-items: center;
+  gap: var(--en-space-3);
+  padding: var(--en-space-3);
+  background: var(--en-bg-elevated);
+  border: 1px solid var(--en-border-faint);
+  border-radius: var(--en-radius-md);
+  cursor: pointer;
+  transition: all 0.15s;
+  animation: cascade-reveal 0.4s var(--en-ease-out) both;
+}
+
+.action-item:nth-child(1) { animation-delay: 0.1s; }
+.action-item:nth-child(2) { animation-delay: 0.2s; }
+.action-item:nth-child(3) { animation-delay: 0.3s; }
+
+.action-item:hover { border-color: var(--en-border-subtle); background: var(--en-bg-overlay); }
+
+.action-item-check {
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--en-border-default);
+  border-radius: 4px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.action-item:hover .action-item-check { border-color: var(--en-primary); }
+
+.action-item-text {
+  font-size: 13px;
+  color: var(--en-text-secondary);
+  flex: 1;
+}
+
+.action-item-tag {
+  font-family: var(--en-font-mono);
+  font-size: 9px;
+  padding: 2px 7px;
+  border-radius: 3px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+/* ============================================================
+   ICON SYSTEM PREVIEW
+   ============================================================ */
+
+.icon-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: var(--en-space-3);
+}
+
+.icon-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--en-space-2);
+  padding: var(--en-space-3);
+  background: var(--en-bg-surface);
+  border: 1px solid var(--en-border-faint);
+  border-radius: var(--en-radius-md);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.icon-item:hover {
+  border-color: var(--en-border-subtle);
+  background: var(--en-bg-elevated);
+  color: var(--en-primary);
+}
+
+.icon-item svg { transition: transform 0.2s; }
+.icon-item:hover svg { transform: scale(1.1); }
+
+.icon-item-label {
+  font-family: var(--en-font-mono);
+  font-size: 8px;
+  color: var(--en-text-muted);
+  letter-spacing: 0.05em;
+  text-align: center;
+}
+
+/* ============================================================
+   BRAND COMPARISON (Pulse / Logos Vision / Entomate)
+   ============================================================ */
+
+.brand-bar {
+  height: 56px;
+  border-radius: var(--en-radius-lg);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--en-space-5);
+  gap: var(--en-space-4);
+  margin-bottom: var(--en-space-3);
+  font-family: var(--en-font-display);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.brand-bar-label {
+  font-size: 11px;
+  font-family: var(--en-font-mono);
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  color: rgba(255,255,255,0.5);
+  text-transform: uppercase;
+  margin-left: auto;
+}
+
+/* ============================================================
+   DARK/LIGHT BACKGROUNDS DEMO
+   ============================================================ */
+
+.bg-demo {
+  padding: var(--en-space-4);
+  border-radius: var(--en-radius-md);
+  font-family: var(--en-font-mono);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* ============================================================
+   CODE TOKEN
+   ============================================================ */
+
+.code-block {
+  background: var(--en-bg-elevated);
+  border: 1px solid var(--en-border-faint);
+  border-radius: var(--en-radius-lg);
+  padding: var(--en-space-5);
+  font-family: var(--en-font-mono);
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--en-text-secondary);
+  overflow-x: auto;
+}
+
+.token-key   { color: #8BAEC7; }
+.token-value { color: var(--en-primary); }
+.token-num   { color: var(--en-secondary); }
+.token-str   { color: var(--en-phosphor); }
+.token-comment { color: var(--en-text-muted); font-style: italic; }
+
+/* ============================================================
+   DIVIDER
+   ============================================================ */
+
+.divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--en-border-default), transparent);
+  margin: var(--en-space-6) 0;
+}
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
+
+.brand-footer {
+  padding: var(--en-space-12) var(--en-space-8);
+  text-align: center;
+  border-top: 1px solid var(--en-border-faint);
+  color: var(--en-text-muted);
+  font-family: var(--en-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+}
+
+/* ── Waveform bar color follows palette primary ── */
+.waveform-bar { background: var(--en-primary); }
+
+/* ── Orbit center follows palette primary ── */
+.orbit-center { background: var(--en-primary); box-shadow: 0 0 16px var(--en-primary); }
+.scan-line { background: linear-gradient(90deg, transparent, var(--en-primary), transparent); box-shadow: 0 0 8px var(--en-primary); }
+
+/* ── Ripple follows palette primary ── */
+.ripple-core { background: var(--en-primary); box-shadow: 0 0 12px var(--en-primary); }
+.ripple-ring { border-color: var(--en-primary); }
+
+/* ── Progress fill follows palette ── */
+.progress-fill { background: linear-gradient(90deg, var(--en-primary-dark), var(--en-primary), var(--en-primary-bright)); }
+
+/* ── Sticky theme pill ── */
+.theme-pill {
+  position: fixed; top: 16px; right: 20px; z-index: 9999;
+  font-family: var(--en-font-mono); font-size: 10px; font-weight: 600;
+  letter-spacing: 0.15em; text-transform: uppercase; padding: 8px 18px;
+  background: var(--en-bg-elevated); color: var(--en-text-secondary);
+  border: 1px solid var(--en-border-default); border-radius: 9999px;
+  cursor: pointer; transition: all 0.2s;
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+}
+.theme-pill:hover { color: var(--en-primary); border-color: var(--en-primary); }
+
+</style>
+</head>
+<body>
+<button class="theme-pill" id="theme-pill" onclick="(function(){var h=document.documentElement;var t=h.getAttribute('data-theme');var n=t==='dark'?'light':'dark';h.setAttribute('data-theme',n);var b=document.getElementById('theme-pill');b.textContent=n==='dark'?'\u25D1 Dark Mode':'\u2600 Light Mode';})();">\u25D1 Dark Mode</button>
+
+<!-- ======================================================
+     HERO
+     ====================================================== -->
+<div class="brand-hero">
+  <div class="brand-hero-inner">
+    <div class="brand-hero-eyebrow">Brand System · Version 2.0 · Void × Crimson · 2026</div>
+    <h1 class="brand-hero-title">ENTOMATE</h1>
+    <p class="brand-hero-sub">Intelligence Catalyst — Brand Identity System</p>
+    <div style="margin-top:24px;">
+      <button id="theme-toggle" onclick="(function(){var h=document.documentElement;var t=h.getAttribute('data-theme');var next=t==='dark'?'light':'dark';h.setAttribute('data-theme',next);var btn=document.getElementById('theme-toggle');btn.textContent=next==='dark'?'☀ Light Mode':'◑ Dark Mode';})();" style="font-family:var(--en-font-mono);font-size:11px;letter-spacing:0.15em;text-transform:uppercase;padding:8px 18px;background:var(--en-bg-elevated);color:var(--en-text-secondary);border:1px solid var(--en-border-default);border-radius:9999px;cursor:pointer;transition:all 0.2s;">◑ Dark Mode</button>
+    </div>
+    <div style="margin-top:12px; display:inline-flex; align-items:center; gap:8px; background:rgba(255,45,107,0.1); border:1px solid rgba(255,45,107,0.25); border-radius:9999px; padding:6px 16px 6px 12px; font-family:var(--en-font-mono); font-size:10px; letter-spacing:0.2em; text-transform:uppercase; color:#FF2D6B;">
+      <span style="width:8px; height:8px; background:#FF2D6B; border-radius:50%; box-shadow:0 0 8px rgba(255,45,107,0.8); display:inline-block;"></span>
+      Palette 03 — Void · Crimson
+    </div>
+  </div>
+</div>
+
+<div class="brand-page">
+
+<!-- ======================================================
+     LOGO CONCEPTS (6 distinct marks)
+     ====================================================== -->
+<div class="section">
+  <div class="section-label">01 — Identity</div>
+  <h2 class="section-title">Logo Concepts</h2>
+  <p class="section-desc">Six distinct marks exploring different facets of meeting intelligence and automation. Each represents a unique brand direction.</p>
+
+  <div class="grid-3">
+
+    <!-- Logo 1: Catalyst Node — Primary Recommendation -->
+    <div class="logo-card" style="border-color: rgba(255,45,107,0.25); background: linear-gradient(135deg, #101010, #181818);">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <svg class="logo-catalyst" width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Outer hexagon ring -->
+          <path d="M32 4 L56 18 L56 46 L32 60 L8 46 L8 18 Z" stroke="#FF2D6B" stroke-width="1.5" stroke-opacity="0.3" fill="none"/>
+          <!-- Inner hexagon -->
+          <path d="M32 14 L48 23 L48 41 L32 50 L16 41 L16 23 Z" stroke="#FF2D6B" stroke-width="1" stroke-opacity="0.45" fill="rgba(255,45,107,0.04)"/>
+          <!-- Center node -->
+          <circle cx="32" cy="32" r="8" fill="#FF2D6B" opacity="0.9"/>
+          <!-- Node connector lines -->
+          <line x1="32" y1="14" x2="32" y2="24" stroke="#FF2D6B" stroke-width="1.5" stroke-opacity="0.6"/>
+          <line x1="32" y1="40" x2="32" y2="50" stroke="#FF2D6B" stroke-width="1.5" stroke-opacity="0.6"/>
+          <line x1="16" y1="23" x2="24" y2="27" stroke="#FF2D6B" stroke-width="1.5" stroke-opacity="0.6"/>
+          <line x1="48" y1="23" x2="40" y2="27" stroke="#FF2D6B" stroke-width="1.5" stroke-opacity="0.6"/>
+          <line x1="16" y1="41" x2="24" y2="37" stroke="#FF2D6B" stroke-width="1.5" stroke-opacity="0.6"/>
+          <line x1="48" y1="41" x2="40" y2="37" stroke="#FF2D6B" stroke-width="1.5" stroke-opacity="0.6"/>
+          <!-- Satellite nodes -->
+          <circle cx="32" cy="14" r="4" fill="#FF2D6B" opacity="0.7"/>
+          <circle cx="32" cy="50" r="4" fill="#FF2D6B" opacity="0.7"/>
+          <circle cx="16" cy="23" r="3" fill="#FFB800" opacity="0.85"/>
+          <circle cx="48" cy="23" r="3" fill="#00F5D4" opacity="0.85"/>
+          <circle cx="16" cy="41" r="3" fill="#00F5D4" opacity="0.85"/>
+          <circle cx="48" cy="41" r="3" fill="#FFB800" opacity="0.85"/>
+          <!-- Inner dark dot -->
+          <circle cx="32" cy="32" r="3" fill="#080808" opacity="0.8"/>
+        </svg>
+        <div>
+          <div class="wordmark">Entomate</div>
+          <div class="wordmark-tagline">Intelligence Catalyst</div>
+        </div>
+      </div>
+      <div class="badge badge-primary badge-dot">Primary Mark</div>
+      <div class="logo-card-name">Catalyst Node</div>
+      <div class="logo-card-desc">Hexagonal intelligence network. Nodes represent meetings, connections represent extracted insights flowing to action.</div>
+    </div>
+
+    <!-- Logo 2: Prism Transform -->
+    <div class="logo-card">
+      <svg class="logo-prism" width="72" height="72" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Prism outline -->
+        <path d="M36 8 L64 58 L8 58 Z" fill="rgba(255,184,0,0.07)" stroke="#FFB800" stroke-width="1.5"/>
+        <!-- Inner light beam entering -->
+        <line x1="36" y1="8" x2="36" y2="28" stroke="white" stroke-width="2" stroke-opacity="0.5"/>
+        <!-- Dispersed spectrum exiting bottom -->
+        <line x1="36" y1="42" x2="16" y2="58" stroke="#FF2D6B" stroke-width="2" stroke-opacity="0.9"/>
+        <line x1="36" y1="40" x2="24" y2="58" stroke="#A0FF32" stroke-width="1.5" stroke-opacity="0.8"/>
+        <line x1="36" y1="40" x2="32" y2="58" stroke="#FF6699" stroke-width="1.5" stroke-opacity="0.8"/>
+        <line x1="36" y1="40" x2="40" y2="58" stroke="#FFB800" stroke-width="1.5" stroke-opacity="0.8"/>
+        <line x1="36" y1="40" x2="48" y2="58" stroke="#00F5D4" stroke-width="2" stroke-opacity="0.8"/>
+        <line x1="36" y1="42" x2="56" y2="58" stroke="#FFD040" stroke-width="1.5" stroke-opacity="0.8"/>
+        <!-- Core prism facet highlight -->
+        <path d="M36 8 L64 58 L8 58 Z" fill="none" stroke="#FFB800" stroke-width="1.5"/>
+        <path d="M36 28 L52 52 L20 52 Z" fill="rgba(255,184,0,0.10)" stroke="#FFB800" stroke-width="0.5" stroke-opacity="0.5"/>
+        <!-- Top vertex dot -->
+        <circle cx="36" cy="8" r="3" fill="#FF2D6B" opacity="0.9"/>
+      </svg>
+      <div class="logo-card-name">Prism Transform</div>
+      <div class="logo-card-desc">Raw meeting input (white light) refracts into structured intelligence outputs. Each color = a data type.</div>
+    </div>
+
+    <!-- Logo 3: Signal Capture -->
+    <div class="logo-card">
+      <svg class="logo-signal" width="72" height="72" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Outer signal rings -->
+        <path d="M20 52 Q8 40 8 28 Q8 12 36 8 Q64 12 64 28 Q64 44 52 52" stroke="#FF2D6B" stroke-width="1.5" stroke-opacity="0.2" fill="none" stroke-linecap="round"/>
+        <path d="M23 49 Q12 38 12 28 Q12 16 36 12 Q60 16 60 28 Q60 40 49 49" stroke="#FF2D6B" stroke-width="1.5" stroke-opacity="0.4" fill="none" stroke-linecap="round"/>
+        <path d="M26 46 Q17 36 17 28 Q17 20 36 17 Q55 20 55 28 Q55 37 46 46" stroke="#FF2D6B" stroke-width="1.5" stroke-opacity="0.65" fill="none" stroke-linecap="round"/>
+        <!-- Speech bubble base -->
+        <path d="M24 54 L24 38 Q24 32 30 32 L42 32 Q48 32 48 38 L48 48 Q48 54 42 54 L32 54 L28 62 Z" fill="rgba(255,45,107,0.08)" stroke="#FF2D6B" stroke-width="1.5"/>
+        <!-- Dots inside bubble (signal to data) -->
+        <circle cx="30" cy="43" r="2.5" fill="#FF2D6B" opacity="0.9"/>
+        <circle cx="36" cy="43" r="2.5" fill="#FFB800" opacity="0.9"/>
+        <circle cx="42" cy="43" r="2.5" fill="#00F5D4" opacity="0.9"/>
+        <!-- Arrow indicating transformation -->
+        <path d="M52 28 L60 28 L58 25 M60 28 L58 31" stroke="#FF2D6B" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <div class="logo-card-name">Signal Capture</div>
+      <div class="logo-card-desc">Meeting conversations (speech bubbles) transformed into structured, actionable intelligence signals.</div>
+    </div>
+
+    <!-- Logo 4: Meridian (Precision targeting) -->
+    <div class="logo-card">
+      <div class="orbit-container" style="width:72px; height:72px;">
+        <svg class="logo-meridian" width="72" height="72" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Outer circle -->
+          <circle cx="36" cy="36" r="32" stroke="#FF2D6B" stroke-width="0.75" stroke-opacity="0.2" stroke-dasharray="4 4"/>
+          <!-- Cardinal crosshairs -->
+          <line x1="36" y1="4" x2="36" y2="16" stroke="#FF2D6B" stroke-width="2" stroke-opacity="0.85"/>
+          <line x1="36" y1="56" x2="36" y2="68" stroke="#FF2D6B" stroke-width="2" stroke-opacity="0.85"/>
+          <line x1="4" y1="36" x2="16" y2="36" stroke="#FF2D6B" stroke-width="2" stroke-opacity="0.85"/>
+          <line x1="56" y1="36" x2="68" y2="36" stroke="#FF2D6B" stroke-width="2" stroke-opacity="0.85"/>
+          <!-- Diagonal lighter lines -->
+          <line x1="13" y1="13" x2="20" y2="20" stroke="#FFB800" stroke-width="1" stroke-opacity="0.5"/>
+          <line x1="52" y1="52" x2="59" y2="59" stroke="#FFB800" stroke-width="1" stroke-opacity="0.5"/>
+          <line x1="59" y1="13" x2="52" y2="20" stroke="#FFB800" stroke-width="1" stroke-opacity="0.5"/>
+          <line x1="13" y1="59" x2="20" y2="52" stroke="#FFB800" stroke-width="1" stroke-opacity="0.5"/>
+          <!-- Middle ring -->
+          <circle cx="36" cy="36" r="18" stroke="#FF2D6B" stroke-width="1" stroke-opacity="0.45" fill="none"/>
+          <!-- Inner ring -->
+          <circle cx="36" cy="36" r="8" stroke="#FF2D6B" stroke-width="1.5" stroke-opacity="0.75" fill="rgba(255,45,107,0.05)"/>
+          <!-- Center target -->
+          <circle cx="36" cy="36" r="3" fill="#FF2D6B"/>
+          <circle cx="36" cy="36" r="1.5" fill="#080808" opacity="0.8"/>
+        </svg>
+      </div>
+      <div class="logo-card-name">Meridian</div>
+      <div class="logo-card-desc">Precision targeting for business intelligence. Crosshair represents pinpoint accuracy in insight extraction.</div>
+    </div>
+
+    <!-- Logo 5: E-Mark (Letterform) -->
+    <div class="logo-card">
+      <svg class="logo-intel" width="72" height="72" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Outer ring -->
+        <circle cx="36" cy="36" r="32" fill="rgba(255,45,107,0.04)" stroke="rgba(255,45,107,0.2)" stroke-width="1"/>
+        <!-- Stylized E letterform from circuit paths -->
+        <path d="M20 16 L52 16 L52 22 L26 22 L26 33 L48 33 L48 39 L26 39 L26 50 L52 50 L52 56 L20 56 Z" fill="none" stroke="#FF2D6B" stroke-width="2" stroke-linejoin="round"/>
+        <!-- Data node dots at key vertices -->
+        <circle cx="20" cy="16" r="3.5" fill="#FF2D6B" opacity="0.9"/>
+        <circle cx="52" cy="16" r="3.5" fill="#CC1A50" opacity="0.8"/>
+        <circle cx="20" cy="56" r="3.5" fill="#FF2D6B" opacity="0.9"/>
+        <circle cx="52" cy="56" r="3.5" fill="#CC1A50" opacity="0.8"/>
+        <circle cx="48" cy="36" r="3" fill="#00F5D4" opacity="0.9"/>
+        <!-- Scan line -->
+        <line x1="20" y1="36" x2="48" y2="36" stroke="#FF2D6B" stroke-width="0.5" stroke-opacity="0.3" stroke-dasharray="2 3"/>
+      </svg>
+      <div class="logo-card-name">Circuit E</div>
+      <div class="logo-card-desc">Letterform as circuit architecture. The E-mark in electric crimson signals live intelligence processing.</div>
+    </div>
+
+    <!-- Logo 6: Neural Thread -->
+    <div class="logo-card">
+      <svg width="72" height="72" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Outer rotating ring -->
+        <g class="logo-neural-outer">
+          <circle cx="36" cy="36" r="30" stroke="#FF2D6B" stroke-width="0.5" stroke-opacity="0.18" fill="none" stroke-dasharray="6 3"/>
+        </g>
+        <!-- Neural paths -->
+        <path d="M36 12 C36 12 20 20 16 30 C12 40 24 44 28 52" stroke="#FF2D6B" stroke-width="1.5" stroke-opacity="0.65" fill="none" stroke-linecap="round"/>
+        <path d="M36 12 C36 12 52 20 56 30 C60 40 48 44 44 52" stroke="#FFB800" stroke-width="1.5" stroke-opacity="0.65" fill="none" stroke-linecap="round"/>
+        <path d="M28 52 C28 52 32 58 36 60 C40 58 44 52 44 52" stroke="#00F5D4" stroke-width="1.5" stroke-opacity="0.65" fill="none" stroke-linecap="round"/>
+        <!-- Synapse nodes -->
+        <circle cx="36" cy="12" r="5" fill="#FF2D6B" opacity="0.9"/>
+        <circle cx="16" cy="30" r="4" fill="#FF2D6B" opacity="0.7"/>
+        <circle cx="56" cy="30" r="4" fill="#FFB800" opacity="0.75"/>
+        <circle cx="28" cy="52" r="4" fill="#00F5D4" opacity="0.85"/>
+        <circle cx="44" cy="52" r="4" fill="#00F5D4" opacity="0.85"/>
+        <circle cx="36" cy="60" r="5" fill="#A0FF32" opacity="0.9"/>
+        <!-- Inner dark cores -->
+        <circle cx="36" cy="12" r="2" fill="#080808" opacity="0.7"/>
+        <circle cx="36" cy="60" r="2" fill="#080808" opacity="0.7"/>
+        <!-- Connecting mid-threads -->
+        <path d="M16 30 C22 32 26 30 28 36 C30 42 28 46 28 52" stroke="#FF2D6B" stroke-width="1" stroke-opacity="0.35" fill="none"/>
+        <path d="M56 30 C50 32 46 30 44 36 C42 42 44 46 44 52" stroke="#FFB800" stroke-width="1" stroke-opacity="0.35" fill="none"/>
+      </svg>
+      <div class="logo-card-name">Neural Thread</div>
+      <div class="logo-card-desc">Synaptic network mapping conversation threads to action outcomes. Organic intelligence topology.</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ======================================================
+     COLOR PALETTE
+     ====================================================== -->
+<div class="section">
+  <div class="section-label">02 — Color</div>
+  <h2 class="section-title">Palette System</h2>
+  <p class="section-desc">Pure Void backgrounds with Electric Crimson primary — anchored in hue 340°. Neon Mint signals and Amber AI intelligence layer. Bold, dramatic, high-contrast palette with rose-tinted light mode.</p>
+
+  <div class="swatch-group">
+    <div class="swatch-group-label">Primary — Electric Crimson (Hue 340°)</div>
+    <div class="grid-5">
+      <div class="swatch" style="background:#FF2D6B;"><div class="swatch-info"><span class="swatch-name">Electric Crimson</span><span class="swatch-hex">#FF2D6B</span></div></div>
+      <div class="swatch" style="background:#FF6699;"><div class="swatch-info"><span class="swatch-name">Bright Crimson</span><span class="swatch-hex">#FF6699</span></div></div>
+      <div class="swatch" style="background:#CC1A50;"><div class="swatch-info"><span class="swatch-name">Dark Crimson</span><span class="swatch-hex">#CC1A50</span></div></div>
+      <div class="swatch" style="background:#8B0F36;"><div class="swatch-info"><span class="swatch-name">Deep Crimson</span><span class="swatch-hex">#8B0F36</span></div></div>
+      <div class="swatch" style="background:#CC0044; border:1px solid rgba(204,0,68,0.4);"><div class="swatch-info"><span class="swatch-name">Ruby</span><span class="swatch-hex">#CC0044</span></div></div>
+    </div>
+  </div>
+  <div class="swatch-group">
+    <div class="swatch-group-label">Secondary — Neon Mint (Signal)</div>
+    <div class="grid-5">
+      <div class="swatch" style="background:#00F5D4;"><div class="swatch-info"><span class="swatch-name">Neon Mint</span><span class="swatch-hex">#00F5D4</span></div></div>
+      <div class="swatch" style="background:#40FFE4;"><div class="swatch-info"><span class="swatch-name">Bright Mint</span><span class="swatch-hex">#40FFE4</span></div></div>
+      <div class="swatch" style="background:#00B89E;"><div class="swatch-info"><span class="swatch-name">Deep Mint</span><span class="swatch-hex">#00B89E</span></div></div>
+      <div class="swatch" style="background:#008C7A;"><div class="swatch-info"><span class="swatch-name">Teal</span><span class="swatch-hex">#008C7A</span></div></div>
+      <div class="swatch" style="background:#A0FF32;"><div class="swatch-info"><span class="swatch-name">Phosphor</span><span class="swatch-hex">#A0FF32</span></div></div>
+    </div>
+  </div>
+  <div class="swatch-group">
+    <div class="swatch-group-label">Tertiary — Amber (AI Layer)</div>
+    <div class="grid-5">
+      <div class="swatch" style="background:#FFB800;"><div class="swatch-info"><span class="swatch-name">Amber</span><span class="swatch-hex">#FFB800</span></div></div>
+      <div class="swatch" style="background:#FFD040;"><div class="swatch-info"><span class="swatch-name">Bright Amber</span><span class="swatch-hex">#FFD040</span></div></div>
+      <div class="swatch" style="background:#CC8800;"><div class="swatch-info"><span class="swatch-name">Dark Amber</span><span class="swatch-hex">#CC8800</span></div></div>
+      <div class="swatch" style="background:#9B6800;"><div class="swatch-info"><span class="swatch-name">Deep Amber</span><span class="swatch-hex">#9B6800</span></div></div>
+      <div class="swatch" style="background:#7A5000;"><div class="swatch-info"><span class="swatch-name">Burnt Gold</span><span class="swatch-hex">#7A5000</span></div></div>
+    </div>
+  </div>
+  <div class="swatch-group">
+    <div class="swatch-group-label">Dark Theme — Pure Void Backgrounds</div>
+    <div class="grid-5">
+      <div class="swatch" style="background:#080808; border:1px solid rgba(248,240,242,0.1);"><div class="swatch-info"><span class="swatch-name">Void</span><span class="swatch-hex">#080808</span></div></div>
+      <div class="swatch" style="background:#101010; border:1px solid rgba(248,240,242,0.08);"><div class="swatch-info"><span class="swatch-name">Surface</span><span class="swatch-hex">#101010</span></div></div>
+      <div class="swatch" style="background:#181818; border:1px solid rgba(248,240,242,0.08);"><div class="swatch-info"><span class="swatch-name">Elevated</span><span class="swatch-hex">#181818</span></div></div>
+      <div class="swatch" style="background:#202020; border:1px solid rgba(248,240,242,0.08);"><div class="swatch-info"><span class="swatch-name">Overlay</span><span class="swatch-hex">#202020</span></div></div>
+      <div class="swatch" style="background:#2A2A2A; border:1px solid rgba(248,240,242,0.08);"><div class="swatch-info"><span class="swatch-name">Muted</span><span class="swatch-hex">#2A2A2A</span></div></div>
+    </div>
+  </div>
+  <div class="swatch-group">
+    <div class="swatch-group-label">Light Theme — Crimson-tinted Neutrals</div>
+    <div class="grid-5">
+      <div class="swatch" style="background:#FFF8FA; border:1px solid rgba(8,8,10,0.1);"><div class="swatch-info"><span class="swatch-name" style="color:#08080A;">Rose Paper</span><span class="swatch-hex" style="color:#4A3840;">#FFF8FA</span></div></div>
+      <div class="swatch" style="background:#FFFFFF; border:1px solid rgba(8,8,10,0.08);"><div class="swatch-info"><span class="swatch-name" style="color:#08080A;">Surface</span><span class="swatch-hex" style="color:#4A3840;">#FFFFFF</span></div></div>
+      <div class="swatch" style="background:#FFF0F4; border:1px solid rgba(8,8,10,0.08);"><div class="swatch-info"><span class="swatch-name" style="color:#08080A;">Elevated</span><span class="swatch-hex" style="color:#4A3840;">#FFF0F4</span></div></div>
+      <div class="swatch" style="background:#FFE5EC; border:1px solid rgba(8,8,10,0.08);"><div class="swatch-info"><span class="swatch-name" style="color:#08080A;">Overlay</span><span class="swatch-hex" style="color:#4A3840;">#FFE5EC</span></div></div>
+      <div class="swatch" style="background:#F5D0DA; border:1px solid rgba(8,8,10,0.08);"><div class="swatch-info"><span class="swatch-name" style="color:#08080A;">Border</span><span class="swatch-hex" style="color:#4A3840;">#F5D0DA</span></div></div>
+    </div>
+  </div>
+  <div class="swatch-group">
+    <div class="swatch-group-label">Brand Gradients</div>
+    <div class="grid-3">
+      <div class="swatch-gradient" style="background:linear-gradient(135deg,#8B0F36 0%,#FF2D6B 50%,#FF6699 100%);"><div class="swatch-gradient-label">Crimson Rise</div></div>
+      <div class="swatch-gradient" style="background:linear-gradient(135deg,#080808 0%,#181818 40%,#FF2D6B 100%);"><div class="swatch-gradient-label">Void Emerge</div></div>
+      <div class="swatch-gradient" style="background:linear-gradient(135deg,#FFB800 0%,#FF2D6B 50%,#A0FF32 100%);"><div class="swatch-gradient-label">Spectrum Output</div></div>
+      <div class="swatch-gradient" style="background:linear-gradient(135deg,#00F5D4 0%,#40FFE4 100%);"><div class="swatch-gradient-label">Mint Alert</div></div>
+      <div class="swatch-gradient" style="background:linear-gradient(90deg,#080808 0%,#101010 35%,#FF2D6B 100%);"><div class="swatch-gradient-label">Horizon Emerge</div></div>
+      <div class="swatch-gradient" style="background:conic-gradient(from 0deg,#FF2D6B,#FFB800,#00F5D4,#A0FF32,#FF2D6B);"><div class="swatch-gradient-label">Full Spectrum</div></div>
+    </div>
+  </div>
+
+</div><!-- /.section -->
+
+<!-- ======================================================
+     BRAND ECOSYSTEM COMPARISON
+     ====================================================== -->
+<div class="section">
+  <div class="section-label">03 — Ecosystem</div>
+  <h2 class="section-title">Brand Harmony</h2>
+  <p class="section-desc">Entomate sits within the same product family as Pulse and Logos Vision. Each occupies a distinct color territory while maintaining visual cohesion.</p>
+
+  <div style="display:flex; flex-direction:column; gap: var(--en-space-3);">
+    <!-- Pulse brand bar -->
+    <div class="brand-bar" style="background: linear-gradient(90deg, rgba(124,58,237,0.15), rgba(139,92,246,0.08)); border: 1px solid rgba(139,92,246,0.3);">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+        <circle cx="14" cy="14" r="13" stroke="#8B5CF6" stroke-width="1.5"/>
+        <path d="M7 14 Q10 8 14 14 Q18 20 21 14" stroke="#8B5CF6" stroke-width="2" fill="none" stroke-linecap="round"/>
+      </svg>
+      <span style="color:#C4B5FD; font-family:var(--en-font-display);">Pulse</span>
+      <div style="flex:1; height:2px; background: linear-gradient(90deg, rgba(139,92,246,0.6), transparent); border-radius:1px;"></div>
+      <span style="color: #8B5CF6; font-size:12px; font-family: var(--en-font-mono);">#8B5CF6</span>
+      <span style="color: #06B6D4; font-size:12px; font-family: var(--en-font-mono);">#06B6D4</span>
+      <span style="color: #EC4899; font-size:12px; font-family: var(--en-font-mono);">#EC4899</span>
+      <div class="brand-bar-label">Communication · Voice · Purple/Cyan</div>
+    </div>
+
+    <!-- Logos Vision brand bar -->
+    <div class="brand-bar" style="background: linear-gradient(90deg, rgba(30,64,175,0.15), rgba(59,130,246,0.08)); border: 1px solid rgba(59,130,246,0.3);">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+        <circle cx="14" cy="14" r="13" stroke="#3B82F6" stroke-width="1.5"/>
+        <path d="M8 11 L14 6 L20 11 L20 22 L8 22 Z" stroke="#3B82F6" stroke-width="1.5" fill="rgba(59,130,246,0.1)"/>
+        <circle cx="14" cy="15" r="3" fill="#60A5FA" opacity="0.8"/>
+      </svg>
+      <span style="color:#93C5FD; font-family:var(--en-font-display);">Logos Vision</span>
+      <div style="flex:1; height:2px; background: linear-gradient(90deg, rgba(59,130,246,0.6), transparent); border-radius:1px;"></div>
+      <span style="color: #1E40AF; font-size:12px; font-family: var(--en-font-mono);">#1E40AF</span>
+      <span style="color: #3B82F6; font-size:12px; font-family: var(--en-font-mono);">#3B82F6</span>
+      <span style="color: #F97316; font-size:12px; font-family: var(--en-font-mono);">#F97316</span>
+      <div class="brand-bar-label">CRM · Relationships · Navy/Blue</div>
+    </div>
+
+    <!-- Entomate brand bar -->
+    <div class="brand-bar" style="background: linear-gradient(90deg, rgba(255,45,107,0.10), rgba(255,45,107,0.03)); border: 1px solid rgba(255,45,107,0.3); box-shadow: 0 0 20px rgba(255,45,107,0.06);">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+        <path d="M14 2 L24 8 L24 20 L14 26 L4 20 L4 8 Z" stroke="#FF2D6B" stroke-width="1.5" fill="rgba(255,45,107,0.07)"/>
+        <circle cx="14" cy="14" r="4" fill="#FF2D6B" opacity="0.9"/>
+        <circle cx="14" cy="14" r="1.5" fill="#080808"/>
+      </svg>
+      <span style="background: linear-gradient(90deg, #FF2D6B, #FFB800); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-family:var(--en-font-display);">Entomate</span>
+      <div style="flex:1; height:2px; background: linear-gradient(90deg, #FF2D6B, rgba(255,184,0,0.3)); border-radius:1px;"></div>
+      <span style="color: #FF2D6B; font-size:12px; font-family: var(--en-font-mono);">#FF2D6B</span>
+      <span style="color: #FFB800; font-size:12px; font-family: var(--en-font-mono);">#FFB800</span>
+      <span style="color: #00F5D4; font-size:12px; font-family: var(--en-font-mono);">#00F5D4</span>
+      <div class="brand-bar-label">Intelligence · Automation · Crimson/Amber</div>
+    </div>
+  </div>
+
+  <div style="margin-top:var(--en-space-5); padding:var(--en-space-4); background:var(--en-bg-surface); border:1px solid var(--en-border-faint); border-radius:var(--en-radius-lg);">
+    <div style="font-family:var(--en-font-mono); font-size:11px; color:var(--en-text-tertiary); margin-bottom:var(--en-space-3); letter-spacing:0.1em; text-transform:uppercase;">Design System Rationale</div>
+    <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:var(--en-space-4);">
+      <div>
+        <div style="color:var(--en-primary); font-size:13px; font-weight:600; margin-bottom:4px;">Hue Separation</div>
+        <div style="font-size:12px; color:var(--en-text-secondary); line-height:1.5;">Entomate sits at Hue 340° (Electric Crimson) — 70° from Pulse (270° purple) and 120° from Logos Vision (220° blue). Maximum perceptual distance.</div>
+      </div>
+      <div>
+        <div style="color:var(--en-secondary); font-size:13px; font-weight:600; margin-bottom:4px;">Tone Distinction</div>
+        <div style="font-size:12px; color:var(--en-text-secondary); line-height:1.5;">Pure Void (true black, zero hue cast) vs. Pulse's cool-dark and Logos Vision's navy. Electric Crimson pops with dramatic, high-contrast clarity.</div>
+      </div>
+      <div>
+        <div style="color:var(--en-tertiary); font-size:13px; font-weight:600; margin-bottom:4px;">Shared Thread</div>
+        <div style="font-size:12px; color:var(--en-text-secondary); line-height:1.5;">All three brands use dark backgrounds, share similar shadow depths, and complement each other in a unified product ecosystem.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================================================
+     TYPOGRAPHY
+     ====================================================== -->
+<div class="section">
+  <div class="section-label">04 — Typography</div>
+  <h2 class="section-title">Type System</h2>
+  <p class="section-desc">Syne for display, Space Grotesk for body, JetBrains Mono for data. Clean geometric hierarchy for intelligence interfaces.</p>
+
+  <div class="type-specimen">
+    <div class="type-meta">Syne · Display · 800 weight</div>
+    <div style="font-family:var(--en-font-display); font-size:48px; font-weight:800; letter-spacing:-0.03em; line-height:1; color:var(--en-text-primary);">Meeting Intelligence</div>
+    <div style="font-family:var(--en-font-display); font-size:48px; font-weight:800; letter-spacing:-0.03em; line-height:1; background: linear-gradient(90deg, #FF2D6B, #FFB800); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">That Actually Works</div>
+  </div>
+
+  <div class="grid-3">
+    <div class="type-specimen">
+      <div class="type-meta">Display · H1</div>
+      <div style="font-family:var(--en-font-display); font-size:32px; font-weight:700; letter-spacing:-0.02em;">48px / 700</div>
+      <div style="font-size:12px; color:var(--en-text-tertiary); margin-top:4px; font-family:var(--en-font-mono);">Syne — Section titles, hero copy</div>
+    </div>
+    <div class="type-specimen">
+      <div class="type-meta">Body · Regular</div>
+      <div style="font-family:var(--en-font-body); font-size:15px; font-weight:400; color:var(--en-text-secondary); line-height:1.6;">The meeting transcript is analyzed for action items, decisions, and follow-up requirements. Results are delivered in under 3 seconds.</div>
+      <div style="font-size:12px; color:var(--en-text-tertiary); margin-top:8px; font-family:var(--en-font-mono);">Space Grotesk 15px / 400</div>
+    </div>
+    <div class="type-specimen">
+      <div class="type-meta">Mono · Data Display</div>
+      <div style="font-family:var(--en-font-mono); font-size:13px; color:var(--en-primary);">98.3% accuracy<br/>2847ms latency<br/>142 action items<br/>→ 18 automations</div>
+      <div style="font-size:12px; color:var(--en-text-tertiary); margin-top:8px; font-family:var(--en-font-mono);">JetBrains Mono — metrics, code, IDs</div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================================================
+     ANIMATIONS
+     ====================================================== -->
+<div class="section">
+  <div class="section-label">05 — Motion</div>
+  <h2 class="section-title">Animation System</h2>
+  <p class="section-desc">Motion conveys intelligence — scanning, processing, transmitting. Each animation has semantic meaning tied to Entomate's core actions.</p>
+
+  <div class="grid-4">
+
+    <div class="anim-demo">
+      <div class="ripple-container" style="width:80px; height:80px;">
+        <div class="ripple-core" style="width:20px; height:20px;"></div>
+        <div class="ripple-ring"></div>
+        <div class="ripple-ring"></div>
+        <div class="ripple-ring"></div>
+      </div>
+      <div class="anim-demo-label">Intel Ripple · Meeting live</div>
+    </div>
+
+    <div class="anim-demo">
+      <div class="waveform">
+        <div class="waveform-bar"></div>
+        <div class="waveform-bar"></div>
+        <div class="waveform-bar"></div>
+        <div class="waveform-bar"></div>
+        <div class="waveform-bar"></div>
+        <div class="waveform-bar"></div>
+        <div class="waveform-bar"></div>
+        <div class="waveform-bar"></div>
+        <div class="waveform-bar"></div>
+        <div class="waveform-bar"></div>
+        <div class="waveform-bar"></div>
+        <div class="waveform-bar"></div>
+      </div>
+      <div class="anim-demo-label">Waveform · Audio capture</div>
+    </div>
+
+    <div class="anim-demo">
+      <div class="scan-container" style="width:100px; height:72px;">
+        <div class="scan-line"></div>
+        <div style="padding:12px 8px; display:flex; flex-direction:column; gap:5px;">
+          <div style="height:6px; background:var(--en-bg-overlay); border-radius:3px; width:80%;"></div>
+          <div style="height:6px; background:var(--en-bg-overlay); border-radius:3px; width:60%;"></div>
+          <div style="height:6px; background:var(--en-bg-overlay); border-radius:3px; width:70%;"></div>
+        </div>
+      </div>
+      <div class="anim-demo-label">Signal Scan · Processing</div>
+    </div>
+
+    <div class="anim-demo">
+      <div class="orbit-container">
+        <div class="orbit-ring"></div>
+        <div class="orbit-center"></div>
+        <div class="orbit-dot"></div>
+        <div class="orbit-dot orbit-dot-2"></div>
+      </div>
+      <div class="anim-demo-label">Node Orbit · AI agents</div>
+    </div>
+
+    <div class="anim-demo">
+      <div style="width:100%; display:flex; flex-direction:column; gap:var(--en-space-2);">
+        <div class="shimmer-box"></div>
+        <div class="shimmer-box" style="height:24px; width:70%;"></div>
+        <div class="shimmer-box" style="height:24px; width:85%;"></div>
+      </div>
+      <div class="anim-demo-label">Shimmer · Loading state</div>
+    </div>
+
+    <div class="anim-demo">
+      <div style="width:100%; display:flex; flex-direction:column; gap:var(--en-space-3);">
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+          <span style="font-family:var(--en-font-mono); font-size:10px; color:var(--en-text-tertiary);">Analysis</span>
+          <span style="font-family:var(--en-font-mono); font-size:10px; color:var(--en-primary);">87%</span>
+        </div>
+        <div class="progress"><div class="progress-fill" style="width:87%;"></div></div>
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+          <span style="font-family:var(--en-font-mono); font-size:10px; color:var(--en-text-tertiary);">Confidence</span>
+          <span style="font-family:var(--en-font-mono); font-size:10px; color:var(--en-secondary);">94%</span>
+        </div>
+        <div class="progress"><div class="progress-fill" style="width:94%; background: linear-gradient(90deg, #008C7A, #00F5D4, #40FFE4); background-size:200% 100%;"></div></div>
+      </div>
+      <div class="anim-demo-label">Progress · Intelligence score</div>
+    </div>
+
+    <div class="anim-demo">
+      <div style="display:flex; gap:6px;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="animation: catalyst-pulse 2s ease-in-out infinite;">
+          <path d="M12 2 L22 7 L22 17 L12 22 L2 17 L2 7 Z" stroke="#FF2D6B" stroke-width="1.5" fill="rgba(255,45,107,0.1)"/>
+          <circle cx="12" cy="12" r="3" fill="#FF2D6B"/>
+        </svg>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="animation: catalyst-pulse 2s 0.4s ease-in-out infinite;">
+          <path d="M12 2 L22 7 L22 17 L12 22 L2 17 L2 7 Z" stroke="#FFB800" stroke-width="1.5" fill="rgba(255,184,0,0.1)"/>
+          <circle cx="12" cy="12" r="3" fill="#FFB800"/>
+        </svg>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="animation: catalyst-pulse 2s 0.8s ease-in-out infinite;">
+          <path d="M12 2 L22 7 L22 17 L12 22 L2 17 L2 7 Z" stroke="#00F5D4" stroke-width="1.5" fill="rgba(0,245,212,0.1)"/>
+          <circle cx="12" cy="12" r="3" fill="#00F5D4"/>
+        </svg>
+      </div>
+      <div class="anim-demo-label">Catalyst Pulse · Active nodes</div>
+    </div>
+
+    <div class="anim-demo">
+      <div style="display:flex; align-items:center; gap:6px;">
+        <div style="width:8px; height:8px; background:var(--en-phosphor); border-radius:50%; box-shadow: 0 0 8px var(--en-phosphor); animation: phosphor-flicker 3s infinite;"></div>
+        <span style="font-family:var(--en-font-mono); font-size:12px; color:var(--en-phosphor); animation: phosphor-flicker 3s infinite;">LIVE</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:6px; margin-top:6px;">
+        <div style="width:8px; height:8px; background:var(--en-primary); border-radius:50%; box-shadow: 0 0 8px var(--en-primary); animation: phosphor-flicker 4s 1s infinite;"></div>
+        <span style="font-family:var(--en-font-mono); font-size:12px; color:var(--en-primary); animation: phosphor-flicker 4s 1s infinite;">ANALYZING</span>
+      </div>
+      <div class="anim-demo-label">Phosphor Flicker · Status</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ======================================================
+     COMPONENTS
+     ====================================================== -->
+<div class="section">
+  <div class="section-label">06 — Components</div>
+  <h2 class="section-title">UI Components</h2>
+  <p class="section-desc">Core building blocks designed for dense, data-rich intelligence interfaces.</p>
+
+  <!-- Buttons -->
+  <div style="background:var(--en-bg-surface); border:1px solid var(--en-border-faint); border-radius:var(--en-radius-xl); padding:var(--en-space-6); margin-bottom:var(--en-space-5);">
+    <div class="type-meta" style="margin-bottom:var(--en-space-4);">Buttons</div>
+    <div style="display:flex; flex-wrap:wrap; gap:var(--en-space-3); align-items:center;">
+      <button class="btn btn-primary">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5,3 19,12 5,21"/></svg>
+        Analyze Meeting
+      </button>
+      <button class="btn btn-secondary">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r="1"/></svg>
+        View Details
+      </button>
+      <button class="btn btn-amber">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4m0 4h.01M5.07 19H19a2 2 0 0 0 1.75-2.96L13.75 4a2 2 0 0 0-3.5 0L3.25 16A2 2 0 0 0 5.07 19z"/></svg>
+        Action Required
+      </button>
+      <button class="btn btn-violet">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        AI Insight
+      </button>
+      <button class="btn btn-ghost">Export</button>
+      <button class="btn btn-sm btn-primary">Run Agent</button>
+      <button class="btn btn-lg btn-primary">Start Intelligence</button>
+    </div>
+  </div>
+
+  <!-- Badges -->
+  <div style="background:var(--en-bg-surface); border:1px solid var(--en-border-faint); border-radius:var(--en-radius-xl); padding:var(--en-space-6); margin-bottom:var(--en-space-5);">
+    <div class="type-meta" style="margin-bottom:var(--en-space-4);">Badges &amp; Status</div>
+    <div style="display:flex; flex-wrap:wrap; gap:var(--en-space-3); align-items:center;">
+      <span class="badge badge-primary badge-dot">In Progress</span>
+      <span class="badge badge-amber badge-dot">Action Required</span>
+      <span class="badge badge-violet">AI Analysis</span>
+      <span class="badge badge-phosphor badge-dot">Live</span>
+      <span class="badge badge-error">High Risk</span>
+      <span class="badge badge-primary">Completed</span>
+      <span class="badge badge-amber">Pending Review</span>
+      <span class="badge badge-violet badge-dot">Predicting</span>
+    </div>
+  </div>
+
+  <!-- Stats Cards -->
+  <div class="grid-4" style="margin-bottom:var(--en-space-5);">
+    <div class="card card-glow">
+      <div class="card-header">
+        <div class="card-icon card-icon-teal">🎙</div>
+        <span class="badge badge-phosphor badge-dot" style="font-size:9px;">Live</span>
+      </div>
+      <div class="card-value" style="color:var(--en-primary);">142</div>
+      <div class="card-label">Action Items Today</div>
+      <div class="card-trend">↑ +23 from yesterday</div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon card-icon-amber">⚡</div>
+        <span class="badge badge-amber" style="font-size:9px;">Urgent</span>
+      </div>
+      <div class="card-value" style="color:var(--en-secondary);">18</div>
+      <div class="card-label">Automations Running</div>
+      <div class="card-trend" style="color:var(--en-secondary);">3 pending review</div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon card-icon-violet">🧠</div>
+        <span class="badge badge-violet" style="font-size:9px;">AI</span>
+      </div>
+      <div class="card-value" style="color:var(--en-tertiary);">94%</div>
+      <div class="card-label">Prediction Confidence</div>
+      <div class="card-trend" style="color:var(--en-tertiary);">+2.1% this week</div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon card-icon-phosphor">📊</div>
+        <span class="badge badge-primary" style="font-size:9px;">Reports</span>
+      </div>
+      <div class="card-value" style="color:var(--en-phosphor);">2.3s</div>
+      <div class="card-label">Avg Analysis Time</div>
+      <div class="card-trend" style="color:var(--en-phosphor);">↓ 0.4s faster</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ======================================================
+     MEETING INTELLIGENCE CARD (Hero Component)
+     ====================================================== -->
+<div class="section">
+  <div class="section-label">07 — Featured</div>
+  <h2 class="section-title">Meeting Intelligence Card</h2>
+  <p class="section-desc">The signature component — real-time analysis output with action items, confidence scores, and one-click automation triggers.</p>
+
+  <div class="grid-2">
+    <div class="meeting-card">
+      <div class="meeting-header">
+        <div>
+          <div class="meeting-title">Q4 Deal Review — Northstar Inc.</div>
+          <div class="meeting-meta">Today · 42 min · 6 participants</div>
+        </div>
+        <div class="meeting-ai-badge">
+          <div class="ai-dot"></div>
+          AI Active
+        </div>
+      </div>
+
+      <div class="meeting-stats">
+        <div class="meeting-stat">
+          <div class="meeting-stat-value" style="color:var(--en-primary);">8</div>
+          <div class="meeting-stat-label">Action Items</div>
+        </div>
+        <div class="meeting-stat">
+          <div class="meeting-stat-value" style="color:var(--en-secondary);">3</div>
+          <div class="meeting-stat-label">Decisions</div>
+        </div>
+        <div class="meeting-stat">
+          <div class="meeting-stat-value" style="color:var(--en-tertiary);">94%</div>
+          <div class="meeting-stat-label">Confidence</div>
+        </div>
+      </div>
+
+      <div style="font-family:var(--en-font-mono); font-size:10px; color:var(--en-text-tertiary); letter-spacing:0.1em; text-transform:uppercase; margin-bottom:var(--en-space-2);">Extracted Action Items</div>
+      <div class="action-items">
+        <div class="action-item">
+          <div class="action-item-check"></div>
+          <div class="action-item-text">Send revised pricing deck to procurement team</div>
+          <span class="action-item-tag" style="background:var(--en-secondary-dim); color:var(--en-secondary);">Today</span>
+        </div>
+        <div class="action-item">
+          <div class="action-item-check"></div>
+          <div class="action-item-text">Schedule technical demo for January 15th</div>
+          <span class="action-item-tag" style="background:var(--en-tertiary-dim); color:var(--en-tertiary-bright);">+2d</span>
+        </div>
+        <div class="action-item">
+          <div class="action-item-check"></div>
+          <div class="action-item-text">Update deal stage to Negotiation in Logos Vision</div>
+          <span class="action-item-tag" style="background:var(--en-primary-dim); color:var(--en-primary);">Auto</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div style="display:flex; gap:var(--en-space-2);">
+        <button class="btn btn-primary btn-sm" style="flex:1;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5,3 19,12 5,21"/></svg>
+          Run Automations
+        </button>
+        <button class="btn btn-ghost btn-sm">Review</button>
+        <button class="btn btn-ghost btn-sm">Share</button>
+      </div>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:var(--en-space-4);">
+      <!-- Sentiment Bar -->
+      <div style="background:var(--en-bg-surface); border:1px solid var(--en-border-faint); border-radius:var(--en-radius-xl); padding:var(--en-space-5);">
+        <div style="font-family:var(--en-font-mono); font-size:10px; color:var(--en-text-tertiary); letter-spacing:0.1em; text-transform:uppercase; margin-bottom:var(--en-space-3);">Meeting Sentiment Analysis</div>
+        <div style="display:flex; gap:4px; height:12px; border-radius:6px; overflow:hidden; margin-bottom:var(--en-space-2);">
+          <div style="width:62%; background: linear-gradient(90deg, #8B0F36, #FF2D6B); border-radius:6px 0 0 6px;"></div>
+          <div style="width:23%; background: var(--en-bg-elevated);"></div>
+          <div style="width:15%; background: linear-gradient(90deg, #008C7A, #00F5D4); border-radius:0 6px 6px 0;"></div>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-family:var(--en-font-mono); font-size:10px;">
+          <span style="color:var(--en-primary);">62% Positive</span>
+          <span style="color:var(--en-text-tertiary);">23% Neutral</span>
+          <span style="color:var(--en-secondary);">15% Concern</span>
+        </div>
+      </div>
+
+      <!-- Deal Risk Score -->
+      <div style="background:var(--en-bg-surface); border:1px solid var(--en-border-faint); border-radius:var(--en-radius-xl); padding:var(--en-space-5);">
+        <div style="font-family:var(--en-font-mono); font-size:10px; color:var(--en-text-tertiary); letter-spacing:0.1em; text-transform:uppercase; margin-bottom:var(--en-space-3);">Deal Close Probability</div>
+        <div style="display:flex; align-items:baseline; gap:var(--en-space-2); margin-bottom:var(--en-space-3);">
+          <span style="font-family:var(--en-font-display); font-size:48px; font-weight:800; letter-spacing:-0.03em; color:var(--en-primary);">78</span>
+          <span style="font-size:18px; color:var(--en-text-tertiary);">%</span>
+          <span class="badge badge-primary" style="margin-left:auto;">High</span>
+        </div>
+        <div class="progress"><div class="progress-fill" style="width:78%;"></div></div>
+        <div style="font-size:12px; color:var(--en-text-tertiary); margin-top:var(--en-space-2);">↑ 12% from last meeting · Based on 847 similar deals</div>
+      </div>
+
+      <!-- Quick actions -->
+      <div style="background:var(--en-bg-surface); border:1px solid var(--en-border-faint); border-radius:var(--en-radius-xl); padding:var(--en-space-5);">
+        <div style="font-family:var(--en-font-mono); font-size:10px; color:var(--en-text-tertiary); letter-spacing:0.1em; text-transform:uppercase; margin-bottom:var(--en-space-3);">One-Click Automations</div>
+        <div style="display:flex; flex-direction:column; gap:var(--en-space-2);">
+          <button class="btn btn-ghost btn-sm" style="justify-content:flex-start; gap:var(--en-space-3);">
+            <span style="color:var(--en-primary);">↗</span> Sync to Logos Vision CRM
+          </button>
+          <button class="btn btn-ghost btn-sm" style="justify-content:flex-start; gap:var(--en-space-3);">
+            <span style="color:var(--en-secondary);">📨</span> Send follow-up via Pulse
+          </button>
+          <button class="btn btn-ghost btn-sm" style="justify-content:flex-start; gap:var(--en-space-3);">
+            <span style="color:var(--en-tertiary);">🤖</span> Run Deal Risk Agent
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================================================
+     DESIGN TOKENS CODE
+     ====================================================== -->
+<div class="section">
+  <div class="section-label">08 — Tokens</div>
+  <h2 class="section-title">Design Token Reference</h2>
+  <p class="section-desc">Drop-in CSS variables for your implementation. Import the tokens file and reference via var(--en-*).</p>
+
+  <div class="code-block">
+<span class="token-comment">/* Entomate Design Tokens v2 — Void × Crimson */</span><br>
+<span class="token-key">[data-theme="dark"] {</span><br>
+&nbsp;&nbsp;<span class="token-comment">/* Primary — Electric Crimson (Hue 340°) */</span><br>
+&nbsp;&nbsp;<span class="token-key">--en-primary:</span>        <span class="token-value">#FF2D6B</span>;<br>
+&nbsp;&nbsp;<span class="token-key">--en-primary-bright:</span> <span class="token-value">#FF6699</span>;<br>
+&nbsp;&nbsp;<span class="token-key">--en-primary-dark:</span>   <span class="token-value">#CC1A50</span>;<br>
+&nbsp;&nbsp;<span class="token-key">--en-primary-dim:</span>    <span class="token-value">rgba(255, 45, 107, 0.12)</span>;<br>
+&nbsp;&nbsp;<br>
+&nbsp;&nbsp;<span class="token-comment">/* Secondary — Neon Mint */</span><br>
+&nbsp;&nbsp;<span class="token-key">--en-secondary:</span>      <span class="token-value">#00F5D4</span>;<br>
+&nbsp;&nbsp;<span class="token-key">--en-secondary-dim:</span>  <span class="token-value">rgba(0, 245, 212, 0.12)</span>;<br>
+&nbsp;&nbsp;<br>
+&nbsp;&nbsp;<span class="token-comment">/* Tertiary — Amber (AI layer) */</span><br>
+&nbsp;&nbsp;<span class="token-key">--en-tertiary:</span>       <span class="token-value">#FFB800</span>;<br>
+&nbsp;&nbsp;<span class="token-key">--en-tertiary-bright:</span><span class="token-value">#FFD040</span>;<br>
+&nbsp;&nbsp;<span class="token-key">--en-tertiary-dim:</span>   <span class="token-value">rgba(255, 184, 0, 0.12)</span>;<br>
+&nbsp;&nbsp;<br>
+&nbsp;&nbsp;<span class="token-comment">/* Phosphor — Live / Active */</span><br>
+&nbsp;&nbsp;<span class="token-key">--en-phosphor:</span>       <span class="token-value">#A0FF32</span>;<br>
+&nbsp;&nbsp;<br>
+&nbsp;&nbsp;<span class="token-comment">/* Backgrounds — Pure Void */</span><br>
+&nbsp;&nbsp;<span class="token-key">--en-bg-abyss:</span>       <span class="token-value">#080808</span>;<br>
+&nbsp;&nbsp;<span class="token-key">--en-bg-surface:</span>     <span class="token-value">#101010</span>;<br>
+&nbsp;&nbsp;<span class="token-key">--en-bg-elevated:</span>    <span class="token-value">#181818</span>;<br>
+&nbsp;&nbsp;<span class="token-key">--en-bg-overlay:</span>     <span class="token-value">#202020</span>;<br>
+<span class="token-key">}</span><br>
+<span class="token-key">[data-theme="light"] {</span><br>
+&nbsp;&nbsp;<span class="token-key">--en-primary:</span>        <span class="token-value">#CC0044</span>;<br>
+&nbsp;&nbsp;<span class="token-key">--en-secondary:</span>      <span class="token-value">#008C7A</span>;<br>
+&nbsp;&nbsp;<span class="token-key">--en-tertiary:</span>       <span class="token-value">#9B6800</span>;<br>
+&nbsp;&nbsp;<span class="token-key">--en-bg-abyss:</span>       <span class="token-value">#FFF8FA</span>;<br>
+&nbsp;&nbsp;<span class="token-key">--en-text-primary:</span>   <span class="token-value">#08080A</span>;<br>
+<span class="token-key">}</span>
+  </div>
+</div>
+
+</div><!-- /.brand-page -->
+
+<div class="brand-footer">
+  ENTOMATE · Brand System v2.0 · Void × Crimson · 2026 · Intelligence Catalyst<br>
+  Electric Crimson · Neon Mint · Amber · Acid Phosphor · Pure Void<br>
+  Syne Display · Space Grotesk Body · JetBrains Mono Data
+</div>
+
+</body>
+</html>

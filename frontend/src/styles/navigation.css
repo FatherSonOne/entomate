@@ -1,9 +1,9 @@
 /* ============================================
-   ENHANCED NAVIGATION DESIGN SYSTEM
-   Modern, spacious navigation with smooth interactions
+   VOID × CRIMSON — NAVIGATION DESIGN SYSTEM
+   Grouped sections · Animated icons · War-room aesthetic
    ============================================ */
 
-/* Sidebar Container */
+/* ── SIDEBAR CONTAINER ── */
 .sidebar {
   background: var(--bg-surface);
   border-right: 1px solid var(--border-default);
@@ -12,70 +12,151 @@
 
 .dark .sidebar {
   background: var(--bg-elevated);
-  backdrop-filter: blur(12px);
-  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.2);
+  border-right: 1px solid var(--border-subtle);
+  box-shadow: 4px 0 32px rgba(0, 0, 0, 0.3);
 }
 
-/* Logo Container */
+/* ── LOGO AREA ── */
 .sidebar-logo {
-  border-bottom: 1px solid var(--border-default);
+  border-bottom: 1px solid var(--border-subtle);
   background: var(--bg-base);
-  transition: all 300ms ease;
+  transition: background 300ms ease;
 }
 
-/* Navigation Item Base */
+.dark .sidebar-logo {
+  background: var(--bg-abyss, #080808);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* Logo mark — crimson circle */
+.sidebar-logo-mark {
+  background: var(--accent-primary);
+  box-shadow: 0 0 12px var(--accent-primary-glow);
+  transition: box-shadow 300ms ease;
+}
+
+.sidebar-logo-mark:hover {
+  box-shadow: 0 0 20px var(--accent-primary-glow), 0 0 40px var(--accent-primary-dim);
+}
+
+/* Logo wordmark — Syne display font */
+.sidebar-logo span.font-display {
+  font-family: var(--font-display, 'Syne', sans-serif);
+  letter-spacing: -0.02em;
+}
+
+/* ── NAVIGATION CONTAINER ── */
+.nav-container {
+  padding: 8px 0 4px;
+}
+
+/* ── GROUPED SECTIONS ── */
+.nav-group {
+  padding: 0 0 4px;
+}
+
+.nav-group-first {
+  padding-top: 4px;
+}
+
+/* Section label — small caps, muted, uppercase */
+.nav-section-label {
+  font-family: var(--font-display, 'Syne', sans-serif);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 10px 20px 4px;
+  -webkit-user-select: none;
+  user-select: none;
+  transition: color 250ms ease;
+}
+
+.dark .nav-section-label {
+  color: var(--text-tertiary, #585055);
+}
+
+/* Divider between groups — subtle crimson accent */
+.nav-group + .nav-group {
+  border-top: 1px solid var(--border-subtle);
+  margin-top: 4px;
+  padding-top: 4px;
+}
+
+/* ── NAV ITEM BASE ── */
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  margin: 0 8px 4px 8px;
-  border-radius: 8px;
+  gap: 10px;
+  padding: 9px 14px;
+  margin: 1px 8px;
+  border-radius: var(--radius-md, 8px);
   color: var(--text-secondary);
   text-decoration: none;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 500;
   position: relative;
-  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
+  border-left: 3px solid transparent;
 }
 
-/* Hover State - Smooth elevation and color change */
+/* Subtle gradient overlay — inactive */
+.nav-item::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--accent-primary-dim));
+  opacity: 0;
+  transition: opacity 250ms ease;
+  pointer-events: none;
+  border-radius: var(--radius-md, 8px);
+}
+
+/* ── HOVER STATE ── */
 .nav-item:hover {
   color: var(--text-primary);
   background: var(--bg-muted);
-  transform: translateX(4px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transform: translateX(3px);
 }
 
 .dark .nav-item:hover {
-  background: var(--bg-muted);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+  background: rgba(255, 45, 107, 0.05);
+  color: var(--text-primary);
 }
 
-/* Focus State - Accessibility */
+.nav-item:hover::after {
+  opacity: 0.04;
+}
+
+/* ── FOCUS STATE ── */
 .nav-item:focus-visible {
   outline: 2px solid var(--accent-primary);
-  outline-offset: 2px;
+  outline-offset: 1px;
   background: var(--accent-primary-dim);
 }
 
-/* Active State - Primary highlight with accent shading */
+/* ── ACTIVE STATE ── */
 .nav-item-active {
-  color: var(--accent-primary);
+  color: var(--accent-primary) !important;
   background: var(--accent-primary-dim);
   font-weight: 600;
-  border-left: 3px solid var(--accent-primary);
-  padding-left: 13px; /* Compensate for border */
+  border-left-color: var(--accent-primary);
   box-shadow:
-    0 2px 8px var(--accent-primary-glow),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    0 1px 6px var(--accent-primary-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .dark .nav-item-active {
+  background: rgba(255, 45, 107, 0.09);
   box-shadow:
-    0 2px 12px var(--accent-primary-glow),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    0 1px 8px var(--accent-primary-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.nav-item-active::after {
+  opacity: 0.08;
 }
 
 .nav-item-active:hover {
@@ -83,215 +164,290 @@
   background: var(--accent-primary-dim);
 }
 
-/* Icon Styling */
-.nav-item svg {
+/* ── ICON WRAPPER ── */
+.nav-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 20px;
   height: 20px;
   flex-shrink: 0;
-  transition: all 250ms ease;
-}
-
-.nav-item:hover svg {
-  transform: scale(1.1);
-}
-
-.nav-item-active svg {
-  filter: drop-shadow(0 0 4px var(--accent-primary-glow));
-}
-
-/* Active Indicator - Pulsing Dot Animation */
-.nav-item-active::before {
-  content: '';
-  position: absolute;
-  left: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 6px;
-  height: 6px;
-  background: var(--accent-primary);
-  border-radius: 50%;
-  animation: pulse-dot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  box-shadow: 0 0 8px var(--accent-primary-glow);
-}
-
-@keyframes pulse-dot {
-  0%, 100% {
-    opacity: 1;
-    transform: translateY(-50%) scale(1);
-  }
-  50% {
-    opacity: 0.6;
-    transform: translateY(-50%) scale(1.3);
-  }
-}
-
-/* Chevron Icon for Active Items */
-.nav-item-chevron {
-  margin-left: auto;
-  opacity: 0.7;
-  transition: transform 250ms ease;
-}
-
-.nav-item-active:hover .nav-item-chevron {
-  transform: translateX(4px);
-}
-
-/* Navigation Container */
-.nav-container {
-  padding: 16px 0;
-}
-
-/* Scrollbar Styling */
-.nav-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: var(--border-strong) transparent;
-}
-
-.nav-scrollbar::-webkit-scrollbar {
-  width: 6px;
-}
-
-.nav-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-  margin: 8px 0;
-}
-
-.nav-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--border-strong);
-  border-radius: 3px;
-  transition: background 250ms ease;
-}
-
-.nav-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: var(--text-tertiary);
-}
-
-/* Navigation Section Divider */
-.nav-divider {
-  height: 1px;
-  background: var(--border-subtle);
-  margin: 16px 16px;
   position: relative;
 }
 
-.nav-divider::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 40px;
-  height: 1px;
-  background: var(--accent-primary);
-  opacity: 0.3;
+.nav-icon-wrap svg {
+  width: 18px;
+  height: 18px;
+  transition: all 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-/* Settings Section - Bottom of Sidebar */
+/* Active icon — glow */
+.nav-item-active .nav-icon-wrap svg {
+  filter: drop-shadow(0 0 5px var(--accent-primary-glow));
+}
+
+/* ── PER-ICON HOVER ANIMATIONS ── */
+/* Each animation targets the specific nav item via data-icon attribute */
+
+/* Dashboard — subtle scale + rotate */
+.nav-item[data-icon="dashboard"]:hover .nav-icon-wrap svg {
+  transform: scale(1.15) rotate(-4deg);
+}
+
+/* Meetings — mic bounce up */
+.nav-item[data-icon="meetings"]:hover .nav-icon-wrap svg {
+  transform: scale(1.2) translateY(-2px);
+  filter: drop-shadow(0 2px 6px var(--accent-primary-glow));
+}
+
+/* Calendar — flip scale */
+.nav-item[data-icon="calendar"]:hover .nav-icon-wrap svg {
+  transform: scale(1.15) rotateY(15deg);
+}
+
+/* Search — rotate magnifier */
+.nav-item[data-icon="search"]:hover .nav-icon-wrap svg {
+  transform: scale(1.15) rotate(12deg);
+}
+
+/* Projects — scale open */
+.nav-item[data-icon="projects"]:hover .nav-icon-wrap svg {
+  transform: scale(1.2) translateY(-1px);
+}
+
+/* Project Board — compress/expand columns */
+.nav-item[data-icon="board"]:hover .nav-icon-wrap svg {
+  transform: scaleX(0.88) scaleY(1.1);
+}
+
+/* Tasks — checkmark draw effect (scale + slight rotate) */
+.nav-item[data-icon="tasks"]:hover .nav-icon-wrap svg {
+  transform: scale(1.18) rotate(-6deg);
+  filter: drop-shadow(0 0 4px var(--accent-secondary, #00F5D4));
+}
+
+/* Goals — target bullseye pulse */
+.nav-item[data-icon="goals"]:hover .nav-icon-wrap svg {
+  transform: scale(1.2);
+  filter: drop-shadow(0 0 6px var(--accent-primary-glow));
+}
+
+/* Workflows — spin quarter turn */
+.nav-item[data-icon="workflows"]:hover .nav-icon-wrap svg {
+  transform: scale(1.15) rotate(45deg);
+  filter: drop-shadow(0 0 4px var(--accent-secondary-dim, rgba(0,245,212,0.3)));
+}
+
+/* Automations — lightning bolt flicker (scale + glow) */
+.nav-item[data-icon="automations"]:hover .nav-icon-wrap svg {
+  transform: scale(1.25) skewX(-4deg);
+  filter: drop-shadow(0 0 6px var(--accent-tertiary, #FFB800));
+}
+
+/* AI Agents — bot "thinking" pulse */
+.nav-item[data-icon="agents"]:hover .nav-icon-wrap svg {
+  transform: scale(1.18);
+  filter: drop-shadow(0 0 8px var(--accent-secondary, #00F5D4));
+  animation: bot-think 600ms ease infinite alternate;
+}
+
+@keyframes bot-think {
+  from { filter: drop-shadow(0 0 4px rgba(0,245,212,0.4)); }
+  to   { filter: drop-shadow(0 0 10px rgba(0,245,212,0.8)); }
+}
+
+/* Analytics — bar chart grow */
+.nav-item[data-icon="analytics"]:hover .nav-icon-wrap svg {
+  transform: scale(1.15) translateY(-1px);
+  filter: drop-shadow(0 0 5px var(--accent-secondary, #00F5D4));
+}
+
+/* Reports — page lift */
+.nav-item[data-icon="reports"]:hover .nav-icon-wrap svg {
+  transform: scale(1.15) translateY(-2px) rotate(-3deg);
+}
+
+/* Settings — gear spin */
+.nav-item[data-icon="settings"]:hover .nav-icon-wrap svg {
+  transform: scale(1.1) rotate(45deg);
+}
+
+/* ── ACTIVE ITEM — PULSING DOT ── */
+.nav-item-active::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 60%;
+  background: var(--accent-primary);
+  border-radius: 0 2px 2px 0;
+  box-shadow: 0 0 8px var(--accent-primary-glow);
+  animation: active-bar-pulse 2.5s ease-in-out infinite;
+  will-change: opacity;
+}
+
+@keyframes active-bar-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.55; }
+}
+
+/* Chevron */
+.nav-item-chevron {
+  margin-left: auto;
+  opacity: 0.5;
+  transition: transform 200ms ease, opacity 200ms ease;
+}
+
+.nav-item-active .nav-item-chevron {
+  opacity: 0.8;
+}
+
+.nav-item-active:hover .nav-item-chevron {
+  transform: translateX(3px);
+}
+
+/* ── SCROLLBAR ── */
+.nav-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 45, 107, 0.25) transparent;
+}
+
+.nav-scrollbar::-webkit-scrollbar { width: 4px; }
+.nav-scrollbar::-webkit-scrollbar-track { background: transparent; margin: 8px 0; }
+.nav-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 45, 107, 0.25);
+  border-radius: 2px;
+}
+.nav-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255, 45, 107, 0.5); }
+
+/* ── FOOTER ── */
 .nav-footer {
-  padding: 16px;
-  border-top: 1px solid var(--border-default);
+  padding: 12px 8px 16px;
+  border-top: 1px solid var(--border-subtle);
   background: linear-gradient(to bottom, transparent, var(--bg-base));
 }
 
-/* Accent Gradient Overlay - Subtle depth */
-.nav-item::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    135deg,
-    transparent 0%,
-    var(--accent-primary-dim) 100%
-  );
-  opacity: 0;
-  transition: opacity 300ms ease;
-  pointer-events: none;
+.dark .nav-footer {
+  background: linear-gradient(to bottom, transparent, rgba(8,8,8,0.8));
 }
 
-.nav-item:hover::after {
-  opacity: 0.05;
+/* ── USER AREA ── */
+.nav-user-area {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px 4px;
+  margin-top: 8px;
+  cursor: pointer;
+  border-radius: var(--radius-md, 8px);
+  transition: background 200ms ease;
 }
 
-.nav-item-active::after {
-  opacity: 0.1;
+.nav-user-area:hover {
+  background: var(--bg-muted);
 }
 
-/* Responsive Spacing Adjustments */
-@media (max-height: 700px) {
-  .nav-item {
-    padding: 10px 16px;
-    margin-bottom: 2px;
-  }
+.dark .nav-user-area:hover {
+  background: rgba(255, 45, 107, 0.05);
 }
 
-@media (min-height: 900px) {
-  .nav-item {
-    padding: 14px 16px;
-    margin-bottom: 6px;
-  }
+.nav-user-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent-primary-dim);
+  border: 1px solid var(--accent-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--accent-primary);
+  transition: box-shadow 200ms ease;
 }
 
-/* Mobile Sidebar Overlay */
-@media (max-width: 1023px) {
-  .sidebar {
-    box-shadow: 8px 0 32px rgba(0, 0, 0, 0.12);
-  }
-
-  .dark .sidebar {
-    box-shadow: 8px 0 32px rgba(0, 0, 0, 0.4);
-  }
+.nav-user-area:hover .nav-user-avatar {
+  box-shadow: 0 0 10px var(--accent-primary-glow);
 }
 
-/* Smooth Entry Animation for Navigation Items */
-.nav-item {
-  animation: nav-item-enter 300ms ease-out backwards;
+.nav-user-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
-@keyframes nav-item-enter {
-  from {
-    opacity: 0;
-    transform: translateX(-16px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+.nav-user-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* Stagger animation delays for each item */
-.nav-item:nth-child(1) { animation-delay: 0ms; }
-.nav-item:nth-child(2) { animation-delay: 30ms; }
-.nav-item:nth-child(3) { animation-delay: 60ms; }
-.nav-item:nth-child(4) { animation-delay: 90ms; }
-.nav-item:nth-child(5) { animation-delay: 120ms; }
-.nav-item:nth-child(6) { animation-delay: 150ms; }
-.nav-item:nth-child(7) { animation-delay: 180ms; }
-.nav-item:nth-child(8) { animation-delay: 210ms; }
-.nav-item:nth-child(9) { animation-delay: 240ms; }
-.nav-item:nth-child(10) { animation-delay: 270ms; }
-.nav-item:nth-child(11) { animation-delay: 300ms; }
-.nav-item:nth-child(12) { animation-delay: 330ms; }
-.nav-item:nth-child(13) { animation-delay: 360ms; }
+.nav-user-role {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
 
-/* Header Enhancement */
+/* ── HEADER BAR ── */
 .header {
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-default);
   backdrop-filter: blur(12px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .dark .header {
-  background: var(--bg-elevated);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+  background: rgba(16, 16, 16, 0.92);
+  border-bottom: 1px solid var(--border-subtle);
+  box-shadow: 0 1px 0 rgba(255, 45, 107, 0.06);
 }
 
-/* Accessibility - Reduced Motion */
+/* ── STAGGER ENTRY ANIMATION ── */
+.nav-item {
+  animation: nav-item-enter 280ms ease-out backwards;
+  will-change: transform, opacity;
+}
+
+@keyframes nav-item-enter {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* Stagger delays across all items */
+.nav-item:nth-child(1)  { animation-delay:  0ms; }
+.nav-item:nth-child(2)  { animation-delay: 25ms; }
+.nav-item:nth-child(3)  { animation-delay: 50ms; }
+.nav-item:nth-child(4)  { animation-delay: 75ms; }
+.nav-item:nth-child(5)  { animation-delay: 100ms; }
+.nav-item:nth-child(6)  { animation-delay: 125ms; }
+.nav-item:nth-child(7)  { animation-delay: 150ms; }
+.nav-item:nth-child(8)  { animation-delay: 175ms; }
+.nav-item:nth-child(9)  { animation-delay: 200ms; }
+.nav-item:nth-child(10) { animation-delay: 225ms; }
+
+/* ── RESPONSIVE ── */
+@media (max-height: 700px) {
+  .nav-item { padding: 7px 14px; margin-bottom: 0; }
+  .nav-section-label { padding: 6px 20px 2px; }
+}
+
+@media (max-width: 1023px) {
+  .sidebar { box-shadow: 8px 0 40px rgba(0, 0, 0, 0.2); }
+  .dark .sidebar { box-shadow: 8px 0 40px rgba(0, 0, 0, 0.6); }
+}
+
+/* ── REDUCED MOTION ── */
 @media (prefers-reduced-motion: reduce) {
   .nav-item,
   .nav-item svg,
   .nav-item::before,
-  .nav-item::after {
-    animation: none;
-    transition-duration: 0.01ms;
+  .nav-item::after,
+  .nav-icon-wrap svg {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
   }
 }

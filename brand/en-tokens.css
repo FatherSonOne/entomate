@@ -1,0 +1,304 @@
+/**
+ * Entomate Design Tokens
+ * Brand: Intelligence Catalyst
+ * Version: 1.0.0
+ *
+ * Usage: Import this file and use var(--en-*) tokens.
+ * Distinct from: Pulse (purple/cyan), Logos Vision (navy/blue)
+ * Palette: Catalyst Teal + Deep Abyss + Signal Amber + Intel Violet + Phosphor Green
+ */
+
+/* ── Google Fonts Import ── */
+/* @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap'); */
+
+:root {
+
+  /* ═══════════════════════════════════════════
+     BRAND COLORS
+     ═══════════════════════════════════════════ */
+
+  /* Primary — Catalyst Teal
+     Usage: CTAs, primary interactive elements, active states, key data points
+     Hue: 173° — distinct from Pulse (270°) and Logos Vision (220°) */
+  --en-primary:              #00D4B4;
+  --en-primary-bright:       #00FFDF;
+  --en-primary-deep:         #009E87;
+  --en-primary-forest:       #00665A;
+  --en-primary-dim:          rgba(0, 212, 180, 0.15);
+  --en-primary-subtle:       rgba(0, 212, 180, 0.08);
+  --en-primary-glow:         0 0 24px rgba(0, 212, 180, 0.4), 0 0 48px rgba(0, 212, 180, 0.18);
+
+  /* Secondary — Signal Amber
+     Usage: Warnings, action-required states, deadlines, high-priority items */
+  --en-secondary:            #FF8C00;
+  --en-secondary-bright:     #FFB347;
+  --en-secondary-deep:       #CC7000;
+  --en-secondary-dim:        rgba(255, 140, 0, 0.15);
+  --en-secondary-subtle:     rgba(255, 140, 0, 0.08);
+  --en-secondary-glow:       0 0 20px rgba(255, 140, 0, 0.35), 0 0 48px rgba(255, 140, 0, 0.15);
+
+  /* Tertiary — Intelligence Violet
+     Usage: AI features, predictions, insights, ML-generated content */
+  --en-tertiary:             #9B6DFF;
+  --en-tertiary-bright:      #C4A7FF;
+  --en-tertiary-deep:        #6B3FCC;
+  --en-tertiary-dim:         rgba(155, 109, 255, 0.15);
+  --en-tertiary-subtle:      rgba(155, 109, 255, 0.08);
+  --en-tertiary-glow:        0 0 20px rgba(155, 109, 255, 0.35), 0 0 48px rgba(155, 109, 255, 0.15);
+
+  /* Phosphor — Live/Active Indicator
+     Usage: Live meetings, active agents, real-time data streaming */
+  --en-phosphor:             #39FF8F;
+  --en-phosphor-dim:         rgba(57, 255, 143, 0.12);
+
+  /* Extended Palette */
+  --en-alert-red:            #FF4466;
+  --en-alert-red-dim:        rgba(255, 68, 102, 0.12);
+  --en-info-sky:             #4DA6FF;
+  --en-insight-gold:         #FFD700;
+
+  /* ═══════════════════════════════════════════
+     BACKGROUNDS — Deep Abyss System
+     ═══════════════════════════════════════════ */
+
+  --en-bg-abyss:             #040912;   /* z-0 canvas */
+  --en-bg-deep:              #070F1E;   /* z-0.5 section bg */
+  --en-bg-surface:           #0C1830;   /* z-1 cards */
+  --en-bg-elevated:          #112040;   /* z-2 modals, panels */
+  --en-bg-overlay:           #1A2E52;   /* z-3 dropdowns, tooltips */
+  --en-bg-scrim:             rgba(4, 9, 18, 0.85);
+
+  /* ═══════════════════════════════════════════
+     TEXT
+     ═══════════════════════════════════════════ */
+
+  --en-text-primary:         #E8F4F2;
+  --en-text-secondary:       #8BAEC7;
+  --en-text-tertiary:        #4D6E8A;
+  --en-text-muted:           #2A4060;
+  --en-text-inverse:         #040912;
+  --en-text-link:            #00D4B4;
+  --en-text-link-hover:      #00FFDF;
+
+  /* ═══════════════════════════════════════════
+     BORDERS
+     ═══════════════════════════════════════════ */
+
+  --en-border-faint:         rgba(0, 212, 180, 0.08);
+  --en-border-subtle:        rgba(0, 212, 180, 0.15);
+  --en-border-default:       rgba(0, 212, 180, 0.25);
+  --en-border-strong:        rgba(0, 212, 180, 0.5);
+  --en-border-active:        #00D4B4;
+
+  /* ═══════════════════════════════════════════
+     SEMANTIC STATES
+     ═══════════════════════════════════════════ */
+
+  --en-success:              #00D4B4;
+  --en-success-dim:          rgba(0, 212, 180, 0.12);
+  --en-warning:              #FF8C00;
+  --en-warning-dim:          rgba(255, 140, 0, 0.12);
+  --en-error:                #FF4466;
+  --en-error-dim:            rgba(255, 68, 102, 0.12);
+  --en-info:                 #4DA6FF;
+  --en-info-dim:             rgba(77, 166, 255, 0.12);
+
+  /* ═══════════════════════════════════════════
+     DATA VISUALIZATION — 7 series
+     ═══════════════════════════════════════════ */
+
+  --en-data-1:               #00D4B4;  /* Catalyst Teal */
+  --en-data-2:               #FF8C00;  /* Signal Amber */
+  --en-data-3:               #9B6DFF;  /* Intel Violet */
+  --en-data-4:               #39FF8F;  /* Phosphor */
+  --en-data-5:               #FF4488;  /* Magenta Rose */
+  --en-data-6:               #4DA6FF;  /* Data Sky */
+  --en-data-7:               #FFD700;  /* Insight Gold */
+
+  /* ═══════════════════════════════════════════
+     TYPOGRAPHY
+     ═══════════════════════════════════════════ */
+
+  --en-font-display:         'Syne', 'Space Grotesk', 'Inter', system-ui, sans-serif;
+  --en-font-body:            'Space Grotesk', 'Inter', system-ui, sans-serif;
+  --en-font-ui:              'Inter', system-ui, sans-serif;
+  --en-font-mono:            'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+
+  /* Type scale */
+  --en-text-xs:              11px;
+  --en-text-sm:              13px;
+  --en-text-base:            15px;
+  --en-text-md:              16px;
+  --en-text-lg:              18px;
+  --en-text-xl:              20px;
+  --en-text-2xl:             24px;
+  --en-text-3xl:             32px;
+  --en-text-4xl:             40px;
+  --en-text-5xl:             48px;
+  --en-text-6xl:             64px;
+
+  /* ═══════════════════════════════════════════
+     SPACING
+     ═══════════════════════════════════════════ */
+
+  --en-space-1:   4px;
+  --en-space-2:   8px;
+  --en-space-3:   12px;
+  --en-space-4:   16px;
+  --en-space-5:   20px;
+  --en-space-6:   24px;
+  --en-space-8:   32px;
+  --en-space-10:  40px;
+  --en-space-12:  48px;
+  --en-space-16:  64px;
+  --en-space-20:  80px;
+  --en-space-24: 96px;
+
+  /* ═══════════════════════════════════════════
+     BORDER RADIUS
+     ═══════════════════════════════════════════ */
+
+  --en-radius-sm:    4px;
+  --en-radius-md:    8px;
+  --en-radius-lg:    12px;
+  --en-radius-xl:    20px;
+  --en-radius-2xl:   32px;
+  --en-radius-3xl:   48px;
+  --en-radius-full:  9999px;
+
+  /* ═══════════════════════════════════════════
+     SHADOWS
+     ═══════════════════════════════════════════ */
+
+  --en-shadow-sm:       0 1px 3px rgba(0, 0, 0, 0.4);
+  --en-shadow-md:       0 4px 12px rgba(0, 0, 0, 0.5);
+  --en-shadow-lg:       0 8px 32px rgba(0, 0, 0, 0.6);
+  --en-shadow-xl:       0 16px 48px rgba(0, 0, 0, 0.7);
+  --en-shadow-card:     0 2px 8px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 212, 180, 0.12);
+  --en-shadow-glow:     0 0 20px rgba(0, 212, 180, 0.3), 0 0 60px rgba(0, 212, 180, 0.1);
+  --en-shadow-amber:    0 0 20px rgba(255, 140, 0, 0.3), 0 0 60px rgba(255, 140, 0, 0.1);
+  --en-shadow-violet:   0 0 20px rgba(155, 109, 255, 0.3), 0 0 60px rgba(155, 109, 255, 0.1);
+
+  /* ═══════════════════════════════════════════
+     ANIMATION TIMING
+     ═══════════════════════════════════════════ */
+
+  --en-ease-out:        cubic-bezier(0.16, 1, 0.3, 1);
+  --en-ease-in-out:     cubic-bezier(0.45, 0, 0.55, 1);
+  --en-ease-spring:     cubic-bezier(0.34, 1.56, 0.64, 1);
+  --en-ease-snap:       cubic-bezier(0.77, 0, 0.175, 1);
+  --en-ease-linear:     linear;
+
+  --en-timing-instant:  80ms;
+  --en-timing-fast:     150ms;
+  --en-timing-normal:   250ms;
+  --en-timing-medium:   400ms;
+  --en-timing-slow:     600ms;
+  --en-timing-deliberate: 1000ms;
+
+  /* ═══════════════════════════════════════════
+     GRID / LAYOUT
+     ═══════════════════════════════════════════ */
+
+  --en-grid-color:      rgba(0, 212, 180, 0.05);
+  --en-grid-size:       60px;
+  --en-sidebar-width:   240px;
+  --en-header-height:   56px;
+  --en-content-max:     1280px;
+  --en-panel-width:     320px;
+
+}
+
+/* ═══════════════════════════════════════════
+   KEYFRAME ANIMATIONS
+   ═══════════════════════════════════════════ */
+
+@keyframes en-catalyst-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.72; transform: scale(0.97); }
+}
+
+@keyframes en-intel-ripple {
+  0%   { transform: scale(0.5); opacity: 0.8; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+
+@keyframes en-signal-scan {
+  0%   { transform: translateY(-100%); opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { transform: translateY(300%); opacity: 0; }
+}
+
+@keyframes en-waveform {
+  0%, 100% { transform: scaleY(0.3); }
+  50%       { transform: scaleY(1); }
+}
+
+@keyframes en-phosphor-flicker {
+  0%, 100% { opacity: 1; }
+  92%       { opacity: 1; }
+  93%       { opacity: 0.4; }
+  94%       { opacity: 1; }
+  96%       { opacity: 0.6; }
+  97%       { opacity: 1; }
+}
+
+@keyframes en-transform-in {
+  0%   { opacity: 0; transform: translateY(16px) scale(0.98); filter: blur(4px); }
+  100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+
+@keyframes en-cascade-reveal {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes en-shimmer {
+  from { background-position: -200% 0; }
+  to   { background-position: 200% 0; }
+}
+
+@keyframes en-intel-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(0, 212, 180, 0.25), 0 0 0 1px rgba(0, 212, 180, 0.12); }
+  50%       { box-shadow: 0 0 24px rgba(0, 212, 180, 0.5), 0 0 0 1px rgba(0, 212, 180, 0.25); }
+}
+
+@keyframes en-node-orbit {
+  from { transform: rotate(0deg) translateX(28px) rotate(0deg); }
+  to   { transform: rotate(360deg) translateX(28px) rotate(-360deg); }
+}
+
+@keyframes en-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* ═══════════════════════════════════════════
+   ANIMATION UTILITY CLASSES
+   ═══════════════════════════════════════════ */
+
+.en-animate-pulse     { animation: en-catalyst-pulse 3s ease-in-out infinite; }
+.en-animate-flicker   { animation: en-phosphor-flicker 4s infinite; }
+.en-animate-spin      { animation: en-spin 8s linear infinite; }
+.en-animate-glow      { animation: en-intel-glow 3s ease-in-out infinite; }
+.en-animate-enter     { animation: en-transform-in 0.5s var(--en-ease-out) both; }
+
+/* Cascade delay utilities */
+.en-delay-1  { animation-delay: 0.1s; }
+.en-delay-2  { animation-delay: 0.2s; }
+.en-delay-3  { animation-delay: 0.3s; }
+.en-delay-4  { animation-delay: 0.4s; }
+.en-delay-5  { animation-delay: 0.5s; }
+
+/* Shimmer loading pattern */
+.en-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--en-bg-elevated) 0%,
+    var(--en-bg-overlay) 50%,
+    var(--en-bg-elevated) 100%
+  );
+  background-size: 200% 100%;
+  animation: en-shimmer 1.5s ease-in-out infinite;
+}

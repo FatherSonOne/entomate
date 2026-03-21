@@ -8,8 +8,8 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Workflow, Plus, Search, Play, Pause, Trash2, Copy,
-  Clock, CheckCircle2, XCircle, MoreVertical, Filter,
-  History, Settings, Zap, AlertCircle, Edit
+  Clock, CheckCircle2, XCircle, MoreVertical,
+  History, Zap, AlertCircle, Edit, Mic
 } from 'lucide-react'
 import { workflowsApi } from '../services/api'
 
@@ -85,7 +85,7 @@ export default function Workflows() {
   const handleDelete = async (id, e) => {
     e.stopPropagation()
     setShowMenu(null)
-    if (!confirm('Are you sure you want to delete this workflow?')) return
+    if (!window.confirm('Delete this workflow? This cannot be undone.')) return
     try {
       await workflowsApi.delete(id)
       setWorkflows(workflows.filter(w => w.id !== id))
@@ -98,11 +98,24 @@ export default function Workflows() {
     e.stopPropagation()
     try {
       await workflowsApi.execute(id)
-      alert('Workflow executed successfully!')
       loadWorkflows()
     } catch (error) {
       console.error('Failed to execute workflow:', error)
-      alert('Failed to execute workflow: ' + error.message)
+    }
+  }
+
+  const handleCreateFromTemplate = async (templateName, nodes, connections) => {
+    try {
+      const response = await workflowsApi.create({
+        name: templateName,
+        description: '',
+        nodes: nodes || [],
+        connections: connections || [],
+        active: false
+      })
+      navigate(`/workflows/${response.workflow.id}`)
+    } catch (error) {
+      console.error('Failed to create workflow from template:', error)
     }
   }
 
@@ -365,11 +378,13 @@ export default function Workflows() {
         <h3 className="font-semibold text-content-primary mb-4">Quick Start Templates</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div
-            onClick={() => {/* TODO: Create from template */}}
-            className="p-4 border border-line-default rounded-lg hover:border-primary-500 hover:bg-accent-primary-dim cursor-pointer transition-colors"
+            onClick={() => handleCreateFromTemplate('Meeting Processing', [], [])}
+            className="p-4 border border-line-default rounded-lg hover:border-accent-primary hover:bg-accent-primary-dim cursor-pointer transition-colors group"
           >
             <div className="flex items-center gap-3 mb-2">
-              <span className="text-2xl">📝</span>
+              <div className="w-8 h-8 rounded-lg bg-accent-primary-dim border border-accent-primary/20 flex items-center justify-center flex-shrink-0 group-hover:border-accent-primary/50 transition-colors">
+                <Mic className="w-4 h-4 text-accent-primary" />
+              </div>
               <h4 className="font-medium text-content-primary">Meeting Processing</h4>
             </div>
             <p className="text-sm text-content-tertiary">
@@ -377,11 +392,13 @@ export default function Workflows() {
             </p>
           </div>
           <div
-            onClick={() => {/* TODO: Create from template */}}
-            className="p-4 border border-line-default rounded-lg hover:border-primary-500 hover:bg-accent-primary-dim cursor-pointer transition-colors"
+            onClick={() => handleCreateFromTemplate('Webhook to Slack', [], [])}
+            className="p-4 border border-line-default rounded-lg hover:border-accent-primary hover:bg-accent-primary-dim cursor-pointer transition-colors group"
           >
             <div className="flex items-center gap-3 mb-2">
-              <span className="text-2xl">🔗</span>
+              <div className="w-8 h-8 rounded-lg bg-accent-secondary-dim border border-accent-secondary/20 flex items-center justify-center flex-shrink-0 group-hover:border-accent-secondary/50 transition-colors">
+                <Zap className="w-4 h-4 text-accent-secondary" />
+              </div>
               <h4 className="font-medium text-content-primary">Webhook to Slack</h4>
             </div>
             <p className="text-sm text-content-tertiary">
@@ -389,11 +406,13 @@ export default function Workflows() {
             </p>
           </div>
           <div
-            onClick={() => {/* TODO: Create from template */}}
-            className="p-4 border border-line-default rounded-lg hover:border-primary-500 hover:bg-accent-primary-dim cursor-pointer transition-colors"
+            onClick={() => handleCreateFromTemplate('Daily Digest', [], [])}
+            className="p-4 border border-line-default rounded-lg hover:border-accent-primary hover:bg-accent-primary-dim cursor-pointer transition-colors group"
           >
             <div className="flex items-center gap-3 mb-2">
-              <span className="text-2xl">📅</span>
+              <div className="w-8 h-8 rounded-lg bg-accent-tertiary-dim border border-accent-tertiary/20 flex items-center justify-center flex-shrink-0 group-hover:border-accent-tertiary/50 transition-colors">
+                <Clock className="w-4 h-4 text-accent-tertiary" />
+              </div>
               <h4 className="font-medium text-content-primary">Daily Digest</h4>
             </div>
             <p className="text-sm text-content-tertiary">

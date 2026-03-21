@@ -51,7 +51,10 @@ function WorkflowCanvasInner({
   onExecute,
   onTest,
   onBack,
-  onChange
+  onChange,
+  onDuplicate,
+  onDelete,
+  onToggleActive
 }) {
   const reactFlowWrapper = useRef(null)
   const { fitView, zoomIn, zoomOut, getZoom, setViewport, screenToFlowPosition } = useReactFlow()
@@ -408,7 +411,9 @@ function WorkflowCanvasInner({
           onZoomOut={() => zoomOut()}
           onFitView={() => fitView({ padding: 0.2 })}
           onToggleGrid={() => setShowGrid(!showGrid)}
-          onToggleActive={() => {/* TODO */}}
+          onToggleActive={onToggleActive}
+          onDuplicate={onDuplicate}
+          onDelete={onDelete}
           onExport={handleExport}
           onImport={handleImport}
           onBack={onBack}

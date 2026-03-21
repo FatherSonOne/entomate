@@ -1,0 +1,1736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Entomate — Dashboard Hero Playground</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+/* ─────────────────────────────────────────────────────────────
+   DESIGN TOKENS — Void × Crimson
+───────────────────────────────────────────────────────────── */
+:root {
+  --en-primary:        #FF2D6B;
+  --en-secondary:      #00F5D4;
+  --en-tertiary:       #FFB800;
+  --en-bg-abyss:       #080808;
+  --en-bg-surface:     #101010;
+  --en-bg-elevated:    #181818;
+  --en-text-primary:   #F8F0F2;
+  --en-text-secondary: #968890;
+  --en-border-default: rgba(248,240,242,0.16);
+  --en-font-display:   'Syne', sans-serif;
+  --en-font-body:      'Space Grotesk', sans-serif;
+  --en-font-mono:      'Space Mono', monospace;
+
+  --en-primary-glow:   rgba(255,45,107,0.18);
+  --en-secondary-glow: rgba(0,245,212,0.12);
+  --en-tertiary-glow:  rgba(255,184,0,0.18);
+  --radius-sm:  4px;
+  --radius-md:  8px;
+  --radius-lg:  12px;
+  --radius-xl:  16px;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   RESET & BASE
+───────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%; height: 100%;
+  background: var(--en-bg-abyss);
+  color: var(--en-text-primary);
+  font-family: var(--en-font-body);
+  font-size: 14px;
+  line-height: 1.5;
+  overflow: hidden;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   APP SHELL
+───────────────────────────────────────────────────────────── */
+#app {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  grid-template-rows: 1fr auto;
+  grid-template-areas:
+    "controls preview"
+    "bottombar bottombar";
+  height: 100vh;
+  width: 100vw;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   LEFT CONTROL PANEL
+───────────────────────────────────────────────────────────── */
+#controls {
+  grid-area: controls;
+  background: var(--en-bg-surface);
+  border-right: 1px solid var(--en-border-default);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+#controls::-webkit-scrollbar { width: 4px; }
+#controls::-webkit-scrollbar-track { background: transparent; }
+#controls::-webkit-scrollbar-thumb { background: rgba(255,45,107,0.3); border-radius: 2px; }
+
+.ctrl-header {
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid var(--en-border-default);
+  flex-shrink: 0;
+}
+
+.ctrl-header-wordmark {
+  font-family: var(--en-font-display);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--en-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ctrl-header-wordmark::before {
+  content: '';
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--en-primary);
+  box-shadow: 0 0 8px var(--en-primary);
+}
+
+.ctrl-header-sub {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--en-text-secondary);
+  font-family: var(--en-font-display);
+  letter-spacing: 0.05em;
+}
+
+.ctrl-body {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  flex: 1;
+}
+
+.ctrl-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ctrl-label {
+  font-family: var(--en-font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--en-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ctrl-label-icon {
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.seg-group {
+  display: flex;
+  gap: 2px;
+  background: var(--en-bg-elevated);
+  border: 1px solid var(--en-border-default);
+  border-radius: var(--radius-md);
+  padding: 3px;
+}
+
+.seg-btn {
+  flex: 1;
+  padding: 7px 6px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--en-text-secondary);
+  font-family: var(--en-font-body);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.seg-btn:hover:not(.active) {
+  background: rgba(248,240,242,0.06);
+  color: var(--en-text-primary);
+}
+
+.seg-btn.active {
+  background: var(--en-primary);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 0 12px var(--en-primary-glow), 0 2px 6px rgba(255,45,107,0.25);
+}
+
+.ctrl-divider {
+  height: 1px;
+  background: var(--en-border-default);
+  margin: 4px 0;
+  flex-shrink: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   RIGHT PREVIEW PANEL
+───────────────────────────────────────────────────────────── */
+#preview {
+  grid-area: preview;
+  background: var(--en-bg-abyss);
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+#preview::-webkit-scrollbar { width: 6px; }
+#preview::-webkit-scrollbar-track { background: transparent; }
+#preview::-webkit-scrollbar-thumb { background: rgba(255,45,107,0.2); border-radius: 3px; }
+
+.preview-label {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgba(8,8,8,0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--en-border-default);
+  padding: 10px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.preview-label-text {
+  font-family: var(--en-font-display);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--en-text-secondary);
+}
+
+.preview-badge {
+  font-family: var(--en-font-mono);
+  font-size: 9px;
+  color: var(--en-secondary);
+  background: rgba(0,245,212,0.08);
+  border: 1px solid rgba(0,245,212,0.2);
+  border-radius: 20px;
+  padding: 2px 10px;
+  letter-spacing: 0.08em;
+}
+
+#hero-stage {
+  flex: 1;
+  padding: 32px 32px 24px;
+  min-height: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   HERO — BASE STYLES
+───────────────────────────────────────────────────────────── */
+#hero-root {
+  background: var(--en-bg-surface);
+  border: 1px solid var(--en-border-default);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  min-height: 480px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s ease;
+}
+
+#hero-root::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,45,107,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,45,107,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+#hero-root::after {
+  content: '';
+  position: absolute;
+  top: -60px; left: 50%;
+  transform: translateX(-50%);
+  width: 60%;
+  height: 120px;
+  background: radial-gradient(ellipse, rgba(255,45,107,0.12) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.hero-inner {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   QUICK ACTIONS — DOCKED TOP
+───────────────────────────────────────────────────────────── */
+#qa-docked {
+  display: none;
+  background: var(--en-bg-elevated);
+  border-bottom: 1px solid var(--en-border-default);
+  padding: 10px 20px;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+#qa-docked.visible { display: flex; }
+
+.qa-label-text {
+  font-family: var(--en-font-display);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--en-text-secondary);
+  margin-right: 4px;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   HERO BODY
+───────────────────────────────────────────────────────────── */
+.hero-body {
+  padding: 28px 28px 24px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ── GREETING ── */
+#greeting-area {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.greeting-date {
+  font-family: var(--en-font-body);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--en-primary);
+  opacity: 0.9;
+}
+
+.greeting-text {
+  font-family: var(--en-font-display);
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--en-text-primary);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+@keyframes typewriter-cursor {
+  0%, 100% { border-right-color: var(--en-primary); }
+  50% { border-right-color: transparent; }
+}
+
+.greeting-text.typewriter {
+  overflow: hidden;
+  white-space: nowrap;
+  border-right: 2px solid var(--en-primary);
+  width: 0;
+  animation:
+    typing 1.8s steps(22, end) forwards,
+    typewriter-cursor 0.75s step-end infinite 1.8s;
+}
+
+@keyframes typing {
+  from { width: 0; }
+  to   { width: 100%; }
+}
+
+/* ── LAYOUT WRAPPERS ── */
+.hero-layout {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.hero-layout.layout-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto 1fr;
+  gap: 16px;
+}
+
+.hero-layout.layout-2col .intelligence-area { grid-column: 1 / -1; }
+.hero-layout.layout-2col .metrics-area      { grid-column: 1; }
+.hero-layout.layout-2col .briefing-inline   { grid-column: 2; }
+.hero-layout.layout-2col .briefing-trigger-row { grid-column: 2; }
+
+.hero-layout.layout-3col {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: auto auto;
+  gap: 16px;
+}
+
+.hero-layout.layout-3col .intelligence-area { grid-column: 1 / -1; }
+.hero-layout.layout-3col .metrics-area      { grid-column: 1 / 3; }
+.hero-layout.layout-3col .briefing-inline   { grid-column: 3; }
+.hero-layout.layout-3col .briefing-trigger-row { grid-column: 3; }
+
+/* ── INTELLIGENCE CARD ── */
+.intel-strip {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  background: var(--en-bg-elevated);
+  border: 1px solid var(--en-border-default);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+}
+
+.intel-strip.visible { display: flex; }
+
+.intel-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--en-tertiary);
+  box-shadow: 0 0 8px var(--en-tertiary-glow);
+  flex-shrink: 0;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.7; }
+}
+
+.intel-strip-label {
+  font-family: var(--en-font-display);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--en-tertiary);
+  flex-shrink: 0;
+}
+
+.intel-strip-text {
+  font-family: var(--en-font-body);
+  font-size: 12px;
+  color: var(--en-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.intel-full {
+  display: none;
+  background: var(--en-bg-elevated);
+  border: 1px solid rgba(255,184,0,0.2);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: 0 0 24px rgba(255,184,0,0.06), inset 0 1px 0 rgba(255,184,0,0.1);
+}
+
+.intel-full.visible { display: block; }
+
+.intel-full-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: rgba(255,184,0,0.05);
+  border-bottom: 1px solid rgba(255,184,0,0.12);
+}
+
+.intel-full-title {
+  font-family: var(--en-font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--en-tertiary);
+}
+
+.intel-badge {
+  margin-left: auto;
+  font-family: var(--en-font-mono);
+  font-size: 9px;
+  color: var(--en-tertiary);
+  background: rgba(255,184,0,0.1);
+  border: 1px solid rgba(255,184,0,0.2);
+  border-radius: 20px;
+  padding: 2px 8px;
+  letter-spacing: 0.06em;
+}
+
+.intel-full-body {
+  padding: 14px 16px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+
+.intel-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  background: rgba(8,8,8,0.4);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--en-border-default);
+}
+
+.intel-item-label {
+  font-family: var(--en-font-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--en-text-secondary);
+}
+
+.intel-item-value {
+  font-family: var(--en-font-body);
+  font-size: 12px;
+  color: var(--en-text-primary);
+  line-height: 1.4;
+}
+
+.intel-item.risk .intel-item-label { color: var(--en-primary); }
+.intel-item.risk .intel-item-value { color: rgba(255,45,107,0.9); }
+.intel-item.action .intel-item-label { color: var(--en-secondary); }
+.intel-item.action .intel-item-value { color: rgba(0,245,212,0.9); }
+
+/* ── METRICS AREA ── */
+.metrics-area {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.metric-card {
+  background: var(--en-bg-elevated);
+  border: 1px solid var(--en-border-default);
+  border-radius: var(--radius-md);
+  padding: 14px 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  overflow: hidden;
+}
+
+.metric-card:hover {
+  border-color: rgba(255,45,107,0.3);
+  box-shadow: 0 0 16px var(--en-primary-glow);
+}
+
+.metric-label {
+  font-family: var(--en-font-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--en-text-secondary);
+}
+
+.metric-number {
+  font-family: var(--en-font-mono);
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.metric-sparkline-wrap { display: block; }
+.metric-sparkline-wrap svg { width: 100%; height: 36px; display: block; }
+
+.metric-ring-wrap { display: flex; align-items: center; gap: 8px; }
+.metric-ring-wrap svg { width: 44px; height: 44px; flex-shrink: 0; }
+.metric-ring-num { font-family: var(--en-font-mono); font-size: 11px; }
+
+/* ── DAILY BRIEFING INLINE ── */
+.briefing-inline {
+  background: var(--en-bg-elevated);
+  border: 1px solid var(--en-border-default);
+  border-left: 3px solid var(--en-secondary);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.briefing-inline.visible { display: flex; }
+
+.briefing-title {
+  font-family: var(--en-font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--en-secondary);
+}
+
+.briefing-items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.briefing-item {
+  font-family: var(--en-font-body);
+  font-size: 12px;
+  color: var(--en-text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.briefing-item::before {
+  content: '';
+  display: inline-block;
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--en-secondary);
+  flex-shrink: 0;
+}
+
+.briefing-item.overdue::before { background: var(--en-primary); }
+.briefing-item.overdue { color: rgba(255,45,107,0.8); }
+
+/* ── BRIEFING TRIGGER ── */
+.briefing-trigger-row {
+  display: none;
+}
+
+.briefing-trigger-row.visible {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.briefing-trigger-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  background: rgba(0,245,212,0.06);
+  border: 1px solid rgba(0,245,212,0.2);
+  border-radius: var(--radius-md);
+  color: var(--en-secondary);
+  font-family: var(--en-font-body);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.briefing-trigger-btn:hover {
+  background: rgba(0,245,212,0.12);
+  box-shadow: 0 0 12px rgba(0,245,212,0.15);
+}
+
+.briefing-trigger-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--en-primary);
+  box-shadow: 0 0 6px var(--en-primary);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+/* ── DAILY BRIEFING SLIDE-IN PANEL ── */
+#briefing-panel {
+  position: fixed;
+  top: 0; right: -360px;
+  width: 360px; height: 100vh;
+  background: var(--en-bg-surface);
+  border-left: 1px solid var(--en-border-default);
+  z-index: 200;
+  transition: right 0.35s cubic-bezier(0.4,0,0.2,1);
+  display: flex;
+  flex-direction: column;
+  padding: 28px 24px;
+  gap: 20px;
+}
+
+#briefing-panel.open { right: 0; }
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.panel-title {
+  font-family: var(--en-font-display);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--en-secondary);
+  letter-spacing: 0.04em;
+}
+
+.panel-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--en-text-secondary);
+  font-size: 18px;
+  line-height: 1;
+  padding: 4px;
+  transition: color 0.15s;
+}
+
+.panel-close:hover { color: var(--en-primary); }
+
+/* ── DAILY BRIEFING MODAL ── */
+#briefing-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(8,8,8,0.75);
+  backdrop-filter: blur(4px);
+  z-index: 300;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+#briefing-modal-overlay.open { display: flex; }
+
+.briefing-modal {
+  background: var(--en-bg-surface);
+  border: 1px solid var(--en-border-default);
+  border-radius: var(--radius-xl);
+  width: 440px;
+  max-width: 90vw;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  box-shadow: 0 0 60px rgba(0,245,212,0.08);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-title {
+  font-family: var(--en-font-display);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--en-secondary);
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--en-text-secondary);
+  font-size: 20px;
+  line-height: 1;
+  transition: color 0.15s;
+}
+
+.modal-close:hover { color: var(--en-primary); }
+
+/* ── QUICK ACTION BUTTONS ── */
+.qa-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border: 1px solid var(--en-border-default);
+  border-radius: var(--radius-md);
+  background: var(--en-bg-elevated);
+  color: var(--en-text-primary);
+  font-family: var(--en-font-body);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.qa-btn:hover {
+  border-color: var(--en-primary);
+  background: var(--en-primary-glow);
+  color: var(--en-primary);
+  box-shadow: 0 0 12px var(--en-primary-glow);
+}
+
+.qa-btn-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.qa-btn.primary {
+  background: var(--en-primary);
+  border-color: var(--en-primary);
+  color: #fff;
+}
+
+.qa-btn.primary:hover {
+  background: #ff1a5c;
+  color: #fff;
+  box-shadow: 0 0 16px rgba(255,45,107,0.4);
+}
+
+/* ── FLOATING QUICK ACTIONS ── */
+#qa-floating {
+  display: none;
+  position: absolute;
+  top: 14px; right: 14px;
+  gap: 8px;
+  z-index: 10;
+}
+
+#qa-floating.visible { display: flex; }
+
+/* ─────────────────────────────────────────────────────────────
+   PANEL / MODAL BRIEFING ITEMS
+───────────────────────────────────────────────────────────── */
+.panel-briefing-items,
+.modal-briefing-items {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.panel-briefing-item,
+.modal-briefing-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--en-bg-elevated);
+  border: 1px solid var(--en-border-default);
+  border-radius: var(--radius-md);
+  font-family: var(--en-font-body);
+  font-size: 13px;
+  color: var(--en-text-secondary);
+}
+
+.panel-briefing-item-icon,
+.modal-briefing-item-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.panel-briefing-item.overdue,
+.modal-briefing-item.overdue {
+  border-color: rgba(255,45,107,0.2);
+  background: rgba(255,45,107,0.04);
+}
+
+.panel-briefing-item.overdue .panel-briefing-item-icon,
+.modal-briefing-item.overdue .modal-briefing-item-icon {
+  color: var(--en-primary);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   BOTTOM BAR
+───────────────────────────────────────────────────────────── */
+#bottombar {
+  grid-area: bottombar;
+  background: var(--en-bg-surface);
+  border-top: 1px solid var(--en-border-default);
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+}
+
+.bottom-prompt-label {
+  font-family: var(--en-font-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--en-primary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+#prompt-output {
+  flex: 1;
+  font-family: var(--en-font-mono);
+  font-size: 11px;
+  color: var(--en-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 6px 12px;
+  background: var(--en-bg-elevated);
+  border: 1px solid var(--en-border-default);
+  border-radius: var(--radius-md);
+}
+
+.bottom-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.bar-btn {
+  padding: 7px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--en-border-default);
+  background: var(--en-bg-elevated);
+  color: var(--en-text-primary);
+  font-family: var(--en-font-body);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.bar-btn:hover {
+  border-color: rgba(248,240,242,0.3);
+  background: rgba(248,240,242,0.06);
+}
+
+.bar-btn.danger {
+  border-color: rgba(255,45,107,0.3);
+  color: var(--en-primary);
+}
+
+.bar-btn.danger:hover {
+  background: var(--en-primary-glow);
+  border-color: var(--en-primary);
+  box-shadow: 0 0 10px var(--en-primary-glow);
+}
+
+.bar-btn.accent {
+  border-color: rgba(0,245,212,0.3);
+  color: var(--en-secondary);
+}
+
+.bar-btn.accent:hover {
+  background: var(--en-secondary-glow);
+  border-color: var(--en-secondary);
+  box-shadow: 0 0 10px var(--en-secondary-glow);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   COPY TOAST
+───────────────────────────────────────────────────────────── */
+#copy-toast {
+  position: fixed;
+  bottom: 70px; right: 24px;
+  background: var(--en-bg-elevated);
+  border: 1px solid rgba(0,245,212,0.3);
+  color: var(--en-secondary);
+  font-family: var(--en-font-body);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  box-shadow: 0 0 20px rgba(0,245,212,0.1);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.2s, transform 0.2s;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+#copy-toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ── LEFT: CONTROLS ── -->
+  <aside id="controls">
+    <div class="ctrl-header">
+      <div class="ctrl-header-wordmark">Entomate</div>
+      <div class="ctrl-header-sub">Dashboard Hero Playground</div>
+    </div>
+
+    <div class="ctrl-body">
+
+      <!-- 1. Layout -->
+      <div class="ctrl-group">
+        <div class="ctrl-label">
+          <span class="ctrl-label-icon">&#9707;</span>
+          Layout
+        </div>
+        <div class="seg-group" data-key="layout">
+          <button class="seg-btn" data-value="1col">Single col</button>
+          <button class="seg-btn active" data-value="2col">2-col split</button>
+          <button class="seg-btn" data-value="3col">3-col grid</button>
+        </div>
+      </div>
+
+      <div class="ctrl-divider"></div>
+
+      <!-- 2. Intelligence Card -->
+      <div class="ctrl-group">
+        <div class="ctrl-label">
+          <span class="ctrl-label-icon">&#9650;</span>
+          Intelligence Card
+        </div>
+        <div class="seg-group" data-key="intel">
+          <button class="seg-btn" data-value="hidden">Hidden</button>
+          <button class="seg-btn" data-value="strip">Compact</button>
+          <button class="seg-btn active" data-value="full">Full card</button>
+        </div>
+      </div>
+
+      <div class="ctrl-divider"></div>
+
+      <!-- 3. Daily Briefing -->
+      <div class="ctrl-group">
+        <div class="ctrl-label">
+          <span class="ctrl-label-icon">&#9632;</span>
+          Daily Briefing
+        </div>
+        <div class="seg-group" data-key="briefing">
+          <button class="seg-btn active" data-value="inline">Inline</button>
+          <button class="seg-btn" data-value="panel">Slide-in</button>
+          <button class="seg-btn" data-value="modal">Modal</button>
+        </div>
+      </div>
+
+      <div class="ctrl-divider"></div>
+
+      <!-- 4. Metric Display -->
+      <div class="ctrl-group">
+        <div class="ctrl-label">
+          <span class="ctrl-label-icon">&#9671;</span>
+          Metric Display
+        </div>
+        <div class="seg-group" data-key="metric">
+          <button class="seg-btn active" data-value="numeric">Numeric</button>
+          <button class="seg-btn" data-value="sparkline">Sparkline</button>
+          <button class="seg-btn" data-value="ring">Ring gauge</button>
+        </div>
+      </div>
+
+      <div class="ctrl-divider"></div>
+
+      <!-- 5. Header Greeting -->
+      <div class="ctrl-group">
+        <div class="ctrl-label">
+          <span class="ctrl-label-icon">&#9674;</span>
+          Header Greeting
+        </div>
+        <div class="seg-group" data-key="greeting">
+          <button class="seg-btn" data-value="none">None</button>
+          <button class="seg-btn active" data-value="static">Static</button>
+          <button class="seg-btn" data-value="typewriter">Typewriter</button>
+        </div>
+      </div>
+
+      <div class="ctrl-divider"></div>
+
+      <!-- 6. Quick Actions Bar -->
+      <div class="ctrl-group">
+        <div class="ctrl-label">
+          <span class="ctrl-label-icon">&#9658;</span>
+          Quick Actions Bar
+        </div>
+        <div class="seg-group" data-key="qa">
+          <button class="seg-btn" data-value="none">None</button>
+          <button class="seg-btn active" data-value="floating">Floating</button>
+          <button class="seg-btn" data-value="docked">Docked top</button>
+        </div>
+      </div>
+
+    </div>
+  </aside>
+
+  <!-- ── RIGHT: PREVIEW ── -->
+  <main id="preview">
+    <div class="preview-label">
+      <span class="preview-label-text">Live Preview</span>
+      <span class="preview-badge">VOID x CRIMSON</span>
+    </div>
+
+    <div id="hero-stage">
+      <div id="hero-root">
+
+        <!-- Docked quick actions bar (top of hero) -->
+        <div id="qa-docked">
+          <span class="qa-label-text">Quick actions</span>
+          <!-- buttons injected by JS -->
+        </div>
+
+        <!-- Hero inner content -->
+        <div class="hero-inner">
+          <div class="hero-body">
+
+            <!-- Greeting -->
+            <div id="greeting-area">
+              <div class="greeting-date" id="greeting-date"></div>
+              <div class="greeting-text" id="greeting-text"></div>
+            </div>
+
+            <!-- Floating quick actions -->
+            <div id="qa-floating">
+              <!-- buttons injected by JS -->
+            </div>
+
+            <!-- Layout wrapper -->
+            <div class="hero-layout" id="hero-layout">
+
+              <!-- Intelligence area -->
+              <div class="intelligence-area">
+                <div class="intel-strip" id="intel-strip">
+                  <div class="intel-dot"></div>
+                  <span class="intel-strip-label">AI</span>
+                  <span class="intel-strip-text" id="intel-strip-text"></span>
+                </div>
+                <div class="intel-full" id="intel-full">
+                  <div class="intel-full-header">
+                    <div class="intel-dot"></div>
+                    <div class="intel-full-title">AI Meeting Intelligence</div>
+                    <div class="intel-badge">GPT-4o</div>
+                  </div>
+                  <div class="intel-full-body">
+                    <div class="intel-item">
+                      <div class="intel-item-label">Meeting Prep</div>
+                      <div class="intel-item-value" id="intel-prep"></div>
+                    </div>
+                    <div class="intel-item risk">
+                      <div class="intel-item-label">Risk Alert</div>
+                      <div class="intel-item-value" id="intel-risk"></div>
+                    </div>
+                    <div class="intel-item action">
+                      <div class="intel-item-label">Next Action</div>
+                      <div class="intel-item-value" id="intel-action"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Metrics -->
+              <div class="metrics-area">
+                <div class="metrics-grid" id="metrics-grid">
+                  <!-- cards injected by JS -->
+                </div>
+              </div>
+
+              <!-- Briefing inline -->
+              <div class="briefing-inline" id="briefing-inline">
+                <div class="briefing-title">Today's Briefing</div>
+                <div class="briefing-items" id="briefing-items-list">
+                  <!-- items injected by JS -->
+                </div>
+              </div>
+
+              <!-- Briefing trigger for panel / modal modes -->
+              <div class="briefing-trigger-row" id="briefing-trigger-row">
+                <button class="briefing-trigger-btn" id="briefing-open-btn">
+                  <div class="briefing-trigger-dot"></div>
+                  <span id="briefing-trigger-label"></span>
+                </button>
+              </div>
+
+            </div><!-- /hero-layout -->
+
+          </div><!-- /hero-body -->
+        </div><!-- /hero-inner -->
+
+      </div><!-- /hero-root -->
+    </div><!-- /hero-stage -->
+  </main>
+
+  <!-- ── BOTTOM BAR ── -->
+  <footer id="bottombar">
+    <span class="bottom-prompt-label">Direction Brief</span>
+    <div id="prompt-output"></div>
+    <div class="bottom-actions">
+      <button class="bar-btn danger" id="btn-reset">Reset Defaults</button>
+      <button class="bar-btn accent" id="btn-copy">Copy Prompt</button>
+    </div>
+  </footer>
+
+</div><!-- /app -->
+
+<!-- Briefing Slide-in Panel -->
+<div id="briefing-panel">
+  <div class="panel-header">
+    <div class="panel-title">Daily Briefing</div>
+    <button class="panel-close" id="panel-close-btn">&#10005;</button>
+  </div>
+  <div class="panel-briefing-items" id="panel-briefing-items"></div>
+</div>
+
+<!-- Briefing Modal -->
+<div id="briefing-modal-overlay">
+  <div class="briefing-modal">
+    <div class="modal-header">
+      <div class="modal-title">Daily Briefing</div>
+      <button class="modal-close" id="modal-close-btn">&#10005;</button>
+    </div>
+    <div class="modal-briefing-items" id="modal-briefing-items"></div>
+  </div>
+</div>
+
+<!-- Copy Toast -->
+<div id="copy-toast"></div>
+
+<script>
+/* =============================================================
+   MOCK DATA
+============================================================= */
+var MOCK = {
+  greeting: 'Good morning, Alex',
+  date: 'Friday, March 20',
+  intel: {
+    strip: 'Prepare Q1 deck — stakeholder meeting at 2pm has 3 open blockers needing resolution.',
+    prep: 'Review Q1 deck (slides 4–8) before 2pm stakeholder call. 3 open blockers flagged.',
+    risk: 'Runway slide missing updated figures. Action required before call.',
+    action: 'Send updated metrics to Jordan by 12pm today.'
+  },
+  metrics: [
+    { label: 'Meetings',    value: 12, max: 20 },
+    { label: 'Projects',    value: 4,  max: 10 },
+    { label: 'Open Tasks',  value: 23, max: 50 },
+    { label: 'Automations', value: 3,  max: 8  }
+  ],
+  sparklineData: [
+    [5,8,6,10,9,11,12],
+    [2,4,3,5,4,4,4],
+    [18,20,22,19,21,24,23],
+    [1,2,2,3,2,3,3]
+  ],
+  briefing: [
+    { text: '3 tasks due today — 2 in Project Alpha, 1 in Onboarding', overdue: false, icon: '\u23F0' },
+    { text: '1 overdue — "Send proposal to client" from 2 days ago',   overdue: true,  icon: '\u26A0' },
+    { text: 'Stand-up in 45 minutes with the engineering team',         overdue: false, icon: '\uD83D\uDCCB' }
+  ],
+  qa: [
+    { label: 'New Meeting', icon: '+',      primary: true  },
+    { label: 'New Task',    icon: '\u2713', primary: false },
+    { label: 'Record',      icon: '\u25CF', primary: false }
+  ]
+};
+
+var METRIC_COLORS = ['#FF2D6B', '#00F5D4', '#FFB800', 'rgba(248,240,242,0.6)'];
+
+/* =============================================================
+   STATE
+============================================================= */
+var STATE = {
+  layout:   '2col',
+  intel:    'full',
+  briefing: 'inline',
+  metric:   'numeric',
+  greeting: 'static',
+  qa:       'floating'
+};
+
+var DEFAULTS = {
+  layout:   '2col',
+  intel:    'full',
+  briefing: 'inline',
+  metric:   'numeric',
+  greeting: 'static',
+  qa:       'floating'
+};
+
+/* =============================================================
+   DOM HELPERS — NO innerHTML
+============================================================= */
+function el(tag, classNames) {
+  var node = document.createElement(tag);
+  if (classNames) node.className = classNames;
+  return node;
+}
+
+function svgEl(tag) {
+  return document.createElementNS('http://www.w3.org/2000/svg', tag);
+}
+
+function clearChildren(parent) {
+  while (parent.firstChild) {
+    parent.removeChild(parent.firstChild);
+  }
+}
+
+function appendText(parent, text) {
+  parent.appendChild(document.createTextNode(text));
+}
+
+/* =============================================================
+   SEGMENTED CONTROLS
+============================================================= */
+document.querySelectorAll('.seg-group').forEach(function(group) {
+  group.querySelectorAll('.seg-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      group.querySelectorAll('.seg-btn').forEach(function(b) {
+        b.classList.remove('active');
+      });
+      btn.classList.add('active');
+      STATE[group.dataset.key] = btn.dataset.value;
+      render();
+    });
+  });
+});
+
+/* =============================================================
+   RENDER
+============================================================= */
+function render() {
+  renderGreeting();
+  renderIntelligence();
+  renderMetrics();
+  renderBriefing();
+  renderQuickActions();
+  renderLayout();
+  updatePrompt();
+}
+
+/* ── Greeting ── */
+function renderGreeting() {
+  var area   = document.getElementById('greeting-area');
+  var dateEl = document.getElementById('greeting-date');
+  var textEl = document.getElementById('greeting-text');
+
+  if (STATE.greeting === 'none') {
+    area.style.display = 'none';
+    return;
+  }
+
+  area.style.display = 'flex';
+  dateEl.textContent = MOCK.date;
+  textEl.textContent = MOCK.greeting;
+
+  textEl.classList.remove('typewriter');
+  // force reflow to restart animation
+  void textEl.offsetWidth;
+
+  if (STATE.greeting === 'typewriter') {
+    textEl.classList.add('typewriter');
+  }
+}
+
+/* ── Intelligence ── */
+function renderIntelligence() {
+  var strip = document.getElementById('intel-strip');
+  var full  = document.getElementById('intel-full');
+
+  strip.classList.remove('visible');
+  full.classList.remove('visible');
+
+  if (STATE.intel === 'strip') {
+    strip.classList.add('visible');
+    document.getElementById('intel-strip-text').textContent = MOCK.intel.strip;
+  } else if (STATE.intel === 'full') {
+    full.classList.add('visible');
+    document.getElementById('intel-prep').textContent   = MOCK.intel.prep;
+    document.getElementById('intel-risk').textContent   = MOCK.intel.risk;
+    document.getElementById('intel-action').textContent = MOCK.intel.action;
+  }
+}
+
+/* ── Metrics ── */
+function buildSparklineSVG(data, color, uid) {
+  var w = 100, h = 36;
+  var minV = Math.min.apply(null, data);
+  var maxV = Math.max.apply(null, data);
+  var range = maxV - minV || 1;
+
+  var pts = data.map(function(v, i) {
+    var x = (i / (data.length - 1)) * w;
+    var y = h - 4 - ((v - minV) / range) * (h - 10);
+    return x + ',' + y;
+  });
+
+  var svg = svgEl('svg');
+  svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+  svg.setAttribute('preserveAspectRatio', 'none');
+
+  var defs = svgEl('defs');
+  var grad = svgEl('linearGradient');
+  var gradId = 'sg' + uid;
+  grad.setAttribute('id', gradId);
+  grad.setAttribute('x1', '0'); grad.setAttribute('y1', '0');
+  grad.setAttribute('x2', '0'); grad.setAttribute('y2', '1');
+
+  var s1 = svgEl('stop');
+  s1.setAttribute('offset', '0%');
+  s1.setAttribute('stop-color', color);
+  s1.setAttribute('stop-opacity', '0.3');
+
+  var s2 = svgEl('stop');
+  s2.setAttribute('offset', '100%');
+  s2.setAttribute('stop-color', color);
+  s2.setAttribute('stop-opacity', '0');
+
+  grad.appendChild(s1);
+  grad.appendChild(s2);
+  defs.appendChild(grad);
+  svg.appendChild(defs);
+
+  var lastX = w;
+  var fillPts = pts.join(' L ');
+  var fillD = 'M ' + fillPts + ' L ' + lastX + ' ' + h + ' L 0 ' + h + ' Z';
+  var fillPath = svgEl('path');
+  fillPath.setAttribute('d', fillD);
+  fillPath.setAttribute('fill', 'url(#' + gradId + ')');
+  svg.appendChild(fillPath);
+
+  var lineD = 'M ' + pts.join(' L ');
+  var linePath = svgEl('path');
+  linePath.setAttribute('d', lineD);
+  linePath.setAttribute('fill', 'none');
+  linePath.setAttribute('stroke', color);
+  linePath.setAttribute('stroke-width', '1.5');
+  linePath.setAttribute('stroke-linejoin', 'round');
+  linePath.setAttribute('stroke-linecap', 'round');
+  svg.appendChild(linePath);
+
+  var lastPt = pts[pts.length - 1].split(',');
+  var dot = svgEl('circle');
+  dot.setAttribute('cx', lastPt[0]);
+  dot.setAttribute('cy', lastPt[1]);
+  dot.setAttribute('r', '2.5');
+  dot.setAttribute('fill', color);
+  svg.appendChild(dot);
+
+  return svg;
+}
+
+function buildRingGaugeSVG(value, max, color) {
+  var pct   = Math.min(value / max, 1);
+  var r     = 18, cx = 22, cy = 22;
+  var circ  = 2 * Math.PI * r;
+  var dash  = pct * circ;
+  var gap   = circ - dash;
+
+  var svg = svgEl('svg');
+  svg.setAttribute('viewBox', '0 0 44 44');
+
+  var bg = svgEl('circle');
+  bg.setAttribute('cx', cx); bg.setAttribute('cy', cy);
+  bg.setAttribute('r', r);
+  bg.setAttribute('fill', 'none');
+  bg.setAttribute('stroke', 'rgba(248,240,242,0.08)');
+  bg.setAttribute('stroke-width', '4');
+  svg.appendChild(bg);
+
+  var arc = svgEl('circle');
+  arc.setAttribute('cx', cx); arc.setAttribute('cy', cy);
+  arc.setAttribute('r', r);
+  arc.setAttribute('fill', 'none');
+  arc.setAttribute('stroke', color);
+  arc.setAttribute('stroke-width', '4');
+  arc.setAttribute('stroke-linecap', 'round');
+  arc.setAttribute('stroke-dasharray', dash + ' ' + gap);
+  arc.setAttribute('transform', 'rotate(-90 ' + cx + ' ' + cy + ')');
+  svg.appendChild(arc);
+
+  return svg;
+}
+
+function renderMetrics() {
+  var grid = document.getElementById('metrics-grid');
+  clearChildren(grid);
+
+  MOCK.metrics.forEach(function(m, i) {
+    var card = el('div', 'metric-card');
+
+    var lbl = el('div', 'metric-label');
+    lbl.textContent = m.label;
+    card.appendChild(lbl);
+
+    if (STATE.metric === 'numeric') {
+      var num = el('div', 'metric-number');
+      num.style.color = METRIC_COLORS[i];
+      num.textContent = String(m.value);
+      card.appendChild(num);
+
+    } else if (STATE.metric === 'sparkline') {
+      var wrap = el('div', 'metric-sparkline-wrap');
+      var svg  = buildSparklineSVG(MOCK.sparklineData[i], METRIC_COLORS[i], i);
+      wrap.appendChild(svg);
+      card.appendChild(wrap);
+
+      var sub = el('div');
+      sub.style.fontFamily = 'var(--en-font-mono)';
+      sub.style.fontSize   = '12px';
+      sub.style.color      = METRIC_COLORS[i];
+      sub.style.marginTop  = '2px';
+      sub.textContent = String(m.value);
+      card.appendChild(sub);
+
+    } else if (STATE.metric === 'ring') {
+      var ring = el('div', 'metric-ring-wrap');
+      var rsvg = buildRingGaugeSVG(m.value, m.max, METRIC_COLORS[i]);
+      ring.appendChild(rsvg);
+
+      var rlbl = el('div', 'metric-ring-num');
+      rlbl.style.color = METRIC_COLORS[i];
+      rlbl.textContent = m.value + ' / ' + m.max;
+      ring.appendChild(rlbl);
+      card.appendChild(ring);
+    }
+
+    grid.appendChild(card);
+  });
+}
+
+/* ── Build briefing item nodes (shared by inline / panel / modal) ── */
+function buildBriefingItemNode(item, iconClass, itemClass) {
+  var node = el('div', itemClass + (item.overdue ? ' overdue' : ''));
+  var ico  = el('span', iconClass);
+  ico.textContent = item.icon;
+  node.appendChild(ico);
+
+  var txt = el('span');
+  txt.textContent = item.text;
+  node.appendChild(txt);
+
+  return node;
+}
+
+/* ── Briefing ── */
+function renderBriefing() {
+  var inlineEl    = document.getElementById('briefing-inline');
+  var triggerRow  = document.getElementById('briefing-trigger-row');
+  var triggerLbl  = document.getElementById('briefing-trigger-label');
+
+  inlineEl.classList.remove('visible');
+  triggerRow.classList.remove('visible');
+
+  document.getElementById('briefing-panel').classList.remove('open');
+  document.getElementById('briefing-modal-overlay').classList.remove('open');
+
+  if (STATE.briefing === 'inline') {
+    inlineEl.classList.add('visible');
+
+    var list = document.getElementById('briefing-items-list');
+    clearChildren(list);
+
+    var d1 = el('div', 'briefing-item');
+    d1.textContent = '3 tasks due today';
+    list.appendChild(d1);
+
+    var d2 = el('div', 'briefing-item overdue');
+    d2.textContent = '1 overdue — "Send proposal to client"';
+    list.appendChild(d2);
+
+  } else {
+    triggerRow.classList.add('visible');
+    triggerLbl.textContent = (STATE.briefing === 'panel') ? 'View Daily Briefing' : 'Open Briefing';
+  }
+
+  // Populate panel
+  var panelList = document.getElementById('panel-briefing-items');
+  clearChildren(panelList);
+  MOCK.briefing.forEach(function(item) {
+    panelList.appendChild(buildBriefingItemNode(item, 'panel-briefing-item-icon', 'panel-briefing-item'));
+  });
+
+  // Populate modal
+  var modalList = document.getElementById('modal-briefing-items');
+  clearChildren(modalList);
+  MOCK.briefing.forEach(function(item) {
+    modalList.appendChild(buildBriefingItemNode(item, 'modal-briefing-item-icon', 'modal-briefing-item'));
+  });
+}
+
+/* ── Quick Actions ── */
+function buildQAButton(qaData) {
+  var btn  = el('button', 'qa-btn' + (qaData.primary ? ' primary' : ''));
+  var ico  = el('span', 'qa-btn-icon');
+  ico.textContent = qaData.icon;
+  var lbl  = el('span', 'qa-btn-label');
+  lbl.textContent = qaData.label;
+  btn.appendChild(ico);
+  btn.appendChild(lbl);
+  return btn;
+}
+
+function renderQuickActions() {
+  var floating = document.getElementById('qa-floating');
+  var docked   = document.getElementById('qa-docked');
+
+  floating.classList.remove('visible');
+  docked.classList.remove('visible');
+
+  clearChildren(floating);
+  // Clear docked buttons only (preserve qa-label-text)
+  var dockedLabel = docked.querySelector('.qa-label-text');
+  clearChildren(docked);
+  if (dockedLabel) docked.appendChild(dockedLabel);
+
+  if (STATE.qa === 'floating') {
+    floating.classList.add('visible');
+    MOCK.qa.forEach(function(qa) {
+      floating.appendChild(buildQAButton(qa));
+    });
+  } else if (STATE.qa === 'docked') {
+    docked.classList.add('visible');
+    MOCK.qa.forEach(function(qa) {
+      docked.appendChild(buildQAButton(qa));
+    });
+  }
+}
+
+/* ── Layout ── */
+function renderLayout() {
+  var layout = document.getElementById('hero-layout');
+  layout.classList.remove('layout-1col', 'layout-2col', 'layout-3col');
+  layout.classList.add('layout-' + STATE.layout);
+}
+
+/* ── Prompt ── */
+var LABEL_MAP = {
+  layout:   { '1col': 'single column', '2col': '2-col split', '3col': '3-col grid' },
+  intel:    { 'hidden': 'no intelligence card', 'strip': 'compact intelligence strip', 'full': 'full intelligence card' },
+  briefing: { 'inline': 'inline briefing', 'panel': 'slide-in briefing panel', 'modal': 'modal briefing' },
+  metric:   { 'numeric': 'numeric metrics', 'sparkline': 'sparkline metrics', 'ring': 'ring gauge metrics' },
+  greeting: { 'none': 'no greeting', 'static': 'static greeting', 'typewriter': 'typewriter greeting' },
+  qa:       { 'none': 'no quick actions', 'floating': 'floating quick actions', 'docked': 'docked quick actions bar' }
+};
+
+function updatePrompt() {
+  var parts = [
+    'Dashboard hero',
+    LABEL_MAP.layout[STATE.layout],
+    LABEL_MAP.intel[STATE.intel],
+    LABEL_MAP.briefing[STATE.briefing],
+    LABEL_MAP.metric[STATE.metric],
+    LABEL_MAP.greeting[STATE.greeting],
+    LABEL_MAP.qa[STATE.qa]
+  ];
+  document.getElementById('prompt-output').textContent = parts.join(' — ') + '.';
+}
+
+/* =============================================================
+   BRIEFING PANEL / MODAL OPEN + CLOSE
+============================================================= */
+document.getElementById('briefing-open-btn').addEventListener('click', function() {
+  if (STATE.briefing === 'panel') {
+    document.getElementById('briefing-panel').classList.add('open');
+  } else if (STATE.briefing === 'modal') {
+    document.getElementById('briefing-modal-overlay').classList.add('open');
+  }
+});
+
+document.getElementById('panel-close-btn').addEventListener('click', function() {
+  document.getElementById('briefing-panel').classList.remove('open');
+});
+
+document.getElementById('modal-close-btn').addEventListener('click', function() {
+  document.getElementById('briefing-modal-overlay').classList.remove('open');
+});
+
+document.getElementById('briefing-modal-overlay').addEventListener('click', function(e) {
+  if (e.target === this) {
+    this.classList.remove('open');
+  }
+});
+
+/* =============================================================
+   RESET + COPY
+============================================================= */
+document.getElementById('btn-reset').addEventListener('click', function() {
+  Object.keys(DEFAULTS).forEach(function(k) {
+    STATE[k] = DEFAULTS[k];
+  });
+
+  document.querySelectorAll('.seg-group').forEach(function(group) {
+    var key = group.dataset.key;
+    group.querySelectorAll('.seg-btn').forEach(function(btn) {
+      if (btn.dataset.value === STATE[key]) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+  });
+
+  render();
+});
+
+document.getElementById('btn-copy').addEventListener('click', function() {
+  var text = document.getElementById('prompt-output').textContent;
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text)
+      .then(function() { showToast('Prompt copied!'); })
+      .catch(function() { fallbackCopy(text); });
+  } else {
+    fallbackCopy(text);
+  }
+});
+
+function fallbackCopy(text) {
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity  = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  var ok = false;
+  try { ok = document.execCommand('copy'); } catch(e) { ok = false; }
+  document.body.removeChild(ta);
+  showToast(ok ? 'Prompt copied!' : 'Copy not supported');
+}
+
+function showToast(message) {
+  var toast = document.getElementById('copy-toast');
+  toast.textContent = message;
+  toast.classList.add('show');
+  setTimeout(function() { toast.classList.remove('show'); }, 2000);
+}
+
+/* =============================================================
+   INITIAL RENDER
+============================================================= */
+render();
+</script>
+</body>
+</html>

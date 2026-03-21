@@ -84,12 +84,45 @@ export default function WorkflowBuilder() {
   }
 
   const handleChange = (data) => {
-    // Update local workflow state
     setWorkflow(prev => ({
       ...prev,
       nodes: data.nodes,
       connections: data.edges
     }))
+  }
+
+  const handleToggleActive = async () => {
+    try {
+      await workflowsApi.toggle(id, !workflow.active)
+      setWorkflow(prev => ({ ...prev, active: !prev.active }))
+    } catch (err) {
+      console.error('Failed to toggle workflow active state:', err)
+    }
+  }
+
+  const handleDuplicate = async () => {
+    try {
+      const response = await workflowsApi.create({
+        name: `${workflow.name} (copy)`,
+        description: workflow.description,
+        nodes: workflow.nodes,
+        connections: workflow.connections,
+        active: false
+      })
+      navigate(`/workflows/${response.workflow.id}`)
+    } catch (err) {
+      console.error('Failed to duplicate workflow:', err)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!window.confirm(`Delete "${workflow.name}"? This cannot be undone.`)) return
+    try {
+      await workflowsApi.delete(id)
+      navigate('/workflows')
+    } catch (err) {
+      console.error('Failed to delete workflow:', err)
+    }
   }
 
   if (loading) {
@@ -154,6 +187,9 @@ export default function WorkflowBuilder() {
           onTest={handleTest}
           onBack={handleBack}
           onChange={handleChange}
+          onToggleActive={handleToggleActive}
+          onDuplicate={handleDuplicate}
+          onDelete={handleDelete}
         />
       </div>
     </div>

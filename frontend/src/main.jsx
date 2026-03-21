@@ -16,6 +16,7 @@ import './styles/themes/monolith.css'
 import './styles/themes/horizon.css'
 import './styles/themes/pastel-zen.css'
 import './styles/themes/playground.css'
+import './styles/themes/void-crimson.css'
 
 // Import main CSS (contains defaults and base styles)
 import './styles/main.css'

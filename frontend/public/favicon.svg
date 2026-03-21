@@ -1,10 +1,30 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <title>Entomate</title>
   <defs>
-    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#22c55e;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#16a34a;stop-opacity:1" />
-    </linearGradient>
+    <radialGradient id="core" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FF2D6B"/>
+      <stop offset="100%" stop-color="#CC1A50"/>
+    </radialGradient>
   </defs>
-  <circle cx="50" cy="50" r="45" fill="url(#grad)"/>
-  <path d="M30 50 L45 65 L70 35" stroke="white" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Outer hexagon -->
+  <path d="M32 4 L56 18 L56 46 L32 60 L8 46 L8 18 Z" stroke="#FF2D6B" stroke-width="1.5" stroke-opacity="0.35" fill="none"/>
+  <!-- Inner hexagon -->
+  <path d="M32 13 L48 22.5 L48 41.5 L32 51 L16 41.5 L16 22.5 Z" stroke="#FF2D6B" stroke-width="1" stroke-opacity="0.55" fill="rgba(255,45,107,0.06)"/>
+  <!-- Connectors -->
+  <line x1="32" y1="13" x2="32" y2="23" stroke="#FF2D6B" stroke-width="1.5" stroke-opacity="0.6"/>
+  <line x1="32" y1="41" x2="32" y2="51" stroke="#FF2D6B" stroke-width="1.5" stroke-opacity="0.6"/>
+  <line x1="16" y1="22.5" x2="24" y2="27" stroke="#FF2D6B" stroke-width="1.5" stroke-opacity="0.6"/>
+  <line x1="48" y1="22.5" x2="40" y2="27" stroke="#FF2D6B" stroke-width="1.5" stroke-opacity="0.6"/>
+  <line x1="16" y1="41.5" x2="24" y2="37" stroke="#FF2D6B" stroke-width="1.5" stroke-opacity="0.6"/>
+  <line x1="48" y1="41.5" x2="40" y2="37" stroke="#FF2D6B" stroke-width="1.5" stroke-opacity="0.6"/>
+  <!-- Central node -->
+  <circle cx="32" cy="32" r="9" fill="url(#core)"/>
+  <circle cx="32" cy="32" r="3.5" fill="white" opacity="0.9"/>
+  <!-- Satellite nodes — top/bottom: crimson · left: neon mint · right: amber -->
+  <circle cx="32" cy="13" r="4" fill="#FF2D6B" opacity="0.85"/>
+  <circle cx="32" cy="51" r="4" fill="#FF2D6B" opacity="0.85"/>
+  <circle cx="16" cy="22.5" r="3.5" fill="#00F5D4" opacity="0.85"/>
+  <circle cx="48" cy="22.5" r="3.5" fill="#FFB800" opacity="0.85"/>
+  <circle cx="16" cy="41.5" r="3.5" fill="#00F5D4" opacity="0.85"/>
+  <circle cx="48" cy="41.5" r="3.5" fill="#FFB800" opacity="0.85"/>
 </svg>

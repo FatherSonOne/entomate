@@ -1,0 +1,1534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Entomate — Meetings Redesign Playground</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Space+Grotesk:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    /* ─── Tokens ─────────────────────────────────────────────── */
+    :root {
+      --en-primary:         #FF2D6B;
+      --en-secondary:       #00F5D4;
+      --en-tertiary:        #FFB800;
+      --en-phosphor:        #A0FF32;
+      --en-bg-abyss:        #080808;
+      --en-bg-surface:      #101010;
+      --en-bg-elevated:     #181818;
+      --en-text-primary:    #F8F0F2;
+      --en-text-secondary:  #968890;
+      --en-border-default:  rgba(248,240,242,0.16);
+      --en-font-display:    'Syne', sans-serif;
+      --en-font-body:       'Space Grotesk', sans-serif;
+      --en-font-mono:       'JetBrains Mono', monospace;
+      --panel-left:         340px;
+      --bottom-bar:         72px;
+      --transition:         180ms cubic-bezier(.4,0,.2,1);
+    }
+
+    /* ─── Reset ──────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+
+    body {
+      background: var(--en-bg-abyss);
+      color: var(--en-text-primary);
+      font-family: var(--en-font-body);
+      font-size: 14px;
+      line-height: 1.5;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ─── Top chrome ─────────────────────────────────────────── */
+    .top-bar {
+      height: 52px;
+      background: var(--en-bg-surface);
+      border-bottom: 1px solid var(--en-border-default);
+      display: flex;
+      align-items: center;
+      padding: 0 24px;
+      gap: 12px;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 10;
+    }
+    .top-bar__logo {
+      font-family: var(--en-font-display);
+      font-weight: 800;
+      font-size: 18px;
+      color: var(--en-primary);
+      letter-spacing: -0.5px;
+    }
+    .top-bar__sep { width: 1px; height: 20px; background: var(--en-border-default); }
+    .top-bar__title {
+      font-size: 13px;
+      color: var(--en-text-secondary);
+      font-family: var(--en-font-mono);
+    }
+    .top-bar__badge {
+      margin-left: auto;
+      background: rgba(255,45,107,0.15);
+      border: 1px solid rgba(255,45,107,0.35);
+      color: var(--en-primary);
+      font-size: 10px;
+      font-family: var(--en-font-mono);
+      font-weight: 500;
+      padding: 2px 8px;
+      border-radius: 4px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    /* ─── Main layout ────────────────────────────────────────── */
+    .workspace {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    /* ─── Left panel ─────────────────────────────────────────── */
+    .panel-left {
+      width: var(--panel-left);
+      flex-shrink: 0;
+      background: var(--en-bg-surface);
+      border-right: 1px solid var(--en-border-default);
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 20px 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .panel-left::-webkit-scrollbar { width: 4px; }
+    .panel-left::-webkit-scrollbar-track { background: transparent; }
+    .panel-left::-webkit-scrollbar-thumb { background: rgba(255,45,107,0.25); border-radius: 2px; }
+
+    .controls-heading {
+      font-family: var(--en-font-mono);
+      font-size: 10px;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: var(--en-primary);
+      padding: 0 2px 8px;
+      border-bottom: 1px solid var(--en-border-default);
+      margin-bottom: 4px;
+    }
+
+    .control-group {
+      background: var(--en-bg-elevated);
+      border: 1px solid var(--en-border-default);
+      border-radius: 8px;
+      padding: 12px 12px 10px;
+    }
+    .control-group__label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--en-primary);
+      letter-spacing: 0.4px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .control-group__label::before {
+      content: '';
+      display: inline-block;
+      width: 3px;
+      height: 11px;
+      background: var(--en-primary);
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    /* ─── Segmented buttons ──────────────────────────────────── */
+    .seg-group {
+      display: flex;
+      gap: 0;
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid var(--en-border-default);
+    }
+    .seg-btn {
+      flex: 1;
+      padding: 6px 4px;
+      background: transparent;
+      border: none;
+      border-right: 1px solid var(--en-border-default);
+      color: var(--en-text-secondary);
+      font-family: var(--en-font-body);
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background var(--transition), color var(--transition);
+      white-space: nowrap;
+      text-align: center;
+      line-height: 1.3;
+    }
+    .seg-btn:last-child { border-right: none; }
+    .seg-btn:hover {
+      background: rgba(255,45,107,0.08);
+      color: var(--en-text-primary);
+    }
+    .seg-btn.active {
+      background: rgba(255,45,107,0.18);
+      color: var(--en-primary);
+      font-weight: 600;
+    }
+
+    /* ─── Right panel (preview) ──────────────────────────────── */
+    .panel-right {
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+      position: relative;
+    }
+
+    .preview-area {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 24px;
+    }
+    .preview-area::-webkit-scrollbar { width: 4px; }
+    .preview-area::-webkit-scrollbar-track { background: transparent; }
+    .preview-area::-webkit-scrollbar-thumb { background: rgba(255,45,107,0.2); border-radius: 2px; }
+
+    .preview-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .preview-header__title {
+      font-family: var(--en-font-display);
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+    .preview-header__count {
+      font-family: var(--en-font-mono);
+      font-size: 12px;
+      color: var(--en-text-secondary);
+    }
+
+    /* ─── View: List ─────────────────────────────────────────── */
+    .view-list { display: flex; flex-direction: column; gap: 10px; }
+
+    /* ─── View: Timeline ─────────────────────────────────────── */
+    .view-timeline {
+      display: none;
+      flex-direction: column;
+      gap: 0;
+    }
+    .timeline-track {
+      position: relative;
+      display: flex;
+      align-items: center;
+      padding: 0 0 32px;
+      gap: 0;
+    }
+    .timeline-track::before {
+      content: '';
+      position: absolute;
+      left: 0; right: 0;
+      top: 20px;
+      height: 2px;
+      background: linear-gradient(90deg, var(--en-primary) 0%, rgba(255,45,107,0.2) 100%);
+      z-index: 0;
+    }
+    .timeline-node {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+      z-index: 1;
+    }
+    .timeline-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 2px solid var(--en-bg-abyss);
+      margin-bottom: 12px;
+      flex-shrink: 0;
+    }
+    .timeline-card {
+      background: var(--en-bg-elevated);
+      border: 1px solid var(--en-border-default);
+      border-radius: 8px;
+      padding: 10px 10px 8px;
+      width: calc(100% - 12px);
+      text-align: center;
+    }
+    .timeline-card__title {
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 4px;
+      color: var(--en-text-primary);
+      line-height: 1.3;
+    }
+    .timeline-card__time {
+      font-family: var(--en-font-mono);
+      font-size: 10px;
+      color: var(--en-text-secondary);
+    }
+    .timeline-cards-below {
+      margin-top: 4px;
+    }
+
+    /* ─── View: Calendar Hybrid ──────────────────────────────── */
+    .view-calendar { display: none; flex-direction: column; gap: 16px; }
+    .cal-week {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+      background: var(--en-bg-elevated);
+      border: 1px solid var(--en-border-default);
+      border-radius: 10px;
+      padding: 12px;
+    }
+    .cal-day {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 4px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background var(--transition);
+    }
+    .cal-day:hover { background: rgba(255,45,107,0.08); }
+    .cal-day.active {
+      background: rgba(255,45,107,0.15);
+      border: 1px solid rgba(255,45,107,0.3);
+    }
+    .cal-day__name {
+      font-size: 10px;
+      color: var(--en-text-secondary);
+      font-family: var(--en-font-mono);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .cal-day__num {
+      font-family: var(--en-font-display);
+      font-size: 16px;
+      font-weight: 700;
+    }
+    .cal-day.active .cal-day__num { color: var(--en-primary); }
+    .cal-day__dot {
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      background: var(--en-primary);
+    }
+    .cal-label {
+      font-size: 11px;
+      color: var(--en-text-secondary);
+      font-family: var(--en-font-mono);
+      letter-spacing: 0.5px;
+      padding-left: 2px;
+    }
+
+    /* ─── Meeting Cards ──────────────────────────────────────── */
+    .meeting-card {
+      background: var(--en-bg-elevated);
+      border: 1px solid var(--en-border-default);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
+      position: relative;
+      overflow: hidden;
+    }
+    .meeting-card:hover {
+      border-color: rgba(255,45,107,0.4);
+      box-shadow: 0 0 0 1px rgba(255,45,107,0.1), 0 8px 24px rgba(0,0,0,0.4);
+      transform: translateY(-1px);
+    }
+    .meeting-card.selected {
+      border-color: rgba(255,45,107,0.6);
+      box-shadow: 0 0 0 1px rgba(255,45,107,0.2);
+    }
+    .meeting-card.live {
+      border-color: rgba(255,45,107,0.3);
+    }
+    .meeting-card.live::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--en-primary), rgba(255,45,107,0.2));
+    }
+
+    /* Compact density */
+    .meeting-card.density-compact .card-body { padding: 10px 14px; }
+    .meeting-card.density-compact .card-row-main { display: flex; align-items: center; gap: 10px; }
+    .meeting-card.density-compact .card-meta,
+    .meeting-card.density-compact .card-row-secondary,
+    .meeting-card.density-compact .card-ai-inline,
+    .meeting-card.density-compact .card-transcript { display: none; }
+
+    /* Standard density */
+    .meeting-card.density-standard .card-body { padding: 14px 16px; }
+    .meeting-card.density-standard .card-row-main { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+    .meeting-card.density-standard .card-row-secondary { display: flex; align-items: center; gap: 12px; }
+    .meeting-card.density-standard .card-ai-inline { display: block; }
+    .meeting-card.density-standard .card-transcript { display: block; }
+
+    /* Expanded density */
+    .meeting-card.density-expanded .card-body { padding: 16px 18px; }
+    .meeting-card.density-expanded .card-row-main { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+    .meeting-card.density-expanded .card-row-secondary { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+    .meeting-card.density-expanded .card-ai-inline { display: block; }
+    .meeting-card.density-expanded .card-transcript { display: block; }
+
+    .card-indicator {
+      flex-shrink: 0;
+      width: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 1px;
+    }
+
+    /* ─── Recording indicators ───────────────────────────────── */
+
+    /* Dot */
+    .ind-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .ind-dot.color-live     { background: var(--en-primary); }
+    .ind-dot.color-processed { background: var(--en-secondary); }
+    .ind-dot.color-processing { background: var(--en-tertiary); }
+
+    /* Waveform */
+    .ind-waveform {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 14px;
+    }
+    .ind-waveform .bar {
+      width: 2px;
+      border-radius: 1px;
+      background: var(--en-secondary);
+      height: 40%;
+    }
+    .ind-waveform.color-live .bar { background: var(--en-primary); }
+    .ind-waveform.color-processing .bar { background: var(--en-tertiary); }
+    .ind-waveform.animated .bar:nth-child(1) { animation: wave 0.8s ease-in-out infinite 0.0s; }
+    .ind-waveform.animated .bar:nth-child(2) { animation: wave 0.8s ease-in-out infinite 0.15s; }
+    .ind-waveform.animated .bar:nth-child(3) { animation: wave 0.8s ease-in-out infinite 0.3s; }
+    .ind-waveform.animated .bar:nth-child(4) { animation: wave 0.8s ease-in-out infinite 0.45s; }
+    @keyframes wave {
+      0%,100% { height: 30%; }
+      50%      { height: 100%; }
+    }
+
+    /* Pulsing ring */
+    .ind-ring {
+      position: relative;
+      width: 12px; height: 12px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .ind-ring .core {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      position: relative;
+      z-index: 1;
+    }
+    .ind-ring.color-live .core     { background: var(--en-primary); }
+    .ind-ring.color-processed .core { background: var(--en-secondary); }
+    .ind-ring.color-processing .core { background: var(--en-tertiary); }
+    .ind-ring .pulse {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      animation: ringpulse 1.8s ease-out infinite;
+    }
+    .ind-ring.color-live .pulse     { border: 1.5px solid var(--en-primary); }
+    .ind-ring.color-processed .pulse { border: 1.5px solid var(--en-secondary); }
+    .ind-ring.color-processing .pulse { border: 1.5px solid var(--en-tertiary); }
+    @keyframes ringpulse {
+      0%   { transform: scale(1); opacity: 0.9; }
+      100% { transform: scale(2.8); opacity: 0; }
+    }
+
+    /* ─── Live pulse override ────────────────────────────────── */
+    .live-pulse-override {
+      position: relative;
+      width: 10px; height: 10px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .live-pulse-override .core {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--en-primary);
+      position: relative;
+      z-index: 1;
+    }
+    .live-pulse-override .ring1,
+    .live-pulse-override .ring2 {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      border: 1.5px solid var(--en-primary);
+    }
+    .live-pulse-override .ring1 { animation: ringpulse 1.4s ease-out infinite 0s; }
+    .live-pulse-override .ring2 { animation: ringpulse 1.4s ease-out infinite 0.6s; }
+
+    /* ─── Card title ─────────────────────────────────────────── */
+    .card-title {
+      font-family: var(--en-font-display);
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--en-text-primary);
+      flex: 1;
+      line-height: 1.3;
+    }
+    .density-compact .card-title { font-size: 13px; }
+
+    /* ─── Status chips ───────────────────────────────────────── */
+    .status-chip {
+      font-size: 10px;
+      font-weight: 600;
+      font-family: var(--en-font-mono);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      flex-shrink: 0;
+    }
+    /* Pill */
+    .status-chip.style-pill {
+      padding: 2px 8px;
+      border-radius: 20px;
+    }
+    /* Square badge */
+    .status-chip.style-square {
+      padding: 2px 7px;
+      border-radius: 2px;
+    }
+    /* Underline text */
+    .status-chip.style-underline {
+      padding: 0;
+      background: transparent !important;
+      border: none !important;
+      border-bottom: 2px solid;
+      border-radius: 0;
+      padding-bottom: 1px;
+    }
+
+    /* Colors */
+    .status-chip.s-processed {
+      color: var(--en-secondary);
+      background: rgba(0,245,212,0.12);
+      border: 1px solid rgba(0,245,212,0.25);
+    }
+    .status-chip.s-processed.style-underline { border-bottom-color: var(--en-secondary); }
+
+    .status-chip.s-processing {
+      color: var(--en-tertiary);
+      background: rgba(255,184,0,0.12);
+      border: 1px solid rgba(255,184,0,0.25);
+    }
+    .status-chip.s-processing.style-underline { border-bottom-color: var(--en-tertiary); }
+
+    .status-chip.s-live {
+      color: var(--en-primary);
+      background: rgba(255,45,107,0.12);
+      border: 1px solid rgba(255,45,107,0.3);
+      animation: liveblink 2s ease-in-out infinite;
+    }
+    .status-chip.s-live.style-underline { border-bottom-color: var(--en-primary); }
+    @keyframes liveblink {
+      0%,100% { opacity: 1; }
+      50%      { opacity: 0.6; }
+    }
+
+    /* ─── Secondary meta row ─────────────────────────────────── */
+    .card-row-secondary { flex-wrap: wrap; gap: 10px; }
+    .meta-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--en-text-secondary);
+      font-size: 12px;
+    }
+    .meta-item .icon {
+      width: 13px; height: 13px;
+      opacity: 0.7;
+      flex-shrink: 0;
+      display: inline-flex;
+    }
+    /* SVG icons via inline */
+
+    .sentiment-badge {
+      font-size: 11px;
+      font-family: var(--en-font-mono);
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+    .sentiment-positive { color: var(--en-phosphor); background: rgba(160,255,50,0.1); }
+    .sentiment-neutral  { color: var(--en-tertiary); background: rgba(255,184,0,0.1); }
+    .sentiment-unknown  { color: var(--en-text-secondary); background: rgba(150,136,144,0.15); }
+
+    .action-badge {
+      font-size: 11px;
+      font-family: var(--en-font-mono);
+      color: var(--en-primary);
+      background: rgba(255,45,107,0.1);
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+    .action-badge.zero { color: var(--en-text-secondary); background: transparent; }
+
+    /* ─── AI Summary Inline ──────────────────────────────────── */
+    .card-ai-inline {
+      margin-top: 8px;
+      padding: 8px 10px;
+      background: rgba(255,45,107,0.05);
+      border-left: 2px solid rgba(255,45,107,0.4);
+      border-radius: 0 6px 6px 0;
+      font-size: 12px;
+      color: var(--en-text-secondary);
+      line-height: 1.5;
+    }
+    .card-ai-inline__label {
+      font-family: var(--en-font-mono);
+      font-size: 9px;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: var(--en-primary);
+      margin-bottom: 3px;
+      opacity: 0.8;
+    }
+
+    /* ─── Transcript preview ─────────────────────────────────── */
+    .card-transcript {
+      margin-top: 6px;
+    }
+    .transcript-link {
+      font-family: var(--en-font-mono);
+      font-size: 11px;
+      color: var(--en-secondary);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      opacity: 0.8;
+      transition: opacity var(--transition);
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 0;
+    }
+    .transcript-link:hover { opacity: 1; }
+    .transcript-text {
+      font-family: var(--en-font-mono);
+      font-size: 11px;
+      color: var(--en-text-secondary);
+      line-height: 1.6;
+      padding: 6px 10px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 4px;
+      border: 1px solid var(--en-border-default);
+    }
+    .transcript-text .tline { display: block; }
+    .transcript-text .speaker {
+      color: var(--en-secondary);
+      margin-right: 6px;
+    }
+
+    /* ─── Right panel (AI detail) ────────────────────────────── */
+    .ai-right-panel {
+      width: 0;
+      flex-shrink: 0;
+      overflow: hidden;
+      transition: width 280ms cubic-bezier(.4,0,.2,1);
+      background: var(--en-bg-surface);
+      border-left: 1px solid var(--en-border-default);
+    }
+    .ai-right-panel.open { width: 280px; }
+    .ai-right-panel__inner {
+      width: 280px;
+      padding: 20px 16px;
+    }
+    .ai-rp-label {
+      font-family: var(--en-font-mono);
+      font-size: 9px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--en-primary);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .ai-rp-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--en-border-default);
+    }
+    .ai-rp-title {
+      font-family: var(--en-font-display);
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      color: var(--en-text-primary);
+      line-height: 1.3;
+    }
+    .ai-rp-body {
+      font-size: 12px;
+      color: var(--en-text-secondary);
+      line-height: 1.7;
+    }
+    .ai-rp-close {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      background: rgba(255,45,107,0.1);
+      border: 1px solid rgba(255,45,107,0.25);
+      color: var(--en-primary);
+      width: 22px; height: 22px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      display: flex; align-items: center; justify-content: center;
+      transition: background var(--transition);
+    }
+    .ai-rp-close:hover { background: rgba(255,45,107,0.2); }
+
+    /* ─── Drawer ─────────────────────────────────────────────── */
+    .ai-drawer {
+      position: fixed;
+      bottom: calc(var(--bottom-bar) + 0px);
+      left: var(--panel-left);
+      right: 0;
+      height: 0;
+      overflow: hidden;
+      background: var(--en-bg-surface);
+      border-top: 1px solid var(--en-border-default);
+      transition: height 300ms cubic-bezier(.4,0,.2,1);
+      z-index: 20;
+    }
+    .ai-drawer.open { height: 200px; }
+    .ai-drawer__inner { padding: 16px 24px; }
+    .ai-drawer__close {
+      position: absolute;
+      top: 10px; right: 16px;
+      background: transparent;
+      border: none;
+      color: var(--en-text-secondary);
+      cursor: pointer;
+      font-size: 18px;
+      transition: color var(--transition);
+    }
+    .ai-drawer__close:hover { color: var(--en-text-primary); }
+
+    /* ─── Bottom bar ─────────────────────────────────────────── */
+    .bottom-bar {
+      height: var(--bottom-bar);
+      background: var(--en-bg-surface);
+      border-top: 1px solid var(--en-border-default);
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 12px;
+      flex-shrink: 0;
+      z-index: 15;
+    }
+    .prompt-label {
+      font-family: var(--en-font-mono);
+      font-size: 9px;
+      color: var(--en-primary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      flex-shrink: 0;
+    }
+    .prompt-output {
+      flex: 1;
+      font-family: var(--en-font-mono);
+      font-size: 12px;
+      color: var(--en-text-secondary);
+      background: var(--en-bg-elevated);
+      border: 1px solid var(--en-border-default);
+      border-radius: 6px;
+      padding: 6px 12px;
+      line-height: 1.4;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .btn-bar {
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-family: var(--en-font-body);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background var(--transition), border-color var(--transition), transform var(--transition);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .btn-bar:active { transform: scale(0.97); }
+    .btn-reset {
+      background: transparent;
+      border: 1px solid var(--en-border-default);
+      color: var(--en-text-secondary);
+    }
+    .btn-reset:hover {
+      border-color: rgba(248,240,242,0.35);
+      color: var(--en-text-primary);
+    }
+    .btn-copy {
+      background: rgba(255,45,107,0.15);
+      border: 1px solid rgba(255,45,107,0.35);
+      color: var(--en-primary);
+    }
+    .btn-copy:hover {
+      background: rgba(255,45,107,0.25);
+      border-color: rgba(255,45,107,0.6);
+    }
+    .btn-copy.copied {
+      background: rgba(0,245,212,0.12);
+      border-color: rgba(0,245,212,0.3);
+      color: var(--en-secondary);
+    }
+
+    /* ─── Misc utils ─────────────────────────────────────────── */
+    .hidden { display: none !important; }
+
+    /* Timeline / calendar view switchers */
+    .view-list.active-view    { display: flex; }
+    .view-timeline.active-view { display: flex; }
+    .view-calendar.active-view { display: flex; }
+
+    /* Scan line texture */
+    .preview-area::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.015) 2px,
+        rgba(0,0,0,0.015) 4px
+      );
+      z-index: 0;
+    }
+
+    /* Glow on live card */
+    .meeting-card.live {
+      box-shadow: 0 0 20px rgba(255,45,107,0.08), inset 0 0 40px rgba(255,45,107,0.02);
+    }
+
+    /* Hover tooltip for no-summary */
+    .no-summary-note {
+      font-size: 12px;
+      color: var(--en-text-secondary);
+      font-style: italic;
+      padding: 8px 0 0;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ─── Top Bar ─────────────────────────────────────────────── -->
+<header class="top-bar">
+  <span class="top-bar__logo">entomate</span>
+  <div class="top-bar__sep"></div>
+  <span class="top-bar__title">meetings-redesign-playground.html</span>
+  <span class="top-bar__badge">Void × Crimson</span>
+</header>
+
+<!-- ─── Workspace ──────────────────────────────────────────── -->
+<div class="workspace">
+
+  <!-- LEFT PANEL -->
+  <aside class="panel-left" id="controlPanel">
+    <div class="controls-heading">Design Controls</div>
+
+    <!-- 1. View Mode -->
+    <div class="control-group">
+      <div class="control-group__label">View Mode</div>
+      <div class="seg-group" id="ctrl-view">
+        <button class="seg-btn active" data-val="list">List</button>
+        <button class="seg-btn" data-val="timeline">Timeline</button>
+        <button class="seg-btn" data-val="calendar">Cal hybrid</button>
+      </div>
+    </div>
+
+    <!-- 2. Recording Indicator -->
+    <div class="control-group">
+      <div class="control-group__label">Recording Indicator</div>
+      <div class="seg-group" id="ctrl-indicator">
+        <button class="seg-btn active" data-val="dot">Dot</button>
+        <button class="seg-btn" data-val="waveform">Waveform</button>
+        <button class="seg-btn" data-val="ring">Pulsing ring</button>
+      </div>
+    </div>
+
+    <!-- 3. Card Density -->
+    <div class="control-group">
+      <div class="control-group__label">Card Density</div>
+      <div class="seg-group" id="ctrl-density">
+        <button class="seg-btn" data-val="compact">Compact</button>
+        <button class="seg-btn active" data-val="standard">Standard</button>
+        <button class="seg-btn" data-val="expanded">Expanded</button>
+      </div>
+    </div>
+
+    <!-- 4. AI Summary Position -->
+    <div class="control-group">
+      <div class="control-group__label">AI Summary Position</div>
+      <div class="seg-group" id="ctrl-summary">
+        <button class="seg-btn active" data-val="inline">Inline</button>
+        <button class="seg-btn" data-val="rightpanel">Right panel</button>
+        <button class="seg-btn" data-val="drawer">Drawer</button>
+      </div>
+    </div>
+
+    <!-- 5. Status Chips -->
+    <div class="control-group">
+      <div class="control-group__label">Status Chips</div>
+      <div class="seg-group" id="ctrl-chips">
+        <button class="seg-btn active" data-val="pill">Pill</button>
+        <button class="seg-btn" data-val="square">Square badge</button>
+        <button class="seg-btn" data-val="underline">Underline text</button>
+      </div>
+    </div>
+
+    <!-- 6. Transcript Preview -->
+    <div class="control-group">
+      <div class="control-group__label">Transcript Preview</div>
+      <div class="seg-group" id="ctrl-transcript">
+        <button class="seg-btn" data-val="hidden">Hidden</button>
+        <button class="seg-btn active" data-val="collapsed">Collapsed</button>
+        <button class="seg-btn" data-val="visible">Visible</button>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- RIGHT PANEL -->
+  <div class="panel-right">
+
+    <!-- Preview area -->
+    <div class="preview-area" id="previewArea">
+      <div class="preview-header">
+        <span class="preview-header__title">Meetings</span>
+        <span class="preview-header__count">4 meetings · today</span>
+      </div>
+
+      <!-- LIST VIEW -->
+      <div class="view-list active-view" id="viewList">
+        <!-- Cards injected here by JS -->
+      </div>
+
+      <!-- TIMELINE VIEW -->
+      <div class="view-timeline" id="viewTimeline">
+        <div class="timeline-track" id="timelineTrack">
+          <!-- Nodes injected by JS -->
+        </div>
+        <div class="cal-label" style="margin-bottom:10px;margin-top:4px;">Selected day — Thu Mar 20</div>
+        <div class="view-list timeline-cards-below" id="timelineCardsBelowList">
+          <!-- same cards reused -->
+        </div>
+      </div>
+
+      <!-- CALENDAR HYBRID VIEW -->
+      <div class="view-calendar" id="viewCalendar">
+        <div class="cal-week" id="calWeek">
+          <!-- Days injected by JS -->
+        </div>
+        <div class="cal-label" id="calLabel">Thu Mar 20 — 4 meetings</div>
+        <div class="view-list" id="calCardList" style="margin-top:12px;">
+          <!-- Cards reused -->
+        </div>
+      </div>
+
+    </div>
+
+    <!-- AI Right Panel -->
+    <div class="ai-right-panel" id="aiRightPanel">
+      <div class="ai-right-panel__inner" style="position:relative;">
+        <button class="ai-rp-close" id="aiRpClose" title="Close">✕</button>
+        <div class="ai-rp-label">AI Summary</div>
+        <div class="ai-rp-title" id="aiRpTitle">Meeting Title</div>
+        <div class="ai-rp-body" id="aiRpBody">Summary content will appear here.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- AI Drawer -->
+<div class="ai-drawer" id="aiDrawer">
+  <div class="ai-drawer__inner">
+    <button class="ai-drawer__close" id="aiDrawerClose">✕</button>
+    <div class="ai-rp-label">AI Summary</div>
+    <div class="ai-rp-title" id="aiDrawerTitle">Meeting Title</div>
+    <div class="ai-rp-body" id="aiDrawerBody">Summary content.</div>
+  </div>
+</div>
+
+<!-- BOTTOM BAR -->
+<div class="bottom-bar">
+  <span class="prompt-label">Prompt</span>
+  <div class="prompt-output" id="promptOutput"></div>
+  <button class="btn-bar btn-reset" id="btnReset">Reset Defaults</button>
+  <button class="btn-bar btn-copy" id="btnCopy">Copy Prompt</button>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<script>
+(function() {
+  "use strict";
+
+  /* ── Meeting data ──────────────────────────────────────────── */
+  const MEETINGS = [
+    {
+      id: 1,
+      title: "Q1 Product Review",
+      status: "processed",
+      sentiment: "positive",
+      duration: "45min",
+      participants: 6,
+      actions: 3,
+      time: "09:00",
+      summary: "Team aligned on Q1 OKR delivery. Three critical blockers identified around the API rate-limit issue and the mobile onboarding flow. Design and engineering agreed on a two-sprint resolution plan.",
+      transcript: [
+        { speaker: "Sarah K.", text: "Let's start with the roadmap status from last quarter." },
+        { speaker: "James M.", text: "We hit 82% of our OKRs — the API work slipped two weeks." }
+      ]
+    },
+    {
+      id: 2,
+      title: "Client Onboarding Call",
+      status: "processing",
+      sentiment: "neutral",
+      duration: "28min",
+      participants: 3,
+      actions: 1,
+      time: "11:30",
+      summary: "Introduced the platform to the new client stakeholders. Technical requirements were gathered. Follow-up action: send integration documentation by Friday.",
+      transcript: [
+        { speaker: "Tom A.", text: "Thanks for joining — let me share my screen." },
+        { speaker: "Client", text: "We're mainly interested in the CRM sync feature." }
+      ]
+    },
+    {
+      id: 3,
+      title: "Team Standup",
+      status: "processed",
+      sentiment: "positive",
+      duration: "15min",
+      participants: 8,
+      actions: 0,
+      time: "13:00",
+      summary: "Daily standup — all team members unblocked. Shipping pipeline is green. Brief discussion on upcoming sprint ceremonies scheduled for next Monday.",
+      transcript: [
+        { speaker: "Dev Lead", text: "Pipeline is all green, no blockers today." },
+        { speaker: "Design", text: "Finishing up the onboarding screens, should be ready by EOD." }
+      ]
+    },
+    {
+      id: 4,
+      title: "Sales Pipeline Review",
+      status: "live",
+      sentiment: "unknown",
+      duration: "ongoing",
+      participants: 4,
+      actions: null,
+      time: "14:45",
+      summary: null,
+      transcript: [
+        { speaker: "AE", text: "We have 12 deals in the late stage this quarter." },
+        { speaker: "Manager", text: "Let's focus on the three enterprise accounts first." }
+      ]
+    }
+  ];
+
+  /* ── State ─────────────────────────────────────────────────── */
+  const state = {
+    view:       "list",
+    indicator:  "dot",
+    density:    "standard",
+    summary:    "inline",
+    chips:      "pill",
+    transcript: "collapsed",
+    selectedId: null
+  };
+
+  const DEFAULTS = {
+    view: "list", indicator: "dot", density: "standard",
+    summary: "inline", chips: "pill", transcript: "collapsed"
+  };
+
+  /* ── Helpers ────────────────────────────────────────────────── */
+  function createEl(tag, classes) {
+    const el = document.createElement(tag);
+    if (classes) el.className = classes;
+    return el;
+  }
+
+  function setText(el, text) {
+    el.textContent = text;
+    return el;
+  }
+
+  /* ── Build recording indicator ─────────────────────────────── */
+  function buildIndicator(meeting) {
+    const wrap = createEl('div', 'card-indicator');
+    const isLive = meeting.status === 'live';
+
+    // Live cards always get pulsing crimson override
+    if (isLive) {
+      const lp = createEl('div', 'live-pulse-override');
+      lp.appendChild(createEl('div', 'core'));
+      lp.appendChild(createEl('div', 'ring1'));
+      lp.appendChild(createEl('div', 'ring2'));
+      wrap.appendChild(lp);
+      return wrap;
+    }
+
+    const colorClass = meeting.status === 'processed'   ? 'color-processed'
+                     : meeting.status === 'processing' ? 'color-processing'
+                     : 'color-live';
+
+    if (state.indicator === 'dot') {
+      const dot = createEl('div', 'ind-dot ' + colorClass);
+      wrap.appendChild(dot);
+    } else if (state.indicator === 'waveform') {
+      const wf = createEl('div', 'ind-waveform ' + colorClass);
+      for (let i = 0; i < 4; i++) wf.appendChild(createEl('div', 'bar'));
+      wrap.appendChild(wf);
+    } else {
+      // ring
+      const ring = createEl('div', 'ind-ring ' + colorClass);
+      ring.appendChild(createEl('div', 'core'));
+      ring.appendChild(createEl('div', 'pulse'));
+      wrap.appendChild(ring);
+    }
+    return wrap;
+  }
+
+  /* ── Build status chip ─────────────────────────────────────── */
+  function buildChip(meeting) {
+    const chip = createEl('span');
+    chip.classList.add('status-chip');
+    chip.classList.add('style-' + state.chips);
+
+    const labels = { processed: 'Processed', processing: 'Processing', live: 'Live' };
+    chip.classList.add('s-' + meeting.status);
+    setText(chip, labels[meeting.status]);
+    return chip;
+  }
+
+  /* ── Build transcript block ────────────────────────────────── */
+  function buildTranscript(meeting) {
+    const wrap = createEl('div', 'card-transcript');
+    if (state.transcript === 'hidden') {
+      return wrap; // empty
+    }
+    if (state.transcript === 'collapsed') {
+      if (meeting.status === 'live') {
+        setText(wrap, '');
+        return wrap;
+      }
+      const btn = createEl('button', 'transcript-link');
+      // Arrow icon via text
+      const arrow = createEl('span');
+      arrow.textContent = '▶';
+      btn.appendChild(arrow);
+      btn.appendChild(document.createTextNode(' View transcript'));
+      wrap.appendChild(btn);
+      return wrap;
+    }
+    // visible
+    if (meeting.status === 'live') {
+      const note = createEl('span', 'no-summary-note');
+      setText(note, 'Live — transcript in progress...');
+      wrap.appendChild(note);
+      return wrap;
+    }
+    const box = createEl('div', 'transcript-text');
+    meeting.transcript.forEach(function(line) {
+      const ln = createEl('span', 'tline');
+      const sp = createEl('span', 'speaker');
+      setText(sp, line.speaker + ':');
+      ln.appendChild(sp);
+      ln.appendChild(document.createTextNode(line.text));
+      box.appendChild(ln);
+    });
+    wrap.appendChild(box);
+    return wrap;
+  }
+
+  /* ── Build AI summary (inline) ──────────────────────────────── */
+  function buildInlineSummary(meeting) {
+    const wrap = createEl('div', 'card-ai-inline');
+    if (meeting.summary === null) {
+      const lbl = createEl('div', 'card-ai-inline__label');
+      setText(lbl, 'AI Summary');
+      const txt = createEl('div');
+      setText(txt, 'Summary will be available when recording ends.');
+      wrap.appendChild(lbl);
+      wrap.appendChild(txt);
+    } else {
+      const lbl = createEl('div', 'card-ai-inline__label');
+      setText(lbl, 'AI Summary');
+      const txt = createEl('div');
+      setText(txt, meeting.summary);
+      wrap.appendChild(lbl);
+      wrap.appendChild(txt);
+    }
+    return wrap;
+  }
+
+  /* ── Build a single meeting card ───────────────────────────── */
+  function buildCard(meeting) {
+    const card = createEl('div', 'meeting-card');
+    card.classList.add('density-' + state.density);
+    if (meeting.status === 'live') card.classList.add('live');
+    if (meeting.id === state.selectedId) card.classList.add('selected');
+    card.dataset.id = meeting.id;
+
+    card.addEventListener('click', function() {
+      onCardClick(meeting);
+    });
+
+    const body = createEl('div', 'card-body');
+
+    /* ── Main row ── */
+    const rowMain = createEl('div', 'card-row-main');
+    rowMain.appendChild(buildIndicator(meeting));
+
+    const title = createEl('div', 'card-title');
+    setText(title, meeting.title);
+    rowMain.appendChild(title);
+
+    rowMain.appendChild(buildChip(meeting));
+    body.appendChild(rowMain);
+
+    /* ── Secondary row (hidden in compact) ── */
+    if (state.density !== 'compact') {
+      const rowSec = createEl('div', 'card-row-secondary');
+
+      // Time
+      const mTime = createEl('div', 'meta-item');
+      const tIcon = createEl('span');
+      tIcon.textContent = '🕐';
+      tIcon.style.fontSize = '11px';
+      mTime.appendChild(tIcon);
+      mTime.appendChild(document.createTextNode(meeting.time + ' · ' + meeting.duration));
+      rowSec.appendChild(mTime);
+
+      // Participants
+      const mPart = createEl('div', 'meta-item');
+      const pIcon = createEl('span');
+      pIcon.textContent = '👥';
+      pIcon.style.fontSize = '11px';
+      mPart.appendChild(pIcon);
+      mPart.appendChild(document.createTextNode(meeting.participants + ' attendees'));
+      rowSec.appendChild(mPart);
+
+      // Sentiment
+      const sentMap = { positive: 'Positive', neutral: 'Neutral', unknown: 'Unknown' };
+      const sentClass = { positive: 'sentiment-positive', neutral: 'sentiment-neutral', unknown: 'sentiment-unknown' };
+      const sentEl = createEl('span', 'sentiment-badge ' + sentClass[meeting.sentiment]);
+      setText(sentEl, sentMap[meeting.sentiment]);
+      rowSec.appendChild(sentEl);
+
+      // Actions
+      if (meeting.actions !== null) {
+        const actEl = createEl('span', meeting.actions === 0 ? 'action-badge zero' : 'action-badge');
+        setText(actEl, meeting.actions + (meeting.actions === 1 ? ' action' : ' actions'));
+        rowSec.appendChild(actEl);
+      } else {
+        const actEl = createEl('span', 'action-badge zero');
+        setText(actEl, 'actions pending');
+        rowSec.appendChild(actEl);
+      }
+
+      body.appendChild(rowSec);
+    }
+
+    /* ── AI summary (inline mode only, hidden in compact) ── */
+    if (state.density !== 'compact' && state.summary === 'inline') {
+      body.appendChild(buildInlineSummary(meeting));
+    }
+
+    /* ── Transcript ── */
+    if (state.density !== 'compact') {
+      body.appendChild(buildTranscript(meeting));
+    }
+
+    card.appendChild(body);
+    return card;
+  }
+
+  /* ── Card click handler ─────────────────────────────────────── */
+  function onCardClick(meeting) {
+    if (state.summary === 'rightpanel') {
+      state.selectedId = meeting.id;
+      openRightPanel(meeting);
+      renderAllViews();
+    } else if (state.summary === 'drawer') {
+      state.selectedId = meeting.id;
+      openDrawer(meeting);
+      renderAllViews();
+    }
+    // inline: no extra action
+  }
+
+  /* ── Right panel ───────────────────────────────────────────── */
+  function openRightPanel(meeting) {
+    const panel = document.getElementById('aiRightPanel');
+    const title = document.getElementById('aiRpTitle');
+    const body  = document.getElementById('aiRpBody');
+    setText(title, meeting.title);
+    setText(body, meeting.summary || 'Summary will be available once the recording ends.');
+    panel.classList.add('open');
+  }
+  function closeRightPanel() {
+    document.getElementById('aiRightPanel').classList.remove('open');
+    state.selectedId = null;
+    renderAllViews();
+  }
+
+  /* ── Drawer ─────────────────────────────────────────────────── */
+  function openDrawer(meeting) {
+    const drawer = document.getElementById('aiDrawer');
+    setText(document.getElementById('aiDrawerTitle'), meeting.title);
+    setText(document.getElementById('aiDrawerBody'), meeting.summary || 'Summary will be available once the recording ends.');
+    drawer.classList.add('open');
+  }
+  function closeDrawer() {
+    document.getElementById('aiDrawer').classList.remove('open');
+    state.selectedId = null;
+    renderAllViews();
+  }
+
+  /* ── Render list of cards into a container ──────────────────── */
+  function renderCardList(container) {
+    while (container.firstChild) container.removeChild(container.firstChild);
+    MEETINGS.forEach(function(m) {
+      container.appendChild(buildCard(m));
+    });
+  }
+
+  /* ── Render timeline ────────────────────────────────────────── */
+  function renderTimeline() {
+    const track = document.getElementById('timelineTrack');
+    while (track.firstChild) track.removeChild(track.firstChild);
+
+    const colors = {
+      processed: 'var(--en-secondary)',
+      processing: 'var(--en-tertiary)',
+      live: 'var(--en-primary)'
+    };
+
+    MEETINGS.forEach(function(m) {
+      const node = createEl('div', 'timeline-node');
+      const dot = createEl('div', 'timeline-dot');
+      dot.style.background = colors[m.status];
+      node.appendChild(dot);
+
+      const card = createEl('div', 'timeline-card');
+      const t = createEl('div', 'timeline-card__title');
+      setText(t, m.title);
+      const time = createEl('div', 'timeline-card__time');
+      setText(time, m.time);
+      card.appendChild(t);
+      card.appendChild(time);
+      node.appendChild(card);
+      track.appendChild(node);
+    });
+
+    renderCardList(document.getElementById('timelineCardsBelowList'));
+  }
+
+  /* ── Render calendar ────────────────────────────────────────── */
+  function renderCalendar() {
+    const week = document.getElementById('calWeek');
+    while (week.firstChild) week.removeChild(week.firstChild);
+
+    const days = [
+      { name: 'Mon', num: 16, hasMeeting: false },
+      { name: 'Tue', num: 17, hasMeeting: false },
+      { name: 'Wed', num: 18, hasMeeting: true  },
+      { name: 'Thu', num: 19, hasMeeting: true  },
+      { name: 'Fri', num: 20, hasMeeting: true, active: true },
+      { name: 'Sat', num: 21, hasMeeting: false },
+      { name: 'Sun', num: 22, hasMeeting: false }
+    ];
+
+    days.forEach(function(d) {
+      const day = createEl('div', 'cal-day' + (d.active ? ' active' : ''));
+      const name = createEl('div', 'cal-day__name');
+      setText(name, d.name);
+      const num = createEl('div', 'cal-day__num');
+      setText(num, d.num);
+      day.appendChild(name);
+      day.appendChild(num);
+      if (d.hasMeeting) {
+        day.appendChild(createEl('div', 'cal-day__dot'));
+      }
+      week.appendChild(day);
+    });
+
+    renderCardList(document.getElementById('calCardList'));
+  }
+
+  /* ── Render all views ───────────────────────────────────────── */
+  function renderAllViews() {
+    // List
+    renderCardList(document.getElementById('viewList'));
+
+    // Timeline
+    renderTimeline();
+
+    // Calendar
+    renderCalendar();
+
+    // Close panels if summary mode changed
+    if (state.summary !== 'rightpanel') {
+      document.getElementById('aiRightPanel').classList.remove('open');
+    }
+    if (state.summary !== 'drawer') {
+      document.getElementById('aiDrawer').classList.remove('open');
+    }
+
+    updateViewVisibility();
+    updatePrompt();
+  }
+
+  /* ── View visibility ────────────────────────────────────────── */
+  function updateViewVisibility() {
+    const vl = document.getElementById('viewList');
+    const vt = document.getElementById('viewTimeline');
+    const vc = document.getElementById('viewCalendar');
+    vl.classList.remove('active-view');
+    vt.classList.remove('active-view');
+    vc.classList.remove('active-view');
+
+    if (state.view === 'list')     vl.classList.add('active-view');
+    if (state.view === 'timeline') vt.classList.add('active-view');
+    if (state.view === 'calendar') vc.classList.add('active-view');
+  }
+
+  /* ── Prompt generation ──────────────────────────────────────── */
+  const viewLabels       = { list: 'List view', timeline: 'Timeline view', calendar: 'Calendar hybrid view' };
+  const indicatorLabels  = { dot: 'dot recording indicator', waveform: 'waveform recording indicator', ring: 'pulsing ring recording indicator' };
+  const densityLabels    = { compact: 'compact density', standard: 'standard density', expanded: 'expanded density' };
+  const summaryLabels    = { inline: 'inline AI summary', rightpanel: 'right-panel AI summary', drawer: 'drawer AI summary' };
+  const chipLabels       = { pill: 'pill status chips', square: 'square badge status chips', underline: 'underline text status chips' };
+  const transcriptLabels = { hidden: 'hidden transcript preview', collapsed: 'collapsed transcript preview', visible: 'visible transcript preview' };
+
+  function updatePrompt() {
+    const parts = [
+      'Meetings redesign \u2014',
+      viewLabels[state.view] + ',',
+      indicatorLabels[state.indicator] + ',',
+      densityLabels[state.density] + ',',
+      summaryLabels[state.summary] + ',',
+      chipLabels[state.chips] + ',',
+      transcriptLabels[state.transcript] + '.'
+    ];
+    const out = document.getElementById('promptOutput');
+    setText(out, parts.join(' '));
+  }
+
+  /* ── Segmented button logic ─────────────────────────────────── */
+  function initSegGroup(id, stateKey) {
+    const group = document.getElementById(id);
+    group.querySelectorAll('.seg-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        group.querySelectorAll('.seg-btn').forEach(function(b) {
+          b.classList.remove('active');
+        });
+        btn.classList.add('active');
+        state[stateKey] = btn.dataset.val;
+        renderAllViews();
+      });
+    });
+  }
+
+  function syncSegGroup(id, val) {
+    const group = document.getElementById(id);
+    group.querySelectorAll('.seg-btn').forEach(function(btn) {
+      btn.classList.toggle('active', btn.dataset.val === val);
+    });
+  }
+
+  /* ── Reset ──────────────────────────────────────────────────── */
+  document.getElementById('btnReset').addEventListener('click', function() {
+    Object.assign(state, DEFAULTS);
+    state.selectedId = null;
+    syncSegGroup('ctrl-view',       state.view);
+    syncSegGroup('ctrl-indicator',  state.indicator);
+    syncSegGroup('ctrl-density',    state.density);
+    syncSegGroup('ctrl-summary',    state.summary);
+    syncSegGroup('ctrl-chips',      state.chips);
+    syncSegGroup('ctrl-transcript', state.transcript);
+    renderAllViews();
+  });
+
+  /* ── Copy ───────────────────────────────────────────────────── */
+  document.getElementById('btnCopy').addEventListener('click', function() {
+    const text = document.getElementById('promptOutput').textContent;
+    const btn = document.getElementById('btnCopy');
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(function() {
+        btn.classList.add('copied');
+        setText(btn, 'Copied!');
+        setTimeout(function() {
+          btn.classList.remove('copied');
+          setText(btn, 'Copy Prompt');
+        }, 1800);
+      });
+    } else {
+      // Fallback
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      btn.classList.add('copied');
+      setText(btn, 'Copied!');
+      setTimeout(function() {
+        btn.classList.remove('copied');
+        setText(btn, 'Copy Prompt');
+      }, 1800);
+    }
+  });
+
+  /* ── Panel close buttons ────────────────────────────────────── */
+  document.getElementById('aiRpClose').addEventListener('click', closeRightPanel);
+  document.getElementById('aiDrawerClose').addEventListener('click', closeDrawer);
+
+  /* ── Init ───────────────────────────────────────────────────── */
+  initSegGroup('ctrl-view',       'view');
+  initSegGroup('ctrl-indicator',  'indicator');
+  initSegGroup('ctrl-density',    'density');
+  initSegGroup('ctrl-summary',    'summary');
+  initSegGroup('ctrl-chips',      'chips');
+  initSegGroup('ctrl-transcript', 'transcript');
+
+  renderAllViews();
+
+})();
+</script>
+</body>
+</html>

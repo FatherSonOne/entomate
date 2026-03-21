@@ -63,3 +63,39 @@ aux
 AUX
 prn
 PRN
+
+# Secret/key files
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.cert
+*.crt
+serviceAccount*.json
+*-credentials.json
+firebase-adminsdk*.json
+google-cloud-key*.json
+*.secret
+*secret*.json
+*secrets*.json
+*credentials*.yaml
+*credentials*.yml
+
+# SSH keys
+id_rsa
+id_rsa.pub
+id_ed25519
+id_dsa
+
+# Infrastructure secrets
+terraform.tfstate
+terraform.tfstate.backup
+*.tfvars
+!*.tfvars.example
+
+# Database files
+*.sqlite
+*.sqlite3
+*.db

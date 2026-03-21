@@ -1,0 +1,557 @@
+/* ============================================================
+   SETTINGS — DESIGN TOKENS
+   Void × Crimson · Electric Crimson System
+   ============================================================ */
+
+:root {
+  --sett-bg:             #FFF8FA;
+  --sett-surface:        #FFFFFF;
+  --sett-surface-raised: #F5F0F2;
+  --sett-border:         rgba(0, 0, 0, 0.08);
+  --sett-border-raised:  rgba(0, 0, 0, 0.12);
+  --sett-primary:        #CC0044;
+  --sett-primary-alt:    #FF2D6B;
+  --sett-primary-soft:   rgba(204, 0, 68, 0.10);
+  --sett-primary-softer: rgba(204, 0, 68, 0.05);
+  --sett-primary-glow:   rgba(204, 0, 68, 0.25);
+  --sett-secondary:      #00B89E;
+  --sett-secondary-dim:  rgba(0, 184, 158, 0.10);
+  --sett-tertiary:       #9B6800;
+  --sett-tertiary-dim:   rgba(155, 104, 0, 0.10);
+  --sett-text-main:      #08080A;
+  --sett-text-secondary: #4A3840;
+  --sett-text-muted:     #7A6870;
+  --sett-shadow-sm:      0 1px 3px rgba(0, 0, 0, 0.06);
+  --sett-shadow-md:      0 4px 12px rgba(0, 0, 0, 0.08);
+  --sett-shadow-crimson: 0 0 0 1px var(--sett-primary),
+                         0 4px 24px var(--sett-primary-glow);
+
+  /* Integration icon container colors — light mode */
+  --sett-icon-ai-bg:      rgba(155, 104, 0, 0.08);
+  --sett-icon-ai-color:   #9B6800;
+  --sett-icon-db-bg:      rgba(37, 99, 235, 0.08);
+  --sett-icon-db-color:   #1D4ED8;
+  --sett-icon-crm-bg:     rgba(5, 150, 105, 0.08);
+  --sett-icon-crm-color:  #047857;
+  --sett-icon-chat-bg:    rgba(217, 119, 6, 0.08);
+  --sett-icon-chat-color: #B45309;
+
+  /* Status indicator colors */
+  --sett-status-connected:    #059669;
+  --sett-status-warning:      #9B6800;
+  --sett-status-error:        #DC2626;
+}
+
+.dark {
+  --sett-bg:             #080808;
+  --sett-surface:        #101010;
+  --sett-surface-raised: #181818;
+  --sett-border:         rgba(255, 255, 255, 0.06);
+  --sett-border-raised:  rgba(255, 255, 255, 0.09);
+  --sett-primary:        #FF2D6B;
+  --sett-primary-alt:    #FF5585;
+  --sett-primary-soft:   rgba(255, 45, 107, 0.10);
+  --sett-primary-softer: rgba(255, 45, 107, 0.05);
+  --sett-primary-glow:   rgba(255, 45, 107, 0.30);
+  --sett-secondary:      #00F5D4;
+  --sett-secondary-dim:  rgba(0, 245, 212, 0.12);
+  --sett-tertiary:       #FFB800;
+  --sett-tertiary-dim:   rgba(255, 184, 0, 0.12);
+  --sett-text-main:      #F8F0F3;
+  --sett-text-secondary: #968890;
+  --sett-text-muted:     #585055;
+  --sett-shadow-sm:      0 1px 4px rgba(0, 0, 0, 0.50);
+  --sett-shadow-md:      0 4px 16px rgba(0, 0, 0, 0.60);
+  --sett-shadow-crimson: 0 0 0 1px var(--sett-primary),
+                         0 4px 24px var(--sett-primary-glow);
+
+  /* Integration icon container colors — dark mode (amber for AI, not purple) */
+  --sett-icon-ai-bg:      rgba(255, 184, 0, 0.10);
+  --sett-icon-ai-color:   #FFB800;
+  --sett-icon-db-bg:      rgba(0, 245, 212, 0.10);
+  --sett-icon-db-color:   #00F5D4;
+  --sett-icon-crm-bg:     rgba(16, 185, 129, 0.10);
+  --sett-icon-crm-color:  #10b981;
+  --sett-icon-chat-bg:    rgba(255, 184, 0, 0.08);
+  --sett-icon-chat-color: #FFB800;
+
+  /* Status indicator colors — dark */
+  --sett-status-connected: #10b981;
+  --sett-status-warning:   #FFB800;
+  --sett-status-error:     #ef4444;
+}
+
+/* ============================================================
+   KEYFRAMES
+   ============================================================ */
+
+@keyframes settEnter {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes settHeartbeat {
+  0%   { opacity: 0;   }
+  35%  { opacity: 1;   }
+  100% { opacity: 0.5; }
+}
+
+@keyframes settStatusLed {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.45; }
+}
+
+/* ============================================================
+   SETTINGS PAGE — LAYOUT
+   ============================================================ */
+
+/* Page header */
+.settings-page-header h1 {
+  font-family: 'Syne', var(--font-display, sans-serif);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--sett-text-main);
+}
+
+.settings-page-header p {
+  font-family: 'Space Grotesk', var(--font-body, system-ui, sans-serif);
+  font-size: 15px;
+  color: var(--sett-text-secondary);
+  margin-top: 4px;
+}
+
+/* ============================================================
+   SETTINGS CARD PANEL HEADERS
+   ============================================================ */
+
+/* Card section headers — border-b divider */
+.settings-card-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--sett-border);
+}
+
+.dark .settings-card-header {
+  border-bottom-color: var(--sett-border-raised);
+}
+
+.settings-card-header h2 {
+  font-family: 'Space Grotesk', var(--font-body, system-ui, sans-serif);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--sett-text-main);
+}
+
+.settings-card-header p {
+  font-size: 13px;
+  color: var(--sett-text-secondary);
+  margin-top: 2px;
+}
+
+/* ============================================================
+   INTEGRATION STATUS ROWS — STAGGER ANIMATION
+   Target: divide-y children in System Status card
+   ============================================================ */
+
+.divide-y > div {
+  animation: settEnter 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
+}
+
+.divide-y > div:nth-child(1) { animation-delay:   0ms; }
+.divide-y > div:nth-child(2) { animation-delay:  35ms; }
+.divide-y > div:nth-child(3) { animation-delay:  70ms; }
+.divide-y > div:nth-child(4) { animation-delay: 105ms; }
+.divide-y > div:nth-child(5) { animation-delay: 140ms; }
+
+/* Items beyond 5 — no animation overhead */
+.divide-y > div:nth-child(n+6) {
+  animation: none;
+  will-change: auto;
+}
+
+/* ============================================================
+   INTEGRATION ICON CONTAINERS
+   Override the hardcoded dark:bg-purple-900/30 etc. with
+   proper Void × Crimson amber/mint tokens
+   ============================================================ */
+
+/* AI Provider icon container — amber, not purple */
+.dark .bg-accent-tertiary-dim {
+  background: var(--sett-icon-ai-bg) !important;
+}
+
+.dark .text-accent-tertiary {
+  color: var(--sett-icon-ai-color) !important;
+}
+
+/* Database icon container — mint, not blue */
+.dark .bg-semantic-info-dim {
+  background: var(--sett-icon-db-bg) !important;
+}
+
+/* CRM icon container — semantic success green, consistent */
+.dark .bg-semantic-success-dim {
+  background: var(--sett-icon-crm-bg) !important;
+}
+
+/* Chat icon container — amber warm, not orange */
+.dark .bg-semantic-warning-dim {
+  background: var(--sett-icon-chat-bg) !important;
+}
+
+/* ============================================================
+   STATUS INDICATOR — "not configured" state
+   Override text-yellow-500 / text-yellow-600 with amber token
+   ============================================================ */
+
+.text-yellow-500,
+.text-yellow-600 {
+  color: var(--sett-tertiary) !important;
+}
+
+/* ============================================================
+   THEME MODE TOGGLE BUTTONS
+   (Light / Dark selector in Appearance card)
+   ============================================================ */
+
+/* Rest state */
+.settings-theme-toggle {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  border-radius: var(--radius-lg, 12px);
+  border: 2px solid var(--sett-border);
+  background: var(--sett-surface);
+  cursor: pointer;
+  transition:
+    border-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
+    background   150ms cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow   150ms cubic-bezier(0.4, 0, 0.2, 1);
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.dark .settings-theme-toggle {
+  background: var(--sett-surface-raised);
+  border-color: var(--sett-border);
+}
+
+/* Hover state */
+.settings-theme-toggle:hover {
+  border-color: rgba(255, 45, 107, 0.35);
+  background: var(--sett-primary-softer);
+}
+
+/* Active / selected state */
+.settings-theme-toggle.active {
+  border-color: var(--sett-primary);
+  background: var(--sett-primary-softer);
+  box-shadow:
+    0 0 0 1px var(--sett-primary),
+    0 4px 16px var(--sett-primary-glow);
+}
+
+/* Focus heartbeat — ::after glow layer */
+.settings-theme-toggle {
+  position: relative;
+}
+
+.settings-theme-toggle::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: calc(var(--radius-lg, 12px) + 4px);
+  box-shadow:
+    0 0 0 3px rgba(255, 45, 107, 0.12),
+    0 0 24px rgba(255, 45, 107, 0.20);
+  opacity: 0;
+  pointer-events: none;
+  will-change: opacity;
+  transition: opacity 0.2s ease;
+}
+
+.settings-theme-toggle:focus-within::after {
+  opacity: 0.5;
+}
+
+.settings-theme-toggle.heartbeat-active::after {
+  animation: settHeartbeat 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Icon and label inside toggle */
+.settings-theme-toggle .theme-toggle-label {
+  font-family: 'Space Grotesk', var(--font-body, system-ui, sans-serif);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--sett-text-secondary);
+  transition: color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.settings-theme-toggle.active .theme-toggle-label {
+  color: var(--sett-primary);
+}
+
+/* ============================================================
+   CONFIGURATION GUIDE — CODE BLOCKS
+   ============================================================ */
+
+/* Guide section container */
+.settings-guide-section {
+  padding: 16px;
+  background: var(--sett-surface);
+  border: 1px solid var(--sett-border);
+  border-radius: var(--radius-md, 8px);
+  border-left: 3px solid transparent;
+  transition:
+    border-left-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
+    background        150ms cubic-bezier(0.4, 0, 0.2, 1);
+  animation: settEnter 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.dark .settings-guide-section {
+  background: var(--sett-surface-raised);
+  border-color: var(--sett-border);
+}
+
+.settings-guide-section:hover {
+  border-left-color: rgba(255, 45, 107, 0.35);
+  background: var(--sett-primary-softer);
+}
+
+.settings-guide-section h3 {
+  font-family: 'Space Grotesk', var(--font-body, system-ui, sans-serif);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--sett-text-main);
+  margin-bottom: 8px;
+}
+
+/* Inline code / env var blocks */
+code {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+  font-size: 12px;
+  background: var(--sett-surface-raised);
+  border: 1px solid var(--sett-border);
+  border-radius: var(--radius-sm, 4px);
+  padding: 2px 6px;
+  color: var(--sett-text-main);
+}
+
+.dark code {
+  background: #0C0C0C;
+  border-color: var(--sett-border-raised);
+  color: #F8F0F3;
+}
+
+/* Code block (display: block variant) */
+code.block-code,
+code[style*="display: block"],
+pre code,
+.bg-surface-muted code {
+  display: block;
+  padding: 8px 12px;
+  margin: 4px 0;
+  background: var(--sett-surface);
+  border-left: 2px solid rgba(255, 45, 107, 0.25);
+}
+
+.dark code.block-code,
+.dark pre code {
+  background: #0C0C0C;
+  border-left-color: rgba(255, 45, 107, 0.35);
+}
+
+/* Config link hover */
+a.text-highlight {
+  color: var(--sett-primary);
+  text-decoration: none;
+  transition: color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+a.text-highlight:hover {
+  color: var(--sett-primary-alt);
+  text-decoration: underline;
+}
+
+/* ============================================================
+   STATUS TEST RESULT BANNERS
+   ============================================================ */
+
+/* Success / error inline result */
+.settings-test-result {
+  margin-top: 8px;
+  margin-left: 52px;   /* aligns with icon-offset (w-10 + gap-3 = 52px) */
+  padding: 8px 12px;
+  border-radius: var(--radius-sm, 4px);
+  font-family: 'Space Grotesk', var(--font-body, system-ui, sans-serif);
+  font-size: 13px;
+  font-weight: 500;
+  animation: settEnter 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.settings-test-result.success {
+  background: rgba(16, 185, 129, 0.08);
+  color: var(--sett-status-connected);
+  border: 1px solid rgba(16, 185, 129, 0.20);
+}
+
+.dark .settings-test-result.success {
+  background: rgba(16, 185, 129, 0.08);
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.18);
+}
+
+.settings-test-result.error {
+  background: rgba(220, 38, 38, 0.06);
+  color: var(--sett-status-error);
+  border: 1px solid rgba(220, 38, 38, 0.18);
+}
+
+.dark .settings-test-result.error {
+  background: rgba(239, 68, 68, 0.08);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.18);
+}
+
+/* ============================================================
+   ABOUT CARD — VERSION / STACK META
+   ============================================================ */
+
+.settings-about-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-family: 'Space Grotesk', var(--font-body, system-ui, sans-serif);
+  font-size: 14px;
+}
+
+.settings-about-meta strong {
+  color: var(--sett-text-main);
+  font-weight: 600;
+}
+
+.settings-about-meta p {
+  color: var(--sett-text-secondary);
+  line-height: 1.6;
+}
+
+/* Version badge */
+.settings-version-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  background: var(--sett-primary-softer);
+  border: 1px solid rgba(255, 45, 107, 0.18);
+  border-radius: var(--radius-full, 9999px);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sett-primary);
+  letter-spacing: 0.04em;
+}
+
+.dark .settings-version-badge {
+  background: rgba(255, 45, 107, 0.08);
+  border-color: rgba(255, 45, 107, 0.20);
+}
+
+/* Section labels inside about */
+.settings-stack-label {
+  font-family: 'Syne', var(--font-display, sans-serif);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sett-text-muted);
+}
+
+/* ============================================================
+   BACK BUTTON (AI Learning sub-section)
+   ============================================================ */
+
+.settings-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: var(--radius-md, 8px);
+  background: transparent;
+  border: 1px solid var(--sett-border);
+  color: var(--sett-text-secondary);
+  font-family: 'Space Grotesk', var(--font-body, system-ui, sans-serif);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background     150ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-color   150ms cubic-bezier(0.4, 0, 0.2, 1),
+    color          150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.settings-back-btn:hover {
+  background: var(--sett-primary-softer);
+  border-color: rgba(255, 45, 107, 0.30);
+  color: var(--sett-primary);
+}
+
+.dark .settings-back-btn {
+  border-color: var(--sett-border);
+}
+
+/* ============================================================
+   SCROLLBAR — CRIMSON THUMB
+   ============================================================ */
+
+.settings-scrollable {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 45, 107, 0.20) transparent;
+}
+
+.settings-scrollable::-webkit-scrollbar       { width: 4px; }
+.settings-scrollable::-webkit-scrollbar-track { background: transparent; margin: 8px 0; }
+.settings-scrollable::-webkit-scrollbar-thumb {
+  background: rgba(255, 45, 107, 0.20);
+  border-radius: 2px;
+}
+.settings-scrollable::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 45, 107, 0.45);
+}
+
+/* ============================================================
+   ACCESSIBILITY
+   ============================================================ */
+
+*:focus-visible {
+  outline: 2px solid var(--sett-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .settings-theme-toggle,
+  .settings-guide-section,
+  .divide-y > div {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

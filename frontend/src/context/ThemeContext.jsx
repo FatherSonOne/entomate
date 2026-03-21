@@ -218,6 +218,27 @@ export const BRAND_THEMES = {
     },
     radius: '20px',
     visualElements: 'Bright colors, colorful shadows, bounce animations'
+  },
+  'void-crimson': {
+    name: 'Void × Crimson',
+    description: 'Electric Crimson on true-black void — intelligence meets dark luxury',
+    category: 'Technical/Futuristic',
+    personality: 'Intense, Precise, Intelligence-Forward',
+    preview: {
+      bg: '#080808',
+      text: '#F8F0F2',
+      accent: '#FF2D6B',
+      secondary: '#00F5D4',
+      tertiary: '#FFB800'
+    },
+    fonts: {
+      display: 'Syne',
+      heading: 'Space Grotesk',
+      body: 'Space Grotesk',
+      mono: 'JetBrains Mono'
+    },
+    radius: '8px',
+    visualElements: 'Crimson glow, hexagonal void grid, phosphor flicker, intelligence ripple'
   }
 };
 
@@ -288,7 +309,7 @@ export function ThemeProvider({ children }) {
         ) || 'synapse';
       }
     }
-    return saved || 'synapse'; // Default to Synapse theme
+    return saved || 'void-crimson'; // Default to Void × Crimson theme
   });
 
   // Preview state management
