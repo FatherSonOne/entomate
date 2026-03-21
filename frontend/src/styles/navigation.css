@@ -391,6 +391,37 @@
   font-size: 10.5px;
   color: var(--text-muted);
   line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 110px;
+}
+
+/* ── SIGN-OUT BUTTON ── */
+.nav-signout-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-left: auto;
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 150ms ease, color 150ms ease, background 150ms ease;
+}
+
+.nav-user-area:hover .nav-signout-btn {
+  opacity: 1;
+}
+
+.nav-signout-btn:hover {
+  color: var(--accent-primary, #FF2D6B);
+  background: rgba(255, 45, 107, 0.1);
 }
 
 /* ── HEADER BAR ── */

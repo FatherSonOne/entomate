@@ -2,6 +2,8 @@
 const dotenv = require('dotenv');
 dotenv.config();
 
+const path = require('path');
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -106,27 +108,26 @@ app.use((req, res, next) => {
 });
 
 // ========================================
-// ROOT ROUTE
+// STATIC ASSETS
+// ========================================
+
+// Logo images referenced by the landing page (../logos/ resolves to /logos/)
+app.use('/logos', express.static(path.join(__dirname, '../output/logos')));
+
+// Serve built React app static files (JS/CSS chunks etc.)
+// This must come before the SPA catch-all below
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, '../frontend/dist'), {
+    index: false // Don't auto-serve index.html here — we control that below
+  }));
+}
+
+// ========================================
+// ROOT — Landing page frontdoor
 // ========================================
 
 app.get('/', (req, res) => {
-  res.json({
-    name: 'Entomate API',
-    version: '1.0.0',
-    status: 'running',
-    message: 'API is running. Frontend is at http://localhost:5173',
-    endpoints: {
-      health: '/health',
-      healthStatus: '/health/status',
-      meetings: '/api/meetings',
-      projects: '/api/projects',
-      tasks: '/api/tasks',
-      dashboard: '/api/dashboard',
-      search: '/api/search',
-      learning: '/api/learning',
-      explainability: '/api/explainability'
-    }
-  });
+  res.sendFile(path.join(__dirname, '../output/landing/index.html'));
 });
 
 // ========================================
@@ -270,6 +271,21 @@ app.use('/api/meeting-summary', require('./routes/meetingSummary'));
 // Workflow Templates
 app.use('/api/templates', require('./routes/templates'));
 
+
+// ========================================
+// SPA FALLBACK (production only)
+// ========================================
+
+// Any non-API, non-logo, non-root route serves the React SPA
+// Covers: /sign-in, /sign-up, /dashboard, /meetings, etc.
+if (process.env.NODE_ENV === 'production') {
+  app.get(/^(?!\/(api|health|hooks|logos)\/).*/, (req, res, next) => {
+    const spaIndex = path.join(__dirname, '../frontend/dist/index.html');
+    res.sendFile(spaIndex, (err) => {
+      if (err) next(); // Fall through to 404 if dist not built
+    });
+  });
+}
 
 // ========================================
 // ERROR HANDLING
