@@ -1,8 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { ClerkProvider } from '@clerk/clerk-react'
 import App from './App'
-import ClerkAuthProvider from './components/ClerkAuthProvider'
+import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 
 // Import brand theme CSS files first (Vite doesn't process @import in CSS)
@@ -24,20 +23,12 @@ import './styles/main.css'
 // Import Void × Crimson component system
 import './styles/vc-components.css'
 
-const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
-
-if (!CLERK_PUBLISHABLE_KEY) {
-  throw new Error('Missing Clerk Publishable Key')
-}
-
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
-      <ClerkAuthProvider>
-        <ThemeProvider>
-          <App />
-        </ThemeProvider>
-      </ClerkAuthProvider>
-    </ClerkProvider>
+    <AuthProvider>
+      <ThemeProvider>
+        <App />
+      </ThemeProvider>
+    </AuthProvider>
   </React.StrictMode>
 )

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { useAuth } from '@clerk/clerk-react'
+import { useAuth } from '../../contexts/AuthContext'
 import {
   Key, Plus, Trash2, Edit2, Copy, Eye, EyeOff, Shield, Clock,
   AlertCircle, CheckCircle2, Search, Filter, RefreshCw, X,

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { useAuth } from '@clerk/clerk-react'
+import { useAuth } from '../../contexts/AuthContext'
 import {
   Zap,
   RefreshCw,

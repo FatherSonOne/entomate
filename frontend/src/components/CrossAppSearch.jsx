@@ -15,7 +15,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '@clerk/clerk-react'
+import { useAuth } from '../contexts/AuthContext'
 import {
   Search, X, Loader2, User, Video, DollarSign, Bell, Bot, GitBranch,
   CheckSquare, Clock, ArrowRight, ExternalLink, Building2, AlertCircle

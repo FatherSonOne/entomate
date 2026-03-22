@@ -16,7 +16,6 @@
   },
   "dependencies": {
     "@anthropic-studio/shared-hub": "file:../../shared-hub",
-    "@clerk/clerk-sdk-node": "^4.13.23",
     "@google/generative-ai": "^0.21.0",
     "@sentry/node": "^8.0.0",
     "@supabase/supabase-js": "^2.47.0",

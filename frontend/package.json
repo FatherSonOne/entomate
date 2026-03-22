@@ -10,8 +10,7 @@
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
-    "@clerk/clerk-react": "^5.59.2",
-    "@clerk/clerk-sdk-node": "^4.13.23",
+    "@supabase/supabase-js": "^2.99.3",
     "@xyflow/react": "^12.10.0",
     "axios": "^1.7.0",
     "date-fns": "^4.1.0",

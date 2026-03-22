@@ -20,7 +20,7 @@ import Calendar from './pages/Calendar'
 import Workflows from './pages/Workflows'
 import WorkflowBuilder from './pages/WorkflowBuilder'
 import SignIn from './pages/SignIn'
-import SignUp from './pages/SignUp'
+import AuthCallback from './pages/AuthCallback'
 import LandingPage from './pages/LandingPage'
 
 export default function App() {
@@ -30,7 +30,7 @@ export default function App() {
         {/* Public routes */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/sign-in" element={<SignIn />} />
-        <Route path="/sign-up" element={<SignUp />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
 
         {/* Protected routes */}
         <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>

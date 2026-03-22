@@ -25,7 +25,7 @@ import {
   LogOut,
   Home
 } from 'lucide-react'
-import { useClerk, useUser } from '@clerk/clerk-react'
+import { useAuth } from '../contexts/AuthContext'
 import { useKeyboardShortcuts, getModKey } from '../hooks/useKeyboardShortcuts'
 import CommandPalette from './CommandPalette'
 import KeyboardShortcutsHelp from './KeyboardShortcutsHelp'
@@ -106,10 +106,12 @@ export default function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
   const { isDark, toggleMode } = useTheme()
-  const { signOut } = useClerk()
-  const { user } = useUser()
+  const { user, signOut } = useAuth()
 
-  const handleSignOut = () => signOut({ redirectUrl: '/sign-in' })
+  const handleSignOut = async () => {
+    await signOut()
+    navigate('/sign-in')
+  }
 
   const isActive = (href) => location.pathname.startsWith(href)
   const breadcrumb = getBreadcrumb(location.pathname)
@@ -198,17 +200,17 @@ export default function Layout() {
 
             <div className="nav-user-area">
               <div className="nav-user-avatar">
-                {user?.imageUrl
-                  ? <img src={user.imageUrl} alt="" className="w-full h-full object-cover rounded-full" />
+                {user?.avatar_url
+                  ? <img src={user.avatar_url} alt="" className="w-full h-full object-cover rounded-full" />
                   : <User className="w-4 h-4" />
                 }
               </div>
               <div className="nav-user-info">
                 <span className="nav-user-name">
-                  {user?.firstName || user?.emailAddresses?.[0]?.emailAddress || 'Workspace'}
+                  {user?.name || user?.email || 'Workspace'}
                 </span>
                 <span className="nav-user-role">
-                  {user?.emailAddresses?.[0]?.emailAddress || 'Free plan'}
+                  {user?.email || 'Free plan'}
                 </span>
               </div>
               <button

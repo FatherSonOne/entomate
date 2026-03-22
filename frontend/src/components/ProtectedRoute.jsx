@@ -1,11 +1,11 @@
 import { Navigate } from 'react-router-dom'
-import { useAuth } from '@clerk/clerk-react'
+import { useAuth } from '../contexts/AuthContext'
 
 export default function ProtectedRoute({ children }) {
-  const { isLoaded, isSignedIn } = useAuth()
+  const { loading, isSignedIn } = useAuth()
 
-  // Show loading state while Clerk is initializing
-  if (!isLoaded) {
+  // Show loading state while checking auth
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -23,4 +23,3 @@ export default function ProtectedRoute({ children }) {
 
   return children
 }
-

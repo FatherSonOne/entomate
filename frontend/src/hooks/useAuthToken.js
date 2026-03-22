@@ -1,24 +1,18 @@
-import { useAuth } from '@clerk/clerk-react'
+import { useAuth } from '../contexts/AuthContext'
 
 /**
- * Hook to get the current auth token from Clerk
+ * Hook to get the current auth token from Supabase
  * Returns null if not authenticated
  */
 export function useAuthToken() {
-  const { getToken, isSignedIn } = useAuth()
-  
+  const { session, isSignedIn } = useAuth()
+
   const getAuthToken = async () => {
-    if (!isSignedIn) {
+    if (!isSignedIn || !session) {
       return null
     }
-    try {
-      return await getToken()
-    } catch (error) {
-      console.error('Error getting auth token:', error)
-      return null
-    }
+    return session.access_token || null
   }
-  
+
   return { getAuthToken, isSignedIn }
 }
-

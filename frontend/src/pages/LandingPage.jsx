@@ -1,9 +1,10 @@
 import React, { useEffect, useRef } from 'react'
 import { Link, Navigate } from 'react-router-dom'
-import { useAuth } from '@clerk/clerk-react'
+import { useAuth } from '../contexts/AuthContext'
 
 export default function LandingPage() {
-  const { isSignedIn, isLoaded } = useAuth()
+  const { isSignedIn, loading: isLoading } = useAuth()
+  const isLoaded = !isLoading
   const landingRef = useRef(null)
 
   // Load Google Fonts

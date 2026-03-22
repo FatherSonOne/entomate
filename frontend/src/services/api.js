@@ -1,24 +1,8 @@
 import axios from 'axios'
+import { supabase } from './supabaseClient'
 
 // Use relative URL to leverage Vite proxy, or fall back to full URL if configured
 const API_BASE_URL = import.meta.env.VITE_API_URL || ''
-
-// Token getter function - will be set by ClerkAuthProvider
-let tokenGetter = null
-
-/**
- * Set the token getter function
- * This should be called from a component that has access to Clerk's useAuth hook
- */
-export const setTokenGetter = (getter) => {
-  tokenGetter = getter
-}
-
-// Token cache to avoid multiple calls
-// Clerk tokens expire quickly (~60s), so cache for only 30 seconds
-let tokenCache = null
-let tokenCacheTime = 0
-const TOKEN_CACHE_DURATION = 30 * 1000 // 30 seconds
 
 // Network status tracking
 let isOnline = navigator.onLine
@@ -91,7 +75,7 @@ const api = axios.create({
   }
 })
 
-// Request interceptor - async to support Clerk token retrieval
+// Request interceptor - async to support Supabase session retrieval
 api.interceptors.request.use(
   async (config) => {
     // Check if we're offline
@@ -99,20 +83,11 @@ api.interceptors.request.use(
       return Promise.reject(new Error('You are offline. Please check your internet connection.'))
     }
 
-    // Get Clerk auth token
+    // Get Supabase session token
     try {
-      // Check cache first
-      const now = Date.now()
-      if (tokenCache && (now - tokenCacheTime) < TOKEN_CACHE_DURATION) {
-        config.headers.Authorization = `Bearer ${tokenCache}`
-      } else if (tokenGetter) {
-        // Get fresh token using the token getter
-        const token = await tokenGetter()
-        if (token) {
-          tokenCache = token
-          tokenCacheTime = now
-          config.headers.Authorization = `Bearer ${token}`
-        }
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.access_token) {
+        config.headers.Authorization = `Bearer ${session.access_token}`
       }
     } catch (error) {
       // If token retrieval fails, continue without auth header
