@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Search, LayoutDashboard, Mic, FolderKanban, CheckSquare,
   Zap, Bot, Target, BarChart3, FileText, Calendar, Settings,
-  Kanban, X, ArrowRight, Command, HelpCircle
+  Kanban, X, Command, HelpCircle
 } from 'lucide-react'
 import { useKeyboardShortcuts, formatShortcut } from '../hooks/useKeyboardShortcuts'
 
@@ -135,102 +135,86 @@ export default function CommandPalette({ isOpen, onClose, onShowShortcuts }) {
   let flatIndex = 0
 
   return (
-    <div className="fixed inset-0 z-[100] overflow-y-auto">
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
-      />
+    <div className="cmd-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="cmd-box">
+        {/* Search input */}
+        <div className="cmd-input-wrap">
+          <Search className="w-5 h-5 text-content-tertiary" />
+          <input
+            ref={inputRef}
+            type="text"
+            className="cmd-input"
+            placeholder="Type a command or search..."
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value)
+              setSelectedIndex(0)
+            }}
+          />
+          <button
+            onClick={onClose}
+            className="rounded p-1 text-content-tertiary hover:text-content-secondary"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
 
-      {/* Dialog */}
-      <div className="flex min-h-full items-start justify-center p-4 pt-[15vh]">
-        <div className="relative w-full max-w-xl transform rounded-xl bg-surface shadow-2xl ring-1 ring-black/5 transition-all">
-          {/* Search input */}
-          <div className="flex items-center border-b border-line-default px-4">
-            <Search className="w-5 h-5 text-content-tertiary" />
-            <input
-              ref={inputRef}
-              type="text"
-              className="flex-1 border-0 bg-transparent py-4 px-3 text-content-primary placeholder-gray-400 focus:outline-none focus:ring-0"
-              placeholder="Type a command or search..."
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value)
-                setSelectedIndex(0)
-              }}
-            />
-            <button
-              onClick={onClose}
-              className="rounded p-1 text-content-tertiary hover:text-content-secondary"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* Commands list */}
-          <div ref={listRef} className="max-h-80 overflow-y-auto p-2">
-            {flatCommands.length === 0 ? (
-              <div className="py-8 text-center text-content-tertiary">
-                <Search className="w-10 h-10 mx-auto mb-2 text-content-muted" />
-                <p>No commands found</p>
-              </div>
-            ) : (
-              Object.entries(groupedCommands).map(([category, cmds]) => (
-                <div key={category} className="mb-2">
-                  <div className="px-3 py-1.5 text-xs font-medium text-content-tertiary uppercase tracking-wide">
-                    {category}
-                  </div>
-                  {cmds.map((cmd) => {
-                    const currentIndex = flatIndex++
-                    const Icon = cmd.icon
-                    const isSelected = currentIndex === selectedIndex
-
-                    return (
-                      <button
-                        key={cmd.id}
-                        data-index={currentIndex}
-                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
-                          isSelected
-                            ? 'bg-primary-50 text-primary-900'
-                            : 'text-content-secondary hover:bg-surface-muted'
-                        }`}
-                        onClick={() => executeCommand(cmd)}
-                        onMouseEnter={() => setSelectedIndex(currentIndex)}
-                      >
-                        <Icon className={`w-5 h-5 ${isSelected ? 'text-accent-primary' : 'text-content-tertiary'}`} />
-                        <span className="flex-1">{cmd.name}</span>
-                        {cmd.shortcut && (
-                          <kbd className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-surface-muted text-content-tertiary rounded border border-line-default">
-                            {formatShortcut(cmd.shortcut)}
-                          </kbd>
-                        )}
-                        {isSelected && (
-                          <ArrowRight className="w-4 h-4 text-primary-500" />
-                        )}
-                      </button>
-                    )
-                  })}
-                </div>
-              ))
-            )}
-          </div>
-
-          {/* Footer hint */}
-          <div className="flex items-center justify-between px-4 py-2 border-t border-line-default text-xs text-content-tertiary">
-            <div className="flex items-center gap-4">
-              <span className="flex items-center gap-1">
-                <kbd className="px-1.5 py-0.5 bg-surface-muted rounded border border-line-default">↑↓</kbd>
-                to navigate
-              </span>
-              <span className="flex items-center gap-1">
-                <kbd className="px-1.5 py-0.5 bg-surface-muted rounded border border-line-default">↵</kbd>
-                to select
-              </span>
-              <span className="flex items-center gap-1">
-                <kbd className="px-1.5 py-0.5 bg-surface-muted rounded border border-line-default">esc</kbd>
-                to close
-              </span>
+        {/* Commands list */}
+        <div ref={listRef} className="cmd-results">
+          {flatCommands.length === 0 ? (
+            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-tertiary)' }}>
+              <Search className="w-10 h-10 mx-auto mb-2 text-content-muted" />
+              <p>No commands found</p>
             </div>
+          ) : (
+            Object.entries(groupedCommands).map(([category, cmds]) => (
+              <div key={category} className="mb-2">
+                <div className="cmd-section-label">
+                  {category}
+                </div>
+                {cmds.map((cmd) => {
+                  const currentIndex = flatIndex++
+                  const Icon = cmd.icon
+                  const isSelected = currentIndex === selectedIndex
+
+                  return (
+                    <button
+                      key={cmd.id}
+                      data-index={currentIndex}
+                      className={`cmd-result${isSelected ? ' selected' : ''}`}
+                      onClick={() => executeCommand(cmd)}
+                      onMouseEnter={() => setSelectedIndex(currentIndex)}
+                    >
+                      <div className="cmd-result-icon"><Icon className="w-4 h-4" /></div>
+                      <span className="cmd-result-title">{cmd.name}</span>
+                      {cmd.shortcut && (
+                        <kbd className="cmd-kbd">
+                          {formatShortcut(cmd.shortcut)}
+                        </kbd>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Footer hint */}
+        <div className="cmd-footer">
+          <div className="flex items-center gap-4">
+            <span className="flex items-center gap-1">
+              <kbd className="cmd-kbd">↑↓</kbd>
+              to navigate
+            </span>
+            <span className="flex items-center gap-1">
+              <kbd className="cmd-kbd">↵</kbd>
+              to select
+            </span>
+            <span className="flex items-center gap-1">
+              <kbd className="cmd-kbd">esc</kbd>
+              to close
+            </span>
           </div>
         </div>
       </div>

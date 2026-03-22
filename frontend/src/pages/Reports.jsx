@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { reportsApi, meetingsApi } from '../services/api'
 import api from '../services/api'
+import { VCButton, VCBadge, VCIconBox } from '../components/vc'
 
 export default function Reports() {
   const [meetings, setMeetings] = useState([])
@@ -88,7 +89,7 @@ export default function Reports() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-accent-primary" />
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--accent-primary)' }} />
       </div>
     )
   }
@@ -97,32 +98,44 @@ export default function Reports() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-content-primary flex items-center gap-2">
-          <FileText className="h-7 w-7 text-accent-primary" />
-          Reports & Export
+        <h1
+          className="text-2xl font-bold flex items-center gap-2"
+          style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}
+        >
+          <FileText className="h-7 w-7" style={{ color: 'var(--accent-primary)' }} />
+          Reports &amp; Export
         </h1>
-        <p className="text-content-tertiary mt-1">
+        <p style={{ color: 'var(--text-tertiary)' }} className="mt-1">
           Generate PDF reports and export data to CSV
         </p>
       </div>
 
       {/* PDF Reports Section */}
-      <div className="card p-6">
-        <h2 className="text-lg font-semibold text-content-primary mb-4 flex items-center gap-2">
-          <FileText className="h-5 w-5 text-semantic-error" />
+      <div className="vc p-6">
+        <h2
+          className="text-lg font-semibold mb-4 flex items-center gap-2"
+          style={{ color: 'var(--text-primary)' }}
+        >
+          <FileText className="h-5 w-5" style={{ color: 'var(--accent-primary)' }} />
           PDF Reports
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Meeting Recap */}
-          <div className="border border-line-default rounded-lg p-4 hover:border-primary-300 transition-colors">
+          <div
+            className="rounded-lg p-4 transition-colors"
+            style={{
+              border: '1px solid rgba(248,240,242,.08)',
+              background: 'var(--bg-elevated)',
+            }}
+          >
             <div className="flex items-start gap-3 mb-3">
-              <div className="p-2 bg-semantic-info-dim rounded-lg">
-                <Calendar className="h-5 w-5 text-semantic-info" />
-              </div>
+              <VCIconBox color="mint" size="sm">
+                <Calendar className="h-5 w-5" />
+              </VCIconBox>
               <div>
-                <h3 className="font-medium text-content-primary">Meeting Recap</h3>
-                <p className="text-sm text-content-tertiary">
+                <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>Meeting Recap</h3>
+                <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
                   PDF summary with action items and decisions
                 </p>
               </div>
@@ -140,10 +153,11 @@ export default function Reports() {
                   </option>
                 ))}
               </select>
-              <button
+              <VCButton
+                variant="primary"
+                className="w-full text-sm"
                 onClick={() => handleDownload('meeting-pdf', { meetingId: selectedMeeting })}
                 disabled={!selectedMeeting || generating === 'meeting-pdf'}
-                className="btn btn-primary w-full text-sm"
               >
                 {generating === 'meeting-pdf' ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -151,19 +165,25 @@ export default function Reports() {
                   <Download className="h-4 w-4 mr-2" />
                 )}
                 Download PDF
-              </button>
+              </VCButton>
             </div>
           </div>
 
           {/* Goals Report */}
-          <div className="border border-line-default rounded-lg p-4 hover:border-primary-300 transition-colors">
+          <div
+            className="rounded-lg p-4 transition-colors"
+            style={{
+              border: '1px solid rgba(248,240,242,.08)',
+              background: 'var(--bg-elevated)',
+            }}
+          >
             <div className="flex items-start gap-3 mb-3">
-              <div className="p-2 bg-accent-tertiary-dim rounded-lg">
-                <Target className="h-5 w-5 text-accent-tertiary" />
-              </div>
+              <VCIconBox color="amber" size="sm">
+                <Target className="h-5 w-5" />
+              </VCIconBox>
               <div>
-                <h3 className="font-medium text-content-primary">Goals & OKRs</h3>
-                <p className="text-sm text-content-tertiary">
+                <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>Goals &amp; OKRs</h3>
+                <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
                   Progress report for all goals
                 </p>
               </div>
@@ -178,10 +198,11 @@ export default function Reports() {
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
-              <button
+              <VCButton
+                variant="primary"
+                className="w-full text-sm"
                 onClick={() => handleDownload('goals-pdf', { quarter: selectedQuarter })}
                 disabled={generating === 'goals-pdf'}
-                className="btn btn-primary w-full text-sm"
               >
                 {generating === 'goals-pdf' ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -189,31 +210,38 @@ export default function Reports() {
                   <Download className="h-4 w-4 mr-2" />
                 )}
                 Download PDF
-              </button>
+              </VCButton>
             </div>
           </div>
 
           {/* Weekly Summary */}
-          <div className="border border-line-default rounded-lg p-4 hover:border-primary-300 transition-colors">
+          <div
+            className="rounded-lg p-4 transition-colors"
+            style={{
+              border: '1px solid rgba(248,240,242,.08)',
+              background: 'var(--bg-elevated)',
+            }}
+          >
             <div className="flex items-start gap-3 mb-3">
-              <div className="p-2 bg-semantic-success-dim rounded-lg">
-                <Clock className="h-5 w-5 text-semantic-success" />
-              </div>
+              <VCIconBox color="mint" size="sm">
+                <Clock className="h-5 w-5" />
+              </VCIconBox>
               <div>
-                <h3 className="font-medium text-content-primary">Weekly Summary</h3>
-                <p className="text-sm text-content-tertiary">
+                <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>Weekly Summary</h3>
+                <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
                   Overview of the past 7 days
                 </p>
               </div>
             </div>
             <div className="space-y-2">
-              <div className="text-sm text-content-tertiary py-2">
+              <div className="text-sm py-2" style={{ color: 'var(--text-tertiary)' }}>
                 Includes meetings, tasks, and overdue items
               </div>
-              <button
+              <VCButton
+                variant="primary"
+                className="w-full text-sm"
                 onClick={() => handleDownload('weekly-pdf')}
                 disabled={generating === 'weekly-pdf'}
-                className="btn btn-primary w-full text-sm"
               >
                 {generating === 'weekly-pdf' ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -221,104 +249,128 @@ export default function Reports() {
                   <Download className="h-4 w-4 mr-2" />
                 )}
                 Download PDF
-              </button>
+              </VCButton>
             </div>
           </div>
         </div>
       </div>
 
       {/* CSV Export Section */}
-      <div className="card p-6">
-        <h2 className="text-lg font-semibold text-content-primary mb-4 flex items-center gap-2">
-          <FileSpreadsheet className="h-5 w-5 text-semantic-success" />
+      <div className="vc p-6">
+        <h2
+          className="text-lg font-semibold mb-4 flex items-center gap-2"
+          style={{ color: 'var(--text-primary)' }}
+        >
+          <FileSpreadsheet className="h-5 w-5" style={{ color: 'var(--accent-secondary)' }} />
           CSV Export
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Meetings Export */}
-          <div className="border border-line-default rounded-lg p-4 hover:border-primary-300 transition-colors">
+          <div
+            className="rounded-lg p-4 transition-colors"
+            style={{
+              border: '1px solid rgba(248,240,242,.08)',
+              background: 'var(--bg-elevated)',
+            }}
+          >
             <div className="flex items-start gap-3 mb-3">
-              <div className="p-2 bg-semantic-info-dim rounded-lg">
-                <Calendar className="h-5 w-5 text-semantic-info" />
-              </div>
+              <VCIconBox color="mint" size="sm">
+                <Calendar className="h-5 w-5" />
+              </VCIconBox>
               <div>
-                <h3 className="font-medium text-content-primary">Meetings</h3>
-                <p className="text-sm text-content-tertiary">
+                <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>Meetings</h3>
+                <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
                   Export all meetings data
                 </p>
               </div>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-content-tertiary">{meetings.length} meetings</span>
-              <button
+              <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>{meetings.length} meetings</span>
+              <VCButton
+                variant="ghost"
+                size="sm"
                 onClick={() => handleDownload('meetings-csv')}
                 disabled={generating === 'meetings-csv'}
-                className="btn btn-secondary text-sm"
               >
                 {generating === 'meetings-csv' ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <Download className="h-4 w-4" />
                 )}
-              </button>
+              </VCButton>
             </div>
           </div>
 
           {/* Action Items Export */}
-          <div className="border border-line-default rounded-lg p-4 hover:border-primary-300 transition-colors">
+          <div
+            className="rounded-lg p-4 transition-colors"
+            style={{
+              border: '1px solid rgba(248,240,242,.08)',
+              background: 'var(--bg-elevated)',
+            }}
+          >
             <div className="flex items-start gap-3 mb-3">
-              <div className="p-2 bg-semantic-warning-dim rounded-lg">
-                <CheckSquare className="h-5 w-5 text-semantic-warning" />
-              </div>
+              <VCIconBox color="amber" size="sm">
+                <CheckSquare className="h-5 w-5" />
+              </VCIconBox>
               <div>
-                <h3 className="font-medium text-content-primary">Action Items</h3>
-                <p className="text-sm text-content-tertiary">
+                <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>Action Items</h3>
+                <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
                   Export all action items
                 </p>
               </div>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-content-tertiary">All statuses</span>
-              <button
+              <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>All statuses</span>
+              <VCButton
+                variant="ghost"
+                size="sm"
                 onClick={() => handleDownload('action-items-csv')}
                 disabled={generating === 'action-items-csv'}
-                className="btn btn-secondary text-sm"
               >
                 {generating === 'action-items-csv' ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <Download className="h-4 w-4" />
                 )}
-              </button>
+              </VCButton>
             </div>
           </div>
 
           {/* Goals Export */}
-          <div className="border border-line-default rounded-lg p-4 hover:border-primary-300 transition-colors">
+          <div
+            className="rounded-lg p-4 transition-colors"
+            style={{
+              border: '1px solid rgba(248,240,242,.08)',
+              background: 'var(--bg-elevated)',
+            }}
+          >
             <div className="flex items-start gap-3 mb-3">
-              <div className="p-2 bg-accent-tertiary-dim rounded-lg">
-                <Target className="h-5 w-5 text-accent-tertiary" />
-              </div>
+              <VCIconBox color="amber" size="sm">
+                <Target className="h-5 w-5" />
+              </VCIconBox>
               <div>
-                <h3 className="font-medium text-content-primary">Goals</h3>
-                <p className="text-sm text-content-tertiary">
+                <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>Goals</h3>
+                <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
                   Export all goals data
                 </p>
               </div>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-content-tertiary">{goals.length} goals</span>
-              <button
+              <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>{goals.length} goals</span>
+              <VCButton
+                variant="ghost"
+                size="sm"
                 onClick={() => handleDownload('goals-csv')}
                 disabled={generating === 'goals-csv'}
-                className="btn btn-secondary text-sm"
               >
                 {generating === 'goals-csv' ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <Download className="h-4 w-4" />
                 )}
-              </button>
+              </VCButton>
             </div>
           </div>
         </div>
@@ -326,65 +378,103 @@ export default function Reports() {
 
       {/* Quick Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="card p-4">
+        <div className="vc p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-semantic-info-dim rounded-lg">
-              <Calendar className="h-5 w-5 text-semantic-info" />
-            </div>
+            <VCIconBox color="mint" size="sm">
+              <Calendar className="h-5 w-5" />
+            </VCIconBox>
             <div>
-              <p className="text-2xl font-bold text-content-primary">{meetings.length}</p>
-              <p className="text-sm text-content-tertiary">Meetings</p>
+              <p
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontWeight: 700,
+                  fontSize: 24,
+                  color: 'var(--text-primary)',
+                }}
+              >
+                {meetings.length}
+              </p>
+              <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Meetings</p>
             </div>
           </div>
         </div>
 
-        <div className="card p-4">
+        <div className="vc p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-accent-tertiary-dim rounded-lg">
-              <Target className="h-5 w-5 text-accent-tertiary" />
-            </div>
+            <VCIconBox color="amber" size="sm">
+              <Target className="h-5 w-5" />
+            </VCIconBox>
             <div>
-              <p className="text-2xl font-bold text-content-primary">{goals.length}</p>
-              <p className="text-sm text-content-tertiary">Goals</p>
+              <p
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontWeight: 700,
+                  fontSize: 24,
+                  color: 'var(--text-primary)',
+                }}
+              >
+                {goals.length}
+              </p>
+              <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Goals</p>
             </div>
           </div>
         </div>
 
-        <div className="card p-4">
+        <div className="vc p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-semantic-success-dim rounded-lg">
-              <CheckSquare className="h-5 w-5 text-semantic-success" />
-            </div>
+            <VCIconBox color="mint" size="sm">
+              <CheckSquare className="h-5 w-5" />
+            </VCIconBox>
             <div>
-              <p className="text-2xl font-bold text-content-primary">
+              <p
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontWeight: 700,
+                  fontSize: 24,
+                  color: 'var(--text-primary)',
+                }}
+              >
                 {goals.filter(g => g.status === 'completed').length}
               </p>
-              <p className="text-sm text-content-tertiary">Completed</p>
+              <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Completed</p>
             </div>
           </div>
         </div>
 
-        <div className="card p-4">
+        <div className="vc p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-semantic-warning-dim rounded-lg">
-              <BarChart3 className="h-5 w-5 text-semantic-warning" />
-            </div>
+            <VCIconBox color="amber" size="sm">
+              <BarChart3 className="h-5 w-5" />
+            </VCIconBox>
             <div>
-              <p className="text-2xl font-bold text-content-primary">
+              <p
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontWeight: 700,
+                  fontSize: 24,
+                  color: 'var(--text-primary)',
+                }}
+              >
                 {goals.length > 0
                   ? Math.round(goals.reduce((sum, g) => sum + (g.progress || 0), 0) / goals.length)
                   : 0}%
               </p>
-              <p className="text-sm text-content-tertiary">Avg Progress</p>
+              <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Avg Progress</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Info */}
-      <div className="bg-semantic-info-dim border border-semantic-info rounded-lg p-4">
-        <h3 className="font-medium text-semantic-info mb-2">About Reports</h3>
-        <ul className="text-sm text-semantic-info space-y-1">
+      <div
+        className="rounded-lg p-4"
+        style={{
+          background: 'rgba(0,245,212,0.06)',
+          border: '1px solid rgba(0,245,212,0.2)',
+        }}
+      >
+        <h3 className="font-medium mb-2" style={{ color: 'var(--accent-secondary)' }}>About Reports</h3>
+        <ul className="text-sm space-y-1" style={{ color: 'var(--accent-secondary)', opacity: 0.85 }}>
           <li>• PDF reports are generated on-demand and downloaded to your device</li>
           <li>• CSV exports can be opened in Excel, Google Sheets, or any spreadsheet app</li>
           <li>• Weekly summaries include data from the past 7 days</li>

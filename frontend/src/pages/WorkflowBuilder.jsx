@@ -9,6 +9,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { AlertCircle, Loader2 } from 'lucide-react'
 import { workflowsApi } from '../services/api'
 import WorkflowCanvas from '../components/workflow/WorkflowCanvas'
+import { VCButton, VCBadge } from '../components/vc'
 
 export default function WorkflowBuilder() {
   const { id } = useParams()
@@ -127,10 +128,16 @@ export default function WorkflowBuilder() {
 
   if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-surface-muted">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 text-accent-primary animate-spin mx-auto mb-4" />
-          <p className="text-content-secondary">Loading workflow...</p>
+      <div
+        className="h-screen flex items-center justify-center"
+        style={{ background: 'var(--bg0, #080808)' }}
+      >
+        <div className="vc text-center" style={{ padding: '2rem 3rem' }}>
+          <Loader2
+            className="w-8 h-8 animate-spin mx-auto mb-4"
+            style={{ color: 'var(--accent-primary, #FF2D6B)' }}
+          />
+          <p style={{ color: 'var(--text-secondary)', margin: 0 }}>Loading workflow...</p>
         </div>
       </div>
     )
@@ -138,24 +145,32 @@ export default function WorkflowBuilder() {
 
   if (error) {
     return (
-      <div className="h-screen flex items-center justify-center bg-surface-muted">
-        <div className="text-center max-w-md">
-          <AlertCircle className="w-12 h-12 text-semantic-error mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-content-primary mb-2">Failed to Load Workflow</h2>
-          <p className="text-content-secondary mb-4">{error}</p>
+      <div
+        className="h-screen flex items-center justify-center"
+        style={{ background: 'var(--bg0, #080808)' }}
+      >
+        <div className="vc text-center" style={{ maxWidth: 440, padding: '2rem' }}>
+          <AlertCircle
+            className="w-12 h-12 mx-auto mb-4"
+            style={{ color: 'var(--accent-primary, #FF2D6B)' }}
+          />
+          <h2 style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: '1.25rem',
+            fontWeight: 600,
+            color: 'var(--text-primary)',
+            marginBottom: 8,
+          }}>
+            Failed to Load Workflow
+          </h2>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: 16 }}>{error}</p>
           <div className="flex gap-2 justify-center">
-            <button
-              onClick={loadWorkflow}
-              className="btn btn-secondary"
-            >
+            <VCButton variant="secondary" onClick={loadWorkflow}>
               Try Again
-            </button>
-            <button
-              onClick={handleBack}
-              className="btn btn-primary"
-            >
+            </VCButton>
+            <VCButton variant="primary" onClick={handleBack}>
               Back to Workflows
-            </button>
+            </VCButton>
           </div>
         </div>
       </div>
@@ -163,18 +178,22 @@ export default function WorkflowBuilder() {
   }
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
+    <div className="h-screen flex flex-col overflow-hidden" style={{ background: 'var(--bg0, #080808)' }}>
       {/* Error banner */}
       {saveError && (
-        <div className="bg-semantic-error-dim border-b border-semantic-error px-4 py-2 flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-semantic-error" />
-          <span className="text-sm text-semantic-error">{saveError}</span>
-          <button
-            onClick={() => setSaveError(null)}
-            className="ml-auto text-semantic-error hover:text-semantic-error"
-          >
+        <div style={{
+          background: 'rgba(255,45,107,.10)',
+          borderBottom: '1px solid rgba(255,45,107,.40)',
+          padding: '8px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+        }}>
+          <AlertCircle className="w-4 h-4" style={{ color: 'var(--accent-primary, #FF2D6B)', flexShrink: 0 }} />
+          <span style={{ fontSize: 14, color: 'var(--accent-primary, #FF2D6B)', flex: 1 }}>{saveError}</span>
+          <VCButton variant="ghost" size="sm" onClick={() => setSaveError(null)}>
             Dismiss
-          </button>
+          </VCButton>
         </div>
       )}
 

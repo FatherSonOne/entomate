@@ -5,31 +5,7 @@ import MeetingRecorder from '../components/MeetingRecorder'
 import IntelligenceDashboard from '../components/intelligence/IntelligenceDashboard'
 import { LearningInsightsWidget } from '../components/intelligence'
 import { meetingsApi, tasksApi, projectsApi, checkHealth } from '../services/api'
-
-// Dev-Core Stat Card: Emphasizes mono font and high contrast
-const StatCard = ({ label, value, icon: Icon, href, accent }) => {
-  const accentClasses = {
-    primary: 'text-accent-primary',
-    blue: 'text-accent-secondary',
-    purple: 'text-accent-tertiary',
-    yellow: 'text-semantic-warning',
-  };
-
-  return (
-    <Link
-      to={href}
-      className="card p-4 group transition-all duration-200 hover:bg-surface-elevated hover:border-accent-primary hover:shadow-glow"
-    >
-      <div className="flex items-center justify-between">
-        <div className="flex flex-col">
-          <p className="text-sm font-medium text-content-secondary uppercase tracking-wider">{label}</p>
-          <p className="text-3xl font-mono font-bold text-content-primary mt-1">{value}</p>
-        </div>
-        <Icon className={`w-6 h-6 flex-shrink-0 ${accentClasses[accent] || 'text-content-tertiary'}`} />
-      </div>
-    </Link>
-  );
-};
+import { VCMetricCard, VCMeetingCard, VCBadge } from '../components/vc'
 
 export default function Dashboard() {
   const navigate = useNavigate()
@@ -80,12 +56,12 @@ export default function Dashboard() {
     loadData();
   }, []);
 
-  const statCardsData = [
-    { label: 'Meetings', value: stats.meetings, icon: Mic, href: '/meetings', accent: 'primary' },
-    { label: 'Projects', value: stats.projects, icon: FolderKanban, href: '/projects', accent: 'blue' },
-    { label: 'Open Tasks', value: stats.tasks, icon: CheckSquare, href: '/tasks', accent: 'yellow' },
-    { label: 'Automations', value: '3', icon: Zap, href: '/automations', accent: 'purple' },
-  ];
+  const metricCards = [
+    { label: 'Meetings',    value: stats.meetings, icon: <Mic className="w-4 h-4" />,          color: 'crimson',  href: '/meetings',    delta: 'View all →' },
+    { label: 'Projects',    value: stats.projects, icon: <FolderKanban className="w-4 h-4" />, color: 'mint',     href: '/projects',    delta: null },
+    { label: 'Open Tasks',  value: stats.tasks,    icon: <CheckSquare className="w-4 h-4" />,  color: 'amber',    href: '/tasks',       delta: null },
+    { label: 'Automations', value: '3',            icon: <Zap className="w-4 h-4" />,          color: 'phosphor', href: '/automations', delta: null },
+  ]
 
   const getServiceStatus = (service) => {
     const status = systemStatus?.services?.[service] || 'checking...';
@@ -106,9 +82,19 @@ export default function Dashboard() {
       {/* Enhanced Intelligence Dashboard - AI-powered meeting prep, deal risks, action items, and relationships */}
       <IntelligenceDashboard />
 
-      {/* Dev-Core: High-density stat grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-        {statCardsData.map(card => <StatCard key={card.label} {...card} />)}
+      {/* VC Metric grid — Neo+Cinema style */}
+      <div className="vc-grid-4">
+        {metricCards.map(card => (
+          <VCMetricCard
+            key={card.label}
+            label={card.label}
+            value={card.value}
+            icon={card.icon}
+            color={card.color}
+            delta={card.delta}
+            href={card.href}
+          />
+        ))}
       </div>
 
       {/* AI Learning Insights Widget */}
@@ -121,17 +107,17 @@ export default function Dashboard() {
       )}
 
       {systemStatus && (
-        <div className="card p-2 border-l-2 border-line-default">
-          <div className="flex items-center gap-x-4 gap-y-1 flex-wrap text-xs font-mono">
+        <div className="vc" style={{ padding: '10px 14px', borderLeft: '2px solid rgba(248,240,242,.1)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', fontSize: 11, fontFamily: 'var(--font-mono)' }}>
             <div className="flex items-center gap-2" title={getServiceStatus('gemini').status}>
-              <div className={`w-1.5 h-1.5 rounded-full ${getServiceStatus('gemini').isConnected ? 'bg-semantic-success animate-pulse' : 'bg-semantic-warning'}`} />
-              <span className="text-content-secondary">AI:</span>
-              <span className="text-content-primary">{getServiceStatus('gemini').status}</span>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: getServiceStatus('gemini').isConnected ? 'var(--accent-secondary, #00F5D4)' : 'rgba(255,184,0,.8)', boxShadow: getServiceStatus('gemini').isConnected ? '0 0 4px var(--accent-secondary)' : 'none' }} />
+              <span style={{ color: 'var(--text-tertiary)' }}>AI:</span>
+              <span style={{ color: 'var(--text-primary)' }}>{getServiceStatus('gemini').status}</span>
             </div>
             <div className="flex items-center gap-2" title={getServiceStatus('database').status}>
-              <div className={`w-1.5 h-1.5 rounded-full ${getServiceStatus('database').isConnected ? 'bg-semantic-success animate-pulse' : 'bg-semantic-warning'}`} />
-              <span className="text-content-secondary">DB:</span>
-               <span className="text-content-primary">{getServiceStatus('database').status}</span>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: getServiceStatus('database').isConnected ? 'var(--accent-secondary, #00F5D4)' : 'rgba(255,184,0,.8)', boxShadow: getServiceStatus('database').isConnected ? '0 0 4px var(--accent-secondary)' : 'none' }} />
+              <span style={{ color: 'var(--text-tertiary)' }}>DB:</span>
+              <span style={{ color: 'var(--text-primary)' }}>{getServiceStatus('database').status}</span>
             </div>
           </div>
         </div>
@@ -144,58 +130,58 @@ export default function Dashboard() {
         </div>
         
         <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="card">
-            <div className="p-3 border-b border-line-strong flex items-center justify-between">
-              <h3 className="font-semibold text-content-primary text-sm">Recent Meetings</h3>
-              <Link to="/meetings" className="text-xs text-accent-primary hover:underline flex items-center gap-1">
+          <div className="vc" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div className="p-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-subtle)' }}>
+              <h3 className="font-semibold text-sm" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}>Recent Meetings</h3>
+              <Link to="/meetings" className="text-xs flex items-center gap-1" style={{ color: 'var(--accent-primary)' }}>
                 View all <ArrowRight className="w-3 h-3" />
               </Link>
             </div>
-            {/* Dev-Core: Use a table-like structure for dense lists */}
-            <div className="divide-y divide-line-default">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '6px 8px' }}>
               {loading ? (
-                 Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-10 bg-surface-elevated animate-pulse"></div>)
-              ) : recentMeetings.length === 0 ? (
-                <p className="text-sm text-content-tertiary p-4 text-center">No recent meetings</p>
-              ) : (
-                recentMeetings.map((meeting) => (
-                  <Link key={meeting.id} to={`/meetings/${meeting.id}`} className="p-2 flex items-center justify-between group hover:bg-surface-elevated">
-                    <div>
-                      <p className="font-medium text-sm text-content-primary group-hover:text-accent-primary truncate">{meeting.title}</p>
-                      <p className="text-xs text-content-tertiary font-mono">{new Date(meeting.created_at).toLocaleString()}</p>
-                    </div>
-                     <span className={`badge text-xs ${ meeting.sentiment_label === 'Positive' ? 'badge-success' : meeting.sentiment_label === 'Negative' ? 'badge-error' : 'badge-gray'}`}>
-                        {meeting.sentiment_label || 'N/A'}
-                      </span>
-                  </Link>
+                Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="h-10 rounded animate-pulse" style={{ background: 'var(--bg-elevated)' }} />
                 ))
+              ) : recentMeetings.length === 0 ? (
+                <p className="text-sm p-4 text-center" style={{ color: 'var(--text-tertiary)' }}>No recent meetings</p>
+              ) : (
+                recentMeetings.map((meeting) => {
+                  const sentimentColor = meeting.sentiment_label === 'Positive' ? 'mint' : meeting.sentiment_label === 'Negative' ? 'error' : 'neutral'
+                  return (
+                    <VCMeetingCard
+                      key={meeting.id}
+                      title={meeting.title}
+                      meta={new Date(meeting.created_at).toLocaleString()}
+                      badge={<VCBadge color={sentimentColor}>{meeting.sentiment_label || 'N/A'}</VCBadge>}
+                      onClick={() => navigate(`/meetings/${meeting.id}`)}
+                    />
+                  )
+                })
               )}
             </div>
           </div>
           
-          <div className="card">
-            <div className="p-3 border-b border-line-strong flex items-center justify-between">
-              <h3 className="font-semibold text-content-primary text-sm">Open Tasks</h3>
-              <Link to="/tasks" className="text-xs text-accent-primary hover:underline flex items-center gap-1">
+          <div className="vc">
+            <div style={{ padding: '12px 14px', borderBottom: '1px solid rgba(248,240,242,.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>Open Tasks</h3>
+              <Link to="/tasks" style={{ fontSize: 11, color: 'var(--accent-primary, #FF2D6B)', display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
                 View all <ArrowRight className="w-3 h-3" />
               </Link>
             </div>
-            <div className="divide-y divide-line-default">
+            <div>
                {loading ? (
-                 Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-10 bg-surface-elevated animate-pulse"></div>)
+                 Array.from({ length: 5 }).map((_, i) => <div key={i} style={{ height: 36, background: 'rgba(248,240,242,.04)', animation: 'pulse 1.5s ease-in-out infinite' }}></div>)
               ) : pendingTasks.length === 0 ? (
                 <p className="text-sm text-content-tertiary p-4 text-center">No open tasks</p>
               ) : (
                 pendingTasks.map((task) => (
-                  <div key={task.id} className="p-2 flex items-center gap-3 group hover:bg-surface-elevated">
-                    <input type="checkbox" className="w-4 h-4 text-accent-primary bg-surface border-line-strong rounded focus:ring-accent-primary focus:ring-1" />
+                  <div key={task.id} style={{ padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid rgba(248,240,242,.04)', cursor: 'pointer' }}>
+                    <input type="checkbox" style={{ width: 14, height: 14, accentColor: 'var(--accent-primary, #FF2D6B)', background: 'transparent', borderColor: 'rgba(248,240,242,.2)', borderRadius: 3 }} />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-content-primary group-hover:text-accent-primary truncate">{task.title}</p>
-                      {task.due_date && <p className={`text-xs font-mono ${new Date(task.due_date) < new Date() ? 'text-semantic-error' : 'text-content-tertiary'}`}>Due: {new Date(task.due_date).toLocaleDateString()}</p>}
+                      <p style={{ fontSize: 13, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</p>
+                      {task.due_date && <p style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: new Date(task.due_date) < new Date() ? 'var(--accent-primary, #FF2D6B)' : 'var(--text-tertiary)' }}>Due: {new Date(task.due_date).toLocaleDateString()}</p>}
                     </div>
-                    <span className={`badge text-xs ${ task.priority === 'high' ? 'badge-error' : task.priority === 'medium' ? 'badge-warning' : 'badge-gray'}`}>
-                      {task.priority}
-                    </span>
+                    <VCBadge color={task.priority === 'high' ? 'crimson' : task.priority === 'medium' ? 'amber' : 'neutral'}>{task.priority}</VCBadge>
                   </div>
                 ))
               )}

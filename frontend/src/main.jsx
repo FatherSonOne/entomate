@@ -21,6 +21,9 @@ import './styles/themes/void-crimson.css'
 // Import main CSS (contains defaults and base styles)
 import './styles/main.css'
 
+// Import Void × Crimson component system
+import './styles/vc-components.css'
+
 const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
 
 if (!CLERK_PUBLISHABLE_KEY) {

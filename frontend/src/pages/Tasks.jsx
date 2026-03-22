@@ -7,6 +7,7 @@ import { tasksApi } from '../services/api'
 import { GuideCard, PageHeader, Skeleton } from '../components/SharedUI'
 import { AgentRecommendationPanel } from '../components/intelligence'
 import { ExplanationModal } from '../components/explainability'
+import { VCButton, VCBadge } from '../components/vc'
 
 export default function Tasks() {
   const [tasks, setTasks] = useState([])
@@ -177,53 +178,58 @@ export default function Tasks() {
     return new Date(dueDate) < new Date()
   }
 
-  const getPriorityColor = (priority) => {
+  const getPriorityBadge = (priority) => {
     switch (priority) {
-      case 'high': return 'text-semantic-error bg-semantic-error/10 border-red-500/20'
-      case 'medium': return 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20'
-      case 'low': return 'text-green-500 bg-green-500/10 border-green-500/20'
-      default: return 'text-content-tertiary bg-surface-muted border-line-subtle'
+      case 'high':   return <VCBadge color="crimson">{priority}</VCBadge>
+      case 'medium': return <VCBadge color="amber">{priority}</VCBadge>
+      case 'low':    return <VCBadge color="mint">{priority}</VCBadge>
+      default:       return <VCBadge color="neutral">{priority}</VCBadge>
     }
   }
 
-  const getStatusColor = (status) => {
+  const getStatusBadge = (status) => {
     switch (status) {
-      case 'done': return 'text-green-500 bg-green-500/10 border-green-500/20'
-      case 'in_progress': return 'text-accent-primary bg-accent-primary/10 border-accent-primary/20'
-      case 'blocked': return 'text-semantic-error bg-semantic-error/10 border-red-500/20'
-      default: return 'text-content-tertiary bg-surface-muted border-line-subtle'
+      case 'done':        return <VCBadge color="mint">{status}</VCBadge>
+      case 'in_progress': return <VCBadge color="amber">In Progress</VCBadge>
+      case 'blocked':     return <VCBadge color="crimson">{status}</VCBadge>
+      default:            return <VCBadge color="neutral">{status}</VCBadge>
     }
   }
 
   return (
     <div className="animate-fade-in max-w-7xl mx-auto">
-      <PageHeader 
-        title="Task Management" 
+      <PageHeader
+        title="Task Management"
         subtitle="Create, prioritize, and track all your tasks in one place."
         actions={
-          <button
+          <VCButton
+            variant="primary"
             onClick={() => {
               setShowCreate(!showCreate)
               setWizardStep(0)
             }}
-            className="btn btn-primary"
           >
             <Plus size={16} />
             New Task
-          </button>
+          </VCButton>
         }
       />
 
-      <GuideCard 
-        title="Task Workflow" 
-        steps={['Create Task', 'Set Priority', 'Complete & Review']} 
-        activeStep={wizardStep} 
+      <GuideCard
+        title="Task Workflow"
+        steps={['Create Task', 'Set Priority', 'Complete & Review']}
+        activeStep={wizardStep}
       />
 
       {/* Create form */}
       {showCreate && (
-        <div className="card p-6 mb-6 animate-fade-in">
-          <h3 className="font-bold text-content-primary text-lg mb-4">Create New Task</h3>
+        <div className="vc p-6 mb-6 animate-fade-in">
+          <h3
+            className="font-bold text-lg mb-4"
+            style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
+          >
+            Create New Task
+          </h3>
           <form onSubmit={handleCreate} className="space-y-4">
             <div>
               <label className="label">Task Title</label>
@@ -264,9 +270,17 @@ export default function Tasks() {
             {(recommendations || loadingRecommendations) && newTask.title.length >= 5 && (
               <div className="animate-fade-in">
                 {loadingRecommendations ? (
-                  <div className="bg-surface-muted border border-line-default rounded-lg p-6 text-center">
-                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-accent-primary"></div>
-                    <p className="mt-2 text-sm text-content-secondary">Getting AI recommendations...</p>
+                  <div
+                    className="border rounded-lg p-6 text-center"
+                    style={{ background: 'var(--bg-elevated)', borderColor: 'rgba(248,240,242,.08)' }}
+                  >
+                    <div
+                      className="inline-block animate-spin rounded-full h-8 w-8 border-b-2"
+                      style={{ borderColor: 'var(--accent-primary)' }}
+                    ></div>
+                    <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                      Getting AI recommendations...
+                    </p>
                   </div>
                 ) : recommendations ? (
                   <AgentRecommendationPanel
@@ -281,16 +295,16 @@ export default function Tasks() {
             )}
 
             <div className="flex gap-3">
-              <button type="submit" disabled={creating} className="btn btn-primary">
+              <VCButton type="submit" variant="primary" disabled={creating}>
                 {creating ? 'Creating...' : 'Create Task'}
-              </button>
-              <button
+              </VCButton>
+              <VCButton
                 type="button"
+                variant="secondary"
                 onClick={() => setShowCreate(false)}
-                className="btn btn-secondary"
               >
                 Cancel
-              </button>
+              </VCButton>
             </div>
           </form>
         </div>
@@ -299,7 +313,10 @@ export default function Tasks() {
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-content-tertiary" />
+          <Search
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
+            style={{ color: 'var(--text-tertiary)' }}
+          />
           <input
             type="text"
             placeholder="Search tasks by title..."
@@ -310,62 +327,76 @@ export default function Tasks() {
         </div>
         <div className="flex gap-2 flex-wrap">
           {['all', 'open', 'in_progress', 'done'].map((status) => (
-            <button
+            <VCButton
               key={status}
               onClick={() => setStatusFilter(status)}
-              className={`btn btn-sm ${
-                statusFilter === status ? 'btn-primary' : 'btn-ghost'
-              }`}
+              variant={statusFilter === status ? 'primary' : 'ghost'}
+              size="sm"
             >
               {status === 'all' ? 'All' :
                status === 'in_progress' ? 'In Progress' :
                status.charAt(0).toUpperCase() + status.slice(1)}
-            </button>
+            </VCButton>
           ))}
         </div>
       </div>
 
       {/* Tasks list */}
-      <div className="card">
+      <div className="vc">
         {loading ? (
           <Skeleton className="h-16" count={8} />
         ) : filteredTasks.length === 0 ? (
-          <div className="p-12 text-center border-dashed border-2 m-4 rounded-lg">
-            <CheckSquare className="w-16 h-16 text-content-muted mx-auto mb-4 opacity-50" />
-            <h3 className="text-xl font-bold text-content-primary mb-2">No tasks found</h3>
-            <p className="text-content-secondary mb-6">
+          <div
+            className="p-12 text-center border-dashed border-2 m-4 rounded-lg"
+            style={{ borderColor: 'rgba(248,240,242,.08)' }}
+          >
+            <CheckSquare className="w-16 h-16 mx-auto mb-4 opacity-50" style={{ color: 'var(--text-tertiary)' }} />
+            <h3
+              className="text-xl font-bold mb-2"
+              style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
+            >
+              No tasks found
+            </h3>
+            <p className="mb-6" style={{ color: 'var(--text-secondary)' }}>
               {searchQuery || statusFilter !== 'all'
                 ? 'Try adjusting your filters'
                 : 'Create your first task to get started'
               }
             </p>
-            <button
+            <VCButton
+              variant="primary"
               onClick={() => {
                 setShowCreate(true)
                 setWizardStep(0)
               }}
-              className="btn btn-primary"
             >
               <Plus size={16} />
               Create Task
-            </button>
+            </VCButton>
           </div>
         ) : (
-          <div className="divide-y divide-line-subtle">
+          <div className="divide-y" style={{ borderColor: 'rgba(248,240,242,.08)' }}>
             {filteredTasks.map((task) => (
               <div
                 key={task.id}
-                className={`p-4 flex items-center gap-4 hover:bg-surface-muted transition-colors group ${
+                className={`p-4 flex items-center gap-4 transition-colors group ${
                   task.status === 'done' ? 'opacity-60' : ''
                 }`}
+                style={{ ['--hover-bg']: 'var(--bg-elevated)' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-elevated)'}
+                onMouseLeave={e => e.currentTarget.style.background = ''}
               >
                 <button
                   onClick={() => task.status === 'done' ? handleReopen(task.id) : handleComplete(task.id)}
                   className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
                     task.status === 'done'
-                      ? 'bg-green-500 border-green-500 text-white'
-                      : 'border-content-muted hover:border-accent-primary'
+                      ? 'text-white'
+                      : ''
                   }`}
+                  style={task.status === 'done'
+                    ? { background: 'var(--accent-secondary)', borderColor: 'var(--accent-secondary)' }
+                    : { borderColor: 'var(--text-tertiary)' }
+                  }
                 >
                   {task.status === 'done' ? (
                     <CheckCircle2 size={16} />
@@ -376,20 +407,28 @@ export default function Tasks() {
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <p className={`font-medium ${
-                      task.status === 'done' ? 'text-content-tertiary line-through' : 'text-content-primary'
-                    }`}>
+                    <p
+                      className={`font-medium ${task.status === 'done' ? 'line-through' : ''}`}
+                      style={{ color: task.status === 'done' ? 'var(--text-tertiary)' : 'var(--text-primary)' }}
+                    >
                       {task.title}
                     </p>
                     {task.due_date && isOverdue(task.due_date) && task.status !== 'done' && (
-                      <AlertCircle size={16} className="text-semantic-error" />
+                      <AlertCircle size={16} style={{ color: 'var(--accent-primary)' }} />
                     )}
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-content-tertiary font-mono">
+                  <div
+                    className="flex items-center gap-3 text-xs"
+                    style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}
+                  >
                     {task.due_date && (
-                      <span className={`flex items-center gap-1 ${
-                        isOverdue(task.due_date) && task.status !== 'done' ? 'text-semantic-error' : ''
-                      }`}>
+                      <span
+                        className="flex items-center gap-1"
+                        style={isOverdue(task.due_date) && task.status !== 'done'
+                          ? { color: 'var(--accent-primary)' }
+                          : {}
+                        }
+                      >
                         <Clock size={12} />
                         {new Date(task.due_date).toLocaleDateString()}
                       </span>
@@ -397,7 +436,8 @@ export default function Tasks() {
                     {task.project_id && (
                       <Link
                         to={`/projects/${task.project_id}`}
-                        className="text-accent-primary hover:underline"
+                        style={{ color: 'var(--accent-primary)' }}
+                        className="hover:underline"
                       >
                         View Project
                       </Link>
@@ -405,18 +445,12 @@ export default function Tasks() {
                   </div>
                 </div>
 
-                <span className={`text-xs px-2 py-1 rounded-sm border font-mono ${getPriorityColor(task.priority)}`}>
-                  {task.priority}
-                </span>
-
-                <span className={`text-xs px-2 py-1 rounded-sm border font-mono ${getStatusColor(task.status)}`}>
-                  {task.status === 'in_progress' ? 'In Progress' :
-                   task.status.charAt(0).toUpperCase() + task.status.slice(1)}
-                </span>
+                {getPriorityBadge(task.priority)}
+                {getStatusBadge(task.status)}
 
                 <button
                   onClick={() => handleDelete(task.id)}
-                  className="p-2 opacity-0 group-hover:opacity-100 hover:bg-semantic-error/10 hover:text-semantic-error rounded-md transition-all"
+                  className="p-2 opacity-0 group-hover:opacity-100 rounded-md transition-all hover:bg-red-500/10 hover:text-red-400"
                 >
                   <Trash2 size={16} />
                 </button>

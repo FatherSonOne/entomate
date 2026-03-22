@@ -5,6 +5,7 @@ import {
   MoreVertical, Trash2, BarChart3
 } from 'lucide-react'
 import { projectsApi, tasksApi } from '../services/api'
+import { VCButton, VCBadge } from '../components/vc'
 
 export default function ProjectDetail() {
   const { id } = useParams()
@@ -82,20 +83,34 @@ export default function ProjectDetail() {
   if (!project) {
     return (
       <div className="text-center py-12">
-        <h2 className="text-xl font-semibold text-content-primary">Project not found</h2>
-        <Link to="/projects" className="text-accent-primary hover:underline mt-2 inline-block">
+        <h2 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>
+          Project not found
+        </h2>
+        <Link
+          to="/projects"
+          className="hover:underline mt-2 inline-block"
+          style={{ color: 'var(--accent-primary)' }}
+        >
           Back to projects
         </Link>
       </div>
     )
   }
 
-  const getStatusColor = (status) => {
+  const getStatusBadge = (status) => {
     switch (status) {
-      case 'done': return 'bg-semantic-success-dim text-semantic-success'
-      case 'in_progress': return 'bg-yellow-100 text-yellow-800'
-      case 'blocked': return 'bg-semantic-error-dim text-semantic-error'
-      default: return 'bg-semantic-info-dim text-semantic-info'
+      case 'active':    return <VCBadge color="mint">{status}</VCBadge>
+      case 'planning':  return <VCBadge color="amber">{status}</VCBadge>
+      case 'completed': return <VCBadge color="neutral">{status}</VCBadge>
+      default:          return <VCBadge color="neutral">{status}</VCBadge>
+    }
+  }
+
+  const getPriorityBadge = (priority) => {
+    switch (priority) {
+      case 'high':   return <VCBadge color="crimson">{priority}</VCBadge>
+      case 'medium': return <VCBadge color="amber">{priority}</VCBadge>
+      default:       return <VCBadge color="mint">{priority}</VCBadge>
     }
   }
 
@@ -111,32 +126,29 @@ export default function ProjectDetail() {
       <div className="flex items-start gap-4">
         <Link
           to="/projects"
-          className="p-2 hover:bg-surface-muted rounded-lg transition-colors"
+          className="p-2 rounded-lg transition-colors"
+          style={{ background: 'var(--bg-elevated)' }}
         >
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div className="flex-1">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-content-primary">{project.name}</h1>
-            <Link
-              to={`/projects/${id}/dashboard`}
-              className="btn btn-secondary"
+            <h1
+              className="text-2xl"
+              style={{ fontFamily: 'var(--font-display)', fontWeight: 700, color: 'var(--text-primary)' }}
             >
+              {project.name}
+            </h1>
+            <VCButton variant="secondary" as={Link} to={`/projects/${id}/dashboard`}>
               <BarChart3 className="w-4 h-4" />
               View Dashboard
-            </Link>
+            </VCButton>
           </div>
           {project.description && (
-            <p className="text-content-secondary mt-1">{project.description}</p>
+            <p className="mt-1" style={{ color: 'var(--text-secondary)' }}>{project.description}</p>
           )}
-          <div className="flex items-center gap-4 mt-2 text-sm text-content-tertiary">
-            <span className={`badge ${
-              project.status === 'active' ? 'badge-success' :
-              project.status === 'completed' ? 'badge-gray' :
-              'badge-info'
-            }`}>
-              {project.status}
-            </span>
+          <div className="flex items-center gap-4 mt-2 text-sm" style={{ color: 'var(--text-tertiary)' }}>
+            {getStatusBadge(project.status)}
             {project.start_date && (
               <span className="flex items-center gap-1">
                 <Calendar className="w-4 h-4" />
@@ -150,41 +162,68 @@ export default function ProjectDetail() {
       {/* Stats */}
       {project.stats && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="card p-4 text-center">
-            <div className="text-2xl font-bold text-content-primary">{project.stats.totalTasks}</div>
-            <div className="text-sm text-content-tertiary">Total Tasks</div>
+          <div className="vc p-4 text-center" style={{ background: 'var(--bg-elevated)' }}>
+            <div
+              className="text-2xl"
+              style={{ fontFamily: 'var(--font-display)', fontWeight: 700, color: 'var(--text-primary)' }}
+            >
+              {project.stats.totalTasks}
+            </div>
+            <div className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Total Tasks</div>
           </div>
-          <div className="card p-4 text-center">
-            <div className="text-2xl font-bold text-semantic-success">{project.stats.completedTasks}</div>
-            <div className="text-sm text-content-tertiary">Completed</div>
+          <div className="vc p-4 text-center" style={{ background: 'var(--bg-elevated)' }}>
+            <div
+              className="text-2xl text-semantic-success"
+              style={{ fontFamily: 'var(--font-display)', fontWeight: 700 }}
+            >
+              {project.stats.completedTasks}
+            </div>
+            <div className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Completed</div>
           </div>
-          <div className="card p-4 text-center">
-            <div className="text-2xl font-bold text-yellow-600">{project.stats.inProgressTasks}</div>
-            <div className="text-sm text-content-tertiary">In Progress</div>
+          <div className="vc p-4 text-center" style={{ background: 'var(--bg-elevated)' }}>
+            <div
+              className="text-2xl"
+              style={{ fontFamily: 'var(--font-display)', fontWeight: 700, color: 'var(--accent-tertiary)' }}
+            >
+              {project.stats.inProgressTasks}
+            </div>
+            <div className="text-sm" style={{ color: 'var(--text-tertiary)' }}>In Progress</div>
           </div>
-          <div className="card p-4 text-center">
-            <div className="text-2xl font-bold text-semantic-info">{project.stats.openTasks}</div>
-            <div className="text-sm text-content-tertiary">Open</div>
+          <div className="vc p-4 text-center" style={{ background: 'var(--bg-elevated)' }}>
+            <div
+              className="text-2xl text-semantic-info"
+              style={{ fontFamily: 'var(--font-display)', fontWeight: 700 }}
+            >
+              {project.stats.openTasks}
+            </div>
+            <div className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Open</div>
           </div>
         </div>
       )}
 
       {/* Tasks */}
-      <div className="card">
-        <div className="p-4 border-b border-line-default flex items-center justify-between">
-          <h2 className="font-semibold text-content-primary">Tasks</h2>
-          <button
+      <div className="vc" style={{ background: 'var(--bg-elevated)' }}>
+        <div
+          className="p-4 border-b flex items-center justify-between"
+          style={{ borderColor: 'rgba(248,240,242,.08)' }}
+        >
+          <h2 className="font-semibold" style={{ color: 'var(--text-primary)' }}>Tasks</h2>
+          <VCButton
+            variant="primary"
+            size="sm"
             onClick={() => setShowAddTask(!showAddTask)}
-            className="btn btn-primary btn-sm"
           >
             <Plus className="w-4 h-4" />
             Add Task
-          </button>
+          </VCButton>
         </div>
 
         {/* Add task form */}
         {showAddTask && (
-          <div className="p-4 bg-surface-muted border-b border-line-default">
+          <div
+            className="p-4 border-b"
+            style={{ background: 'var(--bg-elevated)', borderColor: 'rgba(248,240,242,.08)' }}
+          >
             <form onSubmit={handleAddTask} className="flex gap-3">
               <input
                 type="text"
@@ -203,16 +242,16 @@ export default function ProjectDetail() {
                 <option value="medium">Medium</option>
                 <option value="low">Low</option>
               </select>
-              <button type="submit" disabled={creating} className="btn btn-primary">
+              <VCButton type="submit" variant="primary" disabled={creating}>
                 {creating ? 'Adding...' : 'Add'}
-              </button>
-              <button
+              </VCButton>
+              <VCButton
                 type="button"
+                variant="secondary"
                 onClick={() => setShowAddTask(false)}
-                className="btn btn-secondary"
               >
                 Cancel
-              </button>
+              </VCButton>
             </form>
           </div>
         )}
@@ -220,18 +259,17 @@ export default function ProjectDetail() {
         {/* Task list */}
         {project.tasks?.length === 0 ? (
           <div className="p-8 text-center">
-            <CheckSquare className="w-10 h-10 text-content-muted mx-auto mb-2" />
-            <p className="text-content-tertiary">No tasks yet</p>
-            <p className="text-sm text-content-tertiary">Add a task to get started</p>
+            <CheckSquare className="w-10 h-10 mx-auto mb-2" style={{ color: 'var(--text-tertiary)' }} />
+            <p style={{ color: 'var(--text-tertiary)' }}>No tasks yet</p>
+            <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Add a task to get started</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y" style={{ '--tw-divide-opacity': 1 }}>
             {project.tasks?.map((task) => (
               <div
                 key={task.id}
-                className={`p-4 flex items-center gap-3 ${
-                  task.status === 'done' ? 'bg-surface-muted' : ''
-                }`}
+                className="p-4 flex items-center gap-3"
+                style={task.status === 'done' ? { background: 'var(--bg-elevated)' } : {}}
               >
                 <button
                   onClick={() => handleCompleteTask(task.id)}
@@ -247,12 +285,17 @@ export default function ProjectDetail() {
                 </button>
 
                 <div className="flex-1 min-w-0">
-                  <p className={`font-medium ${
-                    task.status === 'done' ? 'text-content-tertiary line-through' : 'text-content-primary'
-                  }`}>
+                  <p
+                    className={`font-medium ${task.status === 'done' ? 'line-through' : ''}`}
+                    style={{
+                      color: task.status === 'done'
+                        ? 'var(--text-tertiary)'
+                        : 'var(--text-primary)'
+                    }}
+                  >
                     {task.title}
                   </p>
-                  <div className="flex items-center gap-3 mt-1 text-xs text-content-tertiary">
+                  <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--text-tertiary)' }}>
                     {task.due_date && (
                       <span className="flex items-center gap-1">
                         <Clock className="w-3 h-3" />
@@ -268,17 +311,12 @@ export default function ProjectDetail() {
                   </div>
                 </div>
 
-                <span className={`badge ${
-                  task.priority === 'high' ? 'badge-error' :
-                  task.priority === 'medium' ? 'badge-warning' :
-                  'badge-success'
-                }`}>
-                  {task.priority}
-                </span>
+                {getPriorityBadge(task.priority)}
 
                 <button
                   onClick={() => handleDeleteTask(task.id)}
-                  className="p-1.5 text-content-tertiary hover:text-semantic-error hover:bg-semantic-error-dim rounded transition-colors"
+                  className="p-1.5 rounded transition-colors hover:bg-semantic-error-dim hover:text-semantic-error"
+                  style={{ color: 'var(--text-tertiary)' }}
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -290,19 +328,23 @@ export default function ProjectDetail() {
 
       {/* Related Meetings */}
       {project.meetings?.length > 0 && (
-        <div className="card">
-          <div className="p-4 border-b border-line-default">
-            <h2 className="font-semibold text-content-primary">Related Meetings</h2>
+        <div className="vc" style={{ background: 'var(--bg-elevated)' }}>
+          <div
+            className="p-4 border-b"
+            style={{ borderColor: 'rgba(248,240,242,.08)' }}
+          >
+            <h2 className="font-semibold" style={{ color: 'var(--text-primary)' }}>Related Meetings</h2>
           </div>
-          <div className="divide-y divide-gray-100">
+          <div>
             {project.meetings.map((meeting) => (
               <Link
                 key={meeting.id}
                 to={`/meetings/${meeting.id}`}
-                className="block p-4 hover:bg-surface-muted"
+                className="block p-4 transition-colors"
+                style={{ borderBottom: '1px solid rgba(248,240,242,.08)' }}
               >
-                <h4 className="font-medium text-content-primary">{meeting.title}</h4>
-                <p className="text-sm text-content-tertiary mt-0.5">
+                <h4 className="font-medium" style={{ color: 'var(--text-primary)' }}>{meeting.title}</h4>
+                <p className="text-sm mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
                   {new Date(meeting.created_at).toLocaleDateString()}
                 </p>
               </Link>

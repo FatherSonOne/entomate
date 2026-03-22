@@ -8,6 +8,7 @@ import {
 import { integrationsApi, checkHealth } from '../services/api'
 import { useTheme, THEME_MODES } from '../context/ThemeContext'
 import LearningDashboard from '../components/learning/LearningDashboard'
+import { VCButton, VCIconBox } from '../components/vc'
 
 export default function Settings() {
   const location = useLocation()
@@ -99,18 +100,18 @@ export default function Settings() {
 
   const getStatusIcon = (statusValue) => {
     if (statusValue === 'connected') {
-      return <CheckCircle2 className="w-5 h-5 text-semantic-success" />
+      return <CheckCircle2 className="w-5 h-5" style={{ color: 'var(--accent-secondary, #00F5D4)' }} />
     } else if (statusValue === 'not configured') {
       return <AlertCircle className="w-5 h-5 text-yellow-500" />
     } else {
-      return <XCircle className="w-5 h-5 text-semantic-error" />
+      return <XCircle className="w-5 h-5" style={{ color: 'var(--accent-primary, #FF2D6B)' }} />
     }
   }
 
   const getStatusColor = (statusValue) => {
-    if (statusValue === 'connected') return 'text-semantic-success'
-    if (statusValue === 'not configured') return 'text-yellow-600'
-    return 'text-semantic-error'
+    if (statusValue === 'connected') return { color: 'var(--accent-secondary, #00F5D4)' }
+    if (statusValue === 'not configured') return { color: 'var(--accent-tertiary, #FFB800)' }
+    return { color: 'var(--accent-primary, #FF2D6B)' }
   }
 
   // If AI Learning section is active, show LearningDashboard
@@ -119,16 +120,22 @@ export default function Settings() {
       <div className="space-y-6">
         {/* Header with back button */}
         <div className="flex items-center gap-4">
-          <button
+          <VCButton
+            variant="ghost"
+            size="sm"
             onClick={() => setActiveSection('settings')}
-            className="btn btn-ghost btn-sm"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Settings
-          </button>
+          </VCButton>
           <div>
-            <h1 className="text-2xl font-bold text-content-primary">AI Learning System</h1>
-            <p className="text-content-secondary">Review and manage AI learning patterns</p>
+            <h1
+              className="text-2xl font-bold"
+              style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}
+            >
+              AI Learning System
+            </h1>
+            <p style={{ color: 'var(--text-secondary)' }}>Review and manage AI learning patterns</p>
           </div>
         </div>
 
@@ -141,18 +148,31 @@ export default function Settings() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-content-primary">Settings</h1>
-        <p className="text-content-secondary">Configure your Entomate workspace</p>
+        <h1
+          className="text-2xl font-bold"
+          style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}
+        >
+          Settings
+        </h1>
+        <p style={{ color: 'var(--text-secondary)' }}>Configure your Entomate workspace</p>
       </div>
 
       {/* AI Learning Section */}
-      <div className="card">
-        <div className="p-4 border-b border-line-default">
+      <div className="vc">
+        <div
+          className="p-4"
+          style={{ borderBottom: '1px solid rgba(248,240,242,.06)' }}
+        >
           <div className="flex items-center gap-2">
-            <Brain className="w-5 h-5 text-accent-tertiary" />
-            <h2 className="font-semibold text-content-primary">AI Learning</h2>
+            <Brain className="w-5 h-5" style={{ color: 'var(--accent-tertiary, #FFB800)' }} />
+            <h2
+              className="font-semibold"
+              style={{ fontFamily: 'var(--font-display)', fontWeight: 600, color: 'var(--text-primary)', fontSize: 14 }}
+            >
+              AI Learning
+            </h2>
           </div>
-          <p className="text-sm text-content-secondary mt-1">
+          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
             Manage AI agent learning patterns and improve recommendations
           </p>
         </div>
@@ -160,29 +180,37 @@ export default function Settings() {
         <div className="p-5">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
-              <p className="text-sm text-content-secondary mb-4">
+              <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
                 View and approve AI learning patterns to continuously improve agent recommendations for task assignment, priority detection, and deadline suggestions.
               </p>
-              <button
+              <VCButton
+                variant="primary"
                 onClick={() => setActiveSection('ai-learning')}
-                className="btn btn-primary"
               >
                 <Brain className="w-4 h-4" />
                 Manage Learning Patterns
-              </button>
+              </VCButton>
             </div>
           </div>
         </div>
       </div>
 
       {/* Appearance Settings */}
-      <div className="card">
-        <div className="p-4 border-b border-line-default">
+      <div className="vc">
+        <div
+          className="p-4"
+          style={{ borderBottom: '1px solid rgba(248,240,242,.06)' }}
+        >
           <div className="flex items-center gap-2">
-            <Palette className="w-5 h-5 text-accent-primary" />
-            <h2 className="font-semibold text-content-primary">Appearance</h2>
+            <Palette className="w-5 h-5" style={{ color: 'var(--accent-primary, #FF2D6B)' }} />
+            <h2
+              className="font-semibold"
+              style={{ fontFamily: 'var(--font-display)', fontWeight: 600, color: 'var(--text-primary)', fontSize: 14 }}
+            >
+              Appearance
+            </h2>
           </div>
-          <p className="text-sm text-content-secondary mt-1">
+          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
             Customize the look and feel of your workspace
           </p>
         </div>
@@ -200,8 +228,14 @@ export default function Settings() {
                     : 'border-line-default hover:border-line-strong'
                 }`}
               >
-                <Sun className={`w-6 h-6 ${mode === THEME_MODES.light ? 'text-accent-primary' : 'text-content-secondary'}`} />
-                <span className={`text-sm font-medium ${mode === THEME_MODES.light ? 'text-accent-primary' : 'text-content-secondary'}`}>
+                <Sun
+                  className="w-6 h-6"
+                  style={{ color: mode === THEME_MODES.light ? 'var(--accent-primary, #FF2D6B)' : 'var(--text-secondary)' }}
+                />
+                <span
+                  className="text-sm font-medium"
+                  style={{ color: mode === THEME_MODES.light ? 'var(--accent-primary, #FF2D6B)' : 'var(--text-secondary)' }}
+                >
                   Light
                 </span>
               </button>
@@ -214,8 +248,14 @@ export default function Settings() {
                     : 'border-line-default hover:border-line-strong'
                 }`}
               >
-                <Moon className={`w-6 h-6 ${mode === THEME_MODES.dark ? 'text-accent-primary' : 'text-content-secondary'}`} />
-                <span className={`text-sm font-medium ${mode === THEME_MODES.dark ? 'text-accent-primary' : 'text-content-secondary'}`}>
+                <Moon
+                  className="w-6 h-6"
+                  style={{ color: mode === THEME_MODES.dark ? 'var(--accent-primary, #FF2D6B)' : 'var(--text-secondary)' }}
+                />
+                <span
+                  className="text-sm font-medium"
+                  style={{ color: mode === THEME_MODES.dark ? 'var(--accent-primary, #FF2D6B)' : 'var(--text-secondary)' }}
+                >
                   Dark
                 </span>
               </button>
@@ -225,76 +265,113 @@ export default function Settings() {
       </div>
 
       {/* System Status */}
-      <div className="card">
-        <div className="p-4 border-b border-line-default flex items-center justify-between">
-          <h2 className="font-semibold text-content-primary">System Status</h2>
-          <button
+      <div className="vc">
+        <div
+          className="p-4 flex items-center justify-between"
+          style={{ borderBottom: '1px solid rgba(248,240,242,.06)' }}
+        >
+          <h2
+            className="font-semibold"
+            style={{ fontFamily: 'var(--font-display)', fontWeight: 600, color: 'var(--text-primary)', fontSize: 14 }}
+          >
+            System Status
+          </h2>
+          <VCButton
+            variant="secondary"
+            size="sm"
             onClick={handleTestConnection}
             disabled={testing}
-            className="btn btn-secondary btn-sm"
           >
             <RefreshCw className={`w-4 h-4 ${testing ? 'animate-spin' : ''}`} />
             {testing ? 'Testing...' : 'Test Connections'}
-          </button>
+          </VCButton>
         </div>
 
         {loading ? (
           <div className="p-8 text-center">
             <div className="spinner mx-auto mb-4" />
-            <p className="text-content-secondary">Loading status...</p>
+            <p style={{ color: 'var(--text-secondary)' }}>Loading status...</p>
           </div>
         ) : (
-          <div className="divide-y divide-line-subtle">
+          <div>
             {/* AI Provider */}
-            <div className="p-4 flex items-center justify-between">
+            <div
+              className="p-4 flex items-center justify-between"
+              style={{ borderBottom: '1px solid rgba(248,240,242,.06)' }}
+            >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-accent-tertiary-dim dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
-                  <Cpu className="w-5 h-5 text-accent-tertiary dark:text-purple-400" />
-                </div>
+                <VCIconBox color="amber">
+                  <Cpu className="w-5 h-5" />
+                </VCIconBox>
                 <div>
-                  <h3 className="font-medium text-content-primary">
+                  <h3
+                    className="font-medium"
+                    style={{ fontFamily: 'var(--font-display)', fontWeight: 600, color: 'var(--text-primary)', fontSize: 14 }}
+                  >
                     {status?.integrations?.gemini?.provider === 'openai' ? 'OpenAI' : 'Gemini AI'}
                   </h3>
-                  <p className="text-sm text-content-secondary">Transcription and analysis</p>
+                  <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Transcription and analysis</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 {getStatusIcon(status?.integrations?.gemini?.status || status?.health?.services?.gemini)}
-                <span className={`text-sm font-medium ${getStatusColor(status?.integrations?.gemini?.status || status?.health?.services?.gemini)}`}>
+                <span
+                  className="text-sm font-medium"
+                  style={getStatusColor(status?.integrations?.gemini?.status || status?.health?.services?.gemini)}
+                >
                   {status?.integrations?.gemini?.status || status?.health?.services?.gemini || 'Unknown'}
                 </span>
               </div>
             </div>
 
             {/* Database */}
-            <div className="p-4 flex items-center justify-between">
+            <div
+              className="p-4 flex items-center justify-between"
+              style={{ borderBottom: '1px solid rgba(248,240,242,.06)' }}
+            >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-semantic-info-dim dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
-                  <Database className="w-5 h-5 text-semantic-info dark:text-blue-400" />
-                </div>
+                <VCIconBox color="mint">
+                  <Database className="w-5 h-5" />
+                </VCIconBox>
                 <div>
-                  <h3 className="font-medium text-content-primary">Supabase Database</h3>
-                  <p className="text-sm text-content-secondary">Data storage</p>
+                  <h3
+                    className="font-medium"
+                    style={{ fontFamily: 'var(--font-display)', fontWeight: 600, color: 'var(--text-primary)', fontSize: 14 }}
+                  >
+                    Supabase Database
+                  </h3>
+                  <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Data storage</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 {getStatusIcon(status?.integrations?.supabase?.status || status?.health?.services?.database)}
-                <span className={`text-sm font-medium ${getStatusColor(status?.integrations?.supabase?.status || status?.health?.services?.database)}`}>
+                <span
+                  className="text-sm font-medium"
+                  style={getStatusColor(status?.integrations?.supabase?.status || status?.health?.services?.database)}
+                >
                   {status?.integrations?.supabase?.status || status?.health?.services?.database || 'Unknown'}
                 </span>
               </div>
             </div>
 
             {/* CRM - Logos Vision */}
-            <div className="p-4">
+            <div
+              className="p-4"
+              style={{ borderBottom: '1px solid rgba(248,240,242,.06)' }}
+            >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-semantic-success-dim dark:bg-green-900/30 rounded-lg flex items-center justify-center">
-                    <SettingsIcon className="w-5 h-5 text-semantic-success dark:text-green-400" />
-                  </div>
+                  <VCIconBox color="crimson">
+                    <SettingsIcon className="w-5 h-5" />
+                  </VCIconBox>
                   <div>
-                    <h3 className="font-medium text-content-primary">CRM Integration</h3>
-                    <p className="text-sm text-content-secondary">
+                    <h3
+                      className="font-medium"
+                      style={{ fontFamily: 'var(--font-display)', fontWeight: 600, color: 'var(--text-primary)', fontSize: 14 }}
+                    >
+                      CRM Integration
+                    </h3>
+                    <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                       Logos Vision - Task synchronization
                     </p>
                   </div>
@@ -302,25 +379,33 @@ export default function Settings() {
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-2">
                     {getStatusIcon(status?.integrations?.crm?.status)}
-                    <span className={`text-sm font-medium ${getStatusColor(status?.integrations?.crm?.status)}`}>
+                    <span
+                      className="text-sm font-medium"
+                      style={getStatusColor(status?.integrations?.crm?.status)}
+                    >
                       {status?.integrations?.crm?.status || 'Not configured'}
                     </span>
                   </div>
                   {status?.integrations?.crm?.configured && (
-                    <button
+                    <VCButton
+                      variant="secondary"
+                      size="sm"
                       onClick={handleTestCRM}
                       disabled={testingCRM}
-                      className="btn btn-secondary btn-sm"
                     >
                       {testingCRM ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Test'}
-                    </button>
+                    </VCButton>
                   )}
                 </div>
               </div>
               {crmTestResult && (
-                <div className={`mt-2 ml-13 p-2 rounded text-sm ${
-                  crmTestResult.connected ? 'bg-semantic-success-dim text-semantic-success' : 'bg-semantic-error-dim text-semantic-error'
-                }`}>
+                <div
+                  className="mt-2 ml-13 p-2 rounded text-sm"
+                  style={{
+                    background: crmTestResult.connected ? 'rgba(0,245,212,.08)' : 'rgba(255,45,107,.08)',
+                    color: crmTestResult.connected ? 'var(--accent-secondary, #00F5D4)' : 'var(--accent-primary, #FF2D6B)',
+                  }}
+                >
                   {crmTestResult.connected
                     ? `Connected to ${crmTestResult.provider || 'CRM'}`
                     : crmTestResult.message || 'Connection failed'}
@@ -332,12 +417,17 @@ export default function Settings() {
             <div className="p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-semantic-warning-dim dark:bg-orange-900/30 rounded-lg flex items-center justify-center">
-                    <MessageSquare className="w-5 h-5 text-semantic-warning dark:text-orange-400" />
-                  </div>
+                  <VCIconBox color="phosphor">
+                    <MessageSquare className="w-5 h-5" />
+                  </VCIconBox>
                   <div>
-                    <h3 className="font-medium text-content-primary">Chat Integration</h3>
-                    <p className="text-sm text-content-secondary">
+                    <h3
+                      className="font-medium"
+                      style={{ fontFamily: 'var(--font-display)', fontWeight: 600, color: 'var(--text-primary)', fontSize: 14 }}
+                    >
+                      Chat Integration
+                    </h3>
+                    <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                       Pulse - Team notifications
                     </p>
                   </div>
@@ -345,25 +435,33 @@ export default function Settings() {
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-2">
                     {getStatusIcon(status?.integrations?.chat?.status)}
-                    <span className={`text-sm font-medium ${getStatusColor(status?.integrations?.chat?.status)}`}>
+                    <span
+                      className="text-sm font-medium"
+                      style={getStatusColor(status?.integrations?.chat?.status)}
+                    >
                       {status?.integrations?.chat?.status || 'Not configured'}
                     </span>
                   </div>
                   {status?.integrations?.chat?.configured && (
-                    <button
+                    <VCButton
+                      variant="secondary"
+                      size="sm"
                       onClick={handleTestChat}
                       disabled={testingChat}
-                      className="btn btn-secondary btn-sm"
                     >
                       {testingChat ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Test'}
-                    </button>
+                    </VCButton>
                   )}
                 </div>
               </div>
               {chatTestResult && (
-                <div className={`mt-2 ml-13 p-2 rounded text-sm ${
-                  chatTestResult.connected ? 'bg-semantic-success-dim text-semantic-success' : 'bg-semantic-error-dim text-semantic-error'
-                }`}>
+                <div
+                  className="mt-2 ml-13 p-2 rounded text-sm"
+                  style={{
+                    background: chatTestResult.connected ? 'rgba(0,245,212,.08)' : 'rgba(255,45,107,.08)',
+                    color: chatTestResult.connected ? 'var(--accent-secondary, #00F5D4)' : 'var(--accent-primary, #FF2D6B)',
+                  }}
+                >
                   {chatTestResult.connected
                     ? `Connected to ${chatTestResult.team || chatTestResult.provider || 'Chat'}${chatTestResult.user ? ` as ${chatTestResult.user}` : ''}`
                     : chatTestResult.message || 'Connection failed'}
@@ -375,72 +473,127 @@ export default function Settings() {
       </div>
 
       {/* Configuration Guide */}
-      <div className="card p-5">
-        <h2 className="font-semibold text-content-primary mb-4">Configuration Guide</h2>
+      <div className="vc p-5">
+        <h2
+          className="font-semibold mb-4"
+          style={{ fontFamily: 'var(--font-display)', fontWeight: 600, color: 'var(--text-primary)', fontSize: 14 }}
+        >
+          Configuration Guide
+        </h2>
 
         <div className="space-y-4">
-          <div className="p-4 bg-surface-subtle rounded-lg">
-            <h3 className="font-medium text-content-primary mb-2">1. AI Provider (OpenAI or Gemini)</h3>
-            <p className="text-sm text-content-secondary mb-2">
+          <div className="p-4 rounded-lg" style={{ background: 'var(--bg-elevated, #101010)' }}>
+            <h3
+              className="font-medium mb-2"
+              style={{ fontFamily: 'var(--font-display)', fontWeight: 600, color: 'var(--text-primary)', fontSize: 14 }}
+            >
+              1. AI Provider (OpenAI or Gemini)
+            </h3>
+            <p className="text-sm mb-2" style={{ color: 'var(--text-secondary)' }}>
               Required for transcription and AI analysis. OpenAI recommended for better rate limits.
             </p>
             <div className="space-y-2">
-              <div className="bg-surface p-3 rounded border border-line-default">
-                <p className="text-sm font-medium text-semantic-success dark:text-green-400 mb-1">OpenAI (Recommended)</p>
-                <code className="text-xs bg-surface-muted px-2 py-1 rounded block mb-1 text-content-primary">
+              <div
+                className="p-3 rounded"
+                style={{ background: 'var(--bg-elevated, #101010)', border: '1px solid rgba(248,240,242,.08)' }}
+              >
+                <p className="text-sm font-medium mb-1" style={{ color: 'var(--accent-secondary, #00F5D4)' }}>OpenAI (Recommended)</p>
+                <code
+                  className="text-xs px-2 py-1 rounded block mb-1"
+                  style={{ background: 'rgba(248,240,242,.04)', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}
+                >
                   OPENAI_API_KEY=sk-your-key-here
                 </code>
-                <p className="text-xs text-content-secondary">
-                  Get your key from <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer" className="text-highlight hover:underline">OpenAI Platform</a>
+                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  Get your key from <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer" style={{ color: 'var(--accent-primary, #FF2D6B)' }} className="hover:underline">OpenAI Platform</a>
                 </p>
               </div>
-              <div className="bg-surface p-3 rounded border border-line-default">
-                <p className="text-sm font-medium text-content-secondary mb-1">Gemini (Alternative)</p>
-                <code className="text-xs bg-surface-muted px-2 py-1 rounded block mb-1 text-content-primary">
+              <div
+                className="p-3 rounded"
+                style={{ background: 'var(--bg-elevated, #101010)', border: '1px solid rgba(248,240,242,.08)' }}
+              >
+                <p className="text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Gemini (Alternative)</p>
+                <code
+                  className="text-xs px-2 py-1 rounded block mb-1"
+                  style={{ background: 'rgba(248,240,242,.04)', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}
+                >
                   GEMINI_API_KEY=your_api_key_here
                 </code>
-                <p className="text-xs text-content-secondary">
-                  Get your key from <a href="https://aistudio.google.com" target="_blank" rel="noreferrer" className="text-highlight hover:underline">Google AI Studio</a>
+                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  Get your key from <a href="https://aistudio.google.com" target="_blank" rel="noreferrer" style={{ color: 'var(--accent-primary, #FF2D6B)' }} className="hover:underline">Google AI Studio</a>
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="p-4 bg-surface-subtle rounded-lg">
-            <h3 className="font-medium text-content-primary mb-2">2. Supabase Setup</h3>
-            <p className="text-sm text-content-secondary mb-2">
+          <div className="p-4 rounded-lg" style={{ background: 'var(--bg-elevated, #101010)' }}>
+            <h3
+              className="font-medium mb-2"
+              style={{ fontFamily: 'var(--font-display)', fontWeight: 600, color: 'var(--text-primary)', fontSize: 14 }}
+            >
+              2. Supabase Setup
+            </h3>
+            <p className="text-sm mb-2" style={{ color: 'var(--text-secondary)' }}>
               Required for data storage. Create a project at Supabase.
             </p>
-            <code className="text-xs bg-surface-muted px-2 py-1 rounded block mb-1 text-content-primary">
+            <code
+              className="text-xs px-2 py-1 rounded block mb-1"
+              style={{ background: 'rgba(248,240,242,.04)', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}
+            >
               SUPABASE_URL=your_project_url
             </code>
-            <code className="text-xs bg-surface-muted px-2 py-1 rounded block text-content-primary">
+            <code
+              className="text-xs px-2 py-1 rounded block"
+              style={{ background: 'rgba(248,240,242,.04)', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}
+            >
               SUPABASE_ANON_KEY=your_anon_key
             </code>
           </div>
 
-          <div className="p-4 bg-surface-subtle rounded-lg">
-            <h3 className="font-medium text-content-primary mb-2">3. Logos Vision CRM (Optional)</h3>
-            <p className="text-sm text-content-secondary mb-2">
+          <div className="p-4 rounded-lg" style={{ background: 'var(--bg-elevated, #101010)' }}>
+            <h3
+              className="font-medium mb-2"
+              style={{ fontFamily: 'var(--font-display)', fontWeight: 600, color: 'var(--text-primary)', fontSize: 14 }}
+            >
+              3. Logos Vision CRM (Optional)
+            </h3>
+            <p className="text-sm mb-2" style={{ color: 'var(--text-secondary)' }}>
               Connect to Logos Vision to sync action items as tasks and manage customer relationships.
             </p>
-            <code className="text-xs bg-surface-muted px-2 py-1 rounded block mb-1 text-content-primary">
+            <code
+              className="text-xs px-2 py-1 rounded block mb-1"
+              style={{ background: 'rgba(248,240,242,.04)', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}
+            >
               LOGOS_VISION_URL=http://localhost:3001
             </code>
-            <code className="text-xs bg-surface-muted px-2 py-1 rounded block text-content-primary">
+            <code
+              className="text-xs px-2 py-1 rounded block"
+              style={{ background: 'rgba(248,240,242,.04)', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}
+            >
               LOGOS_VISION_API_KEY=your_api_key
             </code>
           </div>
 
-          <div className="p-4 bg-surface-subtle rounded-lg">
-            <h3 className="font-medium text-content-primary mb-2">4. Pulse Integration (Optional)</h3>
-            <p className="text-sm text-content-secondary mb-2">
+          <div className="p-4 rounded-lg" style={{ background: 'var(--bg-elevated, #101010)' }}>
+            <h3
+              className="font-medium mb-2"
+              style={{ fontFamily: 'var(--font-display)', fontWeight: 600, color: 'var(--text-primary)', fontSize: 14 }}
+            >
+              4. Pulse Integration (Optional)
+            </h3>
+            <p className="text-sm mb-2" style={{ color: 'var(--text-secondary)' }}>
               Connect to Pulse for team notifications and meeting recap sharing.
             </p>
-            <code className="text-xs bg-surface-muted px-2 py-1 rounded block mb-1 text-content-primary">
+            <code
+              className="text-xs px-2 py-1 rounded block mb-1"
+              style={{ background: 'rgba(248,240,242,.04)', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}
+            >
               PULSE_URL=http://localhost:3002
             </code>
-            <code className="text-xs bg-surface-muted px-2 py-1 rounded block text-content-primary">
+            <code
+              className="text-xs px-2 py-1 rounded block"
+              style={{ background: 'rgba(248,240,242,.04)', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}
+            >
               PULSE_API_KEY=your_api_key
             </code>
           </div>
@@ -448,11 +601,16 @@ export default function Settings() {
       </div>
 
       {/* About */}
-      <div className="card p-5">
-        <h2 className="font-semibold text-content-primary mb-4">About Entomate</h2>
-        <div className="text-sm text-content-secondary space-y-2">
-          <p><strong className="text-content-primary">Version:</strong> 1.0.0</p>
-          <p><strong className="text-content-primary">Stack:</strong> React + Node.js + Supabase + Gemini AI</p>
+      <div className="vc p-5">
+        <h2
+          className="font-semibold mb-4"
+          style={{ fontFamily: 'var(--font-display)', fontWeight: 600, color: 'var(--text-primary)', fontSize: 14 }}
+        >
+          About Entomate
+        </h2>
+        <div className="text-sm space-y-2" style={{ color: 'var(--text-secondary)' }}>
+          <p><strong style={{ color: 'var(--text-primary)' }}>Version:</strong> 1.0.0</p>
+          <p><strong style={{ color: 'var(--text-primary)' }}>Stack:</strong> React + Node.js + Supabase + Gemini AI</p>
           <p>
             Entomate is an AI-powered meeting intelligence platform that helps teams
             capture, organize, and act on meeting insights automatically.

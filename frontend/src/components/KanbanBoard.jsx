@@ -5,11 +5,34 @@ import {
   Circle, ArrowRight, Plus, MoreHorizontal
 } from 'lucide-react'
 import { dashboardApi, tasksApi } from '../services/api'
+import { VCBadge } from './vc'
+
+// VC Design System color mapping per column status
+const COLUMN_VC_COLOR = {
+  open:        'var(--text-tertiary)',
+  in_progress: 'var(--accent-tertiary, #FFB800)',
+  review:      'var(--accent-secondary, #00F5D4)',
+  done:        'var(--accent-primary, #FF2D6B)',
+}
+
+const COLUMN_COUNT_BADGE_COLOR = {
+  open:        'rgba(248,240,242,.08)',
+  in_progress: 'rgba(255,184,0,.12)',
+  review:      'rgba(0,245,212,.12)',
+  done:        'rgba(255,45,107,.12)',
+}
+
+const COLUMN_COUNT_TEXT_COLOR = {
+  open:        'var(--text-tertiary)',
+  in_progress: 'var(--accent-tertiary, #FFB800)',
+  review:      'var(--accent-secondary, #00F5D4)',
+  done:        'var(--accent-primary, #FF2D6B)',
+}
 
 const COLUMNS = [
-  { id: 'open', title: 'To Do', color: 'gray', icon: Circle },
-  { id: 'in_progress', title: 'In Progress', color: 'blue', icon: ArrowRight },
-  { id: 'done', title: 'Done', color: 'green', icon: CheckCircle2 }
+  { id: 'open', title: 'To Do', icon: Circle },
+  { id: 'in_progress', title: 'In Progress', icon: ArrowRight },
+  { id: 'done', title: 'Done', icon: CheckCircle2 }
 ]
 
 export default function KanbanBoard({ projectId, onTaskUpdate }) {
@@ -91,12 +114,12 @@ export default function KanbanBoard({ projectId, onTaskUpdate }) {
     return tasks.filter(t => t.status === status)
   }
 
-  const getPriorityColor = (priority) => {
+  const getPriorityVCColor = (priority) => {
     switch (priority) {
-      case 'high': return 'text-semantic-error bg-semantic-error-dim'
-      case 'medium': return 'text-semantic-warning bg-semantic-warning-dim'
-      case 'low': return 'text-semantic-success bg-semantic-success-dim'
-      default: return 'text-content-secondary bg-surface-muted'
+      case 'high':   return 'crimson'
+      case 'medium': return 'amber'
+      case 'low':    return 'neutral'
+      default:       return 'neutral'
     }
   }
 
@@ -107,9 +130,13 @@ export default function KanbanBoard({ projectId, onTaskUpdate }) {
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div style={{ display: 'flex', gap: 16, overflowX: 'auto', padding: 4 }}>
         {COLUMNS.map(col => (
-          <div key={col.id} className="bg-surface-muted rounded-lg p-4">
+          <div
+            key={col.id}
+            className="bg-surface-muted rounded-lg p-4"
+            style={{ flex: '0 0 300px', minWidth: 260 }}
+          >
             <div className="animate-pulse">
               <div className="h-6 bg-surface-muted rounded w-24 mb-4"></div>
               <div className="space-y-3">
@@ -124,18 +151,26 @@ export default function KanbanBoard({ projectId, onTaskUpdate }) {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div style={{ display: 'flex', gap: 16, overflowX: 'auto', padding: 4 }}>
       {COLUMNS.map(column => {
         const Icon = column.icon
         const columnTasks = getTasksByStatus(column.id)
         const isOver = dragOverColumn === column.id
+        const headerColor = COLUMN_VC_COLOR[column.id] || 'var(--text-tertiary)'
+        const countBg     = COLUMN_COUNT_BADGE_COLOR[column.id] || 'rgba(248,240,242,.08)'
+        const countColor  = COLUMN_COUNT_TEXT_COLOR[column.id]  || 'var(--text-tertiary)'
 
         return (
           <div
             key={column.id}
             className={`bg-surface-muted rounded-lg transition-colors ${
-              isOver ? 'bg-semantic-info-dim ring-2 ring-blue-300' : ''
+              isOver ? 'bg-semantic-info-dim ring-2' : ''
             }`}
+            style={{
+              flex: '0 0 300px',
+              minWidth: 260,
+              outline: isOver ? `2px solid ${headerColor}` : 'none',
+            }}
             onDragOver={(e) => handleDragOver(e, column.id)}
             onDragLeave={handleDragLeave}
             onDrop={(e) => handleDrop(e, column.id)}
@@ -144,9 +179,32 @@ export default function KanbanBoard({ projectId, onTaskUpdate }) {
             <div className="p-4 border-b border-line-default">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Icon className={`w-4 h-4 text-${column.color}-500`} />
-                  <h3 className="font-semibold text-content-primary">{column.title}</h3>
-                  <span className={`px-2 py-0.5 text-xs font-medium rounded-full bg-${column.color}-100 text-${column.color}-700`}>
+                  <Icon
+                    className="w-4 h-4"
+                    style={{ color: headerColor }}
+                  />
+                  <h3
+                    className="font-semibold"
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      letterSpacing: '.08em',
+                      color: headerColor,
+                    }}
+                  >
+                    {column.title}
+                  </h3>
+                  <span
+                    style={{
+                      background: countBg,
+                      color: countColor,
+                      padding: '1px 6px',
+                      borderRadius: 10,
+                      fontSize: 10,
+                      fontWeight: 600,
+                    }}
+                  >
                     {columnTasks.length}
                   </span>
                 </div>
@@ -156,7 +214,10 @@ export default function KanbanBoard({ projectId, onTaskUpdate }) {
             {/* Tasks */}
             <div className="p-2 min-h-[300px] space-y-2">
               {columnTasks.length === 0 ? (
-                <div className="text-center py-8 text-content-tertiary text-sm">
+                <div
+                  className="text-center py-8 text-sm"
+                  style={{ color: 'var(--text-tertiary)' }}
+                >
                   {isOver ? 'Drop here' : 'No tasks'}
                 </div>
               ) : (
@@ -166,40 +227,65 @@ export default function KanbanBoard({ projectId, onTaskUpdate }) {
                     draggable
                     onDragStart={(e) => handleDragStart(e, task)}
                     onDragEnd={handleDragEnd}
-                    className={`bg-surface rounded-lg border border-line-default p-3 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow ${
-                      draggedTask?.id === task.id ? 'ring-2 ring-primary-500' : ''
+                    className={`vc bg-surface rounded-lg border border-line-default p-3 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow ${
+                      draggedTask?.id === task.id ? 'ring-2' : ''
                     }`}
+                    style={
+                      draggedTask?.id === task.id
+                        ? { outline: `2px solid var(--accent-primary, #FF2D6B)` }
+                        : undefined
+                    }
                   >
                     <div className="flex items-start gap-2">
-                      <GripVertical className="w-4 h-4 text-content-muted mt-0.5 flex-shrink-0" />
+                      <GripVertical
+                        className="w-4 h-4 mt-0.5 flex-shrink-0"
+                        style={{ color: 'var(--text-muted)' }}
+                      />
                       <div className="flex-1 min-w-0">
                         <Link
                           to={`/tasks/${task.id}`}
-                          className="font-medium text-content-primary hover:text-accent-primary line-clamp-2"
+                          className="line-clamp-2"
+                          style={{
+                            fontFamily: 'var(--font-display)',
+                            fontSize: 13,
+                            fontWeight: 600,
+                            color: 'var(--text-primary)',
+                            textDecoration: 'none',
+                          }}
                           onClick={(e) => e.stopPropagation()}
                         >
                           {task.title}
                         </Link>
 
                         {task.description && (
-                          <p className="text-sm text-content-tertiary line-clamp-2 mt-1">
+                          <p
+                            className="line-clamp-2 mt-1"
+                            style={{ fontSize: 12, color: 'var(--text-tertiary)' }}
+                          >
                             {task.description}
                           </p>
                         )}
 
                         <div className="flex items-center gap-2 mt-2 flex-wrap">
-                          {/* Priority badge */}
-                          <span className={`px-2 py-0.5 text-xs font-medium rounded ${getPriorityColor(task.priority)}`}>
-                            {task.priority}
-                          </span>
+                          {/* Priority badge — VCBadge with VC color mapping */}
+                          {task.priority && (
+                            <VCBadge color={getPriorityVCColor(task.priority)}>
+                              {task.priority}
+                            </VCBadge>
+                          )}
 
                           {/* Due date */}
                           {task.due_date && (
-                            <span className={`flex items-center gap-1 text-xs ${
-                              isOverdue(task.due_date) && task.status !== 'done'
-                                ? 'text-semantic-error font-medium'
-                                : 'text-content-tertiary'
-                            }`}>
+                            <span
+                              className="flex items-center gap-1"
+                              style={{
+                                fontSize: 11,
+                                fontWeight: isOverdue(task.due_date) && task.status !== 'done' ? 600 : 400,
+                                color: isOverdue(task.due_date) && task.status !== 'done'
+                                  ? 'var(--accent-primary, #FF2D6B)'
+                                  : 'var(--text-tertiary)',
+                              }}
+                            >
                               {isOverdue(task.due_date) && task.status !== 'done' && (
                                 <AlertTriangle className="w-3 h-3" />
                               )}
@@ -210,7 +296,10 @@ export default function KanbanBoard({ projectId, onTaskUpdate }) {
 
                           {/* Assignee */}
                           {task.assigned_to && (
-                            <span className="flex items-center gap-1 text-xs text-content-tertiary">
+                            <span
+                              className="flex items-center gap-1"
+                              style={{ fontSize: 11, color: 'var(--text-tertiary)' }}
+                            >
                               <User className="w-3 h-3" />
                               {task.assigned_to}
                             </span>
@@ -221,7 +310,12 @@ export default function KanbanBoard({ projectId, onTaskUpdate }) {
                         {task.meeting_id && (
                           <Link
                             to={`/meetings/${task.meeting_id}`}
-                            className="text-xs text-primary-500 hover:text-accent-primary mt-2 inline-block"
+                            className="mt-2 inline-block"
+                            style={{
+                              fontSize: 11,
+                              color: 'var(--accent-secondary, #00F5D4)',
+                              textDecoration: 'none',
+                            }}
                             onClick={(e) => e.stopPropagation()}
                           >
                             From meeting

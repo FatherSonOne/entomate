@@ -31,6 +31,8 @@ import CommandPalette from './CommandPalette'
 import KeyboardShortcutsHelp from './KeyboardShortcutsHelp'
 import { useTheme } from '../context/ThemeContext'
 import '../styles/navigation.css'
+import VCCanvas from './vc/VCCanvas'
+import Logo from './Logo'
 
 // Grouped navigation structure — 4 sections
 const navGroups = [
@@ -121,7 +123,10 @@ export default function Layout() {
   })
 
   return (
-    <div className="min-h-screen transition-colors duration-300">
+    <div className="min-h-screen transition-colors duration-300 hover-glow trans-slow" data-style="neo-cinema">
+      {/* Neural canvas background */}
+      <VCCanvas mode="neural" speed={50} density={95} opacity={0.9} />
+
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
         <div
@@ -132,22 +137,17 @@ export default function Layout() {
 
       {/* Sidebar */}
       <aside
-        className={`sidebar fixed top-0 left-0 z-50 h-full w-64 transform transition-transform duration-200 lg:translate-x-0 ${
+        className={`nl-sidebar z-50 transform transition-transform duration-200 lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
+        data-style="neo-cinema"
+        style={{ isolation: 'isolate' }}
       >
         <div className="flex flex-col h-full">
 
           {/* Logo */}
-          <div className="sidebar-logo flex items-center justify-between h-16 px-4">
-            <div className="flex items-center gap-2.5">
-              <div className="sidebar-logo-mark w-8 h-8 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-base font-mono leading-none">E</span>
-              </div>
-              <span className="text-xl font-display font-bold tracking-tight text-content-primary">
-                entomate
-              </span>
-            </div>
+          <div className="flex items-center justify-between" style={{ padding: '16px 14px 12px' }}>
+            <Logo size="sm" withText={true} />
             <button
               className="lg:hidden p-1 text-content-secondary hover:text-content-primary transition-colors"
               onClick={() => setSidebarOpen(false)}
@@ -157,10 +157,10 @@ export default function Layout() {
           </div>
 
           {/* Grouped Navigation */}
-          <nav className="nav-container flex-1 overflow-y-auto nav-scrollbar">
-            {navGroups.map((group, gi) => (
-              <div key={group.label} className={gi > 0 ? 'nav-group' : 'nav-group nav-group-first'}>
-                <div className="nav-section-label">{group.label}</div>
+          <nav className="nl-scroll">
+            {navGroups.map((group) => (
+              <div key={group.label}>
+                <div className="nl-section">{group.label}</div>
                 {group.items.map((item) => {
                   const Icon = item.icon
                   const active = isActive(item.href)
@@ -169,14 +169,13 @@ export default function Layout() {
                       key={item.name}
                       to={item.href}
                       data-icon={item.iconKey}
-                      className={`nav-item ${active ? 'nav-item-active' : ''}`}
+                      className={`nl-item ${active ? 'active' : ''}`}
                       onClick={() => setSidebarOpen(false)}
                     >
-                      <span className="nav-icon-wrap">
-                        <Icon className="w-5 h-5" />
+                      <span className="nl-icon-box">
+                        <Icon className="w-4 h-4" />
                       </span>
                       <span>{item.name}</span>
-                      {active && <ChevronRight className="nav-item-chevron w-4 h-4 ml-auto" />}
                     </NavLink>
                   )
                 })}
@@ -185,18 +184,17 @@ export default function Layout() {
           </nav>
 
           {/* Footer: Settings + User */}
-          <div className="nav-footer">
+          <div className="nl-footer">
             <NavLink
               to="/settings"
               data-icon="settings"
-              className={`nav-item ${isActive('/settings') ? 'nav-item-active' : ''}`}
+              className={`nl-item ${isActive('/settings') ? 'active' : ''}`}
               onClick={() => setSidebarOpen(false)}
             >
-              <span className="nav-icon-wrap">
-                <Settings className="w-5 h-5" />
+              <span className="nl-icon-box">
+                <Settings className="w-4 h-4" />
               </span>
               <span>Settings</span>
-              {isActive('/settings') && <ChevronRight className="nav-item-chevron w-4 h-4 ml-auto" />}
             </NavLink>
 
             <div className="nav-user-area">
@@ -229,7 +227,17 @@ export default function Layout() {
       {/* Main content */}
       <div className="lg:pl-64">
         {/* Top bar */}
-        <header className="header sticky top-0 z-30 flex items-center h-16 px-4 lg:px-6">
+        <header
+          className="vc-topbar"
+          style={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 30,
+            background: 'var(--bg-elevated, #101010)',
+            borderBottom: '1px solid rgba(248,240,242,.06)',
+            height: 52,
+          }}
+        >
           <button
             className="p-2 -ml-2 text-content-secondary hover:text-content-primary lg:hidden"
             onClick={() => setSidebarOpen(true)}
@@ -253,7 +261,7 @@ export default function Layout() {
             {/* Command palette trigger */}
             <button
               onClick={() => setCommandPaletteOpen(true)}
-              className="hidden sm:flex items-center gap-2 px-3 py-1.5 text-sm text-content-secondary bg-surface-muted hover:bg-muted rounded-lg transition-colors border border-border-subtle"
+              className="vc-topbar-search hidden sm:flex"
             >
               <Search className="w-4 h-4" />
               <span className="hidden md:inline">Search...</span>
@@ -290,7 +298,7 @@ export default function Layout() {
         </header>
 
         {/* Page content */}
-        <main className="p-4 lg:p-6">
+        <main className="p-4 lg:p-6" style={{ position: 'relative', zIndex: 1 }}>
           <Outlet />
         </main>
       </div>

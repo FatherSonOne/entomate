@@ -12,6 +12,7 @@ import {
 } from 'recharts'
 import { dashboardApi, projectsApi } from '../services/api'
 import KanbanBoard from '../components/KanbanBoard'
+import { VCButton, VCBadge } from '../components/vc'
 
 const COLORS = ['#10B981', '#F59E0B', '#EF4444', '#6366F1', '#8B5CF6']
 const STATUS_COLORS = {
@@ -152,13 +153,13 @@ export default function ProjectDashboard() {
     return (
       <div className="space-y-6">
         <div className="animate-pulse">
-          <div className="h-8 bg-surface-muted rounded w-48 mb-4"></div>
+          <div className="h-8 rounded w-48 mb-4" style={{ background: 'var(--bg-elevated)' }}></div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             {[1, 2, 3, 4].map(i => (
-              <div key={i} className="h-24 bg-surface-muted rounded"></div>
+              <div key={i} className="h-24 rounded" style={{ background: 'var(--bg-elevated)' }}></div>
             ))}
           </div>
-          <div className="h-64 bg-surface-muted rounded"></div>
+          <div className="h-64 rounded" style={{ background: 'var(--bg-elevated)' }}></div>
         </div>
       </div>
     )
@@ -178,31 +179,38 @@ export default function ProjectDashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">
           {id && (
-            <Link to="/projects" className="p-2 hover:bg-surface-muted rounded-lg">
+            <Link
+              to="/projects"
+              className="p-2 rounded-lg transition-colors"
+              style={{ background: 'var(--bg-elevated)' }}
+            >
               <ArrowLeft className="w-5 h-5" />
             </Link>
           )}
           <div>
-            <h1 className="text-2xl font-bold text-content-primary">
+            <h1
+              className="text-2xl"
+              style={{ fontFamily: 'var(--font-display)', fontWeight: 700, color: 'var(--text-primary)' }}
+            >
               {id ? (project?.name || 'Project Dashboard') : 'Project Dashboard'}
             </h1>
-            <p className="text-content-secondary">
+            <p style={{ color: 'var(--text-secondary)' }}>
               {id ? 'Project analytics and task management' : 'Overview of all projects and tasks'}
             </p>
           </div>
         </div>
-        <button
+        <VCButton
+          variant="secondary"
           onClick={handleRefresh}
           disabled={refreshing}
-          className="btn btn-secondary"
         >
           <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
           Refresh
-        </button>
+        </VCButton>
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-line-default">
+      <div className="border-b" style={{ borderColor: 'rgba(248,240,242,.08)' }}>
         <nav className="flex gap-4">
           {[
             { id: 'overview', label: 'Overview', icon: BarChart3 },
@@ -214,9 +222,14 @@ export default function ProjectDashboard() {
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
                 activeTab === tab.id
-                  ? 'border-primary-500 text-accent-primary'
-                  : 'border-transparent text-content-tertiary hover:text-content-secondary'
+                  ? 'border-primary-500'
+                  : 'border-transparent'
               }`}
+              style={{
+                color: activeTab === tab.id
+                  ? 'var(--accent-primary)'
+                  : 'var(--text-tertiary)'
+              }}
             >
               <tab.icon className="w-4 h-4" />
               {tab.label}
@@ -230,11 +243,16 @@ export default function ProjectDashboard() {
         <div className="space-y-6">
           {/* Stats Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="card p-5">
+            <div className="vc p-5" style={{ background: 'var(--bg-elevated)' }}>
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-sm text-content-tertiary">Total Tasks</p>
-                  <p className="text-2xl font-bold text-content-primary mt-1">{totalTasks}</p>
+                  <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Total Tasks</p>
+                  <p
+                    className="text-2xl mt-1"
+                    style={{ fontFamily: 'var(--font-display)', fontWeight: 700, color: 'var(--text-primary)' }}
+                  >
+                    {totalTasks}
+                  </p>
                 </div>
                 <div className="p-2 rounded-lg bg-semantic-info-dim">
                   <CheckCircle2 className="w-5 h-5 text-semantic-info" />
@@ -242,29 +260,40 @@ export default function ProjectDashboard() {
               </div>
             </div>
 
-            <div className="card p-5">
+            <div className="vc p-5" style={{ background: 'var(--bg-elevated)' }}>
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-sm text-content-tertiary">Completion Rate</p>
-                  <p className="text-2xl font-bold text-content-primary mt-1">{completionRate}%</p>
+                  <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Completion Rate</p>
+                  <p
+                    className="text-2xl mt-1"
+                    style={{ fontFamily: 'var(--font-display)', fontWeight: 700, color: 'var(--text-primary)' }}
+                  >
+                    {completionRate}%
+                  </p>
                 </div>
                 <div className="p-2 rounded-lg bg-semantic-success-dim">
                   <TrendingUp className="w-5 h-5 text-semantic-success" />
                 </div>
               </div>
-              <div className="mt-3 h-2 bg-surface-muted rounded-full overflow-hidden">
+              <div className="mt-3 h-2 rounded-full overflow-hidden" style={{ background: 'var(--bg-elevated)' }}>
                 <div
-                  className="h-full bg-green-500 rounded-full transition-all"
-                  style={{ width: `${completionRate}%` }}
+                  className="h-full rounded-full transition-all"
+                  style={{
+                    width: `${completionRate}%`,
+                    background: 'linear-gradient(90deg, var(--accent-primary), var(--accent-secondary))'
+                  }}
                 />
               </div>
             </div>
 
-            <div className="card p-5">
+            <div className="vc p-5" style={{ background: 'var(--bg-elevated)' }}>
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-sm text-content-tertiary">In Progress</p>
-                  <p className="text-2xl font-bold text-content-primary mt-1">
+                  <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>In Progress</p>
+                  <p
+                    className="text-2xl mt-1"
+                    style={{ fontFamily: 'var(--font-display)', fontWeight: 700, color: 'var(--text-primary)' }}
+                  >
                     {taskStatusData.find(s => s.name === 'In Progress')?.value || 0}
                   </p>
                 </div>
@@ -274,22 +303,29 @@ export default function ProjectDashboard() {
               </div>
             </div>
 
-            <div className="card p-5">
+            <div className="vc p-5" style={{ background: 'var(--bg-elevated)' }}>
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-sm text-content-tertiary">Overdue</p>
-                  <p className={`text-2xl font-bold mt-1 ${
-                    (dashboardData?.overdueCount || 0) > 0 ? 'text-semantic-error' : 'text-content-primary'
-                  }`}>
+                  <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Overdue</p>
+                  <p
+                    className="text-2xl mt-1"
+                    style={{
+                      fontFamily: 'var(--font-display)',
+                      fontWeight: 700,
+                      color: (dashboardData?.overdueCount || 0) > 0
+                        ? 'var(--accent-primary)'
+                        : 'var(--text-primary)'
+                    }}
+                  >
                     {dashboardData?.overdueCount || 0}
                   </p>
                 </div>
                 <div className={`p-2 rounded-lg ${
-                  (dashboardData?.overdueCount || 0) > 0 ? 'bg-semantic-error-dim' : 'bg-surface-muted'
-                }`}>
+                  (dashboardData?.overdueCount || 0) > 0 ? 'bg-semantic-error-dim' : ''
+                }`} style={(dashboardData?.overdueCount || 0) === 0 ? { background: 'var(--bg-elevated)' } : {}}>
                   <AlertTriangle className={`w-5 h-5 ${
-                    (dashboardData?.overdueCount || 0) > 0 ? 'text-semantic-error' : 'text-content-secondary'
-                  }`} />
+                    (dashboardData?.overdueCount || 0) > 0 ? 'text-semantic-error' : ''
+                  }`} style={(dashboardData?.overdueCount || 0) === 0 ? { color: 'var(--text-secondary)' } : {}} />
                 </div>
               </div>
             </div>
@@ -298,9 +334,12 @@ export default function ProjectDashboard() {
           {/* Charts Row */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Task Status Pie Chart */}
-            <div className="card p-5">
-              <h3 className="font-semibold text-content-primary mb-4 flex items-center gap-2">
-                <PieChart className="w-5 h-5 text-primary-500" />
+            <div className="vc p-5" style={{ background: 'var(--bg-elevated)' }}>
+              <h3
+                className="font-semibold mb-4 flex items-center gap-2"
+                style={{ color: 'var(--text-primary)' }}
+              >
+                <PieChart className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
                 Task Status Distribution
               </h3>
               {taskStatusData.length > 0 && totalTasks > 0 ? (
@@ -324,16 +363,19 @@ export default function ProjectDashboard() {
                   </RechartsPie>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-[250px] flex items-center justify-center text-content-tertiary">
+                <div className="h-[250px] flex items-center justify-center" style={{ color: 'var(--text-tertiary)' }}>
                   No task data available
                 </div>
               )}
             </div>
 
             {/* Priority Distribution */}
-            <div className="card p-5">
-              <h3 className="font-semibold text-content-primary mb-4 flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-amber-500" />
+            <div className="vc p-5" style={{ background: 'var(--bg-elevated)' }}>
+              <h3
+                className="font-semibold mb-4 flex items-center gap-2"
+                style={{ color: 'var(--text-primary)' }}
+              >
+                <AlertTriangle className="w-5 h-5" style={{ color: 'var(--accent-tertiary)' }} />
                 Tasks by Priority
               </h3>
               {priorityData.length > 0 ? (
@@ -351,7 +393,7 @@ export default function ProjectDashboard() {
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-[250px] flex items-center justify-center text-content-tertiary">
+                <div className="h-[250px] flex items-center justify-center" style={{ color: 'var(--text-tertiary)' }}>
                   No priority data available
                 </div>
               )}
@@ -360,9 +402,12 @@ export default function ProjectDashboard() {
 
           {/* AI Insights */}
           {!id && insights.length > 0 && (
-            <div className="card p-5">
-              <h3 className="font-semibold text-content-primary mb-4 flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-primary-500" />
+            <div className="vc p-5" style={{ background: 'var(--bg-elevated)' }}>
+              <h3
+                className="font-semibold mb-4 flex items-center gap-2"
+                style={{ color: 'var(--text-primary)' }}
+              >
+                <TrendingUp className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
                 AI Insights
               </h3>
               <div className="space-y-3">
@@ -399,9 +444,12 @@ export default function ProjectDashboard() {
       {activeTab === 'team' && (
         <div className="space-y-6">
           {/* Team Workload Chart */}
-          <div className="card p-5">
-            <h3 className="font-semibold text-content-primary mb-4 flex items-center gap-2">
-              <Users className="w-5 h-5 text-primary-500" />
+          <div className="vc p-5" style={{ background: 'var(--bg-elevated)' }}>
+            <h3
+              className="font-semibold mb-4 flex items-center gap-2"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              <Users className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
               Team Task Distribution
             </h3>
             {workloadData.length > 0 ? (
@@ -417,7 +465,7 @@ export default function ProjectDashboard() {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-[300px] flex items-center justify-center text-content-tertiary">
+              <div className="h-[300px] flex items-center justify-center" style={{ color: 'var(--text-tertiary)' }}>
                 No team workload data available
               </div>
             )}
@@ -431,41 +479,71 @@ export default function ProjectDashboard() {
                 : 0
 
               return (
-                <div key={index} className="card p-5">
+                <div key={index} className="vc p-5" style={{ background: 'var(--bg-elevated)' }}>
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white font-semibold">
                       {(member.team_member || 'U')[0].toUpperCase()}
                     </div>
                     <div>
-                      <h4 className="font-medium text-content-primary">{member.team_member || 'Unassigned'}</h4>
-                      <p className="text-sm text-content-tertiary">{member.total_assigned} tasks</p>
+                      <h4 className="font-medium" style={{ color: 'var(--text-primary)' }}>
+                        {member.team_member || 'Unassigned'}
+                      </h4>
+                      <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
+                        {member.total_assigned} tasks
+                      </p>
                     </div>
                   </div>
 
                   <div className="space-y-3">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-content-tertiary">Completion</span>
-                      <span className="font-medium">{memberCompletionRate}%</span>
+                      <span style={{ color: 'var(--text-tertiary)' }}>Completion</span>
+                      <span
+                        className="font-medium"
+                        style={{ fontFamily: 'var(--font-display)', fontWeight: 700 }}
+                      >
+                        {memberCompletionRate}%
+                      </span>
                     </div>
-                    <div className="h-2 bg-surface-muted rounded-full overflow-hidden">
+                    <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--bg-elevated)' }}>
                       <div
-                        className="h-full bg-green-500 rounded-full transition-all"
-                        style={{ width: `${memberCompletionRate}%` }}
+                        className="h-full rounded-full transition-all"
+                        style={{
+                          width: `${memberCompletionRate}%`,
+                          background: 'linear-gradient(90deg, var(--accent-primary), var(--accent-secondary))'
+                        }}
                       />
                     </div>
 
                     <div className="grid grid-cols-3 gap-2 pt-2">
-                      <div className="text-center p-2 bg-surface-muted rounded">
-                        <p className="text-lg font-semibold text-content-secondary">{member.pending_items || 0}</p>
-                        <p className="text-xs text-content-tertiary">To Do</p>
+                      <div
+                        className="text-center p-2 rounded"
+                        style={{ background: 'var(--bg-elevated)' }}
+                      >
+                        <p
+                          className="text-lg"
+                          style={{ fontFamily: 'var(--font-display)', fontWeight: 700, color: 'var(--text-secondary)' }}
+                        >
+                          {member.pending_items || 0}
+                        </p>
+                        <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>To Do</p>
                       </div>
                       <div className="text-center p-2 bg-semantic-info-dim rounded">
-                        <p className="text-lg font-semibold text-semantic-info">{member.in_progress_items || 0}</p>
-                        <p className="text-xs text-content-tertiary">Active</p>
+                        <p
+                          className="text-lg font-semibold text-semantic-info"
+                          style={{ fontFamily: 'var(--font-display)', fontWeight: 700 }}
+                        >
+                          {member.in_progress_items || 0}
+                        </p>
+                        <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Active</p>
                       </div>
                       <div className="text-center p-2 bg-semantic-success-dim rounded">
-                        <p className="text-lg font-semibold text-semantic-success">{member.completed_items || 0}</p>
-                        <p className="text-xs text-content-tertiary">Done</p>
+                        <p
+                          className="text-lg font-semibold text-semantic-success"
+                          style={{ fontFamily: 'var(--font-display)', fontWeight: 700 }}
+                        >
+                          {member.completed_items || 0}
+                        </p>
+                        <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Done</p>
                       </div>
                     </div>
                   </div>
@@ -474,10 +552,17 @@ export default function ProjectDashboard() {
             })}
 
             {teamWorkload.length === 0 && (
-              <div className="col-span-full card p-8 text-center">
-                <Users className="w-12 h-12 text-content-muted mx-auto mb-3" />
-                <h3 className="text-lg font-medium text-content-primary mb-1">No team data</h3>
-                <p className="text-content-tertiary">Assign tasks to team members to see workload distribution</p>
+              <div className="col-span-full vc p-8 text-center" style={{ background: 'var(--bg-elevated)' }}>
+                <Users className="w-12 h-12 mx-auto mb-3" style={{ color: 'var(--text-tertiary)' }} />
+                <h3
+                  className="text-lg font-medium mb-1"
+                  style={{ color: 'var(--text-primary)' }}
+                >
+                  No team data
+                </h3>
+                <p style={{ color: 'var(--text-tertiary)' }}>
+                  Assign tasks to team members to see workload distribution
+                </p>
               </div>
             )}
           </div>

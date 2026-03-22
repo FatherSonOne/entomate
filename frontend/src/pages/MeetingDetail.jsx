@@ -7,6 +7,7 @@ import {
 import { meetingsApi, integrationsApi } from '../services/api'
 import ActionItemsList from '../components/ActionItemsList'
 import ChatChannelSelector from '../components/ChatChannelSelector'
+import { VCButton, VCBadge } from '../components/vc'
 
 export default function MeetingDetail() {
   const { id } = useParams()
@@ -115,8 +116,17 @@ export default function MeetingDetail() {
   if (!meeting) {
     return (
       <div className="text-center py-12">
-        <h2 className="text-xl font-semibold text-content-primary">Meeting not found</h2>
-        <Link to="/meetings" className="text-accent-primary hover:underline mt-2 inline-block">
+        <h2
+          className="text-xl font-semibold"
+          style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
+        >
+          Meeting not found
+        </h2>
+        <Link
+          to="/meetings"
+          className="hover:underline mt-2 inline-block"
+          style={{ color: 'var(--accent-primary)' }}
+        >
           Back to meetings
         </Link>
       </div>
@@ -137,16 +147,25 @@ export default function MeetingDetail() {
       <div className="flex items-start gap-4">
         <Link
           to="/meetings"
-          className="p-2 hover:bg-surface-muted rounded-lg transition-colors"
+          className="p-2 rounded-lg transition-colors"
+          style={{ color: 'var(--text-secondary)' }}
         >
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-2">
             <span className="text-2xl">{getSentimentEmoji(meeting.sentiment_label)}</span>
-            <h1 className="text-2xl font-bold text-content-primary">{meeting.title}</h1>
+            <h1
+              className="text-2xl font-bold"
+              style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
+            >
+              {meeting.title}
+            </h1>
           </div>
-          <div className="flex flex-wrap items-center gap-4 text-sm text-content-tertiary">
+          <div
+            className="flex flex-wrap items-center gap-4 text-sm"
+            style={{ color: 'var(--text-tertiary)' }}
+          >
             <span className="flex items-center gap-1">
               <Clock className="w-4 h-4" />
               {new Date(meeting.created_at).toLocaleDateString('en-US', {
@@ -168,24 +187,17 @@ export default function MeetingDetail() {
           </div>
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={openShareModal}
-            className="btn btn-secondary"
-          >
+          <VCButton variant="secondary" onClick={openShareModal}>
             <Share2 className="w-4 h-4" />
             Share
             {meeting.chat_posted && (
               <span className="ml-1 w-2 h-2 bg-green-500 rounded-full" title="Already posted" />
             )}
-          </button>
-          <button
-            onClick={handleSyncToCRM}
-            disabled={syncing}
-            className="btn btn-primary"
-          >
+          </VCButton>
+          <VCButton variant="primary" onClick={handleSyncToCRM} disabled={syncing}>
             {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             Sync to CRM
-          </button>
+          </VCButton>
         </div>
       </div>
 
@@ -193,22 +205,39 @@ export default function MeetingDetail() {
         {/* Main content */}
         <div className="lg:col-span-2 space-y-6">
           {/* Summary */}
-          <div className="card p-5">
-            <h2 className="font-semibold text-content-primary mb-3">Summary</h2>
-            <p className="text-content-secondary">{meeting.summary || 'No summary available'}</p>
+          <div className="vc p-5">
+            <h2
+              className="font-semibold mb-3"
+              style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
+            >
+              Summary
+            </h2>
+            <p style={{ color: 'var(--text-secondary)' }}>{meeting.summary || 'No summary available'}</p>
           </div>
 
           {/* Key Points */}
           {meeting.key_points?.length > 0 && (
-            <div className="card p-5">
-              <h2 className="font-semibold text-content-primary mb-3">Key Points</h2>
+            <div className="vc p-5">
+              <h2
+                className="font-semibold mb-3"
+                style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
+              >
+                Key Points
+              </h2>
               <ul className="space-y-2">
                 {meeting.key_points.map((point, index) => (
                   <li key={index} className="flex items-start gap-2">
-                    <span className="w-6 h-6 rounded-full bg-primary-100 text-primary-700 text-sm flex items-center justify-center flex-shrink-0">
+                    <span
+                      className="w-6 h-6 rounded-full text-sm flex items-center justify-center flex-shrink-0"
+                      style={{
+                        background: 'rgba(255,45,107,.12)',
+                        color: 'var(--accent-primary)',
+                        fontFamily: 'var(--font-mono)'
+                      }}
+                    >
                       {index + 1}
                     </span>
-                    <span className="text-content-secondary">{point}</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>{point}</span>
                   </li>
                 ))}
               </ul>
@@ -217,13 +246,21 @@ export default function MeetingDetail() {
 
           {/* Decisions */}
           {meeting.decisions?.length > 0 && (
-            <div className="card p-5">
-              <h2 className="font-semibold text-content-primary mb-3">Decisions Made</h2>
+            <div className="vc p-5">
+              <h2
+                className="font-semibold mb-3"
+                style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
+              >
+                Decisions Made
+              </h2>
               <ul className="space-y-2">
                 {meeting.decisions.map((decision, index) => (
                   <li key={index} className="flex items-start gap-2">
-                    <CheckSquare className="w-5 h-5 text-semantic-success flex-shrink-0" />
-                    <span className="text-content-secondary">{decision}</span>
+                    <CheckSquare
+                      className="w-5 h-5 flex-shrink-0"
+                      style={{ color: 'var(--accent-secondary)' }}
+                    />
+                    <span style={{ color: 'var(--text-secondary)' }}>{decision}</span>
                   </li>
                 ))}
               </ul>
@@ -231,13 +268,22 @@ export default function MeetingDetail() {
           )}
 
           {/* Transcript */}
-          <div className="card p-5">
-            <h2 className="font-semibold text-content-primary mb-3 flex items-center gap-2">
+          <div className="vc p-5">
+            <h2
+              className="font-semibold mb-3 flex items-center gap-2"
+              style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
+            >
               <FileText className="w-5 h-5" />
               Full Transcript
             </h2>
-            <div className="bg-surface-muted rounded-lg p-4 max-h-96 overflow-y-auto scrollbar-thin">
-              <pre className="whitespace-pre-wrap text-sm text-content-secondary font-mono">
+            <div
+              className="rounded-lg p-4 max-h-96 overflow-y-auto scrollbar-thin"
+              style={{ background: 'var(--bg-elevated)' }}
+            >
+              <pre
+                className="whitespace-pre-wrap text-sm"
+                style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}
+              >
                 {meeting.transcript || 'No transcript available'}
               </pre>
             </div>
@@ -247,8 +293,11 @@ export default function MeetingDetail() {
         {/* Sidebar */}
         <div className="space-y-6">
           {/* Action Items */}
-          <div className="card p-5">
-            <h2 className="font-semibold text-content-primary mb-4 flex items-center gap-2">
+          <div className="vc p-5">
+            <h2
+              className="font-semibold mb-4 flex items-center gap-2"
+              style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
+            >
               <CheckSquare className="w-5 h-5" />
               Action Items ({meeting.actionItems?.length || 0})
             </h2>
@@ -260,8 +309,11 @@ export default function MeetingDetail() {
           </div>
 
           {/* Ask AI */}
-          <div className="card p-5">
-            <h2 className="font-semibold text-content-primary mb-3 flex items-center gap-2">
+          <div className="vc p-5">
+            <h2
+              className="font-semibold mb-3 flex items-center gap-2"
+              style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
+            >
               <MessageSquare className="w-5 h-5" />
               Ask About This Meeting
             </h2>
@@ -275,25 +327,31 @@ export default function MeetingDetail() {
                   onChange={(e) => setQuestion(e.target.value)}
                   disabled={askingQuestion}
                 />
-                <button
+                <VCButton
                   type="submit"
+                  variant="primary"
                   disabled={askingQuestion || !question.trim()}
-                  className="btn btn-primary"
                 >
                   {askingQuestion ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
                     <Send className="w-4 h-4" />
                   )}
-                </button>
+                </VCButton>
               </div>
             </form>
 
             {answer && (
-              <div className="mt-4 p-3 bg-primary-50 rounded-lg">
-                <p className="text-sm text-content-primary">{answer.answer}</p>
+              <div
+                className="mt-4 p-3 rounded-lg"
+                style={{
+                  background: 'rgba(255,45,107,.08)',
+                  borderLeft: '2px solid var(--accent-primary)'
+                }}
+              >
+                <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{answer.answer}</p>
                 {answer.confidence && (
-                  <p className="text-xs text-content-tertiary mt-2">
+                  <p className="text-xs mt-2" style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
                     Confidence: {Math.round(answer.confidence * 100)}%
                   </p>
                 )}
@@ -305,32 +363,49 @@ export default function MeetingDetail() {
 
       {/* Share to Chat Modal */}
       {showShareModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-surface rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+          <div
+            className="rounded-xl shadow-xl max-w-md w-full mx-4 p-6"
+            style={{
+              background: 'var(--bg-elevated)',
+              border: '1px solid rgba(248,240,242,.08)'
+            }}
+          >
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-content-primary">
+              <h3
+                className="text-lg font-semibold"
+                style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
+              >
                 Share Meeting Recap
               </h3>
               <button
                 onClick={() => setShowShareModal(false)}
-                className="p-1 hover:bg-surface-muted rounded"
+                className="p-1 rounded transition-colors"
+                style={{ color: 'var(--text-tertiary)' }}
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <p className="text-sm text-content-secondary mb-4">
+            <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
               Post a formatted recap of "{meeting.title}" to your team chat.
             </p>
 
             {meeting.chat_posted && (
-              <div className="mb-4 p-3 bg-semantic-info-dim text-semantic-info text-sm rounded-lg">
+              <div
+                className="mb-4 p-3 text-sm rounded-lg"
+                style={{
+                  background: 'rgba(0,245,212,.08)',
+                  color: 'var(--accent-secondary)',
+                  border: '1px solid rgba(0,245,212,.18)'
+                }}
+              >
                 This meeting has already been posted to: {meeting.posted_to_channels?.join(', ') || 'chat'}
               </div>
             )}
 
             <div className="mb-6">
-              <label className="block text-sm font-medium text-content-secondary mb-2">
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
                 Select Channel
               </label>
               <ChatChannelSelector
@@ -342,27 +417,32 @@ export default function MeetingDetail() {
             </div>
 
             {shareResult && (
-              <div className={`mb-4 p-3 rounded-lg text-sm ${
-                shareResult.success
-                  ? 'bg-semantic-success-dim text-semantic-success'
-                  : 'bg-semantic-error-dim text-semantic-error'
-              }`}>
+              <div
+                className="mb-4 p-3 rounded-lg text-sm"
+                style={
+                  shareResult.success
+                    ? { background: 'rgba(0,245,212,.08)', color: 'var(--accent-secondary)' }
+                    : { background: 'rgba(255,45,107,.08)', color: 'var(--accent-primary)' }
+                }
+              >
                 {shareResult.message}
               </div>
             )}
 
             <div className="flex gap-3">
-              <button
+              <VCButton
+                variant="secondary"
+                className="flex-1"
                 onClick={() => setShowShareModal(false)}
-                className="btn btn-secondary flex-1"
                 disabled={sharing}
               >
                 Cancel
-              </button>
-              <button
+              </VCButton>
+              <VCButton
+                variant="primary"
+                className="flex-1"
                 onClick={handlePostToChat}
                 disabled={sharing}
-                className="btn btn-primary flex-1"
               >
                 {sharing ? (
                   <>
@@ -375,7 +455,7 @@ export default function MeetingDetail() {
                     Post Recap
                   </>
                 )}
-              </button>
+              </VCButton>
             </div>
           </div>
         </div>

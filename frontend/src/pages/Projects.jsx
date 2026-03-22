@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Plus, Search, FolderKanban, Calendar, DollarSign, Trash2, Target, TrendingUp, Archive } from 'lucide-react'
 import { projectsApi } from '../services/api'
 import { GuideCard, PageHeader, Skeleton } from '../components/SharedUI'
+import { VCButton, VCBadge } from '../components/vc'
 
 export default function Projects() {
   const [projects, setProjects] = useState([])
@@ -68,13 +69,13 @@ export default function Projects() {
     project.name?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const getStatusColor = (status) => {
+  const getStatusBadge = (status) => {
     switch (status) {
-      case 'active': return 'text-green-500 bg-green-500/10 border-green-500/20'
-      case 'planning': return 'text-accent-primary bg-accent-primary/10 border-accent-primary/20'
-      case 'completed': return 'text-content-tertiary bg-surface-muted border-line-subtle'
-      case 'archived': return 'text-content-muted bg-surface-base border-line-subtle'
-      default: return 'text-content-tertiary bg-surface-muted border-line-subtle'
+      case 'active':    return <VCBadge color="mint">{status}</VCBadge>
+      case 'planning':  return <VCBadge color="amber">{status}</VCBadge>
+      case 'completed': return <VCBadge color="neutral">{status}</VCBadge>
+      case 'archived':  return <VCBadge color="neutral">{status}</VCBadge>
+      default:          return <VCBadge color="neutral">{status}</VCBadge>
     }
   }
 
@@ -90,33 +91,38 @@ export default function Projects() {
 
   return (
     <div className="animate-fade-in max-w-7xl mx-auto">
-      <PageHeader 
-        title="Project Portfolio" 
+      <PageHeader
+        title="Project Portfolio"
         subtitle="Organize work into projects, track progress, and manage deliverables."
         actions={
-          <button
+          <VCButton
+            variant="primary"
             onClick={() => {
               setShowCreate(!showCreate)
               setWizardStep(0)
             }}
-            className="btn btn-primary"
           >
             <Plus size={16} />
             New Project
-          </button>
+          </VCButton>
         }
       />
 
-      <GuideCard 
-        title="Project Workflow" 
-        steps={['Create Project', 'Organize Tasks', 'Track Progress']} 
-        activeStep={wizardStep} 
+      <GuideCard
+        title="Project Workflow"
+        steps={['Create Project', 'Organize Tasks', 'Track Progress']}
+        activeStep={wizardStep}
       />
 
       {/* Create form */}
       {showCreate && (
-        <div className="card p-6 mb-6 animate-fade-in">
-          <h3 className="font-bold text-content-primary text-lg mb-4">Create New Project</h3>
+        <div className="vc p-6 mb-6 animate-fade-in" style={{ background: 'var(--bg-elevated)' }}>
+          <h3
+            className="font-bold text-lg mb-4"
+            style={{ fontFamily: 'var(--font-display)', fontWeight: 700, color: 'var(--text-primary)' }}
+          >
+            Create New Project
+          </h3>
           <form onSubmit={handleCreate} className="space-y-4">
             <div>
               <label className="label">Project Name</label>
@@ -139,16 +145,16 @@ export default function Projects() {
               />
             </div>
             <div className="flex gap-3">
-              <button type="submit" disabled={creating} className="btn btn-primary">
+              <VCButton type="submit" variant="primary" disabled={creating}>
                 {creating ? 'Creating...' : 'Create Project'}
-              </button>
-              <button
+              </VCButton>
+              <VCButton
                 type="button"
+                variant="secondary"
                 onClick={() => setShowCreate(false)}
-                className="btn btn-secondary"
               >
                 Cancel
-              </button>
+              </VCButton>
             </div>
           </form>
         </div>
@@ -156,7 +162,10 @@ export default function Projects() {
 
       {/* Search */}
       <div className="relative mb-6">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-content-tertiary" />
+        <Search
+          className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
+          style={{ color: 'var(--text-tertiary)' }}
+        />
         <input
           type="text"
           placeholder="Search projects by name..."
@@ -172,22 +181,27 @@ export default function Projects() {
           <Skeleton className="h-40" count={6} />
         </div>
       ) : filteredProjects.length === 0 ? (
-        <div className="card p-12 text-center border-dashed border-2">
-          <FolderKanban className="w-16 h-16 text-content-muted mx-auto mb-4 opacity-50" />
-          <h3 className="text-xl font-bold text-content-primary mb-2">No projects yet</h3>
-          <p className="text-content-secondary mb-6">
+        <div className="vc p-12 text-center border-dashed border-2" style={{ background: 'var(--bg-elevated)' }}>
+          <FolderKanban className="w-16 h-16 mx-auto mb-4 opacity-50" style={{ color: 'var(--text-tertiary)' }} />
+          <h3
+            className="text-xl mb-2"
+            style={{ fontFamily: 'var(--font-display)', fontWeight: 700, color: 'var(--text-primary)' }}
+          >
+            No projects yet
+          </h3>
+          <p className="mb-6" style={{ color: 'var(--text-secondary)' }}>
             {searchQuery ? 'Try a different search term' : 'Create your first project to organize your work'}
           </p>
-          <button
+          <VCButton
+            variant="primary"
             onClick={() => {
               setShowCreate(true)
               setWizardStep(0)
             }}
-            className="btn btn-primary"
           >
             <Plus size={16} />
             Create Project
-          </button>
+          </VCButton>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -195,27 +209,36 @@ export default function Projects() {
             <Link
               key={project.id}
               to={`/projects/${project.id}`}
-              className="card p-5 hover:border-accent-primary group transition-all"
+              className="vc p-5 hover:border-accent-primary group transition-all"
+              style={{ background: 'var(--bg-elevated)', display: 'block' }}
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="p-2 bg-accent-primary/10 rounded-md group-hover:bg-accent-primary group-hover:text-white transition-colors">
                   <FolderKanban size={20} />
                 </div>
-                <span className={`text-xs px-2 py-1 rounded-sm border font-mono flex items-center gap-1 ${getStatusColor(project.status)}`}>
-                  {getStatusIcon(project.status)}
-                  {project.status}
-                </span>
+                {getStatusBadge(project.status)}
               </div>
 
-              <h3 className="font-bold text-content-primary mb-2 line-clamp-1 group-hover:text-accent-primary transition-colors">
+              <h3
+                className="mb-2 line-clamp-1 group-hover:transition-colors"
+                style={{ fontFamily: 'var(--font-display)', fontWeight: 700, color: 'var(--text-primary)' }}
+              >
                 {project.name}
               </h3>
               {project.description && (
-                <p className="text-sm text-content-secondary line-clamp-2 mb-4">{project.description}</p>
+                <p className="text-sm line-clamp-2 mb-4" style={{ color: 'var(--text-secondary)' }}>
+                  {project.description}
+                </p>
               )}
 
-              <div className="flex items-center justify-between pt-3 border-t border-line-subtle">
-                <div className="flex items-center gap-3 text-xs text-content-tertiary font-mono">
+              <div
+                className="flex items-center justify-between pt-3 border-t"
+                style={{ borderColor: 'rgba(248,240,242,.08)' }}
+              >
+                <div
+                  className="flex items-center gap-3 text-xs"
+                  style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}
+                >
                   {project.deal_value && (
                     <span className="flex items-center gap-1">
                       <DollarSign size={12} />

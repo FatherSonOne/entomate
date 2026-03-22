@@ -7,6 +7,7 @@ import {
   Loader2
 } from 'lucide-react'
 import { calendarApi } from '../services/api'
+import { VCButton, VCBadge } from '../components/vc'
 
 export default function Calendar() {
   const [searchParams] = useSearchParams()
@@ -187,7 +188,7 @@ export default function Calendar() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-accent-primary" />
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--accent-primary)' }} />
       </div>
     )
   }
@@ -197,21 +198,21 @@ export default function Calendar() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-content-primary flex items-center gap-2">
-            <CalendarIcon className="h-7 w-7 text-accent-primary" />
+          <h1 className="text-2xl font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>
+            <CalendarIcon className="h-7 w-7" style={{ color: 'var(--accent-primary)' }} />
             Calendar
           </h1>
-          <p className="text-content-tertiary mt-1">
+          <p className="mt-1" style={{ color: 'var(--text-tertiary)' }}>
             View deadlines, events, and sync with Google Calendar
           </p>
         </div>
         <div className="flex items-center gap-2">
           {status.connected ? (
             <>
-              <button
+              <VCButton
+                variant="secondary"
                 onClick={handleSyncAll}
                 disabled={syncing}
-                className="btn btn-secondary flex items-center gap-2"
               >
                 {syncing ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -219,25 +220,23 @@ export default function Calendar() {
                   <RefreshCw className="h-4 w-4" />
                 )}
                 Sync Tasks
-              </button>
-              <button
+              </VCButton>
+              <VCButton
+                variant="ghost"
                 onClick={handleDisconnect}
-                className="btn btn-secondary flex items-center gap-2 text-semantic-error"
+                style={{ color: 'var(--accent-primary)' }}
               >
                 <Unlink className="h-4 w-4" />
                 Disconnect
-              </button>
+              </VCButton>
             </>
           ) : status.configured ? (
-            <button
-              onClick={handleConnect}
-              className="btn btn-primary flex items-center gap-2"
-            >
+            <VCButton variant="primary" onClick={handleConnect}>
               <Link2 className="h-4 w-4" />
               Connect Google Calendar
-            </button>
+            </VCButton>
           ) : (
-            <div className="text-sm text-content-tertiary bg-surface-muted px-3 py-2 rounded-lg">
+            <div className="text-sm px-3 py-2 rounded-lg" style={{ color: 'var(--text-tertiary)', background: 'var(--bg-elevated)', border: '1px solid rgba(248,240,242,.08)' }}>
               Add GOOGLE_CLIENT_ID to enable
             </div>
           )}
@@ -247,23 +246,23 @@ export default function Calendar() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Calendar Grid */}
         <div className="lg:col-span-2">
-          <div className="card">
+          <div className="vc">
             {/* Calendar Header */}
-            <div className="p-4 border-b border-line-default flex items-center justify-between">
+            <div className="p-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(248,240,242,.08)' }}>
               <div className="flex items-center gap-4">
-                <button onClick={prevMonth} className="p-2 hover:bg-surface-muted rounded-lg">
+                <button onClick={prevMonth} className="p-2 rounded-lg transition-colors hover:bg-black/20" style={{ color: 'var(--text-secondary)' }}>
                   <ChevronLeft className="h-5 w-5" />
                 </button>
-                <h2 className="text-lg font-semibold">
+                <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
                   {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                 </h2>
-                <button onClick={nextMonth} className="p-2 hover:bg-surface-muted rounded-lg">
+                <button onClick={nextMonth} className="p-2 rounded-lg transition-colors hover:bg-black/20" style={{ color: 'var(--text-secondary)' }}>
                   <ChevronRight className="h-5 w-5" />
                 </button>
               </div>
-              <button onClick={goToToday} className="btn btn-secondary text-sm">
+              <VCButton variant="secondary" size="sm" onClick={goToToday}>
                 Today
-              </button>
+              </VCButton>
             </div>
 
             {/* Calendar Grid */}
@@ -271,7 +270,7 @@ export default function Calendar() {
               {/* Weekday headers */}
               <div className="grid grid-cols-7 gap-1 mb-2">
                 {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                  <div key={day} className="text-center text-sm font-medium text-content-tertiary py-2">
+                  <div key={day} className="text-center text-sm font-medium py-2" style={{ color: 'var(--text-tertiary)' }}>
                     {day}
                   </div>
                 ))}
@@ -291,31 +290,47 @@ export default function Calendar() {
                     <button
                       key={index}
                       onClick={() => setSelectedDate(day)}
-                      className={`
-                        min-h-[80px] p-1 text-left rounded-lg border transition-colors
-                        ${isCurrentMonth ? 'bg-surface' : 'bg-surface-muted'}
-                        ${isToday ? 'border-primary-500' : 'border-line-subtle'}
-                        ${isSelected ? 'ring-2 ring-primary-500' : ''}
-                        hover:bg-surface-muted
-                      `}
+                      className="min-h-[80px] p-1 text-left rounded-lg border transition-colors"
+                      style={{
+                        background: isCurrentMonth ? 'var(--bg-elevated)' : 'rgba(16,16,16,.5)',
+                        borderColor: isToday
+                          ? 'var(--accent-primary)'
+                          : isSelected
+                          ? 'rgba(255,45,107,.5)'
+                          : 'rgba(248,240,242,.06)',
+                        boxShadow: isSelected ? '0 0 0 2px rgba(255,45,107,.3)' : 'none'
+                      }}
                     >
-                      <div className={`
-                        text-sm font-medium mb-1
-                        ${isToday ? 'text-accent-primary' : isCurrentMonth ? 'text-content-primary' : 'text-content-tertiary'}
-                      `}>
+                      <div
+                        className="text-sm font-medium mb-1"
+                        style={{
+                          color: isToday
+                            ? 'var(--accent-primary)'
+                            : isCurrentMonth
+                            ? 'var(--text-primary)'
+                            : 'var(--text-tertiary)'
+                        }}
+                      >
                         {day.getDate()}
                       </div>
                       <div className="space-y-0.5">
                         {[...dayEvents, ...dayItems].slice(0, 3).map((item, i) => (
                           <div
                             key={i}
-                            className={`text-xs px-1 py-0.5 rounded truncate ${getItemColor(item)}`}
+                            className="text-xs truncate"
+                            style={{
+                              background: 'rgba(255,45,107,.15)',
+                              color: 'var(--accent-primary)',
+                              borderRadius: 4,
+                              fontSize: 11,
+                              padding: '2px 6px'
+                            }}
                           >
                             {item.title}
                           </div>
                         ))}
                         {hasItems && dayEvents.length + dayItems.length > 3 && (
-                          <div className="text-xs text-content-tertiary px-1">
+                          <div className="text-xs px-1" style={{ color: 'var(--text-tertiary)' }}>
                             +{dayEvents.length + dayItems.length - 3} more
                           </div>
                         )}
@@ -332,21 +347,22 @@ export default function Calendar() {
         <div className="space-y-6">
           {/* Selected Date Details */}
           {selectedDate && (
-            <div className="card p-4">
-              <h3 className="font-semibold text-content-primary mb-3">
+            <div className="vc p-4">
+              <h3 className="font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>
                 {formatDate(selectedDate)}
               </h3>
               <div className="space-y-2">
                 {[...getEventsForDate(selectedDate), ...getUpcomingForDate(selectedDate)].map((item, i) => (
                   <div
                     key={i}
-                    className={`p-3 rounded-lg border ${getItemColor(item)}`}
+                    className="p-3 rounded-lg border"
+                    style={{ background: 'var(--bg-elevated)', borderColor: 'rgba(248,240,242,.08)' }}
                   >
                     <div className="flex items-start gap-2">
-                      {getItemIcon(item.type)}
+                      <span style={{ color: 'var(--accent-primary)' }}>{getItemIcon(item.type)}</span>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">{item.title}</p>
-                        <p className="text-xs opacity-75 capitalize">
+                        <p className="font-medium text-sm truncate" style={{ color: 'var(--text-primary)' }}>{item.title}</p>
+                        <p className="text-xs opacity-75 capitalize" style={{ color: 'var(--text-tertiary)' }}>
                           {item.type?.replace('_', ' ')}
                           {item.priority && ` • ${item.priority}`}
                         </p>
@@ -357,6 +373,7 @@ export default function Calendar() {
                           target="_blank"
                           rel="noopener noreferrer"
                           className="opacity-50 hover:opacity-100"
+                          style={{ color: 'var(--text-secondary)' }}
                         >
                           <ExternalLink className="h-4 w-4" />
                         </a>
@@ -366,7 +383,7 @@ export default function Calendar() {
                 ))}
                 {getEventsForDate(selectedDate).length === 0 &&
                   getUpcomingForDate(selectedDate).length === 0 && (
-                    <p className="text-sm text-content-tertiary text-center py-4">
+                    <p className="text-sm text-center py-4" style={{ color: 'var(--text-tertiary)' }}>
                       No events on this day
                     </p>
                   )}
@@ -375,9 +392,9 @@ export default function Calendar() {
           )}
 
           {/* Upcoming Items */}
-          <div className="card p-4">
-            <h3 className="font-semibold text-content-primary mb-3 flex items-center gap-2">
-              <Clock className="h-4 w-4 text-content-tertiary" />
+          <div className="vc p-4">
+            <h3 className="font-semibold mb-3 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+              <Clock className="h-4 w-4" style={{ color: 'var(--text-tertiary)' }} />
               Upcoming (14 days)
             </h3>
             <div className="space-y-2 max-h-[400px] overflow-y-auto">
@@ -385,13 +402,14 @@ export default function Calendar() {
                 upcoming.slice(0, 10).map((item, i) => (
                   <div
                     key={i}
-                    className={`p-3 rounded-lg border ${getItemColor(item)}`}
+                    className="p-3 rounded-lg"
+                    style={{ background: 'var(--bg-elevated)', border: '1px solid rgba(248,240,242,.08)' }}
                   >
                     <div className="flex items-start gap-2">
-                      {getItemIcon(item.type)}
+                      <span style={{ color: 'var(--accent-primary)' }}>{getItemIcon(item.type)}</span>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">{item.title}</p>
-                        <p className="text-xs opacity-75">
+                        <p className="font-medium text-sm truncate" style={{ color: 'var(--text-primary)' }}>{item.title}</p>
+                        <p className="text-xs opacity-75" style={{ color: 'var(--text-tertiary)' }}>
                           {formatDate(item.date)}
                         </p>
                       </div>
@@ -399,7 +417,7 @@ export default function Calendar() {
                   </div>
                 ))
               ) : (
-                <p className="text-sm text-content-tertiary text-center py-4">
+                <p className="text-sm text-center py-4" style={{ color: 'var(--text-tertiary)' }}>
                   No upcoming items
                 </p>
               )}
@@ -407,30 +425,30 @@ export default function Calendar() {
           </div>
 
           {/* Quick Stats */}
-          <div className="card p-4">
-            <h3 className="font-semibold text-content-primary mb-3">Quick Stats</h3>
+          <div className="vc p-4">
+            <h3 className="font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>Quick Stats</h3>
             <div className="grid grid-cols-2 gap-3">
-              <div className="text-center p-3 bg-semantic-info-dim rounded-lg">
-                <p className="text-2xl font-bold text-semantic-info">{events.length}</p>
-                <p className="text-xs text-content-tertiary">Calendar Events</p>
+              <div className="text-center p-3 rounded-lg" style={{ background: 'rgba(0,245,212,.08)', border: '1px solid rgba(0,245,212,.15)' }}>
+                <p className="text-2xl font-bold" style={{ color: 'var(--accent-secondary)' }}>{events.length}</p>
+                <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Calendar Events</p>
               </div>
-              <div className="text-center p-3 bg-orange-50 rounded-lg">
-                <p className="text-2xl font-bold text-semantic-warning">
+              <div className="text-center p-3 rounded-lg" style={{ background: 'rgba(255,184,0,.08)', border: '1px solid rgba(255,184,0,.15)' }}>
+                <p className="text-2xl font-bold" style={{ color: 'var(--accent-tertiary)' }}>
                   {upcoming.filter(u => u.type === 'action_item').length}
                 </p>
-                <p className="text-xs text-content-tertiary">Due Tasks</p>
+                <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Due Tasks</p>
               </div>
-              <div className="text-center p-3 bg-accent-tertiary-dim rounded-lg">
-                <p className="text-2xl font-bold text-accent-tertiary">
+              <div className="text-center p-3 rounded-lg" style={{ background: 'rgba(160,255,50,.08)', border: '1px solid rgba(160,255,50,.15)' }}>
+                <p className="text-2xl font-bold" style={{ color: 'var(--accent-phosphor)' }}>
                   {upcoming.filter(u => u.type === 'goal').length}
                 </p>
-                <p className="text-xs text-content-tertiary">Goal Deadlines</p>
+                <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Goal Deadlines</p>
               </div>
-              <div className="text-center p-3 bg-semantic-error-dim rounded-lg">
-                <p className="text-2xl font-bold text-semantic-error">
+              <div className="text-center p-3 rounded-lg" style={{ background: 'rgba(255,45,107,.08)', border: '1px solid rgba(255,45,107,.15)' }}>
+                <p className="text-2xl font-bold" style={{ color: 'var(--accent-primary)' }}>
                   {upcoming.filter(u => new Date(u.date) < new Date()).length}
                 </p>
-                <p className="text-xs text-content-tertiary">Overdue</p>
+                <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Overdue</p>
               </div>
             </div>
           </div>
@@ -439,22 +457,19 @@ export default function Calendar() {
 
       {/* Connection Status */}
       {!status.connected && (
-        <div className="bg-semantic-info-dim border border-semantic-info rounded-lg p-4">
+        <div className="rounded-lg p-4" style={{ background: 'rgba(0,245,212,.08)', border: '1px solid rgba(0,245,212,.2)' }}>
           <div className="flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-blue-500 mt-0.5" />
+            <AlertCircle className="h-5 w-5 mt-0.5" style={{ color: 'var(--accent-secondary)' }} />
             <div>
-              <h3 className="font-medium text-semantic-info">Connect Google Calendar</h3>
-              <p className="text-sm text-semantic-info mt-1">
+              <h3 className="font-medium" style={{ color: 'var(--accent-secondary)' }}>Connect Google Calendar</h3>
+              <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
                 Connect your Google Calendar to sync action items, goal deadlines, and meeting schedules.
                 Events will appear in your calendar with reminders.
               </p>
               {status.configured && (
-                <button
-                  onClick={handleConnect}
-                  className="btn btn-primary mt-3"
-                >
+                <VCButton variant="primary" onClick={handleConnect} className="mt-3">
                   Connect Now
-                </button>
+                </VCButton>
               )}
             </div>
           </div>

@@ -1,52 +1,98 @@
 import React from 'react';
 import { ChevronRight } from 'lucide-react';
+import { VCButton, VCBadge, VCCard, VCIconBox } from './vc';
 
 export const GuideCard = ({ title, steps, activeStep = 0, className = "" }) => {
   return (
-    <div className={`border border-accent-primary/20 bg-accent-primary/5 p-4 rounded-sm mb-6 ${className}`}>
+    <div
+      className={`vc ${className}`}
+      style={{
+        border: '1px solid rgba(255,45,107,.20)',
+        background: 'rgba(255,45,107,.05)',
+        padding: '1rem',
+        marginBottom: '1.5rem',
+      }}
+    >
       <div className="flex items-center gap-2 mb-3">
-        <div className="w-5 h-5 bg-accent-primary text-white flex items-center justify-center text-xs font-mono font-bold rounded-sm shadow-sm">
-          i
-        </div>
-        <h4 className="font-mono text-sm font-bold text-accent-primary uppercase tracking-wider">{title}</h4>
+        <VCIconBox color="crimson" size="sm">
+          <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 11 }}>i</span>
+        </VCIconBox>
+        <h4 style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: 13,
+          fontWeight: 700,
+          color: 'var(--accent-primary, #FF2D6B)',
+          textTransform: 'uppercase',
+          letterSpacing: '.08em',
+          margin: 0,
+        }}>{title}</h4>
       </div>
-      
-      <div className="flex flex-wrap items-center gap-2 text-sm">
+
+      <div className="flex flex-wrap items-center gap-2" style={{ fontSize: 14 }}>
         {steps.map((step, idx) => (
           <React.Fragment key={idx}>
-            <span 
-              className={`transition-colors duration-200 ${
-                idx === activeStep 
-                  ? 'text-content-primary font-bold bg-surface-elevated px-2 py-0.5 rounded-sm shadow-sm border border-line-subtle' 
-                  : idx < activeStep 
-                    ? 'text-accent-primary' 
-                    : 'text-content-tertiary'
-              }`}
+            <span
+              style={{
+                transition: 'color 200ms',
+                ...(idx === activeStep
+                  ? {
+                      color: 'var(--text-primary)',
+                      fontWeight: 700,
+                      background: 'var(--bg-elevated, #101010)',
+                      padding: '2px 8px',
+                      borderRadius: 2,
+                      border: '1px solid var(--border-subtle)',
+                    }
+                  : idx < activeStep
+                  ? { color: 'var(--accent-primary, #FF2D6B)' }
+                  : { color: 'var(--text-tertiary)' }),
+              }}
             >
               {step}
             </span>
             {idx < steps.length - 1 && (
-              <ChevronRight 
-                size={14} 
-                className={idx < activeStep ? "text-accent-primary" : "text-content-tertiary"} 
+              <ChevronRight
+                size={14}
+                style={{ color: idx < activeStep ? 'var(--accent-primary, #FF2D6B)' : 'var(--text-tertiary)' }}
               />
             )}
           </React.Fragment>
         ))}
       </div>
-      
-      <div className="mt-3 text-xs text-content-secondary pl-7 border-l-2 border-line-subtle ml-2.5">
-        Current Step: <span className="text-content-primary font-medium">{steps[activeStep]}</span>. Complete this to proceed.
+
+      <div style={{
+        marginTop: 12,
+        fontSize: 12,
+        color: 'var(--text-secondary)',
+        paddingLeft: 28,
+        borderLeft: '2px solid var(--border-subtle)',
+        marginLeft: 10,
+      }}>
+        Current Step:{' '}
+        <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{steps[activeStep]}</span>
+        . Complete this to proceed.
       </div>
     </div>
   );
 };
 
 export const PageHeader = ({ title, subtitle, actions }) => (
-  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 pb-4 border-b border-line-subtle">
+  <div
+    className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 pb-4"
+    style={{ borderBottom: '1px solid var(--border-subtle)' }}
+  >
     <div>
-      <h1 className="text-3xl font-display font-bold tracking-tight text-content-primary">{title}</h1>
-      {subtitle && <p className="text-content-secondary mt-1">{subtitle}</p>}
+      <h1 style={{
+        fontFamily: 'var(--font-display)',
+        fontSize: '1.875rem',
+        fontWeight: 700,
+        letterSpacing: '-.02em',
+        color: 'var(--text-primary)',
+        margin: 0,
+      }}>{title}</h1>
+      {subtitle && (
+        <p style={{ color: 'var(--text-secondary)', marginTop: 4, marginBottom: 0 }}>{subtitle}</p>
+      )}
     </div>
     {actions && <div className="flex gap-3">{actions}</div>}
   </div>
@@ -55,8 +101,11 @@ export const PageHeader = ({ title, subtitle, actions }) => (
 export const Skeleton = ({ className, count = 1 }) => (
   <>
     {Array.from({ length: count }).map((_, i) => (
-      <div key={i} className={`animate-pulse bg-surface-muted rounded-sm ${className}`} />
+      <div
+        key={i}
+        className={`animate-pulse rounded-sm ${className}`}
+        style={{ background: 'var(--bg-elevated, #101010)' }}
+      />
     ))}
   </>
 );
-

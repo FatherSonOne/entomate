@@ -3,8 +3,8 @@ import { supabase, EntomateMeeting, EntoamteActionItem } from '../lib/supabase'
 
 // ==================== PULSE CONFIGURATION ====================
 
-const PULSE_SUPABASE_URL = 'https://ucaeuszgoihoyrvhewxk.supabase.co'
-const PULSE_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVjYWV1c3pnb2lob3lydmhld3hrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyMjg5ODYsImV4cCI6MjA4MDgwNDk4Nn0.0VGjpsPBYjyk6QTG5rAQX4_NcpfBTyR85ofE5jiHTKo'
+const PULSE_SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string
+const PULSE_SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 
 // ==================== TYPES ====================
 

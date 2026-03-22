@@ -57,6 +57,11 @@
 
 /* ── LIGHT MODE ── */
 [data-brand="void-crimson"]:not(.dark) {
+  /* Neo-cinema surface colors (light) */
+  --neo-base: #F8F4F6;
+  --neo-l:    #FFFFFF;
+  --neo-d:    #E0DDE4;
+
   /* Backgrounds — Rose-tinted warm neutral */
   --bg-base:     #FFF8FA;
   --bg-surface:  #FFFFFF;
@@ -110,6 +115,11 @@
   --bg-elevated: rgba(16, 16, 16, 0.8);
   --bg-muted:    #181818;
   --bg-subtle:   #101010;
+
+  /* Neo-cinema surface colors */
+  --neo-base: #141414;
+  --neo-l:    #1E1E1E;
+  --neo-d:    #0C0C0C;
 
   /* Text */
   --text-primary:   #F8F0F2;

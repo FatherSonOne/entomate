@@ -666,6 +666,7 @@ textarea.vinput{resize:vertical;min-height:70px}
     <button class="cact-btn" id="btn-download-txt">Download</button>
     <button class="cact-btn" id="btn-export-json">JSON State</button>
     <button class="cact-btn" id="btn-team-prompt">Team Prompt</button>
+    <button class="cact-btn" id="btn-extract-assets" style="border-color:var(--mg);color:var(--m)">Extract Assets</button>
   </div>
 </div>
 
@@ -2678,6 +2679,137 @@ function generateTeamPrompt() {
   return T.join('\n');
 }
 
+// ── Extract all component assets from the live DOM ──
+function extractComponents() {
+  const now = '2026-03-21';
+  const out = [];
+  out.push('# ENTOMATE — Component Asset Extraction');
+  out.push('> Extracted from live playground DOM — ' + now);
+  out.push('> Use with: /rebuild-ui skill in a new Claude session');
+  out.push('');
+  out.push('---');
+  out.push('');
+
+  // 1. Extract all SVG elements (logos, icons, illustrations)
+  out.push('## SVG ASSETS');
+  out.push('');
+  const svgs = document.querySelectorAll('#show svg');
+  const seenSvg = new Set();
+  let svgIdx = 0;
+  svgs.forEach(svg => {
+    const w = svg.getAttribute('width') || svg.viewBox?.baseVal?.width || 0;
+    const h = svg.getAttribute('height') || svg.viewBox?.baseVal?.height || 0;
+    const key = svg.getAttribute('id') || (w + 'x' + h + '_' + svgIdx);
+    if (seenSvg.has(key) || +w < 20) return;
+    seenSvg.add(key);
+    const parentTitle = svg.closest('.sxs')?.querySelector('.sx-title')?.textContent || 'Unknown';
+    out.push('### SVG: ' + key + ' (from: ' + parentTitle + ')');
+    out.push('Size: ' + w + 'x' + h);
+    out.push('');
+    out.push('```svg');
+    out.push(svg.outerHTML.replace(/\s+/g, ' ').trim());
+    out.push('```');
+    out.push('');
+    svgIdx++;
+  });
+
+  // 2. Extract each component section's HTML blueprint
+  out.push('---');
+  out.push('');
+  out.push('## COMPONENT HTML BLUEPRINTS');
+  out.push('');
+  out.push('> These are the rendered HTML structures — use as implementation reference');
+  out.push('> CSS classes map directly to vc-components.css');
+  out.push('');
+
+  const sections = document.querySelectorAll('#show .sxs');
+  sections.forEach(sec => {
+    const title = sec.querySelector('.sx-title')?.textContent || 'Section';
+    const content = sec.querySelector('.vc, .ddi, .kanban, .cmd-overlay, .chat-widget, .tl, .vtbl-wrap, .cvs-panel, .wf-canvas');
+    if (!content) return;
+    // Serialize only the component HTML, not the section wrapper
+    const html = content.outerHTML
+      .replace(/\s{2,}/g, ' ')
+      .replace(/ style="[^"]{200,}"/g, '') // strip very long inline styles
+      .trim();
+    if (html.length < 20) return;
+    out.push('### ' + title);
+    out.push('');
+    out.push('```html');
+    out.push(html.length > 2000 ? html.slice(0, 2000) + '\n<!-- ... truncated -->' : html);
+    out.push('```');
+    out.push('');
+  });
+
+  // 3. Icon system mapping
+  out.push('---');
+  out.push('');
+  out.push('## ICON SYSTEM — Lucide → VC Container Mapping');
+  out.push('');
+  out.push('```');
+  out.push('Apply .vc-icon + color variant to all icon wrappers:');
+  out.push('');
+  out.push('  .vc-icon         { width:36px; height:36px; border-radius:8px; display:grid; place-items:center; }');
+  out.push('  .vc-icon-crimson { background:rgba(255,45,107,.12); color:#FF2D6B; }');
+  out.push('  .vc-icon-mint    { background:rgba(0,245,212,.12);  color:#00F5D4; }');
+  out.push('  .vc-icon-amber   { background:rgba(255,184,0,.12);  color:#FFB800; }');
+  out.push('  .vc-icon-neutral { background:rgba(248,240,242,.06);color:#968890; }');
+  out.push('  .vc-icon-sm      { width:28px; height:28px; border-radius:6px; }');
+  out.push('  .vc-icon-lg      { width:48px; height:48px; border-radius:10px; }');
+  out.push('');
+  out.push('Entomate icon → Lucide component → color variant:');
+  out.push('  Mic (meetings)       → Mic             → crimson');
+  out.push('  Bot (AI agents)      → Bot             → amber');
+  out.push('  CheckSquare (tasks)  → CheckSquare     → mint');
+  out.push('  BarChart3 (analytics)→ BarChart3       → mint');
+  out.push('  Search               → Search          → neutral');
+  out.push('  Settings             → Settings        → neutral');
+  out.push('  Target (goals)       → Target          → crimson');
+  out.push('  Zap (automations)    → Zap             → amber');
+  out.push('  Calendar             → Calendar        → neutral');
+  out.push('  FolderKanban (proj.) → FolderKanban    → mint');
+  out.push('  Workflow             → Workflow        → amber');
+  out.push('  LayoutDashboard      → LayoutDashboard → neutral');
+  out.push('  FileText (reports)   → FileText        → neutral');
+  out.push('  Kanban (board)       → Kanban          → mint');
+  out.push('');
+  out.push('Usage:');
+  out.push('  <div className="vc-icon vc-icon-crimson"><Mic size={16} /></div>');
+  out.push('  <div className="vc-icon vc-icon-amber"><Bot size={16} /></div>');
+  out.push('```');
+  out.push('');
+
+  // 4. Badge variant mapping
+  out.push('---');
+  out.push('');
+  out.push('## BADGE VARIANTS — Status Indicator Mapping');
+  out.push('');
+  out.push('```');
+  out.push('Entomate status → VCBadge variant:');
+  out.push('  Live / Recording now → variant="live"    (phosphor, animated pulse dot)');
+  out.push('  Active / Running     → variant="success" (mint)');
+  out.push('  Scheduled            → variant="neutral" (grey)');
+  out.push('  AI Summary / AI tag  → variant="ai"      (amber)');
+  out.push('  High Priority        → variant="error"   (crimson)');
+  out.push('  Completed            → variant="success" (mint)');
+  out.push('  Pending / Draft      → variant="neutral" (grey)');
+  out.push('  Recording            → variant="live"    (phosphor)');
+  out.push('  Archived             → variant="neutral" (grey, opacity .6)');
+  out.push('```');
+  out.push('');
+
+  // 5. Current playground state snapshot
+  out.push('---');
+  out.push('');
+  out.push('## PLAYGROUND STATE (restore this config)');
+  out.push('');
+  out.push('```json');
+  out.push(JSON.stringify(S, null, 2));
+  out.push('```');
+
+  return out.join('\n');
+}
+
 // ====== EVENT WIRING ======
 
 // Tab switching
@@ -2930,7 +3062,7 @@ const btnDownloadTxt = document.getElementById('btn-download-txt');
 if (btnDownloadTxt) btnDownloadTxt.addEventListener('click', () => {
   const ta = document.getElementById('exp-output');
   if (!ta) return;
-  const names = {css:'void-crimson.css', react:'vc-components.jsx', brief:'entomate-brief.md', full:'entomate-full-package.md', team:'entomate-team-prompt.md'};
+  const names = {css:'void-crimson.css', react:'vc-components.jsx', brief:'entomate-brief.md', full:'entomate-full-package.md', team:'entomate-team-prompt.md', extract:'entomate-component-assets.md'};
   const blob = new Blob([ta.value], {type:'text/plain'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -2954,6 +3086,22 @@ if (btnExportAll) btnExportAll.addEventListener('click', () => {
     a.href = url; a.download = 'entomate-full-package.md'; a.click();
     URL.revokeObjectURL(url);
   }
+});
+
+const btnExtractAssets = document.getElementById('btn-extract-assets');
+if (btnExtractAssets) btnExtractAssets.addEventListener('click', () => {
+  const content = extractComponents();
+  // Show in textarea
+  const ta = document.getElementById('exp-output');
+  if (ta) ta.value = content;
+  const hint = document.getElementById('exp-hint');
+  if (hint) hint.textContent = 'SVG assets + HTML blueprints + icon mapping extracted from the live playground — download and use with /rebuild-ui';
+  // Auto-download
+  const blob = new Blob([content], {type:'text/plain'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'entomate-component-assets.md'; a.click();
+  URL.revokeObjectURL(url);
 });
 
 const pbarCopy = document.getElementById('pbar-copy');

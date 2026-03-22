@@ -5,6 +5,7 @@ import {
   Calendar, Download, RefreshCw
 } from 'lucide-react';
 import api from '../services/api';
+import { VCButton, VCBadge, VCIconBox } from '../components/vc';
 
 export default function Analytics() {
   const [dashboard, setDashboard] = useState(null);
@@ -52,11 +53,14 @@ export default function Analytics() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-content-primary flex items-center gap-2">
-            <BarChart3 className="h-7 w-7 text-accent-primary" />
+          <h1
+            className="text-2xl font-bold flex items-center gap-2"
+            style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}
+          >
+            <BarChart3 className="h-7 w-7" style={{ color: 'var(--accent-primary)' }} />
             Analytics
           </h1>
-          <p className="text-content-tertiary mt-1">
+          <p style={{ color: 'var(--text-tertiary)' }} className="mt-1">
             Track performance and measure success
           </p>
         </div>
@@ -71,23 +75,27 @@ export default function Analytics() {
             <option value="90d">Last 90 days</option>
             <option value="1y">Last year</option>
           </select>
-          <button onClick={fetchData} className="btn btn-secondary">
+          <VCButton variant="ghost" onClick={fetchData}>
             <RefreshCw className="h-4 w-4" />
-          </button>
+          </VCButton>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-line-default pb-2">
+      <div
+        className="flex gap-2 pb-2"
+        style={{ borderBottom: '1px solid rgba(248,240,242,.08)' }}
+      >
         {['overview', 'meetings', 'tasks', 'ai', 'team'].map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium capitalize ${
+            className="px-4 py-2 rounded-lg text-sm font-medium capitalize transition-colors"
+            style={
               activeTab === tab
-                ? 'bg-primary-100 text-primary-700'
-                : 'text-content-secondary hover:bg-surface-muted'
-            }`}
+                ? { background: 'rgba(255,45,107,0.12)', color: 'var(--accent-primary)' }
+                : { color: 'var(--text-secondary)' }
+            }
           >
             {tab}
           </button>
@@ -128,18 +136,28 @@ export default function Analytics() {
 
           {/* Time Saved Highlight */}
           {aiEffectiveness && (
-            <div className="card p-6 bg-gradient-to-r from-primary-500 to-primary-700 text-white">
+            <div
+              className="vc p-6"
+              style={{ background: 'linear-gradient(135deg, var(--accent-primary, #FF2D6B) 0%, #c0134e 100%)' }}
+            >
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-primary-100 text-sm">Estimated Time Saved</p>
-                  <p className="text-4xl font-bold mt-1">
+                  <p className="text-sm" style={{ color: 'rgba(255,255,255,0.7)' }}>Estimated Time Saved</p>
+                  <p
+                    style={{
+                      fontFamily: 'var(--font-display)',
+                      fontWeight: 700,
+                      fontSize: 36,
+                      color: '#fff',
+                    }}
+                  >
                     {Math.round(aiEffectiveness.timeSaved.estimatedMinutes / 60)} hours
                   </p>
-                  <p className="text-primary-200 text-sm mt-2">
+                  <p className="text-sm mt-2" style={{ color: 'rgba(255,255,255,0.6)' }}>
                     Through AI transcription, summarization, and automations
                   </p>
                 </div>
-                <Clock className="h-16 w-16 text-primary-200" />
+                <Clock className="h-16 w-16" style={{ color: 'rgba(255,255,255,0.4)' }} />
               </div>
             </div>
           )}
@@ -147,8 +165,13 @@ export default function Analytics() {
           {/* Charts Row */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Task Completion */}
-            <div className="card p-6">
-              <h3 className="font-semibold text-content-primary mb-4">Task Status</h3>
+            <div className="vc p-6">
+              <h3
+                className="font-semibold mb-4"
+                style={{ color: 'var(--text-primary)' }}
+              >
+                Task Status
+              </h3>
               <div className="space-y-3">
                 <StatusBar label="Completed" value={dashboard.tasks.completed} total={dashboard.tasks.total} color="green" />
                 <StatusBar label="In Progress" value={dashboard.tasks.inProgress} total={dashboard.tasks.total} color="blue" />
@@ -158,59 +181,163 @@ export default function Analytics() {
             </div>
 
             {/* Meeting Sentiment */}
-            <div className="card p-6">
-              <h3 className="font-semibold text-content-primary mb-4">Meeting Sentiment</h3>
+            <div className="vc p-6">
+              <h3
+                className="font-semibold mb-4"
+                style={{ color: 'var(--text-primary)' }}
+              >
+                Meeting Sentiment
+              </h3>
               <div className="flex items-center justify-center gap-8">
                 <div className="text-center">
-                  <div className="w-16 h-16 bg-semantic-success-dim rounded-full flex items-center justify-center mb-2">
+                  <div
+                    className="w-16 h-16 rounded-full flex items-center justify-center mb-2"
+                    style={{ background: 'rgba(0,245,212,0.12)' }}
+                  >
                     <span className="text-2xl">😊</span>
                   </div>
-                  <p className="text-2xl font-bold text-semantic-success">{dashboard.meetings.sentiment.positive}</p>
-                  <p className="text-sm text-content-tertiary">Positive</p>
+                  <p
+                    style={{
+                      fontFamily: 'var(--font-display)',
+                      fontWeight: 700,
+                      fontSize: 24,
+                      color: 'var(--accent-secondary)',
+                    }}
+                  >
+                    {dashboard.meetings.sentiment.positive}
+                  </p>
+                  <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Positive</p>
                 </div>
                 <div className="text-center">
-                  <div className="w-16 h-16 bg-surface-muted rounded-full flex items-center justify-center mb-2">
+                  <div
+                    className="w-16 h-16 rounded-full flex items-center justify-center mb-2"
+                    style={{ background: 'rgba(248,240,242,0.06)' }}
+                  >
                     <span className="text-2xl">😐</span>
                   </div>
-                  <p className="text-2xl font-bold text-content-secondary">{dashboard.meetings.sentiment.neutral}</p>
-                  <p className="text-sm text-content-tertiary">Neutral</p>
+                  <p
+                    style={{
+                      fontFamily: 'var(--font-display)',
+                      fontWeight: 700,
+                      fontSize: 24,
+                      color: 'var(--text-secondary)',
+                    }}
+                  >
+                    {dashboard.meetings.sentiment.neutral}
+                  </p>
+                  <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Neutral</p>
                 </div>
                 <div className="text-center">
-                  <div className="w-16 h-16 bg-semantic-error-dim rounded-full flex items-center justify-center mb-2">
+                  <div
+                    className="w-16 h-16 rounded-full flex items-center justify-center mb-2"
+                    style={{ background: 'rgba(255,45,107,0.12)' }}
+                  >
                     <span className="text-2xl">😟</span>
                   </div>
-                  <p className="text-2xl font-bold text-semantic-error">{dashboard.meetings.sentiment.negative}</p>
-                  <p className="text-sm text-content-tertiary">Negative</p>
+                  <p
+                    style={{
+                      fontFamily: 'var(--font-display)',
+                      fontWeight: 700,
+                      fontSize: 24,
+                      color: 'var(--accent-primary)',
+                    }}
+                  >
+                    {dashboard.meetings.sentiment.negative}
+                  </p>
+                  <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Negative</p>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Projects Summary */}
-          <div className="card p-6">
-            <h3 className="font-semibold text-content-primary mb-4">Projects Overview</h3>
+          <div className="vc p-6">
+            <h3
+              className="font-semibold mb-4"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              Projects Overview
+            </h3>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <div className="text-center p-4 bg-surface-muted rounded-lg">
-                <p className="text-3xl font-bold text-content-primary">{dashboard.projects.total}</p>
-                <p className="text-sm text-content-tertiary">Total</p>
+              <div
+                className="text-center p-4 rounded-lg"
+                style={{ background: 'rgba(248,240,242,.06)' }}
+              >
+                <p
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontWeight: 700,
+                    fontSize: 24,
+                    color: 'var(--text-primary)',
+                  }}
+                >
+                  {dashboard.projects.total}
+                </p>
+                <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Total</p>
               </div>
-              <div className="text-center p-4 bg-semantic-info-dim rounded-lg">
-                <p className="text-3xl font-bold text-semantic-info">{dashboard.projects.byStatus.active}</p>
-                <p className="text-sm text-content-tertiary">Active</p>
+              <div
+                className="text-center p-4 rounded-lg"
+                style={{ background: 'rgba(0,245,212,0.08)' }}
+              >
+                <p
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontWeight: 700,
+                    fontSize: 24,
+                    color: 'var(--accent-secondary)',
+                  }}
+                >
+                  {dashboard.projects.byStatus.active}
+                </p>
+                <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Active</p>
               </div>
-              <div className="text-center p-4 bg-semantic-success-dim rounded-lg">
-                <p className="text-3xl font-bold text-semantic-success">{dashboard.projects.byStatus.completed}</p>
-                <p className="text-sm text-content-tertiary">Completed</p>
+              <div
+                className="text-center p-4 rounded-lg"
+                style={{ background: 'rgba(0,245,212,0.06)' }}
+              >
+                <p
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontWeight: 700,
+                    fontSize: 24,
+                    color: 'var(--accent-secondary)',
+                  }}
+                >
+                  {dashboard.projects.byStatus.completed}
+                </p>
+                <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Completed</p>
               </div>
-              <div className="text-center p-4 bg-yellow-50 rounded-lg">
-                <p className="text-3xl font-bold text-yellow-600">{dashboard.projects.byStatus.planning}</p>
-                <p className="text-sm text-content-tertiary">Planning</p>
+              <div
+                className="text-center p-4 rounded-lg"
+                style={{ background: 'rgba(255,184,0,0.08)' }}
+              >
+                <p
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontWeight: 700,
+                    fontSize: 24,
+                    color: 'var(--accent-tertiary)',
+                  }}
+                >
+                  {dashboard.projects.byStatus.planning}
+                </p>
+                <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Planning</p>
               </div>
-              <div className="text-center p-4 bg-accent-tertiary-dim rounded-lg">
-                <p className="text-3xl font-bold text-accent-tertiary">
+              <div
+                className="text-center p-4 rounded-lg"
+                style={{ background: 'rgba(255,184,0,0.06)' }}
+              >
+                <p
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontWeight: 700,
+                    fontSize: 24,
+                    color: 'var(--accent-tertiary)',
+                  }}
+                >
                   ${(dashboard.projects.totalDealValue / 1000).toFixed(0)}k
                 </p>
-                <p className="text-sm text-content-tertiary">Deal Value</p>
+                <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Deal Value</p>
               </div>
             </div>
           </div>
@@ -249,24 +376,36 @@ export default function Analytics() {
 
           {/* Trends Chart */}
           {trends && trends.trends.length > 0 && (
-            <div className="card p-6">
-              <h3 className="font-semibold text-content-primary mb-4">Meetings Over Time</h3>
+            <div className="vc p-6">
+              <h3
+                className="font-semibold mb-4"
+                style={{ color: 'var(--text-primary)' }}
+              >
+                Meetings Over Time
+              </h3>
               <div className="h-64 flex items-end gap-2">
                 {trends.trends.map((point, i) => (
                   <div
                     key={i}
-                    className="flex-1 bg-primary-500 rounded-t hover:bg-accent-primary transition-colors relative group"
+                    className="flex-1 rounded-t transition-colors relative group"
                     style={{
-                      height: `${Math.max((point.count / Math.max(...trends.trends.map(t => t.count))) * 100, 5)}%`
+                      height: `${Math.max((point.count / Math.max(...trends.trends.map(t => t.count))) * 100, 5)}%`,
+                      background: 'var(--accent-primary, #FF2D6B)',
+                      opacity: 0.75,
                     }}
+                    onMouseEnter={e => { e.currentTarget.style.opacity = '1' }}
+                    onMouseLeave={e => { e.currentTarget.style.opacity = '0.75' }}
                   >
-                    <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                    <div
+                      className="absolute -top-8 left-1/2 transform -translate-x-1/2 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap"
+                      style={{ background: 'rgba(16,16,16,0.95)', border: '1px solid rgba(248,240,242,.1)' }}
+                    >
                       {point.count} meetings
                     </div>
                   </div>
                 ))}
               </div>
-              <div className="flex justify-between mt-2 text-xs text-content-tertiary">
+              <div className="flex justify-between mt-2 text-xs" style={{ color: 'var(--text-tertiary)' }}>
                 <span>{trends.trends[0]?.date}</span>
                 <span>{trends.trends[trends.trends.length - 1]?.date}</span>
               </div>
@@ -306,8 +445,13 @@ export default function Analytics() {
           </div>
 
           {/* Priority Distribution */}
-          <div className="card p-6">
-            <h3 className="font-semibold text-content-primary mb-4">Tasks by Priority</h3>
+          <div className="vc p-6">
+            <h3
+              className="font-semibold mb-4"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              Tasks by Priority
+            </h3>
             <div className="space-y-3">
               <StatusBar
                 label="High Priority"
@@ -363,78 +507,133 @@ export default function Analytics() {
           </div>
 
           {/* Time Saved Breakdown */}
-          <div className="card p-6">
-            <h3 className="font-semibold text-content-primary mb-4">Time Saved Breakdown</h3>
+          <div className="vc p-6">
+            <h3
+              className="font-semibold mb-4"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              Time Saved Breakdown
+            </h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center p-4 bg-accent-tertiary-dim rounded-lg">
-                <p className="text-2xl font-bold text-accent-tertiary">
+              <div
+                className="text-center p-4 rounded-lg"
+                style={{ background: 'rgba(255,184,0,0.08)' }}
+              >
+                <p
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontWeight: 700,
+                    fontSize: 24,
+                    color: 'var(--accent-tertiary)',
+                  }}
+                >
                   {Math.round(aiEffectiveness.timeSaved.breakdown.transcription / 60)}h
                 </p>
-                <p className="text-sm text-content-tertiary">Transcription</p>
+                <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Transcription</p>
               </div>
-              <div className="text-center p-4 bg-semantic-info-dim rounded-lg">
-                <p className="text-2xl font-bold text-semantic-info">
+              <div
+                className="text-center p-4 rounded-lg"
+                style={{ background: 'rgba(0,245,212,0.08)' }}
+              >
+                <p
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontWeight: 700,
+                    fontSize: 24,
+                    color: 'var(--accent-secondary)',
+                  }}
+                >
                   {Math.round(aiEffectiveness.timeSaved.breakdown.summarization / 60)}h
                 </p>
-                <p className="text-sm text-content-tertiary">Summarization</p>
+                <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Summarization</p>
               </div>
-              <div className="text-center p-4 bg-semantic-success-dim rounded-lg">
-                <p className="text-2xl font-bold text-semantic-success">
+              <div
+                className="text-center p-4 rounded-lg"
+                style={{ background: 'rgba(0,245,212,0.06)' }}
+              >
+                <p
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontWeight: 700,
+                    fontSize: 24,
+                    color: 'var(--accent-secondary)',
+                  }}
+                >
                   {Math.round(aiEffectiveness.timeSaved.breakdown.actionItems / 60)}h
                 </p>
-                <p className="text-sm text-content-tertiary">Action Items</p>
+                <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Action Items</p>
               </div>
-              <div className="text-center p-4 bg-yellow-50 rounded-lg">
-                <p className="text-2xl font-bold text-yellow-600">
+              <div
+                className="text-center p-4 rounded-lg"
+                style={{ background: 'rgba(255,184,0,0.06)' }}
+              >
+                <p
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontWeight: 700,
+                    fontSize: 24,
+                    color: 'var(--accent-tertiary)',
+                  }}
+                >
                   {Math.round(aiEffectiveness.timeSaved.breakdown.automations / 60)}h
                 </p>
-                <p className="text-sm text-content-tertiary">Automations</p>
+                <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Automations</p>
               </div>
             </div>
           </div>
 
           {/* Automation Stats */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="card p-6">
-              <h3 className="font-semibold text-content-primary mb-4">Automation Performance</h3>
+            <div className="vc p-6">
+              <h3
+                className="font-semibold mb-4"
+                style={{ color: 'var(--text-primary)' }}
+              >
+                Automation Performance
+              </h3>
               <div className="space-y-4">
                 <div className="flex justify-between">
-                  <span className="text-content-secondary">Total Executions</span>
-                  <span className="font-medium">{aiEffectiveness.automations.totalExecutions}</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>Total Executions</span>
+                  <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{aiEffectiveness.automations.totalExecutions}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-content-secondary">Successful</span>
-                  <span className="font-medium text-semantic-success">{aiEffectiveness.automations.successful}</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>Successful</span>
+                  <span className="font-medium" style={{ color: 'var(--accent-secondary)' }}>{aiEffectiveness.automations.successful}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-content-secondary">Failed</span>
-                  <span className="font-medium text-semantic-error">{aiEffectiveness.automations.failed}</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>Failed</span>
+                  <span className="font-medium" style={{ color: 'var(--accent-primary)' }}>{aiEffectiveness.automations.failed}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-content-secondary">Avg Duration</span>
-                  <span className="font-medium">{aiEffectiveness.automations.avgDuration}ms</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>Avg Duration</span>
+                  <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{aiEffectiveness.automations.avgDuration}ms</span>
                 </div>
               </div>
             </div>
 
-            <div className="card p-6">
-              <h3 className="font-semibold text-content-primary mb-4">AI Agents Performance</h3>
+            <div className="vc p-6">
+              <h3
+                className="font-semibold mb-4"
+                style={{ color: 'var(--text-primary)' }}
+              >
+                AI Agents Performance
+              </h3>
               <div className="space-y-4">
                 <div className="flex justify-between">
-                  <span className="text-content-secondary">Total Executions</span>
-                  <span className="font-medium">{aiEffectiveness.aiAgents.totalExecutions}</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>Total Executions</span>
+                  <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{aiEffectiveness.aiAgents.totalExecutions}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-content-secondary">Successful</span>
-                  <span className="font-medium text-semantic-success">{aiEffectiveness.aiAgents.successful}</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>Successful</span>
+                  <span className="font-medium" style={{ color: 'var(--accent-secondary)' }}>{aiEffectiveness.aiAgents.successful}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-content-secondary">Success Rate</span>
-                  <span className="font-medium">{aiEffectiveness.aiAgents.successRate}%</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>Success Rate</span>
+                  <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{aiEffectiveness.aiAgents.successRate}%</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-content-secondary">Avg Feedback Rating</span>
-                  <span className="font-medium">
+                  <span style={{ color: 'var(--text-secondary)' }}>Avg Feedback Rating</span>
+                  <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
                     {aiEffectiveness.aiAgents.avgFeedbackRating
                       ? `${aiEffectiveness.aiAgents.avgFeedbackRating}/5`
                       : 'N/A'}
@@ -449,12 +648,20 @@ export default function Analytics() {
       {/* Team Tab */}
       {activeTab === 'team' && teamPerformance && (
         <div className="space-y-6">
-          <div className="card p-6">
-            <h3 className="font-semibold text-content-primary mb-4">Team Performance</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full">
+          <div className="vc p-6">
+            <h3
+              className="font-semibold mb-4"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              Team Performance
+            </h3>
+            <div className="vtbl-wrap overflow-x-auto">
+              <table className="vtbl w-full">
                 <thead>
-                  <tr className="text-left text-sm text-content-tertiary border-b">
+                  <tr
+                    className="text-left text-sm"
+                    style={{ color: 'var(--text-tertiary)', borderColor: 'rgba(248,240,242,.08)' }}
+                  >
                     <th className="pb-3">Team Member</th>
                     <th className="pb-3 text-center">Tasks Created</th>
                     <th className="pb-3 text-center">Completed</th>
@@ -465,36 +672,48 @@ export default function Analytics() {
                 </thead>
                 <tbody>
                   {teamPerformance.teamMembers.map((member) => (
-                    <tr key={member.userId} className="border-b last:border-0">
+                    <tr
+                      key={member.userId}
+                      style={{ borderColor: 'rgba(248,240,242,.08)' }}
+                      className="border-b last:border-0"
+                    >
                       <td className="py-3">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-                            <span className="text-accent-primary font-medium text-sm">
+                          <div
+                            className="w-8 h-8 rounded-full flex items-center justify-center"
+                            style={{ background: 'rgba(255,45,107,0.12)' }}
+                          >
+                            <span
+                              className="font-medium text-sm"
+                              style={{ color: 'var(--accent-primary)' }}
+                            >
                               {member.userName.charAt(0).toUpperCase()}
                             </span>
                           </div>
                           <div>
-                            <p className="font-medium text-content-primary">{member.userName}</p>
-                            <p className="text-xs text-content-tertiary">{member.email}</p>
+                            <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{member.userName}</p>
+                            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{member.email}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="py-3 text-center">{member.tasksCreated}</td>
-                      <td className="py-3 text-center text-semantic-success font-medium">
+                      <td className="py-3 text-center" style={{ color: 'var(--text-primary)' }}>{member.tasksCreated}</td>
+                      <td className="py-3 text-center font-medium" style={{ color: 'var(--accent-secondary)' }}>
                         {member.tasksCompleted}
                       </td>
                       <td className="py-3 text-center">
-                        <span className={`font-medium ${
-                          member.completionRate >= 80 ? 'text-semantic-success' :
-                          member.completionRate >= 50 ? 'text-yellow-600' : 'text-semantic-error'
-                        }`}>
+                        <VCBadge
+                          color={
+                            member.completionRate >= 80 ? 'mint' :
+                            member.completionRate >= 50 ? 'amber' : 'crimson'
+                          }
+                        >
                           {member.completionRate}%
-                        </span>
+                        </VCBadge>
                       </td>
-                      <td className="py-3 text-center text-semantic-error">
+                      <td className="py-3 text-center" style={{ color: 'var(--accent-primary)' }}>
                         {member.highPriorityCompleted}
                       </td>
-                      <td className="py-3 text-center text-content-secondary">
+                      <td className="py-3 text-center" style={{ color: 'var(--text-secondary)' }}>
                         {member.avgCompletionDays !== null ? `${member.avgCompletionDays}d` : '-'}
                       </td>
                     </tr>
@@ -510,29 +729,41 @@ export default function Analytics() {
 }
 
 function MetricCard({ icon: Icon, label, value, total, color }) {
-  const colors = {
-    purple: 'bg-accent-tertiary-dim text-accent-tertiary',
-    blue: 'bg-semantic-info-dim text-semantic-info',
-    green: 'bg-semantic-success-dim text-semantic-success',
-    yellow: 'bg-yellow-100 text-yellow-600',
-    red: 'bg-semantic-error-dim text-semantic-error',
-    gray: 'bg-surface-muted text-content-secondary'
+  const iconColors = {
+    purple: { bg: 'rgba(255,184,0,0.1)',  color: 'var(--accent-tertiary)' },
+    blue:   { bg: 'rgba(0,245,212,0.1)',  color: 'var(--accent-secondary)' },
+    green:  { bg: 'rgba(0,245,212,0.08)', color: 'var(--accent-secondary)' },
+    yellow: { bg: 'rgba(255,184,0,0.08)', color: 'var(--accent-tertiary)' },
+    red:    { bg: 'rgba(255,45,107,0.1)', color: 'var(--accent-primary)' },
+    gray:   { bg: 'rgba(248,240,242,0.06)', color: 'var(--text-secondary)' },
   };
 
+  const scheme = iconColors[color] || iconColors.gray;
+
   return (
-    <div className="card p-4">
+    <div className="vc p-4">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-content-tertiary">{label}</p>
-          <p className="text-2xl font-bold text-content-primary">
+          <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>{label}</p>
+          <p
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontWeight: 700,
+              fontSize: 24,
+              color: 'var(--text-primary)',
+            }}
+          >
             {value}
             {total !== undefined && (
-              <span className="text-sm text-content-tertiary font-normal">/{total}</span>
+              <span className="text-sm font-normal" style={{ color: 'var(--text-tertiary)' }}>/{total}</span>
             )}
           </p>
         </div>
-        <div className={`p-3 rounded-lg ${colors[color]}`}>
-          <Icon className="h-6 w-6" />
+        <div
+          className="p-3 rounded-lg"
+          style={{ background: scheme.bg }}
+        >
+          <Icon className="h-6 w-6" style={{ color: scheme.color }} />
         </div>
       </div>
     </div>
@@ -541,24 +772,24 @@ function MetricCard({ icon: Icon, label, value, total, color }) {
 
 function StatusBar({ label, value, total, color }) {
   const percent = total > 0 ? (value / total) * 100 : 0;
-  const colors = {
-    green: 'bg-green-500',
-    blue: 'bg-blue-500',
-    yellow: 'bg-yellow-500',
-    red: 'bg-semantic-error',
-    gray: 'bg-gray-500'
+  const barColors = {
+    green:  'var(--accent-secondary)',
+    blue:   'var(--accent-secondary)',
+    yellow: 'var(--accent-tertiary)',
+    red:    'var(--accent-primary)',
+    gray:   'rgba(248,240,242,0.3)',
   };
 
   return (
     <div>
       <div className="flex justify-between text-sm mb-1">
-        <span className="text-content-secondary">{label}</span>
-        <span className="text-content-primary font-medium">{value}</span>
+        <span style={{ color: 'var(--text-secondary)' }}>{label}</span>
+        <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{value}</span>
       </div>
-      <div className="w-full h-2 bg-surface-muted rounded-full">
+      <div className="w-full h-2 rounded-full" style={{ background: 'rgba(248,240,242,0.08)' }}>
         <div
-          className={`h-full rounded-full ${colors[color]}`}
-          style={{ width: `${percent}%` }}
+          className="h-full rounded-full transition-all"
+          style={{ width: `${percent}%`, background: barColors[color] || barColors.gray }}
         />
       </div>
     </div>

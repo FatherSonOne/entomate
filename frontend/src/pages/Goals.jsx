@@ -6,6 +6,7 @@ import {
   Calendar, BarChart3, Edit2, Trash2
 } from 'lucide-react';
 import api from '../services/api';
+import { VCButton, VCBadge } from '../components/vc';
 
 export default function Goals() {
   const [goals, setGoals] = useState([]);
@@ -50,20 +51,19 @@ export default function Goals() {
     setExpandedGoals(newExpanded);
   };
 
-  const getProgressColor = (progress) => {
-    if (progress >= 70) return 'bg-green-500';
-    if (progress >= 40) return 'bg-yellow-500';
-    return 'bg-semantic-error';
+  const getProgressBarStyle = (progress) => {
+    if (progress >= 70) return { background: 'var(--accent-secondary)' };
+    if (progress >= 40) return { background: 'var(--accent-tertiary)' };
+    return { background: 'var(--accent-primary)' };
   };
 
   const getStatusBadge = (status) => {
-    const styles = {
-      planning: 'badge-gray',
-      active: 'badge-blue',
-      completed: 'badge-green',
-      abandoned: 'badge-red'
-    };
-    return styles[status] || 'badge-gray';
+    switch (status) {
+      case 'completed': return <VCBadge color="mint">{status}</VCBadge>;
+      case 'active':    return <VCBadge color="amber">{status}</VCBadge>;
+      case 'abandoned': return <VCBadge color="crimson">{status}</VCBadge>;
+      default:          return <VCBadge color="neutral">{status}</VCBadge>; // planning, etc.
+    }
   };
 
   const GoalTypeIcon = ({ type }) => {
@@ -84,9 +84,11 @@ export default function Goals() {
     const hasChildren = goal.children && goal.children.length > 0;
 
     return (
-      <div className={`${level > 0 ? 'ml-8 border-l-2 border-line-default pl-4' : ''}`}>
+      <div className={`${level > 0 ? 'ml-8 pl-4' : ''}`}
+        style={level > 0 ? { borderLeft: '2px solid rgba(248,240,242,.08)' } : {}}
+      >
         <div
-          className={`card p-4 mb-3 cursor-pointer hover:shadow-md transition-shadow ${
+          className={`vc p-4 mb-3 cursor-pointer transition-shadow ${
             selectedGoal?.id === goal.id ? 'ring-2 ring-primary-500' : ''
           }`}
           onClick={() => setSelectedGoal(goal)}
@@ -99,12 +101,13 @@ export default function Goals() {
                     e.stopPropagation();
                     toggleExpand(goal.id);
                   }}
-                  className="mt-1 p-1 hover:bg-surface-muted rounded"
+                  className="mt-1 p-1 rounded"
+                  style={{ ['--hover-bg']: 'var(--bg-elevated)' }}
                 >
                   {isExpanded ? (
-                    <ChevronDown className="h-4 w-4 text-content-tertiary" />
+                    <ChevronDown className="h-4 w-4" style={{ color: 'var(--text-tertiary)' }} />
                   ) : (
-                    <ChevronRight className="h-4 w-4 text-content-tertiary" />
+                    <ChevronRight className="h-4 w-4" style={{ color: 'var(--text-tertiary)' }} />
                   )}
                 </button>
               )}
@@ -115,22 +118,27 @@ export default function Goals() {
                 <GoalTypeIcon type={goal.goal_type} />
               </div>
               <div>
-                <h3 className="font-semibold text-content-primary">{goal.title}</h3>
+                <h3
+                  className="font-semibold"
+                  style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
+                >
+                  {goal.title}
+                </h3>
                 {goal.description && (
-                  <p className="text-sm text-content-tertiary mt-1">{goal.description}</p>
+                  <p className="text-sm mt-1" style={{ color: 'var(--text-tertiary)' }}>
+                    {goal.description}
+                  </p>
                 )}
                 <div className="flex items-center gap-3 mt-2">
-                  <span className={`badge ${getStatusBadge(goal.status)} text-xs`}>
-                    {goal.status}
-                  </span>
+                  {getStatusBadge(goal.status)}
                   {goal.quarter && (
-                    <span className="text-xs text-content-tertiary flex items-center gap-1">
+                    <span className="text-xs flex items-center gap-1" style={{ color: 'var(--text-tertiary)' }}>
                       <Calendar className="h-3 w-3" />
                       {goal.quarter}
                     </span>
                   )}
                   {goal.key_results?.length > 0 && (
-                    <span className="text-xs text-content-tertiary">
+                    <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
                       {goal.key_results.length} Key Results
                     </span>
                   )}
@@ -138,13 +146,22 @@ export default function Goals() {
               </div>
             </div>
             <div className="text-right">
-              <div className="text-2xl font-bold text-content-primary">
+              <div
+                className="text-2xl font-bold"
+                style={{ color: 'var(--text-primary)' }}
+              >
                 {Math.round(goal.progress || 0)}%
               </div>
-              <div className="w-24 h-2 bg-surface-muted rounded-full mt-1">
+              <div
+                className="w-24 h-2 rounded-full mt-1"
+                style={{ background: 'var(--bg-elevated)' }}
+              >
                 <div
-                  className={`h-full rounded-full ${getProgressColor(goal.progress)}`}
-                  style={{ width: `${Math.min(goal.progress || 0, 100)}%` }}
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${Math.min(goal.progress || 0, 100)}%`,
+                    ...getProgressBarStyle(goal.progress)
+                  }}
                 />
               </div>
             </div>
@@ -152,18 +169,23 @@ export default function Goals() {
 
           {/* Key Results Preview */}
           {goal.key_results?.length > 0 && (
-            <div className="mt-4 pt-3 border-t border-line-subtle">
+            <div
+              className="mt-4 pt-3 border-t"
+              style={{ borderColor: 'rgba(248,240,242,.08)' }}
+            >
               <div className="space-y-2">
                 {goal.key_results.slice(0, 3).map((kr) => (
                   <div key={kr.id} className="flex items-center justify-between text-sm">
-                    <span className="text-content-secondary truncate flex-1">{kr.title}</span>
-                    <span className="text-content-primary font-medium ml-4">
+                    <span className="truncate flex-1" style={{ color: 'var(--text-secondary)' }}>
+                      {kr.title}
+                    </span>
+                    <span className="font-medium ml-4" style={{ color: 'var(--text-primary)' }}>
                       {kr.current}/{kr.target} {kr.unit}
                     </span>
                   </div>
                 ))}
                 {goal.key_results.length > 3 && (
-                  <p className="text-xs text-content-tertiary">
+                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
                     +{goal.key_results.length - 3} more
                   </p>
                 )}
@@ -187,7 +209,10 @@ export default function Goals() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+        <div
+          className="animate-spin rounded-full h-8 w-8 border-b-2"
+          style={{ borderColor: 'var(--accent-primary)' }}
+        ></div>
       </div>
     );
   }
@@ -197,60 +222,70 @@ export default function Goals() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-content-primary flex items-center gap-2">
-            <Target className="h-7 w-7 text-accent-primary" />
+          <h1
+            className="text-2xl font-bold flex items-center gap-2"
+            style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
+          >
+            <Target className="h-7 w-7" style={{ color: 'var(--accent-primary)' }} />
             Goals & OKRs
           </h1>
-          <p className="text-content-tertiary mt-1">
+          <p className="mt-1" style={{ color: 'var(--text-tertiary)' }}>
             Track company, team, and individual objectives
           </p>
         </div>
-        <button
+        <VCButton
+          variant="primary"
           onClick={() => setShowCreateModal(true)}
-          className="btn btn-primary flex items-center gap-2"
+          className="flex items-center gap-2"
         >
           <Plus className="h-4 w-4" />
           New Goal
-        </button>
+        </VCButton>
       </div>
 
       {/* Stats Overview */}
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="card p-4">
+          <div className="vc p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-content-tertiary">Total Goals</p>
-                <p className="text-2xl font-bold text-content-primary">{stats.total}</p>
+                <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Total Goals</p>
+                <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{stats.total}</p>
               </div>
-              <Target className="h-8 w-8 text-content-tertiary" />
+              <Target className="h-8 w-8" style={{ color: 'var(--text-tertiary)' }} />
             </div>
           </div>
-          <div className="card p-4">
+          <div className="vc p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-content-tertiary">Avg Progress</p>
-                <p className="text-2xl font-bold text-accent-primary">{stats.averageProgress}%</p>
+                <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Avg Progress</p>
+                <p className="text-2xl font-bold" style={{ color: 'var(--accent-primary)' }}>
+                  {stats.averageProgress}%
+                </p>
               </div>
-              <TrendingUp className="h-8 w-8 text-primary-400" />
+              <TrendingUp className="h-8 w-8" style={{ color: 'var(--accent-primary)' }} />
             </div>
           </div>
-          <div className="card p-4">
+          <div className="vc p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-content-tertiary">On Track</p>
-                <p className="text-2xl font-bold text-semantic-success">{stats.onTrack}</p>
+                <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>On Track</p>
+                <p className="text-2xl font-bold" style={{ color: 'var(--accent-secondary)' }}>
+                  {stats.onTrack}
+                </p>
               </div>
-              <CheckCircle className="h-8 w-8 text-green-400" />
+              <CheckCircle className="h-8 w-8" style={{ color: 'var(--accent-secondary)' }} />
             </div>
           </div>
-          <div className="card p-4">
+          <div className="vc p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-content-tertiary">At Risk</p>
-                <p className="text-2xl font-bold text-semantic-error">{stats.atRisk}</p>
+                <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>At Risk</p>
+                <p className="text-2xl font-bold" style={{ color: 'var(--accent-primary)' }}>
+                  {stats.atRisk}
+                </p>
               </div>
-              <AlertCircle className="h-8 w-8 text-red-400" />
+              <AlertCircle className="h-8 w-8" style={{ color: 'var(--accent-primary)' }} />
             </div>
           </div>
         </div>
@@ -258,26 +293,20 @@ export default function Goals() {
 
       {/* View Toggle */}
       <div className="flex items-center gap-2">
-        <button
+        <VCButton
+          variant={viewMode === 'hierarchy' ? 'primary' : 'ghost'}
+          size="sm"
           onClick={() => setViewMode('hierarchy')}
-          className={`px-3 py-1.5 rounded-lg text-sm ${
-            viewMode === 'hierarchy'
-              ? 'bg-primary-100 text-primary-700'
-              : 'text-content-secondary hover:bg-surface-muted'
-          }`}
         >
           Hierarchy View
-        </button>
-        <button
+        </VCButton>
+        <VCButton
+          variant={viewMode === 'list' ? 'primary' : 'ghost'}
+          size="sm"
           onClick={() => setViewMode('list')}
-          className={`px-3 py-1.5 rounded-lg text-sm ${
-            viewMode === 'list'
-              ? 'bg-primary-100 text-primary-700'
-              : 'text-content-secondary hover:bg-surface-muted'
-          }`}
         >
           List View
-        </button>
+        </VCButton>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -288,8 +317,11 @@ export default function Goals() {
               {/* Company Goals */}
               {hierarchy.company?.length > 0 && (
                 <div>
-                  <h2 className="text-lg font-semibold text-content-primary mb-3 flex items-center gap-2">
-                    <Building2 className="h-5 w-5 text-accent-tertiary" />
+                  <h2
+                    className="text-lg font-semibold mb-3 flex items-center gap-2"
+                    style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
+                  >
+                    <Building2 className="h-5 w-5" style={{ color: 'var(--accent-tertiary)' }} />
                     Company Goals
                   </h2>
                   {hierarchy.company.map((goal) => (
@@ -301,8 +333,11 @@ export default function Goals() {
               {/* Orphan Team Goals */}
               {hierarchy.teams?.length > 0 && (
                 <div>
-                  <h2 className="text-lg font-semibold text-content-primary mb-3 flex items-center gap-2">
-                    <Users className="h-5 w-5 text-semantic-info" />
+                  <h2
+                    className="text-lg font-semibold mb-3 flex items-center gap-2"
+                    style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
+                  >
+                    <Users className="h-5 w-5" style={{ color: 'var(--accent-secondary)' }} />
                     Team Goals
                   </h2>
                   {hierarchy.teams.map((goal) => (
@@ -314,8 +349,11 @@ export default function Goals() {
               {/* Orphan Individual Goals */}
               {hierarchy.individuals?.length > 0 && (
                 <div>
-                  <h2 className="text-lg font-semibold text-content-primary mb-3 flex items-center gap-2">
-                    <User className="h-5 w-5 text-semantic-success" />
+                  <h2
+                    className="text-lg font-semibold mb-3 flex items-center gap-2"
+                    style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
+                  >
+                    <User className="h-5 w-5" style={{ color: 'var(--accent-secondary)' }} />
                     Individual Goals
                   </h2>
                   {hierarchy.individuals.map((goal) => (
@@ -333,18 +371,20 @@ export default function Goals() {
           )}
 
           {goals.length === 0 && (
-            <div className="card p-8 text-center">
-              <Target className="h-12 w-12 text-content-tertiary mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-content-primary mb-2">No goals yet</h3>
-              <p className="text-content-tertiary mb-4">
+            <div className="vc p-8 text-center">
+              <Target className="h-12 w-12 mx-auto mb-4" style={{ color: 'var(--text-tertiary)' }} />
+              <h3
+                className="text-lg font-medium mb-2"
+                style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
+              >
+                No goals yet
+              </h3>
+              <p className="mb-4" style={{ color: 'var(--text-tertiary)' }}>
                 Create your first goal to start tracking progress
               </p>
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="btn btn-primary"
-              >
+              <VCButton variant="primary" onClick={() => setShowCreateModal(true)}>
                 Create Goal
-              </button>
+              </VCButton>
             </div>
           )}
         </div>
@@ -358,9 +398,9 @@ export default function Goals() {
               onClose={() => setSelectedGoal(null)}
             />
           ) : (
-            <div className="card p-8 text-center">
-              <BarChart3 className="h-12 w-12 text-content-tertiary mx-auto mb-4" />
-              <p className="text-content-tertiary">
+            <div className="vc p-8 text-center">
+              <BarChart3 className="h-12 w-12 mx-auto mb-4" style={{ color: 'var(--text-tertiary)' }} />
+              <p style={{ color: 'var(--text-tertiary)' }}>
                 Select a goal to view details
               </p>
             </div>
@@ -423,62 +463,91 @@ function GoalDetailPanel({ goal, onUpdate, onClose }) {
     }
   };
 
+  const getProgressBarStyle = (progress) => {
+    if (progress >= 70) return { background: 'var(--accent-secondary)' };
+    if (progress >= 40) return { background: 'var(--accent-tertiary)' };
+    return { background: 'var(--accent-primary)' };
+  };
+
   return (
-    <div className="card p-4 space-y-4">
+    <div className="vc p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-content-primary">{goal.title}</h3>
+        <h3
+          className="font-semibold"
+          style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
+        >
+          {goal.title}
+        </h3>
         <button
           onClick={deleteGoal}
-          className="p-2 text-semantic-error hover:bg-semantic-error-dim rounded-lg"
+          className="p-2 rounded-lg hover:bg-red-500/10 hover:text-red-400 transition-colors"
+          style={{ color: 'var(--accent-primary)' }}
         >
           <Trash2 className="h-4 w-4" />
         </button>
       </div>
 
       {goal.description && (
-        <p className="text-sm text-content-tertiary">{goal.description}</p>
+        <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>{goal.description}</p>
       )}
 
       {/* Progress */}
       <div>
         <div className="flex justify-between text-sm mb-1">
-          <span className="text-content-tertiary">Progress</span>
-          <span className="font-medium">{Math.round(goal.progress || 0)}%</span>
+          <span style={{ color: 'var(--text-tertiary)' }}>Progress</span>
+          <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
+            {Math.round(goal.progress || 0)}%
+          </span>
         </div>
-        <div className="w-full h-3 bg-surface-muted rounded-full">
+        <div className="w-full h-3 rounded-full" style={{ background: 'var(--bg-elevated)' }}>
           <div
-            className={`h-full rounded-full ${
-              goal.progress >= 70 ? 'bg-green-500' :
-              goal.progress >= 40 ? 'bg-yellow-500' : 'bg-semantic-error'
-            }`}
-            style={{ width: `${Math.min(goal.progress || 0, 100)}%` }}
+            className="h-full rounded-full"
+            style={{
+              width: `${Math.min(goal.progress || 0, 100)}%`,
+              ...getProgressBarStyle(goal.progress)
+            }}
           />
         </div>
       </div>
 
       {/* Key Results */}
       <div>
-        <h4 className="font-medium text-content-primary mb-3">Key Results</h4>
+        <h4
+          className="font-medium mb-3"
+          style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
+        >
+          Key Results
+        </h4>
         <div className="space-y-3">
           {(goal.key_results || []).map((kr) => (
-            <div key={kr.id} className="bg-surface-muted rounded-lg p-3">
+            <div
+              key={kr.id}
+              className="rounded-lg p-3"
+              style={{ background: 'var(--bg-elevated)' }}
+            >
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-content-primary">{kr.title}</span>
+                <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                  {kr.title}
+                </span>
                 <button
                   onClick={() => setEditingKR(editingKR === kr.id ? null : kr.id)}
-                  className="text-content-tertiary hover:text-content-secondary"
+                  style={{ color: 'var(--text-tertiary)' }}
+                  className="hover:opacity-80 transition-opacity"
                 >
                   <Edit2 className="h-3 w-3" />
                 </button>
               </div>
               <div className="flex items-center gap-2">
-                <div className="flex-1 h-2 bg-surface-muted rounded-full">
+                <div className="flex-1 h-2 rounded-full" style={{ background: 'var(--bg-elevated)' }}>
                   <div
-                    className="h-full bg-primary-500 rounded-full"
-                    style={{ width: `${Math.min((kr.current / kr.target) * 100, 100)}%` }}
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${Math.min((kr.current / kr.target) * 100, 100)}%`,
+                      background: 'var(--accent-primary)'
+                    }}
                   />
                 </div>
-                <span className="text-xs text-content-tertiary">
+                <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
                   {kr.current}/{kr.target} {kr.unit}
                 </span>
               </div>
@@ -493,14 +562,17 @@ function GoalDetailPanel({ goal, onUpdate, onClose }) {
                       setEditingKR(null);
                     }}
                   />
-                  <span className="text-sm text-content-tertiary">/ {kr.target}</span>
+                  <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>/ {kr.target}</span>
                 </div>
               )}
             </div>
           ))}
 
           {/* Add Key Result */}
-          <div className="border-2 border-dashed border-line-default rounded-lg p-3">
+          <div
+            className="border-2 border-dashed rounded-lg p-3"
+            style={{ borderColor: 'rgba(248,240,242,.08)' }}
+          >
             <input
               type="text"
               value={newKRTitle}
@@ -516,20 +588,24 @@ function GoalDetailPanel({ goal, onUpdate, onClose }) {
                 placeholder="Target"
                 className="input text-sm flex-1"
               />
-              <button
+              <VCButton
+                variant="primary"
+                size="sm"
                 onClick={addKeyResult}
                 disabled={!newKRTitle || !newKRTarget}
-                className="btn btn-primary btn-sm"
               >
                 Add
-              </button>
+              </VCButton>
             </div>
           </div>
         </div>
       </div>
 
       {/* Metadata */}
-      <div className="pt-3 border-t border-line-default text-xs text-content-tertiary space-y-1">
+      <div
+        className="pt-3 border-t text-xs space-y-1"
+        style={{ borderColor: 'rgba(248,240,242,.08)', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}
+      >
         <p>Quarter: {goal.quarter}</p>
         <p>Type: {goal.goal_type}</p>
         <p>Status: {goal.status}</p>
@@ -571,15 +647,29 @@ function CreateGoalModal({ goals, onClose, onCreated }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-surface rounded-xl shadow-xl max-w-lg w-full mx-4">
+      <div
+        className="rounded-xl shadow-xl max-w-lg w-full mx-4"
+        style={{ background: 'var(--bg-elevated)' }}
+      >
         <form onSubmit={handleSubmit}>
-          <div className="p-6 border-b border-line-default">
-            <h2 className="text-xl font-bold text-content-primary">Create Goal</h2>
+          <div
+            className="p-6 border-b"
+            style={{ borderColor: 'rgba(248,240,242,.08)' }}
+          >
+            <h2
+              className="text-xl font-bold"
+              style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
+            >
+              Create Goal
+            </h2>
           </div>
 
           <div className="p-6 space-y-4">
             <div>
-              <label className="block text-sm font-medium text-content-secondary mb-1">
+              <label
+                className="block text-sm font-medium mb-1"
+                style={{ color: 'var(--text-secondary)' }}
+              >
                 Goal Title *
               </label>
               <input
@@ -593,7 +683,10 @@ function CreateGoalModal({ goals, onClose, onCreated }) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-content-secondary mb-1">
+              <label
+                className="block text-sm font-medium mb-1"
+                style={{ color: 'var(--text-secondary)' }}
+              >
                 Description
               </label>
               <textarea
@@ -607,7 +700,10 @@ function CreateGoalModal({ goals, onClose, onCreated }) {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-content-secondary mb-1">
+                <label
+                  className="block text-sm font-medium mb-1"
+                  style={{ color: 'var(--text-secondary)' }}
+                >
                   Goal Type
                 </label>
                 <select
@@ -626,7 +722,10 @@ function CreateGoalModal({ goals, onClose, onCreated }) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-content-secondary mb-1">
+                <label
+                  className="block text-sm font-medium mb-1"
+                  style={{ color: 'var(--text-secondary)' }}
+                >
                   Quarter
                 </label>
                 <select
@@ -643,7 +742,10 @@ function CreateGoalModal({ goals, onClose, onCreated }) {
 
             {parentOptions.length > 0 && (
               <div>
-                <label className="block text-sm font-medium text-content-secondary mb-1">
+                <label
+                  className="block text-sm font-medium mb-1"
+                  style={{ color: 'var(--text-secondary)' }}
+                >
                   Parent Goal (optional)
                 </label>
                 <select
@@ -660,13 +762,16 @@ function CreateGoalModal({ goals, onClose, onCreated }) {
             )}
           </div>
 
-          <div className="p-6 border-t border-line-default flex justify-end gap-3">
-            <button type="button" onClick={onClose} className="btn btn-secondary">
+          <div
+            className="p-6 border-t flex justify-end gap-3"
+            style={{ borderColor: 'rgba(248,240,242,.08)' }}
+          >
+            <VCButton type="button" variant="secondary" onClick={onClose}>
               Cancel
-            </button>
-            <button type="submit" disabled={saving || !formData.title} className="btn btn-primary">
+            </VCButton>
+            <VCButton type="submit" variant="primary" disabled={saving || !formData.title}>
               {saving ? 'Creating...' : 'Create Goal'}
-            </button>
+            </VCButton>
           </div>
         </form>
       </div>

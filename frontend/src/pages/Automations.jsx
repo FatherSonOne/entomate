@@ -53,6 +53,7 @@ const renderTemplateIcon = (iconName, className = "w-6 h-6") => {
 import { automationsApi } from '../services/api'
 import AutomationBuilder from '../components/AutomationBuilder'
 import { GuideCard, PageHeader, Skeleton } from '../components/SharedUI'
+import { VCButton, VCBadge } from '../components/vc'
 
 export default function Automations() {
   const [automations, setAutomations] = useState([])
@@ -260,83 +261,83 @@ export default function Automations() {
 
   return (
     <div className="animate-fade-in max-w-7xl mx-auto">
-      <PageHeader 
-        title="Workflow Automations" 
+      <PageHeader
+        title="Workflow Automations"
         subtitle="Build intelligent workflows with triggers, conditions, and AI-powered actions."
         actions={
           <div className="flex gap-2">
-            <button
+            <VCButton
+              variant={showHistory ? 'primary' : 'secondary'}
               onClick={() => { setShowHistory(!showHistory); if (!showHistory) loadExecutionLogs(); }}
-              className={`btn ${showHistory ? 'btn-primary' : 'btn-secondary'}`}
             >
               <History size={16} />
               History
-            </button>
-            <button
+            </VCButton>
+            <VCButton
+              variant="secondary"
               onClick={() => {
                 setShowCreate(!showCreate)
                 setWizardStep(0)
               }}
-              className="btn btn-secondary"
             >
               <Plus size={16} />
               Template
-            </button>
-            <button
+            </VCButton>
+            <VCButton
+              variant="primary"
               onClick={() => {
                 setShowBuilder(true)
                 setWizardStep(1)
               }}
-              className="btn btn-primary"
             >
               <Wrench size={16} />
               Custom Build
-            </button>
+            </VCButton>
           </div>
         }
       />
 
-      <GuideCard 
-        title="Automation Workflow" 
-        steps={['Choose Template', 'Configure Actions', 'Monitor Performance']} 
-        activeStep={wizardStep} 
+      <GuideCard
+        title="Automation Workflow"
+        steps={['Choose Template', 'Configure Actions', 'Monitor Performance']}
+        activeStep={wizardStep}
       />
 
       {/* Execution History */}
       {showHistory && (
-        <div className="card mb-6 animate-fade-in">
-          <div className="p-4 border-b border-line-subtle flex items-center justify-between">
-            <h3 className="font-bold text-content-primary flex items-center gap-2">
+        <div className="vc mb-6 animate-fade-in">
+          <div className="p-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(248,240,242,.08)' }}>
+            <h3 className="font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
               <History size={20} />
               Execution History
             </h3>
-            <button onClick={loadExecutionLogs} className="btn btn-ghost btn-sm">
+            <VCButton variant="ghost" size="sm" onClick={loadExecutionLogs}>
               <RefreshCw size={16} className={loadingLogs ? 'animate-spin' : ''} />
-            </button>
+            </VCButton>
           </div>
           <div className="max-h-96 overflow-y-auto">
             {loadingLogs ? (
               <Skeleton className="h-20" count={3} />
             ) : executionLogs.length === 0 ? (
-              <div className="p-8 text-center text-content-tertiary">No execution history yet</div>
+              <div className="p-8 text-center" style={{ color: 'var(--text-tertiary)' }}>No execution history yet</div>
             ) : (
-              <div className="divide-y divide-line-subtle">
+              <div style={{ borderTop: '1px solid rgba(248,240,242,.08)' }}>
                 {executionLogs.map((log, idx) => (
-                  <div key={idx} className="p-3 flex items-center gap-3 hover:bg-surface-muted transition-colors">
+                  <div key={idx} className="p-3 flex items-center gap-3 transition-colors hover:bg-black/20" style={{ borderBottom: '1px solid rgba(248,240,242,.06)' }}>
                     {log.success ? (
-                      <CheckCircle2 size={18} className="text-semantic-success flex-shrink-0" />
+                      <CheckCircle2 size={18} className="flex-shrink-0" style={{ color: 'var(--accent-secondary)' }} />
                     ) : (
-                      <XCircle size={18} className="text-semantic-error flex-shrink-0" />
+                      <XCircle size={18} className="flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
                     )}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-content-primary">{log.automationName || 'Unknown'}</p>
-                      <p className="text-xs text-content-tertiary font-mono">
+                      <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{log.automationName || 'Unknown'}</p>
+                      <p className="text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
                         {new Date(log.created_at).toLocaleString()}
                         {log.duration_ms && ` • ${log.duration_ms}ms`}
                       </p>
                     </div>
                     {log.error_message && (
-                      <span className="text-xs text-semantic-error truncate max-w-32">{log.error_message}</span>
+                      <span className="text-xs truncate max-w-32" style={{ color: 'var(--accent-primary)' }}>{log.error_message}</span>
                     )}
                   </div>
                 ))}
@@ -359,29 +360,29 @@ export default function Automations() {
 
       {/* Scheduler Status */}
       {schedulerStatus.length > 0 && (
-        <div className="card mb-6 animate-fade-in">
-          <div className="p-4 border-b border-line-subtle flex items-center justify-between">
-            <h3 className="font-bold text-content-primary flex items-center gap-2">
-              <Calendar size={20} className="text-accent-secondary" />
+        <div className="vc mb-6 animate-fade-in">
+          <div className="p-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(248,240,242,.08)' }}>
+            <h3 className="font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+              <Calendar size={20} style={{ color: 'var(--accent-secondary)' }} />
               Scheduled Automations
             </h3>
-            <button onClick={() => setSchedulerStatus([])} className="btn btn-ghost btn-sm">
+            <VCButton variant="ghost" size="sm" onClick={() => setSchedulerStatus([])}>
               <XCircle size={16} />
-            </button>
+            </VCButton>
           </div>
-          <div className="divide-y divide-line-subtle">
+          <div>
             {schedulerStatus.map((scheduled) => (
-              <div key={scheduled.id} className="p-3 flex items-center gap-3">
-                <Clock size={18} className="text-accent-secondary flex-shrink-0" />
+              <div key={scheduled.id} className="p-3 flex items-center gap-3" style={{ borderBottom: '1px solid rgba(248,240,242,.06)' }}>
+                <Clock size={18} className="flex-shrink-0" style={{ color: 'var(--accent-secondary)' }} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-content-primary">{scheduled.name}</p>
-                  <p className="text-xs text-content-tertiary font-mono">
+                  <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{scheduled.name}</p>
+                  <p className="text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
                     {scheduled.cronExpression}
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs text-content-tertiary">Next run:</p>
-                  <p className="text-sm text-content-secondary font-mono">
+                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Next run:</p>
+                  <p className="text-sm" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
                     {scheduled.nextRun ? new Date(scheduled.nextRun).toLocaleString() : 'N/A'}
                   </p>
                 </div>
@@ -393,41 +394,45 @@ export default function Automations() {
 
       {/* Create from templates */}
       {showCreate && (
-        <div className="card p-6 mb-6 animate-fade-in">
+        <div className="vc p-6 mb-6 animate-fade-in">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="font-bold text-content-primary text-lg">Choose a Template</h3>
+            <h3 className="font-bold text-lg" style={{ color: 'var(--text-primary)' }}>Choose a Template</h3>
             <div className="flex gap-2 flex-wrap">
-              <button
+              <VCButton
+                variant={selectedCategory === 'all' ? 'primary' : 'ghost'}
+                size="sm"
                 onClick={() => setSelectedCategory('all')}
-                className={`btn btn-sm ${selectedCategory === 'all' ? 'btn-primary' : 'btn-ghost'}`}
               >
                 All
-              </button>
-              <button
+              </VCButton>
+              <VCButton
+                variant={selectedCategory === 'ai' ? 'primary' : 'ghost'}
+                size="sm"
                 onClick={() => setSelectedCategory('ai')}
-                className={`btn btn-sm ${selectedCategory === 'ai' ? 'btn-primary' : 'btn-ghost'}`}
               >
                 <Sparkles size={14} /> AI
-              </button>
-              <button
+              </VCButton>
+              <VCButton
+                variant={selectedCategory === 'integration' ? 'primary' : 'ghost'}
+                size="sm"
                 onClick={() => setSelectedCategory('integration')}
-                className={`btn btn-sm ${selectedCategory === 'integration' ? 'btn-primary' : 'btn-ghost'}`}
               >
                 <RefreshCw size={14} /> Integration
-              </button>
-              <button
+              </VCButton>
+              <VCButton
+                variant={selectedCategory === 'crm' ? 'primary' : 'ghost'}
+                size="sm"
                 onClick={() => setSelectedCategory('crm')}
-                className={`btn btn-sm ${selectedCategory === 'crm' ? 'btn-primary' : 'btn-ghost'}`}
               >
                 <Users size={14} /> CRM
-              </button>
+              </VCButton>
             </div>
           </div>
 
           {/* AI Agent Templates Section */}
           {(selectedCategory === 'all' || selectedCategory === 'ai') && aiTemplates.length > 0 && (
             <div className="mb-6">
-              <h4 className="text-sm font-bold text-accent-tertiary mb-3 flex items-center gap-2">
+              <h4 className="text-sm font-bold mb-3 flex items-center gap-2" style={{ color: 'var(--accent-tertiary)' }}>
                 <Bot size={16} />
                 AI-Powered Automations
               </h4>
@@ -435,20 +440,19 @@ export default function Automations() {
                 {aiTemplates.map((template) => (
                   <div
                     key={template.id}
-                    className="card p-4 hover:border-accent-tertiary cursor-pointer transition-all group"
+                    className="vc p-4 cursor-pointer transition-all group"
+                    style={{ borderColor: 'rgba(248,240,242,.08)' }}
                     onClick={() => handleCreateFromTemplate(template)}
                   >
                     <div className="flex items-start gap-3">
-                      <div className="p-2 bg-accent-tertiary/10 rounded-md group-hover:bg-accent-tertiary group-hover:text-white transition-colors">
+                      <div className="p-2 rounded-md transition-colors group-hover:scale-110" style={{ background: 'rgba(255,184,0,.1)', color: 'var(--accent-tertiary)' }}>
                         <Bot size={20} />
                       </div>
                       <div className="flex-1">
-                        <h4 className="font-bold text-content-primary mb-1">{template.name}</h4>
-                        <p className="text-sm text-content-secondary mb-2">{template.description}</p>
+                        <h4 className="font-bold mb-1" style={{ color: 'var(--text-primary)' }}>{template.name}</h4>
+                        <p className="text-sm mb-2" style={{ color: 'var(--text-secondary)' }}>{template.description}</p>
                         <div className="flex items-center gap-2">
-                          <span className="text-xs px-2 py-1 bg-accent-tertiary/10 text-accent-tertiary rounded-sm border border-accent-tertiary/20 font-mono">
-                            AI Agent
-                          </span>
+                          <VCBadge color="amber">AI Agent</VCBadge>
                         </div>
                       </div>
                     </div>
@@ -461,7 +465,7 @@ export default function Automations() {
           {/* CRM Templates Section */}
           {(selectedCategory === 'all' || selectedCategory === 'crm') && crmTemplates.length > 0 && (
             <div className="mb-6">
-              <h4 className="text-sm font-bold text-accent-secondary mb-3 flex items-center gap-2">
+              <h4 className="text-sm font-bold mb-3 flex items-center gap-2" style={{ color: 'var(--accent-secondary)' }}>
                 <Users size={16} />
                 CRM Workflows
               </h4>
@@ -469,26 +473,24 @@ export default function Automations() {
                 {crmTemplates.map((template) => (
                   <div
                     key={template.id}
-                    className="card p-4 hover:border-accent-secondary cursor-pointer transition-all group"
+                    className="vc p-4 cursor-pointer transition-all group"
                     onClick={() => handleCreateFromTemplate(template)}
                   >
                     <div className="flex items-start gap-3">
-                      <div className="p-2 bg-accent-secondary/10 rounded-md group-hover:bg-accent-secondary group-hover:text-white transition-colors">
+                      <div className="p-2 rounded-md transition-colors group-hover:scale-110" style={{ background: 'rgba(0,245,212,.1)', color: 'var(--accent-secondary)' }}>
                         {renderTemplateIcon(template.icon, "w-5 h-5")}
                       </div>
                       <div className="flex-1">
-                        <h4 className="font-bold text-content-primary mb-1">{template.name}</h4>
-                        <p className="text-sm text-content-secondary mb-2">{template.description}</p>
+                        <h4 className="font-bold mb-1" style={{ color: 'var(--text-primary)' }}>{template.name}</h4>
+                        <p className="text-sm mb-2" style={{ color: 'var(--text-secondary)' }}>{template.description}</p>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs px-2 py-1 bg-accent-secondary/10 text-accent-secondary rounded-sm border border-accent-secondary/20 font-mono">
-                            CRM
-                          </span>
+                          <VCBadge color="mint">CRM</VCBadge>
                           {template.isWorkflowTemplate && (
-                            <span className="text-xs text-content-tertiary font-mono">
+                            <span className="text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
                               {template.nodeCount} nodes
                             </span>
                           )}
-                          <span className="text-xs text-content-tertiary font-mono">
+                          <span className="text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
                             {template.actions?.length || 0} action{(template.actions?.length || 0) !== 1 ? 's' : ''}
                           </span>
                         </div>
@@ -503,7 +505,7 @@ export default function Automations() {
           {/* Standard Templates Section */}
           {(selectedCategory === 'all' || selectedCategory === 'integration') && integrationTemplates.length > 0 && (
             <div>
-              <h4 className="text-sm font-bold text-accent-primary mb-3 flex items-center gap-2">
+              <h4 className="text-sm font-bold mb-3 flex items-center gap-2" style={{ color: 'var(--accent-primary)' }}>
                 <RefreshCw size={16} />
                 Integration Automations
               </h4>
@@ -511,21 +513,21 @@ export default function Automations() {
                 {integrationTemplates.map((template) => (
                   <div
                     key={template.id}
-                    className="card p-4 hover:border-accent-primary cursor-pointer transition-all group"
+                    className="vc p-4 cursor-pointer transition-all group"
                     onClick={() => handleCreateFromTemplate(template)}
                   >
                     <div className="flex items-start gap-3">
-                      <div className="p-2 bg-accent-primary/10 rounded-md group-hover:bg-accent-primary group-hover:text-white transition-colors">
+                      <div className="p-2 rounded-md transition-colors group-hover:scale-110" style={{ background: 'rgba(255,45,107,.1)', color: 'var(--accent-primary)' }}>
                         {getTriggerIcon(template.trigger_type || template.triggerType)}
                       </div>
                       <div className="flex-1">
-                        <h4 className="font-bold text-content-primary mb-1">{template.name}</h4>
-                        <p className="text-sm text-content-secondary mb-2">{template.description}</p>
+                        <h4 className="font-bold mb-1" style={{ color: 'var(--text-primary)' }}>{template.name}</h4>
+                        <p className="text-sm mb-2" style={{ color: 'var(--text-secondary)' }}>{template.description}</p>
                         <div className="flex items-center gap-2">
-                          <span className="text-xs px-2 py-1 bg-accent-primary/10 text-accent-primary rounded-sm border border-accent-primary/20 font-mono">
+                          <VCBadge color="crimson">
                             {(template.trigger_type || template.triggerType)?.replace(/_/g, ' ')}
-                          </span>
-                          <span className="text-xs text-content-tertiary font-mono">
+                          </VCBadge>
+                          <span className="text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
                             {template.actions?.length || 0} action{(template.actions?.length || 0) !== 1 ? 's' : ''}
                           </span>
                         </div>
@@ -537,20 +539,17 @@ export default function Automations() {
             </div>
           )}
 
-          <button
-            onClick={() => setShowCreate(false)}
-            className="btn btn-secondary mt-4"
-          >
+          <VCButton variant="secondary" onClick={() => setShowCreate(false)} className="mt-4">
             Cancel
-          </button>
+          </VCButton>
         </div>
       )}
 
       {/* Automations list */}
-      <div className="card">
-        <div className="p-4 border-b border-line-subtle flex items-center justify-between">
-          <h2 className="font-bold text-content-primary">Active Automations</h2>
-          <span className="text-sm text-content-tertiary font-mono">
+      <div className="vc">
+        <div className="p-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(248,240,242,.08)' }}>
+          <h2 className="font-bold" style={{ color: 'var(--text-primary)' }}>Active Automations</h2>
+          <span className="text-sm" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
             {automations.filter(a => a.enabled).length} active / {automations.length} total
           </span>
         </div>
@@ -558,47 +557,41 @@ export default function Automations() {
         {loading ? (
           <Skeleton className="h-24" count={4} />
         ) : automations.length === 0 ? (
-          <div className="p-12 text-center border-dashed border-2 m-4 rounded-lg">
-            <Zap className="w-16 h-16 text-content-muted mx-auto mb-4 opacity-50" />
-            <h3 className="text-xl font-bold text-content-primary mb-2">No automations yet</h3>
-            <p className="text-content-secondary mb-6">Create your first automation from a template or build a custom workflow</p>
-            <button
-              onClick={() => setShowCreate(true)}
-              className="btn btn-primary"
-            >
+          <div className="p-12 text-center m-4 rounded-lg" style={{ border: '2px dashed rgba(248,240,242,.12)' }}>
+            <Zap className="w-16 h-16 mx-auto mb-4 opacity-50" style={{ color: 'var(--text-tertiary)' }} />
+            <h3 className="text-xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>No automations yet</h3>
+            <p className="mb-6" style={{ color: 'var(--text-secondary)' }}>Create your first automation from a template or build a custom workflow</p>
+            <VCButton variant="primary" onClick={() => setShowCreate(true)}>
               <Plus size={16} />
               Create Automation
-            </button>
+            </VCButton>
           </div>
         ) : (
-          <div className="divide-y divide-line-subtle">
+          <div>
             {automations.map((automation) => (
-              <div key={automation.id} className="p-4 hover:bg-surface-muted transition-colors group">
+              <div key={automation.id} className="p-4 transition-colors hover:bg-black/10 group" style={{ borderBottom: '1px solid rgba(248,240,242,.06)' }}>
                 <div className="flex items-start gap-4">
-                  <div className="p-2 bg-accent-primary/10 rounded-md group-hover:bg-accent-primary group-hover:text-white transition-colors">
+                  <div className="p-2 rounded-md transition-colors group-hover:scale-110" style={{ background: 'rgba(255,45,107,.1)', color: 'var(--accent-primary)' }}>
                     {getTriggerIcon(automation.trigger_type)}
                   </div>
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <h3 className="font-bold text-content-primary">{automation.name}</h3>
-                      <span className={`text-xs px-2 py-1 rounded-sm border font-mono ${
-                        automation.enabled 
-                          ? 'text-green-500 bg-green-500/10 border-green-500/20' 
-                          : 'text-content-tertiary bg-surface-muted border-line-subtle'
-                      }`}>
-                        {automation.enabled ? 'Active' : 'Paused'}
-                      </span>
+                      <h3 className="font-bold" style={{ color: 'var(--text-primary)' }}>{automation.name}</h3>
+                      {automation.enabled
+                        ? <VCBadge color="mint">Active</VCBadge>
+                        : <VCBadge color="neutral">Paused</VCBadge>
+                      }
                       {automation.actions?.some(a => ['auto_assign', 'auto_prioritize', 'suggest_deadline', 'run_agent'].includes(a.type)) && (
-                        <span className="text-xs px-2 py-1 bg-accent-tertiary/10 text-accent-tertiary rounded-sm border border-accent-tertiary/20 font-mono flex items-center gap-1">
+                        <VCBadge color="amber">
                           <Bot size={12} /> AI
-                        </span>
+                        </VCBadge>
                       )}
                     </div>
                     {automation.description && (
-                      <p className="text-sm text-content-secondary mb-2">{automation.description}</p>
+                      <p className="text-sm mb-2" style={{ color: 'var(--text-secondary)' }}>{automation.description}</p>
                     )}
-                    <div className="flex items-center gap-4 text-xs text-content-tertiary flex-wrap font-mono">
+                    <div className="flex items-center gap-4 text-xs flex-wrap" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
                       <span className="flex items-center gap-1">
                         <Clock size={12} />
                         {automation.trigger_type?.replace(/_/g, ' ')}
@@ -623,7 +616,8 @@ export default function Automations() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleToggle(automation.id, automation.enabled)}
-                      className="btn btn-icon btn-ghost"
+                      className="p-2 rounded-lg transition-colors"
+                      style={{ color: automation.enabled ? 'var(--accent-secondary)' : 'var(--text-tertiary)' }}
                       title={automation.enabled ? 'Pause' : 'Resume'}
                     >
                       {automation.enabled ? (
@@ -636,7 +630,8 @@ export default function Automations() {
                     <button
                       onClick={() => handleTest(automation.id)}
                       disabled={testingId === automation.id}
-                      className="btn btn-icon btn-ghost"
+                      className="p-2 rounded-lg transition-colors"
+                      style={{ color: 'var(--text-tertiary)' }}
                       title="Test (dry run)"
                     >
                       {testingId === automation.id ? (
@@ -648,7 +643,8 @@ export default function Automations() {
 
                     <button
                       onClick={() => handleExecute(automation.id)}
-                      className="btn btn-icon btn-ghost"
+                      className="p-2 rounded-lg transition-colors"
+                      style={{ color: 'var(--text-tertiary)' }}
                       title="Run now"
                     >
                       <Zap size={16} />
@@ -656,7 +652,8 @@ export default function Automations() {
 
                     <button
                       onClick={() => handleDelete(automation.id)}
-                      className="btn btn-icon btn-ghost text-semantic-error hover:bg-semantic-error/10"
+                      className="p-2 rounded-lg transition-colors"
+                      style={{ color: 'var(--accent-primary)' }}
                       title="Delete"
                     >
                       <Trash2 size={16} />
@@ -666,28 +663,30 @@ export default function Automations() {
 
                 {/* Test Result */}
                 {testResult && testResult.id === automation.id && (
-                  <div className={`mt-3 p-3 rounded-lg border ${
-                    testResult.success 
-                      ? 'bg-green-500/10 border-green-500/20' 
-                      : 'bg-semantic-error/10 border-red-500/20'
-                  }`}>
+                  <div
+                    className="mt-3 p-3 rounded-lg"
+                    style={testResult.success
+                      ? { background: 'rgba(0,245,212,.1)', border: '1px solid rgba(0,245,212,.2)' }
+                      : { background: 'rgba(255,45,107,.1)', border: '1px solid rgba(255,45,107,.2)' }
+                    }
+                  >
                     <div className="flex items-start gap-2">
                       {testResult.success ? (
-                        <CheckCircle2 size={18} className="text-semantic-success flex-shrink-0" />
+                        <CheckCircle2 size={18} className="flex-shrink-0" style={{ color: 'var(--accent-secondary)' }} />
                       ) : (
-                        <AlertCircle size={18} className="text-semantic-error flex-shrink-0" />
+                        <AlertCircle size={18} className="flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
                       )}
                       <div className="flex-1">
-                        <p className={`font-medium text-sm ${testResult.success ? 'text-semantic-success' : 'text-semantic-error'}`}>
+                        <p className="font-medium text-sm" style={{ color: testResult.success ? 'var(--accent-secondary)' : 'var(--accent-primary)' }}>
                           {testResult.success ? 'Test passed!' : 'Test failed'}
                         </p>
                         {testResult.error && (
-                          <p className="text-xs text-semantic-error mt-1 font-mono">{testResult.error}</p>
+                          <p className="text-xs mt-1" style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)' }}>{testResult.error}</p>
                         )}
                         {testResult.actionResults && (
                           <div className="mt-2 space-y-1">
                             {testResult.actionResults.map((result, idx) => (
-                              <div key={idx} className="text-xs text-content-secondary font-mono">
+                              <div key={idx} className="text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
                                 • {result.type}: {result.preview || 'OK'}
                               </div>
                             ))}
@@ -696,7 +695,7 @@ export default function Automations() {
                       </div>
                       <button
                         onClick={() => setTestResult(null)}
-                        className="text-content-tertiary hover:text-content-primary"
+                        style={{ color: 'var(--text-tertiary)' }}
                       >
                         <XCircle size={16} />
                       </button>

@@ -8,6 +8,7 @@ import {
 import api from '../services/api';
 import { GuideCard, PageHeader, Skeleton } from '../components/SharedUI';
 import ExplanationCard from '../components/explainability/ExplanationCard';
+import { VCButton, VCBadge, VCIconBox } from '../components/vc';
 
 // Category icons mapping
 const categoryIcons = {
@@ -33,7 +34,7 @@ export default function Agents() {
   const [deployError, setDeployError] = useState(null);
   const [explanations, setExplanations] = useState({});
   const [loadingExplanations, setLoadingExplanations] = useState({});
-  
+
   // Wizard state
   const [wizardStep, setWizardStep] = useState(0); // 0: Select Template, 1: Customize Logic, 2: Monitor Performance
   const [selectedTemplate, setSelectedTemplate] = useState(null);
@@ -196,18 +197,18 @@ export default function Agents() {
         subtitle="Orchestrate your automated workforce."
         actions={
           <>
-            <button
+            <VCButton
+              variant="secondary"
               onClick={() => setShowTemplates(true)}
-              className="btn btn-secondary"
             >
               <Zap size={16} /> From Template
-            </button>
-            <button
+            </VCButton>
+            <VCButton
+              variant="primary"
               onClick={() => setShowCreateModal(true)}
-              className="btn btn-primary"
             >
               <Plus size={16} /> Create Agent
-            </button>
+            </VCButton>
           </>
         }
       />
@@ -222,24 +223,24 @@ export default function Agents() {
       {templates.length > 0 && !loading && (
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold flex items-center gap-2">
-              <Layout size={18} className="text-accent-primary" /> Quick Start
+            <h2 className="text-lg font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+              <Layout size={18} style={{ color: 'var(--accent-primary)' }} /> Quick Start
             </h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {templates.slice(0, 3).map((template) => (
               <div
                 key={template.id}
-                className="card p-4 hover:border-accent-primary cursor-pointer group"
+                className="vc p-4 hover:border-accent-primary cursor-pointer group"
                 onClick={() => setShowTemplates(true)}
               >
                 <div className="flex items-start gap-3">
-                  <div className="p-2 bg-accent-primary/10 rounded-sm group-hover:bg-accent-primary group-hover:text-white transition-colors text-xl">
+                  <VCIconBox color="amber" className="group-hover:scale-110 transition-transform text-xl">
                     {template.icon || '🤖'}
-                  </div>
+                  </VCIconBox>
                   <div>
-                    <h3 className="font-bold text-sm">{template.name}</h3>
-                    <p className="text-xs text-content-secondary mt-1 line-clamp-2">{template.description}</p>
+                    <h3 className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>{template.name}</h3>
+                    <p className="text-xs mt-1 line-clamp-2" style={{ color: 'var(--text-secondary)' }}>{template.description}</p>
                   </div>
                 </div>
               </div>
@@ -252,10 +253,19 @@ export default function Agents() {
         {/* Agents List Column */}
         <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-mono uppercase text-content-tertiary tracking-wider">Active Fleet</h3>
+            <h3 className="text-sm font-mono uppercase tracking-wider" style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>Active Fleet</h3>
             <div className="relative">
-              <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-content-tertiary" />
-              <input type="text" placeholder="Filter agents..." className="pl-8 pr-2 py-1 bg-surface-elevated border border-line-subtle rounded-sm text-xs focus:outline-none focus:border-accent-primary w-48" />
+              <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-tertiary)' }} />
+              <input
+                type="text"
+                placeholder="Filter agents..."
+                className="pl-8 pr-2 py-1 rounded-sm text-xs focus:outline-none w-48"
+                style={{
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid rgba(248,240,242,.08)',
+                  color: 'var(--text-primary)'
+                }}
+              />
             </div>
           </div>
 
@@ -264,10 +274,10 @@ export default function Agents() {
               <Skeleton className="h-24 w-full" count={3} />
             </div>
           ) : agents.length === 0 ? (
-            <div className="card p-8 text-center border-dashed border-2">
-              <Bot className="h-12 w-12 text-content-muted mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-content-primary mb-2">No active agents</h3>
-              <button onClick={() => setShowTemplates(true)} className="btn btn-primary mt-2">Deploy First Agent</button>
+            <div className="vc p-8 text-center border-dashed border-2">
+              <Bot className="h-12 w-12 mx-auto mb-4" style={{ color: 'var(--text-tertiary)' }} />
+              <h3 className="text-lg font-medium mb-2" style={{ color: 'var(--text-primary)' }}>No active agents</h3>
+              <VCButton variant="primary" onClick={() => setShowTemplates(true)} className="mt-2">Deploy First Agent</VCButton>
             </div>
           ) : (
             <div className="space-y-3">
@@ -275,28 +285,30 @@ export default function Agents() {
                 <div
                   key={agent.id}
                   onClick={() => selectAgent(agent)}
-                  className={`card p-4 cursor-pointer transition-all hover:translate-x-1 ${selectedAgent?.id === agent.id ? 'border-accent-primary ring-1 ring-accent-primary' : ''
-                    }`}
+                  className={`vc p-4 cursor-pointer transition-all hover:translate-x-1 ${selectedAgent?.id === agent.id ? 'border-accent-primary ring-1 ring-accent-primary' : ''}`}
                 >
                   <div className="flex justify-between items-start">
                     <div className="flex gap-4">
-                      <div className={`p-3 rounded-sm ${agent.enabled ? 'bg-green-500/10 text-green-500' : 'bg-surface-muted text-content-muted'}`}>
+                      <VCIconBox color={agent.enabled ? 'mint' : 'neutral'}>
                         <Bot size={20} />
-                      </div>
+                      </VCIconBox>
                       <div>
-                        <h3 className="font-bold text-content-primary flex items-center gap-2">
+                        <h3 className="font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                           {agent.name}
-                          {agent.enabled && <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>}
+                          {agent.enabled
+                            ? <VCBadge color="mint" live>Running</VCBadge>
+                            : null
+                          }
                         </h3>
-                        <p className="text-sm text-content-secondary mt-1">{agent.description}</p>
+                        <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>{agent.description}</p>
 
-                        <div className="flex items-center gap-4 mt-3 text-xs font-mono text-content-tertiary">
+                        <div className="flex items-center gap-4 mt-3 text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
                           <span className="flex items-center gap-1"><Activity size={12} /> {agent.execution_count || 0} runs</span>
                           <span className="flex items-center gap-1"><CheckCircle size={12} /> {((agent.success_rate || 0) * 100).toFixed(0)}% success</span>
                         </div>
                       </div>
                     </div>
-                    <ChevronRight size={16} className={`text-content-tertiary transition-transform ${selectedAgent?.id === agent.id ? 'rotate-90 text-accent-primary' : ''}`} />
+                    <ChevronRight size={16} style={{ color: 'var(--text-tertiary)' }} className={`transition-transform ${selectedAgent?.id === agent.id ? 'rotate-90' : ''}`} />
                   </div>
                 </div>
               ))}
@@ -308,18 +320,25 @@ export default function Agents() {
         <div className="lg:col-span-1">
           <div className="sticky top-6 space-y-4">
             {selectedAgent ? (
-              <div className="card p-5 animate-fade-in border-t-4 border-t-accent-primary">
+              <div className="vc p-5 animate-fade-in" style={{ borderTop: '4px solid var(--accent-primary)' }}>
                 <div className="flex justify-between items-start mb-6">
-                  <h3 className="font-bold text-lg">Agent Diagnostics</h3>
+                  <h3 className="font-bold text-lg" style={{ color: 'var(--text-primary)' }}>Agent Diagnostics</h3>
                   <div className="flex gap-2">
                     <button
                       onClick={() => toggleAgent(selectedAgent.id)}
-                      className={`p-2 rounded-sm border ${selectedAgent.enabled ? 'border-red-500/20 text-red-500 hover:bg-red-500/10' : 'border-green-500/20 text-green-500 hover:bg-green-500/10'}`}
+                      className="p-2 rounded-sm border transition-colors"
+                      style={selectedAgent.enabled
+                        ? { borderColor: 'rgba(255,59,48,.3)', color: '#ff3b30' }
+                        : { borderColor: 'rgba(0,245,212,.3)', color: 'var(--accent-secondary)' }
+                      }
                       title={selectedAgent.enabled ? "Stop" : "Start"}
                     >
                       {selectedAgent.enabled ? <Pause size={16} /> : <Play size={16} />}
                     </button>
-                    <button className="p-2 rounded-sm border border-line-default hover:text-semantic-error hover:border-red-500/50 transition-colors">
+                    <button
+                      className="p-2 rounded-sm border transition-colors"
+                      style={{ borderColor: 'rgba(248,240,242,.08)', color: 'var(--text-secondary)' }}
+                    >
                       <Trash2 size={16} />
                     </button>
                   </div>
@@ -327,28 +346,28 @@ export default function Agents() {
 
                 <div className="space-y-6">
                   <div>
-                    <label className="text-xs font-mono uppercase text-content-tertiary block mb-2">Configuration</label>
+                    <label className="text-xs font-mono uppercase block mb-2" style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>Configuration</label>
                     <div className="space-y-2">
-                      <div className="flex justify-between text-sm p-2 bg-surface-muted rounded-sm">
-                        <span>Trigger</span>
-                        <span className="font-mono text-accent-primary">{selectedAgent.triggers?.[0]?.type || 'Manual'}</span>
+                      <div className="flex justify-between text-sm p-2 rounded-sm" style={{ background: 'var(--bg-elevated)' }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>Trigger</span>
+                        <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)' }}>{selectedAgent.triggers?.[0]?.type || 'Manual'}</span>
                       </div>
-                      <div className="flex justify-between text-sm p-2 bg-surface-muted rounded-sm">
-                        <span>Actions</span>
-                        <span className="font-mono">{selectedAgent.actions?.length || 0} Steps</span>
+                      <div className="flex justify-between text-sm p-2 rounded-sm" style={{ background: 'var(--bg-elevated)' }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>Actions</span>
+                        <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{selectedAgent.actions?.length || 0} Steps</span>
                       </div>
                     </div>
                   </div>
 
                   <div>
-                    <label className="text-xs font-mono uppercase text-content-tertiary block mb-2">Live Logs</label>
-                    <div className="bg-black/90 text-green-400 p-3 rounded-sm font-mono text-xs h-48 overflow-y-auto custom-scrollbar">
+                    <label className="text-xs font-mono uppercase block mb-2" style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>Live Logs</label>
+                    <div className="text-green-400 p-3 rounded-sm font-mono text-xs h-48 overflow-y-auto custom-scrollbar" style={{ background: 'rgba(0,0,0,.9)', fontFamily: 'var(--font-mono)' }}>
                       {executionLogs.length === 0 ? (
-                        <span className="text-content-tertiary">// Waiting for execution...</span>
+                        <span style={{ color: 'var(--text-tertiary)' }}>// Waiting for execution...</span>
                       ) : (
                         executionLogs.map(log => (
                           <div key={log.id} className="mb-1 border-b border-gray-800 pb-1 last:border-0">
-                            <span className="text-content-tertiary">[{new Date(log.created_at).toLocaleTimeString()}]</span> {log.trigger_type}
+                            <span style={{ color: 'var(--text-tertiary)' }}>[{new Date(log.created_at).toLocaleTimeString()}]</span> {log.trigger_type}
                             <span className={log.success ? 'text-green-400' : 'text-red-400'}> {log.success ? 'OK' : 'ERR'}</span>
                           </div>
                         ))
@@ -358,9 +377,9 @@ export default function Agents() {
                 </div>
               </div>
             ) : (
-              <div className="card p-8 text-center bg-surface-muted/30 border-dashed">
-                <Activity className="h-8 w-8 text-content-tertiary mx-auto mb-2 opacity-50" />
-                <p className="text-sm text-content-secondary">Select an agent to view diagnostics and controls.</p>
+              <div className="vc p-8 text-center border-dashed" style={{ background: 'rgba(16,16,16,.3)' }}>
+                <Activity className="h-8 w-8 mx-auto mb-2 opacity-50" style={{ color: 'var(--text-tertiary)' }} />
+                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Select an agent to view diagnostics and controls.</p>
               </div>
             )}
           </div>
@@ -371,16 +390,17 @@ export default function Agents() {
       {showTemplates && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowTemplates(false)} />
-          <div className="relative bg-surface border border-line-default rounded-lg shadow-xl w-full max-w-4xl max-h-[85vh] overflow-hidden">
+          <div className="relative rounded-lg shadow-xl w-full max-w-4xl max-h-[85vh] overflow-hidden" style={{ background: 'var(--bg-elevated)', border: '1px solid rgba(248,240,242,.08)' }}>
             {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 border-b border-line-default">
+            <div className="flex items-center justify-between p-4" style={{ borderBottom: '1px solid rgba(248,240,242,.08)' }}>
               <div>
-                <h2 className="text-xl font-bold">Agent Templates</h2>
-                <p className="text-sm text-content-secondary">Choose a template to deploy an AI agent</p>
+                <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Agent Templates</h2>
+                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Choose a template to deploy an AI agent</p>
               </div>
               <button
                 onClick={() => setShowTemplates(false)}
-                className="p-2 hover:bg-surface-muted rounded-md transition-colors"
+                className="p-2 rounded-md transition-colors"
+                style={{ color: 'var(--text-secondary)' }}
               >
                 <X size={20} />
               </button>
@@ -388,31 +408,29 @@ export default function Agents() {
 
             {/* Error Message */}
             {deployError && (
-              <div className="mx-4 mt-4 p-3 bg-semantic-error/10 border border-red-500/20 rounded-md flex items-start gap-2">
-                <AlertCircle className="w-5 h-5 text-semantic-error flex-shrink-0 mt-0.5" />
+              <div className="mx-4 mt-4 p-3 rounded-md flex items-start gap-2" style={{ background: 'rgba(255,45,107,.1)', border: '1px solid rgba(255,45,107,.2)' }}>
+                <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: 'var(--accent-primary)' }} />
                 <div className="flex-1">
-                  <p className="text-sm text-semantic-error font-medium">Deployment Failed</p>
-                  <p className="text-xs text-red-400 mt-1">{deployError}</p>
+                  <p className="text-sm font-medium" style={{ color: 'var(--accent-primary)' }}>Deployment Failed</p>
+                  <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>{deployError}</p>
                 </div>
-                <button
-                  onClick={() => setDeployError(null)}
-                  className="text-red-400 hover:text-red-300"
-                >
+                <button onClick={() => setDeployError(null)} style={{ color: 'var(--text-tertiary)' }}>
                   <X size={16} />
                 </button>
               </div>
             )}
 
             {/* Category Tabs */}
-            <div className="flex gap-2 p-4 border-b border-line-default overflow-x-auto">
+            <div className="flex gap-2 p-4 overflow-x-auto" style={{ borderBottom: '1px solid rgba(248,240,242,.08)' }}>
               {categories.map((category) => (
                 <button
                   key={category}
                   onClick={() => setSelectedCategory(category)}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${selectedCategory === category
-                      ? 'bg-accent-primary text-white'
-                      : 'bg-surface-muted text-content-secondary hover:text-content-primary'
-                    }`}
+                  className="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-colors"
+                  style={selectedCategory === category
+                    ? { background: 'var(--accent-primary)', color: '#fff' }
+                    : { background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid rgba(248,240,242,.08)' }
+                  }
                 >
                   {category !== 'All' && <span className="mr-1">{categoryIcons[category] || '📦'}</span>}
                   {category}
@@ -424,72 +442,74 @@ export default function Agents() {
             <div className="p-4 overflow-y-auto max-h-[calc(85vh-160px)]">
               {filteredTemplates.length === 0 ? (
                 <div className="text-center py-12">
-                  <Bot className="h-12 w-12 text-content-muted mx-auto mb-4" />
-                  <p className="text-content-secondary">No templates found</p>
+                  <Bot className="h-12 w-12 mx-auto mb-4" style={{ color: 'var(--text-tertiary)' }} />
+                  <p style={{ color: 'var(--text-secondary)' }}>No templates found</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {filteredTemplates.map((template) => (
                     <div
                       key={template.id}
-                      className="card p-4 hover:border-accent-primary transition-all group"
+                      className="vc p-4 hover:border-accent-primary transition-all group"
                     >
                       <div className="flex items-start gap-3">
-                        <div className="p-3 bg-accent-primary/10 rounded-md text-2xl group-hover:bg-accent-primary group-hover:scale-110 transition-all">
+                        <VCIconBox color="amber" className="group-hover:scale-110 transition-transform text-2xl">
                           {template.icon || '🤖'}
-                        </div>
+                        </VCIconBox>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2">
-                            <h3 className="font-bold text-content-primary">{template.name}</h3>
-                            <span className="text-xs px-2 py-0.5 bg-surface-muted rounded text-content-tertiary whitespace-nowrap">
+                            <h3 className="font-bold" style={{ color: 'var(--text-primary)' }}>{template.name}</h3>
+                            <span className="text-xs px-2 py-0.5 rounded whitespace-nowrap" style={{ background: 'var(--bg-elevated)', color: 'var(--text-tertiary)', border: '1px solid rgba(248,240,242,.08)' }}>
                               {template.category}
                             </span>
                           </div>
-                          <p className="text-sm text-content-secondary mt-1 line-clamp-2">{template.description}</p>
+                          <p className="text-sm mt-1 line-clamp-2" style={{ color: 'var(--text-secondary)' }}>{template.description}</p>
 
                           {/* Triggers & Actions */}
                           <div className="flex flex-wrap gap-2 mt-3">
                             {template.triggers?.slice(0, 2).map((trigger, idx) => (
-                              <span key={idx} className="text-xs px-2 py-0.5 bg-blue-500/10 text-blue-500 rounded">
+                              <span key={idx} className="text-xs px-2 py-0.5 rounded" style={{ background: 'rgba(0,245,212,.1)', color: 'var(--accent-secondary)' }}>
                                 {trigger.type}
                               </span>
                             ))}
                             {template.actions && (
-                              <span className="text-xs px-2 py-0.5 bg-green-500/10 text-green-500 rounded">
+                              <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'rgba(160,255,50,.1)', color: 'var(--accent-phosphor)' }}>
                                 {template.actions.length} actions
                               </span>
                             )}
                           </div>
 
                           {/* Setup Time & Deploy Button */}
-                           <div className="flex items-center justify-between mt-4">
-                             <span className="text-xs text-content-tertiary">
-                               Setup: {template.setupTime || '5 minutes'}
-                             </span>
-                             <div className="flex gap-2">
-                               <button
-                                 onClick={() => startCustomization(template)}
-                                 className="btn btn-secondary btn-sm"
-                               >
-                                 <ChevronRight size={14} /> Customize
-                               </button>
-                               <button
-                                 onClick={() => createFromTemplate(template)}
-                                 disabled={creatingFromTemplate === template.id}
-                                 className="btn btn-primary btn-sm"
-                               >
-                                 {creatingFromTemplate === template.id ? (
-                                   <>
-                                     <Loader2 size={14} className="animate-spin" /> Deploying...
-                                   </>
-                                 ) : (
-                                   <>
-                                     <Zap size={14} /> Quick Deploy
-                                   </>
-                                 )}
-                               </button>
-                             </div>
-                           </div>
+                          <div className="flex items-center justify-between mt-4">
+                            <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                              Setup: {template.setupTime || '5 minutes'}
+                            </span>
+                            <div className="flex gap-2">
+                              <VCButton
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => startCustomization(template)}
+                              >
+                                <ChevronRight size={14} /> Customize
+                              </VCButton>
+                              <VCButton
+                                variant="primary"
+                                size="sm"
+                                onClick={() => createFromTemplate(template)}
+                                disabled={creatingFromTemplate === template.id}
+                              >
+                                {creatingFromTemplate === template.id ? (
+                                  <>
+                                    <Loader2 size={14} className="animate-spin" /> Deploying...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Zap size={14} /> Quick Deploy
+                                  </>
+                                )}
+                              </VCButton>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -498,289 +518,291 @@ export default function Agents() {
               )}
             </div>
           </div>
-         </div>
-       )}
+        </div>
+      )}
 
-       {/* Customize Logic Modal (Step 2) */}
-       {showCustomizeModal && selectedTemplate && (
-         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowCustomizeModal(false)} />
-           <div className="relative bg-surface border border-line-default rounded-lg shadow-xl w-full max-w-3xl max-h-[85vh] overflow-hidden">
-             {/* Modal Header */}
-             <div className="flex items-center justify-between p-4 border-b border-line-default">
-               <div>
-                 <h2 className="text-xl font-bold flex items-center gap-2">
-                   <Settings size={20} className="text-accent-primary" />
-                   Customize Agent Logic
-                 </h2>
-                 <p className="text-sm text-content-secondary">Configure triggers, actions, and behavior</p>
-               </div>
-               <button
-                 onClick={() => setShowCustomizeModal(false)}
-                 className="p-2 hover:bg-surface-muted rounded-md transition-colors"
-               >
-                 <X size={20} />
-               </button>
-             </div>
+      {/* Customize Logic Modal (Step 2) */}
+      {showCustomizeModal && selectedTemplate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowCustomizeModal(false)} />
+          <div className="relative rounded-lg shadow-xl w-full max-w-3xl max-h-[85vh] overflow-hidden" style={{ background: 'var(--bg-elevated)', border: '1px solid rgba(248,240,242,.08)' }}>
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4" style={{ borderBottom: '1px solid rgba(248,240,242,.08)' }}>
+              <div>
+                <h2 className="text-xl font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                  <Settings size={20} style={{ color: 'var(--accent-primary)' }} />
+                  Customize Agent Logic
+                </h2>
+                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Configure triggers, actions, and behavior</p>
+              </div>
+              <button
+                onClick={() => setShowCustomizeModal(false)}
+                className="p-2 rounded-md transition-colors"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
 
-             <div className="p-6 overflow-y-auto max-h-[calc(85vh-140px)] space-y-6">
-               {/* Basic Info */}
-               <div>
-                 <label className="block text-sm font-medium mb-2">Agent Name</label>
-                 <input
-                   type="text"
-                   value={customizations.name}
-                   onChange={(e) => setCustomizations({ ...customizations, name: e.target.value })}
-                   className="input"
-                   placeholder="My Custom Agent"
-                 />
-               </div>
+            <div className="p-6 overflow-y-auto max-h-[calc(85vh-140px)] space-y-6">
+              {/* Basic Info */}
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>Agent Name</label>
+                <input
+                  type="text"
+                  value={customizations.name}
+                  onChange={(e) => setCustomizations({ ...customizations, name: e.target.value })}
+                  className="input"
+                  placeholder="My Custom Agent"
+                />
+              </div>
 
-               <div>
-                 <label className="block text-sm font-medium mb-2">Description</label>
-                 <textarea
-                   value={customizations.description}
-                   onChange={(e) => setCustomizations({ ...customizations, description: e.target.value })}
-                   className="input"
-                   rows={3}
-                   placeholder="What does this agent do?"
-                 />
-               </div>
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>Description</label>
+                <textarea
+                  value={customizations.description}
+                  onChange={(e) => setCustomizations({ ...customizations, description: e.target.value })}
+                  className="input"
+                  rows={3}
+                  placeholder="What does this agent do?"
+                />
+              </div>
 
-               {/* Triggers Section */}
-               <div>
-                 <label className="block text-sm font-medium mb-3 flex items-center gap-2">
-                   <Zap size={16} className="text-accent-secondary" />
-                   Triggers
-                 </label>
-                 <div className="space-y-2">
-                   {customizations.triggers.map((trigger, idx) => (
-                     <div key={idx} className="flex items-center gap-3 p-3 bg-surface-muted rounded-md border border-line-subtle">
-                       <span className="flex-1 font-mono text-sm">{trigger.type}</span>
-                       <button
-                         onClick={() => setCustomizations({
-                           ...customizations,
-                           triggers: customizations.triggers.filter((_, i) => i !== idx)
-                         })}
-                         className="text-semantic-error hover:text-semantic-error"
-                       >
-                         <X size={16} />
-                       </button>
-                     </div>
-                   ))}
-                 </div>
-               </div>
+              {/* Triggers Section */}
+              <div>
+                <label className="block text-sm font-medium mb-3 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                  <Zap size={16} style={{ color: 'var(--accent-secondary)' }} />
+                  Triggers
+                </label>
+                <div className="space-y-2">
+                  {customizations.triggers.map((trigger, idx) => (
+                    <div key={idx} className="flex items-center gap-3 p-3 rounded-md" style={{ background: 'var(--bg-elevated)', border: '1px solid rgba(248,240,242,.08)' }}>
+                      <span className="flex-1 text-sm" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{trigger.type}</span>
+                      <button
+                        onClick={() => setCustomizations({
+                          ...customizations,
+                          triggers: customizations.triggers.filter((_, i) => i !== idx)
+                        })}
+                        style={{ color: 'var(--accent-primary)' }}
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
-               {/* Actions Section */}
-               <div>
-                 <label className="block text-sm font-medium mb-3 flex items-center gap-2">
-                   <Target size={16} className="text-accent-tertiary" />
-                   Actions ({customizations.actions.length})
-                 </label>
-                 <div className="space-y-2">
-                   {customizations.actions.map((action, idx) => (
-                     <div key={idx} className="flex items-center gap-3 p-3 bg-surface-muted rounded-md border border-line-subtle">
-                       <span className="w-6 h-6 bg-accent-primary text-white rounded-sm flex items-center justify-center text-xs font-bold">
-                         {idx + 1}
-                       </span>
-                       <span className="flex-1 font-mono text-sm">{action.type}</span>
-                       <button
-                         onClick={() => setCustomizations({
-                           ...customizations,
-                           actions: customizations.actions.filter((_, i) => i !== idx)
-                         })}
-                         className="text-semantic-error hover:text-semantic-error"
-                       >
-                         <X size={16} />
-                       </button>
-                     </div>
-                   ))}
-                 </div>
-               </div>
+              {/* Actions Section */}
+              <div>
+                <label className="block text-sm font-medium mb-3 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                  <Target size={16} style={{ color: 'var(--accent-tertiary)' }} />
+                  Actions ({customizations.actions.length})
+                </label>
+                <div className="space-y-2">
+                  {customizations.actions.map((action, idx) => (
+                    <div key={idx} className="flex items-center gap-3 p-3 rounded-md" style={{ background: 'var(--bg-elevated)', border: '1px solid rgba(248,240,242,.08)' }}>
+                      <span className="w-6 h-6 rounded-sm flex items-center justify-center text-xs font-bold" style={{ background: 'var(--accent-primary)', color: '#fff' }}>
+                        {idx + 1}
+                      </span>
+                      <span className="flex-1 text-sm" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{action.type}</span>
+                      <button
+                        onClick={() => setCustomizations({
+                          ...customizations,
+                          actions: customizations.actions.filter((_, i) => i !== idx)
+                        })}
+                        style={{ color: 'var(--accent-primary)' }}
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
-               {/* Preview */}
-               <div className="bg-accent-primary/5 border border-accent-primary/20 rounded-md p-4">
-                 <h4 className="text-sm font-bold mb-2 text-accent-primary">Configuration Preview</h4>
-                 <div className="text-xs font-mono space-y-1 text-content-secondary">
-                   <div>Name: <span className="text-content-primary">{customizations.name}</span></div>
-                   <div>Triggers: <span className="text-content-primary">{customizations.triggers.length}</span></div>
-                   <div>Actions: <span className="text-content-primary">{customizations.actions.length}</span></div>
-                 </div>
-               </div>
-             </div>
+              {/* Preview */}
+              <div className="rounded-md p-4" style={{ background: 'rgba(255,45,107,.05)', border: '1px solid rgba(255,45,107,.2)' }}>
+                <h4 className="text-sm font-bold mb-2" style={{ color: 'var(--accent-primary)' }}>Configuration Preview</h4>
+                <div className="text-xs space-y-1" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
+                  <div>Name: <span style={{ color: 'var(--text-primary)' }}>{customizations.name}</span></div>
+                  <div>Triggers: <span style={{ color: 'var(--text-primary)' }}>{customizations.triggers.length}</span></div>
+                  <div>Actions: <span style={{ color: 'var(--text-primary)' }}>{customizations.actions.length}</span></div>
+                </div>
+              </div>
+            </div>
 
-             {/* Modal Footer */}
-             <div className="flex items-center justify-between p-4 border-t border-line-default bg-surface-muted/30">
-               <button
-                 onClick={() => setShowCustomizeModal(false)}
-                 className="btn btn-secondary"
-               >
-                 Cancel
-               </button>
-               <button
-                 onClick={deployCustomizedAgent}
-                 disabled={!customizations.name || creatingFromTemplate}
-                 className="btn btn-primary"
-               >
-                 {creatingFromTemplate ? (
-                   <>
-                     <Loader2 size={16} className="animate-spin" /> Deploying...
-                   </>
-                 ) : (
-                   <>
-                     <Zap size={16} /> Deploy Agent
-                   </>
-                 )}
-               </button>
-             </div>
-           </div>
-         </div>
-       )}
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between p-4" style={{ borderTop: '1px solid rgba(248,240,242,.08)', background: 'rgba(16,16,16,.3)' }}>
+              <VCButton variant="secondary" onClick={() => setShowCustomizeModal(false)}>
+                Cancel
+              </VCButton>
+              <VCButton
+                variant="primary"
+                onClick={deployCustomizedAgent}
+                disabled={!customizations.name || creatingFromTemplate}
+              >
+                {creatingFromTemplate ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" /> Deploying...
+                  </>
+                ) : (
+                  <>
+                    <Zap size={16} /> Deploy Agent
+                  </>
+                )}
+              </VCButton>
+            </div>
+          </div>
+        </div>
+      )}
 
-       {/* Monitor Performance Panel (Step 3) - Shows when agent is selected */}
-       {selectedAgent && wizardStep === 2 && (
-         <div className="mt-8 card p-6 border-t-4 border-t-accent-tertiary animate-fade-in">
-           <div className="flex items-center justify-between mb-6">
-             <h3 className="text-xl font-bold flex items-center gap-2">
-               <BarChart3 size={24} className="text-accent-tertiary" />
-               Performance Analytics
-             </h3>
-             <button
-               onClick={() => {
-                 setSelectedAgent(null);
-                 setWizardStep(0);
-               }}
-               className="btn btn-ghost btn-sm"
-             >
-               <X size={16} /> Close
-             </button>
-           </div>
+      {/* Monitor Performance Panel (Step 3) - Shows when agent is selected */}
+      {selectedAgent && wizardStep === 2 && (
+        <div className="mt-8 vc p-6 animate-fade-in" style={{ borderTop: '4px solid var(--accent-tertiary)' }}>
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+              <BarChart3 size={24} style={{ color: 'var(--accent-tertiary)' }} />
+              Performance Analytics
+            </h3>
+            <VCButton
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSelectedAgent(null);
+                setWizardStep(0);
+              }}
+            >
+              <X size={16} /> Close
+            </VCButton>
+          </div>
 
-           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-             <div className="bg-surface-muted p-4 rounded-md border border-line-subtle">
-               <div className="flex items-center justify-between mb-2">
-                 <span className="text-xs text-content-tertiary uppercase">Total Runs</span>
-                 <Activity size={16} className="text-content-tertiary" />
-               </div>
-               <div className="text-2xl font-bold font-mono">{selectedAgent.execution_count || 0}</div>
-             </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div className="p-4 rounded-md" style={{ background: 'var(--bg-elevated)', border: '1px solid rgba(248,240,242,.08)' }}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs uppercase" style={{ color: 'var(--text-tertiary)' }}>Total Runs</span>
+                <Activity size={16} style={{ color: 'var(--text-tertiary)' }} />
+              </div>
+              <div className="text-2xl font-bold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{selectedAgent.execution_count || 0}</div>
+            </div>
 
-             <div className="bg-surface-muted p-4 rounded-md border border-line-subtle">
-               <div className="flex items-center justify-between mb-2">
-                 <span className="text-xs text-content-tertiary uppercase">Success Rate</span>
-                 <TrendingUp size={16} className="text-semantic-success" />
-               </div>
-               <div className="text-2xl font-bold font-mono text-semantic-success">
-                 {((selectedAgent.success_rate || 0) * 100).toFixed(1)}%
-               </div>
-             </div>
+            <div className="p-4 rounded-md" style={{ background: 'var(--bg-elevated)', border: '1px solid rgba(248,240,242,.08)' }}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs uppercase" style={{ color: 'var(--text-tertiary)' }}>Success Rate</span>
+                <TrendingUp size={16} style={{ color: 'var(--accent-secondary)' }} />
+              </div>
+              <div className="text-2xl font-bold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-secondary)' }}>
+                {((selectedAgent.success_rate || 0) * 100).toFixed(1)}%
+              </div>
+            </div>
 
-             <div className="bg-surface-muted p-4 rounded-md border border-line-subtle">
-               <div className="flex items-center justify-between mb-2">
-                 <span className="text-xs text-content-tertiary uppercase">Avg Duration</span>
-                 <Clock size={16} className="text-content-tertiary" />
-               </div>
-               <div className="text-2xl font-bold font-mono">2.4s</div>
-             </div>
+            <div className="p-4 rounded-md" style={{ background: 'var(--bg-elevated)', border: '1px solid rgba(248,240,242,.08)' }}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs uppercase" style={{ color: 'var(--text-tertiary)' }}>Avg Duration</span>
+                <Clock size={16} style={{ color: 'var(--text-tertiary)' }} />
+              </div>
+              <div className="text-2xl font-bold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>2.4s</div>
+            </div>
 
-             <div className="bg-surface-muted p-4 rounded-md border border-line-subtle">
-               <div className="flex items-center justify-between mb-2">
-                 <span className="text-xs text-content-tertiary uppercase">Status</span>
-                 <div className={`w-2 h-2 rounded-full ${selectedAgent.enabled ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
-               </div>
-               <div className="text-2xl font-bold font-mono">{selectedAgent.enabled ? 'Active' : 'Paused'}</div>
-             </div>
-           </div>
+            <div className="p-4 rounded-md" style={{ background: 'var(--bg-elevated)', border: '1px solid rgba(248,240,242,.08)' }}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs uppercase" style={{ color: 'var(--text-tertiary)' }}>Status</span>
+                {selectedAgent.enabled
+                  ? <VCBadge color="mint" live>Active</VCBadge>
+                  : <VCBadge color="neutral">Paused</VCBadge>
+                }
+              </div>
+              <div className="text-2xl font-bold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{selectedAgent.enabled ? 'Active' : 'Paused'}</div>
+            </div>
+          </div>
 
-           {/* Execution Timeline */}
-           <div>
-             <h4 className="text-sm font-bold mb-3 flex items-center gap-2">
-               <Clock size={16} /> Recent Executions
-             </h4>
-             <div className="space-y-4 max-h-[600px] overflow-y-auto custom-scrollbar">
-               {executionLogs.length === 0 ? (
-                 <div className="bg-black/90 text-content-tertiary p-4 rounded-md font-mono text-xs">
-                   // No execution logs available
-                 </div>
-               ) : (
-                 executionLogs.slice(0, 10).map((log, idx) => {
-                   const explanation = explanations[log.id];
-                   const isLoading = loadingExplanations[log.id];
+          {/* Execution Timeline */}
+          <div>
+            <h4 className="text-sm font-bold mb-3 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+              <Clock size={16} /> Recent Executions
+            </h4>
+            <div className="space-y-4 max-h-[600px] overflow-y-auto custom-scrollbar">
+              {executionLogs.length === 0 ? (
+                <div className="p-4 rounded-md font-mono text-xs" style={{ background: 'rgba(0,0,0,.9)', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                  // No execution logs available
+                </div>
+              ) : (
+                executionLogs.slice(0, 10).map((log, idx) => {
+                  const explanation = explanations[log.id];
+                  const isLoading = loadingExplanations[log.id];
 
-                   return (
-                     <div key={log.id} className="bg-surface-elevated border border-line-default rounded-md p-4">
-                       {/* Execution Header */}
-                       <div className="flex justify-between items-start mb-3">
-                         <div>
-                           <div className="flex items-center gap-2">
-                             <span className={`text-xs font-bold ${log.success ? 'text-semantic-success' : 'text-semantic-error'}`}>
-                               {log.success ? '✓ SUCCESS' : '✗ FAILED'}
-                             </span>
-                             <span className="text-xs text-content-tertiary">
-                               {new Date(log.created_at).toLocaleString()}
-                             </span>
-                           </div>
-                           <div className="mt-1 text-sm text-content-secondary">
-                             Trigger: <span className="font-mono text-accent-primary">{log.trigger_type}</span>
-                           </div>
-                         </div>
-                         {log.duration_ms && (
-                           <span className="text-xs text-content-tertiary font-mono">
-                             {log.duration_ms}ms
-                           </span>
-                         )}
-                       </div>
+                  return (
+                    <div key={log.id} className="vc p-4">
+                      {/* Execution Header */}
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            {log.success
+                              ? <VCBadge color="mint">SUCCESS</VCBadge>
+                              : <VCBadge color="crimson">FAILED</VCBadge>
+                            }
+                            <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                              {new Date(log.created_at).toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                            Trigger: <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)' }}>{log.trigger_type}</span>
+                          </div>
+                        </div>
+                        {log.duration_ms && (
+                          <span className="text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
+                            {log.duration_ms}ms
+                          </span>
+                        )}
+                      </div>
 
-                       {/* Decisions Summary */}
-                       {log.decisions && log.decisions.length > 0 && (
-                         <div className="mb-3 text-xs">
-                           <span className="text-content-tertiary">Decisions: </span>
-                           <span className="text-content-primary">
-                             {log.decisions.length} action{log.decisions.length !== 1 ? 's' : ''} taken
-                           </span>
-                         </div>
-                       )}
+                      {/* Decisions Summary */}
+                      {log.decisions && log.decisions.length > 0 && (
+                        <div className="mb-3 text-xs">
+                          <span style={{ color: 'var(--text-tertiary)' }}>Decisions: </span>
+                          <span style={{ color: 'var(--text-primary)' }}>
+                            {log.decisions.length} action{log.decisions.length !== 1 ? 's' : ''} taken
+                          </span>
+                        </div>
+                      )}
 
-                       {/* AI Explanation */}
-                       {isLoading && (
-                         <div className="flex items-center gap-2 text-xs text-content-tertiary">
-                           <Loader2 size={12} className="animate-spin" />
-                           Loading explanation...
-                         </div>
-                       )}
+                      {/* AI Explanation */}
+                      {isLoading && (
+                        <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                          <Loader2 size={12} className="animate-spin" />
+                          Loading explanation...
+                        </div>
+                      )}
 
-                       {explanation && (
-                         <ExplanationCard
-                           recommendation={{
-                             label: explanation.recommendation?.name || explanation.recommendation?.label || 'Recommendation',
-                             ...explanation.recommendation
-                           }}
-                           explanation={explanation}
-                           executionId={log.id}
-                           onAccept={() => {
-                             console.log('Recommendation accepted:', explanation.recommendation);
-                           }}
-                           onChangeRecommendation={(alternative) => {
-                             console.log('Alternative selected:', alternative);
-                           }}
-                         />
-                       )}
+                      {explanation && (
+                        <ExplanationCard
+                          recommendation={{
+                            label: explanation.recommendation?.name || explanation.recommendation?.label || 'Recommendation',
+                            ...explanation.recommendation
+                          }}
+                          explanation={explanation}
+                          executionId={log.id}
+                          onAccept={() => {
+                            console.log('Recommendation accepted:', explanation.recommendation);
+                          }}
+                          onChangeRecommendation={(alternative) => {
+                            console.log('Alternative selected:', alternative);
+                          }}
+                        />
+                      )}
 
-                       {/* Error Message */}
-                       {!log.success && log.error_message && (
-                         <div className="mt-2 p-2 bg-semantic-error/10 border border-red-500/20 rounded text-xs text-red-400">
-                           {log.error_message}
-                         </div>
-                       )}
-                     </div>
-                   );
-                 })
-               )}
-             </div>
-           </div>
-         </div>
-       )}
-      </div>
-    );
-  }
-
+                      {/* Error Message */}
+                      {!log.success && log.error_message && (
+                        <div className="mt-2 p-2 rounded text-xs" style={{ background: 'rgba(255,45,107,.1)', border: '1px solid rgba(255,45,107,.2)', color: '#ff6b6b' }}>
+                          {log.error_message}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

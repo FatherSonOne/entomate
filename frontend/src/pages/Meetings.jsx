@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Plus, Search, Filter, Clock, Users, MessageSquare, Trash2 } from 'lucide-react'
 import MeetingRecorder from '../components/MeetingRecorder'
 import { meetingsApi } from '../services/api'
+import { VCButton, VCBadge } from '../components/vc'
 
 export default function Meetings() {
   const [meetings, setMeetings] = useState([])
@@ -50,11 +51,11 @@ export default function Meetings() {
     meeting.summary?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const getSentimentColor = (sentiment) => {
+  const getSentimentBadgeColor = (sentiment) => {
     switch (sentiment) {
-      case 'Positive': return 'badge-success'
-      case 'Negative': return 'badge-error'
-      default: return 'badge-gray'
+      case 'Positive': return 'mint'
+      case 'Negative': return 'crimson'
+      default: return 'neutral'
     }
   }
 
@@ -71,16 +72,21 @@ export default function Meetings() {
       {/* Page header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-content-primary">Meetings</h1>
-          <p className="text-content-secondary">View and manage your meeting recordings</p>
+          <h1
+            className="text-2xl font-bold"
+            style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
+          >
+            Meetings
+          </h1>
+          <p style={{ color: 'var(--text-secondary)' }}>View and manage your meeting recordings</p>
         </div>
-        <button
+        <VCButton
+          variant="primary"
           onClick={() => setShowRecorder(!showRecorder)}
-          className="btn btn-primary"
         >
           <Plus className="w-4 h-4" />
           New Meeting
-        </button>
+        </VCButton>
       </div>
 
       {/* Recorder panel */}
@@ -91,7 +97,10 @@ export default function Meetings() {
       {/* Search and filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-content-tertiary" />
+          <Search
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5"
+            style={{ color: 'var(--text-tertiary)' }}
+          />
           <input
             type="text"
             placeholder="Search meetings..."
@@ -100,29 +109,37 @@ export default function Meetings() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        <button className="btn btn-secondary">
+        <VCButton variant="secondary">
           <Filter className="w-4 h-4" />
           Filters
-        </button>
+        </VCButton>
       </div>
 
       {/* Meetings list */}
-      <div className="card">
+      <div className="vc">
         {loading ? (
           <div className="p-8 text-center">
             <div className="spinner mx-auto mb-4" />
-            <p className="text-content-tertiary">Loading meetings...</p>
+            <p style={{ color: 'var(--text-tertiary)' }}>Loading meetings...</p>
           </div>
         ) : filteredMeetings.length === 0 ? (
           <div className="p-8 text-center">
-            <MessageSquare className="w-12 h-12 text-content-muted mx-auto mb-3" />
-            <h3 className="text-lg font-medium text-content-primary mb-1">No meetings found</h3>
-            <p className="text-content-tertiary">
+            <MessageSquare
+              className="w-12 h-12 mx-auto mb-3"
+              style={{ color: 'var(--text-tertiary)' }}
+            />
+            <h3
+              className="text-lg font-medium mb-1"
+              style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
+            >
+              No meetings found
+            </h3>
+            <p style={{ color: 'var(--text-tertiary)' }}>
               {searchQuery ? 'Try a different search term' : 'Record your first meeting to get started'}
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-200">
+          <div className="divide-y" style={{ borderColor: 'rgba(248,240,242,.08)' }}>
             {filteredMeetings.map((meeting) => (
               <Link
                 key={meeting.id}
@@ -133,21 +150,24 @@ export default function Meetings() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-xl">{getSentimentEmoji(meeting.sentiment_label)}</span>
-                      <h3 className="text-lg font-semibold text-content-primary truncate">
+                      <h3
+                        className="text-lg font-semibold truncate"
+                        style={{ color: 'var(--text-primary)' }}
+                      >
                         {meeting.title}
                       </h3>
-                      <span className={`badge ${getSentimentColor(meeting.sentiment_label)}`}>
+                      <VCBadge color={getSentimentBadgeColor(meeting.sentiment_label)}>
                         {meeting.sentiment_label || 'Unknown'}
-                      </span>
+                      </VCBadge>
                     </div>
 
                     {meeting.summary && (
-                      <p className="text-content-secondary line-clamp-2 mb-3">
+                      <p className="line-clamp-2 mb-3" style={{ color: 'var(--text-secondary)' }}>
                         {meeting.summary}
                       </p>
                     )}
 
-                    <div className="flex flex-wrap items-center gap-4 text-sm text-content-tertiary">
+                    <div className="flex flex-wrap items-center gap-4 text-sm" style={{ color: 'var(--text-tertiary)' }}>
                       <span className="flex items-center gap-1">
                         <Clock className="w-4 h-4" />
                         {new Date(meeting.created_at).toLocaleDateString('en-US', {
@@ -169,16 +189,19 @@ export default function Meetings() {
                       )}
 
                       {meeting.key_points?.length > 0 && (
-                        <span className="badge badge-info">
+                        <VCBadge color="neutral">
                           {meeting.key_points.length} key points
-                        </span>
+                        </VCBadge>
                       )}
                     </div>
                   </div>
 
                   <button
                     onClick={(e) => handleDelete(meeting.id, e)}
-                    className="p-2 text-content-tertiary hover:text-semantic-error hover:bg-semantic-error-dim rounded-lg transition-colors"
+                    className="p-2 rounded-lg transition-colors"
+                    style={{ color: 'var(--text-tertiary)' }}
+                    onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-primary)'}
+                    onMouseLeave={e => e.currentTarget.style.color = 'var(--text-tertiary)'}
                   >
                     <Trash2 className="w-5 h-5" />
                   </button>
