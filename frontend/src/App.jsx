@@ -21,18 +21,19 @@ import Workflows from './pages/Workflows'
 import WorkflowBuilder from './pages/WorkflowBuilder'
 import SignIn from './pages/SignIn'
 import SignUp from './pages/SignUp'
+import LandingPage from './pages/LandingPage'
 
 export default function App() {
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Routes>
         {/* Public routes */}
+        <Route path="/" element={<LandingPage />} />
         <Route path="/sign-in" element={<SignIn />} />
         <Route path="/sign-up" element={<SignUp />} />
 
         {/* Protected routes */}
         <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-          <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="meetings" element={<Meetings />} />
           <Route path="meetings/:id" element={<MeetingDetail />} />

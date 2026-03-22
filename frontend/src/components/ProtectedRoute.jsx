@@ -18,7 +18,7 @@ export default function ProtectedRoute({ children }) {
 
   // Redirect to landing/sign-in if not authenticated
   if (!isSignedIn) {
-    return <Navigate to="/sign-in" replace />
+    return <Navigate to="/" replace />
   }
 
   return children
