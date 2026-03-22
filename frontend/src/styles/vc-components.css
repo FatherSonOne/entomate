@@ -15,31 +15,70 @@
   --vc-trk:    0em;
 }
 
-/* ── Surface base ── */
+/* ── Short token aliases (Void × Crimson compact tokens) ── */
+:root {
+  --c:   #FF2D6B;
+  --cb:  #FF6699;
+  --cd:  rgba(255,45,107,.12);
+  --cg:  rgba(255,45,107,.32);
+  --m:   #00F5D4;
+  --md:  rgba(0,245,212,.12);
+  --mg:  rgba(0,245,212,.30);
+  --a:   #FFB800;
+  --ad:  rgba(255,184,0,.12);
+  --p:   #A0FF32;
+  --pd:  rgba(160,255,50,.10);
+  --bg0: #080808;
+  --bg1: #101010;
+  --bg2: #181818;
+  --bg3: #202020;
+  --t0:  #F8F0F2;
+  --t1:  #968890;
+  --t2:  #585055;
+  --b0:  rgba(248,240,242,.06);
+  --b1:  rgba(248,240,242,.10);
+  --b2:  rgba(248,240,242,.16);
+  --neo-base: #141414;
+  --neo-l:    #1E1E1E;
+  --neo-d:    #0C0C0C;
+  --blur:  16px;
+  --rad:   13px;
+  --extr:  7px;
+  --opa:   0.70;
+  --glow-i: 0.60;
+  --font: 'Syne', system-ui, sans-serif;
+}
+
+/* ── Surface base — Glassmorphism (default, Void × Crimson brand) ── */
 .vc {
+  background: rgba(16, 16, 16, 0.70);
+  border: 1px solid rgba(248, 240, 242, 0.10);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  backdrop-filter: blur(16px) saturate(1.4);
+  box-shadow: 0 8px 32px rgba(0,0,0,.4), inset 0 1px 0 rgba(248,240,242,.06);
   border-radius: var(--vc-rad);
-  transition: all 500ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 240ms cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
   font-family: var(--font-display, 'Syne', system-ui, sans-serif);
 }
 
-/* ── Neo-Cinema surface (the selected playground style) ── */
+/* ── Hover lift ── */
+.vc:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(0,0,0,.4), inset 0 1px 0 rgba(248,240,242,.06), 0 0 20px rgba(255,45,107,.08);
+}
+
+/* ── Neo-Cinema surface override ── */
 [data-style="neo-cinema"] .vc {
   background: var(--neo-base, #141414);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   box-shadow:
     calc(var(--vc-extr) * 1px) calc(var(--vc-extr) * 1px) calc(var(--vc-extr) * 2px) var(--neo-d, #0C0C0C),
     calc(var(--vc-extr) * -1px) calc(var(--vc-extr) * -1px) calc(var(--vc-extr) * 2px) var(--neo-l, #1E1E1E),
-    0 0 16px rgba(255, 45, 107, calc(var(--vc-glow) * 0.3));
+    0 0 48px rgba(255, 45, 107, 0.15), 0 16px 48px rgba(0,0,0,.6);
   border: 1px solid rgba(255, 45, 107, 0.14);
-}
-
-/* ── Fallback surface (no data-style set) ── */
-:not([data-style]) .vc,
-[data-style="glass"] .vc {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-default);
-  box-shadow: var(--shadow-card);
 }
 
 /* ── Hover glow ── */

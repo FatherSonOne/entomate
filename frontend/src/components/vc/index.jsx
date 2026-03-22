@@ -81,6 +81,11 @@ export function VCInput({ className = '', icon, ...props }) {
   return <input className={`vinput ${className}`} {...props} />
 }
 
+/* ── VCSelect ────────────────────────────────────────────── */
+export function VCSelect({ className = '', children, ...props }) {
+  return <select className={`vselect ${className}`} {...props}>{children}</select>
+}
+
 /* ── VCTextarea ──────────────────────────────────────────── */
 export function VCTextarea({ className = '', ...props }) {
   return <textarea className={`vinput ${className}`} {...props} />

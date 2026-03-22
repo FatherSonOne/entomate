@@ -7,7 +7,7 @@ import {
 import { meetingsApi, integrationsApi } from '../services/api'
 import ActionItemsList from '../components/ActionItemsList'
 import ChatChannelSelector from '../components/ChatChannelSelector'
-import { VCButton, VCBadge } from '../components/vc'
+import { VCButton, VCBadge, VCTimeline } from '../components/vc'
 
 export default function MeetingDetail() {
   const { id } = useParams()
@@ -191,7 +191,7 @@ export default function MeetingDetail() {
             <Share2 className="w-4 h-4" />
             Share
             {meeting.chat_posted && (
-              <span className="ml-1 w-2 h-2 bg-green-500 rounded-full" title="Already posted" />
+              <VCBadge color="mint" className="ml-1">posted</VCBadge>
             )}
           </VCButton>
           <VCButton variant="primary" onClick={handleSyncToCRM} disabled={syncing}>
@@ -224,23 +224,13 @@ export default function MeetingDetail() {
               >
                 Key Points
               </h2>
-              <ul className="space-y-2">
-                {meeting.key_points.map((point, index) => (
-                  <li key={index} className="flex items-start gap-2">
-                    <span
-                      className="w-6 h-6 rounded-full text-sm flex items-center justify-center flex-shrink-0"
-                      style={{
-                        background: 'rgba(255,45,107,.12)',
-                        color: 'var(--accent-primary)',
-                        fontFamily: 'var(--font-mono)'
-                      }}
-                    >
-                      {index + 1}
-                    </span>
-                    <span style={{ color: 'var(--text-secondary)' }}>{point}</span>
-                  </li>
-                ))}
-              </ul>
+              <VCTimeline
+                events={meeting.key_points.map((point, index) => ({
+                  title: point,
+                  time: `Point ${index + 1}`,
+                  color: index % 3 === 0 ? 'crimson' : index % 3 === 1 ? 'mint' : 'amber',
+                }))}
+              />
             </div>
           )}
 
@@ -253,17 +243,12 @@ export default function MeetingDetail() {
               >
                 Decisions Made
               </h2>
-              <ul className="space-y-2">
-                {meeting.decisions.map((decision, index) => (
-                  <li key={index} className="flex items-start gap-2">
-                    <CheckSquare
-                      className="w-5 h-5 flex-shrink-0"
-                      style={{ color: 'var(--accent-secondary)' }}
-                    />
-                    <span style={{ color: 'var(--text-secondary)' }}>{decision}</span>
-                  </li>
-                ))}
-              </ul>
+              <VCTimeline
+                events={meeting.decisions.map((decision) => ({
+                  title: decision,
+                  color: 'mint',
+                }))}
+              />
             </div>
           )}
 
@@ -364,13 +349,7 @@ export default function MeetingDetail() {
       {/* Share to Chat Modal */}
       {showShareModal && (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-          <div
-            className="rounded-xl shadow-xl max-w-md w-full mx-4 p-6"
-            style={{
-              background: 'var(--bg-elevated)',
-              border: '1px solid rgba(248,240,242,.08)'
-            }}
-          >
+          <div className="vc rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
             <div className="flex items-center justify-between mb-4">
               <h3
                 className="text-lg font-semibold"
@@ -378,13 +357,14 @@ export default function MeetingDetail() {
               >
                 Share Meeting Recap
               </h3>
-              <button
+              <VCButton
+                variant="ghost"
                 onClick={() => setShowShareModal(false)}
-                className="p-1 rounded transition-colors"
-                style={{ color: 'var(--text-tertiary)' }}
+                className="p-1"
+                aria-label="Close"
               >
                 <X className="w-5 h-5" />
-              </button>
+              </VCButton>
             </div>
 
             <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>

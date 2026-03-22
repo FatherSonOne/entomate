@@ -122,13 +122,7 @@ export default function Reports() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Meeting Recap */}
-          <div
-            className="rounded-lg p-4 transition-colors"
-            style={{
-              border: '1px solid rgba(248,240,242,.08)',
-              background: 'var(--bg-elevated)',
-            }}
-          >
+          <div className="vc p-4 transition-colors">
             <div className="flex items-start gap-3 mb-3">
               <VCIconBox color="mint" size="sm">
                 <Calendar className="h-5 w-5" />
@@ -170,13 +164,7 @@ export default function Reports() {
           </div>
 
           {/* Goals Report */}
-          <div
-            className="rounded-lg p-4 transition-colors"
-            style={{
-              border: '1px solid rgba(248,240,242,.08)',
-              background: 'var(--bg-elevated)',
-            }}
-          >
+          <div className="vc p-4 transition-colors">
             <div className="flex items-start gap-3 mb-3">
               <VCIconBox color="amber" size="sm">
                 <Target className="h-5 w-5" />
@@ -215,13 +203,7 @@ export default function Reports() {
           </div>
 
           {/* Weekly Summary */}
-          <div
-            className="rounded-lg p-4 transition-colors"
-            style={{
-              border: '1px solid rgba(248,240,242,.08)',
-              background: 'var(--bg-elevated)',
-            }}
-          >
+          <div className="vc p-4 transition-colors">
             <div className="flex items-start gap-3 mb-3">
               <VCIconBox color="mint" size="sm">
                 <Clock className="h-5 w-5" />
@@ -267,13 +249,7 @@ export default function Reports() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Meetings Export */}
-          <div
-            className="rounded-lg p-4 transition-colors"
-            style={{
-              border: '1px solid rgba(248,240,242,.08)',
-              background: 'var(--bg-elevated)',
-            }}
-          >
+          <div className="vc p-4 transition-colors">
             <div className="flex items-start gap-3 mb-3">
               <VCIconBox color="mint" size="sm">
                 <Calendar className="h-5 w-5" />
@@ -303,13 +279,7 @@ export default function Reports() {
           </div>
 
           {/* Action Items Export */}
-          <div
-            className="rounded-lg p-4 transition-colors"
-            style={{
-              border: '1px solid rgba(248,240,242,.08)',
-              background: 'var(--bg-elevated)',
-            }}
-          >
+          <div className="vc p-4 transition-colors">
             <div className="flex items-start gap-3 mb-3">
               <VCIconBox color="amber" size="sm">
                 <CheckSquare className="h-5 w-5" />
@@ -339,13 +309,7 @@ export default function Reports() {
           </div>
 
           {/* Goals Export */}
-          <div
-            className="rounded-lg p-4 transition-colors"
-            style={{
-              border: '1px solid rgba(248,240,242,.08)',
-              background: 'var(--bg-elevated)',
-            }}
-          >
+          <div className="vc p-4 transition-colors">
             <div className="flex items-start gap-3 mb-3">
               <VCIconBox color="amber" size="sm">
                 <Target className="h-5 w-5" />
@@ -467,13 +431,15 @@ export default function Reports() {
 
       {/* Info */}
       <div
-        className="rounded-lg p-4"
+        className="vc rounded-lg p-4"
         style={{
+          borderColor: 'rgba(0,245,212,0.2)',
           background: 'rgba(0,245,212,0.06)',
-          border: '1px solid rgba(0,245,212,0.2)',
         }}
       >
-        <h3 className="font-medium mb-2" style={{ color: 'var(--accent-secondary)' }}>About Reports</h3>
+        <h3 className="font-medium mb-2 flex items-center gap-2" style={{ color: 'var(--accent-secondary)' }}>
+          About Reports
+        </h3>
         <ul className="text-sm space-y-1" style={{ color: 'var(--accent-secondary)', opacity: 0.85 }}>
           <li>• PDF reports are generated on-demand and downloaded to your device</li>
           <li>• CSV exports can be opened in Excel, Google Sheets, or any spreadsheet app</li>

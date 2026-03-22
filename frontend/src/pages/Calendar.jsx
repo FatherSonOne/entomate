@@ -250,15 +250,15 @@ export default function Calendar() {
             {/* Calendar Header */}
             <div className="p-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(248,240,242,.08)' }}>
               <div className="flex items-center gap-4">
-                <button onClick={prevMonth} className="p-2 rounded-lg transition-colors hover:bg-black/20" style={{ color: 'var(--text-secondary)' }}>
+                <VCButton variant="ghost" size="sm" onClick={prevMonth}>
                   <ChevronLeft className="h-5 w-5" />
-                </button>
+                </VCButton>
                 <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
                   {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                 </h2>
-                <button onClick={nextMonth} className="p-2 rounded-lg transition-colors hover:bg-black/20" style={{ color: 'var(--text-secondary)' }}>
+                <VCButton variant="ghost" size="sm" onClick={nextMonth}>
                   <ChevronRight className="h-5 w-5" />
-                </button>
+                </VCButton>
               </div>
               <VCButton variant="secondary" size="sm" onClick={goToToday}>
                 Today

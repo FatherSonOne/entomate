@@ -12,7 +12,7 @@ import {
   History, Zap, AlertCircle, Edit, Mic
 } from 'lucide-react'
 import { workflowsApi } from '../services/api'
-import { VCButton, VCBadge } from '../components/vc'
+import { VCButton, VCBadge, VCInput } from '../components/vc'
 
 export default function Workflows() {
   const navigate = useNavigate()
@@ -146,52 +146,38 @@ export default function Workflows() {
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
-          <input
+        <div className="flex-1">
+          <VCInput
             type="text"
             placeholder="Search workflows..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 rounded-lg focus:outline-none"
-            style={{
-              background: 'var(--bg-elevated)',
-              border: '1px solid rgba(248,240,242,.08)',
-              color: 'var(--text-primary)'
-            }}
+            className="w-full"
+            icon={<Search className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />}
           />
         </div>
         <div className="flex gap-2">
-          <button
+          <VCButton
+            variant={filterActive === 'all' ? 'primary' : 'ghost'}
+            size="sm"
             onClick={() => setFilterActive('all')}
-            className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-            style={filterActive === 'all'
-              ? { background: 'rgba(255,45,107,.15)', color: 'var(--accent-primary)', border: '1px solid rgba(255,45,107,.3)' }
-              : { background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid rgba(248,240,242,.08)' }
-            }
           >
             All
-          </button>
-          <button
+          </VCButton>
+          <VCButton
+            variant={filterActive === 'active' ? 'mint' : 'ghost'}
+            size="sm"
             onClick={() => setFilterActive('active')}
-            className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-            style={filterActive === 'active'
-              ? { background: 'rgba(0,245,212,.15)', color: 'var(--accent-secondary)', border: '1px solid rgba(0,245,212,.3)' }
-              : { background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid rgba(248,240,242,.08)' }
-            }
           >
             Active
-          </button>
-          <button
+          </VCButton>
+          <VCButton
+            variant={filterActive === 'inactive' ? 'secondary' : 'ghost'}
+            size="sm"
             onClick={() => setFilterActive('inactive')}
-            className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-            style={filterActive === 'inactive'
-              ? { background: 'rgba(248,240,242,.12)', color: 'var(--text-primary)', border: '1px solid rgba(248,240,242,.2)' }
-              : { background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid rgba(248,240,242,.08)' }
-            }
           >
             Inactive
-          </button>
+          </VCButton>
         </div>
       </div>
 
@@ -282,37 +268,33 @@ export default function Workflows() {
 
                   {/* Actions */}
                   <div className="flex items-center gap-2">
-                    <button
+                    <VCButton
+                      variant={workflow.active ? 'secondary' : 'ghost'}
+                      size="sm"
                       onClick={(e) => handleToggleActive(workflow.id, workflow.active, e)}
-                      className="p-2 rounded-lg transition-colors"
-                      style={{ color: workflow.active ? 'var(--accent-secondary)' : 'var(--text-tertiary)' }}
                       title={workflow.active ? 'Deactivate' : 'Activate'}
                     >
-                      {workflow.active ? (
-                        <Pause className="w-4 h-4" />
-                      ) : (
-                        <Play className="w-4 h-4" />
-                      )}
-                    </button>
+                      {workflow.active ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                    </VCButton>
 
-                    <button
+                    <VCButton
+                      variant="ghost"
+                      size="sm"
                       onClick={(e) => handleExecute(workflow.id, e)}
                       disabled={!workflow.active}
-                      className="p-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      style={{ color: 'var(--accent-secondary)' }}
                       title="Execute now"
                     >
                       <Zap className="w-4 h-4" />
-                    </button>
+                    </VCButton>
 
                     <div className="relative">
-                      <button
+                      <VCButton
+                        variant="ghost"
+                        size="sm"
                         onClick={(e) => { e.stopPropagation(); setShowMenu(showMenu === workflow.id ? null : workflow.id); }}
-                        className="p-2 rounded-lg transition-colors"
-                        style={{ color: 'var(--text-tertiary)' }}
                       >
                         <MoreVertical className="w-4 h-4" />
-                      </button>
+                      </VCButton>
 
                       {showMenu === workflow.id && (
                         <>
@@ -321,39 +303,43 @@ export default function Workflows() {
                             onClick={(e) => { e.stopPropagation(); setShowMenu(null); }}
                           />
                           <div className="absolute right-0 top-full mt-1 w-40 rounded-lg shadow-lg py-1 z-20" style={{ background: 'var(--bg-elevated)', border: '1px solid rgba(248,240,242,.08)' }}>
-                            <button
+                            <VCButton
+                              variant="ghost"
+                              size="sm"
+                              className="w-full justify-start px-3 rounded-none"
                               onClick={(e) => { e.stopPropagation(); navigate(`/workflows/${workflow.id}`); setShowMenu(null); }}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-black/20"
-                              style={{ color: 'var(--text-secondary)' }}
                             >
                               <Edit className="w-4 h-4" />
                               Edit
-                            </button>
-                            <button
+                            </VCButton>
+                            <VCButton
+                              variant="ghost"
+                              size="sm"
+                              className="w-full justify-start px-3 rounded-none"
                               onClick={(e) => handleDuplicate(workflow.id, e)}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-black/20"
-                              style={{ color: 'var(--text-secondary)' }}
                             >
                               <Copy className="w-4 h-4" />
                               Duplicate
-                            </button>
-                            <button
+                            </VCButton>
+                            <VCButton
+                              variant="ghost"
+                              size="sm"
+                              className="w-full justify-start px-3 rounded-none"
                               onClick={(e) => { e.stopPropagation(); navigate(`/workflows/${workflow.id}/history`); setShowMenu(null); }}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-black/20"
-                              style={{ color: 'var(--text-secondary)' }}
                             >
                               <History className="w-4 h-4" />
                               History
-                            </button>
+                            </VCButton>
                             <hr style={{ margin: '4px 0', borderColor: 'rgba(248,240,242,.08)' }} />
-                            <button
+                            <VCButton
+                              variant="danger"
+                              size="sm"
+                              className="w-full justify-start px-3 rounded-none"
                               onClick={(e) => handleDelete(workflow.id, e)}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-black/20"
-                              style={{ color: 'var(--accent-primary)' }}
                             >
                               <Trash2 className="w-4 h-4" />
                               Delete
-                            </button>
+                            </VCButton>
                           </div>
                         </>
                       )}

@@ -389,14 +389,13 @@ export default function Tasks() {
                 <button
                   onClick={() => task.status === 'done' ? handleReopen(task.id) : handleComplete(task.id)}
                   className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                    task.status === 'done'
-                      ? 'text-white'
-                      : ''
+                    task.status === 'done' ? 'text-white' : ''
                   }`}
                   style={task.status === 'done'
-                    ? { background: 'var(--accent-secondary)', borderColor: 'var(--accent-secondary)' }
+                    ? { background: 'var(--m)', borderColor: 'var(--m)' }
                     : { borderColor: 'var(--text-tertiary)' }
                   }
+                  aria-label={task.status === 'done' ? 'Reopen task' : 'Complete task'}
                 >
                   {task.status === 'done' ? (
                     <CheckCircle2 size={16} />
@@ -448,12 +447,15 @@ export default function Tasks() {
                 {getPriorityBadge(task.priority)}
                 {getStatusBadge(task.status)}
 
-                <button
+                <VCButton
+                  variant="danger"
+                  size="sm"
                   onClick={() => handleDelete(task.id)}
-                  className="p-2 opacity-0 group-hover:opacity-100 rounded-md transition-all hover:bg-red-500/10 hover:text-red-400"
+                  className="p-2 opacity-0 group-hover:opacity-100 transition-all"
+                  title="Delete task"
                 >
                   <Trash2 size={16} />
-                </button>
+                </VCButton>
               </div>
             ))}
           </div>

@@ -7,7 +7,7 @@ import {
   AlertCircle, Zap, Target, Mic, Flame, Download
 } from 'lucide-react'
 import { searchApi } from '../services/api'
-import { VCButton, VCBadge } from '../components/vc'
+import { VCButton, VCBadge, VCSelect } from '../components/vc'
 
 export default function Search() {
   // Search state
@@ -482,15 +482,14 @@ export default function Search() {
               autoComplete="off"
             />
             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2 z-10">
-              <select
+              <VCSelect
                 value={searchType}
                 onChange={(e) => setSearchType(e.target.value)}
-                className="input py-1.5 px-2 text-sm border-0"
-                style={{ background: 'rgba(248,240,242,0.06)' }}
+                className="py-1.5 px-2 text-sm"
               >
                 <option value="semantic">Semantic</option>
                 <option value="keyword">Keyword</option>
-              </select>
+              </VCSelect>
               <VCButton
                 type="submit"
                 variant="primary"
@@ -1046,13 +1045,13 @@ export default function Search() {
                 <Link
                   key={`${result.type}-${result.id}-${index}`}
                   to={getTypeLink(result)}
-                  className="block p-4 transition-colors"
+                  className="sr-result block p-4 transition-colors"
                   style={{ borderBottom: '1px solid rgba(248,240,242,.04)' }}
                   onMouseEnter={e => { e.currentTarget.style.background = 'rgba(248,240,242,.04)' }}
                   onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
                 >
                   <div className="flex items-start gap-3">
-                    <div className="mt-0.5">
+                    <div className="sr-result-icon mt-0.5">
                       {getTypeIcon(result.type)}
                     </div>
                     <div className="flex-1 min-w-0">

@@ -614,24 +614,20 @@ export default function Automations() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <button
+                    <VCButton
+                      variant={automation.enabled ? 'secondary' : 'ghost'}
+                      size="sm"
                       onClick={() => handleToggle(automation.id, automation.enabled)}
-                      className="p-2 rounded-lg transition-colors"
-                      style={{ color: automation.enabled ? 'var(--accent-secondary)' : 'var(--text-tertiary)' }}
                       title={automation.enabled ? 'Pause' : 'Resume'}
                     >
-                      {automation.enabled ? (
-                        <Pause size={16} />
-                      ) : (
-                        <Play size={16} />
-                      )}
-                    </button>
+                      {automation.enabled ? <Pause size={16} /> : <Play size={16} />}
+                    </VCButton>
 
-                    <button
+                    <VCButton
+                      variant="ghost"
+                      size="sm"
                       onClick={() => handleTest(automation.id)}
                       disabled={testingId === automation.id}
-                      className="p-2 rounded-lg transition-colors"
-                      style={{ color: 'var(--text-tertiary)' }}
                       title="Test (dry run)"
                     >
                       {testingId === automation.id ? (
@@ -639,25 +635,25 @@ export default function Automations() {
                       ) : (
                         <Eye size={16} />
                       )}
-                    </button>
+                    </VCButton>
 
-                    <button
+                    <VCButton
+                      variant="ghost"
+                      size="sm"
                       onClick={() => handleExecute(automation.id)}
-                      className="p-2 rounded-lg transition-colors"
-                      style={{ color: 'var(--text-tertiary)' }}
                       title="Run now"
                     >
                       <Zap size={16} />
-                    </button>
+                    </VCButton>
 
-                    <button
+                    <VCButton
+                      variant="danger"
+                      size="sm"
                       onClick={() => handleDelete(automation.id)}
-                      className="p-2 rounded-lg transition-colors"
-                      style={{ color: 'var(--accent-primary)' }}
                       title="Delete"
                     >
                       <Trash2 size={16} />
-                    </button>
+                    </VCButton>
                   </div>
                 </div>
 
@@ -693,12 +689,9 @@ export default function Automations() {
                           </div>
                         )}
                       </div>
-                      <button
-                        onClick={() => setTestResult(null)}
-                        style={{ color: 'var(--text-tertiary)' }}
-                      >
+                      <VCButton variant="ghost" size="sm" onClick={() => setTestResult(null)}>
                         <XCircle size={16} />
-                      </button>
+                      </VCButton>
                     </div>
                   </div>
                 )}

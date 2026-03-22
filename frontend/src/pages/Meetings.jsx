@@ -196,15 +196,14 @@ export default function Meetings() {
                     </div>
                   </div>
 
-                  <button
+                  <VCButton
+                    variant="ghost"
                     onClick={(e) => handleDelete(meeting.id, e)}
-                    className="p-2 rounded-lg transition-colors"
-                    style={{ color: 'var(--text-tertiary)' }}
-                    onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-primary)'}
-                    onMouseLeave={e => e.currentTarget.style.color = 'var(--text-tertiary)'}
+                    className="p-2"
+                    title="Delete meeting"
                   >
                     <Trash2 className="w-5 h-5" />
-                  </button>
+                  </VCButton>
                 </div>
               </Link>
             ))}

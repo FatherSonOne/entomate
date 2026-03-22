@@ -6,7 +6,7 @@ import {
   Calendar, BarChart3, Edit2, Trash2
 } from 'lucide-react';
 import api from '../services/api';
-import { VCButton, VCBadge } from '../components/vc';
+import { VCButton, VCBadge, VCProgress } from '../components/vc';
 
 export default function Goals() {
   const [goals, setGoals] = useState([]);
@@ -152,16 +152,13 @@ export default function Goals() {
               >
                 {Math.round(goal.progress || 0)}%
               </div>
-              <div
-                className="w-24 h-2 rounded-full mt-1"
-                style={{ background: 'var(--bg-elevated)' }}
-              >
-                <div
-                  className="h-full rounded-full"
-                  style={{
-                    width: `${Math.min(goal.progress || 0, 100)}%`,
-                    ...getProgressBarStyle(goal.progress)
-                  }}
+              <div className="w-24 mt-1">
+                <VCProgress
+                  value={goal.progress || 0}
+                  color={
+                    (goal.progress || 0) >= 70 ? 'mint' :
+                    (goal.progress || 0) >= 40 ? 'amber' : 'crimson'
+                  }
                 />
               </div>
             </div>
@@ -478,13 +475,15 @@ function GoalDetailPanel({ goal, onUpdate, onClose }) {
         >
           {goal.title}
         </h3>
-        <button
+        <VCButton
+          variant="danger"
+          size="sm"
           onClick={deleteGoal}
-          className="p-2 rounded-lg hover:bg-red-500/10 hover:text-red-400 transition-colors"
-          style={{ color: 'var(--accent-primary)' }}
+          className="p-2"
+          title="Delete goal"
         >
           <Trash2 className="h-4 w-4" />
-        </button>
+        </VCButton>
       </div>
 
       {goal.description && (
@@ -499,15 +498,13 @@ function GoalDetailPanel({ goal, onUpdate, onClose }) {
             {Math.round(goal.progress || 0)}%
           </span>
         </div>
-        <div className="w-full h-3 rounded-full" style={{ background: 'var(--bg-elevated)' }}>
-          <div
-            className="h-full rounded-full"
-            style={{
-              width: `${Math.min(goal.progress || 0, 100)}%`,
-              ...getProgressBarStyle(goal.progress)
-            }}
-          />
-        </div>
+        <VCProgress
+          value={goal.progress || 0}
+          color={
+            (goal.progress || 0) >= 70 ? 'mint' :
+            (goal.progress || 0) >= 40 ? 'amber' : 'crimson'
+          }
+        />
       </div>
 
       {/* Key Results */}
@@ -529,22 +526,21 @@ function GoalDetailPanel({ goal, onUpdate, onClose }) {
                 <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
                   {kr.title}
                 </span>
-                <button
+                <VCButton
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setEditingKR(editingKR === kr.id ? null : kr.id)}
-                  style={{ color: 'var(--text-tertiary)' }}
-                  className="hover:opacity-80 transition-opacity"
+                  className="p-0.5"
+                  title="Edit key result"
                 >
                   <Edit2 className="h-3 w-3" />
-                </button>
+                </VCButton>
               </div>
               <div className="flex items-center gap-2">
-                <div className="flex-1 h-2 rounded-full" style={{ background: 'var(--bg-elevated)' }}>
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${Math.min((kr.current / kr.target) * 100, 100)}%`,
-                      background: 'var(--accent-primary)'
-                    }}
+                <div className="flex-1">
+                  <VCProgress
+                    value={kr.target > 0 ? (kr.current / kr.target) * 100 : 0}
+                    color="crimson"
                   />
                 </div>
                 <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
@@ -647,10 +643,7 @@ function CreateGoalModal({ goals, onClose, onCreated }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div
-        className="rounded-xl shadow-xl max-w-lg w-full mx-4"
-        style={{ background: 'var(--bg-elevated)' }}
-      >
+      <div className="vc rounded-xl shadow-xl max-w-lg w-full mx-4">
         <form onSubmit={handleSubmit}>
           <div
             className="p-6 border-b"

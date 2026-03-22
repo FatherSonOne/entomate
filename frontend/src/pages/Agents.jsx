@@ -8,7 +8,7 @@ import {
 import api from '../services/api';
 import { GuideCard, PageHeader, Skeleton } from '../components/SharedUI';
 import ExplanationCard from '../components/explainability/ExplanationCard';
-import { VCButton, VCBadge, VCIconBox } from '../components/vc';
+import { VCButton, VCBadge, VCIconBox, VCInput } from '../components/vc';
 
 // Category icons mapping
 const categoryIcons = {
@@ -254,19 +254,12 @@ export default function Agents() {
         <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-mono uppercase tracking-wider" style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>Active Fleet</h3>
-            <div className="relative">
-              <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-tertiary)' }} />
-              <input
-                type="text"
-                placeholder="Filter agents..."
-                className="pl-8 pr-2 py-1 rounded-sm text-xs focus:outline-none w-48"
-                style={{
-                  background: 'var(--bg-elevated)',
-                  border: '1px solid rgba(248,240,242,.08)',
-                  color: 'var(--text-primary)'
-                }}
-              />
-            </div>
+            <VCInput
+              type="text"
+              placeholder="Filter agents..."
+              className="py-1 text-xs w-48"
+              icon={<Search size={14} style={{ color: 'var(--text-tertiary)' }} />}
+            />
           </div>
 
           {loading ? (
@@ -324,23 +317,17 @@ export default function Agents() {
                 <div className="flex justify-between items-start mb-6">
                   <h3 className="font-bold text-lg" style={{ color: 'var(--text-primary)' }}>Agent Diagnostics</h3>
                   <div className="flex gap-2">
-                    <button
+                    <VCButton
+                      variant={selectedAgent.enabled ? 'danger' : 'mint'}
+                      size="sm"
                       onClick={() => toggleAgent(selectedAgent.id)}
-                      className="p-2 rounded-sm border transition-colors"
-                      style={selectedAgent.enabled
-                        ? { borderColor: 'rgba(255,59,48,.3)', color: '#ff3b30' }
-                        : { borderColor: 'rgba(0,245,212,.3)', color: 'var(--accent-secondary)' }
-                      }
-                      title={selectedAgent.enabled ? "Stop" : "Start"}
+                      title={selectedAgent.enabled ? 'Stop' : 'Start'}
                     >
                       {selectedAgent.enabled ? <Pause size={16} /> : <Play size={16} />}
-                    </button>
-                    <button
-                      className="p-2 rounded-sm border transition-colors"
-                      style={{ borderColor: 'rgba(248,240,242,.08)', color: 'var(--text-secondary)' }}
-                    >
+                    </VCButton>
+                    <VCButton variant="ghost" size="sm">
                       <Trash2 size={16} />
-                    </button>
+                    </VCButton>
                   </div>
                 </div>
 
@@ -397,13 +384,9 @@ export default function Agents() {
                 <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Agent Templates</h2>
                 <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Choose a template to deploy an AI agent</p>
               </div>
-              <button
-                onClick={() => setShowTemplates(false)}
-                className="p-2 rounded-md transition-colors"
-                style={{ color: 'var(--text-secondary)' }}
-              >
+              <VCButton variant="ghost" size="sm" onClick={() => setShowTemplates(false)}>
                 <X size={20} />
-              </button>
+              </VCButton>
             </div>
 
             {/* Error Message */}
@@ -414,9 +397,9 @@ export default function Agents() {
                   <p className="text-sm font-medium" style={{ color: 'var(--accent-primary)' }}>Deployment Failed</p>
                   <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>{deployError}</p>
                 </div>
-                <button onClick={() => setDeployError(null)} style={{ color: 'var(--text-tertiary)' }}>
+                <VCButton variant="ghost" size="sm" onClick={() => setDeployError(null)}>
                   <X size={16} />
-                </button>
+                </VCButton>
               </div>
             )}
 
@@ -535,13 +518,9 @@ export default function Agents() {
                 </h2>
                 <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Configure triggers, actions, and behavior</p>
               </div>
-              <button
-                onClick={() => setShowCustomizeModal(false)}
-                className="p-2 rounded-md transition-colors"
-                style={{ color: 'var(--text-secondary)' }}
-              >
+              <VCButton variant="ghost" size="sm" onClick={() => setShowCustomizeModal(false)}>
                 <X size={20} />
-              </button>
+              </VCButton>
             </div>
 
             <div className="p-6 overflow-y-auto max-h-[calc(85vh-140px)] space-y-6">
@@ -578,15 +557,16 @@ export default function Agents() {
                   {customizations.triggers.map((trigger, idx) => (
                     <div key={idx} className="flex items-center gap-3 p-3 rounded-md" style={{ background: 'var(--bg-elevated)', border: '1px solid rgba(248,240,242,.08)' }}>
                       <span className="flex-1 text-sm" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{trigger.type}</span>
-                      <button
+                      <VCButton
+                        variant="ghost"
+                        size="sm"
                         onClick={() => setCustomizations({
                           ...customizations,
                           triggers: customizations.triggers.filter((_, i) => i !== idx)
                         })}
-                        style={{ color: 'var(--accent-primary)' }}
                       >
                         <X size={16} />
-                      </button>
+                      </VCButton>
                     </div>
                   ))}
                 </div>
@@ -605,15 +585,16 @@ export default function Agents() {
                         {idx + 1}
                       </span>
                       <span className="flex-1 text-sm" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{action.type}</span>
-                      <button
+                      <VCButton
+                        variant="ghost"
+                        size="sm"
                         onClick={() => setCustomizations({
                           ...customizations,
                           actions: customizations.actions.filter((_, i) => i !== idx)
                         })}
-                        style={{ color: 'var(--accent-primary)' }}
                       >
                         <X size={16} />
-                      </button>
+                      </VCButton>
                     </div>
                   ))}
                 </div>

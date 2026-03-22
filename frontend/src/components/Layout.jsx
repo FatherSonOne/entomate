@@ -123,7 +123,7 @@ export default function Layout() {
   })
 
   return (
-    <div className="min-h-screen transition-colors duration-300 hover-glow trans-slow" data-style="neo-cinema">
+    <div className="min-h-screen transition-colors duration-300 hover-glow trans-slow">
       {/* Neural canvas background */}
       <VCCanvas mode="neural" speed={50} density={95} opacity={0.9} />
 
@@ -140,7 +140,6 @@ export default function Layout() {
         className={`nl-sidebar z-50 transform transition-transform duration-200 lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
-        data-style="neo-cinema"
         style={{ isolation: 'isolate' }}
       >
         <div className="flex flex-col h-full">

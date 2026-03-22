@@ -43,7 +43,10 @@ export default function Analytics() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+        <div
+          className="animate-spin rounded-full h-8 w-8 border-b-2"
+          style={{ borderColor: 'var(--accent-primary)' }}
+        />
       </div>
     );
   }
@@ -87,18 +90,15 @@ export default function Analytics() {
         style={{ borderBottom: '1px solid rgba(248,240,242,.08)' }}
       >
         {['overview', 'meetings', 'tasks', 'ai', 'team'].map((tab) => (
-          <button
+          <VCButton
             key={tab}
+            variant={activeTab === tab ? 'primary' : 'ghost'}
+            size="sm"
             onClick={() => setActiveTab(tab)}
-            className="px-4 py-2 rounded-lg text-sm font-medium capitalize transition-colors"
-            style={
-              activeTab === tab
-                ? { background: 'rgba(255,45,107,0.12)', color: 'var(--accent-primary)' }
-                : { color: 'var(--text-secondary)' }
-            }
+            className="capitalize"
           >
             {tab}
-          </button>
+          </VCButton>
         ))}
       </div>
 

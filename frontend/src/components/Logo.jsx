@@ -109,10 +109,10 @@ export const Logo = ({ size = 'md', withText = true, className = '' }) => {
       {withText && (
         <span style={{
           fontFamily: "'Syne', system-ui, sans-serif",
-          fontWeight: 800,
+          fontWeight: 700,
           fontSize: s.textSize,
-          letterSpacing: '-0.03em',
-          lineHeight: 1,
+          letterSpacing: '0.04em',
+          lineHeight: 1.35,
           background: 'linear-gradient(90deg, #FF2D6B 0%, #FF6699 55%, #FFB800 100%)',
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',

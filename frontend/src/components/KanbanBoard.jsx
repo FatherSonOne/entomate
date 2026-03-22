@@ -130,12 +130,11 @@ export default function KanbanBoard({ projectId, onTaskUpdate }) {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', gap: 16, overflowX: 'auto', padding: 4 }}>
+      <div className="kanban">
         {COLUMNS.map(col => (
           <div
             key={col.id}
-            className="bg-surface-muted rounded-lg p-4"
-            style={{ flex: '0 0 300px', minWidth: 260 }}
+            className="kanban-col bg-surface-muted rounded-lg p-4"
           >
             <div className="animate-pulse">
               <div className="h-6 bg-surface-muted rounded w-24 mb-4"></div>
@@ -151,7 +150,7 @@ export default function KanbanBoard({ projectId, onTaskUpdate }) {
   }
 
   return (
-    <div style={{ display: 'flex', gap: 16, overflowX: 'auto', padding: 4 }}>
+    <div className="kanban">
       {COLUMNS.map(column => {
         const Icon = column.icon
         const columnTasks = getTasksByStatus(column.id)
@@ -163,12 +162,10 @@ export default function KanbanBoard({ projectId, onTaskUpdate }) {
         return (
           <div
             key={column.id}
-            className={`bg-surface-muted rounded-lg transition-colors ${
+            className={`kanban-col bg-surface-muted rounded-lg transition-colors ${
               isOver ? 'bg-semantic-info-dim ring-2' : ''
             }`}
             style={{
-              flex: '0 0 300px',
-              minWidth: 260,
               outline: isOver ? `2px solid ${headerColor}` : 'none',
             }}
             onDragOver={(e) => handleDragOver(e, column.id)}
@@ -176,7 +173,7 @@ export default function KanbanBoard({ projectId, onTaskUpdate }) {
             onDrop={(e) => handleDrop(e, column.id)}
           >
             {/* Column Header */}
-            <div className="p-4 border-b border-line-default">
+            <div className="kanban-header">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Icon
@@ -184,25 +181,22 @@ export default function KanbanBoard({ projectId, onTaskUpdate }) {
                     style={{ color: headerColor }}
                   />
                   <h3
-                    className="font-semibold"
                     style={{
                       fontSize: 11,
                       fontWeight: 700,
                       textTransform: 'uppercase',
                       letterSpacing: '.08em',
                       color: headerColor,
+                      margin: 0,
                     }}
                   >
                     {column.title}
                   </h3>
                   <span
+                    className="kanban-count"
                     style={{
                       background: countBg,
                       color: countColor,
-                      padding: '1px 6px',
-                      borderRadius: 10,
-                      fontSize: 10,
-                      fontWeight: 600,
                     }}
                   >
                     {columnTasks.length}
@@ -227,7 +221,7 @@ export default function KanbanBoard({ projectId, onTaskUpdate }) {
                     draggable
                     onDragStart={(e) => handleDragStart(e, task)}
                     onDragEnd={handleDragEnd}
-                    className={`vc bg-surface rounded-lg border border-line-default p-3 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow ${
+                    className={`vc kcard cursor-grab active:cursor-grabbing ${
                       draggedTask?.id === task.id ? 'ring-2' : ''
                     }`}
                     style={
@@ -244,29 +238,19 @@ export default function KanbanBoard({ projectId, onTaskUpdate }) {
                       <div className="flex-1 min-w-0">
                         <Link
                           to={`/tasks/${task.id}`}
-                          className="line-clamp-2"
-                          style={{
-                            fontFamily: 'var(--font-display)',
-                            fontSize: 13,
-                            fontWeight: 600,
-                            color: 'var(--text-primary)',
-                            textDecoration: 'none',
-                          }}
+                          className="kcard-title line-clamp-2"
                           onClick={(e) => e.stopPropagation()}
                         >
                           {task.title}
                         </Link>
 
                         {task.description && (
-                          <p
-                            className="line-clamp-2 mt-1"
-                            style={{ fontSize: 12, color: 'var(--text-tertiary)' }}
-                          >
+                          <p className="kcard-meta line-clamp-2 mt-1">
                             {task.description}
                           </p>
                         )}
 
-                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        <div className="kcard-meta flex items-center gap-2 mt-2 flex-wrap">
                           {/* Priority badge — VCBadge with VC color mapping */}
                           {task.priority && (
                             <VCBadge color={getPriorityVCColor(task.priority)}>
@@ -308,18 +292,19 @@ export default function KanbanBoard({ projectId, onTaskUpdate }) {
 
                         {/* Meeting link */}
                         {task.meeting_id && (
-                          <Link
-                            to={`/meetings/${task.meeting_id}`}
-                            className="mt-2 inline-block"
-                            style={{
-                              fontSize: 11,
-                              color: 'var(--accent-secondary, #00F5D4)',
-                              textDecoration: 'none',
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            From meeting
-                          </Link>
+                          <div className="kcard-footer">
+                            <Link
+                              to={`/meetings/${task.meeting_id}`}
+                              style={{
+                                fontSize: 11,
+                                color: 'var(--accent-secondary, #00F5D4)',
+                                textDecoration: 'none',
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              From meeting
+                            </Link>
+                          </div>
                         )}
                       </div>
                     </div>

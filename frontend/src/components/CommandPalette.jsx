@@ -6,6 +6,7 @@ import {
   Kanban, X, Command, HelpCircle
 } from 'lucide-react'
 import { useKeyboardShortcuts, formatShortcut } from '../hooks/useKeyboardShortcuts'
+import { VCButton } from './vc'
 
 const commands = [
   // Navigation
@@ -151,12 +152,9 @@ export default function CommandPalette({ isOpen, onClose, onShowShortcuts }) {
               setSelectedIndex(0)
             }}
           />
-          <button
-            onClick={onClose}
-            className="rounded p-1 text-content-tertiary hover:text-content-secondary"
-          >
+          <VCButton variant="icon" onClick={onClose} aria-label="Close command palette">
             <X className="w-5 h-5" />
-          </button>
+          </VCButton>
         </div>
 
         {/* Commands list */}
