@@ -7,6 +7,7 @@
 const ai = require('../config/ai');
 const { supabase } = require('../config/supabase');
 const embeddingService = require('./embeddingService');
+const log = require('../utils/log');
 
 class AskService {
   constructor() {
@@ -26,7 +27,7 @@ class AskService {
    */
   async answerQuestion(question, options = {}) {
     try {
-      console.log(`🤔 Answering: "${question}"`);
+      log.info(`Answering: "${question}"`);
       const { conversationId, meetingIds } = options;
 
       if (!ai.isConfigured()) {
@@ -113,7 +114,7 @@ class AskService {
           }
         } catch (error) {
           // Conversation table might not exist
-          console.warn('⚠️ Could not load conversation history');
+          log.warn('Could not load conversation history');
         }
       }
 
@@ -198,11 +199,11 @@ ${transcript ? `Transcript excerpt: ${transcript}...` : ''}
           }
         } catch (error) {
           // Conversation tables might not exist
-          console.warn('⚠️ Could not save conversation:', error.message);
+          log.warn('Could not save conversation:', error.message);
         }
       }
 
-      console.log(`✅ Generated answer with ${citations.length} citations`);
+      log.info(`Generated answer with ${citations.length} citations`);
 
       return {
         answer: response.answer,
@@ -214,7 +215,7 @@ ${transcript ? `Transcript excerpt: ${transcript}...` : ''}
       };
 
     } catch (error) {
-      console.error('❌ Error answering question:', error);
+      log.error('Error answering question:', { error: error.message || error });
       throw error;
     }
   }
@@ -291,7 +292,7 @@ ${transcript ? `Transcript excerpt: ${transcript}...` : ''}
 
       return messages || [];
     } catch (error) {
-      console.error('❌ Error fetching conversation:', error);
+      log.error('Error fetching conversation:', { error: error.message || error });
       return [];
     }
   }
@@ -311,7 +312,7 @@ ${transcript ? `Transcript excerpt: ${transcript}...` : ''}
 
       return conversations || [];
     } catch (error) {
-      console.error('❌ Error listing conversations:', error);
+      log.error('Error listing conversations:', { error: error.message || error });
       return [];
     }
   }
@@ -335,9 +336,9 @@ ${transcript ? `Transcript excerpt: ${transcript}...` : ''}
         .delete()
         .eq('id', conversationId);
 
-      console.log(`🗑️ Deleted conversation: ${conversationId}`);
+      log.info(`Deleted conversation: ${conversationId}`);
     } catch (error) {
-      console.error('❌ Error deleting conversation:', error);
+      log.error('Error deleting conversation:', { error: error.message || error });
     }
   }
 
@@ -348,7 +349,7 @@ ${transcript ? `Transcript excerpt: ${transcript}...` : ''}
     const { conversationId, meetingIds, onChunk, onCitations, onFollowUp, onComplete, onError } = options;
 
     try {
-      console.log(`🤔 Streaming answer for: "${question}"`);
+      log.info(`Streaming answer for: "${question}"`);
 
       if (!ai.isConfigured()) {
         throw new Error('AI service not configured');
@@ -452,7 +453,7 @@ ${transcript ? `Transcript excerpt: ${transcript}...` : ''}
               .join('\n');
           }
         } catch (error) {
-          console.warn('⚠️ Could not load conversation history');
+          log.warn('Could not load conversation history');
         }
       }
 
@@ -521,7 +522,7 @@ ${transcript ? `Transcript excerpt: ${transcript}...` : ''}
             ]);
           }
         } catch (error) {
-          console.warn('⚠️ Could not save conversation:', error.message);
+          log.warn('Could not save conversation:', error.message);
         }
       }
 
@@ -536,10 +537,10 @@ ${transcript ? `Transcript excerpt: ${transcript}...` : ''}
         });
       }
 
-      console.log(`✅ Streamed answer with ${citations.length} citations`);
+      log.info(`Streamed answer with ${citations.length} citations`);
 
     } catch (error) {
-      console.error('❌ Error in streaming answer:', error);
+      log.error('Error in streaming answer:', { error: error.message || error });
       if (onError) {
         onError(error);
       }

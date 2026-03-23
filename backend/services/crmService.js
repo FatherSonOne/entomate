@@ -5,6 +5,7 @@
  */
 
 const axios = require('axios');
+const log = require('../utils/log');
 
 class CRMService {
   constructor() {
@@ -90,7 +91,7 @@ class CRMService {
    */
   async createTask(taskData) {
     if (!this.configured) {
-      console.log('CRM not configured, skipping task creation');
+      log.info('CRM not configured, skipping task creation');
       return { success: false, message: 'CRM not configured' };
     }
 
@@ -113,7 +114,7 @@ class CRMService {
 
       return { success: true, taskId: result.id, provider: this.provider };
     } catch (error) {
-      console.error(`CRM task creation failed:`, error.response?.data || error.message);
+      log.error(`CRM task creation failed:`, error.response?.data || error.message);
       return {
         success: false,
         error: error.response?.data?.message || error.message,
@@ -189,7 +190,7 @@ class CRMService {
         );
       }
     } catch (error) {
-      console.error('Failed to associate task with contact:', error.message);
+      log.error('Failed to associate task with contact:', error.message);
     }
   }
 

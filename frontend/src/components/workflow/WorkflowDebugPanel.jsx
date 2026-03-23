@@ -133,7 +133,7 @@ export default function WorkflowDebugPanel({
       <div className="fixed bottom-4 right-4 z-50">
         <button
           onClick={() => setIsMinimized(false)}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg shadow-lg hover:bg-gray-800"
+          className="flex items-center gap-2 px-4 py-2 vc-bg-code vc-text-primary rounded-lg shadow-lg"
         >
           <Bug className="w-4 h-4" />
           Debug Panel
@@ -160,7 +160,7 @@ export default function WorkflowDebugPanel({
             <button
               onClick={handleTest}
               disabled={executionStatus === 'running'}
-              className="flex items-center gap-1 px-3 py-1 text-sm bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 disabled:opacity-50"
+              className="flex items-center gap-1 px-3 py-1 text-sm vc-bg-warning-dim vc-text-warning rounded disabled:opacity-50"
             >
               <Play className="w-3 h-3" />
               Test
@@ -168,7 +168,7 @@ export default function WorkflowDebugPanel({
             <button
               onClick={handleExecute}
               disabled={executionStatus === 'running'}
-              className="flex items-center gap-1 px-3 py-1 text-sm bg-semantic-success-dim text-semantic-success rounded hover:bg-green-200 disabled:opacity-50"
+              className="flex items-center gap-1 px-3 py-1 text-sm bg-semantic-success-dim text-semantic-success rounded disabled:opacity-50"
             >
               <Play className="w-3 h-3" />
               Execute
@@ -176,7 +176,7 @@ export default function WorkflowDebugPanel({
             {executionStatus === 'running' && (
               <button
                 onClick={onStop}
-                className="flex items-center gap-1 px-3 py-1 text-sm bg-semantic-error-dim text-semantic-error rounded hover:bg-red-200"
+                className="flex items-center gap-1 px-3 py-1 text-sm bg-semantic-error-dim text-semantic-error rounded"
               >
                 <Square className="w-3 h-3" />
                 Stop

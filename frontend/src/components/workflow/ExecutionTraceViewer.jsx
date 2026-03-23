@@ -19,7 +19,7 @@ const statusConfig = {
   failed: { color: 'text-semantic-error bg-semantic-error-dim', icon: XCircle, label: 'Failed' },
   running: { color: 'text-semantic-info bg-semantic-info-dim', icon: Loader2, label: 'Running' },
   pending: { color: 'text-content-tertiary bg-surface-muted', icon: Clock, label: 'Pending' },
-  skipped: { color: 'text-yellow-600 bg-yellow-100', icon: ArrowRight, label: 'Skipped' }
+  skipped: { color: 'vc-text-warning vc-bg-warning-dim', icon: ArrowRight, label: 'Skipped' }
 }
 
 // Format duration
@@ -45,7 +45,7 @@ function JsonViewer({ data, maxHeight = 200 }) {
   return (
     <div className="relative">
       <pre
-        className={`text-xs font-mono bg-gray-900 text-gray-100 p-3 rounded-lg overflow-auto ${
+        className={`text-xs font-mono vc-bg-code vc-text-primary p-3 rounded-lg overflow-auto ${
           !expanded && isLarge ? 'max-h-32' : ''
         }`}
         style={{ maxHeight: expanded ? 'none' : maxHeight }}
@@ -55,7 +55,7 @@ function JsonViewer({ data, maxHeight = 200 }) {
       {isLarge && (
         <button
           onClick={() => setExpanded(!expanded)}
-          className="absolute bottom-2 right-2 px-2 py-1 text-xs bg-gray-700 text-gray-200 rounded hover:bg-gray-600"
+          className="absolute bottom-2 right-2 px-2 py-1 text-xs vc-bg-elevated vc-text-primary rounded"
         >
           {expanded ? 'Collapse' : 'Expand'}
         </button>
@@ -321,7 +321,7 @@ export default function ExecutionTraceViewer({
           <span className="text-content-secondary">{stats.total} nodes</span>
           <span className="text-semantic-success">{stats.completed} completed</span>
           {stats.failed > 0 && <span className="text-semantic-error">{stats.failed} failed</span>}
-          {stats.skipped > 0 && <span className="text-yellow-600">{stats.skipped} skipped</span>}
+          {stats.skipped > 0 && <span className="vc-text-warning">{stats.skipped} skipped</span>}
         </div>
       </div>
 

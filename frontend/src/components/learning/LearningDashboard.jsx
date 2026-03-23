@@ -4,6 +4,8 @@ import {
   Activity, Zap, Target
 } from 'lucide-react';
 import api from '../../services/api';
+import { useToast } from '../vc/ToastProvider';
+import { useConfirm } from '../vc/ConfirmDialog';
 import PatternCard from './PatternCard';
 import PatternApprovalModal from './PatternApprovalModal';
 import EffectivenessReport from './EffectivenessReport';
@@ -13,6 +15,8 @@ import EffectivenessReport from './EffectivenessReport';
  * Displays AI learning insights, patterns, and statistics
  */
 export default function LearningDashboard() {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [activePatterns, setActivePatterns] = useState([]);
   const [pendingPatterns, setPendingPatterns] = useState([]);
   const [overrideStats, setOverrideStats] = useState(null);
@@ -55,7 +59,7 @@ export default function LearningDashboard() {
       setSelectedPattern(null);
     } catch (error) {
       console.error('Failed to approve pattern:', error);
-      alert('Failed to approve pattern. Please try again.');
+      toast.error('Error', 'Failed to approve pattern. Please try again.');
     }
   };
 
@@ -67,19 +71,20 @@ export default function LearningDashboard() {
       setSelectedPattern(null);
     } catch (error) {
       console.error('Failed to reject pattern:', error);
-      alert('Failed to reject pattern. Please try again.');
+      toast.error('Error', 'Failed to reject pattern. Please try again.');
     }
   };
 
   const handleDeactivatePattern = async (pattern) => {
-    if (!confirm('Deactivate this learning pattern?')) return;
+    const ok = await confirm({ title: 'Deactivate?', message: 'Deactivate this learning pattern?', confirmLabel: 'Deactivate', variant: 'danger' });
+    if (!ok) return;
 
     try {
       await api.learning.deactivatePattern(pattern.id);
       await loadDashboardData(); // Reload data
     } catch (error) {
       console.error('Failed to deactivate pattern:', error);
-      alert('Failed to deactivate pattern. Please try again.');
+      toast.error('Error', 'Failed to deactivate pattern. Please try again.');
     }
   };
 
@@ -111,7 +116,7 @@ export default function LearningDashboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 vc-spinner"></div>
       </div>
     );
   }
@@ -143,7 +148,7 @@ export default function LearningDashboard() {
         <div className="bg-surface rounded-lg shadow p-6">
           <div className="flex items-center justify-between mb-2">
             <div className="text-sm font-medium text-content-secondary">Pending Approval</div>
-            <Clock size={20} className="text-yellow-500" />
+            <Clock size={20} className="vc-text-warning" />
           </div>
           <div className="text-3xl font-bold text-content-primary">{pendingPatterns.length}</div>
           <div className="text-xs text-content-tertiary mt-1">New patterns detected</div>
@@ -152,7 +157,7 @@ export default function LearningDashboard() {
         <div className="bg-surface rounded-lg shadow p-6">
           <div className="flex items-center justify-between mb-2">
             <div className="text-sm font-medium text-content-secondary">Total Overrides</div>
-            <Activity size={20} className="text-blue-500" />
+            <Activity size={20} className="vc-text-info" />
           </div>
           <div className="text-3xl font-bold text-content-primary">{overrideStats?.total || 0}</div>
           <div className="text-xs text-content-tertiary mt-1">Last 30 days</div>
@@ -175,7 +180,7 @@ export default function LearningDashboard() {
             onClick={() => setActiveTab('active')}
             className={`pb-4 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'active'
-                ? 'border-indigo-500 text-accent-primary'
+                ? 'vc-border-error text-accent-primary'
                 : 'border-transparent text-content-tertiary hover:text-content-secondary hover:border-line-strong'
             }`}
           >
@@ -185,13 +190,13 @@ export default function LearningDashboard() {
             onClick={() => setActiveTab('pending')}
             className={`pb-4 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'pending'
-                ? 'border-indigo-500 text-accent-primary'
+                ? 'vc-border-error text-accent-primary'
                 : 'border-transparent text-content-tertiary hover:text-content-secondary hover:border-line-strong'
             }`}
           >
             Pending Approval ({pendingPatterns.length})
             {pendingPatterns.length > 0 && (
-              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium vc-bg-warning-dim vc-text-warning">
                 New
               </span>
             )}
@@ -200,7 +205,7 @@ export default function LearningDashboard() {
             onClick={() => setActiveTab('stats')}
             className={`pb-4 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'stats'
-                ? 'border-indigo-500 text-accent-primary'
+                ? 'vc-border-error text-accent-primary'
                 : 'border-transparent text-content-tertiary hover:text-content-secondary hover:border-line-strong'
             }`}
           >
@@ -210,7 +215,7 @@ export default function LearningDashboard() {
             onClick={() => setActiveTab('effectiveness')}
             className={`pb-4 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'effectiveness'
-                ? 'border-indigo-500 text-accent-primary'
+                ? 'vc-border-error text-accent-primary'
                 : 'border-transparent text-content-tertiary hover:text-content-secondary hover:border-line-strong'
             }`}
           >
@@ -305,7 +310,8 @@ export default function LearningDashboard() {
                     </div>
                     <div className="w-full bg-surface-muted rounded-full h-2">
                       <div
-                        className="bg-indigo-600 h-2 rounded-full"
+                        className="h-2 rounded-full"
+                        style={{ background: 'var(--c)' }}
                         style={{ width: `${(count / overrideStats.total) * 100}%` }}
                       ></div>
                     </div>
@@ -335,7 +341,7 @@ export default function LearningDashboard() {
           </div>
 
           {/* Link to Effectiveness Report */}
-          <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg shadow p-6 border border-indigo-100">
+          <div className="rounded-lg shadow p-6 vc-bg-error-dim vc-border-subtle" style={{ border: '1px solid' }}>
             <div className="flex items-center gap-3 mb-2">
               <Zap size={24} className="text-accent-primary" />
               <h3 className="text-lg font-semibold text-content-primary">Detailed Learning Impact</h3>
@@ -345,7 +351,7 @@ export default function LearningDashboard() {
             </p>
             <button
               onClick={() => setActiveTab('effectiveness')}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              className="vbtn vbtn-primary inline-flex items-center gap-2"
             >
               <BarChart3 size={18} />
               View Effectiveness Report

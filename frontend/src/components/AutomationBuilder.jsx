@@ -211,7 +211,7 @@ export default function AutomationBuilder({ onSave, onCancel, onTest, initialDat
 
           {/* Scheduled trigger config */}
           {triggerType === 'scheduled' && (
-            <div className="mt-4 p-4 border border-yellow-200 bg-yellow-50 rounded-lg">
+            <div className="mt-4 p-4 border vc-border-warning vc-bg-warning-dim rounded-lg">
               <h5 className="font-medium text-content-primary mb-3 flex items-center gap-2">
                 <Clock className="w-4 h-4" />
                 Schedule Configuration

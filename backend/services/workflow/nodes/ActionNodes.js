@@ -6,6 +6,7 @@
 
 const BaseNode = require('./BaseNode');
 const { supabase } = require('../../../config/supabase');
+const log = require('../../../utils/log');
 
 /**
  * HTTP Request Node - Make HTTP requests to any API
@@ -32,7 +33,7 @@ class HttpRequestNode extends BaseNode {
     const queryString = this.buildQueryString(queryParams, inputData);
     const fullUrl = queryString ? `${resolvedUrl}?${queryString}` : resolvedUrl;
 
-    console.log(`[HttpRequestNode] ${method} ${fullUrl}`);
+    log.info(`[HttpRequestNode] ${method} ${fullUrl}`);
 
     // Apply authentication
     const authHeaders = await this.applyAuthentication(authentication, context);
@@ -71,7 +72,7 @@ class HttpRequestNode extends BaseNode {
         responseData = await response.text();
       }
 
-      console.log(`[HttpRequestNode] Response: ${response.status} ${response.statusText}`);
+      log.info(`[HttpRequestNode] Response: ${response.status} ${response.statusText}`);
 
       return {
         output: 'main',
@@ -151,7 +152,7 @@ class HttpRequestNode extends BaseNode {
               return this.applyAuthentication({ ...auth, ...cred.data }, context);
             }
           } catch (err) {
-            console.warn('[HttpRequestNode] Failed to load credential:', err);
+            log.warn('[HttpRequestNode] Failed to load credential:', err);
           }
         }
         break;
@@ -173,7 +174,7 @@ class ExecuteWorkflowNode extends BaseNode {
       inputMapping = {}
     } = config;
 
-    console.log(`[ExecuteWorkflowNode] Executing sub-workflow: ${workflowId}`);
+    log.info(`[ExecuteWorkflowNode] Executing sub-workflow: ${workflowId}`);
 
     // Get the workflow
     const { data: workflow, error } = await supabase
@@ -213,7 +214,7 @@ class ExecuteWorkflowNode extends BaseNode {
         )
       ]);
 
-      console.log(`[ExecuteWorkflowNode] Sub-workflow completed: ${result.success ? 'success' : 'failed'}`);
+      log.info(`[ExecuteWorkflowNode] Sub-workflow completed: ${result.success ? 'success' : 'failed'}`);
 
       return {
         output: 'main',
@@ -234,7 +235,7 @@ class ExecuteWorkflowNode extends BaseNode {
         mode: 'sub_workflow',
         triggeredBy: 'sub_workflow'
       }).catch(err => {
-        console.error('[ExecuteWorkflowNode] Background sub-workflow failed:', err);
+        log.error('[ExecuteWorkflowNode] Background sub-workflow failed:', { error: err.message || err });
       });
 
       return {
@@ -262,7 +263,7 @@ class SendSlackNode extends BaseNode {
     const resolvedChannel = this.interpolate(channel, inputData);
     const resolvedMessage = this.interpolate(message, inputData);
 
-    console.log(`[SendSlackNode] Posting to channel: ${resolvedChannel}`);
+    log.info(`[SendSlackNode] Posting to channel: ${resolvedChannel}`);
 
     // Try to use chat service
     try {
@@ -313,7 +314,7 @@ class SendSlackNode extends BaseNode {
         };
       }
 
-      console.warn('[SendSlackNode] Slack not configured, logging message');
+      log.warn('[SendSlackNode] Slack not configured, logging message');
       return {
         output: 'main',
         data: {
@@ -336,7 +337,7 @@ class SendEmailNode extends BaseNode {
     const resolvedSubject = this.interpolate(subject, inputData);
     const resolvedBody = this.interpolate(body, inputData);
 
-    console.log(`[SendEmailNode] Sending email to: ${resolvedTo}`);
+    log.info(`[SendEmailNode] Sending email to: ${resolvedTo}`);
 
     try {
       const emailService = require('../../emailService');
@@ -355,7 +356,7 @@ class SendEmailNode extends BaseNode {
         }
       };
     } catch (err) {
-      console.warn('[SendEmailNode] Email service error:', err.message);
+      log.warn('[SendEmailNode] Email service error:', err.message);
 
       // Fallback to SendGrid if configured
       if (process.env.SENDGRID_API_KEY) {
@@ -379,7 +380,7 @@ class SendEmailNode extends BaseNode {
         };
       }
 
-      console.warn('[SendEmailNode] No email service configured, logging');
+      log.warn('[SendEmailNode] No email service configured, logging');
       return {
         output: 'main',
         data: {
@@ -403,7 +404,7 @@ class CreateTaskNode extends BaseNode {
     const resolvedDueDate = dueDate ? this.interpolate(dueDate, inputData) : null;
     const resolvedAssignedTo = assignedTo ? this.interpolate(assignedTo, inputData) : null;
 
-    console.log(`[CreateTaskNode] Creating task: ${resolvedTitle}`);
+    log.info(`[CreateTaskNode] Creating task: ${resolvedTitle}`);
 
     const { data: task, error } = await supabase
       .from('tasks')
@@ -424,7 +425,7 @@ class CreateTaskNode extends BaseNode {
       throw new Error(`Failed to create task: ${error.message}`);
     }
 
-    console.log(`[CreateTaskNode] Task created: ${task.id}`);
+    log.info(`[CreateTaskNode] Task created: ${task.id}`);
 
     return {
       output: 'main',
@@ -443,7 +444,7 @@ class SyncCrmNode extends BaseNode {
   static async execute(config, inputData, context) {
     const { objectType = 'task', operation = 'create', fieldMapping = {} } = config;
 
-    console.log(`[SyncCrmNode] ${operation} ${objectType} in CRM`);
+    log.info(`[SyncCrmNode] ${operation} ${objectType} in CRM`);
 
     try {
       const crmService = require('../../crmService');
@@ -484,7 +485,7 @@ class SyncCrmNode extends BaseNode {
       };
 
     } catch (err) {
-      console.error('[SyncCrmNode] CRM sync error:', err);
+      log.error('[SyncCrmNode] CRM sync error:', { error: err.message || err });
       return {
         output: 'main',
         data: {
@@ -513,7 +514,7 @@ class RespondWebhookNode extends BaseNode {
       body: body ? this.interpolateObject(body, inputData) : inputData
     };
 
-    console.log(`[RespondWebhookNode] Prepared response with status ${statusCode}`);
+    log.info(`[RespondWebhookNode] Prepared response with status ${statusCode}`);
 
     return {
       output: 'main',
@@ -539,7 +540,7 @@ class SetVariableNode extends BaseNode {
       this.setNestedValue(result, key, resolvedValue);
     }
 
-    console.log(`[SetVariableNode] Set ${Object.keys(variables).length} variables`);
+    log.info(`[SetVariableNode] Set ${Object.keys(variables).length} variables`);
 
     return {
       output: 'main',
@@ -559,7 +560,7 @@ class CodeNode extends BaseNode {
       throw new Error(`Unsupported language: ${language}`);
     }
 
-    console.log('[CodeNode] Executing custom code');
+    log.info('[CodeNode] Executing custom code');
 
     try {
       // Create a sandboxed execution environment
@@ -568,9 +569,9 @@ class CodeNode extends BaseNode {
       // Allowed globals
       const sandbox = {
         console: {
-          log: (...args) => console.log('[CodeNode]', ...args),
-          warn: (...args) => console.warn('[CodeNode]', ...args),
-          error: (...args) => console.error('[CodeNode]', ...args)
+          log: (...args) => log.info('[CodeNode]', ...args),
+          warn: (...args) => log.warn('[CodeNode]', ...args),
+          error: (...args) => log.error('[CodeNode]', ...args)
         },
         JSON,
         Date,
@@ -606,7 +607,7 @@ class CodeNode extends BaseNode {
       const fn = new AsyncFunction(wrappedCode);
       const result = await fn.call(sandbox);
 
-      console.log('[CodeNode] Code executed successfully');
+      log.info('[CodeNode] Code executed successfully');
 
       return {
         output: 'main',
@@ -617,7 +618,7 @@ class CodeNode extends BaseNode {
       };
 
     } catch (error) {
-      console.error('[CodeNode] Execution error:', error);
+      log.error('[CodeNode] Execution error:', { error: error.message || error });
       throw new Error(`Code execution failed: ${error.message}`);
     }
   }

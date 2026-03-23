@@ -4,14 +4,18 @@ import {
   Users, FileSpreadsheet, Loader2, Clock, ChevronDown,
   Building2, BarChart3
 } from 'lucide-react'
+import { useToast } from '../components/vc/ToastProvider'
 import { reportsApi, meetingsApi } from '../services/api'
 import api from '../services/api'
 import { VCButton, VCBadge, VCIconBox } from '../components/vc'
+import ErrorState from '../components/vc/ErrorState'
 
 export default function Reports() {
+  const toast = useToast()
   const [meetings, setMeetings] = useState([])
   const [goals, setGoals] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [generating, setGenerating] = useState(null)
   const [selectedMeeting, setSelectedMeeting] = useState('')
   const [selectedQuarter, setSelectedQuarter] = useState('')
@@ -22,6 +26,7 @@ export default function Reports() {
 
   const loadData = async () => {
     try {
+      setError(null)
       setLoading(true)
       const [meetingsRes, goalsRes] = await Promise.all([
         meetingsApi.list({ limit: 50 }).catch(() => ({ meetings: [] })),
@@ -42,7 +47,7 @@ export default function Reports() {
       let url
       switch (type) {
         case 'meeting-pdf':
-          if (!params.meetingId) return alert('Please select a meeting')
+          if (!params.meetingId) return toast.info('Info', 'Please select a meeting')
           url = reportsApi.downloadMeetingPDF(params.meetingId)
           break
         case 'goals-pdf':
@@ -68,7 +73,7 @@ export default function Reports() {
       window.open(url, '_blank')
     } catch (error) {
       console.error('Failed to generate report:', error)
-      alert('Failed to generate report. Please try again.')
+      toast.error('Error', 'Failed to generate report. Please try again.')
     } finally {
       setTimeout(() => setGenerating(null), 1000)
     }
@@ -268,6 +273,7 @@ export default function Reports() {
                 size="sm"
                 onClick={() => handleDownload('meetings-csv')}
                 disabled={generating === 'meetings-csv'}
+                aria-label="Download meetings CSV"
               >
                 {generating === 'meetings-csv' ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -298,6 +304,7 @@ export default function Reports() {
                 size="sm"
                 onClick={() => handleDownload('action-items-csv')}
                 disabled={generating === 'action-items-csv'}
+                aria-label="Download action items CSV"
               >
                 {generating === 'action-items-csv' ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -328,6 +335,7 @@ export default function Reports() {
                 size="sm"
                 onClick={() => handleDownload('goals-csv')}
                 disabled={generating === 'goals-csv'}
+                aria-label="Download goals CSV"
               >
                 {generating === 'goals-csv' ? (
                   <Loader2 className="h-4 w-4 animate-spin" />

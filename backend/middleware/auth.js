@@ -1,4 +1,5 @@
 const { createClient } = require('@supabase/supabase-js');
+const log = require('../utils/log');
 
 // Initialize Supabase admin client for server-side auth verification
 const supabase = createClient(
@@ -46,7 +47,7 @@ const authenticate = async (req, res, next) => {
 
     next();
   } catch (error) {
-    console.error('Authentication error:', error.message);
+    log.error('Authentication error:', error.message);
     return res.status(401).json({
       error: 'Unauthorized',
       message: 'Invalid or expired token'
@@ -88,7 +89,7 @@ const optionalAuth = async (req, res, next) => {
       };
     } catch (error) {
       // Token invalid or expired, treat as anonymous
-      console.debug('Optional auth failed:', error.message);
+      log.debug('Optional auth failed:', error.message);
       req.user = { id: 'anonymous', email: null, role: 'guest', teamId: 'default' };
     }
 

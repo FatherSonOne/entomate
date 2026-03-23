@@ -5,6 +5,7 @@
 
 const { createClient } = require('@supabase/supabase-js');
 const { v4: uuid } = require('uuid');
+const log = require('../../utils/log');
 
 class PatternDetectionService {
   constructor() {
@@ -28,7 +29,7 @@ class PatternDetectionService {
    */
   async detectPatterns(userId, agentType) {
     try {
-      console.log(`[PatternDetection] Detecting patterns for user ${userId}, agent ${agentType}`);
+      log.info(`[PatternDetection] Detecting patterns for user ${userId}, agent ${agentType}`);
 
       // Get recent overrides (last 90 days)
       const startDate = new Date();
@@ -47,15 +48,15 @@ class PatternDetectionService {
       }
 
       if (!overrides || overrides.length < this.MIN_OVERRIDES) {
-        console.log(`[PatternDetection] Not enough overrides (${overrides?.length || 0}) to detect patterns`);
+        log.info(`[PatternDetection] Not enough overrides (${overrides?.length || 0}) to detect patterns`);
         return [];
       }
 
-      console.log(`[PatternDetection] Analyzing ${overrides.length} overrides`);
+      log.info(`[PatternDetection] Analyzing ${overrides.length} overrides`);
 
       // Group overrides by similar context
       const contextClusters = this.clusterByContext(overrides);
-      console.log(`[PatternDetection] Found ${contextClusters.length} context clusters`);
+      log.info(`[PatternDetection] Found ${contextClusters.length} context clusters`);
 
       const detectedPatterns = [];
 
@@ -83,7 +84,7 @@ class PatternDetectionService {
         }
       }
 
-      console.log(`[PatternDetection] Detected ${detectedPatterns.length} patterns`);
+      log.info(`[PatternDetection] Detected ${detectedPatterns.length} patterns`);
 
       // Store detected patterns
       for (const pattern of detectedPatterns) {
@@ -92,7 +93,7 @@ class PatternDetectionService {
 
       return detectedPatterns;
     } catch (error) {
-      console.error('[PatternDetection] detectPatterns error:', error);
+      log.error('[PatternDetection] detectPatterns error:', { error: error.message || error });
       throw error;
     }
   }
@@ -466,7 +467,7 @@ class PatternDetectionService {
       });
 
       if (isDuplicate) {
-        console.log(`[PatternDetection] Pattern already exists, skipping`);
+        log.info(`[PatternDetection] Pattern already exists, skipping`);
         return null;
       }
 
@@ -486,15 +487,15 @@ class PatternDetectionService {
         .single();
 
       if (error) {
-        console.error('[PatternDetection] Error storing pattern:', error);
+        log.error('[PatternDetection] Error storing pattern:', { error: error.message || error });
         throw error;
       }
 
-      console.log(`[PatternDetection] Pattern stored: ${pattern.description} (confidence: ${confidence}%)`);
+      log.info(`[PatternDetection] Pattern stored: ${pattern.description} (confidence: ${confidence}%)`);
 
       return data;
     } catch (error) {
-      console.error('[PatternDetection] storePattern error:', error);
+      log.error('[PatternDetection] storePattern error:', { error: error.message || error });
       throw error;
     }
   }
@@ -519,7 +520,7 @@ class PatternDetectionService {
 
       return data || [];
     } catch (error) {
-      console.error('[PatternDetection] getPendingPatterns error:', error);
+      log.error('[PatternDetection] getPendingPatterns error:', { error: error.message || error });
       throw error;
     }
   }

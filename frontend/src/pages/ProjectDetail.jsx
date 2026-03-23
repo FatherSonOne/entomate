@@ -6,9 +6,11 @@ import {
 } from 'lucide-react'
 import { projectsApi, tasksApi } from '../services/api'
 import { VCButton, VCBadge } from '../components/vc'
+import { useConfirm } from '../components/vc/ConfirmDialog'
 
 export default function ProjectDetail() {
   const { id } = useParams()
+  const confirm = useConfirm()
   const [project, setProject] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showAddTask, setShowAddTask] = useState(false)
@@ -62,7 +64,8 @@ export default function ProjectDetail() {
   }
 
   const handleDeleteTask = async (taskId) => {
-    if (!confirm('Delete this task?')) return
+    const ok = await confirm({ title: 'Delete Task', message: 'Delete this task?', confirmLabel: 'Delete', variant: 'danger' })
+    if (!ok) return
 
     try {
       await tasksApi.delete(taskId)
@@ -275,7 +278,7 @@ export default function ProjectDetail() {
                   onClick={() => handleCompleteTask(task.id)}
                   className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
                     task.status === 'done'
-                      ? 'bg-green-500 border-green-500 text-white'
+                      ? 'vc-bg-success vc-border-success vc-text-primary'
                       : 'border-line-strong hover:border-primary-500'
                   }`}
                 >

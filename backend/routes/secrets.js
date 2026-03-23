@@ -16,6 +16,9 @@ const { v4: uuidv4 } = require('uuid');
 const secretsVault = require('../services/secretsVault');
 const { SCOPES, ENVIRONMENTS, VALUE_TYPES } = require('../services/secretsVault');
 const { authenticate, authorize } = require('../middleware/auth');
+const log = require('../utils/log');
+const { validate } = require('../middleware/validate');
+const schemas = require('../schemas/secrets');
 
 const router = express.Router();
 
@@ -84,7 +87,7 @@ setInterval(() => {
  * - organizationId: string (optional) - For org-scoped secrets
  * - expiresAt: string (optional) - ISO date for expiration
  */
-router.post('/', authenticate, secretsRateLimit('create'), async (req, res) => {
+router.post('/', authenticate, secretsRateLimit('create'), validate(schemas.create), async (req, res) => {
   try {
     const {
       name,
@@ -128,7 +131,7 @@ router.post('/', authenticate, secretsRateLimit('create'), async (req, res) => {
     });
 
     // Log success (never log the value)
-    console.log(`[Secrets API] Created secret: ${secret.name} by user ${req.user.id}`);
+    log.info(`[Secrets API] Created secret: ${secret.name} by user ${req.user.id}`);
 
     res.status(201).json({
       success: true,
@@ -145,7 +148,7 @@ router.post('/', authenticate, secretsRateLimit('create'), async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[Secrets API] Create error:', error.message);
+    log.error('[Secrets API] Create error:', error.message);
 
     if (error.message.includes('already exists')) {
       return res.status(409).json({
@@ -180,7 +183,7 @@ router.post('/', authenticate, secretsRateLimit('create'), async (req, res) => {
  * - limit: number - Max results (default 100)
  * - offset: number - Pagination offset
  */
-router.get('/', authenticate, secretsRateLimit('list'), async (req, res) => {
+router.get('/', authenticate, secretsRateLimit('list'), validate(schemas.list), async (req, res) => {
   try {
     const {
       scope,
@@ -227,7 +230,7 @@ router.get('/', authenticate, secretsRateLimit('list'), async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[Secrets API] List error:', error.message);
+    log.error('[Secrets API] List error:', error.message);
     res.status(500).json({
       error: 'Internal Server Error',
       message: 'Failed to list secrets'
@@ -274,7 +277,7 @@ router.get('/:id', authenticate, secretsRateLimit('read'), async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[Secrets API] Get error:', error.message);
+    log.error('[Secrets API] Get error:', error.message);
 
     if (error.message === 'Secret not found') {
       return res.status(404).json({
@@ -313,7 +316,7 @@ router.get('/:id', authenticate, secretsRateLimit('read'), async (req, res) => {
  * - description: string (optional) - New description
  * - expiresAt: string (optional) - New expiration date
  */
-router.put('/:id', authenticate, secretsRateLimit('update'), async (req, res) => {
+router.put('/:id', authenticate, secretsRateLimit('update'), validate(schemas.update), async (req, res) => {
   try {
     const { id } = req.params;
     const { value, description, expiresAt } = req.body;
@@ -333,7 +336,7 @@ router.put('/:id', authenticate, secretsRateLimit('update'), async (req, res) =>
 
     const secret = await secretsVault.update(id, updates, req.user.id);
 
-    console.log(`[Secrets API] Updated secret: ${secret.name} by user ${req.user.id}`);
+    log.info(`[Secrets API] Updated secret: ${secret.name} by user ${req.user.id}`);
 
     res.json({
       success: true,
@@ -351,7 +354,7 @@ router.put('/:id', authenticate, secretsRateLimit('update'), async (req, res) =>
     });
 
   } catch (error) {
-    console.error('[Secrets API] Update error:', error.message);
+    log.error('[Secrets API] Update error:', error.message);
 
     if (error.message === 'Secret not found') {
       return res.status(404).json({
@@ -384,7 +387,7 @@ router.delete('/:id', authenticate, secretsRateLimit('delete'), async (req, res)
 
     await secretsVault.delete(id, req.user.id);
 
-    console.log(`[Secrets API] Deleted secret: ${id} by user ${req.user.id}`);
+    log.info(`[Secrets API] Deleted secret: ${id} by user ${req.user.id}`);
 
     res.json({
       success: true,
@@ -392,7 +395,7 @@ router.delete('/:id', authenticate, secretsRateLimit('delete'), async (req, res)
     });
 
   } catch (error) {
-    console.error('[Secrets API] Delete error:', error.message);
+    log.error('[Secrets API] Delete error:', error.message);
 
     if (error.message === 'Secret not found') {
       return res.status(404).json({
@@ -440,7 +443,7 @@ router.get('/:id/audit', authenticate, secretsRateLimit('list'), async (req, res
     });
 
   } catch (error) {
-    console.error('[Secrets API] Audit log error:', error.message);
+    log.error('[Secrets API] Audit log error:', error.message);
 
     if (error.message === 'Access denied') {
       return res.status(403).json({
@@ -463,7 +466,7 @@ router.get('/:id/audit', authenticate, secretsRateLimit('list'), async (req, res
  * Body:
  * - name: string - Secret name to validate
  */
-router.post('/validate', authenticate, async (req, res) => {
+router.post('/validate', authenticate, validate(schemas.validateName), async (req, res) => {
   try {
     const { name } = req.body;
 
@@ -490,7 +493,7 @@ router.post('/validate', authenticate, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[Secrets API] Validate error:', error.message);
+    log.error('[Secrets API] Validate error:', error.message);
     res.status(500).json({
       error: 'Internal Server Error',
       message: 'Failed to validate secret name'
@@ -507,7 +510,7 @@ router.post('/validate', authenticate, async (req, res) => {
  * - template: string - Template containing {{secrets.NAME}} expressions
  * - environment: string - Environment to resolve from
  */
-router.post('/resolve', authenticate, secretsRateLimit('read'), async (req, res) => {
+router.post('/resolve', authenticate, secretsRateLimit('read'), validate(schemas.resolve), async (req, res) => {
   try {
     const { template, environment = ENVIRONMENTS.PRODUCTION, workflowId } = req.body;
 
@@ -550,7 +553,7 @@ router.post('/resolve', authenticate, secretsRateLimit('read'), async (req, res)
     });
 
   } catch (error) {
-    console.error('[Secrets API] Resolve error:', error.message);
+    log.error('[Secrets API] Resolve error:', error.message);
 
     if (error.message.includes('not found')) {
       return res.status(404).json({

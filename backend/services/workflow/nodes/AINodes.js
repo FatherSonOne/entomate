@@ -5,6 +5,7 @@
  */
 
 const BaseNode = require('./BaseNode');
+const log = require('../../../utils/log');
 
 /**
  * AI Agent Node - Run built-in AI agents
@@ -13,7 +14,7 @@ class AIAgentNode extends BaseNode {
   static async execute(config, inputData, context) {
     const { agent, autoApply = false } = config;
 
-    console.log(`[AIAgentNode] Running agent: ${agent}`);
+    log.info(`[AIAgentNode] Running agent: ${agent}`);
 
     try {
       const agentOrchestrator = require('../../agentOrchestrator');
@@ -38,7 +39,7 @@ class AIAgentNode extends BaseNode {
         );
       }
 
-      console.log(`[AIAgentNode] Agent ${agent} completed with confidence: ${result.suggestion?.confidence}`);
+      log.info(`[AIAgentNode] Agent ${agent} completed with confidence: ${result.suggestion?.confidence}`);
 
       return {
         output: 'main',
@@ -53,7 +54,7 @@ class AIAgentNode extends BaseNode {
       };
 
     } catch (error) {
-      console.error(`[AIAgentNode] Agent ${agent} error:`, error);
+      log.error(`[AIAgentNode] Agent ${agent} error:`, { error: error.message || error });
       return {
         output: 'main',
         data: {
@@ -83,7 +84,7 @@ class AIPromptNode extends BaseNode {
     // Interpolate prompt with input data
     const resolvedPrompt = this.interpolate(prompt, inputData);
 
-    console.log(`[AIPromptNode] Sending prompt to ${model}`);
+    log.info(`[AIPromptNode] Sending prompt to ${model}`);
 
     try {
       const geminiService = require('../../../config/gemini');
@@ -95,7 +96,7 @@ class AIPromptNode extends BaseNode {
         maxTokens: 4096
       });
 
-      console.log('[AIPromptNode] Got response from LLM');
+      log.info('[AIPromptNode] Got response from LLM');
 
       // Try to parse as JSON if it looks like JSON
       let parsedResponse = response;
@@ -116,7 +117,7 @@ class AIPromptNode extends BaseNode {
       };
 
     } catch (error) {
-      console.error('[AIPromptNode] Error:', error);
+      log.error('[AIPromptNode] Error:', { error: error.message || error });
       throw new Error(`AI prompt failed: ${error.message}`);
     }
   }
@@ -136,7 +137,7 @@ class AIExtractNode extends BaseNode {
     const text = this.getNestedValue(inputData, inputField);
 
     if (!text) {
-      console.warn(`[AIExtractNode] No text found at field: ${inputField}`);
+      log.warn(`[AIExtractNode] No text found at field: ${inputField}`);
       return {
         output: 'main',
         data: {
@@ -146,7 +147,7 @@ class AIExtractNode extends BaseNode {
       };
     }
 
-    console.log(`[AIExtractNode] Extracting data from ${inputField}`);
+    log.info(`[AIExtractNode] Extracting data from ${inputField}`);
 
     try {
       const geminiService = require('../../../config/gemini');
@@ -175,11 +176,11 @@ Return ONLY a valid JSON object matching the schema. No explanations or addition
         const cleanResponse = response.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
         extracted = JSON.parse(cleanResponse);
       } catch (parseError) {
-        console.error('[AIExtractNode] Failed to parse extraction:', parseError);
+        log.error('[AIExtractNode] Failed to parse extraction:', { error: parseError.message || parseError });
         extracted = { raw: response, parseError: true };
       }
 
-      console.log('[AIExtractNode] Extraction complete');
+      log.info('[AIExtractNode] Extraction complete');
 
       return {
         output: 'main',
@@ -190,7 +191,7 @@ Return ONLY a valid JSON object matching the schema. No explanations or addition
       };
 
     } catch (error) {
-      console.error('[AIExtractNode] Error:', error);
+      log.error('[AIExtractNode] Error:', { error: error.message || error });
       throw new Error(`AI extraction failed: ${error.message}`);
     }
   }
@@ -210,7 +211,7 @@ class AIClassifyNode extends BaseNode {
     const text = this.getNestedValue(inputData, inputField);
 
     if (!text) {
-      console.warn(`[AIClassifyNode] No text found at field: ${inputField}`);
+      log.warn(`[AIClassifyNode] No text found at field: ${inputField}`);
       return {
         output: 'main',
         data: {
@@ -220,7 +221,7 @@ class AIClassifyNode extends BaseNode {
       };
     }
 
-    console.log(`[AIClassifyNode] Classifying text into ${categories.length} categories`);
+    log.info(`[AIClassifyNode] Classifying text into ${categories.length} categories`);
 
     try {
       const geminiService = require('../../../config/gemini');
@@ -263,7 +264,7 @@ Return ONLY a JSON object with this format:
         };
       }
 
-      console.log(`[AIClassifyNode] Classified as: ${classification.category} (${classification.confidence})`);
+      log.info(`[AIClassifyNode] Classified as: ${classification.category} (${classification.confidence})`);
 
       return {
         output: 'main',
@@ -274,7 +275,7 @@ Return ONLY a JSON object with this format:
       };
 
     } catch (error) {
-      console.error('[AIClassifyNode] Error:', error);
+      log.error('[AIClassifyNode] Error:', { error: error.message || error });
       throw new Error(`AI classification failed: ${error.message}`);
     }
   }
@@ -293,7 +294,7 @@ class DetectFollowupsNode extends BaseNode {
     const text = this.getNestedValue(inputData, inputField) || inputData.transcript;
 
     if (!text) {
-      console.warn('[DetectFollowupsNode] No text to analyze');
+      log.warn('[DetectFollowupsNode] No text to analyze');
       return {
         output: 'main',
         data: {
@@ -303,7 +304,7 @@ class DetectFollowupsNode extends BaseNode {
       };
     }
 
-    console.log('[DetectFollowupsNode] Detecting follow-ups');
+    log.info('[DetectFollowupsNode] Detecting follow-ups');
 
     try {
       const agentOrchestrator = require('../../agentOrchestrator');
@@ -349,7 +350,7 @@ class DetectFollowupsNode extends BaseNode {
         }
       }
 
-      console.log(`[DetectFollowupsNode] Found ${followups.length} follow-ups`);
+      log.info(`[DetectFollowupsNode] Found ${followups.length} follow-ups`);
 
       return {
         output: 'main',
@@ -361,7 +362,7 @@ class DetectFollowupsNode extends BaseNode {
       };
 
     } catch (error) {
-      console.error('[DetectFollowupsNode] Error:', error);
+      log.error('[DetectFollowupsNode] Error:', { error: error.message || error });
       return {
         output: 'main',
         data: {

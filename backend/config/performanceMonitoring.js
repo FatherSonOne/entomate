@@ -4,6 +4,7 @@
  */
 
 const errorMonitoring = require('../services/monitoring/ErrorMonitoring');
+const log = require('../utils/log');
 
 class PerformanceMonitor {
   constructor() {
@@ -69,7 +70,7 @@ class PerformanceMonitor {
     if (duration > threshold) {
       metric.slowRequests++;
 
-      console.warn('[Performance] Slow request detected:', {
+      log.warn('[Performance] Slow request detected:', {
         endpoint,
         duration: `${duration}ms`,
         threshold: `${threshold}ms`,
@@ -116,7 +117,7 @@ class PerformanceMonitor {
     if (duration > this.thresholds.database_query) {
       metric.slowQueries++;
 
-      console.warn('[Performance] Slow database query:', {
+      log.warn('[Performance] Slow database query:', {
         queryType,
         duration: `${duration}ms`,
         threshold: `${this.thresholds.database_query}ms`
@@ -141,7 +142,7 @@ class PerformanceMonitor {
 
     // Alert if hit rate drops below 60%
     if (this.metrics.cacheHitRate.total > 100 && hitRate < 0.6) {
-      console.warn('[Performance] Low cache hit rate:', {
+      log.warn('[Performance] Low cache hit rate:', {
         hitRate: `${(hitRate * 100).toFixed(1)}%`,
         hits: this.metrics.cacheHitRate.hits,
         misses: this.metrics.cacheHitRate.misses
@@ -163,7 +164,7 @@ class PerformanceMonitor {
     }
 
     if (duration > this.thresholds.ai_api_call) {
-      console.warn('[Performance] Slow AI API call:', {
+      log.warn('[Performance] Slow AI API call:', {
         duration: `${duration}ms`,
         threshold: `${this.thresholds.ai_api_call}ms`
       });
@@ -266,7 +267,7 @@ class PerformanceMonitor {
       const result = await fn();
       const duration = Date.now() - startTime;
 
-      console.log('[Performance]', {
+      log.info('[Performance]', {
         operation,
         duration: `${duration}ms`,
         success: true
@@ -276,7 +277,7 @@ class PerformanceMonitor {
     } catch (error) {
       const duration = Date.now() - startTime;
 
-      console.error('[Performance]', {
+      log.error('[Performance]', {
         operation,
         duration: `${duration}ms`,
         success: false,

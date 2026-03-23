@@ -62,7 +62,7 @@ class BaseAgent {
    * Log agent activity
    */
   log(message, data = {}) {
-    console.log(`🤖 [${this.name}] ${message}`, data);
+    log.info(`[${this.name}] ${message}`, data);
   }
 }
 

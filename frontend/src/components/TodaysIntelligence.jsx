@@ -26,7 +26,7 @@ import {
   Play
 } from 'lucide-react'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+const API_BASE_URL = import.meta.env.VITE_API_URL || ''
 
 export default function TodaysIntelligence() {
   const { getToken } = useAuth()
@@ -171,7 +171,7 @@ export default function TodaysIntelligence() {
     return (
       <div className="card p-6">
         <div className="text-center py-8">
-          <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
+          <AlertTriangle className="w-12 h-12 vc-text-warning mx-auto mb-3" />
           <p className="text-content-secondary font-medium">Failed to load intelligence briefing</p>
           <p className="text-sm text-content-tertiary mt-1">{error}</p>
           <button
@@ -221,7 +221,7 @@ export default function TodaysIntelligence() {
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-gray-100 border-b border-line-subtle">
+      <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-line-subtle border-b border-line-subtle">
         <div className="p-4 text-center">
           <div className="flex items-center justify-center gap-1 mb-1">
             <Calendar className="w-4 h-4 text-accent-primary" />
@@ -240,7 +240,7 @@ export default function TodaysIntelligence() {
         </div>
         <div className="p-4 text-center">
           <div className="flex items-center justify-center gap-1 mb-1">
-            <DollarSign className="w-4 h-4 text-amber-500" />
+            <DollarSign className="w-4 h-4 vc-text-warning" />
           </div>
           <p className={`text-2xl font-bold ${stats.urgentDealsCount > 0 ? 'text-semantic-warning' : 'text-content-primary'}`}>
             {stats.urgentDealsCount}
@@ -260,7 +260,7 @@ export default function TodaysIntelligence() {
       {insights && insights.length > 0 && (
         <div className="p-4 border-b border-line-subtle bg-surface-muted">
           <h3 className="text-sm font-semibold text-content-secondary mb-3 flex items-center gap-2">
-            <Zap className="w-4 h-4 text-purple-500" />
+            <Zap className="w-4 h-4 text-accent-tertiary" />
             AI Insights
           </h3>
           <div className="space-y-2">
@@ -284,7 +284,7 @@ export default function TodaysIntelligence() {
       )}
 
       {/* Collapsible Sections */}
-      <div className="divide-y divide-gray-100">
+      <div className="divide-y divide-line-subtle">
         {/* Today's Meetings */}
         <CollapsibleSection
           title="Today's Meetings"
@@ -371,7 +371,7 @@ export default function TodaysIntelligence() {
                 >
                   <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
                     item.priority === 'high' ? 'bg-semantic-error' :
-                    item.priority === 'medium' ? 'bg-amber-500' : 'bg-green-500'
+                    item.priority === 'medium' ? 'vc-bg-warning' : 'vc-bg-success'
                   }`} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-content-secondary truncate">{item.task_description}</p>
@@ -412,7 +412,7 @@ export default function TodaysIntelligence() {
         {/* Deals Requiring Attention */}
         <CollapsibleSection
           title="Deals Requiring Attention"
-          icon={<DollarSign className="w-4 h-4 text-amber-500" />}
+          icon={<DollarSign className="w-4 h-4 vc-text-warning" />}
           count={deals.count}
           badge={deals.source === 'logos_crm' ? 'Logos CRM' : undefined}
           isExpanded={expandedSections.deals}
@@ -436,7 +436,7 @@ export default function TodaysIntelligence() {
                 >
                   <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
                     deal.urgencyLevel === 'critical' ? 'bg-semantic-error' :
-                    deal.urgencyLevel === 'high' ? 'bg-amber-500' : 'bg-blue-500'
+                    deal.urgencyLevel === 'high' ? 'vc-bg-warning' : 'vc-bg-info'
                   }`} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-content-secondary truncate">{deal.name}</p>
@@ -491,7 +491,7 @@ export default function TodaysIntelligence() {
                   key={contact.id}
                   className="flex items-center gap-3 p-3 bg-surface-muted rounded-lg"
                 >
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white font-medium text-sm flex-shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-semantic-success to-semantic-success-emphasis flex items-center justify-center text-white font-medium text-sm flex-shrink-0">
                     {(contact.name || contact.email || '?')[0].toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -535,14 +535,14 @@ export default function TodaysIntelligence() {
       </div>
 
       {/* Start Day Button */}
-      <div className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 border-t border-line-subtle">
+      <div className="p-4 bg-surface-muted border-t border-line-subtle">
         <button
           onClick={handleStartDay}
           disabled={startingDay}
           className={`w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-medium transition-all ${
             startingDay
-              ? 'bg-green-500 text-white'
-              : 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-700 hover:to-purple-700'
+              ? 'vc-bg-success vc-text-primary'
+              : 'bg-gradient-to-r from-accent-primary to-accent-tertiary text-white hover:opacity-90'
           }`}
         >
           {startingDay ? (

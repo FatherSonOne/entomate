@@ -23,7 +23,7 @@ export default function PatternApprovalModal({
 
   const getConfidenceColor = (confidence) => {
     if (confidence >= 80) return 'text-semantic-success';
-    if (confidence >= 60) return 'text-yellow-600';
+    if (confidence >= 60) return 'vc-text-warning';
     return 'text-semantic-warning';
   };
 
@@ -154,7 +154,7 @@ export default function PatternApprovalModal({
           {/* How It Will Improve AI */}
           <div>
             <h3 className="text-lg font-semibold text-content-primary mb-3">How This Will Improve AI</h3>
-            <div className="bg-accent-primary-dim border border-indigo-200 rounded-lg p-4">
+            <div className="bg-accent-primary-dim vc-border-subtle rounded-lg p-4" style={{ border: '1px solid' }}>
               {pattern.pattern_type === 'preference' && patternData.preferredOption && (
                 <div className="space-y-2">
                   <div className="text-sm text-accent-primary">
@@ -223,14 +223,14 @@ export default function PatternApprovalModal({
           <div>
             <h3 className="text-lg font-semibold text-content-primary mb-3">Action</h3>
             <div className="space-y-3">
-              <label className="flex items-start gap-3 cursor-pointer p-3 rounded-lg border-2 border-line-default hover:border-indigo-300 hover:bg-accent-primary-dim transition-colors">
+              <label className="flex items-start gap-3 cursor-pointer p-3 rounded-lg border-2 border-line-default hover:bg-accent-primary-dim transition-colors">
                 <input
                   type="radio"
                   name="action"
                   value="approve"
                   checked={action === 'approve'}
                   onChange={(e) => setAction(e.target.value)}
-                  className="mt-1 text-accent-primary focus:ring-indigo-500"
+                  className="mt-1 text-accent-primary"
                 />
                 <div className="flex-1">
                   <div className="font-medium text-content-primary">Accept and apply this pattern</div>
@@ -240,13 +240,13 @@ export default function PatternApprovalModal({
                 </div>
               </label>
 
-              <label className="flex items-start gap-3 cursor-pointer p-3 rounded-lg border-2 border-line-default hover:border-indigo-300 hover:bg-accent-primary-dim transition-colors opacity-50 cursor-not-allowed">
+              <label className="flex items-start gap-3 cursor-pointer p-3 rounded-lg border-2 border-line-default hover:bg-accent-primary-dim transition-colors opacity-50 cursor-not-allowed">
                 <input
                   type="radio"
                   name="action"
                   value="customize"
                   disabled
-                  className="mt-1 text-accent-primary focus:ring-indigo-500"
+                  className="mt-1 text-accent-primary"
                 />
                 <div className="flex-1">
                   <div className="font-medium text-content-primary">Customize pattern (Coming Soon)</div>
@@ -263,7 +263,7 @@ export default function PatternApprovalModal({
                   value="reject"
                   checked={action === 'reject'}
                   onChange={(e) => setAction(e.target.value)}
-                  className="mt-1 text-semantic-error focus:ring-red-500"
+                  className="mt-1 text-semantic-error"
                 />
                 <div className="flex-1">
                   <div className="font-medium text-content-primary">Reject this pattern</div>
@@ -283,7 +283,7 @@ export default function PatternApprovalModal({
                     value={rejectionReason}
                     onChange={(e) => setRejectionReason(e.target.value)}
                     placeholder="Why are you rejecting this pattern?"
-                    className="w-full px-3 py-2 border border-line-strong rounded-md text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full px-3 py-2 border border-line-strong rounded-md text-sm"
                   />
                 </div>
               )}
@@ -304,7 +304,7 @@ export default function PatternApprovalModal({
             className={`flex-1 px-4 py-2 rounded-md font-medium ${
               action === 'reject'
                 ? 'bg-semantic-error text-white hover:opacity-90'
-                : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                : 'vbtn vbtn-primary'
             }`}
           >
             {action === 'reject' ? 'Reject Pattern' : 'Accept & Apply Pattern'}

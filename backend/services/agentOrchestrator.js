@@ -6,6 +6,7 @@
 
 const { getAgent, getAllAgents, hasAgent } = require('./agents');
 const { supabase } = require('../config/supabase');
+const log = require('../utils/log');
 
 class AgentOrchestrator {
   constructor() {
@@ -19,7 +20,7 @@ class AgentOrchestrator {
     const startTime = Date.now();
 
     try {
-      console.log(`🤖 Running agent: ${agentName}`);
+      log.info(`Running agent: ${agentName}`);
 
       const agent = getAgent(agentName);
       if (!agent) {
@@ -40,7 +41,7 @@ class AgentOrchestrator {
       return result;
 
     } catch (error) {
-      console.error(`❌ Agent error (${agentName}):`, error);
+      log.error(`Agent error (${agentName}):`, { error: error.message || error });
 
       const result = {
         agent: agentName,
@@ -58,7 +59,7 @@ class AgentOrchestrator {
    * Run multiple agents in sequence, passing context between them
    */
   async orchestrate(agentNames, context, automation = {}) {
-    console.log(`🎭 Orchestrating ${agentNames.length} agents`);
+    log.info(`Orchestrating ${agentNames.length} agents`);
     const startTime = Date.now();
 
     const results = {
@@ -100,7 +101,7 @@ class AgentOrchestrator {
     }
 
     results.totalTime = Date.now() - startTime;
-    console.log(`✅ Orchestration complete in ${results.totalTime}ms`);
+    log.info(`Orchestration complete in ${results.totalTime}ms`);
 
     return results;
   }
@@ -109,7 +110,7 @@ class AgentOrchestrator {
    * Run agents in parallel (when they don't depend on each other)
    */
   async orchestrateParallel(agentNames, context, automation = {}) {
-    console.log(`🎭 Orchestrating ${agentNames.length} agents in parallel`);
+    log.info(`Orchestrating ${agentNames.length} agents in parallel`);
     const startTime = Date.now();
 
     const promises = agentNames.map(agentName =>
@@ -132,7 +133,7 @@ class AgentOrchestrator {
       }
     }
 
-    console.log(`✅ Parallel orchestration complete in ${results.totalTime}ms`);
+    log.info(`Parallel orchestration complete in ${results.totalTime}ms`);
     return results;
   }
 
@@ -140,7 +141,7 @@ class AgentOrchestrator {
    * Process a meeting with all relevant agents
    */
   async processMeetingWithAgents(meeting, actionItems) {
-    console.log(`🎭 Processing meeting with agents: ${meeting.id}`);
+    log.info(`Processing meeting with agents: ${meeting.id}`);
 
     const results = {
       meeting: meeting.id,
@@ -180,7 +181,7 @@ class AgentOrchestrator {
     }
 
     results.totalTime = Date.now() - startTime;
-    console.log(`✅ Meeting processed with agents in ${results.totalTime}ms`);
+    log.info(`Meeting processed with agents in ${results.totalTime}ms`);
 
     return results;
   }
@@ -189,7 +190,7 @@ class AgentOrchestrator {
    * Apply agent suggestions to action items
    */
   async applyAgentSuggestions(actionItemId, suggestions, options = {}) {
-    console.log(`📝 Applying agent suggestions to action item: ${actionItemId}`);
+    log.info(`Applying agent suggestions to action item: ${actionItemId}`);
 
     if (!supabase) {
       return { applied: false, reason: 'Database not configured' };
@@ -228,11 +229,11 @@ class AgentOrchestrator {
 
       if (error) throw error;
 
-      console.log(`✅ Applied suggestions to action item: ${actionItemId}`);
+      log.info(`Applied suggestions to action item: ${actionItemId}`);
       return { applied: true, updates, data };
 
     } catch (error) {
-      console.error('❌ Failed to apply suggestions:', error);
+      log.error('Failed to apply suggestions:', { error: error.message || error });
       return { applied: false, error: error.message };
     }
   }

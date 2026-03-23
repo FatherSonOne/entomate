@@ -11,6 +11,7 @@ const MeetingPrepService = require('./intelligence/MeetingPrepService');
 const DealRiskService = require('./intelligence/DealRiskService');
 const ActionItemTrackerService = require('./intelligence/ActionItemTrackerService');
 const RelationshipIntelligenceService = require('./intelligence/RelationshipIntelligenceService');
+const log = require('../utils/log');
 
 class IntelligenceService {
   constructor() {
@@ -35,12 +36,12 @@ class IntelligenceService {
       if (hubUrl && hubKey) {
         const { createClient } = require('@supabase/supabase-js');
         this.hubClient = createClient(hubUrl, hubKey);
-        console.log('[IntelligenceService] Shared Hub client initialized');
+        log.info('[IntelligenceService] Shared Hub client initialized');
       } else {
-        console.log('[IntelligenceService] Shared Hub not configured');
+        log.info('[IntelligenceService] Shared Hub not configured');
       }
     } catch (error) {
-      console.warn('[IntelligenceService] Failed to initialize Hub client:', error.message);
+      log.warn('[IntelligenceService] Failed to initialize Hub client:', error.message);
     }
   }
 
@@ -122,7 +123,7 @@ class IntelligenceService {
         }
       };
     } catch (error) {
-      console.error('[IntelligenceService] getTodaysBriefing error:', error);
+      log.error('[IntelligenceService] getTodaysBriefing error:', { error: error.message || error });
       throw error;
     }
   }
@@ -155,7 +156,7 @@ class IntelligenceService {
         .order('created_at', { ascending: true });
 
       if (error) {
-        console.error('[IntelligenceService] Error fetching meetings:', error);
+        log.error('[IntelligenceService] Error fetching meetings:', { error: error.message || error });
         return { meetings: [], count: 0 };
       }
 
@@ -167,7 +168,7 @@ class IntelligenceService {
         count: enrichedMeetings.length
       };
     } catch (error) {
-      console.error('[IntelligenceService] getTodaysMeetings error:', error);
+      log.error('[IntelligenceService] getTodaysMeetings error:', { error: error.message || error });
       return { meetings: [], count: 0 };
     }
   }
@@ -246,7 +247,7 @@ class IntelligenceService {
         };
       });
     } catch (error) {
-      console.warn('[IntelligenceService] Error enriching meetings:', error.message);
+      log.warn('[IntelligenceService] Error enriching meetings:', error.message);
       return meetings;
     }
   }
@@ -283,7 +284,7 @@ class IntelligenceService {
         .limit(20);
 
       if (error) {
-        console.error('[IntelligenceService] Error fetching overdue items:', error);
+        log.error('[IntelligenceService] Error fetching overdue items:', { error: error.message || error });
         return { items: [], count: 0 };
       }
 
@@ -310,7 +311,7 @@ class IntelligenceService {
         highPriorityCount: enrichedItems.filter(i => i.priority === 'high').length
       };
     } catch (error) {
-      console.error('[IntelligenceService] getOverdueActionItems error:', error);
+      log.error('[IntelligenceService] getOverdueActionItems error:', { error: error.message || error });
       return { items: [], count: 0 };
     }
   }
@@ -334,7 +335,7 @@ class IntelligenceService {
         .limit(100);
 
       if (error) {
-        console.error('[IntelligenceService] Error fetching deal events:', error);
+        log.error('[IntelligenceService] Error fetching deal events:', { error: error.message || error });
         return { deals: [], count: 0, source: 'hub_error' };
       }
 
@@ -382,7 +383,7 @@ class IntelligenceService {
         source: 'logos_crm'
       };
     } catch (error) {
-      console.error('[IntelligenceService] getDealsRequiringAttention error:', error);
+      log.error('[IntelligenceService] getDealsRequiringAttention error:', { error: error.message || error });
       return { deals: [], count: 0, source: 'error' };
     }
   }
@@ -455,7 +456,7 @@ class IntelligenceService {
         .limit(20);
 
       if (error) {
-        console.error('[IntelligenceService] Error fetching recent contacts:', error);
+        log.error('[IntelligenceService] Error fetching recent contacts:', { error: error.message || error });
         return { contacts: [], count: 0, source: 'hub_error' };
       }
 
@@ -465,7 +466,7 @@ class IntelligenceService {
         source: 'logos_crm'
       };
     } catch (error) {
-      console.error('[IntelligenceService] getRecentContacts error:', error);
+      log.error('[IntelligenceService] getRecentContacts error:', { error: error.message || error });
       return { contacts: [], count: 0, source: 'error' };
     }
   }
@@ -501,7 +502,7 @@ class IntelligenceService {
         .limit(15);
 
       if (error) {
-        console.error('[IntelligenceService] Error fetching upcoming deadlines:', error);
+        log.error('[IntelligenceService] Error fetching upcoming deadlines:', { error: error.message || error });
         return { items: [], count: 0 };
       }
 
@@ -518,7 +519,7 @@ class IntelligenceService {
         count: enrichedItems.length
       };
     } catch (error) {
-      console.error('[IntelligenceService] getUpcomingDeadlines error:', error);
+      log.error('[IntelligenceService] getUpcomingDeadlines error:', { error: error.message || error });
       return { items: [], count: 0 };
     }
   }
@@ -542,7 +543,7 @@ class IntelligenceService {
         .not('sentiment_label', 'is', null);
 
       if (error) {
-        console.error('[IntelligenceService] Error fetching sentiment:', error);
+        log.error('[IntelligenceService] Error fetching sentiment:', { error: error.message || error });
         return { summary: null };
       }
 
@@ -583,7 +584,7 @@ class IntelligenceService {
         }
       };
     } catch (error) {
-      console.error('[IntelligenceService] getMeetingSentimentSummary error:', error);
+      log.error('[IntelligenceService] getMeetingSentimentSummary error:', { error: error.message || error });
       return { summary: null };
     }
   }
@@ -701,14 +702,14 @@ class IntelligenceService {
     try {
       // Store in a briefing_views table or user preferences
       // For now, just log it
-      console.log(`[IntelligenceService] Briefing viewed by user: ${userId || 'anonymous'}`);
+      log.info(`[IntelligenceService] Briefing viewed by user: ${userId || 'anonymous'}`);
 
       return {
         success: true,
         viewedAt: new Date().toISOString()
       };
     } catch (error) {
-      console.error('[IntelligenceService] markBriefingViewed error:', error);
+      log.error('[IntelligenceService] markBriefingViewed error:', { error: error.message || error });
       return { success: false, message: error.message };
     }
   }
@@ -730,7 +731,7 @@ class IntelligenceService {
         }
       } = options;
 
-      console.log(`[IntelligenceService] Getting dashboard intelligence for user: ${userId}`);
+      log.info(`[IntelligenceService] Getting dashboard intelligence for user: ${userId}`);
 
       // Fetch all intelligence data in parallel for performance
       const [
@@ -772,7 +773,7 @@ class IntelligenceService {
         }
       };
     } catch (error) {
-      console.error('[IntelligenceService] getDashboardIntelligence error:', error);
+      log.error('[IntelligenceService] getDashboardIntelligence error:', { error: error.message || error });
       return {
         success: false,
         error: error.message,

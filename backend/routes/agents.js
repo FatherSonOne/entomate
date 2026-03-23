@@ -7,6 +7,9 @@ const { authenticate, authorize } = require('../middleware/auth');
 const { asyncHandler } = require('../middleware/errorHandler');
 const { aiLimiter } = require('../middleware/rateLimiter');
 const explanationAnalytics = require('../services/explainability/ExplanationAnalytics');
+const log = require('../utils/log');
+const { validate } = require('../middleware/validate');
+const schemas = require('../schemas/agents');
 
 /**
  * GET /api/agents
@@ -40,8 +43,8 @@ router.get('/templates', authenticate, (req, res) => {
     const agentTemplates = require('../services/agentTemplates');
     const templates = agentTemplates.getAllTemplates();
     
-    console.log(`[Agents] Returning ${templates.length} templates`);
-    console.log(`[Agents] Template IDs:`, templates.map(t => t.id).join(', '));
+    log.info(`[Agents] Returning ${templates.length} templates`);
+    log.info(`[Agents] Template IDs:`, templates.map(t => t.id).join(', '));
     
     const response = {
       success: true,
@@ -55,7 +58,7 @@ router.get('/templates', authenticate, (req, res) => {
     
     res.json(response);
   } catch (error) {
-    console.error('[Agents] Error getting templates:', error);
+    log.error('[Agents] Error getting templates:', { error: error.message || error });
     res.status(500).json({
       success: false,
       error: error.message,
@@ -68,7 +71,7 @@ router.get('/templates', authenticate, (req, res) => {
  * POST /api/agents
  * Create a new AI agent
  */
-router.post('/', authenticate, asyncHandler(async (req, res) => {
+router.post('/', authenticate, validate(schemas.create), asyncHandler(async (req, res) => {
   const userId = req.user?.id || 'anonymous';
 
   const agent = await aiAgentService.createAgent(req.body, userId);
@@ -84,7 +87,7 @@ router.post('/', authenticate, asyncHandler(async (req, res) => {
  * POST /api/agents/from-template
  * Create agent from predefined template
  */
-router.post('/from-template', authenticate, asyncHandler(async (req, res) => {
+router.post('/from-template', authenticate, validate(schemas.fromTemplate), asyncHandler(async (req, res) => {
   const { templateId, customizations } = req.body;
   const userId = req.user?.id || 'anonymous';
 
@@ -128,7 +131,7 @@ router.get('/:id', authenticate, asyncHandler(async (req, res) => {
  * PUT /api/agents/:id
  * Update agent
  */
-router.put('/:id', authenticate, asyncHandler(async (req, res) => {
+router.put('/:id', authenticate, validate(schemas.update), asyncHandler(async (req, res) => {
   const agent = await aiAgentService.updateAgent(req.params.id, req.body);
 
   res.json({
@@ -169,7 +172,7 @@ router.post('/:id/toggle', authenticate, asyncHandler(async (req, res) => {
  * POST /api/agents/:id/execute
  * Manually execute an agent
  */
-router.post('/:id/execute', authenticate, aiLimiter, asyncHandler(async (req, res) => {
+router.post('/:id/execute', authenticate, aiLimiter, validate(schemas.execute), asyncHandler(async (req, res) => {
   const { trigger_type, trigger_data } = req.body;
 
   if (!trigger_type) {
@@ -204,7 +207,7 @@ router.post('/:id/execute', authenticate, aiLimiter, asyncHandler(async (req, re
  * POST /api/agents/trigger
  * Trigger all matching agents for an event
  */
-router.post('/trigger', authenticate, aiLimiter, asyncHandler(async (req, res) => {
+router.post('/trigger', authenticate, aiLimiter, validate(schemas.trigger), asyncHandler(async (req, res) => {
   const { trigger_type, data } = req.body;
 
   if (!trigger_type) {
@@ -243,7 +246,7 @@ router.get('/:id/logs', authenticate, asyncHandler(async (req, res) => {
  * POST /api/agents/executions/:executionId/feedback
  * Provide feedback on agent execution
  */
-router.post('/executions/:executionId/feedback', authenticate, asyncHandler(async (req, res) => {
+router.post('/executions/:executionId/feedback', authenticate, validate(schemas.feedback), asyncHandler(async (req, res) => {
   const { rating, notes } = req.body;
 
   if (!rating || rating < 1 || rating > 5) {
@@ -308,7 +311,7 @@ router.get('/analytics/explanations', authenticate, asyncHandler(async (req, res
  * POST /api/agents/analytics/track
  * Track user interaction with explanations
  */
-router.post('/analytics/track', authenticate, asyncHandler(async (req, res) => {
+router.post('/analytics/track', authenticate, validate(schemas.track), asyncHandler(async (req, res) => {
   const { eventType, executionId, metadata } = req.body;
   const userId = req.user?.id;
 
@@ -414,7 +417,7 @@ router.get('/available', authenticate, (req, res) => {
  * POST /api/agents/run/:agentName
  * Run a specific AI agent with context
  */
-router.post('/run/:agentName', authenticate, aiLimiter, asyncHandler(async (req, res) => {
+router.post('/run/:agentName', authenticate, aiLimiter, validate(schemas.run), asyncHandler(async (req, res) => {
   const { agentName } = req.params;
   const context = req.body;
 
@@ -438,7 +441,7 @@ router.post('/run/:agentName', authenticate, aiLimiter, asyncHandler(async (req,
  * POST /api/agents/orchestrate
  * Run multiple agents in sequence or parallel
  */
-router.post('/orchestrate', authenticate, aiLimiter, asyncHandler(async (req, res) => {
+router.post('/orchestrate', authenticate, aiLimiter, validate(schemas.orchestrate), asyncHandler(async (req, res) => {
   const { agents, context, parallel = false } = req.body;
 
   if (!agents || !Array.isArray(agents) || agents.length === 0) {
@@ -462,7 +465,7 @@ router.post('/orchestrate', authenticate, aiLimiter, asyncHandler(async (req, re
  * POST /api/agents/process-meeting
  * Process meeting action items with AI agents
  */
-router.post('/process-meeting', authenticate, aiLimiter, asyncHandler(async (req, res) => {
+router.post('/process-meeting', authenticate, aiLimiter, validate(schemas.processMeeting), asyncHandler(async (req, res) => {
   const { meeting, actionItems } = req.body;
 
   if (!meeting || !actionItems) {
@@ -484,7 +487,7 @@ router.post('/process-meeting', authenticate, aiLimiter, asyncHandler(async (req
  * POST /api/agents/apply-suggestions
  * Apply AI agent suggestions to an action item
  */
-router.post('/apply-suggestions', authenticate, asyncHandler(async (req, res) => {
+router.post('/apply-suggestions', authenticate, validate(schemas.applySuggestions), asyncHandler(async (req, res) => {
   const { actionItemId, suggestions, options } = req.body;
 
   if (!actionItemId || !suggestions) {

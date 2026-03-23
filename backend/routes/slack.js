@@ -9,6 +9,8 @@ const { authenticate } = require('../middleware/auth');
 const slackNotifier = require('../services/slackNotifier');
 const { supabase } = require('../config/supabase');
 const logger = require('../services/logger');
+const { validate } = require('../middleware/validate');
+const schemas = require('../schemas/slack');
 
 // ========================================
 // CONNECTION & STATUS
@@ -121,7 +123,7 @@ router.get('/channels', authenticate, async (req, res) => {
  * POST /api/slack/notify
  * Send a manual notification
  */
-router.post('/notify', authenticate, async (req, res) => {
+router.post('/notify', authenticate, validate(schemas.notify), async (req, res) => {
   try {
     const { type, channel, data } = req.body;
 
@@ -366,7 +368,7 @@ router.get('/settings', authenticate, async (req, res) => {
  * PUT /api/slack/settings
  * Update Slack notification settings
  */
-router.put('/settings', authenticate, async (req, res) => {
+router.put('/settings', authenticate, validate(schemas.settings), async (req, res) => {
   try {
     const {
       defaultChannel,

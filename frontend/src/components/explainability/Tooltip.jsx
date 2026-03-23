@@ -35,7 +35,7 @@ export default function Tooltip({ content, children, position = 'top' }) {
           className={`absolute z-50 ${positionClasses[position]} pointer-events-none`}
           role="tooltip"
         >
-          <div className="bg-gray-900 text-white text-xs rounded py-2 px-3 shadow-lg max-w-xs">
+          <div className="vc-bg-code vc-text-primary text-xs rounded py-2 px-3 shadow-lg max-w-xs">
             {content}
             <div
               className={`tooltip-arrow ${position}`}

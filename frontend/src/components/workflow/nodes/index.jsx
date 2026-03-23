@@ -18,9 +18,9 @@ import {
 // Node category colors
 const categoryColors = {
   trigger: { bg: 'bg-semantic-success-dim', border: 'border-semantic-success', icon: 'text-semantic-success' },
-  logic: { bg: 'bg-yellow-50', border: 'border-yellow-300', icon: 'text-yellow-600' },
-  action: { bg: 'bg-semantic-info-dim', border: 'border-blue-300', icon: 'text-semantic-info' },
-  ai: { bg: 'bg-accent-tertiary-dim', border: 'border-purple-300', icon: 'text-accent-tertiary' },
+  logic: { bg: 'vc-bg-warning-dim', border: 'vc-border-warning', icon: 'vc-text-warning' },
+  action: { bg: 'bg-semantic-info-dim', border: 'vc-border-subtle', icon: 'text-semantic-info' },
+  ai: { bg: 'bg-accent-tertiary-dim', border: 'vc-border-subtle', icon: 'text-accent-tertiary' },
   data: { bg: 'bg-surface-muted', border: 'border-line-strong', icon: 'text-content-secondary' }
 }
 
@@ -111,7 +111,7 @@ const BaseNode = memo(({ data, selected, type }) => {
         <Handle
           type="target"
           position={Position.Left}
-          className="!w-3 !h-3 !bg-gray-400 !border-2 !border-white"
+          className="!w-3 !h-3 !vc-bg-raised !border-2 !border-white"
         />
       )}
 
@@ -139,9 +139,9 @@ const BaseNode = memo(({ data, selected, type }) => {
           'text-content-tertiary'
         }`}>
           <span className={`w-2 h-2 rounded-full ${
-            data.status === 'success' ? 'bg-green-500' :
+            data.status === 'success' ? 'vc-bg-success' :
             data.status === 'error' ? 'bg-semantic-error' :
-            data.status === 'running' ? 'bg-blue-500 animate-pulse' :
+            data.status === 'running' ? 'vc-bg-info animate-pulse' :
             'bg-surface-muted'
           }`} />
           {data.status}
@@ -158,7 +158,7 @@ const BaseNode = memo(({ data, selected, type }) => {
                 position={Position.Right}
                 id="true"
                 style={{ top: '30%' }}
-                className="!w-3 !h-3 !bg-green-500 !border-2 !border-white"
+                className="!w-3 !h-3 !vc-bg-success !border-2 !border-white"
               />
               <Handle
                 type="source"
@@ -176,21 +176,21 @@ const BaseNode = memo(({ data, selected, type }) => {
                 position={Position.Right}
                 id="case_0"
                 style={{ top: '25%' }}
-                className="!w-3 !h-3 !bg-blue-500 !border-2 !border-white"
+                className="!w-3 !h-3 !vc-bg-info !border-2 !border-white"
               />
               <Handle
                 type="source"
                 position={Position.Right}
                 id="case_1"
                 style={{ top: '50%' }}
-                className="!w-3 !h-3 !bg-blue-500 !border-2 !border-white"
+                className="!w-3 !h-3 !vc-bg-info !border-2 !border-white"
               />
               <Handle
                 type="source"
                 position={Position.Right}
                 id="default"
                 style={{ top: '75%' }}
-                className="!w-3 !h-3 !bg-gray-500 !border-2 !border-white"
+                className="!w-3 !h-3 !vc-bg-raised !border-2 !border-white"
               />
             </>
           )}
@@ -201,7 +201,7 @@ const BaseNode = memo(({ data, selected, type }) => {
                 position={Position.Right}
                 id="matches"
                 style={{ top: '30%' }}
-                className="!w-3 !h-3 !bg-green-500 !border-2 !border-white"
+                className="!w-3 !h-3 !vc-bg-success !border-2 !border-white"
               />
               <Handle
                 type="source"
@@ -219,14 +219,14 @@ const BaseNode = memo(({ data, selected, type }) => {
                 position={Position.Right}
                 id="loop"
                 style={{ top: '30%' }}
-                className="!w-3 !h-3 !bg-blue-500 !border-2 !border-white"
+                className="!w-3 !h-3 !vc-bg-info !border-2 !border-white"
               />
               <Handle
                 type="source"
                 position={Position.Right}
                 id="done"
                 style={{ top: '70%' }}
-                className="!w-3 !h-3 !bg-green-500 !border-2 !border-white"
+                className="!w-3 !h-3 !vc-bg-success !border-2 !border-white"
               />
             </>
           )}
@@ -235,7 +235,7 @@ const BaseNode = memo(({ data, selected, type }) => {
         <Handle
           type="source"
           position={Position.Right}
-          className="!w-3 !h-3 !bg-gray-400 !border-2 !border-white"
+          className="!w-3 !h-3 !vc-bg-raised !border-2 !border-white"
         />
       )}
     </div>

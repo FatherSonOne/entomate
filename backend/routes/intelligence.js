@@ -6,6 +6,9 @@
 const express = require('express');
 const router = express.Router();
 const intelligenceService = require('../services/intelligenceService');
+const log = require('../utils/log');
+const { validate } = require('../middleware/validate');
+const schemas = require('../schemas/intelligence');
 
 /**
  * GET /api/intelligence/today
@@ -17,7 +20,7 @@ router.get('/today', async (req, res) => {
     const { timezone } = req.query;
     const userId = req.user?.id; // From auth middleware if authenticated
 
-    console.log('[Intelligence] Fetching today\'s briefing...');
+    log.info('[Intelligence] Fetching today\'s briefing...');
 
     const result = await intelligenceService.getTodaysBriefing({
       userId,
@@ -31,11 +34,11 @@ router.get('/today', async (req, res) => {
       });
     }
 
-    console.log('[Intelligence] Briefing generated successfully');
+    log.info('[Intelligence] Briefing generated successfully');
 
     res.json(result.briefing);
   } catch (error) {
-    console.error('[Intelligence] Error fetching briefing:', error);
+    log.error('[Intelligence] Error fetching briefing:', { error: error.message || error });
     res.status(500).json({
       error: 'Failed to fetch today\'s intelligence',
       details: error.message
@@ -59,7 +62,7 @@ router.get('/meetings', async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error('[Intelligence] Error fetching meetings:', error);
+    log.error('[Intelligence] Error fetching meetings:', { error: error.message || error });
     res.status(500).json({
       error: 'Failed to fetch meetings',
       details: error.message
@@ -77,7 +80,7 @@ router.get('/overdue', async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error('[Intelligence] Error fetching overdue items:', error);
+    log.error('[Intelligence] Error fetching overdue items:', { error: error.message || error });
     res.status(500).json({
       error: 'Failed to fetch overdue items',
       details: error.message
@@ -95,7 +98,7 @@ router.get('/deals', async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error('[Intelligence] Error fetching deals:', error);
+    log.error('[Intelligence] Error fetching deals:', { error: error.message || error });
     res.status(500).json({
       error: 'Failed to fetch deals',
       details: error.message
@@ -113,7 +116,7 @@ router.get('/contacts/recent', async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error('[Intelligence] Error fetching recent contacts:', error);
+    log.error('[Intelligence] Error fetching recent contacts:', { error: error.message || error });
     res.status(500).json({
       error: 'Failed to fetch recent contacts',
       details: error.message
@@ -132,7 +135,7 @@ router.get('/deadlines', async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error('[Intelligence] Error fetching deadlines:', error);
+    log.error('[Intelligence] Error fetching deadlines:', { error: error.message || error });
     res.status(500).json({
       error: 'Failed to fetch deadlines',
       details: error.message
@@ -151,7 +154,7 @@ router.get('/sentiment', async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error('[Intelligence] Error fetching sentiment:', error);
+    log.error('[Intelligence] Error fetching sentiment:', { error: error.message || error });
     res.status(500).json({
       error: 'Failed to fetch sentiment summary',
       details: error.message
@@ -170,7 +173,7 @@ router.post('/briefing/viewed', async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error('[Intelligence] Error marking briefing viewed:', error);
+    log.error('[Intelligence] Error marking briefing viewed:', { error: error.message || error });
     res.status(500).json({
       error: 'Failed to mark briefing as viewed',
       details: error.message
@@ -206,13 +209,13 @@ router.get('/dashboard', async (req, res) => {
       }
     };
 
-    console.log('[Intelligence] Fetching enhanced dashboard...');
+    log.info('[Intelligence] Fetching enhanced dashboard...');
 
     const result = await intelligenceService.getDashboardIntelligence(userId, options);
 
     res.json(result);
   } catch (error) {
-    console.error('[Intelligence] Dashboard error:', error);
+    log.error('[Intelligence] Dashboard error:', { error: error.message || error });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch dashboard intelligence',
@@ -229,7 +232,7 @@ router.get('/meeting-prep/:meetingId', async (req, res) => {
   try {
     const { meetingId } = req.params;
 
-    console.log('[Intelligence] Fetching meeting prep for:', meetingId);
+    log.info('[Intelligence] Fetching meeting prep for:', meetingId);
 
     const prep = await intelligenceService.meetingPrepService.getMeetingPrep(meetingId);
 
@@ -245,7 +248,7 @@ router.get('/meeting-prep/:meetingId', async (req, res) => {
       data: prep
     });
   } catch (error) {
-    console.error('[Intelligence] Meeting prep error:', error);
+    log.error('[Intelligence] Meeting prep error:', { error: error.message || error });
     res.status(500).json({
       success: false,
       error: 'Failed to generate meeting prep',
@@ -262,7 +265,7 @@ router.post('/meeting-prep/:meetingId/brief', async (req, res) => {
   try {
     const { meetingId } = req.params;
 
-    console.log('[Intelligence] Generating meeting brief for:', meetingId);
+    log.info('[Intelligence] Generating meeting brief for:', meetingId);
 
     const brief = await intelligenceService.meetingPrepService.generateMeetingBrief(meetingId);
 
@@ -274,7 +277,7 @@ router.post('/meeting-prep/:meetingId/brief', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[Intelligence] Brief generation error:', error);
+    log.error('[Intelligence] Brief generation error:', { error: error.message || error });
     res.status(500).json({
       success: false,
       error: 'Failed to generate meeting brief',
@@ -303,7 +306,7 @@ router.get('/deal-risks', async (req, res) => {
       limit: parseInt(req.query.limit) || 10
     };
 
-    console.log('[Intelligence] Fetching deal risks...');
+    log.info('[Intelligence] Fetching deal risks...');
 
     const risks = await intelligenceService.dealRiskService.getAtRiskDeals(userId, options);
 
@@ -312,7 +315,7 @@ router.get('/deal-risks', async (req, res) => {
       data: risks
     });
   } catch (error) {
-    console.error('[Intelligence] Deal risks error:', error);
+    log.error('[Intelligence] Deal risks error:', { error: error.message || error });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch deal risks',
@@ -336,7 +339,7 @@ router.get('/action-items', async (req, res) => {
       });
     }
 
-    console.log('[Intelligence] Fetching action item status...');
+    log.info('[Intelligence] Fetching action item status...');
 
     const status = await intelligenceService.actionItemService.getActionItemStatus(userId);
 
@@ -345,7 +348,7 @@ router.get('/action-items', async (req, res) => {
       data: status
     });
   } catch (error) {
-    console.error('[Intelligence] Action items error:', error);
+    log.error('[Intelligence] Action items error:', { error: error.message || error });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch action item status',
@@ -358,12 +361,12 @@ router.get('/action-items', async (req, res) => {
  * POST /api/intelligence/action-items/:itemId/nudge
  * Send intelligent nudge for an overdue/blocked action item
  */
-router.post('/action-items/:itemId/nudge', async (req, res) => {
+router.post('/action-items/:itemId/nudge', validate(schemas.nudge), async (req, res) => {
   try {
     const { itemId } = req.params;
     const { channel = 'in_app' } = req.body;
 
-    console.log('[Intelligence] Sending nudge for action item:', itemId);
+    log.info('[Intelligence] Sending nudge for action item:', itemId);
 
     const result = await intelligenceService.actionItemService.sendNudge(itemId, channel);
 
@@ -372,7 +375,7 @@ router.post('/action-items/:itemId/nudge', async (req, res) => {
       data: result
     });
   } catch (error) {
-    console.error('[Intelligence] Nudge error:', error);
+    log.error('[Intelligence] Nudge error:', { error: error.message || error });
     res.status(500).json({
       success: false,
       error: 'Failed to send nudge',
@@ -397,7 +400,7 @@ router.get('/relationships/:dealId', async (req, res) => {
       });
     }
 
-    console.log('[Intelligence] Fetching relationship insights for deal:', dealId);
+    log.info('[Intelligence] Fetching relationship insights for deal:', dealId);
 
     const insights = await intelligenceService.relationshipService.getRelationshipInsights(dealId, userId);
 
@@ -406,7 +409,7 @@ router.get('/relationships/:dealId', async (req, res) => {
       data: insights
     });
   } catch (error) {
-    console.error('[Intelligence] Relationships error:', error);
+    log.error('[Intelligence] Relationships error:', { error: error.message || error });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch relationship insights',

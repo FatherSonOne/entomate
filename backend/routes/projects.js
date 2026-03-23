@@ -1,6 +1,9 @@
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const { supabase } = require('../config/supabase');
+const { validate } = require('../middleware/validate');
+const schemas = require('../schemas/projects');
+const log = require('../utils/log');
 
 const router = express.Router();
 
@@ -8,7 +11,7 @@ const router = express.Router();
  * POST /api/projects
  * Create a new project
  */
-router.post('/', async (req, res) => {
+router.post('/', validate(schemas.create), async (req, res) => {
   try {
     const { name, description, crmDealId, dealValue, startDate, endDate, teamIds, tags } = req.body;
 
@@ -51,7 +54,7 @@ router.post('/', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error creating project:', error);
+    log.error('Error creating project:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -60,7 +63,7 @@ router.post('/', async (req, res) => {
  * GET /api/projects
  * List all projects with pagination and filters
  */
-router.get('/', async (req, res) => {
+router.get('/', validate(schemas.list), async (req, res) => {
   try {
     const { limit = 20, offset = 0, status, search, ownerId } = req.query;
 
@@ -98,7 +101,7 @@ router.get('/', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error listing projects:', error);
+    log.error('Error listing projects:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -157,7 +160,7 @@ router.get('/:id', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error getting project:', error);
+    log.error('Error getting project:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -166,7 +169,7 @@ router.get('/:id', async (req, res) => {
  * PUT /api/projects/:id
  * Update project
  */
-router.put('/:id', async (req, res) => {
+router.put('/:id', validate(schemas.update), async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
@@ -199,7 +202,7 @@ router.put('/:id', async (req, res) => {
     res.json(project);
 
   } catch (error) {
-    console.error('❌ Error updating project:', error);
+    log.error('Error updating project:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -241,7 +244,7 @@ router.delete('/:id', async (req, res) => {
     res.json({ success: true, message: 'Project deleted' });
 
   } catch (error) {
-    console.error('❌ Error deleting project:', error);
+    log.error('Error deleting project:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -250,7 +253,7 @@ router.delete('/:id', async (req, res) => {
  * POST /api/projects/from-deal
  * Create project from CRM deal
  */
-router.post('/from-deal', async (req, res) => {
+router.post('/from-deal', validate(schemas.fromDeal), async (req, res) => {
   try {
     const { dealId, dealName, dealValue, contactName, expectedCloseDate } = req.body;
 
@@ -318,7 +321,7 @@ router.post('/from-deal', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error creating project from deal:', error);
+    log.error('Error creating project from deal:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -397,7 +400,7 @@ router.get('/:id/stats', async (req, res) => {
     res.json(stats);
 
   } catch (error) {
-    console.error('❌ Error getting project stats:', error);
+    log.error('Error getting project stats:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });

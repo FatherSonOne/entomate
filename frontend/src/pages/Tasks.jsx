@@ -8,16 +8,21 @@ import { GuideCard, PageHeader, Skeleton } from '../components/SharedUI'
 import { AgentRecommendationPanel } from '../components/intelligence'
 import { ExplanationModal } from '../components/explainability'
 import { VCButton, VCBadge } from '../components/vc'
+import { useConfirm } from '../components/vc/ConfirmDialog'
+import ErrorState from '../components/vc/ErrorState'
 
 export default function Tasks() {
+  const confirm = useConfirm()
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [showCreate, setShowCreate] = useState(false)
   const [newTask, setNewTask] = useState({ title: '', priority: 'medium', dueDate: '' })
   const [creating, setCreating] = useState(false)
   const [wizardStep, setWizardStep] = useState(0) // 0: Create, 1: Prioritize, 2: Complete
+  const [formErrors, setFormErrors] = useState({})
 
   // AI Recommendations state
   const [recommendations, setRecommendations] = useState(null)
@@ -31,6 +36,7 @@ export default function Tasks() {
 
   const loadTasks = async () => {
     try {
+      setError(null)
       setLoading(true)
       const params = { limit: 100 }
       if (statusFilter !== 'all') {
@@ -41,16 +47,25 @@ export default function Tasks() {
       if (data.tasks && data.tasks.length > 0) {
         setWizardStep(2) // If tasks exist, show complete step
       }
-    } catch (error) {
-      console.error('Failed to load tasks:', error)
+    } catch (err) {
+      console.error('Failed to load tasks:', err)
+      setError(err.message || 'Failed to load tasks')
     } finally {
       setLoading(false)
     }
   }
 
+  const validate = () => {
+    const errs = {}
+    if (!newTask.title?.trim()) errs.title = 'Title is required'
+    if (newTask.dueDate && isNaN(new Date(newTask.dueDate).getTime())) errs.dueDate = 'Invalid date format'
+    setFormErrors(errs)
+    return Object.keys(errs).length === 0
+  }
+
   const handleCreate = async (e) => {
     e.preventDefault()
-    if (!newTask.title.trim()) return
+    if (!validate()) return
 
     try {
       setCreating(true)
@@ -85,7 +100,8 @@ export default function Tasks() {
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this task?')) return
+    const ok = await confirm({ title: 'Delete Task', message: 'Delete this task?', confirmLabel: 'Delete', variant: 'danger' })
+    if (!ok) return
 
     try {
       await tasksApi.delete(id)
@@ -196,6 +212,12 @@ export default function Tasks() {
     }
   }
 
+  if (error) return (
+    <div className="animate-fade-in max-w-7xl mx-auto">
+      <ErrorState message={error} onRetry={loadTasks} />
+    </div>
+  )
+
   return (
     <div className="animate-fade-in max-w-7xl mx-auto">
       <PageHeader
@@ -207,6 +229,7 @@ export default function Tasks() {
             onClick={() => {
               setShowCreate(!showCreate)
               setWizardStep(0)
+              setFormErrors({})
             }}
           >
             <Plus size={16} />
@@ -241,6 +264,7 @@ export default function Tasks() {
                 onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
                 required
               />
+              {formErrors.title && <span style={{ color: 'var(--c)', fontSize: 12, marginTop: 2, display: 'block' }}>{formErrors.title}</span>}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -263,6 +287,7 @@ export default function Tasks() {
                   value={newTask.dueDate}
                   onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
                 />
+                {formErrors.dueDate && <span style={{ color: 'var(--c)', fontSize: 12, marginTop: 2, display: 'block' }}>{formErrors.dueDate}</span>}
               </div>
             </div>
 
@@ -453,6 +478,7 @@ export default function Tasks() {
                   onClick={() => handleDelete(task.id)}
                   className="p-2 opacity-0 group-hover:opacity-100 transition-all"
                   title="Delete task"
+                  aria-label="Delete task"
                 >
                   <Trash2 size={16} />
                 </VCButton>

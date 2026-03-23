@@ -21,7 +21,7 @@ export default function PatternCard({
 
   const getConfidenceColor = (confidence) => {
     if (confidence >= 80) return 'text-semantic-success bg-semantic-success-dim';
-    if (confidence >= 60) return 'text-yellow-600 bg-yellow-100';
+    if (confidence >= 60) return 'vc-text-warning vc-bg-warning-dim';
     return 'text-semantic-warning bg-semantic-warning-dim';
   };
 
@@ -111,7 +111,7 @@ export default function PatternCard({
               Active
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium vc-bg-warning-dim vc-text-warning">
               <AlertCircle size={12} />
               Pending
             </span>
@@ -165,7 +165,7 @@ export default function PatternCard({
           <>
             <button
               onClick={() => onApprove && onApprove(pattern)}
-              className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-medium text-sm flex items-center justify-center gap-1"
+              className="vbtn vbtn-primary flex-1 font-medium text-sm flex items-center justify-center gap-1"
             >
               <CheckCircle size={16} />
               Approve & Apply
@@ -191,7 +191,7 @@ export default function PatternCard({
             </button>
             <button
               onClick={() => onDeactivate && onDeactivate(pattern)}
-              className="px-4 py-2 bg-semantic-error-dim text-semantic-error rounded-md hover:bg-red-200 font-medium text-sm flex items-center justify-center gap-1"
+              className="px-4 py-2 bg-semantic-error-dim text-semantic-error rounded-md hover:bg-semantic-error-dim font-medium text-sm flex items-center justify-center gap-1"
             >
               <X size={16} />
               Deactivate

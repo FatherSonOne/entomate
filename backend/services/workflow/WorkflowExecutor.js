@@ -11,6 +11,7 @@
 
 const { supabase } = require('../../config/supabase');
 const NodeRegistry = require('./NodeRegistry');
+const log = require('../../utils/log');
 
 class WorkflowExecutor {
   constructor() {
@@ -29,7 +30,7 @@ class WorkflowExecutor {
     const executionId = options.executionId || this.generateId();
     const mode = options.mode || 'production';
 
-    console.log(`[WorkflowExecutor] Starting execution ${executionId} for workflow "${workflow.name}"`);
+    log.info(`[WorkflowExecutor] Starting execution ${executionId} for workflow "${workflow.name}"`);
 
     // Create execution record
     const execution = {
@@ -83,7 +84,7 @@ class WorkflowExecutor {
 
       await this.saveExecution(execution);
 
-      console.log(`[WorkflowExecutor] Execution ${executionId} completed successfully`);
+      log.info(`[WorkflowExecutor] Execution ${executionId} completed successfully`);
 
       return {
         success: true,
@@ -94,7 +95,7 @@ class WorkflowExecutor {
       };
 
     } catch (error) {
-      console.error(`[WorkflowExecutor] Execution ${executionId} failed:`, error);
+      log.error(`[WorkflowExecutor] Execution ${executionId} failed:`, { error: error.message || error });
 
       execution.status = 'failed';
       execution.error = error.message;
@@ -139,14 +140,14 @@ class WorkflowExecutor {
     execution.nodeExecutions.push(nodeExecution);
     execution.currentNodeId = node.id;
 
-    console.log(`[WorkflowExecutor] Executing node ${node.id} (${node.subtype})`);
+    log.info(`[WorkflowExecutor] Executing node ${node.id} (${node.subtype})`);
 
     try {
       // Check for pinned data in development mode
       if (mode === 'test' || mode === 'development') {
         const pinnedData = await this.getPinnedData(workflow.id, node.id);
         if (pinnedData) {
-          console.log(`[WorkflowExecutor] Using pinned data for node ${node.id}`);
+          log.info(`[WorkflowExecutor] Using pinned data for node ${node.id}`);
           nodeExecution.output = pinnedData;
           nodeExecution.status = 'completed';
           nodeExecution.pinned = true;
@@ -201,7 +202,7 @@ class WorkflowExecutor {
         throw error;
       }
 
-      console.warn(`[WorkflowExecutor] Node ${node.id} failed but continuing:`, error.message);
+      log.warn(`[WorkflowExecutor] Node ${node.id} failed but continuing:`, error.message);
       return null;
     }
   }
@@ -219,7 +220,7 @@ class WorkflowExecutor {
     );
 
     if (connections.length === 0) {
-      console.log(`[WorkflowExecutor] No connections from node ${sourceNode.id} output "${outputBranch}"`);
+      log.info(`[WorkflowExecutor] No connections from node ${sourceNode.id} output "${outputBranch}"`);
       return;
     }
 
@@ -233,7 +234,7 @@ class WorkflowExecutor {
 
     if (canParallel && targetNodes.length > 1) {
       // Parallel execution
-      console.log(`[WorkflowExecutor] Executing ${targetNodes.length} nodes in parallel`);
+      log.info(`[WorkflowExecutor] Executing ${targetNodes.length} nodes in parallel`);
       await Promise.all(
         targetNodes.map(targetNode => this.executeNode(targetNode, context, inputData))
       );
@@ -349,10 +350,10 @@ class WorkflowExecutor {
         });
 
       if (error) {
-        console.error('[WorkflowExecutor] Failed to save execution:', error);
+        log.error('[WorkflowExecutor] Failed to save execution:', { error: error.message || error });
       }
     } catch (err) {
-      console.error('[WorkflowExecutor] Error saving execution:', err);
+      log.error('[WorkflowExecutor] Error saving execution:', { error: err.message || err });
     }
   }
 
@@ -361,7 +362,7 @@ class WorkflowExecutor {
    */
   async triggerErrorWorkflow(workflow, execution, error) {
     try {
-      console.log(`[WorkflowExecutor] Triggering error workflow for ${workflow.id}`);
+      log.info(`[WorkflowExecutor] Triggering error workflow for ${workflow.id}`);
 
       const { data: errorWorkflow } = await supabase
         .from('workflows')
@@ -370,7 +371,7 @@ class WorkflowExecutor {
         .single();
 
       if (!errorWorkflow) {
-        console.warn('[WorkflowExecutor] Error workflow not found');
+        log.warn('[WorkflowExecutor] Error workflow not found');
         return;
       }
 
@@ -396,7 +397,7 @@ class WorkflowExecutor {
       });
 
     } catch (err) {
-      console.error('[WorkflowExecutor] Failed to trigger error workflow:', err);
+      log.error('[WorkflowExecutor] Failed to trigger error workflow:', { error: err.message || err });
     }
   }
 

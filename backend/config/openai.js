@@ -1,4 +1,5 @@
 const OpenAI = require('openai');
+const log = require('../utils/log');
 
 class OpenAIService {
   constructor() {
@@ -7,9 +8,9 @@ class OpenAIService {
 
     if (this.apiKey) {
       this.client = new OpenAI({ apiKey: this.apiKey });
-      console.log('✅ OpenAI initialized');
+      log.info('OpenAI initialized');
     } else {
-      console.warn('⚠️ OPENAI_API_KEY not set in environment');
+      log.warn('OPENAI_API_KEY not set in environment');
     }
   }
 
@@ -32,7 +33,7 @@ class OpenAIService {
     }
 
     try {
-      console.log('📝 Starting transcription with Whisper...');
+      log.info('Starting transcription with Whisper...');
 
       // Determine file extension from mime type
       const extMap = {
@@ -69,10 +70,10 @@ class OpenAIService {
         transcript = response.text;
       }
 
-      console.log('✅ Transcription complete');
+      log.info('Transcription complete');
       return transcript;
     } catch (error) {
-      console.error('❌ Transcription error:', error);
+      log.error('Transcription error:', { error: error.message || error });
       throw new Error(`Transcription failed: ${error.message}`);
     }
   }
@@ -88,7 +89,7 @@ class OpenAIService {
     }
 
     try {
-      console.log('📊 Generating summary with GPT...');
+      log.info('Generating summary with GPT...');
 
       const response = await this.client.chat.completions.create({
         model: 'gpt-4o-mini',
@@ -124,11 +125,11 @@ Return JSON with this exact structure:
 
       const text = response.choices[0].message.content;
       const summary = JSON.parse(text);
-      console.log('✅ Summary generated');
+      log.info('Summary generated');
 
       return summary;
     } catch (error) {
-      console.error('❌ Summary error:', error);
+      log.error('Summary error:', { error: error.message || error });
       throw new Error(`Summary generation failed: ${error.message}`);
     }
   }
@@ -144,7 +145,7 @@ Return JSON with this exact structure:
     }
 
     try {
-      console.log('📋 Extracting action items with GPT...');
+      log.info('Extracting action items with GPT...');
       const today = new Date().toISOString().split('T')[0];
 
       const response = await this.client.chat.completions.create({
@@ -192,11 +193,11 @@ Rules:
 
       const text = response.choices[0].message.content;
       const result = JSON.parse(text);
-      console.log(`✅ Extracted ${result.actionItems?.length || 0} action items`);
+      log.info(`Extracted ${result.actionItems?.length || 0} action items`);
 
       return result.actionItems || [];
     } catch (error) {
-      console.error('❌ Action items error:', error);
+      log.error('Action items error:', { error: error.message || error });
       throw new Error(`Action item extraction failed: ${error.message}`);
     }
   }
@@ -218,7 +219,7 @@ Rules:
       });
       return response.data[0].embedding;
     } catch (error) {
-      console.error('❌ Embedding error:', error);
+      log.error('Embedding error:', { error: error.message || error });
       throw new Error(`Embedding generation failed: ${error.message}`);
     }
   }
@@ -235,7 +236,7 @@ Rules:
     }
 
     try {
-      console.log('🤔 Processing question with GPT...');
+      log.info('Processing question with GPT...');
 
       const response = await this.client.chat.completions.create({
         model: 'gpt-4o-mini',
@@ -270,11 +271,11 @@ Return ONLY valid JSON:
 
       const text = response.choices[0].message.content;
       const result = JSON.parse(text);
-      console.log('✅ Question answered');
+      log.info('Question answered');
 
       return result;
     } catch (error) {
-      console.error('❌ Question error:', error);
+      log.error('Question error:', { error: error.message || error });
       throw new Error(`Question answering failed: ${error.message}`);
     }
   }
@@ -322,7 +323,7 @@ Keep it concise but informative.`
 
       return response.choices[0].message.content;
     } catch (error) {
-      console.error('❌ Chat recap error:', error);
+      log.error('Chat recap error:', { error: error.message || error });
       throw new Error(`Chat recap formatting failed: ${error.message}`);
     }
   }

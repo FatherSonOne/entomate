@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { useToast } from '../components/vc/ToastProvider'
+import { useConfirm } from '../components/vc/ConfirmDialog'
 import {
   Calendar as CalendarIcon, ChevronLeft, ChevronRight,
   Plus, RefreshCw, Link2, Unlink, CheckSquare,
@@ -8,11 +10,15 @@ import {
 } from 'lucide-react'
 import { calendarApi } from '../services/api'
 import { VCButton, VCBadge } from '../components/vc'
+import ErrorState from '../components/vc/ErrorState'
 
 export default function Calendar() {
+  const toast = useToast()
+  const confirm = useConfirm()
   const [searchParams] = useSearchParams()
   const [status, setStatus] = useState({ configured: false, connected: false })
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [events, setEvents] = useState([])
   const [upcoming, setUpcoming] = useState([])
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -34,6 +40,7 @@ export default function Calendar() {
 
   const checkStatus = async () => {
     try {
+      setError(null)
       setLoading(true)
       const res = await calendarApi.getStatus()
       setStatus(res)
@@ -41,8 +48,9 @@ export default function Calendar() {
       if (res.connected) {
         await loadCalendarData()
       }
-    } catch (error) {
-      console.error('Failed to check calendar status:', error)
+    } catch (err) {
+      console.error('Failed to check calendar status:', err)
+      setError(err.message || 'Failed to load calendar')
     } finally {
       setLoading(false)
     }
@@ -70,12 +78,13 @@ export default function Calendar() {
       }
     } catch (error) {
       console.error('Failed to get auth URL:', error)
-      alert('Failed to connect to Google Calendar. Make sure the backend is configured.')
+      toast.error('Error', 'Failed to connect to Google Calendar. Make sure the backend is configured.')
     }
   }
 
   const handleDisconnect = async () => {
-    if (!confirm('Disconnect Google Calendar?')) return
+    const ok = await confirm({ title: 'Disconnect?', message: 'Disconnect Google Calendar?', confirmLabel: 'Disconnect', variant: 'danger' })
+    if (!ok) return
     try {
       await calendarApi.disconnect()
       setStatus({ configured: true, connected: false })
@@ -90,11 +99,11 @@ export default function Calendar() {
     setSyncing(true)
     try {
       const result = await calendarApi.syncAllActionItems()
-      alert(`Synced ${result.synced} action items to calendar`)
+      toast.success('Success', `Synced ${result.synced} action items to calendar`)
       await loadCalendarData()
     } catch (error) {
       console.error('Failed to sync:', error)
-      alert('Failed to sync action items')
+      toast.error('Error', 'Failed to sync action items')
     } finally {
       setSyncing(false)
     }
@@ -176,7 +185,7 @@ export default function Calendar() {
   const getItemColor = (item) => {
     if (item.type === 'action_item') {
       if (item.priority === 'high') return 'bg-semantic-error-dim text-semantic-error border-semantic-error'
-      if (item.priority === 'medium') return 'bg-yellow-100 text-yellow-700 border-yellow-200'
+      if (item.priority === 'medium') return 'vc-bg-warning-dim vc-text-warning vc-border-warning'
       return 'bg-semantic-success-dim text-semantic-success border-semantic-success'
     }
     if (item.type === 'goal') {
@@ -192,6 +201,12 @@ export default function Calendar() {
       </div>
     )
   }
+
+  if (error) return (
+    <div className="space-y-6">
+      <ErrorState message={error} onRetry={checkStatus} />
+    </div>
+  )
 
   return (
     <div className="space-y-6">
@@ -250,13 +265,13 @@ export default function Calendar() {
             {/* Calendar Header */}
             <div className="p-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(248,240,242,.08)' }}>
               <div className="flex items-center gap-4">
-                <VCButton variant="ghost" size="sm" onClick={prevMonth}>
+                <VCButton variant="ghost" size="sm" onClick={prevMonth} aria-label="Previous month">
                   <ChevronLeft className="h-5 w-5" />
                 </VCButton>
                 <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
                   {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                 </h2>
-                <VCButton variant="ghost" size="sm" onClick={nextMonth}>
+                <VCButton variant="ghost" size="sm" onClick={nextMonth} aria-label="Next month">
                   <ChevronRight className="h-5 w-5" />
                 </VCButton>
               </div>

@@ -5,6 +5,7 @@
  */
 
 const { supabase, supabaseAdmin } = require('../../config/supabase');
+const log = require('../../utils/log');
 
 class RelationshipIntelligenceService {
   constructor() {
@@ -63,7 +64,7 @@ class RelationshipIntelligenceService {
         }
       };
     } catch (error) {
-      console.error('[RelationshipIntelligenceService] getRelationshipInsights error:', error);
+      log.error('[RelationshipIntelligenceService] getRelationshipInsights error:', { error: error.message || error });
       return this.getEmptyInsights(dealId);
     }
   }
@@ -125,7 +126,7 @@ class RelationshipIntelligenceService {
 
       return Array.from(stakeholderMap.values());
     } catch (error) {
-      console.error('[RelationshipIntelligenceService] getStakeholders error:', error);
+      log.error('[RelationshipIntelligenceService] getStakeholders error:', { error: error.message || error });
       return [];
     }
   }
@@ -189,7 +190,7 @@ class RelationshipIntelligenceService {
         influences
       };
     } catch (error) {
-      console.error('[RelationshipIntelligenceService] classifyStakeholder error:', error);
+      log.error('[RelationshipIntelligenceService] classifyStakeholder error:', { error: error.message || error });
       return null;
     }
   }

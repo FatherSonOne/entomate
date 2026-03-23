@@ -3,12 +3,15 @@ const { v4: uuidv4 } = require('uuid');
 const { supabase } = require('../config/supabase');
 const automationScheduler = require('../services/automationScheduler');
 const { authenticate, authorize, optionalAuth, apiKeyAuth } = require('../middleware/auth');
+const { validate } = require('../middleware/validate');
+const schemas = require('../schemas/automations');
+const log = require('../utils/log');
 
 const router = express.Router();
 
 // Initialize scheduler on module load
 automationScheduler.initialize().catch(err => {
-  console.error('Failed to initialize automation scheduler:', err);
+  log.error('Failed to initialize automation scheduler:', { error: err.message || err });
 });
 
 // Automation trigger types
@@ -44,7 +47,7 @@ const ACTION_TYPES = {
  * Create a new automation
  * Uses optionalAuth to allow creation without login during development
  */
-router.post('/', optionalAuth, async (req, res) => {
+router.post('/', optionalAuth, validate(schemas.create), async (req, res) => {
   try {
     const {
       name,
@@ -106,7 +109,7 @@ router.post('/', optionalAuth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error creating automation:', error);
+    log.error('Error creating automation:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -115,7 +118,7 @@ router.post('/', optionalAuth, async (req, res) => {
  * GET /api/automations
  * List all automations
  */
-router.get('/', async (req, res) => {
+router.get('/', validate(schemas.list), async (req, res) => {
   try {
     const { limit = 50, offset = 0, enabled, triggerType } = req.query;
 
@@ -150,7 +153,7 @@ router.get('/', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error listing automations:', error);
+    log.error('Error listing automations:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -251,7 +254,7 @@ router.get('/templates', (req, res) => {
       })) || []
     }));
   } catch (err) {
-    console.warn('Could not load workflow templates:', err.message);
+    log.warn('Could not load workflow templates:', err.message);
   }
 
   // Combine all templates
@@ -293,7 +296,7 @@ router.get('/:id', async (req, res) => {
     res.json(automation);
 
   } catch (error) {
-    console.error('❌ Error getting automation:', error);
+    log.error('Error getting automation:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -302,7 +305,7 @@ router.get('/:id', async (req, res) => {
  * PUT /api/automations/:id
  * Update automation
  */
-router.put('/:id', optionalAuth, async (req, res) => {
+router.put('/:id', optionalAuth, validate(schemas.update), async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
@@ -338,7 +341,7 @@ router.put('/:id', optionalAuth, async (req, res) => {
     res.json(automation);
 
   } catch (error) {
-    console.error('❌ Error updating automation:', error);
+    log.error('Error updating automation:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -377,7 +380,7 @@ router.delete('/:id', optionalAuth, async (req, res) => {
     res.json({ success: true, message: 'Automation deleted' });
 
   } catch (error) {
-    console.error('❌ Error deleting automation:', error);
+    log.error('Error deleting automation:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -386,7 +389,7 @@ router.delete('/:id', optionalAuth, async (req, res) => {
  * POST /api/automations/:id/toggle
  * Enable or disable automation
  */
-router.post('/:id/toggle', optionalAuth, async (req, res) => {
+router.post('/:id/toggle', optionalAuth, validate(schemas.toggle), async (req, res) => {
   try {
     const { id } = req.params;
     const { enabled } = req.body;
@@ -426,7 +429,7 @@ router.post('/:id/toggle', optionalAuth, async (req, res) => {
     res.json(automation);
 
   } catch (error) {
-    console.error('❌ Error toggling automation:', error);
+    log.error('Error toggling automation:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -435,7 +438,7 @@ router.post('/:id/toggle', optionalAuth, async (req, res) => {
  * POST /api/automations/:id/execute
  * Manually execute an automation
  */
-router.post('/:id/execute', optionalAuth, async (req, res) => {
+router.post('/:id/execute', optionalAuth, validate(schemas.execute), async (req, res) => {
   try {
     const { id } = req.params;
     const { triggerData } = req.body;
@@ -507,7 +510,7 @@ router.post('/:id/execute', optionalAuth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error executing automation:', error);
+    log.error('Error executing automation:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -540,7 +543,7 @@ router.get('/:id/logs', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error getting automation logs:', error);
+    log.error('Error getting automation logs:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -550,7 +553,7 @@ router.get('/:id/logs', async (req, res) => {
  * Trigger automations by event type (internal use)
  * Allows API key auth for service-to-service calls
  */
-router.post('/trigger', apiKeyAuth, async (req, res) => {
+router.post('/trigger', apiKeyAuth, validate(schemas.trigger), async (req, res) => {
   try {
     const { triggerType, triggerData } = req.body;
 
@@ -635,7 +638,7 @@ router.post('/trigger', apiKeyAuth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error triggering automations:', error);
+    log.error('Error triggering automations:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -659,7 +662,7 @@ function shouldTrigger(config, data) {
 
 // Helper function to execute an action
 async function executeAction(action, triggerData, automation) {
-  console.log(`⚡ Executing action: ${action.type}`);
+  log.info(`Executing action: ${action.type}`);
 
   switch (action.type) {
     case ACTION_TYPES.CREATE_TASK:
@@ -738,7 +741,7 @@ router.post('/:id/schedule', optionalAuth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error scheduling automation:', error);
+    log.error('Error scheduling automation:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -747,7 +750,7 @@ router.post('/:id/schedule', optionalAuth, async (req, res) => {
  * POST /api/automations/:id/test
  * Test automation with sample data (dry-run)
  */
-router.post('/:id/test', optionalAuth, async (req, res) => {
+router.post('/:id/test', optionalAuth, validate(schemas.test), async (req, res) => {
   try {
     const { id } = req.params;
     const { sampleData = {} } = req.body;
@@ -793,7 +796,7 @@ router.post('/:id/test', optionalAuth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error testing automation:', error);
+    log.error('Error testing automation:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });

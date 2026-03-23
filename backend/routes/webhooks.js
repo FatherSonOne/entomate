@@ -8,6 +8,7 @@ const express = require('express');
 const router = express.Router();
 const { supabase } = require('../config/supabase');
 const WorkflowExecutor = require('../services/workflow/WorkflowExecutor');
+const log = require('../utils/log');
 
 // Webhook executor instance
 const workflowExecutor = new WorkflowExecutor();
@@ -23,7 +24,7 @@ router.all('/:webhookIdentifier', async (req, res) => {
   const { webhookIdentifier } = req.params;
   const startTime = Date.now();
 
-  console.log(`[Webhooks] Received ${req.method} request for: ${webhookIdentifier}`);
+  log.info(`[Webhooks] Received ${req.method} request for: ${webhookIdentifier}`);
 
   try {
     // Find webhook by path or ID
@@ -124,7 +125,7 @@ router.all('/:webhookIdentifier', async (req, res) => {
         mode: 'production',
         triggeredBy: 'webhook'
       }).catch(err => {
-        console.error(`[Webhooks] Background execution failed:`, err);
+        log.error(`[Webhooks] Background execution failed:`, { error: err.message || err });
       });
 
       return res.status(200).json({
@@ -165,7 +166,7 @@ router.all('/:webhookIdentifier', async (req, res) => {
         mode: 'production',
         triggeredBy: 'webhook'
       }).catch(err => {
-        console.error(`[Webhooks] Background execution failed:`, err);
+        log.error(`[Webhooks] Background execution failed:`, { error: err.message || err });
       });
 
       // Return custom response
@@ -180,7 +181,7 @@ router.all('/:webhookIdentifier', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[Webhooks] Error:', error);
+    log.error('[Webhooks] Error:', { error: error.message || error });
     return res.status(500).json({
       error: 'Internal server error',
       message: error.message

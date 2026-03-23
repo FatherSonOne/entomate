@@ -10,6 +10,7 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const { supabase } = require('../config/supabase');
 const ai = require('../config/ai');
+const log = require('../utils/log');
 
 const router = express.Router();
 
@@ -44,7 +45,7 @@ router.post('/:id/regenerate', async (req, res) => {
       return res.status(400).json({ error: 'Meeting has no transcript to analyze' });
     }
 
-    console.log(`[MeetingSummary] Regenerating summary for meeting: ${id}`);
+    log.info(`[MeetingSummary] Regenerating summary for meeting: ${id}`);
 
     // Regenerate summary using AI
     const summaryData = await ai.generateSummary(meeting.transcript);
@@ -80,7 +81,7 @@ router.post('/:id/regenerate', async (req, res) => {
       .single();
 
     if (updateError) {
-      console.error('[MeetingSummary] Failed to update summary:', updateError);
+      log.error('[MeetingSummary] Failed to update summary:', { error: updateError.message || updateError });
     }
 
     // Get action items
@@ -107,7 +108,7 @@ router.post('/:id/regenerate', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[MeetingSummary] Error regenerating summary:', error);
+    log.error('[MeetingSummary] Error regenerating summary:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -159,7 +160,7 @@ router.post('/:id/publish-crm', async (req, res) => {
     try {
       crmService = require('../services/crmService');
     } catch (err) {
-      console.warn('[MeetingSummary] CRM service not available:', err.message);
+      log.warn('[MeetingSummary] CRM service not available:', err.message);
       crmService = { configured: false };
     }
 
@@ -186,7 +187,7 @@ router.post('/:id/publish-crm', async (req, res) => {
           crmTaskId = crmResult.taskId;
         } else {
           // Simulate CRM task creation for Logos CRM
-          console.log(`[MeetingSummary] Simulating Logos CRM task creation for: ${item.task_description}`);
+          log.info(`[MeetingSummary] Simulating Logos CRM task creation for: ${item.task_description}`);
           crmTaskId = `logos-${uuidv4().substring(0, 8)}`;
         }
 
@@ -247,7 +248,7 @@ router.post('/:id/publish-crm', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[MeetingSummary] Error publishing to CRM:', error);
+    log.error('[MeetingSummary] Error publishing to CRM:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -304,7 +305,7 @@ router.get('/:id', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[MeetingSummary] Error getting summary:', error);
+    log.error('[MeetingSummary] Error getting summary:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });

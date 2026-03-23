@@ -5,6 +5,7 @@
 
 const { createClient } = require('@supabase/supabase-js');
 const { v4: uuid } = require('uuid');
+const log = require('../../utils/log');
 
 class FeedbackService {
   constructor() {
@@ -62,20 +63,20 @@ class FeedbackService {
         .single();
 
       if (error) {
-        console.error('[FeedbackService] Database error:', error);
+        log.error('[FeedbackService] Database error:', { error: error.message || error });
         throw error;
       }
 
-      console.log(`[FeedbackService] Override captured for user ${userId}, agent ${agentType}`);
+      log.info(`[FeedbackService] Override captured for user ${userId}, agent ${agentType}`);
 
       // Trigger pattern detection asynchronously (don't wait for it)
       this.triggerPatternDetection(userId, agentType).catch(err => {
-        console.error('[FeedbackService] Pattern detection trigger failed:', err);
+        log.error('[FeedbackService] Pattern detection trigger failed:', { error: err.message || err });
       });
 
       return data;
     } catch (error) {
-      console.error('[FeedbackService] captureOverride error:', error);
+      log.error('[FeedbackService] captureOverride error:', { error: error.message || error });
       throw error;
     }
   }
@@ -98,7 +99,7 @@ class FeedbackService {
         .maybeSingle();
 
       if (error) {
-        console.error('[FeedbackService] Error checking preference:', error);
+        log.error('[FeedbackService] Error checking preference:', { error: error.message || error });
         // Default to true on error
         return true;
       }
@@ -107,7 +108,7 @@ class FeedbackService {
       // Only return false if explicitly disabled
       return !data || data.preference_value !== 'disabled';
     } catch (error) {
-      console.error('[FeedbackService] shouldPromptForFeedback error:', error);
+      log.error('[FeedbackService] shouldPromptForFeedback error:', { error: error.message || error });
       // Default to true on error
       return true;
     }
@@ -136,13 +137,13 @@ class FeedbackService {
         });
 
       if (error) {
-        console.error('[FeedbackService] Error setting preference:', error);
+        log.error('[FeedbackService] Error setting preference:', { error: error.message || error });
         throw error;
       }
 
-      console.log(`[FeedbackService] Feedback preference updated for user ${userId}, agent ${agentType}: ${preferenceValue}`);
+      log.info(`[FeedbackService] Feedback preference updated for user ${userId}, agent ${agentType}: ${preferenceValue}`);
     } catch (error) {
-      console.error('[FeedbackService] setFeedbackPreference error:', error);
+      log.error('[FeedbackService] setFeedbackPreference error:', { error: error.message || error });
       throw error;
     }
   }
@@ -170,13 +171,13 @@ class FeedbackService {
       const { data, error } = await query;
 
       if (error) {
-        console.error('[FeedbackService] Error fetching overrides:', error);
+        log.error('[FeedbackService] Error fetching overrides:', { error: error.message || error });
         throw error;
       }
 
       return data || [];
     } catch (error) {
-      console.error('[FeedbackService] getRecentOverrides error:', error);
+      log.error('[FeedbackService] getRecentOverrides error:', { error: error.message || error });
       throw error;
     }
   }
@@ -199,7 +200,7 @@ class FeedbackService {
         .gte('created_at', startDate.toISOString());
 
       if (error) {
-        console.error('[FeedbackService] Error fetching stats:', error);
+        log.error('[FeedbackService] Error fetching stats:', { error: error.message || error });
         throw error;
       }
 
@@ -224,7 +225,7 @@ class FeedbackService {
 
       return stats;
     } catch (error) {
-      console.error('[FeedbackService] getOverrideStats error:', error);
+      log.error('[FeedbackService] getOverrideStats error:', { error: error.message || error });
       throw error;
     }
   }
@@ -236,13 +237,13 @@ class FeedbackService {
    */
   async triggerPatternDetection(userId, agentType) {
     try {
-      console.log(`[FeedbackService] Pattern detection triggered for user ${userId}, agent ${agentType}`);
+      log.info(`[FeedbackService] Pattern detection triggered for user ${userId}, agent ${agentType}`);
 
       // Call PatternDetectionService
       const PatternDetectionService = require('./PatternDetectionService');
       await PatternDetectionService.detectPatterns(userId, agentType);
     } catch (error) {
-      console.error('[FeedbackService] triggerPatternDetection error:', error);
+      log.error('[FeedbackService] triggerPatternDetection error:', { error: error.message || error });
       // Don't throw - this is async and non-critical
     }
   }

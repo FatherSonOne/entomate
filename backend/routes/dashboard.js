@@ -5,6 +5,7 @@
 
 const express = require('express');
 const { supabase } = require('../config/supabase');
+const log = require('../utils/log');
 
 const router = express.Router();
 
@@ -16,7 +17,7 @@ router.get('/projects', async (req, res) => {
   try {
     const { status = 'all', sort = 'updated', limit = 50, search } = req.query;
 
-    console.log('📊 Fetching dashboard projects...');
+    log.info('Fetching dashboard projects...');
 
     if (!supabase) {
       return res.status(503).json({ error: 'Database not configured' });
@@ -49,7 +50,7 @@ router.get('/projects', async (req, res) => {
 
     if (error) throw error;
 
-    console.log(`✅ Found ${projects?.length || 0} projects`);
+    log.info(`Found ${projects?.length || 0} projects`);
 
     res.json({
       projects: projects || [],
@@ -57,7 +58,7 @@ router.get('/projects', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error fetching projects:', error);
+    log.error('Error fetching projects:', { error: error.message || error });
     res.status(500).json({
       error: 'Failed to fetch projects',
       details: error.message
@@ -129,7 +130,7 @@ router.get('/projects/:id', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error fetching project detail:', error);
+    log.error('Error fetching project detail:', { error: error.message || error });
     res.status(500).json({
       error: 'Failed to fetch project',
       details: error.message
@@ -152,7 +153,7 @@ router.get('/action-items', async (req, res) => {
       limit = 100
     } = req.query;
 
-    console.log('📋 Fetching action items...');
+    log.info('Fetching action items...');
 
     if (!supabase) {
       return res.status(503).json({ error: 'Database not configured' });
@@ -210,7 +211,7 @@ router.get('/action-items', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error fetching action items:', error);
+    log.error('Error fetching action items:', { error: error.message || error });
     res.status(500).json({
       error: 'Failed to fetch action items',
       details: error.message
@@ -258,7 +259,7 @@ router.patch('/action-items/:id', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error updating action item:', error);
+    log.error('Error updating action item:', { error: error.message || error });
     res.status(500).json({
       error: 'Failed to update action item',
       details: error.message
@@ -272,7 +273,7 @@ router.patch('/action-items/:id', async (req, res) => {
  */
 router.get('/team-workload', async (req, res) => {
   try {
-    console.log('👥 Fetching team workload...');
+    log.info('Fetching team workload...');
 
     if (!supabase) {
       return res.status(503).json({ error: 'Database not configured' });
@@ -329,7 +330,7 @@ router.get('/team-workload', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error fetching team workload:', error);
+    log.error('Error fetching team workload:', { error: error.message || error });
     res.status(500).json({
       error: 'Failed to fetch team workload',
       details: error.message
@@ -343,7 +344,7 @@ router.get('/team-workload', async (req, res) => {
  */
 router.get('/overdue', async (req, res) => {
   try {
-    console.log('⚠️ Fetching overdue items...');
+    log.info('Fetching overdue items...');
 
     if (!supabase) {
       return res.status(503).json({ error: 'Database not configured' });
@@ -391,7 +392,7 @@ router.get('/overdue', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error fetching overdue items:', error);
+    log.error('Error fetching overdue items:', { error: error.message || error });
     res.status(500).json({
       error: 'Failed to fetch overdue items',
       details: error.message
@@ -405,7 +406,7 @@ router.get('/overdue', async (req, res) => {
  */
 router.get('/insights', async (req, res) => {
   try {
-    console.log('📈 Generating insights...');
+    log.info('Generating insights...');
 
     if (!supabase) {
       return res.status(503).json({ error: 'Database not configured' });
@@ -475,7 +476,7 @@ router.get('/insights', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error generating insights:', error);
+    log.error('Error generating insights:', { error: error.message || error });
     res.status(500).json({
       error: 'Failed to generate insights',
       details: error.message
@@ -521,7 +522,7 @@ router.get('/summary', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error fetching summary:', error);
+    log.error('Error fetching summary:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });

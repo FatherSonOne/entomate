@@ -5,6 +5,7 @@
  */
 
 const BaseNode = require('./BaseNode');
+const log = require('../../../utils/log');
 
 /**
  * Transform Node - Map and transform data structure
@@ -13,7 +14,7 @@ class TransformNode extends BaseNode {
   static async execute(config, inputData, context) {
     const { mappings = [] } = config;
 
-    console.log(`[TransformNode] Applying ${mappings.length} mappings`);
+    log.info(`[TransformNode] Applying ${mappings.length} mappings`);
 
     const result = {};
 
@@ -116,7 +117,7 @@ class SplitNode extends BaseNode {
     if (typeof value === 'string') {
       // Split string
       const items = value.split(delimiter).map(s => s.trim()).filter(s => s);
-      console.log(`[SplitNode] Split string into ${items.length} items`);
+      log.info(`[SplitNode] Split string into ${items.length} items`);
 
       return {
         output: 'main',
@@ -127,7 +128,7 @@ class SplitNode extends BaseNode {
       };
     } else if (Array.isArray(value)) {
       // Return individual items (will be used with loop)
-      console.log(`[SplitNode] Array has ${value.length} items`);
+      log.info(`[SplitNode] Array has ${value.length} items`);
 
       return {
         output: 'main',
@@ -200,7 +201,7 @@ class SetNode extends BaseNode {
         result = inputData;
     }
 
-    console.log(`[SetNode] ${mode} ${Object.keys(values).length} fields`);
+    log.info(`[SetNode] ${mode} ${Object.keys(values).length} fields`);
 
     return {
       output: 'main',
@@ -271,7 +272,7 @@ class DateTimeNode extends BaseNode {
         result = new Date().toISOString();
     }
 
-    console.log(`[DateTimeNode] ${operation}: ${result}`);
+    log.info(`[DateTimeNode] ${operation}: ${result}`);
 
     return {
       output: 'main',
@@ -432,7 +433,7 @@ class JsonNode extends BaseNode {
         result = value;
     }
 
-    console.log(`[JsonNode] ${operation}`);
+    log.info(`[JsonNode] ${operation}`);
 
     return {
       output: 'main',
@@ -495,7 +496,7 @@ class CryptoNode extends BaseNode {
         result = value;
     }
 
-    console.log(`[CryptoNode] ${operation}`);
+    log.info(`[CryptoNode] ${operation}`);
 
     return {
       output: 'main',

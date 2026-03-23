@@ -5,6 +5,7 @@
  */
 
 const geminiService = require('../config/gemini');
+const log = require('../utils/log');
 
 // Available agents registry
 const agents = {
@@ -33,7 +34,7 @@ Respond with JSON: { "recommended": "name", "confidence": 0.0-1.0, "reason": "br
         const result = await geminiService.generateText(prompt);
         return JSON.parse(result);
       } catch (error) {
-        console.error('[AssignmentAgent] Error:', error);
+        log.error('[AssignmentAgent] Error:', { error: error.message || error });
         return {
           recommended: team[0]?.name || null,
           confidence: 0.3,
@@ -63,7 +64,7 @@ Respond with JSON: { "recommended": "priority", "confidence": 0.0-1.0, "reason":
         const result = await geminiService.generateText(prompt);
         return JSON.parse(result);
       } catch (error) {
-        console.error('[PriorityAgent] Error:', error);
+        log.error('[PriorityAgent] Error:', { error: error.message || error });
         return {
           recommended: currentPriority || 'medium',
           confidence: 0.5,
@@ -93,7 +94,7 @@ Respond with JSON: { "recommended": "YYYY-MM-DD", "confidence": 0.0-1.0, "reason
         const result = await geminiService.generateText(prompt);
         return JSON.parse(result);
       } catch (error) {
-        console.error('[DeadlineAgent] Error:', error);
+        log.error('[DeadlineAgent] Error:', { error: error.message || error });
         // Default to 1 week from now
         const defaultDeadline = new Date();
         defaultDeadline.setDate(defaultDeadline.getDate() + 7);
@@ -124,7 +125,7 @@ Respond with JSON: { "followUps": [{ "action": "description", "urgency": "high/m
         const result = await geminiService.generateText(prompt);
         return JSON.parse(result);
       } catch (error) {
-        console.error('[FollowupAgent] Error:', error);
+        log.error('[FollowupAgent] Error:', { error: error.message || error });
         return {
           followUps: [],
           confidence: 0.3,

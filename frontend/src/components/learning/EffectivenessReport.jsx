@@ -41,7 +41,7 @@ export default function EffectivenessReport({ days = 30, className = '' }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 vc-spinner"></div>
       </div>
     );
   }
@@ -119,21 +119,21 @@ export default function EffectivenessReport({ days = 30, className = '' }) {
           {/* Success Rate */}
           <div className={`rounded-lg p-4 ${
             overrides.successRate >= 70 ? 'bg-semantic-success-dim' :
-            overrides.successRate >= 50 ? 'bg-yellow-50' : 'bg-semantic-error-dim'
+            overrides.successRate >= 50 ? 'vc-bg-warning-dim' : 'bg-semantic-error-dim'
           }`}>
             <div className="flex items-center gap-2 mb-2">
               <CheckCircle size={18} className={
                 overrides.successRate >= 70 ? 'text-semantic-success' :
-                overrides.successRate >= 50 ? 'text-yellow-600' : 'text-semantic-error'
+                overrides.successRate >= 50 ? 'vc-text-warning' : 'text-semantic-error'
               } />
               <span className={`text-sm font-medium ${
                 overrides.successRate >= 70 ? 'text-semantic-success' :
-                overrides.successRate >= 50 ? 'text-yellow-900' : 'text-semantic-error'
+                overrides.successRate >= 50 ? 'vc-text-warning' : 'text-semantic-error'
               }`}>Success Rate</span>
             </div>
             <div className={`text-3xl font-bold ${
               overrides.successRate >= 70 ? 'text-semantic-success' :
-              overrides.successRate >= 50 ? 'text-yellow-600' : 'text-semantic-error'
+              overrides.successRate >= 50 ? 'vc-text-warning' : 'text-semantic-error'
             }`}>{overrides.successRate}%</div>
             <div className="text-xs text-content-secondary mt-1">
               {overrides.successful} / {overrides.withOutcomes} tracked
@@ -199,11 +199,11 @@ export default function EffectivenessReport({ days = 30, className = '' }) {
             {lowPerformingPatterns.map((pattern, index) => (
               <div
                 key={index}
-                className="flex items-center justify-between p-4 bg-orange-50 border border-semantic-warning rounded-lg"
+                className="flex items-center justify-between p-4 vc-bg-warning-dim border border-semantic-warning rounded-lg"
               >
                 <div className="flex-1">
                   <p className="font-medium text-content-primary">{pattern.description}</p>
-                  <p className="text-xs text-orange-700 mt-1 italic">{pattern.recommendation}</p>
+                  <p className="text-xs vc-text-warning mt-1 italic">{pattern.recommendation}</p>
                   <p className="text-xs text-content-secondary mt-1">
                     {pattern.totalOutcomes} outcomes tracked • Confidence: {pattern.confidence}%
                   </p>
@@ -252,7 +252,7 @@ export default function EffectivenessReport({ days = 30, className = '' }) {
                     <td className="px-4 py-4 text-sm">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                         pattern.confidence >= 80 ? 'bg-semantic-success-dim text-semantic-success' :
-                        pattern.confidence >= 60 ? 'bg-yellow-100 text-yellow-800' :
+                        pattern.confidence >= 60 ? 'vc-bg-warning-dim vc-text-warning' :
                         'bg-surface-muted text-content-primary'
                       }`}>
                         {pattern.confidence}%
@@ -297,7 +297,7 @@ export default function EffectivenessReport({ days = 30, className = '' }) {
               <div
                 key={index}
                 className={`flex items-start gap-3 p-3 rounded-lg ${
-                  rec.type === 'warning' ? 'bg-orange-50 border border-semantic-warning' :
+                  rec.type === 'warning' ? 'vc-bg-warning-dim border border-semantic-warning' :
                   rec.type === 'suggestion' ? 'bg-semantic-info-dim border border-semantic-info' :
                   'bg-surface-muted border border-line-default'
                 }`}

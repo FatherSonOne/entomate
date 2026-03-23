@@ -10,10 +10,12 @@ import { AlertCircle, Loader2 } from 'lucide-react'
 import { workflowsApi } from '../services/api'
 import WorkflowCanvas from '../components/workflow/WorkflowCanvas'
 import { VCButton, VCBadge } from '../components/vc'
+import { useConfirm } from '../components/vc/ConfirmDialog'
 
 export default function WorkflowBuilder() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const confirm = useConfirm()
   const [workflow, setWorkflow] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -117,7 +119,8 @@ export default function WorkflowBuilder() {
   }
 
   const handleDelete = async () => {
-    if (!window.confirm(`Delete "${workflow.name}"? This cannot be undone.`)) return
+    const ok = await confirm({ title: 'Delete Workflow', message: `Delete "${workflow.name}"? This cannot be undone.`, confirmLabel: 'Delete', variant: 'danger' })
+    if (!ok) return
     try {
       await workflowsApi.delete(id)
       navigate('/workflows')

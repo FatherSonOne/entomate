@@ -10,6 +10,7 @@ const embeddingService = require('../services/embeddingService');
 const askService = require('../services/askService');
 const { searchCache, suggestionCache, withCache } = require('../utils/cache');
 const { authenticate } = require('../middleware/auth');
+const log = require('../utils/log');
 
 const router = express.Router();
 
@@ -46,7 +47,7 @@ router.post('/', async (req, res) => {
     const cacheKey = searchCache.generateKey('keyword', query, types, limit, filters);
     const cached = searchCache.get(cacheKey);
     if (cached) {
-      console.log(`📦 Cache hit for keyword search: "${query}"`);
+      log.info(`Cache hit for keyword search: "${query}"`);
       return res.json({ ...cached, fromCache: true });
     }
 
@@ -199,7 +200,7 @@ router.post('/', async (req, res) => {
     res.json(response);
 
   } catch (error) {
-    console.error('❌ Error searching:', error);
+    log.error('Error searching:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -220,7 +221,7 @@ router.post('/semantic', async (req, res) => {
     const cacheKey = searchCache.generateKey('semantic', query, limit, threshold);
     const cached = searchCache.get(cacheKey);
     if (cached) {
-      console.log(`📦 Cache hit for semantic search: "${query}"`);
+      log.info(`Cache hit for semantic search: "${query}"`);
       return res.json({ ...cached, fromCache: true });
     }
 
@@ -264,7 +265,7 @@ router.post('/semantic', async (req, res) => {
     res.json(response);
 
   } catch (error) {
-    console.error('❌ Error in semantic search:', error);
+    log.error('Error in semantic search:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -293,7 +294,7 @@ router.post('/ask', async (req, res) => {
     res.json(answer);
 
   } catch (error) {
-    console.error('❌ Error in ask endpoint:', error);
+    log.error('Error in ask endpoint:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -347,7 +348,7 @@ router.post('/ask/stream', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error in streaming ask endpoint:', error);
+    log.error('Error in streaming ask endpoint:', { error: error.message || error });
     if (!res.headersSent) {
       res.status(500).json({ error: error.message });
     } else {
@@ -378,7 +379,7 @@ router.post('/ask/follow-up', async (req, res) => {
     res.json(answer);
 
   } catch (error) {
-    console.error('❌ Follow-up error:', error);
+    log.error('Follow-up error:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -396,7 +397,7 @@ router.get('/conversations', async (req, res) => {
     res.json({ conversations });
 
   } catch (error) {
-    console.error('❌ Error listing conversations:', error);
+    log.error('Error listing conversations:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -414,7 +415,7 @@ router.get('/conversations/:id', async (req, res) => {
     res.json({ messages });
 
   } catch (error) {
-    console.error('❌ Error fetching conversation:', error);
+    log.error('Error fetching conversation:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -432,7 +433,7 @@ router.delete('/conversations/:id', async (req, res) => {
     res.json({ success: true });
 
   } catch (error) {
-    console.error('❌ Error deleting conversation:', error);
+    log.error('Error deleting conversation:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -462,7 +463,7 @@ router.get('/history', async (req, res) => {
     res.json({ history: history || [] });
 
   } catch (error) {
-    console.error('❌ Error fetching history:', error);
+    log.error('Error fetching history:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -482,7 +483,7 @@ router.delete('/history', async (req, res) => {
     res.json({ success: true });
 
   } catch (error) {
-    console.error('❌ Error clearing history:', error);
+    log.error('Error clearing history:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -518,7 +519,7 @@ router.post('/save', async (req, res) => {
     res.json({ saved: data });
 
   } catch (error) {
-    console.error('❌ Error saving search:', error);
+    log.error('Error saving search:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -545,7 +546,7 @@ router.get('/saved', async (req, res) => {
     res.json({ saved: data || [] });
 
   } catch (error) {
-    console.error('❌ Error fetching saved searches:', error);
+    log.error('Error fetching saved searches:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -567,7 +568,7 @@ router.delete('/saved/:id', async (req, res) => {
     res.json({ success: true });
 
   } catch (error) {
-    console.error('❌ Error deleting saved search:', error);
+    log.error('Error deleting saved search:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -722,7 +723,7 @@ router.get('/suggestions', authenticate, async (req, res) => {
     res.json(response);
 
   } catch (error) {
-    console.error('❌ Error getting suggestions:', error);
+    log.error('Error getting suggestions:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -759,7 +760,7 @@ router.get('/recent', async (req, res) => {
     res.json({ recent });
 
   } catch (error) {
-    console.error('❌ Error getting recent:', error);
+    log.error('Error getting recent:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -885,7 +886,7 @@ router.get('/analytics', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error getting analytics:', error);
+    log.error('Error getting analytics:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -957,7 +958,7 @@ router.post('/export', async (req, res) => {
     res.send(csvContent);
 
   } catch (error) {
-    console.error('❌ Error exporting results:', error);
+    log.error('Error exporting results:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -991,7 +992,7 @@ async function logSearch(query, searchType, resultsCount, executionTime) {
       });
   } catch (error) {
     // Non-critical, don't throw
-    console.warn('⚠️ Could not log search:', error.message);
+    log.warn('Could not log search:', error.message);
   }
 }
 
@@ -1027,7 +1028,7 @@ router.post('/cache/invalidate', async (req, res) => {
       cleared += suggestionCache.clear();
     }
 
-    console.log(`🧹 Cache invalidated: ${cleared} entries cleared`);
+    log.info(`Cache invalidated: ${cleared} entries cleared`);
     res.json({ success: true, cleared });
   } catch (error) {
     res.status(500).json({ error: error.message });

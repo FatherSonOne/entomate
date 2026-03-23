@@ -1,6 +1,9 @@
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const { supabase } = require('../config/supabase');
+const { validate } = require('../middleware/validate');
+const schemas = require('../schemas/tasks');
+const log = require('../utils/log');
 
 const router = express.Router();
 
@@ -8,7 +11,7 @@ const router = express.Router();
  * POST /api/tasks
  * Create a new task
  */
-router.post('/', async (req, res) => {
+router.post('/', validate(schemas.create), async (req, res) => {
   try {
     const {
       projectId,
@@ -61,7 +64,7 @@ router.post('/', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error creating task:', error);
+    log.error('Error creating task:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -70,7 +73,7 @@ router.post('/', async (req, res) => {
  * GET /api/tasks
  * List tasks with filters
  */
-router.get('/', async (req, res) => {
+router.get('/', validate(schemas.list), async (req, res) => {
   try {
     const {
       limit = 50,
@@ -130,7 +133,7 @@ router.get('/', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error listing tasks:', error);
+    log.error('Error listing tasks:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -169,7 +172,7 @@ router.get('/:id', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error getting task:', error);
+    log.error('Error getting task:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -178,7 +181,7 @@ router.get('/:id', async (req, res) => {
  * PUT /api/tasks/:id
  * Update task
  */
-router.put('/:id', async (req, res) => {
+router.put('/:id', validate(schemas.update), async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
@@ -218,7 +221,7 @@ router.put('/:id', async (req, res) => {
     res.json(task);
 
   } catch (error) {
-    console.error('❌ Error updating task:', error);
+    log.error('Error updating task:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -254,7 +257,7 @@ router.delete('/:id', async (req, res) => {
     res.json({ success: true, message: 'Task deleted' });
 
   } catch (error) {
-    console.error('❌ Error deleting task:', error);
+    log.error('Error deleting task:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -289,7 +292,7 @@ router.post('/:id/complete', async (req, res) => {
     res.json(task);
 
   } catch (error) {
-    console.error('❌ Error completing task:', error);
+    log.error('Error completing task:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -324,7 +327,7 @@ router.post('/:id/reopen', async (req, res) => {
     res.json(task);
 
   } catch (error) {
-    console.error('❌ Error reopening task:', error);
+    log.error('Error reopening task:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -333,7 +336,7 @@ router.post('/:id/reopen', async (req, res) => {
  * PUT /api/tasks/:id/assign
  * Assign task to user
  */
-router.put('/:id/assign', async (req, res) => {
+router.put('/:id/assign', validate(schemas.assign), async (req, res) => {
   try {
     const { id } = req.params;
     const { assignedTo } = req.body;
@@ -359,7 +362,7 @@ router.put('/:id/assign', async (req, res) => {
     res.json(task);
 
   } catch (error) {
-    console.error('❌ Error assigning task:', error);
+    log.error('Error assigning task:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -368,7 +371,7 @@ router.put('/:id/assign', async (req, res) => {
  * POST /api/tasks/bulk
  * Create multiple tasks at once
  */
-router.post('/bulk', async (req, res) => {
+router.post('/bulk', validate(schemas.bulkCreate), async (req, res) => {
   try {
     const { tasks, projectId } = req.body;
 
@@ -409,7 +412,7 @@ router.post('/bulk', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error creating bulk tasks:', error);
+    log.error('Error creating bulk tasks:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -418,7 +421,7 @@ router.post('/bulk', async (req, res) => {
  * PUT /api/tasks/bulk/status
  * Update status of multiple tasks
  */
-router.put('/bulk/status', async (req, res) => {
+router.put('/bulk/status', validate(schemas.bulkStatus), async (req, res) => {
   try {
     const { taskIds, status } = req.body;
 
@@ -458,7 +461,7 @@ router.put('/bulk/status', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error bulk updating tasks:', error);
+    log.error('Error bulk updating tasks:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });

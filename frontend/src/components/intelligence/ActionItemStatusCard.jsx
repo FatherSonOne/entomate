@@ -32,7 +32,7 @@ export default function ActionItemStatusCard({ data, onAction }) {
             <p className="text-lg font-bold text-semantic-success">
               {summary.completed}/{summary.total}
             </p>
-            <div className="w-full h-1.5 bg-green-200 rounded-full mt-2 overflow-hidden">
+            <div className="w-full h-1.5 vc-bg-success-dim rounded-full mt-2 overflow-hidden">
               <div
                 className="h-full bg-semantic-success rounded-full transition-all"
                 style={{ width: `${(summary.completionRate * 100).toFixed(0)}%` }}

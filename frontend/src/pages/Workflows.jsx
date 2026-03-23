@@ -13,9 +13,12 @@ import {
 } from 'lucide-react'
 import { workflowsApi } from '../services/api'
 import { VCButton, VCBadge, VCInput } from '../components/vc'
+import { useConfirm } from '../components/vc/ConfirmDialog'
+import ErrorState from '../components/vc/ErrorState'
 
 export default function Workflows() {
   const navigate = useNavigate()
+  const confirm = useConfirm()
   const [workflows, setWorkflows] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -86,7 +89,8 @@ export default function Workflows() {
   const handleDelete = async (id, e) => {
     e.stopPropagation()
     setShowMenu(null)
-    if (!window.confirm('Delete this workflow? This cannot be undone.')) return
+    const ok = await confirm({ title: 'Delete Workflow', message: 'Delete this workflow? This cannot be undone.', confirmLabel: 'Delete', variant: 'danger' })
+    if (!ok) return
     try {
       await workflowsApi.delete(id)
       setWorkflows(workflows.filter(w => w.id !== id))
@@ -273,6 +277,7 @@ export default function Workflows() {
                       size="sm"
                       onClick={(e) => handleToggleActive(workflow.id, workflow.active, e)}
                       title={workflow.active ? 'Deactivate' : 'Activate'}
+                      aria-label={workflow.active ? 'Deactivate' : 'Activate'}
                     >
                       {workflow.active ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                     </VCButton>
@@ -283,6 +288,7 @@ export default function Workflows() {
                       onClick={(e) => handleExecute(workflow.id, e)}
                       disabled={!workflow.active}
                       title="Execute now"
+                      aria-label="Execute now"
                     >
                       <Zap className="w-4 h-4" />
                     </VCButton>
@@ -292,6 +298,7 @@ export default function Workflows() {
                         variant="ghost"
                         size="sm"
                         onClick={(e) => { e.stopPropagation(); setShowMenu(showMenu === workflow.id ? null : workflow.id); }}
+                        aria-label="More options"
                       >
                         <MoreVertical className="w-4 h-4" />
                       </VCButton>

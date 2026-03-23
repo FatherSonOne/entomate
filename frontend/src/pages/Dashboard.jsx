@@ -9,6 +9,7 @@ import IntelligenceDashboard from '../components/intelligence/IntelligenceDashbo
 import { LearningInsightsWidget } from '../components/intelligence'
 import { meetingsApi, tasksApi, projectsApi, checkHealth } from '../services/api'
 import { VCBadge } from '../components/vc'
+import ErrorState from '../components/vc/ErrorState'
 
 /* ═══════════════════════════════════════════════════════════════
    TYPEWRITER HOOK
@@ -295,10 +296,12 @@ export default function Dashboard() {
   const [pendingTasks, setPendingTasks]     = useState([])
   const [systemStatus, setSystemStatus]     = useState(null)
   const [loading, setLoading]               = useState(true)
+  const [error, setError]                   = useState(null)
   const [learningInsights, setLearningInsights] = useState(null)
 
   const loadData = async () => {
     try {
+      setError(null)
       setLoading(true)
       const [health, meetings, tasks, projects] = await Promise.all([
         checkHealth().catch(() => ({ services: {} })),
@@ -324,6 +327,7 @@ export default function Dashboard() {
       } catch {}
     } catch (err) {
       console.error('Failed to load dashboard data:', err)
+      setError(err.message || 'Failed to load dashboard')
     } finally {
       setLoading(false)
     }
@@ -333,6 +337,8 @@ export default function Dashboard() {
 
   const handleReviewPatterns   = () => navigate('/settings', { state: { section: 'ai-learning' } })
   const handleNavigateToLearn  = () => navigate('/settings', { state: { section: 'ai-learning' } })
+
+  if (error) return <ErrorState message={error} onRetry={loadData} />
 
   return (
     <div className="space-y-4">

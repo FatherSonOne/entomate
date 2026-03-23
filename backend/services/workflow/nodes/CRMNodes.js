@@ -10,6 +10,7 @@
 const BaseNode = require('./BaseNode');
 const crmService = require('../../crmService');
 const { supabase } = require('../../../config/supabase');
+const log = require('../../../utils/log');
 
 // ============================================================================
 // CRM TRIGGER NODES
@@ -24,7 +25,7 @@ class DealStageChangedTrigger extends BaseNode {
     // Trigger nodes pass through data from the event
     const { fromStage, toStage, dealId, deal } = inputData;
 
-    console.log(`[DealStageChangedTrigger] Deal ${dealId} moved from ${fromStage} to ${toStage}`);
+    log.info(`[DealStageChangedTrigger] Deal ${dealId} moved from ${fromStage} to ${toStage}`);
 
     // Check stage filters if configured
     if (config.fromStages?.length > 0 && !config.fromStages.includes(fromStage)) {
@@ -69,7 +70,7 @@ class ContactCreatedTrigger extends BaseNode {
   static async execute(config, inputData, context) {
     const { contactId, contact } = inputData;
 
-    console.log(`[ContactCreatedTrigger] New contact: ${contactId}`);
+    log.info(`[ContactCreatedTrigger] New contact: ${contactId}`);
 
     // Check source filter
     if (config.sources?.length > 0 && !config.sources.includes(contact?.source)) {
@@ -109,7 +110,7 @@ class DealClosedTrigger extends BaseNode {
   static async execute(config, inputData, context) {
     const { dealId, deal, outcome } = inputData;
 
-    console.log(`[DealClosedTrigger] Deal ${dealId} closed: ${outcome}`);
+    log.info(`[DealClosedTrigger] Deal ${dealId} closed: ${outcome}`);
 
     // Check outcome filter (won, lost, or both)
     if (config.outcomes?.length > 0 && !config.outcomes.includes(outcome)) {
@@ -150,7 +151,7 @@ class TaskOverdueTrigger extends BaseNode {
   static async execute(config, inputData, context) {
     const { taskId, task, daysOverdue } = inputData;
 
-    console.log(`[TaskOverdueTrigger] Task ${taskId} is ${daysOverdue} days overdue`);
+    log.info(`[TaskOverdueTrigger] Task ${taskId} is ${daysOverdue} days overdue`);
 
     // Check minimum days overdue
     if (config.minDaysOverdue && daysOverdue < config.minDaysOverdue) {
@@ -191,7 +192,7 @@ class ActivityLoggedTrigger extends BaseNode {
   static async execute(config, inputData, context) {
     const { activityId, activity, activityType } = inputData;
 
-    console.log(`[ActivityLoggedTrigger] ${activityType} logged: ${activityId}`);
+    log.info(`[ActivityLoggedTrigger] ${activityType} logged: ${activityId}`);
 
     // Check activity type filter
     if (config.activityTypes?.length > 0 && !config.activityTypes.includes(activityType)) {
@@ -260,7 +261,7 @@ class CreateDealNode extends BaseNode {
       dealData.customFields[key] = this.interpolate(val, inputData);
     }
 
-    console.log(`[CreateDealNode] Creating deal: ${dealData.name}`);
+    log.info(`[CreateDealNode] Creating deal: ${dealData.name}`);
 
     // Use CRM service or store locally
     let result;
@@ -337,7 +338,7 @@ class UpdateDealNode extends BaseNode {
       updateData[key] = this.interpolate(val, inputData);
     }
 
-    console.log(`[UpdateDealNode] Updating deal ${resolvedDealId}:`, updateData);
+    log.info(`[UpdateDealNode] Updating deal ${resolvedDealId}:`, updateData);
 
     // Update in database
     const { data, error } = await supabase
@@ -393,7 +394,7 @@ class CreateContactNode extends BaseNode {
       contactData.customFields[key] = this.interpolate(val, inputData);
     }
 
-    console.log(`[CreateContactNode] Creating contact: ${contactData.email}`);
+    log.info(`[CreateContactNode] Creating contact: ${contactData.email}`);
 
     let result;
     if (crmService.configured) {
@@ -452,7 +453,7 @@ class UpdateContactNode extends BaseNode {
       updateData[key] = this.interpolate(val, inputData);
     }
 
-    console.log(`[UpdateContactNode] Updating contact ${resolvedContactId}`);
+    log.info(`[UpdateContactNode] Updating contact ${resolvedContactId}`);
 
     const { data, error } = await supabase
       .from('contacts')
@@ -503,7 +504,7 @@ class CreateCRMTaskNode extends BaseNode {
       contact_id: this.interpolate(relatedContactId, inputData)
     };
 
-    console.log(`[CreateCRMTaskNode] Creating task: ${taskData.title}`);
+    log.info(`[CreateCRMTaskNode] Creating task: ${taskData.title}`);
 
     // Use CRM service
     const result = await crmService.createTask(taskData);
@@ -574,7 +575,7 @@ class LogActivityNode extends BaseNode {
       contact_id: this.interpolate(relatedContactId, inputData)
     };
 
-    console.log(`[LogActivityNode] Logging ${activityData.type}: ${activityData.subject}`);
+    log.info(`[LogActivityNode] Logging ${activityData.type}: ${activityData.subject}`);
 
     const { data, error } = await supabase
       .from('activities')
@@ -621,7 +622,7 @@ class AssignOwnerNode extends BaseNode {
 
     const table = objectType === 'contact' ? 'contacts' : 'deals';
 
-    console.log(`[AssignOwnerNode] Assigning ${table} ${resolvedObjectId} to ${resolvedOwnerId}`);
+    log.info(`[AssignOwnerNode] Assigning ${table} ${resolvedObjectId} to ${resolvedOwnerId}`);
 
     const { data, error } = await supabase
       .from(table)
@@ -671,7 +672,7 @@ class LookupContactNode extends BaseNode {
       };
     }
 
-    console.log(`[LookupContactNode] Searching by ${searchBy}: ${resolvedValue}`);
+    log.info(`[LookupContactNode] Searching by ${searchBy}: ${resolvedValue}`);
 
     // Search in CRM first
     if (crmService.configured) {
@@ -721,7 +722,7 @@ class LookupDealNode extends BaseNode {
 
     const resolvedValue = searchValue || this.getNestedValue(inputData, searchValueField);
 
-    console.log(`[LookupDealNode] Searching by ${searchBy}: ${resolvedValue}`);
+    log.info(`[LookupDealNode] Searching by ${searchBy}: ${resolvedValue}`);
 
     let query = supabase.from('deals').select('*');
 
@@ -769,7 +770,7 @@ class GetPipelineNode extends BaseNode {
   static async execute(config, inputData, context) {
     const { pipelineId, outputField = 'pipeline' } = config;
 
-    console.log(`[GetPipelineNode] Getting pipeline stages`);
+    log.info(`[GetPipelineNode] Getting pipeline stages`);
 
     // Default pipeline stages if not configured
     const defaultStages = [
@@ -815,7 +816,7 @@ class CalculateLeadScoreNode extends BaseNode {
     const contactId = this.getNestedValue(inputData, contactIdField);
     const contact = inputData.contact || {};
 
-    console.log(`[CalculateLeadScoreNode] Calculating score for contact`);
+    log.info(`[CalculateLeadScoreNode] Calculating score for contact`);
 
     // Scoring factors
     let score = 0;
@@ -900,7 +901,7 @@ class SearchCRMNode extends BaseNode {
 
     const searchQuery = query || this.getNestedValue(inputData, queryField);
 
-    console.log(`[SearchCRMNode] Searching for: ${searchQuery}`);
+    log.info(`[SearchCRMNode] Searching for: ${searchQuery}`);
 
     const results = {
       deals: [],
@@ -954,7 +955,7 @@ class GetStaleDealsNode extends BaseNode {
     const staleDate = new Date();
     staleDate.setDate(staleDate.getDate() - staleDays);
 
-    console.log(`[GetStaleDealsNode] Finding deals with no activity since ${staleDate.toISOString()}`);
+    log.info(`[GetStaleDealsNode] Finding deals with no activity since ${staleDate.toISOString()}`);
 
     let query = supabase
       .from('deals')

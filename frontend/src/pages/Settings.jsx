@@ -102,7 +102,7 @@ export default function Settings() {
     if (statusValue === 'connected') {
       return <CheckCircle2 className="w-5 h-5" style={{ color: 'var(--accent-secondary, #00F5D4)' }} />
     } else if (statusValue === 'not configured') {
-      return <AlertCircle className="w-5 h-5 text-yellow-500" />
+      return <AlertCircle className="w-5 h-5 vc-text-warning" />
     } else {
       return <XCircle className="w-5 h-5" style={{ color: 'var(--accent-primary, #FF2D6B)' }} />
     }

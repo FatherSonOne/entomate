@@ -5,6 +5,7 @@
  */
 
 const axios = require('axios');
+const log = require('../utils/log');
 
 class SlackNotifier {
   constructor() {
@@ -22,9 +23,9 @@ class SlackNotifier {
     };
 
     if (this.configured) {
-      console.log('[SlackNotifier] Initialized with bot token');
+      log.info('[SlackNotifier] Initialized with bot token');
     } else {
-      console.log('[SlackNotifier] Not configured - SLACK_BOT_TOKEN missing');
+      log.info('[SlackNotifier] Not configured - SLACK_BOT_TOKEN missing');
     }
   }
 
@@ -126,7 +127,7 @@ class SlackNotifier {
    */
   async sendMessage(channel, text, blocks = null, options = {}) {
     if (!this.configured) {
-      console.log('[SlackNotifier] Not configured, skipping message');
+      log.info('[SlackNotifier] Not configured, skipping message');
       return { success: false, error: 'Not configured' };
     }
 
@@ -160,7 +161,7 @@ class SlackNotifier {
       });
 
       if (!response.data.ok) {
-        console.error('[SlackNotifier] Send failed:', response.data.error);
+        log.error('[SlackNotifier] Send failed:', response.data.error);
         return { success: false, error: response.data.error };
       }
 
@@ -170,7 +171,7 @@ class SlackNotifier {
         channel: response.data.channel
       };
     } catch (error) {
-      console.error('[SlackNotifier] Send error:', error.message);
+      log.error('[SlackNotifier] Send error:', error.message);
       return {
         success: false,
         error: error.response?.data?.error || error.message

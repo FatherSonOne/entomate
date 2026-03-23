@@ -6,6 +6,7 @@
 const cron = require('node-cron');
 const { supabase } = require('../config/supabase');
 const emailService = require('./emailService');
+const log = require('../utils/log');
 
 class SchedulerService {
   constructor() {
@@ -33,7 +34,7 @@ class SchedulerService {
     }
 
     this.initialized = true;
-    console.log('Scheduler service initialized');
+    log.info('Scheduler service initialized');
   }
 
   /**
@@ -42,14 +43,14 @@ class SchedulerService {
   scheduleWeeklySummary() {
     // Every Monday at 9:00 AM
     const job = cron.schedule('0 9 * * 1', async () => {
-      console.log('Running weekly summary job...');
+      log.info('Running weekly summary job...');
       await this.sendWeeklySummaries();
     }, {
       timezone: process.env.TIMEZONE || 'America/New_York'
     });
 
     this.jobs.set('weekly-summary', job);
-    console.log('Scheduled weekly summary for Mondays at 9 AM');
+    log.info('Scheduled weekly summary for Mondays at 9 AM');
   }
 
   /**
@@ -58,14 +59,14 @@ class SchedulerService {
   scheduleOverdueCheck() {
     // Every day at 8:00 AM
     const job = cron.schedule('0 8 * * *', async () => {
-      console.log('Running overdue check job...');
+      log.info('Running overdue check job...');
       await this.checkOverdueItems();
     }, {
       timezone: process.env.TIMEZONE || 'America/New_York'
     });
 
     this.jobs.set('overdue-check', job);
-    console.log('Scheduled overdue check for daily at 8 AM');
+    log.info('Scheduled overdue check for daily at 8 AM');
   }
 
   /**
@@ -73,12 +74,12 @@ class SchedulerService {
    */
   async sendWeeklySummaries() {
     if (!supabase) {
-      console.log('Database not configured, skipping weekly summary');
+      log.info('Database not configured, skipping weekly summary');
       return;
     }
 
     if (!emailService.isConfigured()) {
-      console.log('Email service not configured, skipping weekly summary');
+      log.info('Email service not configured, skipping weekly summary');
       return;
     }
 
@@ -99,7 +100,7 @@ class SchedulerService {
       // Get users to send to (you would typically have a users/subscriptions table)
       const summaryRecipients = process.env.WEEKLY_SUMMARY_RECIPIENTS;
       if (!summaryRecipients) {
-        console.log('No weekly summary recipients configured');
+        log.info('No weekly summary recipients configured');
         return;
       }
 
@@ -113,13 +114,13 @@ class SchedulerService {
             goals: goalsRes.data || [],
             period
           });
-          console.log(`Weekly summary sent to ${email}`);
+          log.info(`Weekly summary sent to ${email}`);
         } catch (error) {
-          console.error(`Failed to send weekly summary to ${email}:`, error);
+          log.error(`Failed to send weekly summary to ${email}:`, { error: error.message || error });
         }
       }
     } catch (error) {
-      console.error('Failed to run weekly summary job:', error);
+      log.error('Failed to run weekly summary job:', { error: error.message || error });
     }
   }
 
@@ -128,12 +129,12 @@ class SchedulerService {
    */
   async checkOverdueItems() {
     if (!supabase) {
-      console.log('Database not configured, skipping overdue check');
+      log.info('Database not configured, skipping overdue check');
       return;
     }
 
     if (!emailService.isConfigured()) {
-      console.log('Email service not configured, skipping overdue check');
+      log.info('Email service not configured, skipping overdue check');
       return;
     }
 
@@ -149,11 +150,11 @@ class SchedulerService {
         .order('due_date', { ascending: true });
 
       if (!overdueItems || overdueItems.length === 0) {
-        console.log('No overdue items found');
+        log.info('No overdue items found');
         return;
       }
 
-      console.log(`Found ${overdueItems.length} overdue items`);
+      log.info(`Found ${overdueItems.length} overdue items`);
 
       // Group by assignee email
       const byAssignee = new Map();
@@ -171,13 +172,13 @@ class SchedulerService {
       for (const [email, items] of byAssignee) {
         try {
           await this.sendOverdueAlert(email, items);
-          console.log(`Overdue alert sent to ${email} for ${items.length} items`);
+          log.info(`Overdue alert sent to ${email} for ${items.length} items`);
         } catch (error) {
-          console.error(`Failed to send overdue alert to ${email}:`, error);
+          log.error(`Failed to send overdue alert to ${email}:`, { error: error.message || error });
         }
       }
     } catch (error) {
-      console.error('Failed to run overdue check job:', error);
+      log.error('Failed to run overdue check job:', { error: error.message || error });
     }
   }
 
@@ -258,7 +259,7 @@ class SchedulerService {
   stopAll() {
     for (const [name, job] of this.jobs) {
       job.stop();
-      console.log(`Stopped job: ${name}`);
+      log.info(`Stopped job: ${name}`);
     }
     this.jobs.clear();
   }

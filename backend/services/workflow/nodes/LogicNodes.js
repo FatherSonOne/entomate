@@ -5,6 +5,7 @@
  */
 
 const BaseNode = require('./BaseNode');
+const log = require('../../../utils/log');
 
 /**
  * IF Node - Binary conditional branching
@@ -16,7 +17,7 @@ class IfNode extends BaseNode {
     // Evaluate all conditions
     const result = this.evaluateConditions(conditions || [], inputData);
 
-    console.log(`[IfNode] Conditions evaluated to: ${result}`);
+    log.info(`[IfNode] Conditions evaluated to: ${result}`);
 
     return {
       output: result ? 'true' : 'false',
@@ -43,20 +44,20 @@ class SwitchNode extends BaseNode {
     // Get the value to switch on
     const value = this.getNestedValue(inputData, field);
 
-    console.log(`[SwitchNode] Switching on field "${field}" with value: ${value}`);
+    log.info(`[SwitchNode] Switching on field "${field}" with value: ${value}`);
 
     // Find matching case
     const matchedCase = cases?.find(c => c.value === value);
 
     if (matchedCase) {
-      console.log(`[SwitchNode] Matched case: output ${matchedCase.output}`);
+      log.info(`[SwitchNode] Matched case: output ${matchedCase.output}`);
       return {
         output: String(matchedCase.output),
         data: inputData
       };
     }
 
-    console.log('[SwitchNode] No match found, using default');
+    log.info('[SwitchNode] No match found, using default');
     return {
       output: 'default',
       data: inputData
@@ -99,7 +100,7 @@ class MergeNode extends BaseNode {
 
     if (mode === 'pass_through') {
       // Just pass through the first input
-      console.log('[MergeNode] Pass-through mode, forwarding input');
+      log.info('[MergeNode] Pass-through mode, forwarding input');
       return {
         output: 'main',
         data: inputData
@@ -108,7 +109,7 @@ class MergeNode extends BaseNode {
 
     // Collect input
     pending.inputs.push(inputData);
-    console.log(`[MergeNode] Collected input ${pending.inputs.length}/${pending.expectedInputs}`);
+    log.info(`[MergeNode] Collected input ${pending.inputs.length}/${pending.expectedInputs}`);
 
     if (mode === 'wait_all' && pending.inputs.length < pending.expectedInputs) {
       // Wait for more inputs - this will be handled by the executor
@@ -155,7 +156,7 @@ class MergeNode extends BaseNode {
     // Clean up
     this.pendingInputs.delete(mergeKey);
 
-    console.log('[MergeNode] Merged all inputs');
+    log.info('[MergeNode] Merged all inputs');
     return {
       output: 'main',
       data: combinedData
@@ -190,7 +191,7 @@ class SplitBatchesNode extends BaseNode {
         results: []
       };
       this.batchState.set(stateKey, state);
-      console.log(`[SplitBatchesNode] Starting batch processing of ${itemArray.length} items`);
+      log.info(`[SplitBatchesNode] Starting batch processing of ${itemArray.length} items`);
     } else {
       // Subsequent execution - collect result from previous batch
       state.results.push(inputData);
@@ -204,7 +205,7 @@ class SplitBatchesNode extends BaseNode {
     state.currentIndex = endIndex;
 
     if (batch.length > 0) {
-      console.log(`[SplitBatchesNode] Processing batch ${Math.ceil(endIndex / state.batchSize)} (items ${startIndex + 1}-${endIndex})`);
+      log.info(`[SplitBatchesNode] Processing batch ${Math.ceil(endIndex / state.batchSize)} (items ${startIndex + 1}-${endIndex})`);
       return {
         output: 'loop',
         data: {
@@ -221,7 +222,7 @@ class SplitBatchesNode extends BaseNode {
     const finalResults = state.results;
     this.batchState.delete(stateKey);
 
-    console.log('[SplitBatchesNode] All batches processed');
+    log.info('[SplitBatchesNode] All batches processed');
     return {
       output: 'done',
       data: {
@@ -257,7 +258,7 @@ class LoopNode extends BaseNode {
         originalData: inputData
       };
       this.loopState.set(stateKey, state);
-      console.log(`[LoopNode] Starting loop over ${itemArray.length} items`);
+      log.info(`[LoopNode] Starting loop over ${itemArray.length} items`);
     } else {
       // Collect result from previous iteration
       state.results.push(inputData);
@@ -266,7 +267,7 @@ class LoopNode extends BaseNode {
 
     if (state.currentIndex < state.items.length) {
       const currentItem = state.items[state.currentIndex];
-      console.log(`[LoopNode] Iteration ${state.currentIndex + 1}/${state.items.length}`);
+      log.info(`[LoopNode] Iteration ${state.currentIndex + 1}/${state.items.length}`);
 
       return {
         output: 'each',
@@ -288,7 +289,7 @@ class LoopNode extends BaseNode {
     const finalResults = state.results;
     this.loopState.delete(stateKey);
 
-    console.log('[LoopNode] Loop complete');
+    log.info('[LoopNode] Loop complete');
     return {
       output: 'done',
       data: {
@@ -368,7 +369,7 @@ class AggregateNode extends BaseNode {
 
     this.aggregateState.delete(stateKey);
 
-    console.log(`[AggregateNode] Aggregated ${state.items.length} items with operation: ${operation}`);
+    log.info(`[AggregateNode] Aggregated ${state.items.length} items with operation: ${operation}`);
 
     return {
       output: 'main',
@@ -400,7 +401,7 @@ class FilterNode extends BaseNode {
         }
       }
 
-      console.log(`[FilterNode] Filtered ${inputData.length} items: ${matches.length} matches, ${noMatches.length} no match`);
+      log.info(`[FilterNode] Filtered ${inputData.length} items: ${matches.length} matches, ${noMatches.length} no match`);
 
       // Return both outputs - executor will handle routing
       return {
@@ -417,7 +418,7 @@ class FilterNode extends BaseNode {
     const condition = { field, operator, value };
     const matched = this.evaluateCondition(condition, inputData);
 
-    console.log(`[FilterNode] Single item filter result: ${matched ? 'matches' : 'no_match'}`);
+    log.info(`[FilterNode] Single item filter result: ${matched ? 'matches' : 'no_match'}`);
 
     return {
       output: matched ? 'matches' : 'no_match',
@@ -447,11 +448,11 @@ class WaitNode extends BaseNode {
         break;
     }
 
-    console.log(`[WaitNode] Waiting for ${duration} ${unit} (${ms}ms)`);
+    log.info(`[WaitNode] Waiting for ${duration} ${unit} (${ms}ms)`);
 
     await this.wait(ms);
 
-    console.log('[WaitNode] Wait complete');
+    log.info('[WaitNode] Wait complete');
 
     return {
       output: 'main',
@@ -473,7 +474,7 @@ class StopErrorNode extends BaseNode {
     // Interpolate error message
     const message = this.interpolate(errorMessage, inputData);
 
-    console.log(`[StopErrorNode] Stopping workflow with error: ${message}`);
+    log.info(`[StopErrorNode] Stopping workflow with error: ${message}`);
 
     throw new Error(message);
   }

@@ -11,6 +11,7 @@ import {
   AlertCircle, CheckCircle2, FileJson, Copy, Edit2, Save, X
 } from 'lucide-react'
 import { workflowsApi } from '../../services/api'
+import { useConfirm } from '../vc/ConfirmDialog'
 
 // JSON Editor component
 function JsonEditor({ value, onChange, error, placeholder }) {
@@ -147,6 +148,7 @@ export default function DataPinningPanel({
   onUnpinData,
   onClose
 }) {
+  const confirm = useConfirm()
   const [localPinnedData, setLocalPinnedData] = useState(pinnedData)
   const [showAddPin, setShowAddPin] = useState(false)
   const [selectedNode, setSelectedNode] = useState('')
@@ -280,7 +282,8 @@ export default function DataPinningPanel({
 
   // Handle clear all
   const handleClearAll = async () => {
-    if (!confirm('Remove all pinned data?')) return
+    const ok = await confirm({ title: 'Clear All?', message: 'Remove all pinned data?', confirmLabel: 'Remove All', variant: 'danger' })
+    if (!ok) return
 
     for (const nodeId of Object.keys(localPinnedData)) {
       await handleRemovePin(nodeId)

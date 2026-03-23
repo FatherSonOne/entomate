@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { supabase } = require('../config/supabase');
 const { asyncHandler } = require('../middleware/errorHandler');
+const { validate } = require('../middleware/validate');
+const schemas = require('../schemas/analytics');
 
 /**
  * GET /api/analytics/dashboard
@@ -418,7 +420,7 @@ router.get('/ai-effectiveness', asyncHandler(async (req, res) => {
  * POST /api/analytics/record
  * Record a metric event
  */
-router.post('/record', asyncHandler(async (req, res) => {
+router.post('/record', validate(schemas.record), asyncHandler(async (req, res) => {
   const {
     metric_type,
     value,

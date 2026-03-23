@@ -64,7 +64,7 @@ function TreeNode({ name, value, path, depth = 0, searchTerm, onCopy }) {
   }
 
   return (
-    <div className={`${matchesSearch ? 'bg-yellow-50' : ''}`}>
+    <div className={`${matchesSearch ? 'vc-bg-warning-dim' : ''}`}>
       <div
         className={`flex items-center gap-1 py-0.5 px-1 hover:bg-surface-muted rounded cursor-pointer group`}
         style={{ paddingLeft: depth * 16 }}
@@ -152,7 +152,7 @@ function TableView({ data, onCopy }) {
 
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200 text-sm">
+      <table className="min-w-full divide-y divide-line-default text-sm">
         <thead className="bg-surface-muted">
           <tr>
             <th className="px-3 py-2 text-left text-xs font-medium text-content-tertiary uppercase tracking-wider">
@@ -168,7 +168,7 @@ function TableView({ data, onCopy }) {
             ))}
           </tr>
         </thead>
-        <tbody className="bg-surface divide-y divide-gray-200">
+        <tbody className="bg-surface divide-y divide-line-default">
           {data.map((row, index) => (
             <tr key={index} className="hover:bg-surface-muted">
               <td className="px-3 py-2 text-content-tertiary">{index}</td>
@@ -334,7 +334,7 @@ export default function NodeOutputInspector({
             No output data
           </div>
         ) : showRaw ? (
-          <pre className="p-3 text-xs font-mono bg-gray-900 text-gray-100 overflow-auto">
+          <pre className="p-3 text-xs font-mono vc-bg-code vc-text-primary overflow-auto">
             {jsonString}
           </pre>
         ) : viewMode === 'tree' ? (

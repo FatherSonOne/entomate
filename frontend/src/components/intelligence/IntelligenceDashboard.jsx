@@ -11,10 +11,14 @@ import {
   X
 } from 'lucide-react'
 import api from '../../services/api'
+import { useToast } from '../vc/ToastProvider'
 import MeetingPrepCard from './MeetingPrepCard'
 import DealRiskAlertCard from './DealRiskAlertCard'
 import ActionItemStatusCard from './ActionItemStatusCard'
 import RelationshipInsightCard from './RelationshipInsightCard'
+import QuickScheduleModal from './QuickScheduleModal'
+import QuickTaskModal from './QuickTaskModal'
+import ReassignModal from './ReassignModal'
 
 /**
  * IntelligenceDashboard - Enhanced Intelligence Dashboard
@@ -34,6 +38,7 @@ import RelationshipInsightCard from './RelationshipInsightCard'
  */
 export default function IntelligenceDashboard() {
   const { getToken } = useAuth()
+  const toast = useToast()
   const [intelligence, setIntelligence] = useState(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -52,6 +57,11 @@ export default function IntelligenceDashboard() {
       risks: 7 // days
     }
   })
+
+  // Modal state
+  const [scheduleModal, setScheduleModal] = useState({ open: false, context: null })
+  const [taskModal, setTaskModal] = useState({ open: false, context: null })
+  const [reassignModal, setReassignModal] = useState({ open: false, itemId: null, currentAssignee: null })
 
   // Load intelligence data
   const loadIntelligence = useCallback(async (isRefresh = false) => {
@@ -96,18 +106,17 @@ export default function IntelligenceDashboard() {
         case 'prepareBrief':
           // Generate meeting brief
           await api.intelligence.generateMeetingBrief(meetingId)
-          alert('Meeting brief generated successfully!')
+          toast.success('Success', 'Meeting brief generated successfully!')
           break
         case 'reschedule':
-          // Open calendar integration
-          alert('Calendar integration coming soon!')
+          setScheduleModal({ open: true, context: { title: `Reschedule meeting`, relatedId: meetingId } })
           break
         default:
           console.warn('Unknown meeting action:', action)
       }
     } catch (err) {
       console.error('Meeting action failed:', err)
-      alert(`Failed to ${action}: ${err.message}`)
+      toast.error('Error', `Failed to ${action}: ${err.message}`)
     }
   }
 
@@ -116,19 +125,17 @@ export default function IntelligenceDashboard() {
     try {
       switch (action) {
         case 'scheduleCall':
-          // Open calendar to schedule call
-          alert('Calendar integration coming soon!')
+          setScheduleModal({ open: true, context: { title: `Follow-up call — Deal ${dealId}`, relatedId: dealId } })
           break
         case 'createTask':
-          // Create follow-up task
-          alert('Task creation coming soon!')
+          setTaskModal({ open: true, context: { title: '', description: `Follow-up task for deal ${dealId}`, priority: 'high', source: 'deal_risk', relatedId: dealId } })
           break
         default:
           console.warn('Unknown risk action:', action)
       }
     } catch (err) {
       console.error('Risk action failed:', err)
-      alert(`Failed to ${action}: ${err.message}`)
+      toast.error('Error', `Failed to ${action}: ${err.message}`)
     }
   }
 
@@ -139,17 +146,16 @@ export default function IntelligenceDashboard() {
         case 'nudge':
           // Send nudge to owner
           await api.intelligence.sendNudge(itemId, 'in_app')
-          alert('Nudge sent successfully!')
+          toast.success('Success', 'Nudge sent successfully!')
           loadIntelligence(true)
           break
         case 'reassign':
-          // Open reassignment dialog
-          alert('Reassignment dialog coming soon!')
+          setReassignModal({ open: true, itemId, currentAssignee: null })
           break
         case 'complete':
           // Mark as complete
           await api.tasks.complete(itemId)
-          alert('Task marked as complete!')
+          toast.success('Success', 'Task marked as complete!')
           loadIntelligence(true)
           break
         default:
@@ -157,7 +163,7 @@ export default function IntelligenceDashboard() {
       }
     } catch (err) {
       console.error('Action item action failed:', err)
-      alert(`Failed to ${action}: ${err.message}`)
+      toast.error('Error', `Failed to ${action}: ${err.message}`)
     }
   }
 
@@ -166,23 +172,25 @@ export default function IntelligenceDashboard() {
     try {
       switch (action) {
         case 'addToCRM':
-          // Sync to CRM
-          alert('CRM integration coming soon!')
+          try {
+            await api.integrations.syncActionItems([stakeholderId])
+            toast.success('Synced', 'Contact synced to CRM')
+          } catch (err) {
+            toast.error('Error', err.message || 'Failed to sync to CRM')
+          }
           break
         case 'scheduleMeeting':
-          // Open calendar
-          alert('Calendar integration coming soon!')
+          setScheduleModal({ open: true, context: { title: `Meeting with stakeholder`, relatedId: stakeholderId } })
           break
         case 'getIntroduction':
-          // Create introduction request task
-          alert('Introduction request coming soon!')
+          setTaskModal({ open: true, context: { title: `Request introduction`, description: `Set up introduction for stakeholder ${stakeholderId}`, priority: 'medium', source: 'relationship', type: 'introduction', relatedId: stakeholderId } })
           break
         default:
           console.warn('Unknown relationship action:', action)
       }
     } catch (err) {
       console.error('Relationship action failed:', err)
-      alert(`Failed to ${action}: ${err.message}`)
+      toast.error('Error', `Failed to ${action}: ${err.message}`)
     }
   }
 
@@ -217,7 +225,7 @@ export default function IntelligenceDashboard() {
         </div>
         <div className="p-6">
           <div className="text-center py-8">
-            <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
+            <AlertTriangle className="w-12 h-12 vc-text-warning mx-auto mb-3" />
             <p className="text-content-secondary font-medium">Failed to load intelligence dashboard</p>
             <p className="text-sm text-content-tertiary mt-1">{error}</p>
             <button
@@ -389,6 +397,25 @@ export default function IntelligenceDashboard() {
           onClose={() => setShowCustomize(false)}
         />
       )}
+
+      {/* Quick action modals */}
+      <QuickScheduleModal
+        isOpen={scheduleModal.open}
+        onClose={() => setScheduleModal({ open: false, context: null })}
+        context={scheduleModal.context}
+      />
+      <QuickTaskModal
+        isOpen={taskModal.open}
+        onClose={() => { setTaskModal({ open: false, context: null }); loadIntelligence(true) }}
+        context={taskModal.context}
+      />
+      <ReassignModal
+        isOpen={reassignModal.open}
+        onClose={() => setReassignModal({ open: false, itemId: null, currentAssignee: null })}
+        itemId={reassignModal.itemId}
+        currentAssignee={reassignModal.currentAssignee}
+        onReassigned={() => loadIntelligence(true)}
+      />
     </div>
   )
 }

@@ -8,6 +8,7 @@ const crmService = require('./crmService');
 const chatService = require('./chatService');
 const geminiService = require('../config/gemini');
 const agentOrchestrator = require('./agentOrchestrator');
+const log = require('../utils/log');
 
 class AutomationEngine {
   constructor() {
@@ -49,7 +50,7 @@ class AutomationEngine {
 
       if (!result.success && this.retryConfig.retryableActions.includes(action.type)) {
         if (attempt < this.retryConfig.maxRetries) {
-          console.log(`Retrying action ${action.type}, attempt ${attempt + 1}/${this.retryConfig.maxRetries}`);
+          log.info(`Retrying action ${action.type}, attempt ${attempt + 1}/${this.retryConfig.maxRetries}`);
           await new Promise(resolve => setTimeout(resolve, this.retryConfig.retryDelay * attempt));
           return this.executeWithRetry(action, triggerData, attempt + 1);
         }
@@ -58,7 +59,7 @@ class AutomationEngine {
       return { ...result, attempts: attempt };
     } catch (error) {
       if (attempt < this.retryConfig.maxRetries && this.retryConfig.retryableActions.includes(action.type)) {
-        console.log(`Retrying action ${action.type} after error, attempt ${attempt + 1}/${this.retryConfig.maxRetries}`);
+        log.info(`Retrying action ${action.type} after error, attempt ${attempt + 1}/${this.retryConfig.maxRetries}`);
         await new Promise(resolve => setTimeout(resolve, this.retryConfig.retryDelay * attempt));
         return this.executeWithRetry(action, triggerData, attempt + 1);
       }
@@ -70,7 +71,7 @@ class AutomationEngine {
    * Trigger automations for an event
    */
   async trigger(triggerType, triggerData) {
-    console.log(`🤖 Automation triggered: ${triggerType}`);
+    log.info(`Automation triggered: ${triggerType}`);
 
     try {
       // Find enabled automations for this trigger
@@ -83,11 +84,11 @@ class AutomationEngine {
       if (error) throw error;
 
       if (!automations || automations.length === 0) {
-        console.log(`No automations found for trigger: ${triggerType}`);
+        log.info(`No automations found for trigger: ${triggerType}`);
         return { executed: 0, results: [] };
       }
 
-      console.log(`Found ${automations.length} automations to execute`);
+      log.info(`Found ${automations.length} automations to execute`);
 
       // Execute each automation
       const results = [];
@@ -98,7 +99,7 @@ class AutomationEngine {
 
       return { executed: results.length, results };
     } catch (error) {
-      console.error('Automation trigger error:', error);
+      log.error('Automation trigger error:', { error: error.message || error });
       return { executed: 0, error: error.message };
     }
   }
@@ -118,7 +119,7 @@ class AutomationEngine {
     };
 
     try {
-      console.log(`Executing automation: ${automation.name}`);
+      log.info(`Executing automation: ${automation.name}`);
 
       // Check conditions if present
       if (automation.trigger_config?.conditions) {
@@ -127,7 +128,7 @@ class AutomationEngine {
           triggerData
         );
         if (!conditionsMet) {
-          console.log(`Conditions not met for automation: ${automation.name}`);
+          log.info(`Conditions not met for automation: ${automation.name}`);
           executionLog.success = true;
           executionLog.error_message = 'Conditions not met';
           await this.logExecution(executionLog, startTime);
@@ -172,7 +173,7 @@ class AutomationEngine {
       };
 
     } catch (error) {
-      console.error(`Automation execution error:`, error);
+      log.error(`Automation execution error:`, { error: error.message || error });
       executionLog.success = false;
       executionLog.error_message = error.message;
       await this.logExecution(executionLog, startTime);
@@ -215,7 +216,7 @@ class AutomationEngine {
           if (value !== undefined && value !== null) return false;
           break;
         default:
-          console.warn(`Unknown operator: ${condition.operator}`);
+          log.warn(`Unknown operator: ${condition.operator}`);
       }
     }
     return true;
@@ -232,7 +233,7 @@ class AutomationEngine {
     const handler = this.actionHandlers[action.type];
 
     if (!handler) {
-      console.warn(`Unknown action type: ${action.type}`);
+      log.warn(`Unknown action type: ${action.type}`);
       return { success: false, error: `Unknown action type: ${action.type}` };
     }
 
@@ -436,12 +437,12 @@ class AutomationEngine {
         };
 
         await sgMail.send(msg);
-        console.log(`Email sent to ${to}`);
+        log.info(`Email sent to ${to}`);
         return { success: true, to, subject };
       }
 
       // Fallback: Log email (would be sent in production)
-      console.log(`📧 Email would be sent:
+      log.info(`📧 Email would be sent:
         To: ${to}
         Subject: ${subject}
         Body: ${body.substring(0, 100)}...`);
@@ -475,7 +476,7 @@ class AutomationEngine {
       const webhookUrl = process.env.SLACK_WEBHOOK_URL;
 
       if (!webhookUrl) {
-        console.log(`📢 Slack message would be sent:
+        log.info(`📢 Slack message would be sent:
           Channel: ${channel}
           Message: ${message.substring(0, 100)}...`);
         return {
@@ -500,7 +501,7 @@ class AutomationEngine {
         throw new Error(`Slack webhook failed: ${response.statusText}`);
       }
 
-      console.log(`Slack message sent to ${channel}`);
+      log.info(`Slack message sent to ${channel}`);
       return { success: true, channel, message: 'Message sent' };
     } catch (error) {
       return { success: false, error: error.message };
@@ -730,7 +731,7 @@ class AutomationEngine {
           duration_ms: Date.now() - startTime
         });
     } catch (error) {
-      console.error('Failed to log automation execution:', error);
+      log.error('Failed to log automation execution:', { error: error.message || error });
     }
   }
 

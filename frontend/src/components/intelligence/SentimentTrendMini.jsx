@@ -27,9 +27,9 @@ export default function SentimentTrendMini({ sentiment, className = '' }) {
   }
 
   const getBarColor = (sentimentType) => {
-    if (sentimentType === 'positive') return 'bg-green-500'
+    if (sentimentType === 'positive') return 'vc-bg-success'
     if (sentimentType === 'negative') return 'bg-semantic-error'
-    return 'bg-gray-400'
+    return 'vc-bg-raised'
   }
 
   // Take last 5 data points for mini chart

@@ -155,7 +155,7 @@ class BaseNode {
       case 'not_in':
         return Array.isArray(value) ? !value.includes(fieldValue) : true;
       default:
-        console.warn(`Unknown operator: ${operator}`);
+        log.warn(`Unknown operator: ${operator}`);
         return false;
     }
   }
@@ -203,7 +203,7 @@ class BaseNode {
         lastError = error;
         if (attempt < maxRetries - 1) {
           const delay = baseDelay * Math.pow(2, attempt);
-          console.log(`Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms`);
+          log.info(`Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms`);
           await this.wait(delay);
         }
       }
@@ -261,7 +261,7 @@ class BaseNode {
       const fn = new Function('data', `return ${resolved}`);
       return fn(data);
     } catch (error) {
-      console.warn('Expression evaluation failed:', error.message);
+      log.warn('Expression evaluation failed:', error.message);
       return expression;
     }
   }

@@ -4,7 +4,11 @@ const { supabase } = require('../config/supabase');
 const ai = require('../config/ai');
 const crmService = require('../services/crmService');
 const chatService = require('../services/chatService');
+const logosVisionService = require('../services/logosVisionService');
 const { authenticate } = require('../middleware/auth');
+const { validate } = require('../middleware/validate');
+const schemas = require('../schemas/integrations');
+const log = require('../utils/log');
 
 const router = express.Router();
 
@@ -16,7 +20,7 @@ const router = express.Router();
  * POST /api/integrations/crm/sync-action-items
  * Sync action items to CRM as tasks
  */
-router.post('/crm/sync-action-items', authenticate, async (req, res) => {
+router.post('/crm/sync-action-items', authenticate, validate(schemas.syncActionItems), async (req, res) => {
   try {
     const { actionItemIds, syncAll = false } = req.body;
 
@@ -75,7 +79,7 @@ router.post('/crm/sync-action-items', authenticate, async (req, res) => {
           crmTaskId = crmResult.taskId;
         } else {
           // Fallback: simulate CRM task creation if not configured
-          console.log('⚠️ CRM not configured, simulating task creation');
+          log.info('CRM not configured, simulating task creation');
           crmTaskId = `simulated-${uuidv4().substring(0, 8)}`;
         }
 
@@ -132,7 +136,7 @@ router.post('/crm/sync-action-items', authenticate, async (req, res) => {
     res.json(results);
 
   } catch (error) {
-    console.error('❌ Error syncing to CRM:', error);
+    log.error('Error syncing to CRM:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -141,7 +145,7 @@ router.post('/crm/sync-action-items', authenticate, async (req, res) => {
  * POST /api/integrations/crm/create-deal
  * Create a deal in CRM
  */
-router.post('/crm/create-deal', authenticate, async (req, res) => {
+router.post('/crm/create-deal', authenticate, validate(schemas.createDeal), async (req, res) => {
   try {
     const { name, value, contactEmail, contactName, stage, notes } = req.body;
 
@@ -167,7 +171,7 @@ router.post('/crm/create-deal', authenticate, async (req, res) => {
       crmDealId = dealResult.taskId;
     } else {
       // Fallback to simulated ID if CRM not configured
-      console.log('⚠️ CRM not configured, simulating deal creation');
+      log.info('CRM not configured, simulating deal creation');
       crmDealId = `deal-${uuidv4().substring(0, 8)}`;
     }
 
@@ -193,7 +197,7 @@ router.post('/crm/create-deal', authenticate, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error creating CRM deal:', error);
+    log.error('Error creating CRM deal:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -229,7 +233,7 @@ router.get('/crm/deals', async (req, res) => {
       });
     } else {
       // Fallback to mock data if CRM not configured
-      console.log('⚠️ CRM not configured, returning sample deals');
+      log.info('CRM not configured, returning sample deals');
       const mockDeals = [
         { id: 'deal-001', name: 'Acme Corp - Enterprise License', value: 50000, stage: 'negotiation' },
         { id: 'deal-002', name: 'TechStart - Pilot Program', value: 15000, stage: 'proposal' },
@@ -251,7 +255,7 @@ router.get('/crm/deals', async (req, res) => {
     }
 
   } catch (error) {
-    console.error('❌ Error fetching CRM deals:', error);
+    log.error('Error fetching CRM deals:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -264,7 +268,7 @@ router.get('/crm/deals', async (req, res) => {
  * POST /api/integrations/chat/post-recap
  * Post meeting recap to chat channel
  */
-router.post('/chat/post-recap', authenticate, async (req, res) => {
+router.post('/chat/post-recap', authenticate, validate(schemas.postRecap), async (req, res) => {
   try {
     const { meetingId, channelId, customMessage } = req.body;
 
@@ -327,7 +331,7 @@ router.post('/chat/post-recap', authenticate, async (req, res) => {
         throw new Error(postResult.error || 'Failed to post to chat');
       }
     } else {
-      console.log('⚠️ Chat not configured, simulating post');
+      log.info('Chat not configured, simulating post');
       postResult = { success: true, messageId: `simulated-${uuidv4().substring(0, 8)}`, channel: 'simulated' };
     }
 
@@ -369,7 +373,7 @@ router.post('/chat/post-recap', authenticate, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error posting to chat:', error);
+    log.error('Error posting to chat:', { error: error.message || error });
 
     // Log the failure
     if (supabase && req.body.meetingId) {
@@ -394,7 +398,7 @@ router.post('/chat/post-recap', authenticate, async (req, res) => {
  * POST /api/integrations/chat/send-message
  * Send a custom message to chat
  */
-router.post('/chat/send-message', authenticate, async (req, res) => {
+router.post('/chat/send-message', authenticate, validate(schemas.sendMessage), async (req, res) => {
   try {
     const { channelId, message, attachments } = req.body;
 
@@ -411,7 +415,7 @@ router.post('/chat/send-message', authenticate, async (req, res) => {
         throw new Error(result.error || 'Failed to send message');
       }
     } else {
-      console.log('⚠️ Chat not configured, simulating send');
+      log.info('Chat not configured, simulating send');
       result = { success: true, messageId: `simulated-${uuidv4().substring(0, 8)}`, channel: 'simulated' };
     }
 
@@ -424,7 +428,7 @@ router.post('/chat/send-message', authenticate, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error sending chat message:', error);
+    log.error('Error sending chat message:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -473,7 +477,7 @@ router.get('/chat/channels', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error fetching channels:', error);
+    log.error('Error fetching channels:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -545,7 +549,7 @@ router.post('/webhooks/crm', async (req, res) => {
   try {
     const { event, data } = req.body;
 
-    console.log(`📥 Received CRM webhook: ${event}`);
+    log.info(`Received CRM webhook: ${event}`);
 
     // Handle different event types
     switch (event) {
@@ -574,7 +578,7 @@ router.post('/webhooks/crm', async (req, res) => {
     res.json({ received: true, event });
 
   } catch (error) {
-    console.error('❌ Error processing CRM webhook:', error);
+    log.error('Error processing CRM webhook:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -587,7 +591,7 @@ router.post('/webhooks/chat', async (req, res) => {
   try {
     const { command, text, userId, channelId } = req.body;
 
-    console.log(`📥 Received chat webhook: ${command}`);
+    log.info(`Received chat webhook: ${command}`);
 
     // Handle slash commands
     switch (command) {
@@ -607,7 +611,7 @@ router.post('/webhooks/chat', async (req, res) => {
     res.json({ received: true, command });
 
   } catch (error) {
-    console.error('❌ Error processing chat webhook:', error);
+    log.error('Error processing chat webhook:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -775,7 +779,7 @@ router.get('/logs', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error fetching logs:', error);
+    log.error('Error fetching logs:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -784,7 +788,7 @@ router.get('/logs', async (req, res) => {
  * POST /api/integrations/retry
  * Retry failed integrations
  */
-router.post('/retry', authenticate, async (req, res) => {
+router.post('/retry', authenticate, validate(schemas.retry), async (req, res) => {
   try {
     const { logIds } = req.body;
 
@@ -838,7 +842,7 @@ router.post('/retry', authenticate, async (req, res) => {
     res.json(results);
 
   } catch (error) {
-    console.error('❌ Error retrying integrations:', error);
+    log.error('Error retrying integrations:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -887,6 +891,70 @@ function formatChatRecapFallback(meeting, actionItems) {
   return message;
 }
 
+// ========================================
+// LOGOS VISION (SHARED HUB) ENDPOINTS
+// ========================================
+
+/**
+ * GET /api/integrations/logos/status
+ * Check Logos Vision (Hub) connection status
+ */
+router.get('/logos/status', async (req, res) => {
+  try {
+    const status = await logosVisionService.checkConnection()
+    res.json({ provider: 'logos_vision', ...status })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+/**
+ * GET /api/integrations/logos/contacts
+ * Get recent contacts from the shared hub
+ */
+router.get('/logos/contacts', async (req, res) => {
+  try {
+    const { limit = 10 } = req.query
+    const contacts = await logosVisionService.getRecentContacts({ limit: parseInt(limit) })
+    res.json({ contacts, count: contacts.length, source: 'logos_vision' })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+/**
+ * POST /api/integrations/logos/lookup
+ * Look up a contact by email
+ */
+router.post('/logos/lookup', authenticate, validate(schemas.lookup), async (req, res) => {
+  try {
+    const { email } = req.body
+    if (!email) return res.status(400).json({ error: 'Email required' })
+    const contact = await logosVisionService.lookupContact(email)
+    res.json({ contact, found: !!contact })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+/**
+ * GET /api/integrations/logos/deals
+ * Get deal events from Logos Vision through the hub
+ */
+router.get('/logos/deals', async (req, res) => {
+  try {
+    const { limit = 20 } = req.query
+    const deals = await logosVisionService.getDeals({ limit: parseInt(limit) })
+    res.json({ deals, count: deals.length, source: 'logos_vision' })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// ========================================
+// HELPER FUNCTIONS
+// ========================================
+
 async function triggerAutomation(triggerType, data) {
   // Call the automations trigger endpoint internally
   try {
@@ -896,7 +964,7 @@ async function triggerAutomation(triggerType, data) {
       triggerData: data
     });
   } catch (error) {
-    console.error('Failed to trigger automation:', error.message);
+    log.error('Failed to trigger automation:', error.message);
   }
 }
 

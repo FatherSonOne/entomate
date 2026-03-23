@@ -11,6 +11,9 @@ const { authenticate } = require('../middleware/auth');
 const { apiLimiter, aiLimiter } = require('../middleware/rateLimiter');
 const WorkflowExecutor = require('../services/workflow/WorkflowExecutor');
 const NodeRegistry = require('../services/workflow/NodeRegistry');
+const log = require('../utils/log');
+const { validate } = require('../middleware/validate');
+const schemas = require('../schemas/workflows');
 
 const workflowExecutor = new WorkflowExecutor();
 const nodeRegistry = new NodeRegistry();
@@ -61,7 +64,7 @@ router.get('/', authenticate, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[Workflows] List error:', error);
+    log.error('[Workflows] List error:', { error: error.message || error });
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -107,7 +110,7 @@ router.get('/:id', authenticate, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[Workflows] Get error:', error);
+    log.error('[Workflows] Get error:', { error: error.message || error });
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -116,7 +119,7 @@ router.get('/:id', authenticate, async (req, res) => {
  * POST /api/workflows
  * Create a new workflow
  */
-router.post('/', authenticate, async (req, res) => {
+router.post('/', authenticate, validate(schemas.create), async (req, res) => {
   try {
     const {
       name,
@@ -172,7 +175,7 @@ router.post('/', authenticate, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[Workflows] Create error:', error);
+    log.error('[Workflows] Create error:', { error: error.message || error });
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -181,7 +184,7 @@ router.post('/', authenticate, async (req, res) => {
  * PUT /api/workflows/:id
  * Update an existing workflow
  */
-router.put('/:id', authenticate, async (req, res) => {
+router.put('/:id', authenticate, validate(schemas.update), async (req, res) => {
   try {
     const { id } = req.params;
     const {
@@ -248,7 +251,7 @@ router.put('/:id', authenticate, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[Workflows] Update error:', error);
+    log.error('[Workflows] Update error:', { error: error.message || error });
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -274,7 +277,7 @@ router.delete('/:id', authenticate, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[Workflows] Delete error:', error);
+    log.error('[Workflows] Delete error:', { error: error.message || error });
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -287,7 +290,7 @@ router.delete('/:id', authenticate, async (req, res) => {
  * POST /api/workflows/:id/execute
  * Execute a workflow manually
  */
-router.post('/:id/execute', authenticate, aiLimiter, async (req, res) => {
+router.post('/:id/execute', authenticate, aiLimiter, validate(schemas.execute), async (req, res) => {
   try {
     const { id } = req.params;
     const { inputData = {}, mode = 'production' } = req.body;
@@ -330,7 +333,7 @@ router.post('/:id/execute', authenticate, aiLimiter, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[Workflows] Execute error:', error);
+    log.error('[Workflows] Execute error:', { error: error.message || error });
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -339,7 +342,7 @@ router.post('/:id/execute', authenticate, aiLimiter, async (req, res) => {
  * POST /api/workflows/:id/test
  * Test a workflow (dry run)
  */
-router.post('/:id/test', authenticate, async (req, res) => {
+router.post('/:id/test', authenticate, validate(schemas.test), async (req, res) => {
   try {
     const { id } = req.params;
     const { inputData = {} } = req.body;
@@ -369,7 +372,7 @@ router.post('/:id/test', authenticate, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[Workflows] Test error:', error);
+    log.error('[Workflows] Test error:', { error: error.message || error });
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -378,7 +381,7 @@ router.post('/:id/test', authenticate, async (req, res) => {
  * POST /api/workflows/:id/toggle
  * Activate or deactivate a workflow
  */
-router.post('/:id/toggle', authenticate, async (req, res) => {
+router.post('/:id/toggle', authenticate, validate(schemas.toggle), async (req, res) => {
   try {
     const { id } = req.params;
     const { active } = req.body;
@@ -414,7 +417,7 @@ router.post('/:id/toggle', authenticate, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[Workflows] Toggle error:', error);
+    log.error('[Workflows] Toggle error:', { error: error.message || error });
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -447,7 +450,7 @@ router.get('/:id/versions', authenticate, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[Workflows] Versions error:', error);
+    log.error('[Workflows] Versions error:', { error: error.message || error });
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -478,7 +481,7 @@ router.get('/:id/versions/:version', authenticate, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[Workflows] Get version error:', error);
+    log.error('[Workflows] Get version error:', { error: error.message || error });
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -529,7 +532,7 @@ router.post('/:id/versions/:version/restore', authenticate, async (req, res) => 
     });
 
   } catch (error) {
-    console.error('[Workflows] Restore error:', error);
+    log.error('[Workflows] Restore error:', { error: error.message || error });
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -573,7 +576,7 @@ router.get('/:id/executions', authenticate, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[Workflows] Executions error:', error);
+    log.error('[Workflows] Executions error:', { error: error.message || error });
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -604,7 +607,7 @@ router.get('/:workflowId/executions/:executionId', authenticate, async (req, res
     });
 
   } catch (error) {
-    console.error('[Workflows] Get execution error:', error);
+    log.error('[Workflows] Get execution error:', { error: error.message || error });
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -645,7 +648,7 @@ router.get('/nodes/types', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[Workflows] Node types error:', error);
+    log.error('[Workflows] Node types error:', { error: error.message || error });
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -678,7 +681,7 @@ router.get('/nodes/:type/:subtype/schema', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[Workflows] Node schema error:', error);
+    log.error('[Workflows] Node schema error:', { error: error.message || error });
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -687,7 +690,7 @@ router.get('/nodes/:type/:subtype/schema', async (req, res) => {
  * POST /api/workflows/:id/nodes/:nodeId/pin
  * Pin data for a node (development feature)
  */
-router.post('/:id/nodes/:nodeId/pin', authenticate, async (req, res) => {
+router.post('/:id/nodes/:nodeId/pin', authenticate, validate(schemas.pin), async (req, res) => {
   try {
     const { id, nodeId } = req.params;
     const { data: pinnedData } = req.body;
@@ -712,7 +715,7 @@ router.post('/:id/nodes/:nodeId/pin', authenticate, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[Workflows] Pin data error:', error);
+    log.error('[Workflows] Pin data error:', { error: error.message || error });
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -739,7 +742,7 @@ router.delete('/:id/nodes/:nodeId/pin', authenticate, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[Workflows] Unpin data error:', error);
+    log.error('[Workflows] Unpin data error:', { error: error.message || error });
     res.status(500).json({ success: false, error: error.message });
   }
 });

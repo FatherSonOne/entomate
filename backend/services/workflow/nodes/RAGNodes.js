@@ -5,6 +5,7 @@
  */
 
 const BaseNode = require('./BaseNode');
+const log = require('../../../utils/log');
 
 /**
  * Vector Store Node - Store documents with embeddings
@@ -20,7 +21,7 @@ class VectorStoreNode extends BaseNode {
       metadataFields = []
     } = config;
 
-    console.log(`[VectorStoreNode] Storing in collection: ${collectionName}`);
+    log.info(`[VectorStoreNode] Storing in collection: ${collectionName}`);
 
     try {
       const ragHandler = require('../../agents/ragHandler');
@@ -37,7 +38,7 @@ class VectorStoreNode extends BaseNode {
       return result;
 
     } catch (error) {
-      console.error('[VectorStoreNode] Error:', error);
+      log.error('[VectorStoreNode] Error:', { error: error.message || error });
       return {
         output: 'main',
         data: {
@@ -97,7 +98,7 @@ class VectorSearchNode extends BaseNode {
 
     const searchQuery = staticQuery || this.getNestedValue(inputData, queryField);
 
-    console.log(`[VectorSearchNode] Searching: "${searchQuery?.substring(0, 50) || 'N/A'}..."`);
+    log.info(`[VectorSearchNode] Searching: "${searchQuery?.substring(0, 50) || 'N/A'}..."`);
 
     try {
       const ragHandler = require('../../agents/ragHandler');
@@ -119,7 +120,7 @@ class VectorSearchNode extends BaseNode {
       return result;
 
     } catch (error) {
-      console.error('[VectorSearchNode] Error:', error);
+      log.error('[VectorSearchNode] Error:', { error: error.message || error });
       return {
         output: 'main',
         data: {
@@ -187,7 +188,7 @@ class RAGQueryNode extends BaseNode {
 
     const userQuery = staticQuery || this.getNestedValue(inputData, queryField);
 
-    console.log(`[RAGQueryNode] RAG query: "${userQuery?.substring(0, 50) || 'N/A'}..."`);
+    log.info(`[RAGQueryNode] RAG query: "${userQuery?.substring(0, 50) || 'N/A'}..."`);
 
     try {
       const ragHandler = require('../../agents/ragHandler');
@@ -209,7 +210,7 @@ class RAGQueryNode extends BaseNode {
       return result;
 
     } catch (error) {
-      console.error('[RAGQueryNode] Error:', error);
+      log.error('[RAGQueryNode] Error:', { error: error.message || error });
       return {
         output: 'main',
         data: {
@@ -264,7 +265,7 @@ class DocumentLoaderNode extends BaseNode {
 
     const source = staticSource || this.getNestedValue(inputData, sourceField);
 
-    console.log(`[DocumentLoaderNode] Loading ${sourceType} from: ${String(source)?.substring(0, 50) || 'N/A'}...`);
+    log.info(`[DocumentLoaderNode] Loading ${sourceType} from: ${String(source)?.substring(0, 50) || 'N/A'}...`);
 
     try {
       const ragHandler = require('../../agents/ragHandler');
@@ -281,7 +282,7 @@ class DocumentLoaderNode extends BaseNode {
       return result;
 
     } catch (error) {
-      console.error('[DocumentLoaderNode] Error:', error);
+      log.error('[DocumentLoaderNode] Error:', { error: error.message || error });
       return {
         output: 'main',
         data: {
@@ -342,7 +343,7 @@ class EmbeddingNode extends BaseNode {
       };
     }
 
-    console.log(`[EmbeddingNode] Generating embedding for ${textToEmbed.length} chars`);
+    log.info(`[EmbeddingNode] Generating embedding for ${textToEmbed.length} chars`);
 
     try {
       const vectorStore = require('../../vectorStore');
@@ -362,7 +363,7 @@ class EmbeddingNode extends BaseNode {
       };
 
     } catch (error) {
-      console.error('[EmbeddingNode] Error:', error);
+      log.error('[EmbeddingNode] Error:', { error: error.message || error });
       return {
         output: 'main',
         data: {
@@ -423,7 +424,7 @@ class ChunkTextNode extends BaseNode {
       };
     }
 
-    console.log(`[ChunkTextNode] Chunking ${textToChunk.length} chars with strategy: ${strategy}`);
+    log.info(`[ChunkTextNode] Chunking ${textToChunk.length} chars with strategy: ${strategy}`);
 
     try {
       const vectorStore = require('../../vectorStore');
@@ -454,7 +455,7 @@ class ChunkTextNode extends BaseNode {
       };
 
     } catch (error) {
-      console.error('[ChunkTextNode] Error:', error);
+      log.error('[ChunkTextNode] Error:', { error: error.message || error });
       return {
         output: 'main',
         data: {
@@ -523,7 +524,7 @@ class SemanticCompareNode extends BaseNode {
       };
     }
 
-    console.log(`[SemanticCompareNode] Comparing texts (${textA.length} vs ${textB.length} chars)`);
+    log.info(`[SemanticCompareNode] Comparing texts (${textA.length} vs ${textB.length} chars)`);
 
     try {
       const vectorStore = require('../../vectorStore');
@@ -566,7 +567,7 @@ class SemanticCompareNode extends BaseNode {
       };
 
     } catch (error) {
-      console.error('[SemanticCompareNode] Error:', error);
+      log.error('[SemanticCompareNode] Error:', { error: error.message || error });
       return {
         output: 'main',
         data: {

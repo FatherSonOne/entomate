@@ -7,6 +7,9 @@ const express = require('express');
 const router = express.Router();
 const { supabase } = require('../config/supabase');
 const calendarService = require('../services/calendarService');
+const log = require('../utils/log');
+const { validate } = require('../middleware/validate');
+const schemas = require('../schemas/calendar');
 
 // Initialize calendar service
 calendarService.initialize();
@@ -82,7 +85,7 @@ router.get('/callback', async (req, res) => {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     res.redirect(`${frontendUrl}${returnUrl}?connected=true`);
   } catch (error) {
-    console.error('Calendar OAuth error:', error);
+    log.error('Calendar OAuth error:', { error: error.message || error });
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     res.redirect(`${frontendUrl}/calendar?error=${encodeURIComponent(error.message)}`);
   }
@@ -157,7 +160,7 @@ router.get('/calendars', requireCalendar, async (req, res) => {
       }))
     });
   } catch (error) {
-    console.error('Error listing calendars:', error);
+    log.error('Error listing calendars:', { error: error.message || error });
     res.status(500).json({ error: 'Failed to list calendars', details: error.message });
   }
 });
@@ -192,7 +195,7 @@ router.get('/events', requireCalendar, async (req, res) => {
       }))
     });
   } catch (error) {
-    console.error('Error getting events:', error);
+    log.error('Error getting events:', { error: error.message || error });
     res.status(500).json({ error: 'Failed to get events', details: error.message });
   }
 });
@@ -201,7 +204,7 @@ router.get('/events', requireCalendar, async (req, res) => {
  * POST /api/calendar/events
  * Create a calendar event
  */
-router.post('/events', requireCalendar, async (req, res) => {
+router.post('/events', requireCalendar, validate(schemas.createEvent), async (req, res) => {
   try {
     const { calendarId = 'primary', ...eventData } = req.body;
 
@@ -220,7 +223,7 @@ router.post('/events', requireCalendar, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error creating event:', error);
+    log.error('Error creating event:', { error: error.message || error });
     res.status(500).json({ error: 'Failed to create event', details: error.message });
   }
 });
@@ -229,7 +232,7 @@ router.post('/events', requireCalendar, async (req, res) => {
  * PATCH /api/calendar/events/:eventId
  * Update a calendar event
  */
-router.patch('/events/:eventId', requireCalendar, async (req, res) => {
+router.patch('/events/:eventId', requireCalendar, validate(schemas.updateEvent), async (req, res) => {
   try {
     const { eventId } = req.params;
     const { calendarId = 'primary', ...eventData } = req.body;
@@ -245,7 +248,7 @@ router.patch('/events/:eventId', requireCalendar, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error updating event:', error);
+    log.error('Error updating event:', { error: error.message || error });
     res.status(500).json({ error: 'Failed to update event', details: error.message });
   }
 });
@@ -263,7 +266,7 @@ router.delete('/events/:eventId', requireCalendar, async (req, res) => {
 
     res.json({ success: true, message: 'Event deleted' });
   } catch (error) {
-    console.error('Error deleting event:', error);
+    log.error('Error deleting event:', { error: error.message || error });
     res.status(500).json({ error: 'Failed to delete event', details: error.message });
   }
 });
@@ -306,7 +309,7 @@ router.post('/sync/action-item/:id', requireCalendar, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error syncing action item:', error);
+    log.error('Error syncing action item:', { error: error.message || error });
     res.status(500).json({ error: 'Failed to sync action item', details: error.message });
   }
 });
@@ -350,7 +353,7 @@ router.post('/sync/action-items', requireCalendar, async (req, res) => {
       details: results
     });
   } catch (error) {
-    console.error('Error syncing action items:', error);
+    log.error('Error syncing action items:', { error: error.message || error });
     res.status(500).json({ error: 'Failed to sync action items', details: error.message });
   }
 });
@@ -393,7 +396,7 @@ router.post('/sync/goal/:id', requireCalendar, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error syncing goal:', error);
+    log.error('Error syncing goal:', { error: error.message || error });
     res.status(500).json({ error: 'Failed to sync goal', details: error.message });
   }
 });
@@ -432,7 +435,7 @@ router.post('/sync/meeting/:id', requireCalendar, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error syncing meeting:', error);
+    log.error('Error syncing meeting:', { error: error.message || error });
     res.status(500).json({ error: 'Failed to sync meeting', details: error.message });
   }
 });
@@ -465,7 +468,7 @@ router.get('/upcoming', requireCalendar, async (req, res) => {
         source: 'google_calendar'
       }));
     } catch (e) {
-      console.log('Could not fetch calendar events:', e.message);
+      log.info('Could not fetch calendar events:', e.message);
     }
 
     // Get action items with due dates
@@ -529,7 +532,7 @@ router.get('/upcoming', requireCalendar, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error getting upcoming items:', error);
+    log.error('Error getting upcoming items:', { error: error.message || error });
     res.status(500).json({ error: 'Failed to get upcoming items', details: error.message });
   }
 });

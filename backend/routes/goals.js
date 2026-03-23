@@ -3,6 +3,8 @@ const router = express.Router();
 const { supabase } = require('../config/supabase');
 const { asyncHandler } = require('../middleware/errorHandler');
 const { isValidUUID } = require('../utils/validators');
+const { validate } = require('../middleware/validate');
+const schemas = require('../schemas/goals');
 
 // Helper to check if error is missing table
 function isTableMissing(error) {
@@ -21,7 +23,7 @@ const EMPTY_GOALS_RESPONSE = {
  * GET /api/goals
  * List all goals with filters
  */
-router.get('/', asyncHandler(async (req, res) => {
+router.get('/', validate(schemas.list), asyncHandler(async (req, res) => {
   const { type, status, quarter, owner_id, team_id } = req.query;
 
   let query = supabase.from('goals').select('*');
@@ -102,7 +104,7 @@ router.get('/hierarchy', asyncHandler(async (req, res) => {
  * POST /api/goals
  * Create a new goal
  */
-router.post('/', asyncHandler(async (req, res) => {
+router.post('/', validate(schemas.create), asyncHandler(async (req, res) => {
   const {
     title,
     description,
@@ -275,7 +277,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
  * PUT /api/goals/:id
  * Update goal
  */
-router.put('/:id', asyncHandler(async (req, res) => {
+router.put('/:id', validate(schemas.update), asyncHandler(async (req, res) => {
   const { id } = req.params;
 
   if (!isValidUUID(id)) {
@@ -330,7 +332,7 @@ router.delete('/:id', asyncHandler(async (req, res) => {
  * POST /api/goals/:id/key-results
  * Add key result to goal
  */
-router.post('/:id/key-results', asyncHandler(async (req, res) => {
+router.post('/:id/key-results', validate(schemas.createKeyResult), asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { title, target, unit } = req.body;
 
@@ -386,7 +388,7 @@ router.post('/:id/key-results', asyncHandler(async (req, res) => {
  * PUT /api/goals/:id/key-results/:krId
  * Update key result progress
  */
-router.put('/:id/key-results/:krId', asyncHandler(async (req, res) => {
+router.put('/:id/key-results/:krId', validate(schemas.updateKeyResult), asyncHandler(async (req, res) => {
   const { id, krId } = req.params;
   const { current, title, target } = req.body;
 
@@ -444,7 +446,7 @@ router.put('/:id/key-results/:krId', asyncHandler(async (req, res) => {
  * POST /api/goals/:id/link-task
  * Link a task to a goal
  */
-router.post('/:id/link-task', asyncHandler(async (req, res) => {
+router.post('/:id/link-task', validate(schemas.linkTask), asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { task_id } = req.body;
 

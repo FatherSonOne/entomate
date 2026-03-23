@@ -307,7 +307,7 @@ export default function MeetingSummaryWidget({
                   key={index}
                   className="flex items-start gap-2 text-sm text-content-secondary"
                 >
-                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-semantic-warning-dim text-orange-700 flex items-center justify-center text-xs font-medium">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-semantic-warning-dim vc-text-warning flex items-center justify-center text-xs font-medium">
                     {index + 1}
                   </span>
                   <span>{step}</span>
@@ -404,8 +404,8 @@ function PriorityBadge({ priority }) {
       label: 'High'
     },
     medium: {
-      bg: 'bg-yellow-100',
-      text: 'text-yellow-700',
+      bg: 'vc-bg-warning-dim',
+      text: 'vc-text-warning',
       label: 'Medium'
     },
     low: {

@@ -8,6 +8,7 @@
 
 const gemini = require('./gemini');
 const openai = require('./openai');
+const log = require('../utils/log');
 
 class AIService {
   constructor() {
@@ -15,7 +16,7 @@ class AIService {
     this.providerName = this._determineProvider();
     this.provider = this._getProvider();
 
-    console.log(`🤖 AI Provider: ${this.providerName} (${this.isConfigured() ? 'configured' : 'not configured'})`);
+    log.info(`AI Provider: ${this.providerName} (${this.isConfigured() ? 'configured' : 'not configured'})`);
   }
 
   _determineProvider() {

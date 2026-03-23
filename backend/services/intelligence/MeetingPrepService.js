@@ -6,6 +6,7 @@
 
 const { supabase, supabaseAdmin } = require('../../config/supabase');
 const OpenAI = require('openai');
+const log = require('../../utils/log');
 
 class MeetingPrepService {
   constructor() {
@@ -20,9 +21,9 @@ class MeetingPrepService {
     const apiKey = process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY;
     if (apiKey && process.env.OPENAI_API_KEY) {
       this.openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-      console.log('[MeetingPrepService] AI client initialized');
+      log.info('[MeetingPrepService] AI client initialized');
     } else {
-      console.warn('[MeetingPrepService] No AI API key configured');
+      log.warn('[MeetingPrepService] No AI API key configured');
     }
   }
 
@@ -70,7 +71,7 @@ class MeetingPrepService {
         .limit(10);
 
       if (error) {
-        console.error('[MeetingPrepService] Error fetching meetings:', error);
+        log.error('[MeetingPrepService] Error fetching meetings:', { error: error.message || error });
         return [];
       }
 
@@ -85,7 +86,7 @@ class MeetingPrepService {
 
       return enrichedMeetings.filter(Boolean);
     } catch (error) {
-      console.error('[MeetingPrepService] getUpcomingMeetingPrep error:', error);
+      log.error('[MeetingPrepService] getUpcomingMeetingPrep error:', { error: error.message || error });
       return [];
     }
   }
@@ -109,7 +110,7 @@ class MeetingPrepService {
           .single();
 
         if (error || !data) {
-          console.error('[MeetingPrepService] Meeting not found:', meetingId);
+          log.error('[MeetingPrepService] Meeting not found:', meetingId);
           return null;
         }
 
@@ -194,7 +195,7 @@ class MeetingPrepService {
         briefDocument: null // Generated on-demand via separate endpoint
       };
     } catch (error) {
-      console.error('[MeetingPrepService] getMeetingPrep error:', error);
+      log.error('[MeetingPrepService] getMeetingPrep error:', { error: error.message || error });
       return null;
     }
   }
@@ -211,7 +212,7 @@ class MeetingPrepService {
         .order('due_date', { ascending: true });
 
       if (error) {
-        console.error('[MeetingPrepService] Error fetching action items:', error);
+        log.error('[MeetingPrepService] Error fetching action items:', { error: error.message || error });
         return [];
       }
 
@@ -224,7 +225,7 @@ class MeetingPrepService {
           : 0
       }));
     } catch (error) {
-      console.error('[MeetingPrepService] getRelatedActionItems error:', error);
+      log.error('[MeetingPrepService] getRelatedActionItems error:', { error: error.message || error });
       return [];
     }
   }
@@ -264,7 +265,7 @@ class MeetingPrepService {
 
       return relevantMeetings.slice(0, 5);
     } catch (error) {
-      console.error('[MeetingPrepService] getSentimentHistory error:', error);
+      log.error('[MeetingPrepService] getSentimentHistory error:', { error: error.message || error });
       return [];
     }
   }
@@ -304,7 +305,7 @@ class MeetingPrepService {
 
       return [];
     } catch (error) {
-      console.error('[MeetingPrepService] getRelatedMeetingHistory error:', error);
+      log.error('[MeetingPrepService] getRelatedMeetingHistory error:', { error: error.message || error });
       return [];
     }
   }
@@ -318,11 +319,32 @@ class MeetingPrepService {
     }
 
     try {
-      // TODO: Query shared hub for deal information
-      // For now, return null - this will be enhanced when shared hub is fully integrated
-      return null;
+      const { getHubClient } = require('../hubClient');
+      const hub = getHubClient();
+      if (!hub) return null;
+
+      const { data: events } = await hub
+        .from('cross_app_events')
+        .select('payload, created_at')
+        .eq('source_app', 'logos_crm')
+        .eq('event_category', 'deal')
+        .contains('payload', { dealId: crmDealId })
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (!events?.length) return null;
+
+      const latest = events[0].payload;
+      return {
+        dealId: crmDealId,
+        name: latest.name,
+        stage: latest.stage,
+        value: latest.value,
+        lastActivity: events[0].created_at,
+        recentEvents: events.map(e => ({ type: e.payload.eventType, date: e.created_at }))
+      };
     } catch (error) {
-      console.error('[MeetingPrepService] getDealContext error:', error);
+      log.error('[MeetingPrepService] getDealContext error:', { error: error.message || error });
       return null;
     }
   }
@@ -433,7 +455,7 @@ class MeetingPrepService {
 
       return points.slice(0, 5);
     } catch (error) {
-      console.error('[MeetingPrepService] AI generation error:', error);
+      log.error('[MeetingPrepService] AI generation error:', { error: error.message || error });
       return this.generateRuleBasedTalkingPoints(context);
     }
   }
@@ -534,7 +556,7 @@ class MeetingPrepService {
 
       return completion.choices[0]?.message?.content || this.formatMeetingBrief(prep);
     } catch (error) {
-      console.error('[MeetingPrepService] generateMeetingBrief error:', error);
+      log.error('[MeetingPrepService] generateMeetingBrief error:', { error: error.message || error });
       throw error;
     }
   }

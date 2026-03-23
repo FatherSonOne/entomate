@@ -6,6 +6,7 @@
 
 const ai = require('../config/ai');
 const { supabase } = require('../config/supabase');
+const log = require('../utils/log');
 
 class EmbeddingService {
   constructor() {
@@ -35,7 +36,7 @@ class EmbeddingService {
       const embedding = await ai.generateEmbedding(truncatedText);
       return embedding;
     } catch (error) {
-      console.error('❌ Embedding error:', error);
+      log.error('Embedding error:', { error: error.message || error });
       throw error;
     }
   }
@@ -46,7 +47,7 @@ class EmbeddingService {
   async storeEmbedding(contentType, sourceId, sourceType, text) {
     try {
       if (!supabase) {
-        console.warn('⚠️ Supabase not configured, skipping embedding storage');
+        log.warn('Supabase not configured, skipping embedding storage');
         return null;
       }
 
@@ -69,16 +70,16 @@ class EmbeddingService {
       if (error) {
         // Table might not exist yet
         if (error.code === '42P01') {
-          console.warn('⚠️ Embeddings table not found. Run database migrations.');
+          log.warn('Embeddings table not found. Run database migrations.');
           return null;
         }
         throw error;
       }
 
-      console.log(`✅ Stored embedding for ${sourceType}:${sourceId}`);
+      log.info(`Stored embedding for ${sourceType}:${sourceId}`);
       return data;
     } catch (error) {
-      console.error('❌ Error storing embedding:', error);
+      log.error('Error storing embedding:', { error: error.message || error });
       // Don't throw - embedding storage is non-critical
       return null;
     }
@@ -89,7 +90,7 @@ class EmbeddingService {
    */
   async semanticSearch(query, limit = 10, filters = {}) {
     try {
-      console.log(`🔍 Semantic search: "${query}"`);
+      log.info(`Semantic search: "${query}"`);
       const startTime = Date.now();
 
       if (!supabase) {
@@ -112,7 +113,7 @@ class EmbeddingService {
           const enrichedResults = await this.enrichResults(data);
           const executionTime = Date.now() - startTime;
 
-          console.log(`✅ Found ${enrichedResults.length} similar items in ${executionTime}ms`);
+          log.info(`Found ${enrichedResults.length} similar items in ${executionTime}ms`);
           return {
             results: enrichedResults,
             executionTime,
@@ -120,13 +121,13 @@ class EmbeddingService {
           };
         }
       } catch (rpcError) {
-        console.warn('⚠️ Vector search not available:', rpcError.message);
+        log.warn('Vector search not available:', rpcError.message);
       }
 
       // Fallback to text-based search
       return this.fallbackTextSearch(query, limit, filters);
     } catch (error) {
-      console.error('❌ Search error:', error);
+      log.error('Search error:', { error: error.message || error });
       throw error;
     }
   }
@@ -205,7 +206,7 @@ class EmbeddingService {
    */
   async generateEmbeddingsForMeeting(meetingId, meeting, actionItems = []) {
     try {
-      console.log(`📝 Generating embeddings for meeting: ${meetingId}`);
+      log.info(`Generating embeddings for meeting: ${meetingId}`);
       const generated = [];
 
       // 1. Embed summary
@@ -274,10 +275,10 @@ class EmbeddingService {
         }
       }
 
-      console.log(`✅ Generated ${generated.length} embeddings for meeting`);
+      log.info(`Generated ${generated.length} embeddings for meeting`);
       return generated;
     } catch (error) {
-      console.error('❌ Error generating embeddings:', error);
+      log.error('Error generating embeddings:', { error: error.message || error });
       return [];
     }
   }
@@ -336,9 +337,9 @@ class EmbeddingService {
         throw error;
       }
 
-      console.log(`🗑️ Deleted embeddings for ${sourceType}:${sourceId}`);
+      log.info(`Deleted embeddings for ${sourceType}:${sourceId}`);
     } catch (error) {
-      console.error('❌ Error deleting embeddings:', error);
+      log.error('Error deleting embeddings:', { error: error.message || error });
     }
   }
 }

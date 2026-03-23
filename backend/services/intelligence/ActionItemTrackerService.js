@@ -5,6 +5,7 @@
  */
 
 const { supabase, supabaseAdmin } = require('../../config/supabase');
+const log = require('../../utils/log');
 
 class ActionItemTrackerService {
   constructor() {
@@ -54,7 +55,7 @@ class ActionItemTrackerService {
         blockingChains
       };
     } catch (error) {
-      console.error('[ActionItemTrackerService] getActionItemStatus error:', error);
+      log.error('[ActionItemTrackerService] getActionItemStatus error:', { error: error.message || error });
       return this.getEmptyStatus();
     }
   }
@@ -77,7 +78,7 @@ class ActionItemTrackerService {
         .order('due_date', { ascending: true });
 
       if (error) {
-        console.error('[ActionItemTrackerService] Error fetching items:', error);
+        log.error('[ActionItemTrackerService] Error fetching items:', { error: error.message || error });
         return [];
       }
 
@@ -94,7 +95,7 @@ class ActionItemTrackerService {
           : null
       }));
     } catch (error) {
-      console.error('[ActionItemTrackerService] getUserActionItems error:', error);
+      log.error('[ActionItemTrackerService] getUserActionItems error:', { error: error.message || error });
       return [];
     }
   }
@@ -174,7 +175,7 @@ class ActionItemTrackerService {
         }
       };
     } catch (error) {
-      console.error('[ActionItemTrackerService] calculateTrends error:', error);
+      log.error('[ActionItemTrackerService] calculateTrends error:', { error: error.message || error });
       return {
         weekOverWeek: {
           completionRate: 0,
@@ -280,7 +281,7 @@ class ActionItemTrackerService {
         } : null
       };
     } catch (error) {
-      console.error('[ActionItemTrackerService] calculateBenchmarks error:', error);
+      log.error('[ActionItemTrackerService] calculateBenchmarks error:', { error: error.message || error });
       return {
         userCompletionRate: 0,
         teamAverage: 0,
@@ -362,7 +363,7 @@ class ActionItemTrackerService {
 
       return chains;
     } catch (error) {
-      console.error('[ActionItemTrackerService] detectBlockingChains error:', error);
+      log.error('[ActionItemTrackerService] detectBlockingChains error:', { error: error.message || error });
       return [];
     }
   }
@@ -428,7 +429,7 @@ class ActionItemTrackerService {
 
       return nudges;
     } catch (error) {
-      console.error('[ActionItemTrackerService] getIntelligentNudges error:', error);
+      log.error('[ActionItemTrackerService] getIntelligentNudges error:', { error: error.message || error });
       return [];
     }
   }
@@ -480,32 +481,55 @@ class ActionItemTrackerService {
 
       const nudge = this.shouldNudge(item);
       if (!nudge) {
-        console.log('[ActionItemTrackerService] No nudge needed');
+        log.info('[ActionItemTrackerService] No nudge needed');
         return { success: true, sent: false };
       }
 
       // Send nudge based on channel
       switch (channel) {
         case 'slack':
-          // TODO: Integrate with Slack service
-          console.log('[ActionItemTrackerService] Slack nudge:', nudge.message);
+          try {
+            const chatService = require('../chatService');
+            const slackChannel = process.env.SLACK_DEFAULT_CHANNEL || '#general';
+            await chatService.postMessage(slackChannel, nudge.message, {
+              blocks: [
+                { type: 'section', text: { type: 'mrkdwn', text: `*Action Item Reminder*\n${nudge.message}` } },
+                { type: 'context', elements: [{ type: 'mrkdwn', text: `Assigned to: ${item.assigned_to_name || 'Unassigned'} | Priority: ${item.priority || 'medium'} | Due: ${item.due_date || 'No date'}` }] }
+              ]
+            });
+          } catch (slackErr) {
+            log.warn('[ActionItemTrackerService] Slack nudge failed:', slackErr.message);
+          }
           break;
 
         case 'email':
-          // TODO: Integrate with email service
-          console.log('[ActionItemTrackerService] Email nudge:', nudge.message);
+          try {
+            const hubEventPublisher = require('../hubEventPublisher');
+            await hubEventPublisher.publish({
+              type: 'notification.email',
+              category: 'meeting',
+              targetApp: 'pulse',
+              payload: {
+                to: item.assigned_to_email,
+                subject: `Action Item Reminder: ${item.task_description}`,
+                body: nudge.message,
+                priority: item.priority
+              }
+            });
+          } catch (emailErr) {
+            log.warn('[ActionItemTrackerService] Email nudge failed:', emailErr.message);
+          }
           break;
 
         case 'in_app':
         default:
-          // In-app notification (could be stored in notifications table)
-          console.log('[ActionItemTrackerService] In-app nudge:', nudge.message);
+          log.info('[ActionItemTrackerService] In-app nudge:', nudge.message);
           break;
       }
 
       return { success: true, sent: true, channel, message: nudge.message };
     } catch (error) {
-      console.error('[ActionItemTrackerService] sendNudge error:', error);
+      log.error('[ActionItemTrackerService] sendNudge error:', { error: error.message || error });
       throw error;
     }
   }

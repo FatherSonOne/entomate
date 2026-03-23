@@ -10,6 +10,9 @@ const { apiLimiter } = require('../middleware/rateLimiter');
 const FeedbackService = require('../services/learning/FeedbackService');
 const OutcomeTracker = require('../services/learning/OutcomeTracker');
 const { createClient } = require('@supabase/supabase-js');
+const log = require('../utils/log');
+const { validate } = require('../middleware/validate');
+const schemas = require('../schemas/learning');
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -25,6 +28,7 @@ router.post(
   '/feedback/override',
   authenticate,
   apiLimiter,
+  validate(schemas.override),
   async (req, res) => {
     try {
       const userId = req.user.id;
@@ -65,7 +69,7 @@ router.post(
         message: 'Override captured successfully'
       });
     } catch (error) {
-      console.error('[Learning API] Override capture error:', error);
+      log.error('[Learning API] Override capture error:', { error: error.message || error });
       res.status(500).json({
         success: false,
         error: 'Failed to capture override',
@@ -102,7 +106,7 @@ router.get(
         data: { shouldPrompt }
       });
     } catch (error) {
-      console.error('[Learning API] Should prompt check error:', error);
+      log.error('[Learning API] Should prompt check error:', { error: error.message || error });
       res.status(500).json({
         success: false,
         error: 'Failed to check feedback preference'
@@ -119,6 +123,7 @@ router.put(
   '/feedback/preference',
   authenticate,
   apiLimiter,
+  validate(schemas.preference),
   async (req, res) => {
     try {
       const userId = req.user.id;
@@ -138,7 +143,7 @@ router.put(
         message: 'Feedback preference updated'
       });
     } catch (error) {
-      console.error('[Learning API] Preference update error:', error);
+      log.error('[Learning API] Preference update error:', { error: error.message || error });
       res.status(500).json({
         success: false,
         error: 'Failed to update preference'
@@ -171,7 +176,7 @@ router.get(
         data: overrides
       });
     } catch (error) {
-      console.error('[Learning API] Recent overrides error:', error);
+      log.error('[Learning API] Recent overrides error:', { error: error.message || error });
       res.status(500).json({
         success: false,
         error: 'Failed to fetch recent overrides'
@@ -200,7 +205,7 @@ router.get(
         data: stats
       });
     } catch (error) {
-      console.error('[Learning API] Override stats error:', error);
+      log.error('[Learning API] Override stats error:', { error: error.message || error });
       res.status(500).json({
         success: false,
         error: 'Failed to fetch override statistics'
@@ -246,7 +251,7 @@ router.get(
         data: data || []
       });
     } catch (error) {
-      console.error('[Learning API] Patterns retrieval error:', error);
+      log.error('[Learning API] Patterns retrieval error:', { error: error.message || error });
       res.status(500).json({
         success: false,
         error: 'Failed to retrieve patterns'
@@ -263,6 +268,7 @@ router.post(
   '/patterns/:patternId/approve',
   authenticate,
   apiLimiter,
+  validate(schemas.approve),
   async (req, res) => {
     try {
       const userId = req.user.id;
@@ -303,7 +309,7 @@ router.post(
         message: 'Pattern approved and activated'
       });
     } catch (error) {
-      console.error('[Learning API] Pattern approval error:', error);
+      log.error('[Learning API] Pattern approval error:', { error: error.message || error });
       res.status(500).json({
         success: false,
         error: 'Failed to approve pattern'
@@ -320,6 +326,7 @@ router.post(
   '/patterns/:patternId/reject',
   authenticate,
   apiLimiter,
+  validate(schemas.reject),
   async (req, res) => {
     try {
       const userId = req.user.id;
@@ -360,7 +367,7 @@ router.post(
         message: 'Pattern rejected'
       });
     } catch (error) {
-      console.error('[Learning API] Pattern rejection error:', error);
+      log.error('[Learning API] Pattern rejection error:', { error: error.message || error });
       res.status(500).json({
         success: false,
         error: 'Failed to reject pattern'
@@ -415,7 +422,7 @@ router.post(
         message: 'Pattern deactivated'
       });
     } catch (error) {
-      console.error('[Learning API] Pattern deactivation error:', error);
+      log.error('[Learning API] Pattern deactivation error:', { error: error.message || error });
       res.status(500).json({
         success: false,
         error: 'Failed to deactivate pattern'
@@ -460,7 +467,7 @@ router.get(
         data: report
       });
     } catch (error) {
-      console.error('[Learning API] Report generation error:', error);
+      log.error('[Learning API] Report generation error:', { error: error.message || error });
       res.status(500).json({
         success: false,
         error: 'Failed to generate report'
@@ -477,6 +484,7 @@ router.post(
   '/outcomes/:overrideId',
   authenticate,
   apiLimiter,
+  validate(schemas.outcome),
   async (req, res) => {
     try {
       const userId = req.user.id;
@@ -515,7 +523,7 @@ router.post(
         message: 'Outcome tracked successfully'
       });
     } catch (error) {
-      console.error('[Learning API] Outcome tracking error:', error);
+      log.error('[Learning API] Outcome tracking error:', { error: error.message || error });
       res.status(500).json({
         success: false,
         error: 'Failed to track outcome',
@@ -545,7 +553,7 @@ router.get(
         data: report
       });
     } catch (error) {
-      console.error('[Learning API] Effectiveness report error:', error);
+      log.error('[Learning API] Effectiveness report error:', { error: error.message || error });
       res.status(500).json({
         success: false,
         error: 'Failed to generate effectiveness report',
@@ -618,7 +626,7 @@ router.get(
         data: response
       });
     } catch (error) {
-      console.error('[Learning API] Pattern validation retrieval error:', error);
+      log.error('[Learning API] Pattern validation retrieval error:', { error: error.message || error });
       res.status(500).json({
         success: false,
         error: 'Failed to retrieve pattern validation'

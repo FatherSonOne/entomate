@@ -8,6 +8,7 @@
 const { supabase, supabaseAdmin } = require('../../config/supabase');
 const db = supabaseAdmin || supabase;
 const analytics = require('./ExplanationAnalytics');
+const log = require('../../utils/log');
 
 class ExplainabilityService {
   /**
@@ -25,7 +26,7 @@ class ExplainabilityService {
       const factorDefinitions = this.getFactorDefinitions(agentType);
 
       if (!factorDefinitions || factorDefinitions.length === 0) {
-        console.warn(`No factor definitions found for agent type: ${agentType}`);
+        log.warn(`No factor definitions found for agent type: ${agentType}`);
         return this.getDefaultExplanation(recommendation);
       }
 
@@ -75,7 +76,7 @@ class ExplainabilityService {
         }
       };
     } catch (error) {
-      console.error('[Explainability] Error generating explanation:', error);
+      log.error('[Explainability] Error generating explanation:', { error: error.message || error });
       return this.getDefaultExplanation(recommendation);
     }
   }
@@ -187,7 +188,7 @@ class ExplainabilityService {
     for (const def of factorDefinitions) {
       const calculator = this[def.calculator];
       if (!calculator) {
-        console.warn(`Calculator not found: ${def.calculator}`);
+        log.warn(`Calculator not found: ${def.calculator}`);
         // Provide default factor result
         results.push({
           name: def.name,
@@ -209,7 +210,7 @@ class ExplainabilityService {
           naturalLanguage: result.naturalLanguage
         });
       } catch (error) {
-        console.error(`Error calculating factor ${def.name}:`, error);
+        log.error(`Error calculating factor ${def.name}:`, { error: error.message || error });
         // Provide fallback
         results.push({
           name: def.name,
@@ -328,7 +329,7 @@ class ExplainabilityService {
       // Fallback: infer from role
       return [{ skill: candidate.role || 'general' }];
     } catch (error) {
-      console.error('Error fetching candidate skills:', error);
+      log.error('Error fetching candidate skills:', { error: error.message || error });
       return [{ skill: 'general' }];
     }
   }
@@ -380,7 +381,7 @@ class ExplainabilityService {
         naturalLanguage: naturalLanguage
       };
     } catch (error) {
-      console.error('Error calculating workload:', error);
+      log.error('Error calculating workload:', { error: error.message || error });
       return {
         score: 70,
         details: ['Workload calculation unavailable'],
@@ -503,7 +504,7 @@ class ExplainabilityService {
         naturalLanguage: naturalLanguage
       };
     } catch (error) {
-      console.error('Error calculating performance:', error);
+      log.error('Error calculating performance:', { error: error.message || error });
       return {
         score: 75,
         details: ['Performance data unavailable'],
@@ -871,7 +872,7 @@ class ExplainabilityService {
 
       return alternatives;
     } catch (error) {
-      console.error('Error calculating alternatives:', error);
+      log.error('Error calculating alternatives:', { error: error.message || error });
       return [];
     }
   }
@@ -894,7 +895,7 @@ class ExplainabilityService {
       // For other agent types, return empty for now
       return [];
     } catch (error) {
-      console.error('Error getting options:', error);
+      log.error('Error getting options:', { error: error.message || error });
       return [];
     }
   }
@@ -982,10 +983,10 @@ class ExplainabilityService {
         });
 
       if (error) {
-        console.error('[Explainability] Error storing explanation:', error);
+        log.error('[Explainability] Error storing explanation:', { error: error.message || error });
       }
     } catch (error) {
-      console.error('[Explainability] Error storing explanation:', error);
+      log.error('[Explainability] Error storing explanation:', { error: error.message || error });
     }
   }
 
@@ -1003,7 +1004,7 @@ class ExplainabilityService {
       if (error) throw error;
       return data;
     } catch (error) {
-      console.error('[Explainability] Error retrieving explanation:', error);
+      log.error('[Explainability] Error retrieving explanation:', { error: error.message || error });
       return null;
     }
   }

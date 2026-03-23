@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import api from '../services/api';
 import { VCButton, VCBadge, VCIconBox } from '../components/vc';
+import ErrorState from '../components/vc/ErrorState';
 
 export default function Analytics() {
   const [dashboard, setDashboard] = useState(null);
@@ -51,6 +52,45 @@ export default function Analytics() {
     );
   }
 
+  if (!dashboard && !loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1
+              className="text-2xl font-bold flex items-center gap-2"
+              style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}
+            >
+              <BarChart3 className="h-7 w-7" style={{ color: 'var(--accent-primary)' }} />
+              Analytics
+            </h1>
+            <p style={{ color: 'var(--text-tertiary)' }} className="mt-1">
+              Track performance and measure success
+            </p>
+          </div>
+        </div>
+
+        <div className="vc" style={{
+          padding: '3rem 2rem',
+          textAlign: 'center',
+          maxWidth: 480,
+          margin: '2rem auto'
+        }}>
+          <BarChart3 size={48} style={{ color: 'var(--c)', margin: '0 auto 1rem', opacity: 0.5 }} />
+          <h2 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
+            No analytics data yet
+          </h2>
+          <p style={{ color: 'var(--t1)', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
+            Record your first meeting to start seeing insights and performance metrics.
+          </p>
+          <VCButton variant="primary" onClick={() => window.location.href = '/meetings'}>
+            Go to Meetings
+          </VCButton>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -78,7 +118,7 @@ export default function Analytics() {
             <option value="90d">Last 90 days</option>
             <option value="1y">Last year</option>
           </select>
-          <VCButton variant="ghost" onClick={fetchData}>
+          <VCButton variant="ghost" onClick={fetchData} aria-label="Refresh">
             <RefreshCw className="h-4 w-4" />
           </VCButton>
         </div>

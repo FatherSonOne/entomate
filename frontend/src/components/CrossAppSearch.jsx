@@ -23,7 +23,7 @@ import {
 import { useKeyboardShortcuts, formatShortcut } from '../hooks/useKeyboardShortcuts'
 
 // API configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+const API_BASE_URL = import.meta.env.VITE_API_URL || ''
 
 // Type icons mapping
 const TYPE_ICONS = {
@@ -277,7 +277,7 @@ export default function CrossAppSearch({ isOpen, onClose }) {
             {/* Error state */}
             {error && (
               <div className="p-4 text-center">
-                <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-2" />
+                <AlertCircle className="w-10 h-10 vc-text-error mx-auto mb-2" />
                 <p className="text-semantic-error">{error}</p>
               </div>
             )}

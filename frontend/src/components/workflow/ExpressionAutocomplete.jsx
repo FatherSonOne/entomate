@@ -46,14 +46,14 @@ const CATEGORIES = {
   },
   String: {
     icon: Type,
-    color: 'text-emerald-600',
-    bgColor: 'bg-emerald-50',
+    color: 'vc-text-success',
+    bgColor: 'vc-bg-success-dim',
     description: 'String manipulation functions'
   },
   DateTime: {
     icon: Calendar,
     color: 'text-semantic-warning',
-    bgColor: 'bg-orange-50',
+    bgColor: 'vc-bg-warning-dim',
     description: 'Date and time functions'
   },
   Number: {
@@ -64,27 +64,35 @@ const CATEGORIES = {
   },
   Array: {
     icon: List,
-    color: 'text-cyan-600',
-    bgColor: 'bg-cyan-50',
-    description: 'Array manipulation functions'
+    color: '',
+    bgColor: '',
+    description: 'Array manipulation functions',
+    style: { color: 'var(--m)' },
+    bgStyle: { background: 'var(--md)' }
   },
   Object: {
     icon: Braces,
-    color: 'text-violet-600',
-    bgColor: 'bg-violet-50',
-    description: 'Object manipulation functions'
+    color: '',
+    bgColor: '',
+    description: 'Object manipulation functions',
+    style: { color: 'var(--c)' },
+    bgStyle: { background: 'var(--cd)' }
   },
   Logic: {
     icon: Filter,
-    color: 'text-pink-600',
-    bgColor: 'bg-pink-50',
-    description: 'Conditional and logic functions'
+    color: '',
+    bgColor: '',
+    description: 'Conditional and logic functions',
+    style: { color: 'var(--c)' },
+    bgStyle: { background: 'var(--cd)' }
   },
   Encoding: {
     icon: Lock,
-    color: 'text-slate-600',
-    bgColor: 'bg-slate-50',
-    description: 'Encoding and decoding functions'
+    color: '',
+    bgColor: '',
+    description: 'Encoding and decoding functions',
+    style: { color: 'var(--t1)' },
+    bgStyle: { background: 'var(--bg2)' }
   }
 }
 
@@ -119,14 +127,17 @@ function SuggestionItem({ item, isSelected, onClick, onHover }) {
       aria-selected={isSelected}
     >
       {/* Type icon */}
-      <div className={`
-        flex-shrink-0 w-6 h-6 rounded flex items-center justify-center
-        ${category.bgColor || 'bg-surface-muted'}
-      `}>
+      <div
+        className={`
+          flex-shrink-0 w-6 h-6 rounded flex items-center justify-center
+          ${category.bgColor || 'bg-surface-muted'}
+        `}
+        style={category.bgStyle || undefined}
+      >
         {item.type === 'function' ? (
-          <CategoryIcon className={`w-3.5 h-3.5 ${category.color || 'text-content-secondary'}`} />
+          <CategoryIcon className={`w-3.5 h-3.5 ${category.color || 'text-content-secondary'}`} style={category.style || undefined} />
         ) : (
-          <Icon className={`w-3.5 h-3.5 ${category.color || 'text-content-secondary'}`} />
+          <Icon className={`w-3.5 h-3.5 ${category.color || 'text-content-secondary'}`} style={category.style || undefined} />
         )}
       </div>
 
@@ -170,12 +181,15 @@ function CategoryHeader({ name, count }) {
   const Icon = category.icon || Box
 
   return (
-    <div className={`
-      sticky top-0 flex items-center gap-2 px-3 py-1.5 text-xs font-medium
-      border-b border-line-subtle ${category.bgColor || 'bg-surface-muted'}
-    `}>
-      <Icon className={`w-3.5 h-3.5 ${category.color || 'text-content-secondary'}`} />
-      <span className={category.color || 'text-content-secondary'}>{name}</span>
+    <div
+      className={`
+        sticky top-0 flex items-center gap-2 px-3 py-1.5 text-xs font-medium
+        border-b border-line-subtle ${category.bgColor || 'bg-surface-muted'}
+      `}
+      style={category.bgStyle || undefined}
+    >
+      <Icon className={`w-3.5 h-3.5 ${category.color || 'text-content-secondary'}`} style={category.style || undefined} />
+      <span className={category.color || 'text-content-secondary'} style={category.style || undefined}>{name}</span>
       <span className="text-content-tertiary">({count})</span>
     </div>
   )

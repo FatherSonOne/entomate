@@ -14,6 +14,7 @@
 
 const crypto = require('crypto');
 const { supabase, supabaseAdmin } = require('../config/supabase');
+const log = require('../utils/log');
 
 // Encryption configuration
 const ENCRYPTION_ALGORITHM = 'aes-256-gcm';
@@ -59,7 +60,7 @@ class SecretsVault {
     const masterKey = process.env.SECRETS_MASTER_KEY;
 
     if (!masterKey) {
-      console.warn('[SecretsVault] SECRETS_MASTER_KEY not set - using derived key (NOT FOR PRODUCTION)');
+      log.warn('[SecretsVault] SECRETS_MASTER_KEY not set - using derived key (NOT FOR PRODUCTION)');
       // Derive a key from JWT_SECRET as fallback (for development only)
       const fallbackSource = process.env.JWT_SECRET || 'development-fallback-key';
       this.encryptionKey = crypto
@@ -88,7 +89,7 @@ class SecretsVault {
     }
 
     this.initialized = true;
-    console.log('[SecretsVault] Initialized with encryption');
+    log.info('[SecretsVault] Initialized with encryption');
   }
 
   /**
@@ -246,7 +247,7 @@ class SecretsVault {
     const client = supabaseAdmin || supabase;
 
     if (!client) {
-      console.log('[SecretsVault] Database not configured, returning mock secret');
+      log.info('[SecretsVault] Database not configured, returning mock secret');
       return {
         id: crypto.randomUUID(),
         ...secretData,
@@ -266,11 +267,11 @@ class SecretsVault {
       if (error.code === '23505') {
         throw new Error(`Secret with name "${name}" already exists in this scope and environment`);
       }
-      console.error('[SecretsVault] Create error:', error);
+      log.error('[SecretsVault] Create error:', { error: error.message || error });
       throw new Error(`Failed to create secret: ${error.message}`);
     }
 
-    console.log(`[SecretsVault] Created secret: ${secret.name} (${secret.id})`);
+    log.info(`[SecretsVault] Created secret: ${secret.name} (${secret.id})`);
 
     return secret;
   }
@@ -302,8 +303,15 @@ class SecretsVault {
 
     // Check access permissions
     if (secret.user_id !== userId) {
-      // TODO: Add organization/team access checks
-      throw new Error('Access denied');
+      // Check organization-level access: if secret has an org_id and user belongs to same org
+      let hasOrgAccess = false;
+      if (secret.organization_id && context?.organizationId) {
+        hasOrgAccess = secret.organization_id === context.organizationId &&
+          (secret.scope === 'organization' || secret.scope === 'workflow');
+      }
+      if (!hasOrgAccess) {
+        throw new Error('Access denied');
+      }
     }
 
     // Check expiration
@@ -316,7 +324,7 @@ class SecretsVault {
     try {
       decryptedValue = this.decrypt(secret.encrypted_value);
     } catch (decryptError) {
-      console.error('[SecretsVault] Decryption error:', decryptError.message);
+      log.error('[SecretsVault] Decryption error:', decryptError.message);
       throw new Error('Failed to decrypt secret');
     }
 
@@ -484,7 +492,7 @@ class SecretsVault {
     const { data: secrets, error, count } = await query;
 
     if (error) {
-      console.error('[SecretsVault] List error:', error);
+      log.error('[SecretsVault] List error:', { error: error.message || error });
       throw new Error('Failed to list secrets');
     }
 
@@ -567,11 +575,11 @@ class SecretsVault {
       .single();
 
     if (error) {
-      console.error('[SecretsVault] Update error:', error);
+      log.error('[SecretsVault] Update error:', { error: error.message || error });
       throw new Error('Failed to update secret');
     }
 
-    console.log(`[SecretsVault] Updated secret: ${existing.name} (${secretId})`);
+    log.info(`[SecretsVault] Updated secret: ${existing.name} (${secretId})`);
 
     return secret;
   }
@@ -615,14 +623,14 @@ class SecretsVault {
       .eq('id', secretId);
 
     if (error) {
-      console.error('[SecretsVault] Delete error:', error);
+      log.error('[SecretsVault] Delete error:', { error: error.message || error });
       throw new Error('Failed to delete secret');
     }
 
     // Log deletion
     await this.logAccess(secretId, 'deleted', userId, { accessMethod: 'api' });
 
-    console.log(`[SecretsVault] Deleted secret: ${existing.name} (${secretId})`);
+    log.info(`[SecretsVault] Deleted secret: ${existing.name} (${secretId})`);
 
     return true;
   }
@@ -658,7 +666,7 @@ class SecretsVault {
         const value = await this.getValueByName(secretName, userId, options);
         resolved = resolved.replace(fullMatch, value);
       } catch (error) {
-        console.warn(`[SecretsVault] Failed to resolve secret "${secretName}": ${error.message}`);
+        log.warn(`[SecretsVault] Failed to resolve secret "${secretName}": ${error.message}`);
         // Leave placeholder or throw based on options
         if (options.throwOnMissing) {
           throw new Error(`Secret "${secretName}" not found or inaccessible`);
@@ -748,7 +756,7 @@ class SecretsVault {
       });
     } catch (error) {
       // Don't fail the main operation if audit logging fails
-      console.error('[SecretsVault] Audit log error:', error.message);
+      log.error('[SecretsVault] Audit log error:', error.message);
     }
   }
 

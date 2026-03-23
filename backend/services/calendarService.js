@@ -5,6 +5,7 @@
 
 const { google } = require('googleapis');
 const { addDays, addHours, format, parseISO, startOfDay, endOfDay } = require('date-fns');
+const log = require('../utils/log');
 
 class CalendarService {
   constructor() {
@@ -23,13 +24,13 @@ class CalendarService {
     const redirectUri = process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/api/calendar/callback';
 
     if (!clientId || !clientSecret) {
-      console.log('Google Calendar not configured - missing credentials');
+      log.info('Google Calendar not configured - missing credentials');
       return;
     }
 
     this.oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
     this.initialized = true;
-    console.log('Google Calendar service initialized');
+    log.info('Google Calendar service initialized');
   }
 
   /**

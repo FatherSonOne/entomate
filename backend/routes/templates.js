@@ -9,6 +9,7 @@ const router = express.Router();
 const { supabase } = require('../config/supabase');
 const { authenticate, optionalAuth } = require('../middleware/auth');
 const { apiLimiter } = require('../middleware/rateLimiter');
+const log = require('../utils/log');
 const {
   getAllTemplates,
   getTemplatesByCategory,
@@ -74,7 +75,7 @@ router.get('/', optionalAuth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[Templates] List error:', error);
+    log.error('[Templates] List error:', { error: error.message || error });
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -110,7 +111,7 @@ router.get('/categories', optionalAuth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[Templates] Categories error:', error);
+    log.error('[Templates] Categories error:', { error: error.message || error });
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -150,7 +151,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[Templates] Get error:', error);
+    log.error('[Templates] Get error:', { error: error.message || error });
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -199,7 +200,7 @@ router.get('/:id/preview', optionalAuth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[Templates] Preview error:', error);
+    log.error('[Templates] Preview error:', { error: error.message || error });
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -277,7 +278,7 @@ router.post('/:id/import', authenticate, apiLimiter, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[Templates] Import error:', error);
+    log.error('[Templates] Import error:', { error: error.message || error });
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -331,7 +332,7 @@ router.post('/:id/duplicate', authenticate, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[Templates] Duplicate error:', error);
+    log.error('[Templates] Duplicate error:', { error: error.message || error });
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -389,7 +390,7 @@ router.get('/stats/popular', optionalAuth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[Templates] Popular stats error:', error);
+    log.error('[Templates] Popular stats error:', { error: error.message || error });
     res.status(500).json({ success: false, error: error.message });
   }
 });

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
+import { useToast } from '../vc/ToastProvider';
 
 /**
  * FeedbackPrompt Component
@@ -15,6 +16,7 @@ export default function FeedbackPrompt({
   onClose,
   onSubmit
 }) {
+  const toast = useToast();
   const [feedbackReason, setFeedbackReason] = useState('');
   const [feedbackText, setFeedbackText] = useState('');
   const [otherText, setOtherText] = useState('');
@@ -130,7 +132,7 @@ export default function FeedbackPrompt({
       if (onClose) onClose();
     } catch (error) {
       console.error('Failed to submit feedback:', error);
-      alert('Failed to submit feedback. Please try again.');
+      toast.error('Error', 'Failed to submit feedback. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -202,7 +204,7 @@ export default function FeedbackPrompt({
                     setFeedbackReason(e.target.value);
                     setFeedbackText(option.label);
                   }}
-                  className="text-accent-primary focus:ring-indigo-500"
+                  className="text-accent-primary"
                 />
                 <span className="text-sm text-content-secondary">{option.label}</span>
               </label>
@@ -219,7 +221,7 @@ export default function FeedbackPrompt({
                   setFeedbackReason(e.target.value);
                   setFeedbackText('');
                 }}
-                className="mt-1 text-accent-primary focus:ring-indigo-500"
+                className="mt-1 text-accent-primary"
               />
               <div className="flex-1">
                 <span className="text-sm text-content-secondary block mb-1">Other:</span>
@@ -229,7 +231,7 @@ export default function FeedbackPrompt({
                     value={otherText}
                     onChange={(e) => setOtherText(e.target.value)}
                     placeholder="Enter your reason..."
-                    className="w-full px-3 py-2 border border-line-strong rounded-md text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full px-3 py-2 border border-line-strong rounded-md text-sm"
                     autoFocus
                   />
                 )}
@@ -245,7 +247,7 @@ export default function FeedbackPrompt({
               type="checkbox"
               checked={dontAskAgain}
               onChange={(e) => setDontAskAgain(e.target.checked)}
-              className="rounded text-accent-primary focus:ring-indigo-500"
+              className="rounded text-accent-primary"
             />
             <span className="text-sm text-content-secondary">
               Don't ask me again for {getAgentDisplayName()}
@@ -265,7 +267,7 @@ export default function FeedbackPrompt({
           <button
             onClick={handleSubmit}
             disabled={isSubmitting || (feedbackReason === 'other' && !otherText.trim())}
-            className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm"
+            className="vbtn vbtn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm"
           >
             {isSubmitting ? 'Submitting...' : 'Submit Feedback'}
           </button>

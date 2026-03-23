@@ -4,6 +4,7 @@
  */
 
 const { createClient } = require('@supabase/supabase-js');
+const log = require('../../utils/log');
 
 class OutcomeTracker {
   constructor() {
@@ -51,18 +52,18 @@ class OutcomeTracker {
         .single();
 
       if (error) {
-        console.error('[OutcomeTracker] Error updating override:', error);
+        log.error('[OutcomeTracker] Error updating override:', { error: error.message || error });
         throw error;
       }
 
-      console.log(`[OutcomeTracker] Tracked outcome for override ${overrideId}: ${outcomeSuccess ? 'success' : 'failure'}`);
+      log.info(`[OutcomeTracker] Tracked outcome for override ${overrideId}: ${outcomeSuccess ? 'success' : 'failure'}`);
 
       // Find and update associated patterns
       await this.updatePatternsFromOutcome(overrideId, outcomeSuccess);
 
       return data;
     } catch (error) {
-      console.error('[OutcomeTracker] trackOverrideOutcome error:', error);
+      log.error('[OutcomeTracker] trackOverrideOutcome error:', { error: error.message || error });
       throw error;
     }
   }
@@ -123,7 +124,7 @@ class OutcomeTracker {
         .eq('status', 'active');
 
       if (error) {
-        console.error('[OutcomeTracker] Error fetching patterns:', error);
+        log.error('[OutcomeTracker] Error fetching patterns:', { error: error.message || error });
         return;
       }
 
@@ -131,14 +132,14 @@ class OutcomeTracker {
         return;
       }
 
-      console.log(`[OutcomeTracker] Updating ${patterns.length} patterns based on outcome`);
+      log.info(`[OutcomeTracker] Updating ${patterns.length} patterns based on outcome`);
 
       // Update each pattern's validation metrics
       for (const pattern of patterns) {
         await this.updatePatternValidation(pattern.id, outcomeSuccess);
       }
     } catch (error) {
-      console.error('[OutcomeTracker] updatePatternsFromOutcome error:', error);
+      log.error('[OutcomeTracker] updatePatternsFromOutcome error:', { error: error.message || error });
     }
   }
 
@@ -157,7 +158,7 @@ class OutcomeTracker {
         .single();
 
       if (fetchError || !pattern) {
-        console.error('[OutcomeTracker] Pattern not found:', patternId);
+        log.error('[OutcomeTracker] Pattern not found:', patternId);
         return;
       }
 
@@ -205,13 +206,13 @@ class OutcomeTracker {
         .eq('id', patternId);
 
       if (updateError) {
-        console.error('[OutcomeTracker] Error updating pattern:', updateError);
+        log.error('[OutcomeTracker] Error updating pattern:', { error: updateError.message || updateError });
         return;
       }
 
-      console.log(`[OutcomeTracker] Updated pattern ${patternId}: confidence ${pattern.confidence} → ${newConfidence}, success rate ${Math.round(validation.successRate * 100)}%`);
+      log.info(`[OutcomeTracker] Updated pattern ${patternId}: confidence ${pattern.confidence} → ${newConfidence}, success rate ${Math.round(validation.successRate * 100)}%`);
     } catch (error) {
-      console.error('[OutcomeTracker] updatePatternValidation error:', error);
+      log.error('[OutcomeTracker] updatePatternValidation error:', { error: error.message || error });
     }
   }
 
@@ -232,13 +233,13 @@ class OutcomeTracker {
         .eq('id', patternId);
 
       if (error) {
-        console.error('[OutcomeTracker] Error deprecating pattern:', error);
+        log.error('[OutcomeTracker] Error deprecating pattern:', { error: error.message || error });
         return;
       }
 
-      console.log(`[OutcomeTracker] Deprecated pattern ${patternId}: ${reason}`);
+      log.info(`[OutcomeTracker] Deprecated pattern ${patternId}: ${reason}`);
     } catch (error) {
-      console.error('[OutcomeTracker] deprecatePattern error:', error);
+      log.error('[OutcomeTracker] deprecatePattern error:', { error: error.message || error });
     }
   }
 
@@ -306,7 +307,7 @@ class OutcomeTracker {
 
       return report;
     } catch (error) {
-      console.error('[OutcomeTracker] getEffectivenessReport error:', error);
+      log.error('[OutcomeTracker] getEffectivenessReport error:', { error: error.message || error });
       throw error;
     }
   }

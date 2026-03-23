@@ -50,15 +50,21 @@ const renderTemplateIcon = (iconName, className = "w-6 h-6") => {
   // Fallback to default
   return <Workflow className={className} />
 }
+import { useToast } from '../components/vc/ToastProvider'
+import { useConfirm } from '../components/vc/ConfirmDialog'
 import { automationsApi } from '../services/api'
 import AutomationBuilder from '../components/AutomationBuilder'
 import { GuideCard, PageHeader, Skeleton } from '../components/SharedUI'
 import { VCButton, VCBadge } from '../components/vc'
+import ErrorState from '../components/vc/ErrorState'
 
 export default function Automations() {
+  const toast = useToast()
+  const confirm = useConfirm()
   const [automations, setAutomations] = useState([])
   const [templates, setTemplates] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [showCreate, setShowCreate] = useState(false)
   const [showBuilder, setShowBuilder] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
@@ -76,6 +82,7 @@ export default function Automations() {
 
   const loadData = async () => {
     try {
+      setError(null)
       setLoading(true)
       const [automationsData, templatesData] = await Promise.all([
         automationsApi.list(),
@@ -86,8 +93,9 @@ export default function Automations() {
       if (automationsData.automations && automationsData.automations.length > 0) {
         setWizardStep(2) // If automations exist, show monitor step
       }
-    } catch (error) {
-      console.error('Failed to load data:', error)
+    } catch (err) {
+      console.error('Failed to load data:', err)
+      setError(err.message || 'Failed to load automations')
     } finally {
       setLoading(false)
     }
@@ -151,7 +159,7 @@ export default function Automations() {
   const handleExecute = async (id) => {
     try {
       const result = await automationsApi.execute(id, {})
-      alert(`Automation executed! ${result.success ? 'Success' : 'Failed'}`)
+      toast.success('Success', `Automation executed! ${result.success ? 'Success' : 'Failed'}`)
       loadData()
     } catch (error) {
       console.error('Failed to execute automation:', error)
@@ -159,7 +167,8 @@ export default function Automations() {
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this automation?')) return
+    const ok = await confirm({ title: 'Delete?', message: 'Delete this automation?', confirmLabel: 'Delete', variant: 'danger' })
+    if (!ok) return
 
     try {
       await automationsApi.delete(id)
@@ -194,7 +203,7 @@ export default function Automations() {
       loadData()
     } catch (error) {
       console.error('Failed to create automation:', error)
-      alert('Failed to create automation: ' + error.message)
+      toast.error('Error', 'Failed to create automation: ' + error.message)
     }
   }
 
@@ -259,6 +268,12 @@ export default function Automations() {
   const integrationTemplates = templates.filter(t => t.category === 'integration' || !t.category)
   const crmTemplates = templates.filter(t => t.category === 'crm')
 
+  if (error) return (
+    <div className="animate-fade-in max-w-7xl mx-auto">
+      <ErrorState message={error} onRetry={loadData} />
+    </div>
+  )
+
   return (
     <div className="animate-fade-in max-w-7xl mx-auto">
       <PageHeader
@@ -311,7 +326,7 @@ export default function Automations() {
               <History size={20} />
               Execution History
             </h3>
-            <VCButton variant="ghost" size="sm" onClick={loadExecutionLogs}>
+            <VCButton variant="ghost" size="sm" onClick={loadExecutionLogs} aria-label="Refresh">
               <RefreshCw size={16} className={loadingLogs ? 'animate-spin' : ''} />
             </VCButton>
           </div>
@@ -366,7 +381,7 @@ export default function Automations() {
               <Calendar size={20} style={{ color: 'var(--accent-secondary)' }} />
               Scheduled Automations
             </h3>
-            <VCButton variant="ghost" size="sm" onClick={() => setSchedulerStatus([])}>
+            <VCButton variant="ghost" size="sm" onClick={() => setSchedulerStatus([])} aria-label="Close">
               <XCircle size={16} />
             </VCButton>
           </div>
@@ -619,6 +634,7 @@ export default function Automations() {
                       size="sm"
                       onClick={() => handleToggle(automation.id, automation.enabled)}
                       title={automation.enabled ? 'Pause' : 'Resume'}
+                      aria-label={automation.enabled ? 'Pause' : 'Resume'}
                     >
                       {automation.enabled ? <Pause size={16} /> : <Play size={16} />}
                     </VCButton>
@@ -629,6 +645,7 @@ export default function Automations() {
                       onClick={() => handleTest(automation.id)}
                       disabled={testingId === automation.id}
                       title="Test (dry run)"
+                      aria-label="Test automation"
                     >
                       {testingId === automation.id ? (
                         <div className="spinner w-4 h-4" />
@@ -642,6 +659,7 @@ export default function Automations() {
                       size="sm"
                       onClick={() => handleExecute(automation.id)}
                       title="Run now"
+                      aria-label="Run now"
                     >
                       <Zap size={16} />
                     </VCButton>
@@ -651,6 +669,7 @@ export default function Automations() {
                       size="sm"
                       onClick={() => handleDelete(automation.id)}
                       title="Delete"
+                      aria-label="Delete"
                     >
                       <Trash2 size={16} />
                     </VCButton>
@@ -689,7 +708,7 @@ export default function Automations() {
                           </div>
                         )}
                       </div>
-                      <VCButton variant="ghost" size="sm" onClick={() => setTestResult(null)}>
+                      <VCButton variant="ghost" size="sm" onClick={() => setTestResult(null)} aria-label="Close">
                         <XCircle size={16} />
                       </VCButton>
                     </div>

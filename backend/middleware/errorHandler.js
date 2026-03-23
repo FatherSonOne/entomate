@@ -51,7 +51,7 @@ const errorHandler = (err, req, res, next) => {
 
   // Log error (in production, send to logging service)
   if (process.env.NODE_ENV !== 'test') {
-    console.error('Error:', {
+    log.error('Error:', {
       message: err.message,
       code: err.code,
       statusCode: err.statusCode,

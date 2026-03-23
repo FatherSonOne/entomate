@@ -20,6 +20,7 @@ class ErrorMonitoringService {
   initializeSentry() {
     try {
       const Sentry = require('@sentry/node');
+const log = require('../../utils/log');
 
       Sentry.init({
         dsn: process.env.SENTRY_DSN,
@@ -49,9 +50,9 @@ class ErrorMonitoringService {
       });
 
       this.sentry = Sentry;
-      console.log('[ErrorMonitoring] Sentry initialized successfully');
+      log.info('[ErrorMonitoring] Sentry initialized successfully');
     } catch (error) {
-      console.error('[ErrorMonitoring] Failed to initialize Sentry:', error);
+      log.error('[ErrorMonitoring] Failed to initialize Sentry:', { error: error.message || error });
     }
   }
 
@@ -62,8 +63,8 @@ class ErrorMonitoringService {
    */
   captureException(error, context = {}) {
     // Log to console in all environments
-    console.error('[ErrorMonitoring] Exception:', error);
-    console.error('[ErrorMonitoring] Context:', context);
+    log.error('[ErrorMonitoring] Exception:', { error: error.message || error });
+    log.error('[ErrorMonitoring] Context:', context);
 
     if (this.sentryEnabled && this.sentry) {
       this.sentry.withScope(scope => {
@@ -99,7 +100,7 @@ class ErrorMonitoringService {
    * @param {Object} context - Additional context
    */
   captureMessage(message, level = 'info', context = {}) {
-    console.log(`[ErrorMonitoring] [${level.toUpperCase()}] ${message}`, context);
+    log.info(`[ErrorMonitoring] [${level.toUpperCase()}] ${message}`, context);
 
     if (this.sentryEnabled && this.sentry) {
       this.sentry.withScope(scope => {
@@ -128,7 +129,7 @@ class ErrorMonitoringService {
       ...metadata
     };
 
-    console.log('[ErrorMonitoring] AI Usage:', usageData);
+    log.info('[ErrorMonitoring] AI Usage:', usageData);
 
     if (this.sentryEnabled && this.sentry) {
       this.sentry.addBreadcrumb({
@@ -176,7 +177,7 @@ class ErrorMonitoringService {
     // TODO: Integrate with your analytics service (Mixpanel, Amplitude, etc.)
     // For now, just log to console in development
     if (process.env.NODE_ENV === 'development') {
-      console.log('[Analytics]', eventType, data);
+      log.info('[Analytics]', eventType, data);
     }
   }
 
@@ -217,7 +218,7 @@ class ErrorMonitoringService {
       timestamp: new Date().toISOString()
     };
 
-    console.log('[Performance]', performanceData);
+    log.info('[Performance]', performanceData);
 
     if (this.sentryEnabled && this.sentry) {
       this.sentry.addBreadcrumb({

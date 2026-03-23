@@ -5,6 +5,7 @@
 
 const { createClient } = require('@supabase/supabase-js');
 const { v4: uuid } = require('uuid');
+const log = require('../../utils/log');
 
 class ExplanationService {
   constructor() {
@@ -63,7 +64,7 @@ class ExplanationService {
 
       return explanation;
     } catch (error) {
-      console.error('[ExplanationService] generateExplanation error:', error);
+      log.error('[ExplanationService] generateExplanation error:', { error: error.message || error });
       throw error;
     }
   }
@@ -92,15 +93,15 @@ class ExplanationService {
         .single();
 
       if (error) {
-        console.error('[ExplanationService] Database error:', error);
+        log.error('[ExplanationService] Database error:', { error: error.message || error });
         throw error;
       }
 
-      console.log(`[ExplanationService] Explanation stored for execution ${explanation.agentExecutionId}`);
+      log.info(`[ExplanationService] Explanation stored for execution ${explanation.agentExecutionId}`);
 
       return data;
     } catch (error) {
-      console.error('[ExplanationService] storeExplanation error:', error);
+      log.error('[ExplanationService] storeExplanation error:', { error: error.message || error });
       throw error;
     }
   }
@@ -138,7 +139,7 @@ class ExplanationService {
 
       return data;
     } catch (error) {
-      console.error('[ExplanationService] getExplanationByExecutionId error:', error);
+      log.error('[ExplanationService] getExplanationByExecutionId error:', { error: error.message || error });
       throw error;
     }
   }
@@ -169,7 +170,7 @@ class ExplanationService {
 
       return data || [];
     } catch (error) {
-      console.error('[ExplanationService] getRecentExplanations error:', error);
+      log.error('[ExplanationService] getRecentExplanations error:', { error: error.message || error });
       throw error;
     }
   }
@@ -331,7 +332,7 @@ class ExplanationService {
 
       return stats;
     } catch (error) {
-      console.error('[ExplanationService] getExplanationStats error:', error);
+      log.error('[ExplanationService] getExplanationStats error:', { error: error.message || error });
       throw error;
     }
   }

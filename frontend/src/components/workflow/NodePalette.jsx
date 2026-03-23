@@ -105,11 +105,11 @@ const colorClasses = {
     hover: 'hover:bg-semantic-success-dim'
   },
   yellow: {
-    bg: 'bg-yellow-50',
-    border: 'border-yellow-200',
-    text: 'text-yellow-700',
-    icon: 'text-yellow-600',
-    hover: 'hover:bg-yellow-100'
+    bg: 'vc-bg-warning-dim',
+    border: 'vc-border-warning',
+    text: 'vc-text-warning',
+    icon: 'vc-text-warning',
+    hover: 'hover:vc-bg-warning-dim'
   },
   blue: {
     bg: 'bg-semantic-info-dim',

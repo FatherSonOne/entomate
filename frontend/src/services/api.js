@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { supabase } from './supabaseClient'
+import cache from './apiCache'
 
 // Use relative URL to leverage Vite proxy, or fall back to full URL if configured
 const API_BASE_URL = import.meta.env.VITE_API_URL || ''
@@ -83,6 +84,22 @@ api.interceptors.request.use(
       return Promise.reject(new Error('You are offline. Please check your internet connection.'))
     }
 
+    // Check cache for GET requests (skip retries)
+    if (config.method === 'get' && !config._retryCount) {
+      const cached = cache.get(config.url, config.params)
+      if (cached !== null) {
+        // Return cached data via a resolved adapter
+        config.adapter = () => Promise.resolve({ data: cached, status: 200, statusText: 'OK', headers: {}, config })
+        return config
+      }
+    }
+
+    // Invalidate cache on mutations
+    if (['post', 'put', 'patch', 'delete'].includes(config.method)) {
+      const resourcePath = config.url?.split('?')[0]
+      if (resourcePath) cache.invalidate(resourcePath)
+    }
+
     // Get Supabase session token
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -110,6 +127,12 @@ api.interceptors.response.use(
       backendAvailable = true
       notifyConnectionChange()
     }
+
+    // Cache GET responses
+    if (response.config?.method === 'get' && response.config?.url) {
+      cache.set(response.config.url, response.config.params, response.data)
+    }
+
     return response.data
   },
   async (error) => {

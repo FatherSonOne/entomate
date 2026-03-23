@@ -36,7 +36,7 @@ export default function StakeholderCard({ stakeholder, onAction, className = '' 
           <Star
             key={i}
             className={`w-3 h-3 ${
-              i < stars ? 'text-amber-400 fill-amber-400' : 'text-content-muted'
+              i < stars ? 'vc-fill-warning' : 'vc-text-dim'
             }`}
           />
         ))}
@@ -116,8 +116,8 @@ export default function StakeholderCard({ stakeholder, onAction, className = '' 
           <div className="w-full h-1.5 bg-surface-muted rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full transition-all ${
-                stakeholder.relationshipStrength.score >= 75 ? 'bg-green-500' :
-                stakeholder.relationshipStrength.score >= 50 ? 'bg-amber-500' : 'bg-red-500'
+                stakeholder.relationshipStrength.score >= 75 ? 'vc-bg-success' :
+                stakeholder.relationshipStrength.score >= 50 ? 'vc-bg-warning' : 'vc-bg-error'
               }`}
               style={{ width: `${stakeholder.relationshipStrength.score}%` }}
             />

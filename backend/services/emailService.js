@@ -5,6 +5,7 @@
 
 const nodemailer = require('nodemailer');
 const reportService = require('./reportService');
+const log = require('../utils/log');
 
 class EmailService {
   constructor() {
@@ -25,7 +26,7 @@ class EmailService {
     const emailPass = process.env.EMAIL_PASS || process.env.SMTP_PASS;
 
     if (!emailHost || !emailUser || !emailPass) {
-      console.log('Email service not configured - missing SMTP credentials');
+      log.info('Email service not configured - missing SMTP credentials');
       return;
     }
 
@@ -40,7 +41,7 @@ class EmailService {
     });
 
     this.initialized = true;
-    console.log('Email service initialized');
+    log.info('Email service initialized');
   }
 
   /**
@@ -71,10 +72,10 @@ class EmailService {
         attachments
       });
 
-      console.log(`Email sent to ${to}: ${result.messageId}`);
+      log.info(`Email sent to ${to}: ${result.messageId}`);
       return result;
     } catch (error) {
-      console.error('Failed to send email:', error);
+      log.error('Failed to send email:', { error: error.message || error });
       throw error;
     }
   }

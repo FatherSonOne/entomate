@@ -110,12 +110,6 @@
 }
 .glow-pulse .vc { animation: vc-glow-pulse 2.5s ease-in-out infinite; }
 
-/* ── Typewriter cursor blink ── */
-@keyframes vc-cursor-blink {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0; }
-}
-
 /* ============================================================
    BUTTONS
    ============================================================ */
@@ -530,6 +524,43 @@ textarea.vinput { resize: vertical; min-height: 70px; }
 .vtoast-phosphor { border-left: 3px solid var(--accent-phosphor); }
 .vtoast-title { font-family: var(--font-display); font-size: 13px; font-weight: 700; color: var(--text-primary); }
 .vtoast-msg   { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; line-height: 1.4; }
+
+/* Toast stack (portal) */
+.vc-toast-stack {
+  position: fixed; bottom: 20px; right: 20px; z-index: 9999;
+  display: flex; flex-direction: column-reverse; gap: 8px;
+  pointer-events: none; max-width: 380px;
+}
+.vc-toast-item {
+  position: relative; pointer-events: auto;
+  animation: vc-toast-in 300ms cubic-bezier(.4,0,.2,1);
+}
+.vc-toast-close {
+  position: absolute; top: 8px; right: 8px;
+  background: none; border: none; color: var(--t1); cursor: pointer;
+  opacity: 0; transition: opacity 200ms;
+}
+.vc-toast-item:hover .vc-toast-close { opacity: 1; }
+@keyframes vc-toast-in { from { opacity: 0; transform: translateY(12px) scale(.95); } to { opacity: 1; transform: none; } }
+
+/* Confirm dialog (portal) */
+.vc-confirm-overlay {
+  position: fixed; inset: 0; z-index: 10000;
+  background: rgba(0,0,0,.6); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  animation: vc-fade-in 200ms ease;
+}
+.vc-confirm-dialog {
+  padding: 28px; max-width: 400px; width: 90%;
+  text-align: center;
+  animation: vc-scale-in 250ms cubic-bezier(.4,0,.2,1);
+}
+.vc-confirm-icon { margin-bottom: 12px; }
+.vc-confirm-title { font-family: var(--font); font-size: 16px; font-weight: 700; color: var(--t0); margin: 0 0 8px; }
+.vc-confirm-message { font-size: 13px; color: var(--t1); margin: 0 0 20px; line-height: 1.5; }
+.vc-confirm-actions { display: flex; gap: 10px; justify-content: center; }
+@keyframes vc-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes vc-scale-in { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: none; } }
 
 /* ============================================================
    CHAT  (.vc-chat-*)
@@ -973,377 +1004,46 @@ textarea.vinput { resize: vertical; min-height: 70px; }
 .vc-scale-in   { animation: scaleIn 380ms cubic-bezier(.4,0,.2,1) both; }
 
 /* ============================================================
-   MEETINGS PAGE — Calendar hybrid + Meeting rows
+   SEMANTIC UTILITY CLASSES
+   Map Tailwind color classes → design tokens
    ============================================================ */
 
-/* Page shell */
-.meetings-page { display: flex; flex-direction: column; gap: 16px; }
+/* Text colors */
+.vc-text-success  { color: var(--m) !important; }
+.vc-text-warning  { color: var(--a) !important; }
+.vc-text-error    { color: var(--c) !important; }
+.vc-text-info     { color: var(--m) !important; }
+.vc-text-accent   { color: var(--c) !important; }
+.vc-text-muted    { color: var(--t1) !important; }
+.vc-text-dim      { color: var(--t2) !important; }
+.vc-text-primary  { color: var(--t0) !important; }
+.vc-text-phosphor { color: var(--p) !important; }
 
-.meetings-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-.meetings-title {
-  font-family: var(--font, 'Syne', system-ui);
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--t0);
-  margin: 0;
-}
-.meetings-sub { font-size: 12px; color: var(--t1); margin: 2px 0 0; }
+/* Background colors */
+.vc-bg-success     { background: var(--m) !important; }
+.vc-bg-warning     { background: var(--a) !important; }
+.vc-bg-error       { background: var(--c) !important; }
+.vc-bg-info        { background: var(--m) !important; }
+.vc-bg-success-dim { background: var(--md) !important; }
+.vc-bg-warning-dim { background: var(--ad) !important; }
+.vc-bg-error-dim   { background: var(--cd) !important; }
+.vc-bg-surface     { background: var(--bg1) !important; }
+.vc-bg-deep        { background: var(--bg0) !important; }
+.vc-bg-elevated    { background: var(--bg2) !important; }
+.vc-bg-raised      { background: var(--bg3) !important; }
+.vc-bg-code        { background: var(--bg0) !important; }
 
-.meetings-header-actions { display: flex; align-items: center; gap: 8px; }
+/* Border colors */
+.vc-border-success { border-color: var(--m) !important; }
+.vc-border-warning { border-color: var(--a) !important; }
+.vc-border-error   { border-color: var(--c) !important; }
+.vc-border-subtle  { border-color: var(--b0) !important; }
+.vc-border-default { border-color: var(--b1) !important; }
+.vc-border-strong  { border-color: var(--b2) !important; }
 
-/* View toggle pill */
-.view-toggle {
-  display: flex;
-  background: var(--bg2);
-  border: 1px solid var(--b1);
-  border-radius: 8px;
-  padding: 3px;
-  gap: 2px;
-}
-.view-toggle-btn {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 28px;
-  border-radius: 6px;
-  border: none;
-  background: transparent;
-  color: var(--t1);
-  cursor: pointer;
-  transition: all 180ms ease;
-}
-.view-toggle-btn.active { background: var(--cd); color: var(--c); }
-.view-toggle-btn:hover:not(.active) { color: var(--t0); }
+/* Fill/star colors (for rating stars etc) */
+.vc-fill-warning   { color: var(--a) !important; fill: var(--a) !important; }
 
-/* Search bar */
-.meetings-search-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-.meetings-search {
-  flex: 1;
-  position: relative;
-}
-.meetings-search .vinput { width: 100%; box-sizing: border-box; }
-.meetings-search-icon {
-  position: absolute;
-  left: 11px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 14px;
-  height: 14px;
-  color: var(--t2);
-  pointer-events: none;
-}
-
-/* ── Layout modes ── */
-.meetings-body--cal {
-  display: grid;
-  grid-template-columns: 200px 1fr;
-  gap: 16px;
-  align-items: start;
-}
-.meetings-body--list { display: block; }
-
-/* ── Aside (calendar + stats) ── */
-.meetings-aside {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  position: sticky;
-  top: 60px;
-}
-
-/* ── Mini Calendar ── */
-.mtg-cal {
-  background: var(--neo-base, #141414);
-  border: 1px solid var(--b1);
-  border-radius: var(--rad);
-  padding: 14px;
-}
-.mtg-cal-nav {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-.mtg-cal-month {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--t0);
-  font-family: var(--font, 'Syne', system-ui);
-}
-.mtg-cal-nav-btn {
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 5px;
-  border: 1px solid var(--b1);
-  background: transparent;
-  color: var(--t1);
-  cursor: pointer;
-  transition: all 160ms ease;
-}
-.mtg-cal-nav-btn:hover { border-color: var(--c); color: var(--c); }
-
-.mtg-cal-grid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 2px;
-}
-.mtg-cal-dow {
-  font-size: 9px;
-  font-weight: 700;
-  color: var(--t2);
-  text-align: center;
-  padding: 2px 0;
-  text-transform: uppercase;
-  letter-spacing: .05em;
-}
-.mtg-cal-day {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 100%;
-  aspect-ratio: 1;
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--t1);
-  background: transparent;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: all 140ms ease;
-}
-.mtg-cal-day:hover { background: var(--b0); color: var(--t0); }
-.mtg-cal-day--today { color: var(--c); font-weight: 700; }
-.mtg-cal-day--today::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 5px;
-  border: 1px solid rgba(255,45,107,.30);
-}
-.mtg-cal-day--sel {
-  background: var(--c) !important;
-  color: #fff !important;
-  font-weight: 700;
-}
-.mtg-cal-dot {
-  position: absolute;
-  bottom: 2px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: var(--c);
-}
-.mtg-cal-clear {
-  margin-top: 10px;
-  width: 100%;
-  padding: 6px;
-  font-size: 10px;
-  color: var(--t1);
-  background: var(--b0);
-  border: 1px solid var(--b1);
-  border-radius: 6px;
-  cursor: pointer;
-  text-align: center;
-  transition: all 140ms ease;
-  font-family: var(--font, 'Syne', system-ui);
-}
-.mtg-cal-clear:hover { color: var(--c); border-color: var(--cg); }
-
-/* ── Aside stats ── */
-.meetings-aside-stats {
-  background: var(--neo-base, #141414);
-  border: 1px solid var(--b1);
-  border-radius: var(--rad);
-  padding: 12px 14px;
-  display: flex;
-  justify-content: space-around;
-}
-.meetings-stat { text-align: center; }
-.meetings-stat-val { display: block; font-size: 18px; font-weight: 700; color: var(--t0); line-height: 1; font-family: var(--font, 'Syne', system-ui); }
-.meetings-stat-lbl { display: block; font-size: 9px; color: var(--t2); margin-top: 3px; text-transform: uppercase; letter-spacing: .06em; }
-
-/* ── Meeting list ── */
-.meetings-list { padding: 0; overflow: hidden; }
-.meetings-list-inner { display: flex; flex-direction: column; }
-
-.meetings-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 48px 24px;
-  text-align: center;
-  gap: 4px;
-}
-
-.meetings-date-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px 8px;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--t1);
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  border-bottom: 1px solid var(--b0);
-}
-
-/* ── Meeting row ── */
-.mtg-row {
-  display: flex;
-  align-items: flex-start;
-  border-bottom: 1px solid var(--b0);
-  transition: background 180ms ease;
-}
-.mtg-row:last-child { border-bottom: none; }
-.mtg-row:hover { background: rgba(248,240,242,.03); }
-
-.mtg-row-link {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  flex: 1;
-  padding: 14px 16px;
-  text-decoration: none;
-  color: inherit;
-  min-width: 0;
-}
-
-.mtg-row-indicator {
-  flex-shrink: 0;
-  padding-top: 2px;
-}
-
-.mtg-row-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-
-.mtg-row-title-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.mtg-row-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--t0);
-  font-family: var(--font, 'Syne', system-ui);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 300px;
-}
-.mtg-row-chips { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
-
-/* ── Inline AI summary ── */
-.mtg-row-ai-summary {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--t1);
-  line-height: 1.5;
-}
-.mtg-row-ai-summary span {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-}
-.mtg-ai-icon { color: var(--a); flex-shrink: 0; margin-top: 2px; }
-
-/* Meta row */
-.mtg-row-meta {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-.mtg-row-meta-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  color: var(--t2);
-}
-
-/* Delete button */
-.mtg-row-delete {
-  flex-shrink: 0;
-  margin: 10px 8px 0 0;
-  opacity: 0;
-  transition: opacity 160ms ease;
-}
-.mtg-row:hover .mtg-row-delete { opacity: 1; }
-
-/* ── Transcript preview ── */
-.mtg-transcript { margin-top: 2px; }
-.mtg-transcript-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  color: var(--t2);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 2px 0;
-  font-family: var(--font, 'Syne', system-ui);
-  transition: color 140ms ease;
-}
-.mtg-transcript-toggle:hover { color: var(--t0); }
-.mtg-transcript-body {
-  margin: 6px 0 0;
-  padding: 8px 10px;
-  background: var(--b0);
-  border-left: 2px solid var(--b2);
-  border-radius: 0 6px 6px 0;
-  font-size: 11px;
-  color: var(--t1);
-  line-height: 1.6;
-  font-family: monospace;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-/* ── Pulsing recording ring ── */
-@keyframes rec-ring-pulse {
-  0%   { box-shadow: 0 0 0 0 rgba(255,45,107,.6); transform: scale(1); }
-  60%  { box-shadow: 0 0 0 6px rgba(255,45,107,0); transform: scale(1.08); }
-  100% { box-shadow: 0 0 0 0 rgba(255,45,107,0); transform: scale(1); }
-}
-
-.mtg-rec-ring {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: 2px solid var(--c);
-  display: grid;
-  place-items: center;
-  background: var(--cd);
-  animation: rec-ring-pulse 1.6s cubic-bezier(.4,0,.6,1) infinite;
-  flex-shrink: 0;
-}
-
-/* ── Responsive ── */
-@media (max-width: 680px) {
-  .meetings-body--cal {
-    grid-template-columns: 1fr;
-  }
-  .meetings-aside { position: static; }
-  .mtg-row-title  { max-width: 200px; }
-}
+/* Spinner */
+.vc-spinner { border-color: transparent; border-top-color: var(--c); animation: spin 0.6s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }

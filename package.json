@@ -14,7 +14,8 @@
     "clean": "rm -rf dist node_modules/.vite",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "prepare": "husky"
   },
   "dependencies": {
     "@google/genai": "^1.33.0",
@@ -22,11 +23,21 @@
     "react": "^19.2.3",
     "react-dom": "^19.2.3"
   },
+  "lint-staged": {
+    "frontend/src/**/*.{js,jsx}": [
+      "cd frontend && npx eslint --fix --no-error-on-unmatched-pattern"
+    ],
+    "backend/**/*.js": [
+      "cd backend && npx eslint --fix --no-error-on-unmatched-pattern"
+    ]
+  },
   "devDependencies": {
     "@types/node": "^22.14.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0",
     "vitest": "^4.0.16"

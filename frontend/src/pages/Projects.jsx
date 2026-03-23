@@ -4,15 +4,20 @@ import { Plus, Search, FolderKanban, Calendar, DollarSign, Trash2, Target, Trend
 import { projectsApi } from '../services/api'
 import { GuideCard, PageHeader, Skeleton } from '../components/SharedUI'
 import { VCButton, VCBadge } from '../components/vc'
+import { useConfirm } from '../components/vc/ConfirmDialog'
+import ErrorState from '../components/vc/ErrorState'
 
 export default function Projects() {
+  const confirm = useConfirm()
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [newProject, setNewProject] = useState({ name: '', description: '' })
   const [creating, setCreating] = useState(false)
   const [wizardStep, setWizardStep] = useState(0) // 0: Create, 1: Organize, 2: Track
+  const [formErrors, setFormErrors] = useState({})
 
   useEffect(() => {
     loadProjects()
@@ -20,22 +25,31 @@ export default function Projects() {
 
   const loadProjects = async () => {
     try {
+      setError(null)
       setLoading(true)
       const data = await projectsApi.list({ limit: 50 })
       setProjects(data.projects || [])
       if (data.projects && data.projects.length > 0) {
         setWizardStep(2) // If projects exist, show track step
       }
-    } catch (error) {
-      console.error('Failed to load projects:', error)
+    } catch (err) {
+      console.error('Failed to load projects:', err)
+      setError(err.message || 'Failed to load projects')
     } finally {
       setLoading(false)
     }
   }
 
+  const validate = () => {
+    const errs = {}
+    if (!newProject.name?.trim()) errs.name = 'Project name is required'
+    setFormErrors(errs)
+    return Object.keys(errs).length === 0
+  }
+
   const handleCreate = async (e) => {
     e.preventDefault()
-    if (!newProject.name.trim()) return
+    if (!validate()) return
 
     try {
       setCreating(true)
@@ -55,7 +69,8 @@ export default function Projects() {
     e.preventDefault()
     e.stopPropagation()
 
-    if (!confirm('Are you sure you want to delete this project?')) return
+    const ok = await confirm({ title: 'Delete Project', message: 'Are you sure you want to delete this project?', confirmLabel: 'Delete', variant: 'danger' })
+    if (!ok) return
 
     try {
       await projectsApi.delete(id)
@@ -89,6 +104,12 @@ export default function Projects() {
     }
   }
 
+  if (error) return (
+    <div className="animate-fade-in max-w-7xl mx-auto">
+      <ErrorState message={error} onRetry={loadProjects} />
+    </div>
+  )
+
   return (
     <div className="animate-fade-in max-w-7xl mx-auto">
       <PageHeader
@@ -100,6 +121,7 @@ export default function Projects() {
             onClick={() => {
               setShowCreate(!showCreate)
               setWizardStep(0)
+              setFormErrors({})
             }}
           >
             <Plus size={16} />
@@ -134,6 +156,7 @@ export default function Projects() {
                 onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
                 required
               />
+              {formErrors.name && <span style={{ color: 'var(--c)', fontSize: 12, marginTop: 2, display: 'block' }}>{formErrors.name}</span>}
             </div>
             <div>
               <label className="label">Description</label>
@@ -258,6 +281,7 @@ export default function Projects() {
                   onClick={(e) => handleDelete(project.id, e)}
                   className="p-1.5 opacity-0 group-hover:opacity-100 transition-all"
                   title="Delete project"
+                  aria-label="Delete project"
                 >
                   <Trash2 size={14} />
                 </VCButton>

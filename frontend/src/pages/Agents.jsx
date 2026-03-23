@@ -9,6 +9,7 @@ import api from '../services/api';
 import { GuideCard, PageHeader, Skeleton } from '../components/SharedUI';
 import ExplanationCard from '../components/explainability/ExplanationCard';
 import { VCButton, VCBadge, VCIconBox, VCInput } from '../components/vc';
+import ErrorState from '../components/vc/ErrorState';
 
 // Category icons mapping
 const categoryIcons = {
@@ -348,14 +349,14 @@ export default function Agents() {
 
                   <div>
                     <label className="text-xs font-mono uppercase block mb-2" style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>Live Logs</label>
-                    <div className="text-green-400 p-3 rounded-sm font-mono text-xs h-48 overflow-y-auto custom-scrollbar" style={{ background: 'rgba(0,0,0,.9)', fontFamily: 'var(--font-mono)' }}>
+                    <div className="vc-text-success p-3 rounded-sm font-mono text-xs h-48 overflow-y-auto custom-scrollbar" style={{ background: 'rgba(0,0,0,.9)', fontFamily: 'var(--font-mono)' }}>
                       {executionLogs.length === 0 ? (
                         <span style={{ color: 'var(--text-tertiary)' }}>// Waiting for execution...</span>
                       ) : (
                         executionLogs.map(log => (
-                          <div key={log.id} className="mb-1 border-b border-gray-800 pb-1 last:border-0">
+                          <div key={log.id} className="mb-1 border-b vc-border-subtle pb-1 last:border-0">
                             <span style={{ color: 'var(--text-tertiary)' }}>[{new Date(log.created_at).toLocaleTimeString()}]</span> {log.trigger_type}
-                            <span className={log.success ? 'text-green-400' : 'text-red-400'}> {log.success ? 'OK' : 'ERR'}</span>
+                            <span className={log.success ? 'vc-text-success' : 'vc-text-error'}> {log.success ? 'OK' : 'ERR'}</span>
                           </div>
                         ))
                       )}

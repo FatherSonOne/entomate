@@ -4,6 +4,7 @@
  */
 
 const errorMonitoring = require('../services/monitoring/ErrorMonitoring');
+const log = require('./log');
 
 class AIUsageLogger {
   constructor() {
@@ -78,7 +79,7 @@ class AIUsageLogger {
     });
 
     // Log detailed usage
-    console.log('[AI Usage]', {
+    log.info('[AI Usage]', {
       timestamp: new Date().toISOString(),
       model,
       operation,
@@ -153,7 +154,7 @@ class AIUsageLogger {
 
     // Log warning at 80% of threshold
     if (this.dailyUsage.totalCost > thresholds.daily * 0.8) {
-      console.warn('[AI Usage] Warning: Approaching daily cost threshold', {
+      log.warn('[AI Usage] Warning: Approaching daily cost threshold', {
         current: `$${this.dailyUsage.totalCost.toFixed(2)}`,
         threshold: `$${thresholds.daily}`,
         remaining: `$${(thresholds.daily - this.dailyUsage.totalCost).toFixed(2)}`
@@ -182,11 +183,27 @@ class AIUsageLogger {
   /**
    * Reset daily usage statistics
    */
-  resetDailyUsage() {
+  async resetDailyUsage() {
     // Log summary before reset
-    console.log('[AI Usage] Daily summary:', this.getDailyUsage());
+    const summary = this.getDailyUsage();
+    log.info('[AI Usage] Daily summary:', summary);
 
-    // TODO: Save to database for historical tracking
+    // Save to database for historical tracking
+    try {
+      const { supabase } = require('../config/supabase');
+      if (supabase && summary.requestCount > 0) {
+        await supabase.from('ai_usage_logs').insert({
+          date: summary.date,
+          total_tokens: summary.totalTokens,
+          total_cost: summary.totalCost,
+          request_count: summary.requestCount,
+          by_model: summary.byModel
+        });
+        log.info('[AI Usage] Daily summary saved to database');
+      }
+    } catch (dbErr) {
+      log.warn('[AI Usage] Failed to save daily summary:', dbErr.message);
+    }
 
     // Reset counters
     this.dailyUsage = {
@@ -197,7 +214,7 @@ class AIUsageLogger {
       requestCount: 0
     };
 
-    console.log('[AI Usage] Daily usage reset');
+    log.info('[AI Usage] Daily usage reset');
   }
 
   /**

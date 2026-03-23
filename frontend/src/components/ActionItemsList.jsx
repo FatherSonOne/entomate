@@ -61,9 +61,9 @@ export default function ActionItemsList({ items = [], onUpdate, meetingId }) {
   const getPriorityColor = (priority) => {
     switch (priority) {
       case 'high': return 'bg-semantic-error'
-      case 'medium': return 'bg-yellow-500'
-      case 'low': return 'bg-green-500'
-      default: return 'bg-gray-400'
+      case 'medium': return 'vc-bg-warning'
+      case 'low': return 'vc-bg-success'
+      default: return 'vc-bg-raised'
     }
   }
 
@@ -85,7 +85,7 @@ export default function ActionItemsList({ items = [], onUpdate, meetingId }) {
         )
       default:
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium vc-bg-warning-dim vc-text-warning">
             <Clock className="w-3 h-3" />
             Pending
           </span>
@@ -182,7 +182,7 @@ export default function ActionItemsList({ items = [], onUpdate, meetingId }) {
       <div className="flex items-center justify-between mb-4">
         <div className="text-xs text-content-tertiary">
           <span className="text-semantic-success">{syncedCount} synced</span>
-          {pendingCount > 0 && <span className="ml-2 text-yellow-600">{pendingCount} pending</span>}
+          {pendingCount > 0 && <span className="ml-2 vc-text-warning">{pendingCount} pending</span>}
           {failedCount > 0 && <span className="ml-2 text-semantic-error">{failedCount} failed</span>}
         </div>
         {hasPending && (
@@ -210,8 +210,8 @@ export default function ActionItemsList({ items = [], onUpdate, meetingId }) {
 
       {/* Priority groups */}
       {renderItems(highPriority, 'High Priority', 'bg-semantic-error')}
-      {renderItems(mediumPriority, 'Medium Priority', 'bg-yellow-500')}
-      {renderItems(lowPriority, 'Low Priority', 'bg-green-500')}
+      {renderItems(mediumPriority, 'Medium Priority', 'vc-bg-warning')}
+      {renderItems(lowPriority, 'Low Priority', 'vc-bg-success')}
     </div>
   )
 }

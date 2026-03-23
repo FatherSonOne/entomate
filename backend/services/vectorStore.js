@@ -12,6 +12,7 @@
 
 const ai = require('../config/ai');
 const { supabase } = require('../config/supabase');
+const log = require('../utils/log');
 
 class VectorStore {
   constructor() {
@@ -60,7 +61,7 @@ class VectorStore {
       const embedding = await ai.generateEmbedding(truncatedText);
       return embedding;
     } catch (error) {
-      console.error('[VectorStore] Embedding generation error:', error);
+      log.error('[VectorStore] Embedding generation error:', { error: error.message || error });
       throw new Error(`Failed to generate embedding: ${error.message}`);
     }
   }
@@ -75,7 +76,7 @@ class VectorStore {
       return [];
     }
 
-    console.log(`[VectorStore] Generating embeddings for ${texts.length} texts`);
+    log.info(`[VectorStore] Generating embeddings for ${texts.length} texts`);
     const embeddings = [];
 
     for (const text of texts) {
@@ -155,7 +156,7 @@ class VectorStore {
       if (startIndex >= text.length - 1) break;
     }
 
-    console.log(`[VectorStore] Split text into ${chunks.length} chunks`);
+    log.info(`[VectorStore] Split text into ${chunks.length} chunks`);
     return chunks;
   }
 
@@ -244,11 +245,11 @@ class VectorStore {
         throw error;
       }
 
-      console.log(`[VectorStore] Stored document in collection: ${collectionName}`);
+      log.info(`[VectorStore] Stored document in collection: ${collectionName}`);
       return data;
 
     } catch (error) {
-      console.error('[VectorStore] Store document error:', error);
+      log.error('[VectorStore] Store document error:', { error: error.message || error });
       throw error;
     }
   }
@@ -269,7 +270,7 @@ class VectorStore {
       throw new Error('Supabase not configured');
     }
 
-    console.log(`[VectorStore] Storing ${chunks.length} chunks in collection: ${collectionName}`);
+    log.info(`[VectorStore] Storing ${chunks.length} chunks in collection: ${collectionName}`);
 
     const results = [];
     for (let i = 0; i < chunks.length; i++) {
@@ -293,7 +294,7 @@ class VectorStore {
       results.push(result);
     }
 
-    console.log(`[VectorStore] Successfully stored ${results.length} chunks`);
+    log.info(`[VectorStore] Successfully stored ${results.length} chunks`);
     return results;
   }
 
@@ -312,7 +313,7 @@ class VectorStore {
     chunkOverlap = this.defaultChunkOverlap,
     chunkingStrategy = 'overlap' // 'overlap' | 'paragraph' | 'none'
   }) {
-    console.log(`[VectorStore] Ingesting document (${content.length} chars) with strategy: ${chunkingStrategy}`);
+    log.info(`[VectorStore] Ingesting document (${content.length} chars) with strategy: ${chunkingStrategy}`);
 
     let chunks;
 
@@ -367,7 +368,7 @@ class VectorStore {
     }
 
     const startTime = Date.now();
-    console.log(`[VectorStore] Similarity search: "${query.substring(0, 50)}..."`);
+    log.info(`[VectorStore] Similarity search: "${query.substring(0, 50)}..."`);
 
     try {
       // Generate query embedding
@@ -397,14 +398,14 @@ class VectorStore {
       if (error) {
         // Fallback to basic similarity search if RPC not available
         if (error.code === '42883') {
-          console.warn('[VectorStore] RPC function not found, using fallback search');
+          log.warn('[VectorStore] RPC function not found, using fallback search');
           return this.fallbackSimilaritySearch(queryEmbedding, collectionName, topK, threshold);
         }
         throw error;
       }
 
       const executionTime = Date.now() - startTime;
-      console.log(`[VectorStore] Found ${data?.length || 0} results in ${executionTime}ms`);
+      log.info(`[VectorStore] Found ${data?.length || 0} results in ${executionTime}ms`);
 
       return {
         success: true,
@@ -416,7 +417,7 @@ class VectorStore {
       };
 
     } catch (error) {
-      console.error('[VectorStore] Similarity search error:', error);
+      log.error('[VectorStore] Similarity search error:', { error: error.message || error });
       throw error;
     }
   }
@@ -510,7 +511,7 @@ class VectorStore {
     filters = {}
   }) {
     const startTime = Date.now();
-    console.log(`[VectorStore] Hybrid search: "${query.substring(0, 50)}..."`);
+    log.info(`[VectorStore] Hybrid search: "${query.substring(0, 50)}..."`);
 
     try {
       // Perform vector search
@@ -544,7 +545,7 @@ class VectorStore {
         .slice(0, topK);
 
       const executionTime = Date.now() - startTime;
-      console.log(`[VectorStore] Hybrid search found ${finalResults.length} results in ${executionTime}ms`);
+      log.info(`[VectorStore] Hybrid search found ${finalResults.length} results in ${executionTime}ms`);
 
       return {
         success: true,
@@ -557,7 +558,7 @@ class VectorStore {
       };
 
     } catch (error) {
-      console.error('[VectorStore] Hybrid search error:', error);
+      log.error('[VectorStore] Hybrid search error:', { error: error.message || error });
       throw error;
     }
   }
@@ -591,7 +592,7 @@ class VectorStore {
 
       if (error) {
         // Fallback to ILIKE search
-        console.warn('[VectorStore] Full-text search failed, using ILIKE fallback');
+        log.warn('[VectorStore] Full-text search failed, using ILIKE fallback');
         return this.ilikeSearch({ query, collectionName, topK });
       }
 
@@ -608,7 +609,7 @@ class VectorStore {
       };
 
     } catch (error) {
-      console.error('[VectorStore] Keyword search error:', error);
+      log.error('[VectorStore] Keyword search error:', { error: error.message || error });
       return { success: false, results: [], error: error.message };
     }
   }
@@ -739,7 +740,7 @@ class VectorStore {
 
     if (error) throw error;
 
-    console.log(`[VectorStore] Deleted collection: ${collectionName} (${data?.length || 0} documents)`);
+    log.info(`[VectorStore] Deleted collection: ${collectionName} (${data?.length || 0} documents)`);
 
     return {
       success: true,
@@ -821,7 +822,7 @@ class VectorStore {
 
     if (error) throw error;
 
-    console.log(`[VectorStore] Deleted ${data?.length || 0} documents for source: ${sourceType}:${sourceId}`);
+    log.info(`[VectorStore] Deleted ${data?.length || 0} documents for source: ${sourceType}:${sourceId}`);
 
     return {
       success: true,

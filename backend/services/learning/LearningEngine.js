@@ -4,6 +4,7 @@
  */
 
 const { createClient } = require('@supabase/supabase-js');
+const log = require('../../utils/log');
 
 class LearningEngine {
   constructor() {
@@ -32,16 +33,16 @@ class LearningEngine {
         .eq('status', 'active');
 
       if (error) {
-        console.error('[LearningEngine] Error fetching patterns:', error);
+        log.error('[LearningEngine] Error fetching patterns:', { error: error.message || error });
         return recommendation; // Return original on error
       }
 
       if (!patterns || patterns.length === 0) {
-        console.log(`[LearningEngine] No active patterns for user ${userId}, agent ${agentType}`);
+        log.info(`[LearningEngine] No active patterns for user ${userId}, agent ${agentType}`);
         return recommendation; // No learning to apply
       }
 
-      console.log(`[LearningEngine] Applying ${patterns.length} patterns for user ${userId}, agent ${agentType}`);
+      log.info(`[LearningEngine] Applying ${patterns.length} patterns for user ${userId}, agent ${agentType}`);
 
       // Clone recommendation to avoid mutation
       const learnedRecommendation = JSON.parse(JSON.stringify(recommendation));
@@ -75,11 +76,11 @@ class LearningEngine {
         patterns: appliedPatterns
       };
 
-      console.log(`[LearningEngine] Applied ${appliedPatterns.length} patterns to recommendation`);
+      log.info(`[LearningEngine] Applied ${appliedPatterns.length} patterns to recommendation`);
 
       return learnedRecommendation;
     } catch (error) {
-      console.error('[LearningEngine] applyLearning error:', error);
+      log.error('[LearningEngine] applyLearning error:', { error: error.message || error });
       return recommendation; // Return original on error
     }
   }
@@ -105,7 +106,7 @@ class LearningEngine {
         return this.applyBoostPattern(recommendation, patternData);
 
       default:
-        console.warn(`[LearningEngine] Unknown pattern type: ${pattern.pattern_type}`);
+        log.warn(`[LearningEngine] Unknown pattern type: ${pattern.pattern_type}`);
         return false;
     }
   }
@@ -144,7 +145,7 @@ class LearningEngine {
             reason: `User historically prefers this option for ${context} tasks`
           };
 
-          console.log(`[LearningEngine] Applied preference boost: +${boost}% to ${preferredOption}`);
+          log.info(`[LearningEngine] Applied preference boost: +${boost}% to ${preferredOption}`);
           return true;
         }
       }
@@ -160,7 +161,7 @@ class LearningEngine {
           if (preferredScore >= topScore - 20) { // Only boost if reasonably close
             preferred.score = topScore + 5;
             recommendation.recommendation = preferred;
-            console.log(`[LearningEngine] Boosted ${preferredOption} to top recommendation`);
+            log.info(`[LearningEngine] Boosted ${preferredOption} to top recommendation`);
             return true;
           }
         }
@@ -204,7 +205,7 @@ class LearningEngine {
 
       const filtered = originalCount - recommendation.candidates.length;
       if (filtered > 0) {
-        console.log(`[LearningEngine] Applied constraint: filtered ${filtered} excluded options`);
+        log.info(`[LearningEngine] Applied constraint: filtered ${filtered} excluded options`);
 
         // If current top recommendation was excluded, pick new top
         if (recommendation.candidates.length > 0) {
@@ -251,7 +252,7 @@ class LearningEngine {
           reason: `Adjusted based on learned ${context} priority patterns`
         };
 
-        console.log(`[LearningEngine] Applied priority boost: ${direction} (${boostAmount}%)`);
+        log.info(`[LearningEngine] Applied priority boost: ${direction} (${boostAmount}%)`);
         return true;
       }
     }
@@ -274,7 +275,7 @@ class LearningEngine {
           reason: `${direction === 'increase' ? 'Increased' : 'Decreased'} based on learned patterns`
         };
 
-        console.log(`[LearningEngine] Applied boost: ${adjustment}% to ${factor}`);
+        log.info(`[LearningEngine] Applied boost: ${adjustment}% to ${factor}`);
         return true;
       }
     }

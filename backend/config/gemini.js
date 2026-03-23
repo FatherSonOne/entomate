@@ -1,4 +1,5 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const log = require('../utils/log');
 
 class GeminiService {
   constructor() {
@@ -12,7 +13,7 @@ class GeminiService {
       this.model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
       this.embeddingModel = this.genAI.getGenerativeModel({ model: 'text-embedding-004' });
     } else {
-      console.warn('⚠️ GEMINI_API_KEY not set in environment');
+      log.warn('GEMINI_API_KEY not set in environment');
     }
   }
 
@@ -35,7 +36,7 @@ class GeminiService {
     }
 
     try {
-      console.log('📝 Starting transcription...');
+      log.info('Starting transcription...');
 
       const audioData = audioBuffer.toString('base64');
 
@@ -64,11 +65,11 @@ Format the transcript clearly with each speaker turn on a new line.`
       });
 
       const transcript = response.response.text();
-      console.log('✅ Transcription complete');
+      log.info('Transcription complete');
 
       return transcript;
     } catch (error) {
-      console.error('❌ Transcription error:', error);
+      log.error('Transcription error:', { error: error.message || error });
       throw new Error(`Transcription failed: ${error.message}`);
     }
   }
@@ -84,7 +85,7 @@ Format the transcript clearly with each speaker turn on a new line.`
     }
 
     try {
-      console.log('📊 Generating summary...');
+      log.info('Generating summary...');
 
       const response = await this.model.generateContent({
         contents: [{
@@ -121,11 +122,11 @@ Return JSON with this exact structure:
       }
 
       const summary = JSON.parse(jsonText);
-      console.log('✅ Summary generated');
+      log.info('Summary generated');
 
       return summary;
     } catch (error) {
-      console.error('❌ Summary error:', error);
+      log.error('Summary error:', { error: error.message || error });
       throw new Error(`Summary generation failed: ${error.message}`);
     }
   }
@@ -141,7 +142,7 @@ Return JSON with this exact structure:
     }
 
     try {
-      console.log('📋 Extracting action items...');
+      log.info('Extracting action items...');
 
       const today = new Date().toISOString().split('T')[0];
 
@@ -189,11 +190,11 @@ Rules:
       }
 
       const result = JSON.parse(jsonText);
-      console.log(`✅ Extracted ${result.actionItems?.length || 0} action items`);
+      log.info(`Extracted ${result.actionItems?.length || 0} action items`);
 
       return result.actionItems || [];
     } catch (error) {
-      console.error('❌ Action items error:', error);
+      log.error('Action items error:', { error: error.message || error });
       throw new Error(`Action item extraction failed: ${error.message}`);
     }
   }
@@ -212,7 +213,7 @@ Rules:
       const result = await this.embeddingModel.embedContent(text);
       return result.embedding.values;
     } catch (error) {
-      console.error('❌ Embedding error:', error);
+      log.error('Embedding error:', { error: error.message || error });
       throw new Error(`Embedding generation failed: ${error.message}`);
     }
   }
@@ -229,7 +230,7 @@ Rules:
     }
 
     try {
-      console.log('🤔 Processing question...');
+      log.info('Processing question...');
 
       const response = await this.model.generateContent({
         contents: [{
@@ -263,11 +264,11 @@ Return ONLY valid JSON:
       }
 
       const result = JSON.parse(jsonText);
-      console.log('✅ Question answered');
+      log.info('Question answered');
 
       return result;
     } catch (error) {
-      console.error('❌ Question error:', error);
+      log.error('Question error:', { error: error.message || error });
       throw new Error(`Question answering failed: ${error.message}`);
     }
   }
@@ -309,7 +310,7 @@ Keep it concise but informative.`
 
       return response.response.text();
     } catch (error) {
-      console.error('❌ Chat recap error:', error);
+      log.error('Chat recap error:', { error: error.message || error });
       throw new Error(`Chat recap formatting failed: ${error.message}`);
     }
   }

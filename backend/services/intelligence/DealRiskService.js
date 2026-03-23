@@ -5,6 +5,7 @@
  */
 
 const { supabase, supabaseAdmin } = require('../../config/supabase');
+const log = require('../../utils/log');
 
 class DealRiskService {
   constructor() {
@@ -23,10 +24,10 @@ class DealRiskService {
       if (hubUrl && hubKey) {
         const { createClient } = require('@supabase/supabase-js');
         this.hubClient = createClient(hubUrl, hubKey);
-        console.log('[DealRiskService] Shared Hub client initialized');
+        log.info('[DealRiskService] Shared Hub client initialized');
       }
     } catch (error) {
-      console.warn('[DealRiskService] Hub initialization failed:', error.message);
+      log.warn('[DealRiskService] Hub initialization failed:', error.message);
     }
   }
 
@@ -50,7 +51,7 @@ class DealRiskService {
         .limit(limit);
 
       if (error) {
-        console.error('[DealRiskService] Error fetching cached scores:', error);
+        log.error('[DealRiskService] Error fetching cached scores:', { error: error.message || error });
       }
 
       // If we have fresh cached scores (< 4 hours old), use them
@@ -63,16 +64,16 @@ class DealRiskService {
         );
 
         if (freshScores.length > 0) {
-          console.log('[DealRiskService] Using cached risk scores');
+          log.info('[DealRiskService] Using cached risk scores');
           return freshScores.map(score => this.formatRiskAlert(score));
         }
       }
 
       // Otherwise, calculate fresh scores
-      console.log('[DealRiskService] Calculating fresh risk scores');
+      log.info('[DealRiskService] Calculating fresh risk scores');
       return await this.calculateAndCacheRiskScores(userId, options);
     } catch (error) {
-      console.error('[DealRiskService] getAtRiskDeals error:', error);
+      log.error('[DealRiskService] getAtRiskDeals error:', { error: error.message || error });
       return [];
     }
   }
@@ -106,7 +107,7 @@ class DealRiskService {
 
       return filteredScores.map(score => this.formatRiskAlert(score));
     } catch (error) {
-      console.error('[DealRiskService] calculateAndCacheRiskScores error:', error);
+      log.error('[DealRiskService] calculateAndCacheRiskScores error:', { error: error.message || error });
       return [];
     }
   }
@@ -164,7 +165,7 @@ class DealRiskService {
 
       return deals;
     } catch (error) {
-      console.error('[DealRiskService] getUserDeals error:', error);
+      log.error('[DealRiskService] getUserDeals error:', { error: error.message || error });
       return [];
     }
   }
@@ -257,7 +258,7 @@ class DealRiskService {
         calculated_at: new Date().toISOString()
       };
     } catch (error) {
-      console.error('[DealRiskService] calculateRiskScore error:', error);
+      log.error('[DealRiskService] calculateRiskScore error:', { error: error.message || error });
       return null;
     }
   }
@@ -302,7 +303,7 @@ class DealRiskService {
           : 0
       };
     } catch (error) {
-      console.error('[DealRiskService] getEngagementData error:', error);
+      log.error('[DealRiskService] getEngagementData error:', { error: error.message || error });
       return { meetingFrequency: 0, historicalAvg: 0, dropPercentage: 0 };
     }
   }
@@ -345,7 +346,7 @@ class DealRiskService {
         scores
       };
     } catch (error) {
-      console.error('[DealRiskService] getSentimentData error:', error);
+      log.error('[DealRiskService] getSentimentData error:', { error: error.message || error });
       return { trend: 'unknown', currentScore: 50, scores: [] };
     }
   }
@@ -392,7 +393,7 @@ class DealRiskService {
 
       return { total, completed, overdue, completionRate };
     } catch (error) {
-      console.error('[DealRiskService] getActionItemData error:', error);
+      log.error('[DealRiskService] getActionItemData error:', { error: error.message || error });
       return { total: 0, completed: 0, overdue: 0, completionRate: 100 };
     }
   }
@@ -431,7 +432,7 @@ class DealRiskService {
         coverageLevel
       };
     } catch (error) {
-      console.error('[DealRiskService] getStakeholderData error:', error);
+      log.error('[DealRiskService] getStakeholderData error:', { error: error.message || error });
       return { uniqueStakeholders: 0, coverageLevel: 'low' };
     }
   }
@@ -606,7 +607,7 @@ class DealRiskService {
    */
   async cacheRiskScores(riskScores) {
     if (!supabaseAdmin) {
-      console.warn('[DealRiskService] No admin client for caching');
+      log.warn('[DealRiskService] No admin client for caching');
       return;
     }
 
@@ -629,13 +630,13 @@ class DealRiskService {
           });
 
         if (error) {
-          console.error('[DealRiskService] Cache error:', error);
+          log.error('[DealRiskService] Cache error:', { error: error.message || error });
         }
       }
 
-      console.log(`[DealRiskService] Cached ${riskScores.length} risk scores`);
+      log.info(`[DealRiskService] Cached ${riskScores.length} risk scores`);
     } catch (error) {
-      console.error('[DealRiskService] cacheRiskScores error:', error);
+      log.error('[DealRiskService] cacheRiskScores error:', { error: error.message || error });
     }
   }
 

@@ -7,6 +7,7 @@
 const cron = require('node-cron');
 const { supabase } = require('../config/supabase');
 const { v4: uuidv4 } = require('uuid');
+const log = require('../utils/log');
 
 class AutomationScheduler {
   constructor() {
@@ -20,14 +21,14 @@ class AutomationScheduler {
   async initialize() {
     if (this.initialized) return;
 
-    console.log('⏰ Initializing automation scheduler...');
+    log.info('Initializing automation scheduler...');
 
     try {
       await this.loadScheduledAutomations();
       this.initialized = true;
-      console.log('✅ Automation scheduler initialized');
+      log.info('Automation scheduler initialized');
     } catch (error) {
-      console.error('❌ Failed to initialize scheduler:', error);
+      log.error('Failed to initialize scheduler:', { error: error.message || error });
     }
   }
 
@@ -36,7 +37,7 @@ class AutomationScheduler {
    */
   async loadScheduledAutomations() {
     if (!supabase) {
-      console.warn('⚠️ Supabase not configured, skipping scheduled automations');
+      log.warn('Supabase not configured, skipping scheduled automations');
       return;
     }
 
@@ -47,11 +48,11 @@ class AutomationScheduler {
       .eq('enabled', true);
 
     if (error) {
-      console.error('❌ Error loading scheduled automations:', error);
+      log.error('Error loading scheduled automations:', { error: error.message || error });
       return;
     }
 
-    console.log(`📅 Found ${automations?.length || 0} scheduled automations`);
+    log.info(`Found ${automations?.length || 0} scheduled automations`);
 
     for (const automation of automations || []) {
       this.scheduleAutomation(automation);
@@ -65,13 +66,13 @@ class AutomationScheduler {
     const cronExpression = automation.trigger_config?.cron;
 
     if (!cronExpression) {
-      console.warn(`⚠️ Automation ${automation.id} has no cron expression`);
+      log.warn(`Automation ${automation.id} has no cron expression`);
       return false;
     }
 
     // Validate cron expression
     if (!cron.validate(cronExpression)) {
-      console.error(`❌ Invalid cron expression for automation ${automation.id}: ${cronExpression}`);
+      log.error(`Invalid cron expression for automation ${automation.id}: ${cronExpression}`);
       return false;
     }
 
@@ -93,7 +94,7 @@ class AutomationScheduler {
       nextRun: this.getNextRunTime(cronExpression)
     });
 
-    console.log(`⏰ Scheduled automation: ${automation.name} (${cronExpression})`);
+    log.info(`Scheduled automation: ${automation.name} (${cronExpression})`);
     return true;
   }
 
@@ -105,7 +106,7 @@ class AutomationScheduler {
     if (scheduled) {
       scheduled.job.stop();
       this.scheduledJobs.delete(automationId);
-      console.log(`🛑 Cancelled scheduled automation: ${automationId}`);
+      log.info(`Cancelled scheduled automation: ${automationId}`);
       return true;
     }
     return false;
@@ -116,7 +117,7 @@ class AutomationScheduler {
    */
   async executeScheduledAutomation(automation) {
     const startTime = Date.now();
-    console.log(`⚡ Executing scheduled automation: ${automation.name}`);
+    log.info(`Executing scheduled automation: ${automation.name}`);
 
     const triggerData = {
       triggeredBy: 'scheduler',
@@ -159,7 +160,7 @@ class AutomationScheduler {
         error_message: errorMessage,
         duration_ms: duration,
         created_at: new Date().toISOString()
-      }).catch(err => console.error('Failed to log execution:', err));
+      }).catch(err => log.error('Failed to log execution:', { error: err.message || err }));
 
       // Update automation stats
       await supabase
@@ -169,7 +170,7 @@ class AutomationScheduler {
           last_executed_at: new Date().toISOString()
         })
         .eq('id', automation.id)
-        .catch(err => console.error('Failed to update automation stats:', err));
+        .catch(err => log.error('Failed to update automation stats:', { error: err.message || err }));
     }
 
     // Update next run time in our map
@@ -178,7 +179,7 @@ class AutomationScheduler {
       scheduled.nextRun = this.getNextRunTime(scheduled.cronExpression);
     }
 
-    console.log(`${success ? '✅' : '❌'} Scheduled automation completed: ${automation.name} (${duration}ms)`);
+    log.info(`${success ? '' : ''} Scheduled automation completed: ${automation.name} (${duration}ms)`);
 
     return { success, results, duration };
   }
@@ -189,7 +190,7 @@ class AutomationScheduler {
   async executeAction(action, triggerData, automation) {
     // This would call the actual action executor
     // For now, return success with placeholder
-    console.log(`  ⚡ Executing action: ${action.type}`);
+    log.info(`Executing action: ${action.type}`);
     return { message: `Action ${action.type} executed`, triggerData };
   }
 
@@ -267,13 +268,13 @@ class AutomationScheduler {
    * Shutdown scheduler
    */
   shutdown() {
-    console.log('⏹️ Shutting down automation scheduler...');
+    log.info('Shutting down automation scheduler...');
     for (const [id, scheduled] of this.scheduledJobs) {
       scheduled.job.stop();
     }
     this.scheduledJobs.clear();
     this.initialized = false;
-    console.log('✅ Automation scheduler stopped');
+    log.info('Automation scheduler stopped');
   }
 }
 

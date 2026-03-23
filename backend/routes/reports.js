@@ -7,6 +7,7 @@ const express = require('express');
 const router = express.Router();
 const { supabase } = require('../config/supabase');
 const reportService = require('../services/reportService');
+const log = require('../utils/log');
 
 /**
  * GET /api/reports/meeting/:id/pdf
@@ -49,7 +50,7 @@ router.get('/meeting/:id/pdf', async (req, res) => {
 
     res.send(pdfBuffer);
   } catch (error) {
-    console.error('Error generating meeting PDF:', error);
+    log.error('Error generating meeting PDF:', { error: error.message || error });
     res.status(500).json({ error: 'Failed to generate PDF', details: error.message });
   }
 });
@@ -99,7 +100,7 @@ router.get('/goals/pdf', async (req, res) => {
 
     res.send(pdfBuffer);
   } catch (error) {
-    console.error('Error generating goals PDF:', error);
+    log.error('Error generating goals PDF:', { error: error.message || error });
     res.status(500).json({ error: 'Failed to generate PDF', details: error.message });
   }
 });
@@ -176,7 +177,7 @@ router.get('/project/:id/pdf', async (req, res) => {
 
     res.send(pdfBuffer);
   } catch (error) {
-    console.error('Error generating project PDF:', error);
+    log.error('Error generating project PDF:', { error: error.message || error });
     res.status(500).json({ error: 'Failed to generate PDF', details: error.message });
   }
 });
@@ -218,7 +219,7 @@ router.get('/weekly/pdf', async (req, res) => {
 
     res.send(pdfBuffer);
   } catch (error) {
-    console.error('Error generating weekly PDF:', error);
+    log.error('Error generating weekly PDF:', { error: error.message || error });
     res.status(500).json({ error: 'Failed to generate PDF', details: error.message });
   }
 });
@@ -246,7 +247,7 @@ router.get('/meetings/csv', async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="meetings-export-${Date.now()}.csv"`);
     res.send(csv);
   } catch (error) {
-    console.error('Error generating meetings CSV:', error);
+    log.error('Error generating meetings CSV:', { error: error.message || error });
     res.status(500).json({ error: 'Failed to generate CSV', details: error.message });
   }
 });
@@ -282,7 +283,7 @@ router.get('/action-items/csv', async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="action-items-export-${Date.now()}.csv"`);
     res.send(csv);
   } catch (error) {
-    console.error('Error generating action items CSV:', error);
+    log.error('Error generating action items CSV:', { error: error.message || error });
     res.status(500).json({ error: 'Failed to generate CSV', details: error.message });
   }
 });
@@ -318,7 +319,7 @@ router.get('/goals/csv', async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="goals-export-${Date.now()}.csv"`);
     res.send(csv);
   } catch (error) {
-    console.error('Error generating goals CSV:', error);
+    log.error('Error generating goals CSV:', { error: error.message || error });
     res.status(500).json({ error: 'Failed to generate CSV', details: error.message });
   }
 });

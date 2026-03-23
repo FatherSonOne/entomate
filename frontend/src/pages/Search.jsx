@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { searchApi } from '../services/api'
 import { VCButton, VCBadge, VCSelect } from '../components/vc'
+import ErrorState from '../components/vc/ErrorState'
 
 export default function Search() {
   // Search state

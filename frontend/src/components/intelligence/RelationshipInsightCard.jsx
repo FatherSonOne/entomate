@@ -22,7 +22,7 @@ export default function RelationshipInsightCard({ data, onAction }) {
     const badges = {
       champion: { label: 'Champion', color: 'bg-semantic-success-dim text-semantic-success border-semantic-success' },
       influencer: { label: 'Influencer', color: 'bg-semantic-info-dim text-semantic-info border-semantic-info' },
-      economic_buyer: { label: 'Economic Buyer', color: 'bg-accent-tertiary-dim text-purple-800 border-accent-tertiary' },
+      economic_buyer: { label: 'Economic Buyer', color: 'bg-accent-tertiary-dim text-accent-tertiary border-accent-tertiary' },
       blocker: { label: 'Blocker', color: 'bg-semantic-error-dim text-semantic-error border-semantic-error' },
       unknown: { label: 'Unknown', color: 'bg-surface-muted text-content-primary border-line-default' }
     }
@@ -38,7 +38,7 @@ export default function RelationshipInsightCard({ data, onAction }) {
           <Star
             key={i}
             className={`w-3 h-3 ${
-              i < stars ? 'text-amber-400 fill-amber-400' : 'text-gray-300'
+              i < stars ? 'vc-fill-warning' : 'vc-text-dim'
             }`}
           />
         ))}
@@ -64,7 +64,7 @@ export default function RelationshipInsightCard({ data, onAction }) {
       {newChampions.length > 0 && (
         <div>
           <h5 className="text-xs font-semibold text-content-secondary mb-2 flex items-center gap-1">
-            <Star className="w-4 h-4 text-amber-500" />
+            <Star className="w-4 h-4 vc-text-warning" />
             New Champion Identified
           </h5>
           {newChampions.slice(0, 2).map((champion, index) => {
@@ -209,8 +209,8 @@ export default function RelationshipInsightCard({ data, onAction }) {
           <div className="w-full h-2 bg-surface-muted rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full transition-all ${
-                coverage.coverageScore >= 75 ? 'bg-green-500' :
-                coverage.coverageScore >= 50 ? 'bg-amber-500' : 'bg-red-500'
+                coverage.coverageScore >= 75 ? 'vc-bg-success' :
+                coverage.coverageScore >= 50 ? 'vc-bg-warning' : 'vc-bg-error'
               }`}
               style={{ width: `${coverage.coverageScore}%` }}
             />

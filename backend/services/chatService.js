@@ -5,6 +5,7 @@
  */
 
 const axios = require('axios');
+const log = require('../utils/log');
 
 class ChatService {
   constructor() {
@@ -35,7 +36,7 @@ class ChatService {
         break;
 
       default:
-        console.log(`⚠️ Unknown chat provider: ${this.provider}`);
+        log.info(`Unknown chat provider: ${this.provider}`);
     }
   }
 
@@ -182,7 +183,7 @@ class ChatService {
 
         allChannels.push(...textChannels);
       } catch (err) {
-        console.error(`Failed to get channels for guild ${guild.name}:`, err.message);
+        log.error(`Failed to get channels for guild ${guild.name}:`, err.message);
       }
     }
 
@@ -194,7 +195,7 @@ class ChatService {
    */
   async postMessage(channelId, message, options = {}) {
     if (!this.configured) {
-      console.log('⚠️ Chat not configured, skipping message post');
+      log.info('Chat not configured, skipping message post');
       return { success: false, message: 'Chat not configured' };
     }
 
@@ -220,7 +221,7 @@ class ChatService {
 
       return { success: true, ...result };
     } catch (error) {
-      console.error(`Chat post failed:`, error.response?.data || error.message);
+      log.error(`Chat post failed:`, error.response?.data || error.message);
       return {
         success: false,
         error: error.response?.data?.error || error.message,

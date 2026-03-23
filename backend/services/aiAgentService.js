@@ -13,6 +13,7 @@ const chatService = require('./chatService');
 const automationEngine = require('./automationEngine');
 const agentTemplates = require('./agentTemplates');
 const explainabilityService = require('./explainability/ExplainabilityService');
+const log = require('../utils/log');
 
 class AIAgent {
   constructor(agentData) {
@@ -44,7 +45,7 @@ class AIAgent {
     };
 
     try {
-      console.log(`🤖 Agent "${this.name}" executing...`);
+      log.info(`Agent "${this.name}" executing...`);
 
       // Step 1: Gather context
       execution.context_gathered = await this.gatherContext(triggerEvent);
@@ -94,7 +95,7 @@ class AIAgent {
           await explainabilityService.storeExplanation(executionRecord.id, explanation);
         }
       } catch (error) {
-        console.error(`Agent "${this.name}" explanation error:`, error);
+        log.error(`Agent "${this.name}" explanation error:`, { error: error.message || error });
       }
 
       return {
@@ -106,7 +107,7 @@ class AIAgent {
       };
 
     } catch (error) {
-      console.error(`Agent "${this.name}" error:`, error);
+      log.error(`Agent "${this.name}" error:`, { error: error.message || error });
       execution.success = false;
       execution.error_message = error.message;
       execution.duration_ms = Date.now() - startTime;
@@ -173,7 +174,7 @@ class AIAgent {
       context.pastDecisions = this.memory.recentDecisions || [];
 
     } catch (error) {
-      console.error('Context gathering error:', error);
+      log.error('Context gathering error:', { error: error.message || error });
     }
 
     return context;
@@ -207,7 +208,7 @@ class AIAgent {
       }
 
     } catch (error) {
-      console.error('AI decision error:', error);
+      log.error('AI decision error:', { error: error.message || error });
       // Fall back to rule-based decisions
       decisions.push(...this.makeRuleBasedDecisions(context, triggerEvent));
     }
@@ -269,7 +270,7 @@ Respond in JSON format:
         return parsed.decisions || [];
       }
     } catch (error) {
-      console.error('Failed to parse AI decisions:', error);
+      log.error('Failed to parse AI decisions:', { error: error.message || error });
     }
     return [];
   }
@@ -381,7 +382,7 @@ Respond in JSON format:
       .single();
 
     if (error) {
-      console.error('Error logging execution:', error);
+      log.error('Error logging execution:', { error: error.message || error });
       return null;
     }
 
@@ -442,7 +443,7 @@ class AIAgentService {
    * Trigger agents for an event
    */
   async trigger(triggerType, triggerData) {
-    console.log(`🤖 AI Agent trigger: ${triggerType}`);
+    log.info(`AI Agent trigger: ${triggerType}`);
 
     try {
       // Find enabled agents for this trigger
@@ -471,11 +472,11 @@ class AIAgentService {
       });
 
       if (matchingAgents.length === 0) {
-        console.log(`No agents matched trigger: ${triggerType}`);
+        log.info(`No agents matched trigger: ${triggerType}`);
         return { executed: 0, results: [] };
       }
 
-      console.log(`Found ${matchingAgents.length} agents to execute`);
+      log.info(`Found ${matchingAgents.length} agents to execute`);
 
       // Execute each agent
       const results = [];
@@ -488,7 +489,7 @@ class AIAgentService {
       return { executed: results.length, results };
 
     } catch (error) {
-      console.error('AI Agent trigger error:', error);
+      log.error('AI Agent trigger error:', { error: error.message || error });
       return { executed: 0, error: error.message };
     }
   }

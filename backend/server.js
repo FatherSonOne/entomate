@@ -20,6 +20,20 @@ const { apiLimiter } = require('./middleware/rateLimiter');
 const logger = require('./services/logger');
 const errorTracking = require('./services/errorTracking');
 
+// Validate environment variables
+const { validateEnv } = require('./config/validateEnv');
+validateEnv();
+
+// Process-level error handlers
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled Rejection:', { reason: reason?.message || reason, stack: reason?.stack });
+});
+
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught Exception:', { message: error.message, stack: error.stack });
+  process.exit(1);
+});
+
 // Initialize app
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -41,7 +55,16 @@ app.use(errorTracking.requestHandler());
 
 // Security headers
 app.use(helmet({
-  contentSecurityPolicy: process.env.NODE_ENV === 'production' ? undefined : false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", process.env.SUPABASE_URL || '', "https://*.supabase.co"].filter(Boolean),
+    }
+  },
   crossOriginEmbedderPolicy: false
 }));
 
@@ -64,7 +87,7 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 // Cookie and session (for calendar OAuth)
 app.use(cookieParser());
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'entomate-session-secret',
+  secret: process.env.SESSION_SECRET || (process.env.NODE_ENV === 'production' ? (() => { throw new Error('SESSION_SECRET is required in production'); })() : 'entomate-dev-session-secret'),
   resave: false,
   saveUninitialized: false,
   cookie: {

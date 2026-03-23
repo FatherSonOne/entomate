@@ -61,7 +61,7 @@ export default function WorkflowToolbar({
             {workflow?.name || 'Untitled Workflow'}
           </h1>
           {isDirty && (
-            <span className="w-2 h-2 bg-orange-400 rounded-full" title="Unsaved changes" />
+            <span className="w-2 h-2 vc-bg-warning rounded-full" title="Unsaved changes" />
           )}
           <span className={`px-2 py-0.5 text-xs rounded-full ${
             isActive

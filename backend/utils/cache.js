@@ -26,7 +26,7 @@ class MemoryCache {
       this.cleanup();
     }, 60 * 1000);
 
-    console.log('✅ Memory cache initialized (max size:', this.maxSize, ', default TTL:', this.defaultTTL / 1000, 's)');
+    log.info('Memory cache initialized (max size:', this.maxSize, ', default TTL:', this.defaultTTL / 1000, 's)');
   }
 
   /**
@@ -140,7 +140,7 @@ class MemoryCache {
     }
 
     if (removed > 0) {
-      console.log(`🧹 Cache cleanup: removed ${removed} expired entries`);
+      log.info(`Cache cleanup: removed ${removed} expired entries`);
     }
   }
 

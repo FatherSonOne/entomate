@@ -8,7 +8,7 @@ import {
 
 // Secrets API service factory - creates API with token getter
 const createSecretsApi = (getToken) => ({
-  baseUrl: import.meta.env.VITE_API_URL || 'http://localhost:3000',
+  baseUrl: import.meta.env.VITE_API_URL || '',
 
   async request(endpoint, options = {}) {
     const token = await getToken()
@@ -68,7 +68,7 @@ let secretsApi = null
 // Environment badge colors
 const ENVIRONMENT_COLORS = {
   development: 'bg-semantic-info-dim text-semantic-info border-semantic-info',
-  staging: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+  staging: 'vc-bg-warning-dim vc-text-warning vc-border-warning',
   production: 'bg-semantic-success-dim text-semantic-success border-semantic-success'
 }
 
@@ -893,7 +893,7 @@ export default function SecretsManager({
       )}
 
       {/* Info footer */}
-      <div className="mt-4 p-3 bg-semantic-info-dim border border-blue-100 rounded-lg">
+      <div className="mt-4 p-3 bg-semantic-info-dim border vc-border-subtle rounded-lg">
         <p className="text-sm text-semantic-info">
           <strong>Tip:</strong> Use secrets in your workflows with expressions like{' '}
           <code className="bg-semantic-info-dim px-1 rounded">{'{{secrets.API_KEY}}'}</code>

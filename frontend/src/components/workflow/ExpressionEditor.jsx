@@ -111,7 +111,7 @@ function PreviewTooltip({ value, visible, position }) {
 
   return (
     <div
-      className="fixed z-50 bg-gray-900 text-white text-xs rounded-lg shadow-xl p-3 max-w-sm"
+      className="fixed z-50 vc-bg-code vc-text-primary text-xs rounded-lg shadow-xl p-3 max-w-sm"
       style={{ top: position.top, left: position.left }}
     >
       <div className="flex items-center gap-2 mb-1 text-content-tertiary">

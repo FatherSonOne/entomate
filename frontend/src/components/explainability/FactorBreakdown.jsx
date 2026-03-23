@@ -11,7 +11,7 @@ export default function FactorBreakdown({ factors, showDetails = true, compact =
       case 'strong':
         return <TrendingUp size={16} className="text-semantic-success" />;
       case 'moderate':
-        return <Minus size={16} className="text-yellow-600" />;
+        return <Minus size={16} className="vc-text-warning" />;
       case 'weak':
         return <TrendingDown size={16} className="text-semantic-warning" />;
       default:
@@ -22,11 +22,11 @@ export default function FactorBreakdown({ factors, showDetails = true, compact =
   const getImpactColor = (impact) => {
     switch (impact) {
       case 'strong':
-        return 'border-green-500 bg-semantic-success-dim';
+        return 'vc-border-success vc-bg-success-dim';
       case 'moderate':
-        return 'border-yellow-500 bg-yellow-50';
+        return 'vc-border-warning vc-bg-warning-dim';
       case 'weak':
-        return 'border-orange-500 bg-orange-50';
+        return 'vc-border-warning vc-bg-warning-dim';
       default:
         return 'border-line-strong bg-surface-muted';
     }
@@ -34,15 +34,15 @@ export default function FactorBreakdown({ factors, showDetails = true, compact =
 
   const getScoreColor = (score) => {
     if (score >= 80) return 'text-semantic-success';
-    if (score >= 60) return 'text-yellow-600';
+    if (score >= 60) return 'vc-text-warning';
     if (score >= 40) return 'text-semantic-warning';
     return 'text-semantic-error';
   };
 
   const getScoreBarColor = (score) => {
-    if (score >= 80) return 'bg-green-500';
-    if (score >= 60) return 'bg-yellow-500';
-    if (score >= 40) return 'bg-orange-500';
+    if (score >= 80) return 'vc-bg-success';
+    if (score >= 60) return 'vc-bg-warning';
+    if (score >= 40) return 'vc-bg-warning';
     return 'bg-semantic-error';
   };
 
@@ -57,7 +57,7 @@ export default function FactorBreakdown({ factors, showDetails = true, compact =
                   {getImpactIcon(factor.impact)}
                   <span className="text-sm font-medium text-content-secondary">{factor.name}</span>
                   {factor.learningApplied && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-accent-primary-dim text-indigo-800">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-accent-primary-dim vc-text-accent">
                       <CheckCircle size={10} />
                       Learned
                     </span>

@@ -6,13 +6,16 @@ import {
   Calendar, BarChart3, Edit2, Trash2
 } from 'lucide-react';
 import api from '../services/api';
+import { useConfirm } from '../components/vc/ConfirmDialog';
 import { VCButton, VCBadge, VCProgress } from '../components/vc';
+import ErrorState from '../components/vc/ErrorState';
 
 export default function Goals() {
   const [goals, setGoals] = useState([]);
   const [hierarchy, setHierarchy] = useState(null);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [selectedGoal, setSelectedGoal] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [viewMode, setViewMode] = useState('hierarchy'); // hierarchy, list
@@ -24,6 +27,7 @@ export default function Goals() {
 
   const fetchData = async () => {
     try {
+      setError(null);
       setLoading(true);
       const [goalsRes, hierarchyRes, statsRes] = await Promise.all([
         api.get('/goals'),
@@ -34,8 +38,9 @@ export default function Goals() {
       setGoals(goalsRes.data || []);
       setHierarchy(hierarchyRes.data);
       setStats(statsRes.data);
-    } catch (error) {
-      console.error('Failed to fetch goals:', error);
+    } catch (err) {
+      console.error('Failed to fetch goals:', err);
+      setError(err.message || 'Failed to load goals');
     } finally {
       setLoading(false);
     }
@@ -103,6 +108,7 @@ export default function Goals() {
                   }}
                   className="mt-1 p-1 rounded"
                   style={{ ['--hover-bg']: 'var(--bg-elevated)' }}
+                  aria-label={isExpanded ? 'Collapse' : 'Expand'}
                 >
                   {isExpanded ? (
                     <ChevronDown className="h-4 w-4" style={{ color: 'var(--text-tertiary)' }} />
@@ -213,6 +219,12 @@ export default function Goals() {
       </div>
     );
   }
+
+  if (error) return (
+    <div className="space-y-6">
+      <ErrorState message={error} onRetry={fetchData} />
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -421,6 +433,7 @@ export default function Goals() {
 }
 
 function GoalDetailPanel({ goal, onUpdate, onClose }) {
+  const confirm = useConfirm();
   const [editingKR, setEditingKR] = useState(null);
   const [newKRTitle, setNewKRTitle] = useState('');
   const [newKRTarget, setNewKRTarget] = useState('');
@@ -450,7 +463,8 @@ function GoalDetailPanel({ goal, onUpdate, onClose }) {
   };
 
   const deleteGoal = async () => {
-    if (!confirm('Are you sure you want to delete this goal?')) return;
+    const ok = await confirm({ title: 'Delete?', message: 'Are you sure you want to delete this goal?', confirmLabel: 'Delete', variant: 'danger' });
+    if (!ok) return;
     try {
       await api.delete(`/goals/${goal.id}`);
       onClose();
@@ -481,6 +495,7 @@ function GoalDetailPanel({ goal, onUpdate, onClose }) {
           onClick={deleteGoal}
           className="p-2"
           title="Delete goal"
+          aria-label="Delete goal"
         >
           <Trash2 className="h-4 w-4" />
         </VCButton>
@@ -532,6 +547,7 @@ function GoalDetailPanel({ goal, onUpdate, onClose }) {
                   onClick={() => setEditingKR(editingKR === kr.id ? null : kr.id)}
                   className="p-0.5"
                   title="Edit key result"
+                  aria-label="Edit key result"
                 >
                   <Edit2 className="h-3 w-3" />
                 </VCButton>
@@ -619,10 +635,19 @@ function CreateGoalModal({ goals, onClose, onCreated }) {
     quarter: getCurrentQuarter()
   });
   const [saving, setSaving] = useState(false);
+  const [formErrors, setFormErrors] = useState({});
+
+  const validate = () => {
+    const errs = {};
+    if (!formData.title?.trim()) errs.title = 'Title is required';
+    if (!['company', 'team', 'individual'].includes(formData.goal_type)) errs.goal_type = 'Goal type must be company, team, or individual';
+    setFormErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.title) return;
+    if (!validate()) return;
 
     setSaving(true);
     try {
@@ -673,6 +698,7 @@ function CreateGoalModal({ goals, onClose, onCreated }) {
                 placeholder="Increase revenue by 20%"
                 required
               />
+              {formErrors.title && <span style={{ color: 'var(--c)', fontSize: 12, marginTop: 2, display: 'block' }}>{formErrors.title}</span>}
             </div>
 
             <div>
@@ -712,6 +738,7 @@ function CreateGoalModal({ goals, onClose, onCreated }) {
                   <option value="team">Team</option>
                   <option value="individual">Individual</option>
                 </select>
+                {formErrors.goal_type && <span style={{ color: 'var(--c)', fontSize: 12, marginTop: 2, display: 'block' }}>{formErrors.goal_type}</span>}
               </div>
 
               <div>

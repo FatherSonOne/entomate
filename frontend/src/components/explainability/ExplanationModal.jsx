@@ -13,7 +13,7 @@ export default function ExplanationModal({ explanation, onClose, agentType }) {
 
   const getConfidenceColor = (conf) => {
     if (conf >= 80) return 'text-semantic-success bg-semantic-success-dim';
-    if (conf >= 60) return 'text-yellow-600 bg-yellow-100';
+    if (conf >= 60) return 'vc-text-warning vc-bg-warning-dim';
     return 'text-semantic-warning bg-semantic-warning-dim';
   };
 
@@ -47,7 +47,7 @@ export default function ExplanationModal({ explanation, onClose, agentType }) {
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-surface rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="sticky top-0 bg-gradient-to-r from-indigo-600 to-blue-600 px-6 py-4 flex items-center justify-between">
+        <div className="sticky top-0 px-6 py-4 flex items-center justify-between" style={{ background: 'var(--c)' }}>
           <div className="flex items-center gap-4 text-white">
             <div className="text-4xl">{getAgentIcon(agentType)}</div>
             <div>
@@ -57,7 +57,7 @@ export default function ExplanationModal({ explanation, onClose, agentType }) {
           </div>
           <button
             onClick={onClose}
-            className="text-white hover:text-gray-200 p-2 rounded-full hover:bg-surface hover:bg-opacity-20"
+            className="p-2 rounded-full hover:bg-surface hover:bg-opacity-20" style={{ color: 'var(--t0)' }}
           >
             <X size={24} />
           </button>
@@ -66,7 +66,7 @@ export default function ExplanationModal({ explanation, onClose, agentType }) {
         {/* Content */}
         <div className="px-6 py-6 space-y-6">
           {/* Recommendation Summary */}
-          <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg p-6 border border-indigo-200">
+          <div className="rounded-lg p-6 border vc-border-subtle" style={{ background: 'var(--cd)' }}>
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
                 <Brain size={32} className="text-accent-primary" />
@@ -181,7 +181,7 @@ export default function ExplanationModal({ explanation, onClose, agentType }) {
         <div className="sticky bottom-0 bg-surface-muted border-t border-line-default px-6 py-4 flex justify-end">
           <button
             onClick={onClose}
-            className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-medium"
+            className="px-6 py-2 rounded-md font-medium" style={{ background: 'var(--c)', color: 'var(--t0)' }}
           >
             Close
           </button>

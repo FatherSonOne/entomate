@@ -38,7 +38,7 @@ function AudioVisualizer({ stream, isActive }) {
         const x = i * barWidth
         const y = canvas.height - barHeight
 
-        ctx.fillStyle = `rgba(var(--highlight-color-rgb), ${0.1 + percent * 0.9})`
+        ctx.fillStyle = `rgba(255, 45, 107, ${0.1 + percent * 0.9})`
         ctx.fillRect(x, y, barWidth - 1, barHeight)
       }
     }

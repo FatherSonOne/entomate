@@ -8,6 +8,7 @@ const router = express.Router();
 const { authenticate } = require('../middleware/auth');
 const { apiLimiter } = require('../middleware/rateLimiter');
 const ExplanationService = require('../services/explainability/ExplanationService');
+const log = require('../utils/log');
 
 /**
  * POST /api/explainability/explanations
@@ -53,7 +54,7 @@ router.post(
         message: 'Explanation created successfully'
       });
     } catch (error) {
-      console.error('[Explainability API] Create explanation error:', error);
+      log.error('[Explainability API] Create explanation error:', { error: error.message || error });
       res.status(500).json({
         success: false,
         error: 'Failed to create explanation',
@@ -89,7 +90,7 @@ router.get(
         data: explanation
       });
     } catch (error) {
-      console.error('[Explainability API] Get explanation error:', error);
+      log.error('[Explainability API] Get explanation error:', { error: error.message || error });
       res.status(500).json({
         success: false,
         error: 'Failed to retrieve explanation'
@@ -120,7 +121,7 @@ router.get(
         data: explanations
       });
     } catch (error) {
-      console.error('[Explainability API] Get recent explanations error:', error);
+      log.error('[Explainability API] Get recent explanations error:', { error: error.message || error });
       res.status(500).json({
         success: false,
         error: 'Failed to retrieve explanations'
@@ -148,7 +149,7 @@ router.get(
         data: stats
       });
     } catch (error) {
-      console.error('[Explainability API] Get stats error:', error);
+      log.error('[Explainability API] Get stats error:', { error: error.message || error });
       res.status(500).json({
         success: false,
         error: 'Failed to retrieve statistics'
@@ -185,7 +186,7 @@ router.post(
         data: { summary }
       });
     } catch (error) {
-      console.error('[Explainability API] Generate summary error:', error);
+      log.error('[Explainability API] Generate summary error:', { error: error.message || error });
       res.status(500).json({
         success: false,
         error: 'Failed to generate summary'

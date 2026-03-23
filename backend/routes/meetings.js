@@ -4,6 +4,11 @@ const { v4: uuidv4 } = require('uuid');
 const { supabase } = require('../config/supabase');
 const ai = require('../config/ai');
 const embeddingService = require('../services/embeddingService');
+const hubEventPublisher = require('../services/hubEventPublisher');
+const logosVisionService = require('../services/logosVisionService');
+const { validate } = require('../middleware/validate');
+const schemas = require('../schemas/meetings');
+const log = require('../utils/log');
 
 const router = express.Router();
 
@@ -27,7 +32,7 @@ const upload = multer({
  * POST /api/meetings/process
  * Upload audio and process with Gemini AI
  */
-router.post('/process', upload.single('audio'), async (req, res) => {
+router.post('/process', upload.single('audio'), validate(schemas.process), async (req, res) => {
   try {
     const { title, attendees, projectId, crmDealId } = req.body;
 
@@ -39,7 +44,7 @@ router.post('/process', upload.single('audio'), async (req, res) => {
       return res.status(503).json({ error: 'AI API not configured (set OPENAI_API_KEY or GEMINI_API_KEY)' });
     }
 
-    console.log(`🎙️ Processing meeting: ${title || 'Untitled Meeting'} (using ${ai.getProviderName()})`);
+    log.info(`Processing meeting: ${title || 'Untitled Meeting'} (using ${ai.getProviderName()})`);
 
     // Step 1: Transcribe audio
     const transcript = await ai.transcribeAudio(req.file.buffer, req.file.mimetype);
@@ -56,7 +61,7 @@ router.post('/process', upload.single('audio'), async (req, res) => {
       const textForEmbedding = `${title || ''} ${summaryData.summary} ${transcript.substring(0, 5000)}`;
       embedding = await ai.generateEmbedding(textForEmbedding);
     } catch (embeddingError) {
-      console.warn('⚠️ Embedding generation failed:', embeddingError.message);
+      log.warn('Embedding generation failed:', embeddingError.message);
     }
 
     // Step 5: Upload audio to Supabase Storage (if configured)
@@ -77,7 +82,7 @@ router.post('/process', upload.single('audio'), async (req, res) => {
           audioUrl = urlData?.publicUrl;
         }
       } catch (storageError) {
-        console.warn('⚠️ Audio upload failed:', storageError.message);
+        log.warn('Audio upload failed:', storageError.message);
       }
     }
 
@@ -117,14 +122,14 @@ router.post('/process', upload.single('audio'), async (req, res) => {
         .single();
 
       if (meetingError) {
-        console.error('❌ Meeting save error:', meetingError);
+        log.error('Meeting save error:', { error: meetingError.message || meetingError });
         // Continue anyway - return data even if DB save fails
       } else {
         savedMeeting = meeting;
       }
     }
 
-    console.log('✅ Meeting saved:', savedMeeting.id);
+    log.info('Meeting saved:', savedMeeting.id);
 
     // Step 7: Save action items
     const savedActionItems = [];
@@ -161,7 +166,7 @@ router.post('/process', upload.single('audio'), async (req, res) => {
       }
     }
 
-    console.log(`✅ Saved ${savedActionItems.length} action items`);
+    log.info(`Saved ${savedActionItems.length} action items`);
 
     // Step 8: Generate embeddings for semantic search (async, non-blocking)
     setImmediate(async () => {
@@ -176,9 +181,46 @@ router.post('/process', upload.single('audio'), async (req, res) => {
           },
           savedActionItems
         );
-        console.log(`✅ Generated embeddings for meeting ${savedMeeting.id}`);
+        log.info(`Generated embeddings for meeting ${savedMeeting.id}`);
       } catch (embeddingError) {
-        console.warn('⚠️ Embedding generation failed:', embeddingError.message);
+        log.warn('Embedding generation failed:', embeddingError.message);
+      }
+
+      // Step 9: Publish to Shared Hub (Logos Vision + Pulse sync)
+      try {
+        // Publish meeting completed event (broadcast to all apps)
+        await hubEventPublisher.meetingCompleted({
+          ...savedMeeting,
+          action_items: savedActionItems
+        });
+
+        // Sync each action item to Logos Vision
+        for (const item of savedActionItems) {
+          await hubEventPublisher.actionItemCreated(item, savedMeeting.id);
+        }
+
+        // Discover new contacts from attendees
+        const attendees = savedMeeting.attendees || [];
+        for (const attendee of attendees) {
+          if (attendee.email) {
+            await logosVisionService.upsertContact({
+              email: attendee.email,
+              name: attendee.name,
+              source: 'entomate'
+            });
+          }
+        }
+
+        // Notify Pulse about the meeting
+        await hubEventPublisher.notifyPulse({
+          title: `Meeting processed: ${savedMeeting.title}`,
+          body: `${savedActionItems.length} action items extracted. Sentiment: ${savedMeeting.sentiment_label || 'Neutral'}`,
+          urgency: savedActionItems.some(i => i.priority === 'high') ? 'high' : 'normal'
+        });
+
+        log.info(`Hub sync complete for meeting ${savedMeeting.id}`);
+      } catch (hubError) {
+        log.warn('Hub sync failed (non-blocking):', hubError.message);
       }
     });
 
@@ -206,7 +248,7 @@ router.post('/process', upload.single('audio'), async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error processing meeting:', error);
+    log.error('Error processing meeting:', { error: error.message || error });
     res.status(500).json({
       error: 'Failed to process meeting',
       details: error.message
@@ -218,7 +260,7 @@ router.post('/process', upload.single('audio'), async (req, res) => {
  * POST /api/meetings/transcript
  * Process a text transcript (no audio)
  */
-router.post('/transcript', async (req, res) => {
+router.post('/transcript', validate(schemas.transcript), async (req, res) => {
   try {
     const { title, transcript, attendees, projectId, crmDealId } = req.body;
 
@@ -230,7 +272,7 @@ router.post('/transcript', async (req, res) => {
       return res.status(503).json({ error: 'Gemini API not configured' });
     }
 
-    console.log('📝 Processing transcript:', title || 'Untitled Meeting');
+    log.info('Processing transcript:', title || 'Untitled Meeting');
 
     // Generate summary
     const summaryData = await ai.generateSummary(transcript);
@@ -244,7 +286,7 @@ router.post('/transcript', async (req, res) => {
       const textForEmbedding = `${title || ''} ${summaryData.summary} ${transcript.substring(0, 5000)}`;
       embedding = await ai.generateEmbedding(textForEmbedding);
     } catch (embeddingError) {
-      console.warn('⚠️ Embedding generation failed:', embeddingError.message);
+      log.warn('Embedding generation failed:', embeddingError.message);
     }
 
     // Save meeting
@@ -329,9 +371,9 @@ router.post('/transcript', async (req, res) => {
           },
           savedActionItems
         );
-        console.log(`✅ Generated embeddings for meeting ${savedMeeting.id}`);
+        log.info(`Generated embeddings for meeting ${savedMeeting.id}`);
       } catch (embeddingError) {
-        console.warn('⚠️ Embedding generation failed:', embeddingError.message);
+        log.warn('Embedding generation failed:', embeddingError.message);
       }
     });
 
@@ -351,7 +393,7 @@ router.post('/transcript', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error processing transcript:', error);
+    log.error('Error processing transcript:', { error: error.message || error });
     res.status(500).json({
       error: 'Failed to process transcript',
       details: error.message
@@ -363,7 +405,7 @@ router.post('/transcript', async (req, res) => {
  * GET /api/meetings
  * List all meetings with pagination and filters
  */
-router.get('/', async (req, res) => {
+router.get('/', validate(schemas.list), async (req, res) => {
   try {
     const { limit = 20, offset = 0, projectId, search, startDate, endDate } = req.query;
 
@@ -405,7 +447,7 @@ router.get('/', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error listing meetings:', error);
+    log.error('Error listing meetings:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -444,7 +486,7 @@ router.get('/:id', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error getting meeting:', error);
+    log.error('Error getting meeting:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -453,7 +495,7 @@ router.get('/:id', async (req, res) => {
  * PUT /api/meetings/:id
  * Update meeting
  */
-router.put('/:id', async (req, res) => {
+router.put('/:id', validate(schemas.update), async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
@@ -486,7 +528,7 @@ router.put('/:id', async (req, res) => {
     res.json(meeting);
 
   } catch (error) {
-    console.error('❌ Error updating meeting:', error);
+    log.error('Error updating meeting:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -522,7 +564,7 @@ router.delete('/:id', async (req, res) => {
     res.json({ success: true, message: 'Meeting deleted' });
 
   } catch (error) {
-    console.error('❌ Error deleting meeting:', error);
+    log.error('Error deleting meeting:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -531,7 +573,7 @@ router.delete('/:id', async (req, res) => {
  * POST /api/meetings/:id/ask
  * Ask AI question about a specific meeting
  */
-router.post('/:id/ask', async (req, res) => {
+router.post('/:id/ask', validate(schemas.ask), async (req, res) => {
   try {
     const { id } = req.params;
     const { question } = req.body;
@@ -584,7 +626,7 @@ ${meeting.transcript}
     });
 
   } catch (error) {
-    console.error('❌ Error answering question:', error);
+    log.error('Error answering question:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -637,7 +679,7 @@ router.get('/:id/recap', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error generating recap:', error);
+    log.error('Error generating recap:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });

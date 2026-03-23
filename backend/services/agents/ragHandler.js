@@ -12,6 +12,7 @@
 const BaseAgent = require('./baseAgent');
 const vectorStore = require('../vectorStore');
 const ai = require('../../config/ai');
+const log = require('../../utils/log');
 
 class RAGHandler extends BaseAgent {
   constructor() {
@@ -136,7 +137,7 @@ class RAGHandler extends BaseAgent {
       };
 
     } catch (error) {
-      console.error('[RAGHandler] Vector store error:', error);
+      log.error('[RAGHandler] Vector store error:', { error: error.message || error });
       return {
         output: 'main',
         data: {
@@ -232,7 +233,7 @@ class RAGHandler extends BaseAgent {
       };
 
     } catch (error) {
-      console.error('[RAGHandler] Vector search error:', error);
+      log.error('[RAGHandler] Vector search error:', { error: error.message || error });
       return {
         output: 'main',
         data: {
@@ -358,7 +359,7 @@ class RAGHandler extends BaseAgent {
       };
 
     } catch (error) {
-      console.error('[RAGHandler] RAG query error:', error);
+      log.error('[RAGHandler] RAG query error:', { error: error.message || error });
       return {
         output: 'main',
         data: {
@@ -533,7 +534,7 @@ Please provide a comprehensive answer based on the context above.`;
       };
 
     } catch (error) {
-      console.error('[RAGHandler] Document loader error:', error);
+      log.error('[RAGHandler] Document loader error:', { error: error.message || error });
       return {
         output: 'main',
         data: {
@@ -687,10 +688,17 @@ Please provide a comprehensive answer based on the context above.`;
         break;
 
       case '.pdf':
-        // PDF parsing would require additional library like pdf-parse
-        // For now, return a placeholder message
-        textContent = '[PDF content - requires pdf-parse library for extraction]';
-        metadata.note = 'PDF parsing not implemented. Install pdf-parse for PDF support.';
+        try {
+          const pdfParse = require('pdf-parse');
+          const pdfData = await pdfParse(content);
+          textContent = pdfData.text;
+          metadata.pages = pdfData.numpages;
+          metadata.info = pdfData.info;
+        } catch (pdfError) {
+          log.error('[RAGHandler] PDF parse failed:', pdfError.message);
+          textContent = '[PDF content could not be extracted]';
+          metadata.error = pdfError.message;
+        }
         break;
 
       default:

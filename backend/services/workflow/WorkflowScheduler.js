@@ -7,6 +7,7 @@
 const cron = require('node-cron');
 const { supabase } = require('../../config/supabase');
 const WorkflowExecutor = require('./WorkflowExecutor');
+const log = require('../../utils/log');
 
 class WorkflowScheduler {
   constructor() {
@@ -21,11 +22,11 @@ class WorkflowScheduler {
    */
   async initialize() {
     if (this.isInitialized) {
-      console.log('[WorkflowScheduler] Already initialized');
+      log.info('[WorkflowScheduler] Already initialized');
       return;
     }
 
-    console.log('[WorkflowScheduler] Initializing...');
+    log.info('[WorkflowScheduler] Initializing...');
 
     try {
       // Load all enabled schedules
@@ -41,7 +42,7 @@ class WorkflowScheduler {
         throw error;
       }
 
-      console.log(`[WorkflowScheduler] Found ${schedules?.length || 0} active schedules`);
+      log.info(`[WorkflowScheduler] Found ${schedules?.length || 0} active schedules`);
 
       // Start each schedule
       for (const schedule of schedules || []) {
@@ -51,10 +52,10 @@ class WorkflowScheduler {
       }
 
       this.isInitialized = true;
-      console.log('[WorkflowScheduler] Initialization complete');
+      log.info('[WorkflowScheduler] Initialization complete');
 
     } catch (error) {
-      console.error('[WorkflowScheduler] Initialization error:', error);
+      log.error('[WorkflowScheduler] Initialization error:', { error: error.message || error });
     }
   }
 
@@ -68,7 +69,7 @@ class WorkflowScheduler {
 
     // Validate cron expression
     if (!cron.validate(cron_expression)) {
-      console.error(`[WorkflowScheduler] Invalid cron expression: ${cron_expression}`);
+      log.error(`[WorkflowScheduler] Invalid cron expression: ${cron_expression}`);
       await this.updateScheduleError(scheduleId, `Invalid cron expression: ${cron_expression}`);
       return;
     }
@@ -78,11 +79,11 @@ class WorkflowScheduler {
       this.jobs.get(scheduleId).stop();
     }
 
-    console.log(`[WorkflowScheduler] Starting schedule ${scheduleId}: "${cron_expression}" (${timezone})`);
+    log.info(`[WorkflowScheduler] Starting schedule ${scheduleId}: "${cron_expression}" (${timezone})`);
 
     // Create cron job
     const job = cron.schedule(cron_expression, async () => {
-      console.log(`[WorkflowScheduler] Executing scheduled workflow: ${workflow.name}`);
+      log.info(`[WorkflowScheduler] Executing scheduled workflow: ${workflow.name}`);
 
       try {
         // Execute workflow
@@ -116,10 +117,10 @@ class WorkflowScheduler {
           })
           .eq('id', workflow_id);
 
-        console.log(`[WorkflowScheduler] Scheduled execution ${result.success ? 'succeeded' : 'failed'}: ${workflow.name}`);
+        log.info(`[WorkflowScheduler] Scheduled execution ${result.success ? 'succeeded' : 'failed'}: ${workflow.name}`);
 
       } catch (error) {
-        console.error(`[WorkflowScheduler] Scheduled execution error:`, error);
+        log.error(`[WorkflowScheduler] Scheduled execution error:`, { error: error.message || error });
 
         await supabase
           .from('workflow_schedules')
@@ -143,7 +144,7 @@ class WorkflowScheduler {
       .update({ next_run_at: nextRun })
       .eq('id', scheduleId);
 
-    console.log(`[WorkflowScheduler] Schedule ${scheduleId} started. Next run: ${nextRun}`);
+    log.info(`[WorkflowScheduler] Schedule ${scheduleId} started. Next run: ${nextRun}`);
   }
 
   /**
@@ -154,7 +155,7 @@ class WorkflowScheduler {
     if (job) {
       job.stop();
       this.jobs.delete(scheduleId);
-      console.log(`[WorkflowScheduler] Schedule ${scheduleId} stopped`);
+      log.info(`[WorkflowScheduler] Schedule ${scheduleId} stopped`);
       return true;
     }
     return false;
@@ -173,7 +174,7 @@ class WorkflowScheduler {
       .single();
 
     if (error || !schedule) {
-      console.error(`[WorkflowScheduler] Schedule ${scheduleId} not found`);
+      log.error(`[WorkflowScheduler] Schedule ${scheduleId} not found`);
       return false;
     }
 
@@ -359,13 +360,13 @@ class WorkflowScheduler {
    * Stop all schedules (for graceful shutdown)
    */
   stopAll() {
-    console.log('[WorkflowScheduler] Stopping all schedules...');
+    log.info('[WorkflowScheduler] Stopping all schedules...');
     for (const [id, job] of this.jobs.entries()) {
       job.stop();
     }
     this.jobs.clear();
     this.isInitialized = false;
-    console.log('[WorkflowScheduler] All schedules stopped');
+    log.info('[WorkflowScheduler] All schedules stopped');
   }
 
   /**

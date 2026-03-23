@@ -11,6 +11,7 @@ import {
   Plus, Minus, FileJson, Loader2, Check, X
 } from 'lucide-react'
 import { workflowsApi } from '../../services/api'
+import { useConfirm } from '../vc/ConfirmDialog'
 
 // Format relative time
 const formatRelativeTime = (timestamp) => {
@@ -246,6 +247,7 @@ export default function VersionHistoryPanel({
   onRestore,
   onClose
 }) {
+  const confirm = useConfirm()
   const [versions, setVersions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -305,7 +307,8 @@ export default function VersionHistoryPanel({
   }
 
   const handleRestore = async (version) => {
-    if (!confirm(`Restore workflow to version ${version.version_number}? This will create a new version with the restored content.`)) {
+    const ok = await confirm({ title: 'Restore Version?', message: `Restore workflow to version ${version.version_number}? This will create a new version with the restored content.`, confirmLabel: 'Restore', variant: 'danger' })
+    if (!ok) {
       return
     }
 
