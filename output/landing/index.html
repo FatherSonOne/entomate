@@ -463,8 +463,8 @@
       animation:
         hands-float 4s ease-in-out infinite,
         hands-glow 3s ease-in-out infinite;
-      -webkit-mask-image: radial-gradient(ellipse 85% 80% at 50% 45%, black 40%, transparent 100%);
-      mask-image: radial-gradient(ellipse 85% 80% at 50% 45%, black 40%, transparent 100%);
+      -webkit-mask-image: radial-gradient(ellipse 95% 95% at 50% 45%, black 60%, transparent 100%);
+      mask-image: radial-gradient(ellipse 95% 95% at 50% 45%, black 60%, transparent 100%);
     }
 
     @keyframes hands-float {
@@ -1759,7 +1759,8 @@
 
         <!-- Hero hands image -->
         <div class="hero-hands-img">
-          <img src="../logos/logo-c-hero.png" alt="Entomate — The Hands of the Trifecto" />
+          <img src="/logos/logo-c-hero.png" alt="Entomate — The Hands of the Trifecto"
+               onerror="this.onerror=null;this.src='../logos/logo-c-hero.png';" />
         </div>
 
         <!-- Floating workflow nodes -->

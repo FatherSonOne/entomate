@@ -193,14 +193,94 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* Brand hero visual */}
+        {/* Brand hero visual — Animated Hands of the Trifecto */}
         <div className="hero-visual">
           <div className="hero-visual-wrap">
-            <img
-              src="/logos/logo-c-hero.png"
-              alt="Entomate — The Hands of the Trifecto"
-              className="hero-brand-img"
-            />
+            {/* Background glow */}
+            <div className="hands-bg-glow"></div>
+
+            {/* Scan line overlay */}
+            <div className="hands-scan-line"></div>
+
+            {/* Animated SVG particles & neural arcs */}
+            <svg className="hands-particles" viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg">
+              {/* Neural arcs between hand centers */}
+              <path d="M280 250 Q400 180 520 250" fill="none" stroke="#FF2D6B" strokeWidth="1.5" strokeDasharray="300" strokeDashoffset="300" opacity="0.6">
+                <animate attributeName="stroke-dashoffset" values="300;0;300" dur="4s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0;0.7;0" dur="4s" repeatCount="indefinite"/>
+              </path>
+              <path d="M260 240 Q400 150 540 240" fill="none" stroke="#00F5D4" strokeWidth="1" strokeDasharray="350" strokeDashoffset="350" opacity="0.4">
+                <animate attributeName="stroke-dashoffset" values="350;0;350" dur="4s" begin="0.5s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0;0.5;0" dur="4s" begin="0.5s" repeatCount="indefinite"/>
+              </path>
+              <path d="M290 265 Q400 220 510 265" fill="none" stroke="#FFB800" strokeWidth="1" strokeDasharray="260" strokeDashoffset="260" opacity="0.5">
+                <animate attributeName="stroke-dashoffset" values="260;0;260" dur="4s" begin="1s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0;0.6;0" dur="4s" begin="1s" repeatCount="indefinite"/>
+              </path>
+
+              {/* Center neural node */}
+              <circle cx="400" cy="248" r="4" fill="#FF2D6B">
+                <animate attributeName="r" values="4;10;4" dur="2s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0.8;1;0.8" dur="2s" repeatCount="indefinite"/>
+              </circle>
+
+              {/* Ripple rings from center */}
+              <circle cx="400" cy="248" r="4" fill="none" stroke="#FF2D6B" strokeWidth="1.5" opacity="0.8">
+                <animate attributeName="r" values="4;60" dur="2.5s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0.8;0" dur="2.5s" repeatCount="indefinite"/>
+              </circle>
+              <circle cx="400" cy="248" r="4" fill="none" stroke="#FFB800" strokeWidth="1" opacity="0.6">
+                <animate attributeName="r" values="4;60" dur="2.5s" begin="0.8s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0.6;0" dur="2.5s" begin="0.8s" repeatCount="indefinite"/>
+              </circle>
+              <circle cx="400" cy="248" r="4" fill="none" stroke="#00F5D4" strokeWidth="0.8" opacity="0.5">
+                <animate attributeName="r" values="4;60" dur="2.5s" begin="1.6s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0.5;0" dur="2.5s" begin="1.6s" repeatCount="indefinite"/>
+              </circle>
+
+              {/* Left hand energy particles */}
+              <circle cx="120" cy="248" r="3" fill="#FF2D6B" opacity="0.9">
+                <animate attributeName="cx" values="120;280" dur="3s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0.9;0" dur="3s" repeatCount="indefinite"/>
+                <animate attributeName="r" values="3;1" dur="3s" repeatCount="indefinite"/>
+              </circle>
+              <circle cx="120" cy="228" r="2" fill="#00F5D4" opacity="0.7">
+                <animate attributeName="cx" values="120;270" dur="3s" begin="0.4s" repeatCount="indefinite"/>
+                <animate attributeName="cy" values="228;242" dur="3s" begin="0.4s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0.7;0" dur="3s" begin="0.4s" repeatCount="indefinite"/>
+              </circle>
+
+              {/* Right hand energy particles */}
+              <circle cx="680" cy="248" r="3" fill="#FF2D6B" opacity="0.9">
+                <animate attributeName="cx" values="680;520" dur="3s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0.9;0" dur="3s" repeatCount="indefinite"/>
+                <animate attributeName="r" values="3;1" dur="3s" repeatCount="indefinite"/>
+              </circle>
+              <circle cx="680" cy="268" r="2" fill="#FFB800" opacity="0.7">
+                <animate attributeName="cx" values="680;530" dur="3s" begin="0.6s" repeatCount="indefinite"/>
+                <animate attributeName="cy" values="268;254" dur="3s" begin="0.6s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0.7;0" dur="3s" begin="0.6s" repeatCount="indefinite"/>
+              </circle>
+
+              {/* Lightning arc flashes */}
+              <path d="M315 245 L335 238 L325 250 L345 244" stroke="#FFD040" strokeWidth="1.5" fill="none" strokeLinecap="round" opacity="0">
+                <animate attributeName="opacity" values="0;0;1;0;0" dur="5s" repeatCount="indefinite"/>
+              </path>
+              <path d="M455 244 L475 250 L465 238 L485 245" stroke="#FFD040" strokeWidth="1.5" fill="none" strokeLinecap="round" opacity="0">
+                <animate attributeName="opacity" values="0;0;0;1;0" dur="5s" repeatCount="indefinite"/>
+              </path>
+
+              {/* Subtle circuit lines */}
+              <line x1="0" y1="80" x2="800" y2="80" stroke="#00F5D4" strokeWidth="0.5" strokeDasharray="4 8" opacity="0.1"/>
+              <line x1="0" y1="420" x2="800" y2="420" stroke="#00F5D4" strokeWidth="0.5" strokeDasharray="4 8" opacity="0.1"/>
+            </svg>
+
+            {/* Hero hands image */}
+            <div className="hero-hands-img">
+              <img src="/logos/logo-c-hero.png" alt="Entomate — The Hands of the Trifecto" />
+            </div>
+
+            {/* Floating workflow nodes */}
             <div className="wf-node trigger wf-node-hero-trigger">
               <span className="wf-node-dot"></span>
               meeting_ended
@@ -1103,45 +1183,125 @@ export default function LandingPage() {
           background: var(--border);
         }
 
-        /* ── HERO VISUAL (right side) ── */
+        /* ── HERO VISUAL (right side) — Animated Hands ── */
         .landing-page .hero-visual {
           position: absolute;
-          right: -60px;
+          right: -40px;
           top: 50%;
           transform: translateY(-50%);
-          width: 520px;
+          width: 580px;
           pointer-events: none;
         }
 
-        .landing-page .workflow-canvas {
-          width: 100%;
-          aspect-ratio: 1;
+        .landing-page .hero-visual-wrap {
           position: relative;
+          width: 100%;
+          aspect-ratio: 8/5;
+          overflow: visible;
+        }
+
+        .landing-page .hands-bg-glow {
+          position: absolute;
+          inset: 0;
+          background:
+            radial-gradient(ellipse 60% 50% at 50% 50%, rgba(255,45,107,0.08) 0%, transparent 70%),
+            radial-gradient(ellipse 30% 30% at 25% 60%, rgba(0,245,212,0.05) 0%, transparent 70%),
+            radial-gradient(ellipse 30% 30% at 75% 60%, rgba(0,245,212,0.05) 0%, transparent 70%);
+          animation: hands-glow-pulse 4s ease-in-out infinite;
+        }
+
+        @keyframes hands-glow-pulse {
+          0%, 100% { opacity: 0.7; }
+          50%       { opacity: 1; }
+        }
+
+        .landing-page .hands-scan-line {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          z-index: 10;
+          overflow: hidden;
+        }
+        .landing-page .hands-scan-line::after {
+          content: '';
+          position: absolute;
+          width: 100%;
+          height: 2px;
+          background: linear-gradient(90deg, transparent, rgba(255,45,107,0.35), transparent);
+          box-shadow: 0 0 12px rgba(255,45,107,0.25);
+          animation: hands-scan 4s linear infinite;
+        }
+
+        @keyframes hands-scan {
+          0%   { transform: translateY(-100%); opacity: 0; }
+          5%   { opacity: 0.6; }
+          95%  { opacity: 0.6; }
+          100% { transform: translateY(300%); opacity: 0; }
+        }
+
+        .landing-page .hands-particles {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          pointer-events: none;
+          z-index: 5;
+        }
+
+        .landing-page .hero-hands-img {
+          position: relative;
+          z-index: 2;
+          width: 100%;
+          height: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .landing-page .hero-hands-img img {
+          max-width: 110%;
+          margin-left: -5%;
+          max-height: 100%;
+          object-fit: contain;
+          animation:
+            hands-float 4s ease-in-out infinite,
+            hands-glow 3s ease-in-out infinite;
+          -webkit-mask-image: radial-gradient(ellipse 95% 95% at 50% 45%, black 60%, transparent 100%);
+          mask-image: radial-gradient(ellipse 95% 95% at 50% 45%, black 60%, transparent 100%);
+        }
+
+        @keyframes hands-float {
+          0%, 100% { transform: translateY(0px) scale(1); }
+          50%       { transform: translateY(-10px) scale(1.015); }
+        }
+
+        @keyframes hands-glow {
+          0%, 100% { filter: drop-shadow(0 0 8px rgba(255,45,107,0.3)) drop-shadow(0 0 20px rgba(255,45,107,0.15)); }
+          50%       { filter: drop-shadow(0 0 20px rgba(255,45,107,0.5)) drop-shadow(0 0 60px rgba(255,45,107,0.25)) drop-shadow(0 0 100px rgba(255,45,107,0.1)); }
         }
 
         .landing-page .wf-node {
           position: absolute;
           border-radius: var(--radius-md);
-          padding: 10px 14px;
-          font-size: 11px;
+          padding: 8px 12px;
+          font-size: 10px;
           font-weight: 600;
           font-family: var(--font-mono);
           display: flex;
           align-items: center;
-          gap: 6px;
+          gap: 5px;
           white-space: nowrap;
           backdrop-filter: blur(12px);
           border: 1px solid;
           animation: node-float 6s ease-in-out infinite alternate;
           will-change: transform;
+          z-index: 15;
         }
 
         .landing-page .wf-node.trigger {
           background: rgba(255, 45, 107, 0.10);
           border-color: rgba(255, 45, 107, 0.35);
           color: var(--crimson);
-          top: 10%;
-          left: 5%;
           animation-delay: 0s;
         }
 
@@ -1149,8 +1309,6 @@ export default function LandingPage() {
           background: rgba(0, 245, 212, 0.08);
           border-color: rgba(0, 245, 212, 0.25);
           color: var(--mint);
-          top: 35%;
-          left: 20%;
           animation-delay: -2s;
         }
 
@@ -1158,68 +1316,22 @@ export default function LandingPage() {
           background: rgba(255, 184, 0, 0.08);
           border-color: rgba(255, 184, 0, 0.25);
           color: var(--amber);
-          top: 60%;
-          left: 10%;
           animation-delay: -4s;
         }
 
-        .landing-page .wf-node.output {
-          background: rgba(255, 255, 255, 0.04);
-          border-color: rgba(255, 255, 255, 0.12);
-          color: var(--text-secondary);
-          top: 20%;
-          right: 5%;
-          animation-delay: -1s;
-        }
-
-        .landing-page .wf-node.output2 {
-          background: rgba(255, 255, 255, 0.04);
-          border-color: rgba(255, 255, 255, 0.12);
-          color: var(--text-secondary);
-          top: 55%;
-          right: 10%;
-          animation-delay: -3s;
-        }
-
         .landing-page .wf-node-dot {
-          width: 6px;
-          height: 6px;
+          width: 5px;
+          height: 5px;
           border-radius: 50%;
           flex-shrink: 0;
         }
         .landing-page .trigger .wf-node-dot  { background: var(--crimson); box-shadow: 0 0 6px var(--crimson); }
         .landing-page .action .wf-node-dot   { background: var(--mint); box-shadow: 0 0 6px var(--mint); }
         .landing-page .ai .wf-node-dot       { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
-        .landing-page .output .wf-node-dot,
-        .landing-page .output2 .wf-node-dot  { background: var(--text-muted); }
 
         @keyframes node-float {
           from { transform: translateY(0px); }
-          to   { transform: translateY(-12px); }
-        }
-
-        /* SVG connection lines */
-        .landing-page .wf-svg {
-          position: absolute;
-          inset: 0;
-          width: 100%;
-          height: 100%;
-        }
-
-        .landing-page .wf-line {
-          fill: none;
-          stroke-width: 1.5;
-          stroke-dasharray: 6 4;
-          animation: line-march 2s linear infinite;
-        }
-
-        .landing-page .wf-line.crimson { stroke: rgba(255, 45, 107, 0.5); }
-        .landing-page .wf-line.mint    { stroke: rgba(0, 245, 212, 0.4); }
-        .landing-page .wf-line.amber   { stroke: rgba(255, 184, 0, 0.4); }
-
-        @keyframes line-march {
-          from { stroke-dashoffset: 20; }
-          to   { stroke-dashoffset: 0; }
+          to   { transform: translateY(-10px); }
         }
 
         /* ── SECTION SHARED ── */
@@ -2142,25 +2254,10 @@ export default function LandingPage() {
           border-radius: 12px;
         }
 
-        /* ── HERO VISUAL WRAPPER ── */
-        .landing-page .hero-visual-wrap {
-          position: relative;
-          width: 100%;
-        }
-
-        .landing-page .hero-brand-img {
-          width: 100%;
-          border-radius: 20px;
-          opacity: 0.92;
-          box-shadow: 0 40px 80px rgba(0, 0, 0, 0.7), 0 0 60px rgba(255, 45, 107, 0.12);
-          -webkit-mask-image: linear-gradient(to left, black 60%, transparent 100%);
-          mask-image: linear-gradient(to left, black 60%, transparent 100%);
-          display: block;
-        }
-
-        .landing-page .wf-node-hero-trigger { top: 12%; left: -20px; }
-        .landing-page .wf-node-hero-ai      { top: 55%; right: -10px; left: auto; }
-        .landing-page .wf-node-hero-action  { bottom: 14%; left: 15%; }
+        /* ── HERO NODE POSITIONS ── */
+        .landing-page .wf-node-hero-trigger { top: 8%; left: -10px; }
+        .landing-page .wf-node-hero-ai      { top: 50%; right: -8px; left: auto; }
+        .landing-page .wf-node-hero-action  { bottom: 12%; left: 10%; }
 
         /* ── TRIFECTO CENTERED SUB ── */
         .landing-page .trifecto-sub { margin: 0 auto; }
