@@ -9,6 +9,8 @@
  * - Pattern-based invalidation
  */
 
+const log = require('./log');
+
 class MemoryCache {
   constructor(options = {}) {
     this.cache = new Map();

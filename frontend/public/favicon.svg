@@ -7,19 +7,24 @@
     </linearGradient>
   </defs>
 
-  <!-- Background square -->
+  <!-- Background -->
   <rect width="64" height="64" rx="14" fill="url(#bg)"/>
-  <!-- Crimson border -->
-  <rect x="1" y="1" width="62" height="62" rx="13" stroke="#FF2D6B" stroke-width="2" stroke-opacity="0.6" fill="none"/>
+  <rect x="1" y="1" width="62" height="62" rx="13" stroke="#FF2D6B" stroke-width="1.5" stroke-opacity="0.5" fill="none"/>
 
-  <!-- E letterform — bold, centered, white -->
-  <!-- Top bar -->
-  <rect x="14" y="16" width="36" height="8" rx="4" fill="white"/>
-  <!-- Middle bar (shorter) -->
-  <rect x="14" y="28" width="26" height="8" rx="4" fill="white" opacity="0.85"/>
-  <!-- Bottom bar -->
-  <rect x="14" y="40" width="36" height="8" rx="4" fill="white"/>
+  <!-- Three E bars (crimson) -->
+  <rect x="22" y="14" width="26" height="6" rx="1.5" fill="#FF2D6B"/>
+  <rect x="22" y="29" width="20" height="6" rx="1.5" fill="#FF2D6B" opacity="0.85"/>
+  <rect x="22" y="44" width="26" height="6" rx="1.5" fill="#FF2D6B"/>
 
-  <!-- Amber dot accent — top right -->
-  <circle cx="52" cy="12" r="5" fill="#FFB800"/>
+  <!-- Circuit traces -->
+  <path d="M22 17 L14 17 L10 13" stroke="#FF2D6B" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+  <circle cx="10" cy="13" r="2" fill="#FF2D6B" opacity="0.9"/>
+  <path d="M22 32 L12 32 L8 28" stroke="#FF2D6B" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+  <circle cx="8" cy="28" r="2" fill="#FF2D6B" opacity="0.9"/>
+  <path d="M22 47 L14 47 L10 51" stroke="#FF2D6B" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+  <circle cx="10" cy="51" r="2" fill="#FF2D6B" opacity="0.9"/>
+
+  <!-- Small accent node -->
+  <path d="M22 14 L18 10" stroke="#FF2D6B" stroke-width="1.2" stroke-linecap="round" fill="none" opacity="0.6"/>
+  <circle cx="18" cy="10" r="1.5" fill="#FF2D6B" opacity="0.6"/>
 </svg>

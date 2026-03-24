@@ -25,17 +25,19 @@
   },
   "lint-staged": {
     "frontend/src/**/*.{js,jsx}": [
-      "cd frontend && npx eslint --fix --no-error-on-unmatched-pattern"
+      "npx eslint --fix --no-error-on-unmatched-pattern"
     ],
     "backend/**/*.js": [
-      "cd backend && npx eslint --fix --no-error-on-unmatched-pattern"
+      "npx eslint --fix --no-error-on-unmatched-pattern"
     ]
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^22.14.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "eslint": "^10.1.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
     "typescript": "~5.8.2",
