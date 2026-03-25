@@ -127,6 +127,7 @@ export default function LandingPage() {
             <li><a href="#trifecto">The Trifecto</a></li>
             <li><a href="#features">Features</a></li>
             <li><a href="#integrations">Integrations</a></li>
+            <li><a href="#guide">User Guide</a></li>
             <li><a href="#logos">Branding</a></li>
           </ul>
 
@@ -204,61 +205,63 @@ export default function LandingPage() {
 
             {/* Animated SVG particles & neural arcs */}
             <svg className="hands-particles" viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg">
-              {/* Neural arcs between hand centers */}
-              <path d="M280 250 Q400 180 520 250" fill="none" stroke="#FF2D6B" strokeWidth="1.5" strokeDasharray="300" strokeDashoffset="300" opacity="0.6">
+              {/* Neural arcs between hand centers — calibrated to fingertip meeting point (400, 210) */}
+              <path d="M280 220 Q400 150 520 220" fill="none" stroke="#FF2D6B" strokeWidth="1.5" strokeDasharray="300" strokeDashoffset="300" opacity="0.6">
                 <animate attributeName="stroke-dashoffset" values="300;0;300" dur="4s" repeatCount="indefinite"/>
                 <animate attributeName="opacity" values="0;0.7;0" dur="4s" repeatCount="indefinite"/>
               </path>
-              <path d="M260 240 Q400 150 540 240" fill="none" stroke="#00F5D4" strokeWidth="1" strokeDasharray="350" strokeDashoffset="350" opacity="0.4">
+              <path d="M260 210 Q400 120 540 210" fill="none" stroke="#00F5D4" strokeWidth="1" strokeDasharray="350" strokeDashoffset="350" opacity="0.4">
                 <animate attributeName="stroke-dashoffset" values="350;0;350" dur="4s" begin="0.5s" repeatCount="indefinite"/>
                 <animate attributeName="opacity" values="0;0.5;0" dur="4s" begin="0.5s" repeatCount="indefinite"/>
               </path>
-              <path d="M290 265 Q400 220 510 265" fill="none" stroke="#FFB800" strokeWidth="1" strokeDasharray="260" strokeDashoffset="260" opacity="0.5">
+              <path d="M290 235 Q400 190 510 235" fill="none" stroke="#FFB800" strokeWidth="1" strokeDasharray="260" strokeDashoffset="260" opacity="0.5">
                 <animate attributeName="stroke-dashoffset" values="260;0;260" dur="4s" begin="1s" repeatCount="indefinite"/>
                 <animate attributeName="opacity" values="0;0.6;0" dur="4s" begin="1s" repeatCount="indefinite"/>
               </path>
 
-              {/* Center neural node */}
-              <circle cx="400" cy="248" r="4" fill="#FF2D6B">
+              {/* Center neural node — at fingertip meeting point */}
+              <circle cx="400" cy="210" r="4" fill="#FF2D6B">
                 <animate attributeName="r" values="4;10;4" dur="2s" repeatCount="indefinite"/>
                 <animate attributeName="opacity" values="0.8;1;0.8" dur="2s" repeatCount="indefinite"/>
               </circle>
 
               {/* Ripple rings from center */}
-              <circle cx="400" cy="248" r="4" fill="none" stroke="#FF2D6B" strokeWidth="1.5" opacity="0.8">
+              <circle cx="400" cy="210" r="4" fill="none" stroke="#FF2D6B" strokeWidth="1.5" opacity="0.8">
                 <animate attributeName="r" values="4;60" dur="2.5s" repeatCount="indefinite"/>
                 <animate attributeName="opacity" values="0.8;0" dur="2.5s" repeatCount="indefinite"/>
               </circle>
-              <circle cx="400" cy="248" r="4" fill="none" stroke="#FFB800" strokeWidth="1" opacity="0.6">
+              <circle cx="400" cy="210" r="4" fill="none" stroke="#FFB800" strokeWidth="1" opacity="0.6">
                 <animate attributeName="r" values="4;60" dur="2.5s" begin="0.8s" repeatCount="indefinite"/>
                 <animate attributeName="opacity" values="0.6;0" dur="2.5s" begin="0.8s" repeatCount="indefinite"/>
               </circle>
-              <circle cx="400" cy="248" r="4" fill="none" stroke="#00F5D4" strokeWidth="0.8" opacity="0.5">
+              <circle cx="400" cy="210" r="4" fill="none" stroke="#00F5D4" strokeWidth="0.8" opacity="0.5">
                 <animate attributeName="r" values="4;60" dur="2.5s" begin="1.6s" repeatCount="indefinite"/>
                 <animate attributeName="opacity" values="0.5;0" dur="2.5s" begin="1.6s" repeatCount="indefinite"/>
               </circle>
 
               {/* Left hand energy particles */}
-              <circle cx="120" cy="248" r="3" fill="#FF2D6B" opacity="0.9">
-                <animate attributeName="cx" values="120;280" dur="3s" repeatCount="indefinite"/>
+              <circle cx="140" cy="220" r="3" fill="#FF2D6B" opacity="0.9">
+                <animate attributeName="cx" values="140;300" dur="3s" repeatCount="indefinite"/>
+                <animate attributeName="cy" values="220;212" dur="3s" repeatCount="indefinite"/>
                 <animate attributeName="opacity" values="0.9;0" dur="3s" repeatCount="indefinite"/>
                 <animate attributeName="r" values="3;1" dur="3s" repeatCount="indefinite"/>
               </circle>
-              <circle cx="120" cy="228" r="2" fill="#00F5D4" opacity="0.7">
-                <animate attributeName="cx" values="120;270" dur="3s" begin="0.4s" repeatCount="indefinite"/>
-                <animate attributeName="cy" values="228;242" dur="3s" begin="0.4s" repeatCount="indefinite"/>
+              <circle cx="160" cy="200" r="2" fill="#00F5D4" opacity="0.7">
+                <animate attributeName="cx" values="160;290" dur="3s" begin="0.4s" repeatCount="indefinite"/>
+                <animate attributeName="cy" values="200;208" dur="3s" begin="0.4s" repeatCount="indefinite"/>
                 <animate attributeName="opacity" values="0.7;0" dur="3s" begin="0.4s" repeatCount="indefinite"/>
               </circle>
 
               {/* Right hand energy particles */}
-              <circle cx="680" cy="248" r="3" fill="#FF2D6B" opacity="0.9">
-                <animate attributeName="cx" values="680;520" dur="3s" repeatCount="indefinite"/>
+              <circle cx="660" cy="220" r="3" fill="#FF2D6B" opacity="0.9">
+                <animate attributeName="cx" values="660;500" dur="3s" repeatCount="indefinite"/>
+                <animate attributeName="cy" values="220;212" dur="3s" repeatCount="indefinite"/>
                 <animate attributeName="opacity" values="0.9;0" dur="3s" repeatCount="indefinite"/>
                 <animate attributeName="r" values="3;1" dur="3s" repeatCount="indefinite"/>
               </circle>
-              <circle cx="680" cy="268" r="2" fill="#FFB800" opacity="0.7">
-                <animate attributeName="cx" values="680;530" dur="3s" begin="0.6s" repeatCount="indefinite"/>
-                <animate attributeName="cy" values="268;254" dur="3s" begin="0.6s" repeatCount="indefinite"/>
+              <circle cx="640" cy="200" r="2" fill="#FFB800" opacity="0.7">
+                <animate attributeName="cx" values="640;510" dur="3s" begin="0.6s" repeatCount="indefinite"/>
+                <animate attributeName="cy" values="200;208" dur="3s" begin="0.6s" repeatCount="indefinite"/>
                 <animate attributeName="opacity" values="0.7;0" dur="3s" begin="0.6s" repeatCount="indefinite"/>
               </circle>
 
@@ -280,7 +283,20 @@ export default function LandingPage() {
               <img src="/logos/logo-c-hero.png" alt="Entomate — The Hands of the Trifecto" />
             </div>
 
-            {/* Floating workflow nodes */}
+            {/* Workflow trail — clockwise arc connecting trigger → AI → action around the hands */}
+            <svg className="wf-trail-line" viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg">
+              <path d="M160 90 Q400 60 620 160 Q700 300 580 410"
+                    fill="none" stroke="url(#trail-grad)" strokeWidth="1" strokeDasharray="6 4" opacity="0.35">
+                <animate attributeName="stroke-dashoffset" values="0;-40" dur="3s" repeatCount="indefinite"/>
+              </path>
+              <defs>
+                <linearGradient id="trail-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#FF2D6B"/>
+                  <stop offset="50%" stopColor="#FFB800"/>
+                  <stop offset="100%" stopColor="#00F5D4"/>
+                </linearGradient>
+              </defs>
+            </svg>
             <div className="wf-node trigger wf-node-hero-trigger">
               <span className="wf-node-dot"></span>
               meeting_ended
@@ -762,6 +778,41 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── USER GUIDE ── */}
+      <section className="guide-preview" id="guide">
+        <div className="container">
+          <div className="section-label">User Guide</div>
+          <h2 className="section-title">Everything you need to know,<br />in one place.</h2>
+          <p className="section-sub" style={{ margin: '0 auto', maxWidth: 600 }}>
+            Entomate comes with a built-in interactive User Guide covering every feature —
+            from meeting recording to AI agents. It updates automatically when new features ship.
+          </p>
+
+          <div className="guide-preview-grid">
+            {[
+              { icon: '🎙️', title: 'Meetings', desc: 'Record, transcribe, and analyze meetings with AI-powered sentiment detection.' },
+              { icon: '✅', title: 'Tasks & AI', desc: 'AI suggests assignments, priorities, and deadlines — with full explainability.' },
+              { icon: '🔀', title: 'Workflows', desc: 'Visual node-based automations connecting triggers to actions across your tools.' },
+              { icon: '🤖', title: 'AI Agents', desc: 'Deploy intelligent bots for assignment, priority detection, and follow-ups.' },
+              { icon: '🎯', title: 'Goals & OKRs', desc: 'Track objectives at Company, Team, and Individual levels with key results.' },
+              { icon: '🔍', title: 'Search & AI Q&A', desc: 'Semantic search across your workspace with natural-language AI question answering.' },
+            ].map((item, i) => (
+              <div key={i} className="guide-preview-card">
+                <span className="guide-preview-icon">{item.icon}</span>
+                <h3 className="guide-preview-title">{item.title}</h3>
+                <p className="guide-preview-desc">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ textAlign: 'center', marginTop: 32 }}>
+            <Link to="/sign-in" className="btn-primary btn-large">
+              Read the Full Guide &rarr;
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* ── CTA ── */}
       <section className="cta-section">
         <div className="container">
@@ -1118,14 +1169,18 @@ export default function LandingPage() {
           font-size: clamp(48px, 6vw, 80px);
           font-weight: 800;
           letter-spacing: -0.03em;
-          line-height: 1.05;
+          line-height: 1.18;
           color: var(--text-primary);
           margin-bottom: 24px;
+          overflow: visible;
         }
 
         .landing-page .hero h1 .highlight {
           color: var(--crimson);
           text-shadow: 0 0 40px rgba(255, 45, 107, 0.4);
+          display: inline-block;
+          padding-bottom: 0.05em;
+          vertical-align: baseline;
         }
 
         .landing-page .hero-sub {
@@ -1186,10 +1241,10 @@ export default function LandingPage() {
         /* ── HERO VISUAL (right side) — Animated Hands ── */
         .landing-page .hero-visual {
           position: absolute;
-          right: -40px;
+          right: -60px;
           top: 50%;
           transform: translateY(-50%);
-          width: 580px;
+          width: 900px;
           pointer-events: none;
         }
 
@@ -1198,16 +1253,20 @@ export default function LandingPage() {
           width: 100%;
           aspect-ratio: 8/5;
           overflow: visible;
+          -webkit-mask-image: radial-gradient(ellipse 85% 80% at 50% 45%, black 50%, transparent 100%);
+          mask-image: radial-gradient(ellipse 85% 80% at 50% 45%, black 50%, transparent 100%);
         }
 
         .landing-page .hands-bg-glow {
           position: absolute;
-          inset: 0;
+          inset: -20%;
           background:
-            radial-gradient(ellipse 60% 50% at 50% 50%, rgba(255,45,107,0.08) 0%, transparent 70%),
-            radial-gradient(ellipse 30% 30% at 25% 60%, rgba(0,245,212,0.05) 0%, transparent 70%),
-            radial-gradient(ellipse 30% 30% at 75% 60%, rgba(0,245,212,0.05) 0%, transparent 70%);
+            radial-gradient(ellipse 50% 45% at 50% 45%, rgba(255,45,107,0.12) 0%, transparent 70%),
+            radial-gradient(ellipse 25% 25% at 30% 55%, rgba(0,245,212,0.06) 0%, transparent 70%),
+            radial-gradient(ellipse 25% 25% at 70% 55%, rgba(0,245,212,0.06) 0%, transparent 70%),
+            radial-gradient(ellipse 20% 20% at 50% 42%, rgba(255,184,0,0.08) 0%, transparent 60%);
           animation: hands-glow-pulse 4s ease-in-out infinite;
+          pointer-events: none;
         }
 
         @keyframes hands-glow-pulse {
@@ -1253,21 +1312,16 @@ export default function LandingPage() {
           z-index: 2;
           width: 100%;
           height: 100%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
+          overflow: hidden;
         }
 
         .landing-page .hero-hands-img img {
-          max-width: 110%;
-          margin-left: -5%;
-          max-height: 100%;
-          object-fit: contain;
-          animation:
-            hands-float 4s ease-in-out infinite,
-            hands-glow 3s ease-in-out infinite;
-          -webkit-mask-image: radial-gradient(ellipse 95% 95% at 50% 45%, black 60%, transparent 100%);
-          mask-image: radial-gradient(ellipse 95% 95% at 50% 45%, black 60%, transparent 100%);
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          object-position: center 30%;
+          mix-blend-mode: lighten;
+          animation: hands-float 4s ease-in-out infinite;
         }
 
         @keyframes hands-float {
@@ -1275,16 +1329,11 @@ export default function LandingPage() {
           50%       { transform: translateY(-10px) scale(1.015); }
         }
 
-        @keyframes hands-glow {
-          0%, 100% { filter: drop-shadow(0 0 8px rgba(255,45,107,0.3)) drop-shadow(0 0 20px rgba(255,45,107,0.15)); }
-          50%       { filter: drop-shadow(0 0 20px rgba(255,45,107,0.5)) drop-shadow(0 0 60px rgba(255,45,107,0.25)) drop-shadow(0 0 100px rgba(255,45,107,0.1)); }
-        }
-
         .landing-page .wf-node {
           position: absolute;
           border-radius: var(--radius-md);
-          padding: 8px 12px;
-          font-size: 10px;
+          padding: 6px 10px;
+          font-size: 9px;
           font-weight: 600;
           font-family: var(--font-mono);
           display: flex;
@@ -1296,6 +1345,11 @@ export default function LandingPage() {
           animation: node-float 6s ease-in-out infinite alternate;
           will-change: transform;
           z-index: 15;
+          opacity: 0.85;
+          transition: opacity 0.3s ease;
+        }
+        .landing-page .hero-visual-wrap:hover .wf-node {
+          opacity: 1;
         }
 
         .landing-page .wf-node.trigger {
@@ -2060,6 +2114,72 @@ export default function LandingPage() {
           font-family: var(--font-mono);
         }
 
+        /* ── USER GUIDE PREVIEW ── */
+        .landing-page .guide-preview {
+          padding: 120px 0;
+          text-align: center;
+          position: relative;
+        }
+
+        .landing-page .guide-preview-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 20px;
+          margin-top: 48px;
+          max-width: 900px;
+          margin-left: auto;
+          margin-right: auto;
+        }
+
+        .landing-page .guide-preview-card {
+          padding: 28px 24px;
+          border-radius: 12px;
+          border: 1px solid rgba(248,240,242,.06);
+          background: rgba(255,255,255,0.02);
+          text-align: left;
+          transition: border-color 0.25s, background 0.25s, transform 0.25s;
+        }
+
+        .landing-page .guide-preview-card:hover {
+          border-color: rgba(255,45,107,0.2);
+          background: rgba(255,255,255,0.04);
+          transform: translateY(-2px);
+        }
+
+        .landing-page .guide-preview-icon {
+          font-size: 28px;
+          display: block;
+          margin-bottom: 12px;
+        }
+
+        .landing-page .guide-preview-title {
+          font-size: 16px;
+          font-weight: 600;
+          color: #fafafa;
+          margin: 0 0 8px;
+          letter-spacing: -0.01em;
+        }
+
+        .landing-page .guide-preview-desc {
+          font-size: 13px;
+          color: #94a3b8;
+          line-height: 1.5;
+          margin: 0;
+        }
+
+        @media (max-width: 768px) {
+          .landing-page .guide-preview-grid {
+            grid-template-columns: 1fr;
+            gap: 12px;
+          }
+        }
+
+        @media (min-width: 769px) and (max-width: 1024px) {
+          .landing-page .guide-preview-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+
         /* ── CTA SECTION ── */
         .landing-page .cta-section {
           padding: 160px 0;
@@ -2254,10 +2374,19 @@ export default function LandingPage() {
           border-radius: 12px;
         }
 
-        /* ── HERO NODE POSITIONS ── */
-        .landing-page .wf-node-hero-trigger { top: 8%; left: -10px; }
-        .landing-page .wf-node-hero-ai      { top: 50%; right: -8px; left: auto; }
-        .landing-page .wf-node-hero-action  { bottom: 12%; left: 10%; }
+        /* ── HERO WORKFLOW TRAIL ── */
+        .landing-page .wf-trail-line {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          pointer-events: none;
+          z-index: 12;
+        }
+
+        .landing-page .wf-node-hero-trigger { top: 10%; left: 12%; }
+        .landing-page .wf-node-hero-ai      { top: 22%; right: 10%; left: auto; }
+        .landing-page .wf-node-hero-action  { bottom: 10%; right: 18%; left: auto; }
 
         /* ── TRIFECTO CENTERED SUB ── */
         .landing-page .trifecto-sub { margin: 0 auto; }

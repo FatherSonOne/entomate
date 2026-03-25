@@ -298,8 +298,8 @@ export function VCTopbar({ title, breadcrumb, onSearch, onCommandPalette, rightS
   return (
     <header className="vc-topbar" style={{
       position: 'sticky', top: 0, zIndex: 30,
-      background: 'var(--bg-elevated, #101010)',
-      borderBottom: '1px solid rgba(248,240,242,.06)',
+      background: 'var(--bg-elevated)',
+      borderBottom: '1px solid var(--b1)',
       padding: '0 20px', height: 52,
       display: 'flex', alignItems: 'center', gap: 12
     }}>

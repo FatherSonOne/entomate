@@ -58,9 +58,9 @@
 /* ── LIGHT MODE ── */
 [data-brand="void-crimson"]:not(.dark) {
   /* Neo-cinema surface colors (light) */
-  --neo-base: #F8F4F6;
+  --neo-base: #FFFFFF;
   --neo-l:    #FFFFFF;
-  --neo-d:    #E0DDE4;
+  --neo-d:    rgba(0,0,0,.06);
 
   /* Backgrounds — Rose-tinted warm neutral */
   --bg-base:     #FFF8FA;

@@ -161,7 +161,7 @@ export default function Settings() {
       <div className="vc">
         <div
           className="p-4"
-          style={{ borderBottom: '1px solid rgba(248,240,242,.06)' }}
+          style={{ borderBottom: '1px solid var(--b1, rgba(248,240,242,.06))' }}
         >
           <div className="flex items-center gap-2">
             <Brain className="w-5 h-5" style={{ color: 'var(--accent-tertiary, #FFB800)' }} />
@@ -199,7 +199,7 @@ export default function Settings() {
       <div className="vc">
         <div
           className="p-4"
-          style={{ borderBottom: '1px solid rgba(248,240,242,.06)' }}
+          style={{ borderBottom: '1px solid var(--b1, rgba(248,240,242,.06))' }}
         >
           <div className="flex items-center gap-2">
             <Palette className="w-5 h-5" style={{ color: 'var(--accent-primary, #FF2D6B)' }} />
@@ -268,7 +268,7 @@ export default function Settings() {
       <div className="vc">
         <div
           className="p-4 flex items-center justify-between"
-          style={{ borderBottom: '1px solid rgba(248,240,242,.06)' }}
+          style={{ borderBottom: '1px solid var(--b1, rgba(248,240,242,.06))' }}
         >
           <h2
             className="font-semibold"
@@ -297,7 +297,7 @@ export default function Settings() {
             {/* AI Provider */}
             <div
               className="p-4 flex items-center justify-between"
-              style={{ borderBottom: '1px solid rgba(248,240,242,.06)' }}
+              style={{ borderBottom: '1px solid var(--b1, rgba(248,240,242,.06))' }}
             >
               <div className="flex items-center gap-3">
                 <VCIconBox color="amber">
@@ -327,7 +327,7 @@ export default function Settings() {
             {/* Database */}
             <div
               className="p-4 flex items-center justify-between"
-              style={{ borderBottom: '1px solid rgba(248,240,242,.06)' }}
+              style={{ borderBottom: '1px solid var(--b1, rgba(248,240,242,.06))' }}
             >
               <div className="flex items-center gap-3">
                 <VCIconBox color="mint">
@@ -357,7 +357,7 @@ export default function Settings() {
             {/* CRM - Logos Vision */}
             <div
               className="p-4"
-              style={{ borderBottom: '1px solid rgba(248,240,242,.06)' }}
+              style={{ borderBottom: '1px solid var(--b1, rgba(248,240,242,.06))' }}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -482,7 +482,7 @@ export default function Settings() {
         </h2>
 
         <div className="space-y-4">
-          <div className="p-4 rounded-lg" style={{ background: 'var(--bg-elevated, #101010)' }}>
+          <div className="p-4 rounded-lg" style={{ background: 'var(--bg-elevated)' }}>
             <h3
               className="font-medium mb-2"
               style={{ fontFamily: 'var(--font-display)', fontWeight: 600, color: 'var(--text-primary)', fontSize: 14 }}
@@ -495,12 +495,12 @@ export default function Settings() {
             <div className="space-y-2">
               <div
                 className="p-3 rounded"
-                style={{ background: 'var(--bg-elevated, #101010)', border: '1px solid rgba(248,240,242,.08)' }}
+                style={{ background: 'var(--bg-elevated)', border: '1px solid var(--b1)' }}
               >
                 <p className="text-sm font-medium mb-1" style={{ color: 'var(--accent-secondary, #00F5D4)' }}>OpenAI (Recommended)</p>
                 <code
                   className="text-xs px-2 py-1 rounded block mb-1"
-                  style={{ background: 'rgba(248,240,242,.04)', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}
+                  style={{ background: 'var(--b0)', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}
                 >
                   OPENAI_API_KEY=sk-your-key-here
                 </code>
@@ -510,12 +510,12 @@ export default function Settings() {
               </div>
               <div
                 className="p-3 rounded"
-                style={{ background: 'var(--bg-elevated, #101010)', border: '1px solid rgba(248,240,242,.08)' }}
+                style={{ background: 'var(--bg-elevated)', border: '1px solid var(--b1)' }}
               >
                 <p className="text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Gemini (Alternative)</p>
                 <code
                   className="text-xs px-2 py-1 rounded block mb-1"
-                  style={{ background: 'rgba(248,240,242,.04)', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}
+                  style={{ background: 'var(--b0)', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}
                 >
                   GEMINI_API_KEY=your_api_key_here
                 </code>
@@ -526,7 +526,7 @@ export default function Settings() {
             </div>
           </div>
 
-          <div className="p-4 rounded-lg" style={{ background: 'var(--bg-elevated, #101010)' }}>
+          <div className="p-4 rounded-lg" style={{ background: 'var(--bg-elevated)' }}>
             <h3
               className="font-medium mb-2"
               style={{ fontFamily: 'var(--font-display)', fontWeight: 600, color: 'var(--text-primary)', fontSize: 14 }}
@@ -538,19 +538,19 @@ export default function Settings() {
             </p>
             <code
               className="text-xs px-2 py-1 rounded block mb-1"
-              style={{ background: 'rgba(248,240,242,.04)', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}
+              style={{ background: 'var(--b0)', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}
             >
               SUPABASE_URL=your_project_url
             </code>
             <code
               className="text-xs px-2 py-1 rounded block"
-              style={{ background: 'rgba(248,240,242,.04)', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}
+              style={{ background: 'var(--b0)', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}
             >
               SUPABASE_ANON_KEY=your_anon_key
             </code>
           </div>
 
-          <div className="p-4 rounded-lg" style={{ background: 'var(--bg-elevated, #101010)' }}>
+          <div className="p-4 rounded-lg" style={{ background: 'var(--bg-elevated)' }}>
             <h3
               className="font-medium mb-2"
               style={{ fontFamily: 'var(--font-display)', fontWeight: 600, color: 'var(--text-primary)', fontSize: 14 }}
@@ -562,19 +562,19 @@ export default function Settings() {
             </p>
             <code
               className="text-xs px-2 py-1 rounded block mb-1"
-              style={{ background: 'rgba(248,240,242,.04)', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}
+              style={{ background: 'var(--b0)', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}
             >
               LOGOS_VISION_URL=http://localhost:3001
             </code>
             <code
               className="text-xs px-2 py-1 rounded block"
-              style={{ background: 'rgba(248,240,242,.04)', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}
+              style={{ background: 'var(--b0)', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}
             >
               LOGOS_VISION_API_KEY=your_api_key
             </code>
           </div>
 
-          <div className="p-4 rounded-lg" style={{ background: 'var(--bg-elevated, #101010)' }}>
+          <div className="p-4 rounded-lg" style={{ background: 'var(--bg-elevated)' }}>
             <h3
               className="font-medium mb-2"
               style={{ fontFamily: 'var(--font-display)', fontWeight: 600, color: 'var(--text-primary)', fontSize: 14 }}
@@ -586,13 +586,13 @@ export default function Settings() {
             </p>
             <code
               className="text-xs px-2 py-1 rounded block mb-1"
-              style={{ background: 'rgba(248,240,242,.04)', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}
+              style={{ background: 'var(--b0)', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}
             >
               PULSE_URL=http://localhost:3002
             </code>
             <code
               className="text-xs px-2 py-1 rounded block"
-              style={{ background: 'rgba(248,240,242,.04)', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}
+              style={{ background: 'var(--b0)', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}
             >
               PULSE_API_KEY=your_api_key
             </code>

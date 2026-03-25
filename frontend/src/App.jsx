@@ -22,6 +22,7 @@ const Reports = React.lazy(() => import('./pages/Reports'))
 const Calendar = React.lazy(() => import('./pages/Calendar'))
 const Workflows = React.lazy(() => import('./pages/Workflows'))
 const WorkflowBuilder = React.lazy(() => import('./pages/WorkflowBuilder'))
+const UsersGuide = React.lazy(() => import('./components/UsersGuide/UsersGuide'))
 const SignIn = React.lazy(() => import('./pages/SignIn'))
 const AuthCallback = React.lazy(() => import('./pages/AuthCallback'))
 const LandingPage = React.lazy(() => import('./pages/LandingPage'))
@@ -56,6 +57,7 @@ export default function App() {
             <Route path="calendar" element={<Calendar />} />
             <Route path="search" element={<Search />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="guide" element={<UsersGuide />} />
           </Route>
 
           {/* Workflow builder - full screen, outside Layout */}

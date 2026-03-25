@@ -49,7 +49,37 @@
   --font: 'Syne', system-ui, sans-serif;
 }
 
-/* ── Surface base — Glassmorphism (default, Void × Crimson brand) ── */
+/* ── Light mode short token overrides — Rose-tinted warm neutral ── */
+:root:not(.dark) {
+  --c:   #CC0044;
+  --cb:  #E8005A;
+  --cd:  rgba(204,0,68,.08);
+  --cg:  rgba(204,0,68,.22);
+  --m:   #008C7A;
+  --md:  rgba(0,140,122,.08);
+  --mg:  rgba(0,140,122,.20);
+  --a:   #9B6800;
+  --ad:  rgba(155,104,0,.08);
+  --p:   #5A9B00;
+  --pd:  rgba(90,155,0,.08);
+  --bg0: #FFF8FA;
+  --bg1: #FFFFFF;
+  --bg2: #FFF0F4;
+  --bg3: #FFE5EC;
+  --t0:  #08080A;
+  --t1:  #4A3840;
+  --t2:  #7A6870;
+  --b0:  rgba(8,8,10,.06);
+  --b1:  rgba(8,8,10,.10);
+  --b2:  rgba(8,8,10,.18);
+  --neo-base: #FFFFFF;
+  --neo-l:    #FFFFFF;
+  --neo-d:    rgba(0,0,0,.06);
+  --opa:   0.92;
+  --glow-i: 0.25;
+}
+
+/* ── Surface base — Glassmorphism (default, dark mode) ── */
 .vc {
   background: rgba(16, 16, 16, 0.70);
   border: 1px solid rgba(248, 240, 242, 0.10);
@@ -61,6 +91,17 @@
   position: relative;
   overflow: hidden;
   font-family: var(--font-display, 'Syne', system-ui, sans-serif);
+}
+
+/* ── Light mode surface — Clean white glass ── */
+:root:not(.dark) .vc {
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(8, 8, 10, 0.08);
+  box-shadow: 0 1px 4px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.04), 0 0 0 1px rgba(8,8,10,.04);
+}
+
+:root:not(.dark) .vc:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,.08), 0 8px 24px rgba(0,0,0,.06), 0 0 0 1px rgba(204,0,68,.12);
 }
 
 /* ── Hover lift ── */
@@ -88,6 +129,14 @@
     0 8px 32px rgba(0, 0, 0, 0.5) !important;
   border-color: rgba(255, 45, 107, 0.3) !important;
   transform: translateY(-2px);
+}
+
+/* ── Light mode hover glow — softer, warm ── */
+:root:not(.dark) .hover-glow .vc:hover {
+  box-shadow:
+    0 0 24px rgba(204, 0, 68, 0.12),
+    0 4px 20px rgba(0, 0, 0, 0.08) !important;
+  border-color: rgba(204, 0, 68, 0.20) !important;
 }
 
 /* ── Slow transition ── */

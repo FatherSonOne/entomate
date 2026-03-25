@@ -122,13 +122,13 @@
   --radius-2xl:  32px;
   --radius-full: 9999px;
 
-  /* ── SHADOWS ── */
-  --shadow-sm:    0 1px 3px rgba(0, 0, 0, 0.4);
-  --shadow-md:    0 4px 12px rgba(0, 0, 0, 0.5);
-  --shadow-lg:    0 8px 32px rgba(0, 0, 0, 0.6);
-  --shadow-card:  0 1px 4px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(8, 8, 10, 0.07);
-  --shadow-hover: 0 4px 20px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(204, 0, 68, 0.25);
-  --shadow-glow:  0 4px 16px rgba(204, 0, 68, 0.22);
+  /* ── SHADOWS (Light mode — soft, warm) ── */
+  --shadow-sm:    0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-md:    0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg:    0 8px 32px rgba(0, 0, 0, 0.10);
+  --shadow-card:  0 1px 4px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(8, 8, 10, 0.05);
+  --shadow-hover: 0 4px 20px rgba(0, 0, 0, 0.10), 0 0 0 1px rgba(204, 0, 68, 0.18);
+  --shadow-glow:  0 4px 16px rgba(204, 0, 68, 0.15);
 }
 
 /* ── DARK MODE — True Void ── */
@@ -222,7 +222,7 @@
 
   .card:hover {
     border-color: var(--accent-primary);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 45, 107, 0.15);
+    box-shadow: var(--shadow-hover);
     @apply transform -translate-y-[1px];
   }
 
@@ -242,7 +242,7 @@
   .btn-primary {
     background: var(--accent-primary);
     color: #fff;
-    box-shadow: 0 0 0 1px rgba(255, 45, 107, 0.25), 0 4px 12px rgba(255, 45, 107, 0.2);
+    box-shadow: 0 0 0 1px var(--accent-primary-glow), 0 4px 12px var(--accent-primary-dim);
     @apply transition-all duration-200;
   }
   .btn-primary:hover {
@@ -400,12 +400,12 @@
     background: transparent;
   }
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(255, 45, 107, 0.35);
+    background: var(--cg, rgba(255, 45, 107, 0.35));
     border-radius: 3px;
     transition: background 250ms ease;
   }
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 45, 107, 0.55);
+    background: var(--accent-primary-glow);
   }
 
   @keyframes fadeIn {

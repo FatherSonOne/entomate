@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -23,13 +23,16 @@ import {
   Sun,
   User,
   LogOut,
-  Home
+  Home,
+  BookOpen
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useKeyboardShortcuts, getModKey } from '../hooks/useKeyboardShortcuts'
 import CommandPalette from './CommandPalette'
 import KeyboardShortcutsHelp from './KeyboardShortcutsHelp'
 import { useTheme } from '../context/ThemeContext'
+import { useGuideNewFeatures } from './UsersGuide/UsersGuide'
+import { useToast } from './vc/ToastProvider'
 import '../styles/navigation.css'
 import VCCanvas from './vc/VCCanvas'
 import Logo from './Logo'
@@ -87,6 +90,7 @@ const breadcrumbMap = {
   '/analytics':        'Analytics',
   '/reports':          'Reports',
   '/settings':         'Settings',
+  '/guide':            'User Guide',
 }
 
 function getBreadcrumb(pathname) {
@@ -112,6 +116,25 @@ export default function Layout() {
     await signOut()
     navigate('/sign-in')
   }
+
+  const { hasNew: guideHasNew, dismiss: dismissGuideNew, newCount: guideNewCount } = useGuideNewFeatures()
+  const toast = useToast()
+
+  // Show toast when guide has new/updated sections
+  const guideToastShown = useRef(false)
+  useEffect(() => {
+    if (guideHasNew && !guideToastShown.current) {
+      guideToastShown.current = true
+      setTimeout(() => {
+        toast.show({
+          title: 'User Guide Updated',
+          message: `${guideNewCount} sections have new or updated content.`,
+          color: 'amber',
+          duration: 6000,
+        })
+      }, 2000)
+    }
+  }, [guideHasNew, guideNewCount, toast])
 
   const isActive = (href) => location.pathname.startsWith(href)
   const breadcrumb = getBreadcrumb(location.pathname)
@@ -184,8 +207,45 @@ export default function Layout() {
             ))}
           </nav>
 
-          {/* Footer: Settings + User */}
+          {/* Footer: Guide + Settings + User */}
           <div className="nl-footer">
+            <NavLink
+              to="/guide"
+              data-icon="guide"
+              className={`nl-item ${isActive('/guide') ? 'active' : ''}`}
+              onClick={() => { setSidebarOpen(false); dismissGuideNew() }}
+            >
+              <span className="nl-icon-box" style={{ position: 'relative' }}>
+                <BookOpen className="w-4 h-4" />
+                {guideHasNew && (
+                  <span style={{
+                    position: 'absolute',
+                    top: -2,
+                    right: -2,
+                    width: 7,
+                    height: 7,
+                    borderRadius: '50%',
+                    background: '#FFB800',
+                    border: '1.5px solid var(--bg0, #060606)',
+                  }} />
+                )}
+              </span>
+              <span>User Guide</span>
+              {guideHasNew && (
+                <span style={{
+                  fontSize: 9,
+                  fontWeight: 700,
+                  padding: '1px 5px',
+                  borderRadius: 4,
+                  background: 'rgba(255,184,0,0.15)',
+                  color: '#FFB800',
+                  marginLeft: 'auto',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.03em',
+                }}>New</span>
+              )}
+            </NavLink>
+
             <NavLink
               to="/settings"
               data-icon="settings"
@@ -235,8 +295,8 @@ export default function Layout() {
             position: 'sticky',
             top: 0,
             zIndex: 30,
-            background: 'var(--bg-elevated, #101010)',
-            borderBottom: '1px solid rgba(248,240,242,.06)',
+            background: 'var(--bg-elevated)',
+            borderBottom: '1px solid var(--b1)',
             height: 52,
           }}
         >
