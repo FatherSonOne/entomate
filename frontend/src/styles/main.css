@@ -204,6 +204,40 @@
     @apply font-semibold tracking-tight text-content-primary;
     font-family: 'Syne', 'Space Grotesk', sans-serif;
   }
+
+  /* ── GLOBAL SCROLLBAR — Void × Crimson ──
+     Crimson thumb on transparent track, thin profile.
+     Uses CSS vars so light/dark mode adapts automatically. */
+
+  /* Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--cg, rgba(255,45,107,.32)) transparent;
+  }
+
+  /* Webkit (Chrome, Edge, Safari) */
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: var(--cg, rgba(255,45,107,.32));
+    border-radius: 3px;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-primary-glow, rgba(255,45,107,.50));
+  }
+
+  /* Hide scrollbar on very small containers */
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
 }
 
 @layer components {
@@ -391,22 +425,8 @@
   .animate-cascade-reveal { animation: cascade-reveal 0.4s var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both; }
   .animate-signal-scan    { animation: signal-scan 2s var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) infinite; }
 
-  /* ── CUSTOM SCROLLBAR ── */
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-  .custom-scrollbar::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: var(--cg, rgba(255, 45, 107, 0.35));
-    border-radius: 3px;
-    transition: background 250ms ease;
-  }
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: var(--accent-primary-glow);
-  }
+  /* ── CUSTOM SCROLLBAR (legacy class — global * rule in @layer base handles all scrollbars now) ── */
+  .custom-scrollbar { scrollbar-width: thin; scrollbar-color: var(--cg) transparent; }
 
   @keyframes fadeIn {
     from { opacity: 0; transform: translateY(10px); }
