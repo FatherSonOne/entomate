@@ -5,7 +5,7 @@ const { supabase } = require('../config/supabase');
 const ai = require('../config/ai');
 const embeddingService = require('../services/embeddingService');
 const hubEventPublisher = require('../services/hubEventPublisher');
-const logosVisionService = require('../services/logosVisionService');
+const { getEcosystemBridge } = require('../services/ecosystemBridge');
 const { validate } = require('../middleware/validate');
 const schemas = require('../schemas/meetings');
 const log = require('../utils/log');
@@ -169,7 +169,7 @@ router.post('/process', upload.single('audio'), validate(schemas.process), async
     log.info(`Saved ${savedActionItems.length} action items`);
 
     // Step 8: Generate embeddings for semantic search (async, non-blocking)
-    setImmediate(async () => {
+    setTimeout(async () => {
       try {
         await embeddingService.generateEmbeddingsForMeeting(
           savedMeeting.id,
@@ -186,43 +186,69 @@ router.post('/process', upload.single('audio'), validate(schemas.process), async
         log.warn('Embedding generation failed:', embeddingError.message);
       }
 
-      // Step 9: Publish to Shared Hub (Logos Vision + Pulse sync)
+      // Step 9: Ecosystem Bridge sync (Logos Vision + Pulse)
       try {
-        // Publish meeting completed event (broadcast to all apps)
-        await hubEventPublisher.meetingCompleted({
-          ...savedMeeting,
-          action_items: savedActionItems
-        });
+        const bridge = await getEcosystemBridge();
 
-        // Sync each action item to Logos Vision
-        for (const item of savedActionItems) {
-          await hubEventPublisher.actionItemCreated(item, savedMeeting.id);
-        }
+        // Post meeting recap to Pulse
+        if (bridge.isConnected('pulse')) {
+          const recap = formatRecapFallback(savedMeeting, savedActionItems);
+          await bridge.postToPulse({
+            channel: 'entomate-meetings',
+            title: `Meeting processed: ${savedMeeting.title}`,
+            message: recap,
+            urgency: savedActionItems.some(i => i.priority === 'high') ? 'high' : 'normal',
+            metadata: { meetingId: savedMeeting.id }
+          });
 
-        // Discover new contacts from attendees
-        const attendees = savedMeeting.attendees || [];
-        for (const attendee of attendees) {
-          if (attendee.email) {
-            await logosVisionService.upsertContact({
-              email: attendee.email,
-              name: attendee.name,
-              source: 'entomate'
+          // Post task assignments to Pulse
+          const highPriItems = savedActionItems.filter(i => i.priority === 'high');
+          if (highPriItems.length > 0) {
+            const taskMsg = highPriItems.map(i =>
+              `🔴 ${i.task_description} → ${i.assigned_to_name || 'Unassigned'} (due ${i.due_date || 'TBD'})`
+            ).join('\n');
+            await bridge.postToPulse({
+              channel: 'entomate-tasks',
+              title: `${highPriItems.length} high-priority task(s) from: ${savedMeeting.title}`,
+              message: taskMsg,
+              urgency: 'high'
             });
           }
         }
 
-        // Notify Pulse about the meeting
-        await hubEventPublisher.notifyPulse({
-          title: `Meeting processed: ${savedMeeting.title}`,
-          body: `${savedActionItems.length} action items extracted. Sentiment: ${savedMeeting.sentiment_label || 'Neutral'}`,
-          urgency: savedActionItems.some(i => i.priority === 'high') ? 'high' : 'normal'
-        });
+        // Sync meeting + action items to Logos Vision
+        if (bridge.isConnected('logos_vision')) {
+          await bridge.syncMeetingToLogosVision({
+            meeting: savedMeeting,
+            actionItems: savedActionItems
+          });
 
-        log.info(`Hub sync complete for meeting ${savedMeeting.id}`);
-      } catch (hubError) {
-        log.warn('Hub sync failed (non-blocking):', hubError.message);
+          // Discover contacts from attendees
+          const attendees = savedMeeting.attendees || [];
+          for (const attendee of attendees) {
+            if (attendee.email) {
+              await bridge.syncContactToLogosVision({
+                email: attendee.email,
+                name: attendee.name,
+                meetingId: savedMeeting.id
+              });
+            }
+          }
+        }
+
+        // Legacy hub fallback (for backward compat during migration)
+        try {
+          await hubEventPublisher.meetingCompleted({
+            ...savedMeeting,
+            action_items: savedActionItems
+          });
+        } catch { /* hub may not be configured */ }
+
+        log.info(`Ecosystem sync complete for meeting ${savedMeeting.id}`);
+      } catch (syncError) {
+        log.warn('Ecosystem sync failed (non-blocking):', syncError.message);
       }
-    });
+    }, 0);
 
     // Return response
     res.json({
@@ -359,7 +385,7 @@ router.post('/transcript', validate(schemas.transcript), async (req, res) => {
     }
 
     // Generate embeddings for semantic search (async, non-blocking)
-    setImmediate(async () => {
+    setTimeout(async () => {
       try {
         await embeddingService.generateEmbeddingsForMeeting(
           savedMeeting.id,
@@ -375,7 +401,7 @@ router.post('/transcript', validate(schemas.transcript), async (req, res) => {
       } catch (embeddingError) {
         log.warn('Embedding generation failed:', embeddingError.message);
       }
-    });
+    }, 0);
 
     res.json({
       success: true,

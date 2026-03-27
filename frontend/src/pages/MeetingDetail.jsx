@@ -8,6 +8,7 @@ import { meetingsApi, integrationsApi } from '../services/api'
 import ActionItemsList from '../components/ActionItemsList'
 import ChatChannelSelector from '../components/ChatChannelSelector'
 import { VCButton, VCBadge, VCTimeline } from '../components/vc'
+import EcosystemSyncStatus from '../components/EcosystemSyncStatus'
 
 export default function MeetingDetail() {
   const { id } = useParams()
@@ -292,6 +293,9 @@ export default function MeetingDetail() {
               onUpdate={loadMeeting}
             />
           </div>
+
+          {/* Ecosystem Sync Status */}
+          <EcosystemSyncStatus meetingId={id} />
 
           {/* Ask AI */}
           <div className="vc p-5">

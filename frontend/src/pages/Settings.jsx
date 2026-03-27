@@ -8,6 +8,7 @@ import {
 import { integrationsApi, checkHealth } from '../services/api'
 import { useTheme, THEME_MODES } from '../context/ThemeContext'
 import LearningDashboard from '../components/learning/LearningDashboard'
+import EcosystemSettings from '../components/EcosystemSettings'
 import { VCButton, VCIconBox } from '../components/vc'
 
 export default function Settings() {
@@ -263,6 +264,9 @@ export default function Settings() {
           </div>
         </div>
       </div>
+
+      {/* Ecosystem Bridge */}
+      <EcosystemSettings />
 
       {/* System Status */}
       <div className="vc">

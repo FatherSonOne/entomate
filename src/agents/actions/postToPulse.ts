@@ -1,10 +1,15 @@
 /**
  * Post to Pulse Action
- * Posts messages to Pulse chat channels
+ * Posts messages to Pulse chat channels via the Ecosystem Bridge.
+ *
+ * Uses the backend /api/ecosystem/pulse endpoint (bridge pattern),
+ * falling back to direct Supabase insert if backend is unavailable.
  */
 
 import { supabase } from '../../lib/supabase';
 import type { Agent, ActionStep } from '../types';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 export interface PostToPulseConfig {
   channel: string | 'auto';
@@ -20,6 +25,7 @@ export interface PostToPulseResult {
   messageId?: string;
   channel: string;
   message: string;
+  viaBridge?: boolean;
 }
 
 /**
@@ -60,8 +66,47 @@ export async function execute(params: {
     };
   }
 
+  // Try ecosystem bridge API first
   try {
-    // Post to Pulse via Supabase (assuming pulse_messages table)
+    const response = await fetch(`${API_BASE_URL}/api/ecosystem/pulse`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        channel,
+        message: finalMessage,
+        title: `Agent: ${params.agent.name}`,
+        metadata: {
+          agent_id: params.agent.id,
+          agent_name: params.agent.name,
+          trigger_event_id: triggerPayload.triggerEventId,
+          source: 'entomate_agent'
+        }
+      })
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      console.log('[Action:post_to_pulse] Posted via ecosystem bridge');
+      return {
+        result: {
+          posted: true,
+          messageId: data.eventLogId,
+          channel,
+          message: finalMessage,
+          viaBridge: true
+        },
+        countersDelta: { pulseMessages: 1 }
+      };
+    }
+
+    // If bridge endpoint returns non-OK, fall through to legacy path
+    console.warn('[Action:post_to_pulse] Bridge returned non-OK, falling back to direct insert');
+  } catch (bridgeErr) {
+    console.warn('[Action:post_to_pulse] Bridge unavailable, falling back to direct insert:', (bridgeErr as Error).message);
+  }
+
+  // Fallback: direct Supabase insert (legacy path)
+  try {
     const { data, error } = await supabase
       .from('pulse_messages')
       .insert({
@@ -82,14 +127,15 @@ export async function execute(params: {
       throw new Error(`Failed to post to Pulse: ${error.message}`);
     }
 
-    console.log('[Action:post_to_pulse] Message posted successfully', { messageId: data?.id });
+    console.log('[Action:post_to_pulse] Message posted via direct insert', { messageId: data?.id });
 
     return {
       result: {
         posted: true,
         messageId: data?.id,
         channel,
-        message: finalMessage
+        message: finalMessage,
+        viaBridge: false
       },
       countersDelta: { pulseMessages: 1 }
     };
@@ -105,16 +151,9 @@ export async function execute(params: {
  */
 function resolveChannel(channel: string | 'auto', payload: Record<string, any>): string {
   if (channel === 'auto') {
-    // Auto-detect based on payload context
-    if (payload.dealId || payload.deal_id) {
-      return 'sales';
-    }
-    if (payload.projectId || payload.project_id) {
-      return 'projects';
-    }
-    if (payload.customerId || payload.customer_id) {
-      return 'customer-success';
-    }
+    if (payload.dealId || payload.deal_id) return 'sales';
+    if (payload.projectId || payload.project_id) return 'projects';
+    if (payload.customerId || payload.customer_id) return 'customer-success';
     return 'general';
   }
   return channel;
@@ -124,13 +163,9 @@ function resolveChannel(channel: string | 'auto', payload: Record<string, any>):
  * Build message from template with variable substitution
  */
 function buildMessage(template: string, payload: Record<string, any>): string {
-  let message = template;
-
-  // Replace all {{variable}} patterns
   const variablePattern = /\{\{(\w+)\}\}/g;
 
-  message = message.replace(variablePattern, (match, varName) => {
-    // Try different casings and common variations
+  return template.replace(variablePattern, (match, varName) => {
     const value = payload[varName]
       || payload[camelToSnake(varName)]
       || payload[snakeToCamel(varName)]
@@ -138,13 +173,13 @@ function buildMessage(template: string, payload: Record<string, any>): string {
       || '';
 
     if (Array.isArray(value)) {
-      return value.map((item, i) => `${i + 1}. ${typeof item === 'string' ? item : item.title || JSON.stringify(item)}`).join('\n');
+      return value.map((item, i) =>
+        `${i + 1}. ${typeof item === 'string' ? item : item.title || JSON.stringify(item)}`
+      ).join('\n');
     }
 
     return String(value || match);
   });
-
-  return message;
 }
 
 /**
@@ -160,32 +195,20 @@ function addMentions(
   if (config.mentionOwner && payload.ownerId) {
     mentions.push(`@${payload.ownerName || payload.ownerId}`);
   }
-
   if (config.mentionAssignee && payload.assigneeId) {
     mentions.push(`@${payload.assigneeName || payload.assigneeId}`);
   }
-
   if (config.mentionCSM && payload.csmId) {
     mentions.push(`@${payload.csmName || payload.csmId}`);
   }
 
-  if (mentions.length > 0) {
-    return `${mentions.join(' ')} ${message}`;
-  }
-
-  return message;
+  return mentions.length > 0 ? `${mentions.join(' ')} ${message}` : message;
 }
 
-/**
- * Convert camelCase to snake_case
- */
 function camelToSnake(str: string): string {
   return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
 }
 
-/**
- * Convert snake_case to camelCase
- */
 function snakeToCamel(str: string): string {
   return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
 }

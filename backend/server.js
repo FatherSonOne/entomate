@@ -25,7 +25,7 @@ const { validateEnv } = require('./config/validateEnv');
 validateEnv();
 
 // Process-level error handlers
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', (reason) => {
   logger.error('Unhandled Rejection:', { reason: reason?.message || reason, stack: reason?.stack });
 });
 
@@ -294,6 +294,9 @@ app.use('/api/meeting-summary', require('./routes/meetingSummary'));
 // Workflow Templates
 app.use('/api/templates', require('./routes/templates'));
 
+// Ecosystem Bridge (Pulse + Logos Vision cross-app communication)
+app.use('/api/ecosystem', require('./routes/ecosystem'));
+
 
 // ========================================
 // SPA FALLBACK (production only)
@@ -335,7 +338,7 @@ async function gracefulShutdown(signal) {
     const workflowScheduler = require('./services/workflow/WorkflowScheduler');
     workflowScheduler.stopAll();
     logger.info('Workflow scheduler stopped');
-  } catch (error) {
+  } catch {
     // Ignore if not initialized
   }
 

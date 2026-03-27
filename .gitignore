@@ -104,3 +104,6 @@ terraform.tfstate.backup
 
 # nano-banana temp URI files
 *.uri
+
+.vercel
+.env*.local
