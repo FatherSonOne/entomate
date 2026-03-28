@@ -11,6 +11,7 @@ import * as syncToCrmAction from './actions/syncToCrm';
 import * as postToPulseAction from './actions/postToPulse';
 import * as createOnboardingProjectAction from './actions/createOnboardingProject';
 import * as assignTaskAction from './actions/assignTask';
+import * as prepareContextAction from './actions/prepareContext';
 
 /**
  * Trigger handler interface
@@ -109,6 +110,24 @@ export const TRIGGERS: Record<TriggerType, TriggerHandler> = {
 
       return now > deadline && actionItem.status !== 'completed';
     }
+  },
+
+  'meeting.upcoming': {
+    type: 'meeting.upcoming',
+    description: 'Fires before a meeting to prepare intelligence context',
+    evaluate: async (_config, context) => {
+      const { meeting, intelligenceConfig } = context;
+
+      if (!meeting) return false;
+      if (!intelligenceConfig || !intelligenceConfig.profileId) return false;
+      if (intelligenceConfig.status !== 'pending') return false;
+
+      // Check if meeting hasn't passed
+      const scheduledAt = meeting.scheduled_at || meeting.start_time;
+      if (scheduledAt && new Date(scheduledAt) < new Date()) return false;
+
+      return true;
+    }
   }
 };
 
@@ -144,6 +163,12 @@ export const ACTIONS: Record<ActionType, ActionHandler> = {
     type: 'assign_task',
     description: 'Auto-assign a task based on workload and skills',
     execute: assignTaskAction.execute
+  },
+
+  'prepare_context': {
+    type: 'prepare_context',
+    description: 'Assemble cross-app context for a meeting intelligence profile',
+    execute: prepareContextAction.execute
   }
 };
 

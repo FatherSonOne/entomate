@@ -82,6 +82,57 @@ export interface EntoamteProjectTask {
   updated_at: string
 }
 
+// ==================== INTELLIGENCE PROFILE TABLES ====================
+
+export interface IntelligenceProfileRow {
+  id: string
+  name: string
+  slug: string
+  description: string | null
+  icon: string
+  category: string
+  system_prompt_template: string
+  custom_fields: any[]
+  focus_areas: any[]
+  tone: string
+  output_format: Record<string, any>
+  context_sources: string[]
+  context_depth: string
+  suggest_when: any[]
+  is_builtin: boolean
+  is_active: boolean
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface MeetingIntelligenceConfigRow {
+  id: string
+  meeting_id: string
+  profile_id: string | null
+  custom_field_values: Record<string, any>
+  assembled_context: Record<string, any> | null
+  context_assembled_at: string | null
+  composed_prompt: string | null
+  tone_override: string | null
+  focus_override: any[] | null
+  additional_instructions: string | null
+  status: string
+  suggestion_dismissed: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface IntelligenceContextCacheRow {
+  id: string
+  entity_type: string
+  entity_id: string
+  source_app: string
+  context_data: Record<string, any>
+  expires_at: string
+  created_at: string
+}
+
 export interface EntoamteAutomation {
   id: string
   name: string

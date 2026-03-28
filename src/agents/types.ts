@@ -5,6 +5,7 @@
 // Trigger types supported in Phase 2
 export type TriggerType =
   | 'meeting.completed'
+  | 'meeting.upcoming'
   | 'task.overdue'
   | 'deal.stage_changed'
   | 'action_item.missed_deadline';
@@ -15,7 +16,8 @@ export type ActionType =
   | 'sync_to_crm'
   | 'post_to_pulse'
   | 'create_onboarding_project'
-  | 'assign_task';
+  | 'assign_task'
+  | 'prepare_context';
 
 // Agent run statuses
 export type AgentRunStatus = 'running' | 'success' | 'failed' | 'skipped';

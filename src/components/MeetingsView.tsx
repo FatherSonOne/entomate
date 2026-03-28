@@ -6,6 +6,7 @@ import { postMeetingSummaryToPulse, notifyAssigneesAboutActionItems, getMeetingP
 import { onMeetingProcessed as fireAgentTriggers } from '../agents/agentTriggerService'
 import { indexMeeting } from '../search/indexer'
 import { LinkedRecordsPanel } from './LinkedRecordsPanel'
+import { MeetingIntelligencePanel } from './intelligence/MeetingIntelligencePanel'
 import { CoachingPanel, SentimentAnalysisCard } from '../phase3/components'
 import type { EntomateMeeting, EntoamteActionItem } from '../lib/supabase'
 
@@ -336,6 +337,14 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({ onMeetingProcessed }
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
       </div>
+
+      {/* Meeting Intelligence Panel */}
+      <MeetingIntelligencePanel
+        meetingId={meeting.id}
+        meetingTitle={meeting.title}
+        meetingTags={(meeting as any).tags}
+        meetingParticipants={meeting.attendees || (meeting as any).participants}
+      />
 
       {meeting.summary && (
         <div className="bg-gray-50 p-4 rounded-xl">

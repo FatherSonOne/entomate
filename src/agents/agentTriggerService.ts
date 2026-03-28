@@ -33,6 +33,35 @@ export async function fireMeetingCompletedTrigger(
     return [];
   }
 
+  // Load meeting intelligence config if one exists
+  let intelligenceConfig = null;
+  try {
+    const { data: configRow } = await supabase
+      .from('meeting_intelligence_config')
+      .select('*')
+      .eq('meeting_id', meetingId)
+      .single();
+
+    if (configRow) {
+      intelligenceConfig = {
+        id: configRow.id,
+        meetingId: configRow.meeting_id,
+        profileId: configRow.profile_id,
+        customFieldValues: configRow.custom_field_values || {},
+        assembledContext: configRow.assembled_context || null,
+        composedPrompt: configRow.composed_prompt,
+        toneOverride: configRow.tone_override,
+        focusOverride: configRow.focus_override,
+        additionalInstructions: configRow.additional_instructions,
+        status: configRow.status,
+      };
+      console.log('[AgentTriggerService] Found intelligence config for meeting:', meetingId);
+    }
+  } catch (err) {
+    // Not having an intelligence config is normal — continue without it
+    console.log('[AgentTriggerService] No intelligence config for meeting (expected for unconfigured meetings)');
+  }
+
   // Create trigger event
   const triggerEvent: TriggerEvent = {
     type: 'meeting.completed',
@@ -44,7 +73,8 @@ export async function fireMeetingCompletedTrigger(
       sentiment: meeting.sentiment_score,
       participants: meeting.participants || [],
       dealId: meeting.deal_id,
-      createdAt: meeting.created_at
+      createdAt: meeting.created_at,
+      intelligenceConfig,
     },
     timestamp: new Date().toISOString(),
     sourceId: `meeting:${meetingId}:${Date.now()}`
@@ -259,6 +289,74 @@ function calculateDaysOverdue(dueDate: string): number {
   return Math.floor(diffMs / (1000 * 60 * 60 * 24));
 }
 
+// ==================== MEETING UPCOMING TRIGGER ====================
+
+/**
+ * Fire meeting.upcoming trigger to assemble intelligence context
+ * Call this before a meeting starts (e.g., from a scheduler)
+ */
+export async function fireMeetingUpcomingTrigger(
+  meetingId: string,
+  options: { dryRun?: boolean } = {}
+): Promise<AgentRunResult[]> {
+  console.log('[AgentTriggerService] Firing meeting.upcoming', { meetingId });
+
+  // Load meeting data
+  const { data: meeting } = await supabase
+    .from('entomate_meetings')
+    .select('*')
+    .eq('id', meetingId)
+    .single();
+
+  if (!meeting) {
+    console.error('[AgentTriggerService] Meeting not found:', meetingId);
+    return [];
+  }
+
+  // Load intelligence config
+  let intelligenceConfig = null;
+  const { data: configRow } = await supabase
+    .from('meeting_intelligence_config')
+    .select('*')
+    .eq('meeting_id', meetingId)
+    .single();
+
+  if (configRow) {
+    intelligenceConfig = {
+      id: configRow.id,
+      meetingId: configRow.meeting_id,
+      profileId: configRow.profile_id,
+      customFieldValues: configRow.custom_field_values || {},
+      assembledContext: configRow.assembled_context || null,
+      composedPrompt: configRow.composed_prompt,
+      toneOverride: configRow.tone_override,
+      focusOverride: configRow.focus_override,
+      additionalInstructions: configRow.additional_instructions,
+      status: configRow.status,
+    };
+  }
+
+  if (!intelligenceConfig || !intelligenceConfig.profileId) {
+    console.log('[AgentTriggerService] No intelligence profile for meeting — skipping upcoming trigger');
+    return [];
+  }
+
+  const triggerEvent: TriggerEvent = {
+    type: 'meeting.upcoming',
+    payload: {
+      meetingId: meeting.id,
+      meetingTitle: meeting.title,
+      scheduledAt: meeting.start_time || meeting.scheduled_at,
+      participants: meeting.attendees || meeting.participants || [],
+      intelligenceConfig,
+    },
+    timestamp: new Date().toISOString(),
+    sourceId: `meeting:${meetingId}:upcoming:${Date.now()}`
+  };
+
+  return runAgentsForTrigger(triggerEvent, options.dryRun);
+}
+
 // ==================== MANUAL TRIGGER FOR TESTING ====================
 
 /**
@@ -297,6 +395,29 @@ export async function manualTriggerAgent(
  */
 export async function onMeetingProcessed(meetingId: string): Promise<void> {
   console.log('[AgentTriggerService] Meeting processed hook:', meetingId);
+
+  // Fallback: assemble intelligence context if pending
+  // (Primary path is the meeting.upcoming trigger, but for manual meetings
+  // or recordings uploaded after the fact, this ensures context is ready)
+  try {
+    const { data: config } = await supabase
+      .from('meeting_intelligence_config')
+      .select('id, profile_id, status')
+      .eq('meeting_id', meetingId)
+      .single();
+
+    if (config && config.profile_id && config.status === 'pending') {
+      console.log('[AgentTriggerService] Assembling intelligence context (fallback path)');
+      const { assembleContext } = await import('../intelligence/contextAssembler');
+      const { getProfileById } = await import('../intelligence/profileService');
+      const profile = await getProfileById(config.profile_id);
+      if (profile) {
+        await assembleContext(meetingId, profile);
+      }
+    }
+  } catch (err) {
+    console.error('[AgentTriggerService] Fallback context assembly failed (non-blocking):', err);
+  }
 
   // Fire agent triggers (in production, not dry run)
   const results = await fireMeetingCompletedTrigger(meetingId, { dryRun: false });

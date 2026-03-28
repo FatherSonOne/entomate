@@ -32,12 +32,8 @@ export interface MeetingSummary {
   sentiment_score: number
 }
 
-export async function summarizeMeeting(transcript: string): Promise<MeetingSummary> {
-  const prompt = `
-Analyze this meeting transcript and provide a structured summary.
-
-TRANSCRIPT:
-${transcript}
+export async function summarizeMeeting(transcript: string, systemPrompt?: string): Promise<MeetingSummary> {
+  const defaultInstructions = `Analyze this meeting transcript and provide a structured summary.
 
 Respond in this exact JSON format:
 {
@@ -48,8 +44,11 @@ Respond in this exact JSON format:
   "sentiment_score": 0.0 to 1.0 (0 = very negative, 1 = very positive)
 }
 
-Only respond with valid JSON, no markdown or extra text.
-`
+Only respond with valid JSON, no markdown or extra text.`
+
+  const prompt = systemPrompt
+    ? `${systemPrompt}\n\nTRANSCRIPT:\n${transcript}\n\nRespond with valid JSON including: summary, key_points, decisions, sentiment_label, sentiment_score.`
+    : `${defaultInstructions}\n\nTRANSCRIPT:\n${transcript}`
 
   try {
     const response = await ai.models.generateContent({
@@ -82,12 +81,8 @@ export interface ExtractedActionItem {
   priority: 'low' | 'medium' | 'high'
 }
 
-export async function extractActionItems(transcript: string): Promise<ExtractedActionItem[]> {
-  const prompt = `
-Analyze this meeting transcript and extract all action items, tasks, and follow-ups that were mentioned or assigned.
-
-TRANSCRIPT:
-${transcript}
+export async function extractActionItems(transcript: string, systemPrompt?: string): Promise<ExtractedActionItem[]> {
+  const defaultInstructions = `Analyze this meeting transcript and extract all action items, tasks, and follow-ups that were mentioned or assigned.
 
 For each action item, identify:
 1. The specific task or action to be done
@@ -112,8 +107,11 @@ Look for phrases like:
 - "By Friday", "End of week", "ASAP", "When you get a chance"
 - Names followed by action verbs
 
-Only respond with valid JSON, no markdown or extra text.
-`
+Only respond with valid JSON, no markdown or extra text.`
+
+  const prompt = systemPrompt
+    ? `${systemPrompt}\n\nTRANSCRIPT:\n${transcript}\n\nExtract action items as JSON with: task_description, assigned_to_name, due_date, priority.`
+    : `${defaultInstructions}\n\nTRANSCRIPT:\n${transcript}`
 
   try {
     const response = await ai.models.generateContent({
@@ -133,17 +131,19 @@ Only respond with valid JSON, no markdown or extra text.
 
 // ==================== ASK ASSISTANT ====================
 
-export async function askAboutMeeting(transcript: string, question: string): Promise<string> {
-  const prompt = `
-You are an AI assistant helping answer questions about a meeting. Use the transcript below to answer the user's question accurately.
+export async function askAboutMeeting(transcript: string, question: string, systemPrompt?: string): Promise<string> {
+  const defaultInstructions = `You are an AI assistant helping answer questions about a meeting. Use the transcript below to answer the user's question accurately.`
+
+  const basePrompt = systemPrompt || defaultInstructions
+
+  const prompt = `${basePrompt}
 
 MEETING TRANSCRIPT:
 ${transcript}
 
 USER QUESTION: ${question}
 
-Provide a clear, concise answer based only on information from the transcript. If the answer isn't in the transcript, say so.
-`
+Provide a clear, concise answer based only on information from the transcript. If the answer isn't in the transcript, say so.`
 
   try {
     const response = await ai.models.generateContent({
@@ -169,14 +169,19 @@ export interface ProcessedMeeting {
   action_items: ExtractedActionItem[]
 }
 
-export async function processMeetingAudio(audioBase64: string, mimeType: string): Promise<ProcessedMeeting> {
+export async function processMeetingAudio(
+  audioBase64: string,
+  mimeType: string,
+  intelligencePrompt?: string
+): Promise<ProcessedMeeting> {
   // Step 1: Transcribe
   const transcript = await transcribeAudio(audioBase64, mimeType)
 
   // Step 2: Summarize and extract action items in parallel
+  // If an intelligence prompt is provided, pass it through to override default prompts
   const [summaryResult, actionItems] = await Promise.all([
-    summarizeMeeting(transcript),
-    extractActionItems(transcript)
+    summarizeMeeting(transcript, intelligencePrompt),
+    extractActionItems(transcript, intelligencePrompt)
   ])
 
   return {

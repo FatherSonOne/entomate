@@ -20,6 +20,7 @@ export { actionHandlers, getActionHandler, executeAction } from './actions';
 // Trigger Service (for firing triggers from app events)
 export {
   fireMeetingCompletedTrigger,
+  fireMeetingUpcomingTrigger,
   fireDealStageChangedTrigger,
   fireTaskOverdueTrigger,
   checkOverdueTasks,
