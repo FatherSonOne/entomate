@@ -9,6 +9,7 @@ import ActionItemsList from '../components/ActionItemsList'
 import ChatChannelSelector from '../components/ChatChannelSelector'
 import { VCButton, VCBadge, VCTimeline } from '../components/vc'
 import EcosystemSyncStatus from '../components/EcosystemSyncStatus'
+import MeetingIntelligencePanel from '../components/intelligence/MeetingIntelligencePanel'
 
 export default function MeetingDetail() {
   const { id } = useParams()
@@ -201,6 +202,15 @@ export default function MeetingDetail() {
           </VCButton>
         </div>
       </div>
+
+      {/* Meeting Intelligence Panel */}
+      <MeetingIntelligencePanel
+        meetingId={meeting.id}
+        meetingTitle={meeting.title}
+        meetingDescription={meeting.description}
+        meetingTags={meeting.tags}
+        meetingParticipants={meeting.attendees || meeting.participants}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main content */}
