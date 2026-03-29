@@ -88,8 +88,14 @@ export async function execute(params: {
     };
   }
 
-  // Build the extraction prompt
-  const prompt = buildExtractionPrompt(transcript, meetingTitle, config);
+  // Check for intelligence config — use composed prompt if available
+  const intelligenceConfig = triggerPayload.intelligenceConfig;
+  const intelligencePrompt = intelligenceConfig?.composedPrompt;
+
+  // Build the extraction prompt (intelligence prompt overrides the default)
+  const prompt = intelligencePrompt
+    ? `${intelligencePrompt}\n\nMeeting: ${meetingTitle}\n\nExtract the following in JSON format:\n1. actionItems: Array of {title, description, assignee, priority}\n2. decisions: Array of key decisions made\n3. keyPoints: Array of important discussion points\n4. nextSteps: Array of agreed next steps\n\nRespond with valid JSON only.\n\nTRANSCRIPT:\n${transcript.slice(0, 15000)}`
+    : buildExtractionPrompt(transcript, meetingTitle, config);
 
   try {
     const ai = getGenAI();
