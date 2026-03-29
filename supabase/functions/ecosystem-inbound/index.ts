@@ -134,7 +134,8 @@ async function routeEvent(event: Record<string, unknown>, sourceApp: string) {
     case 'meeting.feedback':
       return handleMeetingFeedback(data)
 
-    // Health check ping
+    // Health check (supports both event names for cross-app compatibility)
+    case 'heartbeat':
     case 'health.ping':
       return { pong: true, timestamp: new Date().toISOString(), app: 'entomate' }
 

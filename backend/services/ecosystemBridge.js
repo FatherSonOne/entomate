@@ -453,7 +453,7 @@ class EcosystemBridge {
     }
 
     const result = await this.sendEvent(appName, {
-      eventType: 'health.ping',
+      eventType: 'heartbeat',
       data: { timestamp: new Date().toISOString() }
     });
 
