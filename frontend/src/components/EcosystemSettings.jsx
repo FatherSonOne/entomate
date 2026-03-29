@@ -202,6 +202,10 @@ export default function EcosystemSettings() {
       setTesting(appName)
       setTestResult(null)
       const resp = await fetch(`${API_BASE}/api/ecosystem/test/${appName}`, { method: 'POST' })
+      if (!resp.ok) {
+        setTestResult({ app: appName, success: false, error: `Server returned ${resp.status}` })
+        return
+      }
       const data = await resp.json()
       setTestResult({ app: appName, ...data })
       await loadEcosystemData()

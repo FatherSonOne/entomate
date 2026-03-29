@@ -19,6 +19,9 @@ const log = require('../utils/log');
 
 const SOURCE_APP = 'entomate';
 
+// Supabase edge functions require an anon key to pass the API gateway.
+// The key is stored in ecosystem_config.features.gateway_key for each app.
+
 class EcosystemBridge {
   constructor() {
     this._config = new Map();   // app_name -> config row
@@ -145,14 +148,22 @@ class EcosystemBridge {
 
     // Send HTTP request
     try {
+      // Supabase edge functions need an anon key in Authorization header
+      const anonKey = cfg.features?.gateway_key;
+
+      const headers = {
+        'Content-Type': 'application/json',
+        'X-Ecosystem-Token': cfg.service_token,
+        'X-Ecosystem-Source': SOURCE_APP,
+        'X-Ecosystem-Event-Id': eventId
+      };
+      if (anonKey) {
+        headers['Authorization'] = `Bearer ${anonKey}`;
+      }
+
       const response = await fetch(cfg.api_url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Ecosystem-Token': cfg.service_token,
-          'X-Ecosystem-Source': SOURCE_APP,
-          'X-Ecosystem-Event-Id': eventId
-        },
+        headers,
         body: JSON.stringify(ecosystemEvent),
         signal: AbortSignal.timeout(15000)  // 15s timeout
       });
@@ -192,16 +203,19 @@ class EcosystemBridge {
 
       // Update event log to failed
       if (eventLogId) {
-        await supabaseAdmin
-          .from('ecosystem_events')
-          .update({
-            status: 'failed',
-            error_message: err.message,
-            processing_time_ms: processingTime,
-            next_retry_at: new Date(Date.now() + 5 * 60 * 1000).toISOString()  // retry in 5 min
-          })
-          .eq('id', eventLogId)
-          .catch(() => {});
+        try {
+          await supabaseAdmin
+            .from('ecosystem_events')
+            .update({
+              status: 'failed',
+              error_message: err.message,
+              processing_time_ms: processingTime,
+              next_retry_at: new Date(Date.now() + 5 * 60 * 1000).toISOString()  // retry in 5 min
+            })
+            .eq('id', eventLogId);
+        } catch {
+          // Swallow — logging failure shouldn't mask the original error
+        }
       }
 
       log.error(`[EcosystemBridge] Failed ${event.eventType} → ${targetApp}:`, err.message);
