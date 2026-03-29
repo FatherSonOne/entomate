@@ -115,10 +115,18 @@ export interface ParticipantContext {
   email?: string;
   role?: string;
   organization?: string;
+  orgType?: string;                   // "nonprofit", "corporate", "government"
   relationship?: string;              // "client", "partner", "team_member"
   lastInteraction?: string;           // ISO date
   meetingCount?: number;
   notes?: string;                     // CRM notes about this contact
+  donationContext?: {
+    totalDonated: number;
+    lastDonation: string | null;
+    donationCount: number;
+    averageDonation: number;
+  };
+  activeProjects?: { name: string; status: string; description: string | null }[];
   sourceApp: 'logos_vision' | 'pulse' | 'entomate';
 }
 

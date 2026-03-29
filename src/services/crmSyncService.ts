@@ -17,6 +17,7 @@ import {
   testLogosVisionConnection,
   getConnectionInfo,
 } from '../lib/logosVisionClient'
+import { ecosystemBridge } from './ecosystemBridge'
 
 // Re-export types for convenience
 export type { LogosVisionTeamMember, LogosVisionTask, LogosVisionActivity, LogosVisionProject }
@@ -490,6 +491,100 @@ export async function syncMeetingToCrm(
       meetingId,
       error: error instanceof Error ? error.message : 'Unknown error',
     }
+  }
+}
+
+/**
+ * Sync a meeting to Logos Vision via the Ecosystem Bridge.
+ * Includes intelligence profile metadata when available.
+ * Falls back to direct sync if the bridge is unavailable.
+ */
+export async function syncMeetingViaBridge(
+  meetingId: string,
+  teamMemberId: string,
+  intelligenceProfile?: {
+    name: string;
+    icon?: string;
+    slug?: string;
+    category?: string;
+    sections?: { heading: string; content: string }[];
+    outputQualityScore?: number;
+    contextSources?: { type: string; count: number }[];
+  }
+): Promise<MeetingSyncResult> {
+  // Check if bridge is available
+  if (!ecosystemBridge.isConnected('logos_vision')) {
+    console.log('[crmSync] Bridge not available, falling back to direct sync');
+    return syncMeetingToCrm(meetingId, teamMemberId);
+  }
+
+  try {
+    // Load meeting data
+    const { data: meeting, error: meetingError } = await supabase
+      .from('entomate_meetings')
+      .select('*')
+      .eq('id', meetingId)
+      .single()
+
+    if (meetingError || !meeting) {
+      return { success: false, meetingId, error: 'Meeting not found' }
+    }
+
+    // Load action items
+    const { data: actionItems } = await supabase
+      .from('entomate_action_items')
+      .select('*')
+      .eq('meeting_id', meetingId)
+
+    // Send via bridge
+    const result = await ecosystemBridge.sendMeetingProcessed({
+      meeting: {
+        id: meeting.id,
+        title: meeting.title,
+        summary: meeting.summary || null,
+        meeting_date: meeting.start_time || meeting.created_at,
+        key_points: meeting.key_points || [],
+        decisions: meeting.decisions || [],
+        attendees: meeting.attendees || [],
+      },
+      actionItems: (actionItems || []).map(item => ({
+        id: item.id,
+        task_description: item.task_description,
+        assigned_to_name: item.assigned_to_name,
+        assigned_to_email: item.assigned_to_email,
+        due_date: item.due_date,
+        priority: item.priority,
+        status: item.status,
+        meeting_id: item.meeting_id,
+      })),
+      teamMemberId,
+      intelligenceProfile,
+    });
+
+    if (!result) {
+      console.warn('[crmSync] Bridge send failed, falling back to direct sync');
+      return syncMeetingToCrm(meetingId, teamMemberId);
+    }
+
+    // Update action item sync statuses
+    for (const item of actionItems || []) {
+      await supabase
+        .from('entomate_action_items')
+        .update({
+          crm_sync_status: 'synced',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', item.id)
+    }
+
+    return {
+      success: true,
+      meetingId,
+      activityId: result.activityId as string | undefined,
+    }
+  } catch (error) {
+    console.error('[crmSync] Bridge sync error, falling back:', error);
+    return syncMeetingToCrm(meetingId, teamMemberId);
   }
 }
 

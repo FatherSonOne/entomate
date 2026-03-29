@@ -130,6 +130,10 @@ async function routeEvent(event: Record<string, unknown>, sourceApp: string) {
     case 'notification.send':
       return handleNotification(data)
 
+    // From Logos Vision: meeting quality feedback for MIP analytics
+    case 'meeting.feedback':
+      return handleMeetingFeedback(data)
+
     // Health check ping
     case 'health.ping':
       return { pong: true, timestamp: new Date().toISOString(), app: 'entomate' }
@@ -191,4 +195,49 @@ async function handleNotification(data: Record<string, unknown>) {
   // Store notification for Entomate UI to display
   console.log('[ecosystem-inbound] Notification from Pulse:', data.title)
   return { acknowledged: true, eventType: 'notification.send' }
+}
+
+async function handleMeetingFeedback(data: Record<string, unknown>) {
+  const { meetingId, rating, feedback, source } = data as {
+    meetingId: string
+    rating: number
+    feedback?: string
+    source?: string
+  }
+
+  if (!meetingId || !rating) {
+    return { error: 'Missing meetingId or rating' }
+  }
+
+  // Update meeting_intelligence_config with feedback
+  const { error: configError } = await supabase
+    .from('meeting_intelligence_config')
+    .update({
+      quality_feedback_rating: rating,
+      quality_feedback_text: feedback || null,
+      quality_feedback_source: source || 'unknown',
+      quality_feedback_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('meeting_id', meetingId)
+
+  if (configError) {
+    // Config row may not exist — log to a standalone table as fallback
+    console.warn('[ecosystem-inbound] meeting_intelligence_config update failed:', configError.message)
+
+    await supabase
+      .from('ecosystem_events')
+      .insert({
+        event_id: crypto.randomUUID(),
+        source: source || 'unknown',
+        target_app: 'entomate',
+        event_type: 'meeting.feedback',
+        direction: 'inbound',
+        status: 'processed',
+        payload: { meetingId, rating, feedback, source, note: 'config row not found, logged as event' }
+      })
+  }
+
+  console.log(`[ecosystem-inbound] Meeting feedback received: meeting=${meetingId} rating=${rating} source=${source}`)
+  return { processed: true, eventType: 'meeting.feedback', meetingId }
 }

@@ -9,6 +9,7 @@
 
 import { supabase } from '../lib/supabase';
 import { logosVisionSupabase, getConnectionInfo as getLVConnectionInfo } from '../lib/logosVisionClient';
+import { ecosystemBridge } from '../services/ecosystemBridge';
 import { fetchFromPulseApi, checkPulseConnection } from './pulseFetcher';
 import { buildMeetingPrompt } from './promptBuilder';
 import { saveMeetingIntelligenceConfig } from './profileService';
@@ -73,35 +74,88 @@ export async function assembleContext(
   const lvConfigured = getLVConnectionInfo().isConfigured || getLVConnectionInfo().isSharedInstance;
   const pulseAvailable = await isPulseAvailable();
 
-  // Gather contacts (also populates org info and notes)
-  if (sources.includes('contacts')) {
-    try {
-      participants = await gatherContacts(participantNames, lvConfigured);
+  // ── Try bridge-first for CRM data (contacts, org, deals, tasks, notes) ──
+  const needsCrmData = sources.some(s =>
+    ['contacts', 'org_info', 'crm_deals', 'tasks', 'notes'].includes(s)
+  );
+
+  let bridgeUsed = false;
+
+  if (needsCrmData && ecosystemBridge.isConnected('logos_vision')) {
+    const bridgeResult = await gatherContextViaBridge(
+      participantNames,
+      meeting.title || '',
+      depth
+    );
+
+    if (bridgeResult) {
+      bridgeUsed = true;
+      participants = bridgeResult.participants;
+      organization = bridgeResult.organization;
+      relatedDeals = bridgeResult.relatedDeals;
+      openTasks = bridgeResult.openTasks;
+
+      // Mark all CRM sources as successful
       if (participants.length > 0) successfulSources.push('contacts');
-    } catch (err) {
-      console.error('[Intelligence:contextAssembler] contacts gather failed:', err);
-    }
-  }
-
-  // Gather organization info
-  if (sources.includes('org_info') && lvConfigured) {
-    try {
-      organization = await gatherOrgInfo(participants);
       if (organization) successfulSources.push('org_info');
-    } catch (err) {
-      console.error('[Intelligence:contextAssembler] org_info gather failed:', err);
+      if (relatedDeals.length > 0) successfulSources.push('crm_deals');
+      if (openTasks.length > 0) successfulSources.push('tasks');
+      // Notes are included in participants from the bridge response
+      successfulSources.push('notes');
+
+      console.log('[Intelligence:contextAssembler] CRM context gathered via bridge API');
     }
   }
 
-  // Gather CRM deals/projects
-  if (sources.includes('crm_deals') && lvConfigured) {
-    try {
-      relatedDeals = await gatherDeals(participants, organization);
-      if (relatedDeals.length > 0) successfulSources.push('crm_deals');
-    } catch (err) {
-      console.error('[Intelligence:contextAssembler] crm_deals gather failed:', err);
+  // ── Fallback: direct Supabase queries if bridge unavailable ──
+  if (!bridgeUsed) {
+    if (sources.includes('contacts')) {
+      try {
+        participants = await gatherContacts(participantNames, lvConfigured);
+        if (participants.length > 0) successfulSources.push('contacts');
+      } catch (err) {
+        console.error('[Intelligence:contextAssembler] contacts gather failed:', err);
+      }
+    }
+
+    if (sources.includes('org_info') && lvConfigured) {
+      try {
+        organization = await gatherOrgInfo(participants);
+        if (organization) successfulSources.push('org_info');
+      } catch (err) {
+        console.error('[Intelligence:contextAssembler] org_info gather failed:', err);
+      }
+    }
+
+    if (sources.includes('crm_deals') && lvConfigured) {
+      try {
+        relatedDeals = await gatherDeals(participants, organization);
+        if (relatedDeals.length > 0) successfulSources.push('crm_deals');
+      } catch (err) {
+        console.error('[Intelligence:contextAssembler] crm_deals gather failed:', err);
+      }
+    }
+
+    if (sources.includes('tasks')) {
+      try {
+        openTasks = await gatherTasks(participantNames, meetingId, lvConfigured);
+        if (openTasks.length > 0) successfulSources.push('tasks');
+      } catch (err) {
+        console.error('[Intelligence:contextAssembler] tasks gather failed:', err);
+      }
+    }
+
+    if (sources.includes('notes') && lvConfigured) {
+      try {
+        participants = await enrichParticipantsWithNotes(participants);
+        successfulSources.push('notes');
+      } catch (err) {
+        console.error('[Intelligence:contextAssembler] notes gather failed:', err);
+      }
     }
   }
+
+  // ── Non-CRM sources: always gathered independently ──
 
   // Gather past meetings from Entomate
   if (sources.includes('past_meetings')) {
@@ -120,26 +174,6 @@ export async function assembleContext(
       if (recentConversations.length > 0) successfulSources.push('pulse_history');
     } catch (err) {
       console.error('[Intelligence:contextAssembler] pulse_history gather failed:', err);
-    }
-  }
-
-  // Gather open tasks
-  if (sources.includes('tasks')) {
-    try {
-      openTasks = await gatherTasks(participantNames, meetingId, lvConfigured);
-      if (openTasks.length > 0) successfulSources.push('tasks');
-    } catch (err) {
-      console.error('[Intelligence:contextAssembler] tasks gather failed:', err);
-    }
-  }
-
-  // Gather notes from Logos Vision activities
-  if (sources.includes('notes') && lvConfigured) {
-    try {
-      participants = await enrichParticipantsWithNotes(participants);
-      successfulSources.push('notes');
-    } catch (err) {
-      console.error('[Intelligence:contextAssembler] notes gather failed:', err);
     }
   }
 
@@ -192,6 +226,145 @@ export async function assembleContext(
   }
 
   return context;
+}
+
+// ==================== BRIDGE-FIRST CONTEXT GATHERING ====================
+
+/**
+ * Attempt to gather CRM context via the Logos Vision Context API (bridge).
+ * Returns participants + orgContext on success, or null to trigger fallback.
+ */
+async function gatherContextViaBridge(
+  participantNames: string[],
+  meetingTitle: string,
+  contextDepth: ContextDepth = 'standard'
+): Promise<{
+  participants: ParticipantContext[];
+  organization: OrgContext | undefined;
+  relatedDeals: DealContext[];
+  openTasks: TaskContext[];
+} | null> {
+  try {
+    const participants = participantNames.map(name => ({ name, email: '' }));
+    const response = await ecosystemBridge.requestContext(participants, meetingTitle, contextDepth);
+
+    if (!response?.success) return null;
+
+    const lvParticipants = response.participants as LvParticipantResponse[];
+    const lvOrganization = response.organization as LvOrgResponse;
+
+    // Map LV participants → Entomate ParticipantContext
+    const mappedParticipants: ParticipantContext[] = lvParticipants.map(p => {
+      // Recent activities go into notes as a text summary
+      let notes: string | undefined;
+      if (p.recentActivities && p.recentActivities.length > 0) {
+        notes = p.recentActivities
+          .slice(0, 3)
+          .map(a => `${a.type}: ${a.title} (${a.date})`)
+          .join('; ');
+      }
+
+      return {
+        name: p.name,
+        email: p.email || undefined,
+        role: p.role || undefined,
+        organization: p.organization || undefined,
+        orgType: p.orgType || undefined,
+        relationship: p.relationship || undefined,
+        lastInteraction: p.engagement?.lastInteraction || undefined,
+        meetingCount: p.engagement?.meetingCount || 0,
+        notes,
+        donationContext: p.donationContext || undefined,
+        activeProjects: p.activeProjects?.map(proj => ({
+          name: proj.name,
+          status: proj.status,
+          description: proj.description,
+        })) || undefined,
+        sourceApp: 'logos_vision' as const,
+      };
+    });
+
+    // Map LV organization → Entomate OrgContext
+    const mappedOrg: OrgContext | undefined = lvOrganization?.organizations?.length
+      ? {
+          name: lvOrganization.organizations[0],
+          type: lvOrganization.hasNonprofitContext ? 'nonprofit' : undefined,
+          activeDeals: undefined,
+          totalMeetings: undefined,
+          keyContacts: lvOrganization.organizations,
+          notes: lvOrganization.aggregateDonations
+            ? `Aggregate donations: $${lvOrganization.aggregateDonations.toLocaleString()}`
+            : undefined,
+        }
+      : undefined;
+
+    // Map active projects → DealContext
+    const relatedDeals: DealContext[] = lvParticipants.flatMap(p =>
+      (p.activeProjects || []).map(proj => ({
+        name: proj.name,
+        stage: proj.status,
+        lastActivity: undefined,
+      }))
+    );
+
+    // Map open tasks → TaskContext
+    const openTasks: TaskContext[] = lvParticipants.flatMap(p =>
+      (p.openTasks || []).map(t => ({
+        title: t.description,
+        status: t.status,
+        dueDate: t.dueDate || undefined,
+        priority: t.priority,
+        relatedTo: 'logos_vision',
+      }))
+    );
+
+    console.log(
+      `[Intelligence:contextAssembler] Bridge context received — ` +
+      `${mappedParticipants.length} participants, ${relatedDeals.length} deals, ` +
+      `${openTasks.length} tasks, nonprofit=${lvOrganization?.hasNonprofitContext || false}`
+    );
+
+    return {
+      participants: mappedParticipants,
+      organization: mappedOrg,
+      relatedDeals,
+      openTasks,
+    };
+  } catch (err) {
+    console.warn('[Intelligence:contextAssembler] Bridge context request failed, falling back:', err);
+    return null;
+  }
+}
+
+// LV context.response type shapes (for mapping)
+interface LvParticipantResponse {
+  name: string;
+  email: string | null;
+  role: string | null;
+  organization: string | null;
+  orgType: string | null;
+  relationship: string;
+  engagement: {
+    totalActivities: number;
+    lastInteraction: string | null;
+    meetingCount: number;
+  };
+  recentActivities: { type: string; title: string; date: string; notes: string | null }[];
+  openTasks: { description: string; status: string; dueDate: string | null; priority: string }[];
+  activeProjects: { name: string; status: string; description: string | null }[];
+  donationContext?: {
+    totalDonated: number;
+    lastDonation: string | null;
+    donationCount: number;
+    averageDonation: number;
+  };
+}
+
+interface LvOrgResponse {
+  organizations: string[];
+  participantCount: number;
+  hasNonprofitContext: boolean;
+  aggregateDonations?: number;
 }
 
 // ==================== SOURCE GATHERERS ====================
