@@ -7,7 +7,7 @@ import {
 import MeetingRecorder from '../components/MeetingRecorder'
 import IntelligenceDashboard from '../components/intelligence/IntelligenceDashboard'
 import { LearningInsightsWidget } from '../components/intelligence'
-import { meetingsApi, tasksApi, projectsApi, checkHealth } from '../services/api'
+import { meetingsApi, tasksApi, projectsApi, learningApi, checkHealth } from '../services/api'
 import { VCBadge } from '../components/vc'
 import ErrorState from '../components/vc/ErrorState'
 
@@ -319,11 +319,8 @@ export default function Dashboard() {
       })
 
       try {
-        const lr = await fetch('/api/learning/insights')
-        if (lr.ok) {
-          const ld = await lr.json()
-          if (ld.success) setLearningInsights(ld.insights)
-        }
+        const { data: ld } = await learningApi.getInsights()
+        if (ld.success) setLearningInsights(ld.insights)
       } catch {}
     } catch (err) {
       console.error('Failed to load dashboard data:', err)

@@ -163,10 +163,15 @@ router.post('/test/:appName', async (req, res) => {
     const bridge = await getEcosystemBridge();
 
     const result = await bridge.testConnection(appName);
+
+    // Return 200 even on connection failure — the success field tells the UI
+    // what happened. A 500 should only mean our own code broke.
     res.json({ success: result.success, ...result });
   } catch (error) {
     log.error('[Ecosystem] Test connection error:', error.message);
-    res.status(500).json({ success: false, error: 'Connection test failed' });
+    // Still return 200 with success:false so the frontend can display
+    // the error message instead of an opaque "500 Internal Server Error"
+    res.json({ success: false, error: error.message || 'Connection test failed' });
   }
 });
 

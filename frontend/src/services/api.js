@@ -905,7 +905,10 @@ export const learningApi = {
 
   // Get pattern validation metrics
   getPatternValidation: (patternId) =>
-    api.get(`/learning/patterns/${patternId}/validation`)
+    api.get(`/learning/patterns/${patternId}/validation`),
+
+  // Get dashboard insights (active patterns, pending, effectiveness)
+  getInsights: () => api.get('/learning/insights')
 }
 
 // ========================================

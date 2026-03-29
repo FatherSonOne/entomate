@@ -195,13 +195,19 @@ export default function EcosystemSettings() {
     }
   }
 
+  const [testResult, setTestResult] = useState(null)
+
   const handleTest = async (appName) => {
     try {
       setTesting(appName)
-      await fetch(`${API_BASE}/api/ecosystem/test/${appName}`, { method: 'POST' })
+      setTestResult(null)
+      const resp = await fetch(`${API_BASE}/api/ecosystem/test/${appName}`, { method: 'POST' })
+      const data = await resp.json()
+      setTestResult({ app: appName, ...data })
       await loadEcosystemData()
     } catch (err) {
       console.error('Test failed:', err)
+      setTestResult({ app: appName, success: false, error: err.message || 'Network error' })
     } finally {
       setTesting(null)
     }
@@ -340,6 +346,7 @@ export default function EcosystemSettings() {
           connected={isConnected('pulse')}
           config={getAppConfig('pulse')}
           testing={testing === 'pulse'}
+          testResult={testResult?.app === 'pulse' ? testResult : null}
           expanded={showForm === 'pulse'}
           onConnect={() => handleConnect('pulse')}
           onDisconnect={() => handleDisconnect('pulse')}
@@ -365,6 +372,7 @@ export default function EcosystemSettings() {
           connected={isConnected('logos_vision')}
           config={getAppConfig('logos_vision')}
           testing={testing === 'logos_vision'}
+          testResult={testResult?.app === 'logos_vision' ? testResult : null}
           expanded={showForm === 'logos_vision'}
           onConnect={() => handleConnect('logos_vision')}
           onDisconnect={() => handleDisconnect('logos_vision')}
@@ -503,7 +511,7 @@ function TokenField({ label, hint, field, value, onChange, onGenerate, onCopy, c
 }
 
 function AppConnectionCard({
-  name, displayName, description, logo, connected, config, testing, expanded,
+  name, displayName, description, logo, connected, config, testing, testResult, expanded,
   onConnect, onDisconnect, onTest, formData, setFormData, onSave, saving, onCancel,
   generateToken, copyToClipboard, copied, showTokens, toggleShowToken
 }) {
@@ -544,8 +552,13 @@ function AppConnectionCard({
           {connected && (
             <>
               <VCButton variant="ghost" size="sm" onClick={onTest} disabled={testing}>
-                {testing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowRight className="w-3.5 h-3.5" />}
-                {testing ? 'Testing' : 'Test'}
+                {testing
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : testResult
+                    ? (testResult.success ? <CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> : <XCircle className="w-3.5 h-3.5 text-red-400" />)
+                    : <ArrowRight className="w-3.5 h-3.5" />
+                }
+                {testing ? 'Testing' : testResult ? (testResult.success ? 'Pass' : 'Fail') : 'Test'}
               </VCButton>
               <VCButton variant="ghost" size="sm" onClick={onDisconnect}>
                 <Unlink className="w-3.5 h-3.5" />
@@ -560,6 +573,14 @@ function AppConnectionCard({
           )}
         </div>
       </div>
+
+      {/* Test result message */}
+      {testResult && !testResult.success && (
+        <div className="px-3 pb-2 flex items-center gap-2 text-xs" style={{ color: 'var(--text-error, #ef4444)' }}>
+          <XCircle className="w-3.5 h-3.5 flex-shrink-0" />
+          <span>{testResult.error || 'Connection test failed — is the target app running?'}</span>
+        </div>
+      )}
 
       {/* Inline connection form */}
       {expanded && (

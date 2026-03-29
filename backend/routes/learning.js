@@ -635,4 +635,69 @@ router.get(
   }
 );
 
+/**
+ * GET /api/learning/insights
+ * Dashboard widget data: active patterns, pending approvals, effectiveness
+ */
+router.get(
+  '/insights',
+  authenticate,
+  apiLimiter,
+  async (req, res) => {
+    try {
+      const userId = req.user.id;
+
+      // Active patterns
+      const { data: activePatterns } = await supabase
+        .from('learning_patterns')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('status', 'active');
+
+      // Pending approvals
+      const { data: pendingPatterns } = await supabase
+        .from('learning_patterns')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('status', 'pending');
+
+      // Effectiveness from override stats (last 30 days)
+      let effectiveness = 0;
+      let weekOverWeek = 0;
+      try {
+        const stats = await FeedbackService.getOverrideStats(userId, 30);
+        if (stats && stats.total > 0) {
+          effectiveness = stats.successRate || 0;
+        }
+        // Week-over-week: compare last 7 days vs previous 7 days
+        const thisWeek = await FeedbackService.getOverrideStats(userId, 7);
+        const lastWeek = await FeedbackService.getOverrideStats(userId, 14);
+        const thisRate = thisWeek?.successRate || 0;
+        const lastRate = lastWeek?.successRate || 0;
+        weekOverWeek = lastRate > 0
+          ? Math.round(((thisRate - lastRate) / lastRate) * 100)
+          : 0;
+      } catch {
+        // Stats not available yet — return zeros
+      }
+
+      res.json({
+        success: true,
+        insights: {
+          activePatterns: activePatterns?.length || 0,
+          pendingApprovals: pendingPatterns?.length || 0,
+          effectiveness,
+          weekOverWeek
+        }
+      });
+    } catch (error) {
+      log.error('[Learning API] Insights error:', { error: error.message || error });
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch learning insights'
+      });
+    }
+  }
+);
+
 module.exports = router;
