@@ -8,18 +8,33 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-ecosystem-token, x-ecosystem-source, x-ecosystem-event-id, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+
+function jsonResponse(body: Record<string, unknown>, status: number) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  })
+}
+
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
 Deno.serve(async (req) => {
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders })
+  }
+
   // Only accept POST
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json' }
-    })
+    return jsonResponse({ error: 'Method not allowed' }, 405)
   }
 
   const startTime = Date.now()
@@ -31,10 +46,7 @@ Deno.serve(async (req) => {
     const eventId = req.headers.get('X-Ecosystem-Event-Id')
 
     if (!token || !sourceApp) {
-      return new Response(JSON.stringify({ error: 'Missing required headers' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' }
-      })
+      return jsonResponse({ error: 'Missing required headers' }, 401)
     }
 
     // Look up the source app's config and validate its inbound token
@@ -47,10 +59,7 @@ Deno.serve(async (req) => {
       .single()
 
     if (configError || !config) {
-      return new Response(JSON.stringify({ error: 'Invalid token or source app not configured' }), {
-        status: 403,
-        headers: { 'Content-Type': 'application/json' }
-      })
+      return jsonResponse({ error: 'Invalid token or source app not configured' }, 403)
     }
 
     // 2. Parse event body
@@ -97,17 +106,11 @@ Deno.serve(async (req) => {
         .eq('id', eventLog.id)
     }
 
-    return new Response(JSON.stringify({ success: status === 'processed', ...result }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    })
+    return jsonResponse({ success: status === 'processed', ...result }, 200)
 
   } catch (err) {
     console.error('[ecosystem-inbound] Error:', (err as Error).message)
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    })
+    return jsonResponse({ error: 'Internal server error' }, 500)
   }
 })
 
