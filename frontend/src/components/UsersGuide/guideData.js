@@ -1,8 +1,8 @@
 // ─── Entomate User Guide Data ─────────────────────────────────────────────
 // Version tracking — update these when guide content changes
 
-export const guideVersion = '1.0.0'
-export const guideUpdated = 'March 25, 2026'
+export const guideVersion = '1.1.0'
+export const guideUpdated = 'March 29, 2026'
 
 // ─── Version key for localStorage new-feature detection ───────────────────
 export const GUIDE_VERSION_KEY = 'entomate_guide_version'
@@ -15,6 +15,7 @@ export const CATEGORIES = [
   { label: 'Work Management',    ids: ['tasks', 'projects', 'goals'] },
   { label: 'Automation & AI',    ids: ['workflows', 'automations', 'agents'] },
   { label: 'Intelligence',       ids: ['search', 'analytics', 'reports'] },
+  { label: 'Ecosystem',           ids: ['ecosystem', 'meeting-intelligence'] },
   { label: 'Configuration',      ids: ['settings', 'troubleshooting'] },
 ]
 
@@ -212,7 +213,8 @@ export const guideSections = [
     id: 'meeting-details',
     title: 'Meeting Details',
     icon: '📝',
-    summary: 'Deep dive into a single meeting with transcripts, AI analysis, and action items.',
+    badge: 'Updated',
+    summary: 'Deep dive into a single meeting with transcripts, AI analysis, intelligence profiles, and action items.',
     steps: [
       'Click any meeting from the Meetings list to open its detail view.',
       'Review the AI-generated summary, key points timeline, and decisions timeline.',
@@ -250,10 +252,23 @@ export const guideSections = [
           'Action items are synced across your Tasks page automatically.',
         ],
       },
+      {
+        id: 'md-intelligence',
+        title: 'Intelligence Profile Panel',
+        description: 'AI suggests the best analysis profile for your meeting.',
+        steps: [
+          'The panel appears when AI detects a matching intelligence profile.',
+          'Accept the suggestion or choose a different profile.',
+          'Fill in any custom fields the profile requires.',
+          'The summary, focus areas, and action item extraction are shaped by the profile.',
+        ],
+        note: 'See the Meeting Intelligence Profiles section for the full list of built-in profiles.',
+      },
     ],
     tips: [
       'The Ask AI feature understands the full meeting context — try follow-up questions.',
       'Key Points and Decisions are displayed on visual timelines for quick scanning.',
+      'Intelligence profiles enrich analysis with external context from contacts, CRM, and past meetings.',
     ],
   },
 
@@ -722,6 +737,133 @@ export const guideSections = [
   },
 
   {
+    id: 'ecosystem',
+    title: 'Ecosystem Integration',
+    icon: '🌐',
+    badge: 'New',
+    summary: 'Connect Entomate with Pulse and Logos Vision for cross-app meeting sync and intelligence sharing.',
+    steps: [
+      'Navigate to Settings and open the Ecosystem section.',
+      'Connect Pulse and/or Logos Vision by entering the API URL and service token.',
+      'Click Test Connection to verify the link is working.',
+      'Once connected, meeting recaps and action items sync automatically.',
+    ],
+    subsections: [
+      {
+        id: 'eco-pulse',
+        title: 'Pulse Integration',
+        description: 'Sync meeting intelligence with the Pulse communication app.',
+        steps: [
+          'Meeting recaps are posted to the #entomate-meetings bot channel in Pulse.',
+          'High-priority action items are posted to #entomate-tasks.',
+          'Pulse can auto-export recordings to Entomate for AI processing.',
+          'Pull recordings from Pulse on-demand or on a schedule.',
+        ],
+      },
+      {
+        id: 'eco-logos',
+        title: 'Logos Vision Integration',
+        description: 'Sync action items and contacts with the Logos Vision CRM.',
+        steps: [
+          'Action items sync as CRM tasks automatically.',
+          'Meeting attendees are synced as CRM contacts.',
+          'Task completion status syncs back to Logos Vision.',
+          'Meeting intelligence provides context for CRM deal management.',
+        ],
+      },
+      {
+        id: 'eco-events',
+        title: 'Event Log & Monitoring',
+        steps: [
+          'View all inbound and outbound events in the Ecosystem Settings.',
+          'Each event shows direction, status, timestamp, and processing time.',
+          'Failed events can be retried with one click.',
+          'Event stats show delivery rates and error counts.',
+        ],
+      },
+      {
+        id: 'eco-auto-sync',
+        title: 'Auto-Sync & Recording Pull',
+        steps: [
+          'Enable auto-sync to periodically check Pulse for new recordings.',
+          'Recordings are imported and processed through the AI pipeline automatically.',
+          'The recordings list is posted to the Pulse bot channel with an Export All option.',
+          'Individual recordings can be requested on-demand.',
+        ],
+      },
+    ],
+    tips: [
+      'Test connections regularly from the Ecosystem Settings page to catch issues early.',
+      'The event log is your best tool for diagnosing sync failures.',
+    ],
+  },
+
+  {
+    id: 'meeting-intelligence',
+    title: 'Meeting Intelligence Profiles',
+    icon: '🧠',
+    badge: 'New',
+    summary: 'AI profiles that customize how your meetings are analyzed, summarized, and followed up.',
+    steps: [
+      'Open a meeting or start a new one — the AI will suggest a matching intelligence profile.',
+      'Accept the suggested profile or choose a different one from the list.',
+      'Fill in any custom fields the profile requires (e.g., grant name, deal stage).',
+      'The AI uses the profile to shape its summary, focus areas, and action item extraction.',
+    ],
+    subsections: [
+      {
+        id: 'mip-builtin',
+        title: 'Built-In Profiles',
+        description: 'Ready-to-use profiles for common meeting types.',
+        steps: [
+          'Grant Specialist — Optimized for grant review and compliance meetings.',
+          'Sales Discovery — Focuses on pain points, budget signals, and next steps.',
+          'Client Check-In — Tracks relationship health and satisfaction.',
+          'Board Meeting — Captures governance decisions and strategic direction.',
+          'Internal Standup — Quick daily sync with blockers and progress.',
+          'Strategic Planning — Long-term goals, market analysis, and roadmap.',
+          'Vendor Negotiation — Contract terms, pricing, and commitments.',
+        ],
+      },
+      {
+        id: 'mip-suggest',
+        title: 'How Suggestions Work',
+        steps: [
+          'The AI analyzes meeting title, attendees, and content keywords.',
+          'It matches against profile suggestion rules (keywords, recurring patterns, org type).',
+          'A confidence score indicates how well the profile fits.',
+          'You can always override or dismiss a suggestion.',
+        ],
+      },
+      {
+        id: 'mip-context',
+        title: 'Context Sources',
+        description: 'Profiles pull in external context to enrich analysis.',
+        steps: [
+          'Contacts — Attendee history, roles, and relationship data.',
+          'CRM Deals — Active deal status, stage, and value.',
+          'Past Meetings — Previous meetings with same attendees for continuity.',
+          'Pulse Threads — Relevant conversations from the Pulse communication app.',
+        ],
+      },
+      {
+        id: 'mip-analytics',
+        title: 'Profile Analytics',
+        steps: [
+          'Track which profiles are used most often.',
+          'See acceptance rates for profile suggestions.',
+          'Monitor output quality scores from user feedback.',
+          'View average action items extracted per profile.',
+        ],
+      },
+    ],
+    tips: [
+      'The AI learns which profiles work best for your meetings over time.',
+      'Rate meeting summaries to help the AI improve profile effectiveness.',
+    ],
+  },
+
+  {
     id: 'settings',
     title: 'Settings',
     icon: '⚙️',
@@ -751,6 +893,17 @@ export const guideSections = [
           'Database — Whether Supabase connection is active.',
           'CRM Integration — Test your CRM connection.',
           'Chat Integration — Test your Slack or chat platform connection.',
+        ],
+      },
+      {
+        id: 'set-ecosystem',
+        title: 'Ecosystem Connections',
+        description: 'Manage cross-app connections with Pulse and Logos Vision.',
+        steps: [
+          'Open the Ecosystem Settings section.',
+          'Add or edit connection details for Pulse and Logos Vision.',
+          'Generate secure tokens for authentication.',
+          'Test connections and view recent sync events.',
         ],
       },
       {
