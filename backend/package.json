@@ -16,7 +16,6 @@
     "build:docker": "docker build -t entomate-backend ."
   },
   "dependencies": {
-    "@anthropic-studio/shared-hub": "file:../../shared-hub",
     "@google/generative-ai": "^0.21.0",
     "@sentry/node": "^8.0.0",
     "@supabase/supabase-js": "^2.47.0",

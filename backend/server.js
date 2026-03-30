@@ -383,6 +383,14 @@ if (process.env.NODE_ENV !== 'test') {
     } catch (error) {
       logger.warn('Workflow scheduler not initialized:', error.message);
     }
+
+    // Initialize ecosystem auto-sync scheduler
+    try {
+      const ecosystemScheduler = require('./services/ecosystemScheduler');
+      ecosystemScheduler.initialize();
+    } catch (error) {
+      logger.warn('Ecosystem scheduler not initialized:', error.message);
+    }
   });
 }
 

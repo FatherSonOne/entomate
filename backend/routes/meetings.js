@@ -710,6 +710,245 @@ router.get('/:id/recap', async (req, res) => {
   }
 });
 
+// ── Shared AI Pipeline ──
+
+/**
+ * Run the AI processing pipeline on a meeting's transcript.
+ * Used by /process, /transcript, and /:id/reprocess routes.
+ *
+ * @param {string} transcript - The meeting transcript text
+ * @param {string} title - Meeting title (used for embedding context)
+ * @returns {{ summaryData, actionItems, embedding }}
+ */
+async function runAIPipeline(transcript, title) {
+  const summaryData = await ai.generateSummary(transcript);
+  const actionItems = await ai.extractActionItems(transcript);
+
+  let embedding = null;
+  try {
+    const textForEmbedding = `${title || ''} ${summaryData.summary} ${transcript.substring(0, 5000)}`;
+    embedding = await ai.generateEmbedding(textForEmbedding);
+  } catch (embeddingError) {
+    log.warn('Embedding generation failed:', embeddingError.message);
+  }
+
+  return { summaryData, actionItems, embedding };
+}
+
+/**
+ * Save action items to DB for a given meeting.
+ * @returns {Array} saved action items
+ */
+async function saveActionItems(meetingId, actionItems) {
+  const saved = [];
+  for (const item of actionItems) {
+    const data = {
+      id: uuidv4(),
+      meeting_id: meetingId,
+      task_description: item.task,
+      context: item.context,
+      assigned_to_name: item.owner,
+      assigned_to_email: item.ownerEmail,
+      due_date: item.dueDate,
+      priority: item.priority?.toLowerCase() || 'medium',
+      status: 'open',
+      crm_sync_status: 'pending',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    if (supabase) {
+      const { data: row, error } = await supabase
+        .from('action_items')
+        .insert(data)
+        .select()
+        .single();
+      saved.push(error ? data : row);
+    } else {
+      saved.push(data);
+    }
+  }
+  return saved;
+}
+
+/**
+ * Fire async post-processing: embeddings + ecosystem bridge sync.
+ * Non-blocking — errors are logged but never thrown.
+ */
+function firePostProcessing(savedMeeting, summaryData, savedActionItems) {
+  setTimeout(async () => {
+    try {
+      await embeddingService.generateEmbeddingsForMeeting(
+        savedMeeting.id,
+        {
+          summary: savedMeeting.summary,
+          key_points: summaryData.keyPoints,
+          decisions: summaryData.decisions,
+          transcript: savedMeeting.transcript,
+        },
+        savedActionItems
+      );
+      log.info(`Generated embeddings for meeting ${savedMeeting.id}`);
+    } catch (embeddingError) {
+      log.warn('Embedding generation failed:', embeddingError.message);
+    }
+
+    try {
+      const bridge = await getEcosystemBridge();
+
+      if (bridge.isConnected('pulse')) {
+        const recap = formatRecapFallback(savedMeeting, savedActionItems);
+        await bridge.postToPulse({
+          channel: 'entomate-meetings',
+          title: `Meeting processed: ${savedMeeting.title}`,
+          message: recap,
+          urgency: savedActionItems.some(i => i.priority === 'high') ? 'high' : 'normal',
+          metadata: { meetingId: savedMeeting.id },
+        });
+
+        const highPriItems = savedActionItems.filter(i => i.priority === 'high');
+        if (highPriItems.length > 0) {
+          const taskMsg = highPriItems.map(i =>
+            `🔴 ${i.task_description} → ${i.assigned_to_name || 'Unassigned'} (due ${i.due_date || 'TBD'})`
+          ).join('\n');
+          await bridge.postToPulse({
+            channel: 'entomate-tasks',
+            title: `${highPriItems.length} high-priority task(s) from: ${savedMeeting.title}`,
+            message: taskMsg,
+            urgency: 'high',
+          });
+        }
+      }
+
+      if (bridge.isConnected('logos_vision')) {
+        await bridge.syncMeetingToLogosVision({
+          meeting: savedMeeting,
+          actionItems: savedActionItems,
+        });
+
+        const attendees = savedMeeting.attendees || [];
+        for (const attendee of attendees) {
+          if (attendee.email) {
+            await bridge.syncContactToLogosVision({
+              email: attendee.email,
+              name: attendee.name,
+              meetingId: savedMeeting.id,
+            });
+          }
+        }
+      }
+
+      try {
+        await hubEventPublisher.meetingCompleted({
+          ...savedMeeting,
+          action_items: savedActionItems,
+        });
+      } catch { /* hub may not be configured */ }
+
+      log.info(`Ecosystem sync complete for meeting ${savedMeeting.id}`);
+    } catch (syncError) {
+      log.warn('Ecosystem sync failed (non-blocking):', syncError.message);
+    }
+  }, 0);
+}
+
+// ── Reprocess Endpoint ──
+
+/**
+ * POST /api/meetings/:id/reprocess
+ * Re-run AI processing on an existing meeting (e.g., after ecosystem import).
+ * Used by the ecosystem-inbound edge function after receiving a Pulse export.
+ */
+router.post('/:id/reprocess', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!supabase) {
+      return res.status(503).json({ error: 'Database not configured' });
+    }
+
+    const { data: meeting, error } = await supabase
+      .from('meetings')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error || !meeting) {
+      return res.status(404).json({ error: 'Meeting not found' });
+    }
+
+    // Already fully processed?
+    if (meeting.summary && meeting.key_points?.length > 0) {
+      return res.json({ success: true, alreadyProcessed: true, meetingId: id });
+    }
+
+    if (!ai.isConfigured()) {
+      return res.status(503).json({ error: 'AI not configured' });
+    }
+
+    let transcript = meeting.transcript;
+
+    // Transcribe audio if we have audio but no transcript
+    if (!transcript && meeting.audio_file_url) {
+      try {
+        const audioResp = await fetch(meeting.audio_file_url);
+        if (audioResp.ok) {
+          const buffer = Buffer.from(await audioResp.arrayBuffer());
+          const mimeType = audioResp.headers.get('content-type') || 'audio/webm';
+          transcript = await ai.transcribeAudio(buffer, mimeType);
+        }
+      } catch (transcribeErr) {
+        log.warn('Audio transcription failed:', transcribeErr.message);
+      }
+    }
+
+    if (!transcript) {
+      return res.status(400).json({ error: 'No transcript or audio available to process' });
+    }
+
+    // Run AI pipeline
+    const { summaryData, actionItems, embedding } = await runAIPipeline(transcript, meeting.title);
+
+    // Update meeting record
+    const updateData = {
+      transcript,
+      summary: summaryData.summary,
+      key_points: summaryData.keyPoints || [],
+      decisions: summaryData.decisions || [],
+      sentiment_label: summaryData.sentiment,
+      sentiment_score: summaryData.sentimentScore || 0.5,
+      topics: summaryData.topics || [],
+      duration_minutes: meeting.duration_minutes || parseDuration(summaryData.estimatedDuration),
+      updated_at: new Date().toISOString(),
+    };
+    if (embedding) {
+      updateData.transcript_embedding = embedding;
+    }
+
+    await supabase.from('meetings').update(updateData).eq('id', id);
+
+    // Save action items
+    const savedActionItems = await saveActionItems(id, actionItems);
+
+    // Build the updated meeting object for post-processing
+    const updatedMeeting = { ...meeting, ...updateData };
+
+    // Fire async post-processing (embeddings + ecosystem sync)
+    firePostProcessing(updatedMeeting, summaryData, savedActionItems);
+
+    res.json({
+      success: true,
+      meetingId: id,
+      summary: summaryData.summary,
+      sentiment: summaryData.sentiment,
+      actionItemCount: savedActionItems.length,
+    });
+  } catch (err) {
+    log.error('Reprocess error:', err);
+    res.status(500).json({ error: 'Failed to reprocess meeting' });
+  }
+});
+
 // Helper functions
 function parseAttendees(attendeesInput) {
   if (!attendeesInput) return [];

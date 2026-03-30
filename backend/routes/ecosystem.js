@@ -292,4 +292,74 @@ router.get('/sync-status/:meetingId', async (req, res) => {
   }
 });
 
+// ── Recording Pull & Import ──
+
+/**
+ * POST /api/ecosystem/pull-recordings
+ * Request a list of available Pulse recordings via the ecosystem bridge.
+ * Pulse will post the list to the #entomate-meetings bot channel.
+ */
+router.post('/pull-recordings', async (req, res) => {
+  try {
+    const bridge = await getEcosystemBridge();
+
+    if (!bridge.isConnected('pulse')) {
+      return res.status(503).json({ success: false, error: 'Pulse is not connected' });
+    }
+
+    const { workspaceId, since, limit: reqLimit } = req.body;
+
+    if (!workspaceId) {
+      return res.status(400).json({ error: 'workspaceId is required' });
+    }
+
+    await bridge.sendEvent('pulse', {
+      eventType: 'meeting.recordings_list',
+      data: {
+        workspaceId,
+        since: since || new Date(Date.now() - 7 * 86400000).toISOString(),
+        limit: reqLimit || 20,
+      },
+    });
+
+    res.json({ success: true, message: 'Recordings list requested from Pulse' });
+  } catch (error) {
+    log.error('[Ecosystem] Pull recordings error:', error.message);
+    res.status(500).json({ success: false, error: 'Failed to request recordings from Pulse' });
+  }
+});
+
+/**
+ * POST /api/ecosystem/import-recording
+ * Request a specific recording from Pulse via the ecosystem bridge.
+ * Pulse will look up the recording and send it back as a meeting.export event.
+ *
+ * NOTE: Requires Pulse-side meeting.export_request handler (see Pulse execution prompt).
+ */
+router.post('/import-recording', async (req, res) => {
+  try {
+    const bridge = await getEcosystemBridge();
+
+    if (!bridge.isConnected('pulse')) {
+      return res.status(503).json({ success: false, error: 'Pulse is not connected' });
+    }
+
+    const { recordingId, source } = req.body;
+
+    if (!recordingId) {
+      return res.status(400).json({ error: 'recordingId is required' });
+    }
+
+    await bridge.sendEvent('pulse', {
+      eventType: 'meeting.export_request',
+      data: { recordingId, source },
+    });
+
+    res.json({ success: true, message: `Export requested for recording ${recordingId}` });
+  } catch (error) {
+    log.error('[Ecosystem] Import recording error:', error.message);
+    res.status(500).json({ success: false, error: 'Failed to request recording from Pulse' });
+  }
+});
+
 module.exports = router;

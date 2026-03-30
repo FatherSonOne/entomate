@@ -1,0 +1,41 @@
+# Render Blueprint — Entomate Backend
+# Deploy via: https://dashboard.render.com → New → Blueprint → connect this repo
+
+services:
+  - type: web
+    name: entomate-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    region: ohio  # us-east, close to Supabase
+    plan: free    # upgrade to starter ($7/mo) to avoid spin-down
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3000"
+      - key: FRONTEND_URL
+        sync: false  # set manually
+      - key: CORS_ORIGINS
+        sync: false  # set manually
+      - key: AI_PROVIDER
+        value: gemini
+      - key: GEMINI_API_KEY
+        sync: false  # set manually (secret)
+      - key: SUPABASE_URL
+        sync: false  # set manually
+      - key: SUPABASE_ANON_KEY
+        sync: false  # set manually
+      - key: SUPABASE_SERVICE_KEY
+        sync: false  # set manually (secret)
+      - key: HUB_SUPABASE_URL
+        sync: false  # set manually (same as SUPABASE_URL)
+      - key: HUB_SUPABASE_ANON_KEY
+        sync: false  # set manually
+      - key: HUB_SUPABASE_SERVICE_KEY
+        sync: false  # set manually (secret)
+      - key: TRUST_PROXY
+        value: "1"
+      - key: LOG_LEVEL
+        value: info
