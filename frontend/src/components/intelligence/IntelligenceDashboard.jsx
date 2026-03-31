@@ -45,16 +45,22 @@ export default function IntelligenceDashboard() {
   const [error, setError] = useState(null)
   const [showCustomize, setShowCustomize] = useState(false)
 
-  // User preferences
-  const [preferences, setPreferences] = useState({
-    showMeetingPrep: true,
-    showDealRisks: true,
-    showActionItems: true,
-    showRelationships: true,
-    dealRiskFilter: ['medium', 'high', 'critical'],
-    timeHorizon: {
-      meetings: 24, // hours
-      risks: 7 // days
+  // User preferences (persisted to localStorage)
+  const [preferences, setPreferences] = useState(() => {
+    try {
+      const saved = localStorage.getItem('entomate_intelligence_prefs')
+      if (saved) return JSON.parse(saved)
+    } catch {}
+    return {
+      showMeetingPrep: true,
+      showDealRisks: true,
+      showActionItems: true,
+      showRelationships: true,
+      dealRiskFilter: ['medium', 'high', 'critical'],
+      timeHorizon: {
+        meetings: 24, // hours
+        risks: 7 // days
+      }
     }
   })
 
@@ -427,6 +433,7 @@ function CustomizationModal({ preferences, onSave, onClose }) {
   const [localPrefs, setLocalPrefs] = useState(preferences)
 
   const handleSave = () => {
+    try { localStorage.setItem('entomate_intelligence_prefs', JSON.stringify(localPrefs)) } catch {}
     onSave(localPrefs)
   }
 

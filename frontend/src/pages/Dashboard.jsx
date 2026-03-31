@@ -1,15 +1,19 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   Mic, FolderKanban, CheckSquare, Zap, ArrowRight,
   BrainCircuit, Plus, Sparkles, Target, Play,
+  AlertTriangle, Users, BarChart3, ChevronDown, ChevronUp,
+  Wifi, WifiOff, Clock, Keyboard, Activity,
 } from 'lucide-react'
 import MeetingRecorder from '../components/MeetingRecorder'
 import IntelligenceDashboard from '../components/intelligence/IntelligenceDashboard'
 import { LearningInsightsWidget } from '../components/intelligence'
-import { meetingsApi, tasksApi, projectsApi, learningApi, checkHealth } from '../services/api'
+import SentimentTrendMini from '../components/intelligence/SentimentTrendMini'
+import { meetingsApi, tasksApi, projectsApi, automationsApi, dashboardApi, learningApi, checkHealth } from '../services/api'
 import { VCBadge } from '../components/vc'
 import ErrorState from '../components/vc/ErrorState'
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 
 /* ═══════════════════════════════════════════════════════════════
    TYPEWRITER HOOK
@@ -104,7 +108,7 @@ function RingGauge({ value, max, label, icon, color = 'crimson', size = 84 }) {
 /* ═══════════════════════════════════════════════════════════════
    INTELLIGENCE BRIEF CARD
    ═══════════════════════════════════════════════════════════════ */
-function IntelligenceBriefCard({ meetings, tasks, projects }) {
+function IntelligenceBriefCard({ meetings, tasks, projects, automations }) {
   const items = [
     meetings > 0
       ? { dot:'var(--c)',  text:`${meetings} meeting${meetings !== 1 ? 's' : ''} recorded — summaries & action items extracted` }
@@ -115,7 +119,9 @@ function IntelligenceBriefCard({ meetings, tasks, projects }) {
     projects > 0
       ? { dot:'var(--m)',  text:`${projects} active project${projects !== 1 ? 's' : ''} tracked — relationship graphs updating` }
       : { dot:'var(--t2)', text:'No projects yet — create one to enable deal intelligence' },
-    { dot:'var(--p)', text:'3 automation workflows running — follow-up detection enabled' },
+    automations > 0
+      ? { dot:'var(--p)', text:`${automations} automation workflow${automations !== 1 ? 's' : ''} running — follow-up detection enabled` }
+      : { dot:'var(--t2)', text:'No automations configured — set up workflows to automate follow-ups' },
   ]
 
   return (
@@ -198,7 +204,7 @@ function DashboardHero({ stats, loading, navigate, recorderRef }) {
     { label:'Meetings',  value:stats.meetings,  max:Math.max(stats.meetings, 15),  color:'crimson',  icon:<Mic style={{ width:9, height:9 }} />,          href:'/meetings' },
     { label:'Tasks',     value:stats.tasks,     max:Math.max(stats.tasks, 20),     color:'amber',    icon:<CheckSquare style={{ width:9, height:9 }} />,   href:'/tasks' },
     { label:'Projects',  value:stats.projects,  max:Math.max(stats.projects, 10),  color:'mint',     icon:<FolderKanban style={{ width:9, height:9 }} />,  href:'/projects' },
-    { label:'Auto',      value:3,               max:10,                            color:'phosphor', icon:<Zap style={{ width:9, height:9 }} />,           href:'/automations' },
+    { label:'Auto',      value:stats.automations, max:Math.max(stats.automations, 10), color:'phosphor', icon:<Zap style={{ width:9, height:9 }} />,           href:'/automations' },
   ]
 
   return (
@@ -231,7 +237,7 @@ function DashboardHero({ stats, loading, navigate, recorderRef }) {
               ))}
             </div>
           ) : (
-            <IntelligenceBriefCard meetings={stats.meetings} tasks={stats.tasks} projects={stats.projects} />
+            <IntelligenceBriefCard meetings={stats.meetings} tasks={stats.tasks} projects={stats.projects} automations={stats.automations} />
           )}
         </div>
 
@@ -259,13 +265,20 @@ function DashboardHero({ stats, loading, navigate, recorderRef }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   SYSTEM STATUS BAR
+   SYSTEM STATUS BAR (with Ecosystem indicators)
    ═══════════════════════════════════════════════════════════════ */
 function SystemStatus({ systemStatus }) {
   const svc = (key) => {
     const s = systemStatus?.services?.[key] || 'checking...'
     return { status: s, ok: s.includes('connected') }
   }
+
+  const ecosystemApps = [
+    { label:'Pulse',      color:'#FF2D6B' },
+    { label:'Entomate',   color:'#00F5D4' },
+    { label:'LogosVision', color:'#38BDF8' },
+  ]
+
   return (
     <div className="vc" style={{ padding:'8px 14px', borderLeft:'2px solid rgba(248,240,242,.08)' }}>
       <div style={{ display:'flex', alignItems:'center', gap:16, flexWrap:'wrap', fontSize:10, fontFamily:'var(--font-mono, JetBrains Mono, monospace)' }}>
@@ -279,6 +292,311 @@ function SystemStatus({ systemStatus }) {
             </div>
           )
         })}
+
+        {/* Ecosystem separator */}
+        <div style={{ width:1, height:12, background:'rgba(248,240,242,.12)' }} />
+        <span style={{ color:'var(--t2)', fontSize:8, fontWeight:700, letterSpacing:'.08em', textTransform:'uppercase' }}>Ecosystem</span>
+
+        {ecosystemApps.map(app => {
+          const ecoStatus = systemStatus?.ecosystem?.[app.label.toLowerCase()]
+          const ok = ecoStatus?.connected !== false
+          return (
+            <div key={app.label} style={{ display:'flex', alignItems:'center', gap:5 }}>
+              <div style={{ width:5, height:5, borderRadius:'50%', background: ok ? app.color : 'var(--t2)', boxShadow: ok ? `0 0 6px ${app.color}` : 'none', opacity: ok ? 1 : 0.4 }} />
+              <span style={{ color: ok ? 'var(--t0)' : 'var(--t2)' }}>{app.label}</span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   OVERDUE ALERT BANNER
+   ═══════════════════════════════════════════════════════════════ */
+function OverdueAlertBanner({ items, navigate }) {
+  const [expanded, setExpanded] = useState(false)
+  if (!items || items.length === 0) return null
+
+  return (
+    <div className="vc" style={{ borderLeft:'2px solid var(--c)', overflow:'hidden' }}>
+      {/* Header */}
+      <button
+        onClick={() => setExpanded(!expanded)}
+        style={{
+          width:'100%', padding:'10px 14px', display:'flex', alignItems:'center', gap:10,
+          background:'none', border:'none', cursor:'pointer', color:'var(--t0)',
+        }}
+      >
+        <AlertTriangle style={{ width:14, height:14, color:'var(--c)', flexShrink:0 }} />
+        <span style={{ fontSize:12, fontWeight:700, fontFamily:'var(--font)', color:'var(--c)' }}>
+          {items.length} overdue item{items.length !== 1 ? 's' : ''} need attention
+        </span>
+        <span style={{ marginLeft:'auto', display:'flex' }}>
+          {expanded
+            ? <ChevronUp style={{ width:14, height:14, color:'var(--t2)' }} />
+            : <ChevronDown style={{ width:14, height:14, color:'var(--t2)' }} />
+          }
+        </span>
+      </button>
+
+      {/* Expandable list */}
+      {expanded && (
+        <div style={{ padding:'0 14px 10px', display:'flex', flexDirection:'column', gap:4 }}>
+          {items.slice(0, 10).map(item => (
+            <div
+              key={item.id}
+              onClick={() => navigate(`/tasks`)}
+              style={{
+                padding:'6px 10px', borderRadius:8, display:'flex', alignItems:'center', gap:10,
+                cursor:'pointer', background:'rgba(255,45,107,.04)',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background='rgba(255,45,107,.10)'}
+              onMouseLeave={e => e.currentTarget.style.background='rgba(255,45,107,.04)'}
+            >
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:11, fontWeight:600, color:'var(--t0)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                  {item.task_description || item.title}
+                </div>
+                <div style={{ fontSize:9, color:'var(--t2)', fontFamily:'var(--font-mono)' }}>
+                  {item.assigned_to_name && `${item.assigned_to_name} · `}Due: {new Date(item.due_date).toLocaleDateString()}
+                </div>
+              </div>
+              <VCBadge color="crimson">{item.days_overdue || Math.floor((Date.now() - new Date(item.due_date)) / 86400000)}d late</VCBadge>
+            </div>
+          ))}
+          {items.length > 10 && (
+            <div style={{ fontSize:10, color:'var(--t2)', textAlign:'center', padding:4 }}>
+              +{items.length - 10} more overdue items
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TEAM WORKLOAD WIDGET
+   ═══════════════════════════════════════════════════════════════ */
+function TeamWorkloadWidget({ workload }) {
+  if (!workload || workload.length === 0) return null
+
+  const maxAssigned = Math.max(...workload.map(m => m.total_assigned), 1)
+
+  return (
+    <div className="vc" style={{ display:'flex', flexDirection:'column', overflow:'hidden' }}>
+      <div style={{ padding:'10px 14px', borderBottom:'1px solid var(--b0)', display:'flex', alignItems:'center', gap:8 }}>
+        <Users style={{ width:13, height:13, color:'var(--m)' }} />
+        <h3 style={{ fontFamily:'var(--font)', fontWeight:600, fontSize:13, color:'var(--t0)' }}>Team Workload</h3>
+        <span style={{ fontSize:10, color:'var(--t2)', marginLeft:'auto' }}>{workload.length} member{workload.length !== 1 ? 's' : ''}</span>
+      </div>
+      <div style={{ padding:'10px 14px', display:'flex', flexDirection:'column', gap:10 }}>
+        {workload.slice(0, 8).map((member, i) => {
+          const pctDone = member.total_assigned > 0 ? (member.completed_items / member.total_assigned) * 100 : 0
+          const pctInProgress = member.total_assigned > 0 ? (member.in_progress_items / member.total_assigned) * 100 : 0
+          const pctPending = 100 - pctDone - pctInProgress
+          const barWidth = `${(member.total_assigned / maxAssigned) * 100}%`
+
+          return (
+            <div key={i}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:3 }}>
+                <span style={{ fontSize:11, fontWeight:600, color:'var(--t0)' }}>{member.team_member || member.name}</span>
+                <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:9, color:'var(--t2)' }}>
+                  {member.high_priority_count > 0 && (
+                    <span style={{ color:'var(--c)', fontWeight:700 }}>{member.high_priority_count} high</span>
+                  )}
+                  <span>{member.total_assigned} total</span>
+                </div>
+              </div>
+              {/* Stacked bar */}
+              <div style={{ height:6, borderRadius:3, background:'rgba(248,240,242,.06)', overflow:'hidden', width:barWidth, minWidth:20 }}>
+                <div style={{ display:'flex', height:'100%' }}>
+                  <div style={{ width:`${pctDone}%`, background:'var(--m)', transition:'width .6s ease' }} />
+                  <div style={{ width:`${pctInProgress}%`, background:'var(--a)', transition:'width .6s ease' }} />
+                  <div style={{ width:`${pctPending}%`, background:'rgba(255,45,107,.3)', transition:'width .6s ease' }} />
+                </div>
+              </div>
+            </div>
+          )
+        })}
+        {/* Legend */}
+        <div style={{ display:'flex', gap:12, fontSize:8, color:'var(--t2)', marginTop:2 }}>
+          <span style={{ display:'flex', alignItems:'center', gap:3 }}><div style={{ width:6, height:6, borderRadius:2, background:'var(--m)' }} />Done</span>
+          <span style={{ display:'flex', alignItems:'center', gap:3 }}><div style={{ width:6, height:6, borderRadius:2, background:'var(--a)' }} />In Progress</span>
+          <span style={{ display:'flex', alignItems:'center', gap:3 }}><div style={{ width:6, height:6, borderRadius:2, background:'rgba(255,45,107,.3)' }} />Pending</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   INSIGHTS & TRENDS PANEL
+   ═══════════════════════════════════════════════════════════════ */
+function InsightsTrendsPanel({ insights }) {
+  if (!insights || !insights.metrics) return null
+
+  const { metrics, sentimentCounts = {}, priorityCounts = {}, statusCounts = {} } = insights
+
+  // Sentiment donut data
+  const sentimentTotal = (sentimentCounts.Positive || 0) + (sentimentCounts.Neutral || 0) + (sentimentCounts.Negative || 0)
+  const sentimentSlices = [
+    { label:'Positive', value:sentimentCounts.Positive || 0, color:'#00F5D4' },
+    { label:'Neutral',  value:sentimentCounts.Neutral  || 0, color:'#FFB800' },
+    { label:'Negative', value:sentimentCounts.Negative || 0, color:'#FF2D6B' },
+  ]
+
+  // Priority bar data
+  const maxPriority = Math.max(priorityCounts.high || 0, priorityCounts.medium || 0, priorityCounts.low || 0, 1)
+  const priorityBars = [
+    { label:'High',   value:priorityCounts.high   || 0, color:'#FF2D6B' },
+    { label:'Medium', value:priorityCounts.medium || 0, color:'#FFB800' },
+    { label:'Low',    value:priorityCounts.low    || 0, color:'#A0FF32' },
+  ]
+
+  // Mini donut SVG helper
+  const renderDonut = (slices, total, size = 60) => {
+    if (total === 0) return null
+    const r = (size / 2) - 5
+    const circ = 2 * Math.PI * r
+    let offset = 0
+
+    return (
+      <svg width={size} height={size} style={{ transform:'rotate(-90deg)' }}>
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(248,240,242,.06)" strokeWidth={5} />
+        {slices.filter(s => s.value > 0).map((s, i) => {
+          const pct = s.value / total
+          const dash = pct * circ
+          const el = (
+            <circle
+              key={i}
+              cx={size/2} cy={size/2} r={r}
+              fill="none" stroke={s.color} strokeWidth={5}
+              strokeDasharray={`${dash} ${circ - dash}`}
+              strokeDashoffset={-offset}
+              strokeLinecap="round"
+              style={{ filter:`drop-shadow(0 0 3px ${s.color}44)` }}
+            />
+          )
+          offset += dash
+          return el
+        })}
+      </svg>
+    )
+  }
+
+  return (
+    <div className="vc" style={{ display:'flex', flexDirection:'column', overflow:'hidden' }}>
+      <div style={{ padding:'10px 14px', borderBottom:'1px solid var(--b0)', display:'flex', alignItems:'center', gap:8 }}>
+        <BarChart3 style={{ width:13, height:13, color:'var(--a)' }} />
+        <h3 style={{ fontFamily:'var(--font)', fontWeight:600, fontSize:13, color:'var(--t0)' }}>Insights & Trends</h3>
+      </div>
+
+      <div style={{ padding:'14px', display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:14 }}>
+        {/* Sentiment Donut */}
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:6 }}>
+          {renderDonut(sentimentSlices, sentimentTotal)}
+          <span style={{ fontSize:9, fontWeight:700, color:'var(--t2)', letterSpacing:'.06em', textTransform:'uppercase' }}>Sentiment</span>
+          <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+            {sentimentSlices.map(s => (
+              <div key={s.label} style={{ display:'flex', alignItems:'center', gap:4, fontSize:9, color:'var(--t1)' }}>
+                <div style={{ width:5, height:5, borderRadius:'50%', background:s.color }} />
+                {s.label}: {s.value}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Priority Bars */}
+        <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+          <span style={{ fontSize:9, fontWeight:700, color:'var(--t2)', letterSpacing:'.06em', textTransform:'uppercase', textAlign:'center' }}>Priority</span>
+          <div style={{ display:'flex', flexDirection:'column', gap:8, flex:1, justifyContent:'center' }}>
+            {priorityBars.map(b => (
+              <div key={b.label}>
+                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:2 }}>
+                  <span style={{ fontSize:9, color:'var(--t1)' }}>{b.label}</span>
+                  <span style={{ fontSize:9, color:b.color, fontWeight:700, fontFamily:'var(--font-mono)' }}>{b.value}</span>
+                </div>
+                <div style={{ height:4, borderRadius:2, background:'rgba(248,240,242,.06)', overflow:'hidden' }}>
+                  <div style={{ height:'100%', width:`${(b.value / maxPriority) * 100}%`, background:b.color, borderRadius:2, transition:'width .8s ease' }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Completion Ring */}
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:6 }}>
+          <RingGauge value={metrics.overallCompletion || 0} max={100} label="Complete" color="mint" size={60} />
+          <div style={{ display:'flex', flexDirection:'column', gap:2, alignItems:'center' }}>
+            <span style={{ fontSize:9, color:'var(--t1)' }}>{metrics.completedItems || 0}/{metrics.totalItems || 0} items</span>
+            {(metrics.overdueItems || 0) > 0 && (
+              <span style={{ fontSize:9, color:'var(--c)', fontWeight:700 }}>{metrics.overdueItems} overdue</span>
+            )}
+            <span style={{ fontSize:9, color:'var(--t2)' }}>Avg progress: {metrics.avgProgress || 0}%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AUTOMATION ACTIVITY FEED
+   ═══════════════════════════════════════════════════════════════ */
+function AutomationActivityFeed({ count, navigate }) {
+  const [runs, setRuns] = useState([])
+  const [loadingRuns, setLoadingRuns] = useState(true)
+
+  useEffect(() => {
+    const loadRuns = async () => {
+      try {
+        const res = await automationsApi.list({ limit: 5 })
+        setRuns((res.automations || res.data?.automations || []).slice(0, 5))
+      } catch {}
+      setLoadingRuns(false)
+    }
+    loadRuns()
+  }, [])
+
+  return (
+    <div className="vc" style={{ display:'flex', flexDirection:'column', overflow:'hidden' }}>
+      <div style={{ padding:'10px 14px', borderBottom:'1px solid var(--b0)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <Zap style={{ width:13, height:13, color:'#A0FF32' }} />
+          <h3 style={{ fontFamily:'var(--font)', fontWeight:600, fontSize:13, color:'var(--t0)' }}>Automations</h3>
+          <VCBadge color="phosphor">{count} active</VCBadge>
+        </div>
+        <button onClick={() => navigate('/automations')} style={{ fontSize:11, color:'var(--c)', display:'flex', alignItems:'center', gap:4, background:'none', border:'none', cursor:'pointer' }}>
+          View all <ArrowRight style={{ width:12, height:12 }} />
+        </button>
+      </div>
+      <div style={{ padding:'6px 8px', display:'flex', flexDirection:'column', gap:2 }}>
+        {loadingRuns ? (
+          Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} style={{ height:32, borderRadius:8, background:'rgba(248,240,242,.04)', animation:'pulse 1.5s ease-in-out infinite' }} />
+          ))
+        ) : runs.length === 0 ? (
+          <p style={{ fontSize:12, color:'var(--t2)', padding:'12px', textAlign:'center' }}>No automations configured</p>
+        ) : (
+          runs.map((auto) => (
+            <div
+              key={auto.id}
+              style={{ padding:'7px 10px', borderRadius:8, display:'flex', alignItems:'center', gap:10 }}
+              onMouseEnter={e => e.currentTarget.style.background='var(--b0)'}
+              onMouseLeave={e => e.currentTarget.style.background='transparent'}
+            >
+              <div style={{ width:6, height:6, borderRadius:'50%', background: auto.enabled ? '#A0FF32' : 'var(--t2)', boxShadow: auto.enabled ? '0 0 5px rgba(160,255,50,.4)' : 'none', flexShrink:0 }} />
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:11, fontWeight:600, color:'var(--t0)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{auto.name || auto.title}</div>
+                <div style={{ fontSize:9, color:'var(--t2)' }}>{auto.trigger_type || auto.type || 'workflow'}</div>
+              </div>
+              <VCBadge color={auto.enabled ? 'mint' : 'neutral'}>{auto.enabled ? 'active' : 'paused'}</VCBadge>
+            </div>
+          ))
+        )}
       </div>
     </div>
   )
@@ -291,9 +609,12 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const recorderRef = useRef(null)
 
-  const [stats, setStats]               = useState({ meetings: 0, tasks: 0, projects: 0 })
+  const [stats, setStats]               = useState({ meetings: 0, tasks: 0, projects: 0, automations: 0 })
   const [recentMeetings, setRecentMeetings] = useState([])
   const [pendingTasks, setPendingTasks]     = useState([])
+  const [overdueItems, setOverdueItems]     = useState([])
+  const [teamWorkload, setTeamWorkload]     = useState([])
+  const [insights, setInsights]             = useState(null)
   const [systemStatus, setSystemStatus]     = useState(null)
   const [loading, setLoading]               = useState(true)
   const [error, setError]                   = useState(null)
@@ -303,19 +624,27 @@ export default function Dashboard() {
     try {
       setError(null)
       setLoading(true)
-      const [health, meetings, tasks, projects] = await Promise.all([
+      const [health, meetings, tasks, projects, automations, overdue, workload, insightsRes] = await Promise.all([
         checkHealth().catch(() => ({ services: {} })),
         meetingsApi.list({ limit: 5 }).catch(() => ({ meetings: [], count: 0 })),
         tasksApi.list({ limit: 5, status: 'open' }).catch(() => ({ tasks: [], count: 0 })),
         projectsApi.list({ limit: 5 }).catch(() => ({ projects: [], count: 0 })),
+        automationsApi.list({ limit: 1 }).catch(() => ({ count: 0 })),
+        dashboardApi.getOverdue().catch(() => ({ data: { overdue: [], count: 0 } })),
+        dashboardApi.getTeamWorkload().catch(() => ({ data: { workload: [] } })),
+        dashboardApi.getInsights().catch(() => ({ data: null })),
       ])
       setSystemStatus(health)
       setRecentMeetings(meetings.meetings || [])
       setPendingTasks(tasks.tasks || [])
+      setOverdueItems((overdue.data || overdue).overdue || [])
+      setTeamWorkload((workload.data || workload).workload || [])
+      setInsights((insightsRes.data || insightsRes).metrics ? (insightsRes.data || insightsRes) : null)
       setStats({
-        meetings: meetings.count || 0,
-        tasks:    tasks.count    || 0,
-        projects: projects.count || 0,
+        meetings:    meetings.count    || 0,
+        tasks:       tasks.count       || 0,
+        projects:    projects.count    || 0,
+        automations: automations.count || 0,
       })
 
       try {
@@ -332,6 +661,16 @@ export default function Dashboard() {
 
   useEffect(() => { loadData() }, [])
 
+  // Keyboard shortcuts: R=refresh, N=new meeting, T=new task, K=search
+  const [showShortcuts, setShowShortcuts] = useState(false)
+  useKeyboardShortcuts({
+    'r': { callback: () => loadData(), requireMod: false },
+    'n': { callback: () => recorderRef.current?.scrollIntoView({ behavior:'smooth', block:'center' }), requireMod: false },
+    't': { callback: () => navigate('/tasks'), requireMod: false },
+    'mod+k': { callback: () => navigate('/search'), allowInInput: true },
+    '?': { callback: () => setShowShortcuts(s => !s), requireMod: false },
+  })
+
   const handleReviewPatterns   = () => navigate('/settings', { state: { section: 'ai-learning' } })
   const handleNavigateToLearn  = () => navigate('/settings', { state: { section: 'ai-learning' } })
 
@@ -342,6 +681,9 @@ export default function Dashboard() {
 
       {/* ── Hero section ── */}
       <DashboardHero stats={stats} loading={loading} navigate={navigate} recorderRef={recorderRef} />
+
+      {/* ── Overdue alert banner ── */}
+      <OverdueAlertBanner items={overdueItems} navigate={navigate} />
 
       {/* ── Full intelligence dashboard ── */}
       <IntelligenceDashboard />
@@ -355,15 +697,22 @@ export default function Dashboard() {
         />
       )}
 
+      {/* ── Insights & Trends + Team Workload row ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <InsightsTrendsPanel insights={insights} />
+        <TeamWorkloadWidget workload={teamWorkload} />
+      </div>
+
       {/* ── System status ── */}
       {systemStatus && <SystemStatus systemStatus={systemStatus} />}
 
-      {/* ── Main content grid — recorder + recent meetings + tasks ── */}
+      {/* ── Main content grid — recorder + recent meetings + tasks + automations ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
         {/* Meeting Recorder */}
-        <div className="lg:col-span-1" ref={recorderRef}>
+        <div className="lg:col-span-1 space-y-4" ref={recorderRef}>
           <MeetingRecorder onMeetingProcessed={loadData} />
+          <AutomationActivityFeed count={stats.automations} navigate={navigate} />
         </div>
 
         <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -397,6 +746,7 @@ export default function Dashboard() {
                             <div style={{ fontSize:12, fontWeight:600, color:'var(--t0)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{m.title}</div>
                             <div style={{ fontSize:10, color:'var(--t2)', fontFamily:'var(--font-mono)' }}>{new Date(m.created_at).toLocaleString()}</div>
                           </div>
+                          {m.sentiment && <SentimentTrendMini sentiment={m.sentiment} />}
                           <VCBadge color={sc}>{m.sentiment_label || 'N/A'}</VCBadge>
                         </div>
                       )
@@ -424,7 +774,16 @@ export default function Dashboard() {
                       <div key={task.id} style={{ padding:'8px 14px', display:'flex', alignItems:'center', gap:10, borderBottom:'1px solid var(--b0)', cursor:'pointer' }}>
                         <input
                           type="checkbox"
-                          style={{ width:13, height:13, accentColor:'var(--c)', flexShrink:0 }}
+                          onChange={async (e) => {
+                            e.stopPropagation()
+                            try {
+                              await tasksApi.complete(task.id)
+                              loadData()
+                            } catch (err) {
+                              console.error('Failed to complete task:', err)
+                            }
+                          }}
+                          style={{ width:13, height:13, accentColor:'var(--c)', flexShrink:0, cursor:'pointer' }}
                         />
                         <div style={{ flex:1, minWidth:0 }}>
                           <p style={{ fontSize:12, color:'var(--t0)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{task.title}</p>
@@ -444,6 +803,39 @@ export default function Dashboard() {
           </div>
 
         </div>
+      </div>
+
+      {/* ── Keyboard shortcuts overlay ── */}
+      {showShortcuts && (
+        <div
+          style={{
+            position:'fixed', bottom:16, right:16, zIndex:50,
+            padding:'12px 16px', borderRadius:'var(--vc-rad, 13px)',
+            background:'var(--neo-base, #141414)', border:'1px solid rgba(248,240,242,.12)',
+            boxShadow:'7px 7px 14px var(--neo-d,#0C0C0C), -7px -7px 14px var(--neo-l,#1E1E1E)',
+            fontSize:11, color:'var(--t1)', fontFamily:'var(--font-mono)',
+          }}
+        >
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+            <Keyboard style={{ width:13, height:13, color:'var(--a)' }} />
+            <span style={{ fontWeight:700, color:'var(--t0)', fontFamily:'var(--font)', fontSize:12 }}>Keyboard Shortcuts</span>
+            <button onClick={() => setShowShortcuts(false)} style={{ marginLeft:'auto', background:'none', border:'none', color:'var(--t2)', cursor:'pointer', fontSize:14, lineHeight:1 }}>&times;</button>
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'40px 1fr', gap:'4px 10px' }}>
+            <kbd style={{ background:'var(--b0)', borderRadius:3, padding:'1px 5px', fontSize:10, textAlign:'center', color:'var(--t0)' }}>R</kbd><span>Refresh dashboard</span>
+            <kbd style={{ background:'var(--b0)', borderRadius:3, padding:'1px 5px', fontSize:10, textAlign:'center', color:'var(--t0)' }}>N</kbd><span>Start new meeting</span>
+            <kbd style={{ background:'var(--b0)', borderRadius:3, padding:'1px 5px', fontSize:10, textAlign:'center', color:'var(--t0)' }}>T</kbd><span>New task</span>
+            <kbd style={{ background:'var(--b0)', borderRadius:3, padding:'1px 5px', fontSize:10, textAlign:'center', color:'var(--t0)' }}>⌘K</kbd><span>Search</span>
+            <kbd style={{ background:'var(--b0)', borderRadius:3, padding:'1px 5px', fontSize:10, textAlign:'center', color:'var(--t0)' }}>?</kbd><span>Toggle this panel</span>
+          </div>
+        </div>
+      )}
+
+      {/* ── Shortcuts hint footer ── */}
+      <div style={{ textAlign:'center', padding:'4px 0' }}>
+        <span style={{ fontSize:9, color:'var(--t2)', cursor:'pointer' }} onClick={() => setShowShortcuts(s => !s)}>
+          Press <kbd style={{ background:'var(--b0)', borderRadius:2, padding:'0 3px', fontSize:8, color:'var(--t1)' }}>?</kbd> for keyboard shortcuts
+        </span>
       </div>
     </div>
   )
