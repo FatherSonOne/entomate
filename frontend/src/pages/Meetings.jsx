@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Search, Clock, Users, MessageSquare, Trash2, AlertTriangle, RefreshCw } from 'lucide-react'
 import MeetingRecorder from '../components/MeetingRecorder'
-import { meetingsApi } from '../services/api'
+import { meetingsApi, settingsApi } from '../services/api'
 import { VCButton, VCBadge } from '../components/vc'
 import { useConfirm } from '../components/vc/ConfirmDialog'
 import { useToast } from '../components/vc/ToastProvider'
@@ -15,9 +15,15 @@ export default function Meetings() {
   const [error, setError] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [showRecorder, setShowRecorder] = useState(false)
+  const [audioInputDeviceId, setAudioInputDeviceId] = useState('')
 
   useEffect(() => {
     loadMeetings()
+    // Load user's preferred audio device
+    settingsApi.getUser().then(res => {
+      const deviceId = res?.settings?.meetings_json?.audioInputDeviceId
+      if (deviceId) setAudioInputDeviceId(deviceId)
+    }).catch(() => {})
   }, [])
 
   const loadMeetings = async () => {
@@ -101,7 +107,7 @@ export default function Meetings() {
 
       {/* Recorder panel */}
       {showRecorder && (
-        <MeetingRecorder onMeetingProcessed={handleMeetingProcessed} />
+        <MeetingRecorder onMeetingProcessed={handleMeetingProcessed} audioInputDeviceId={audioInputDeviceId} />
       )}
 
       {/* Search and filters */}

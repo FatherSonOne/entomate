@@ -49,7 +49,7 @@ function AudioVisualizer({ stream, isActive }) {
   return <canvas ref={canvasRef} width={300} height={30} className="w-full rounded" />
 }
 
-export default function MeetingRecorder({ onMeetingProcessed }) {
+export default function MeetingRecorder({ onMeetingProcessed, audioInputDeviceId }) {
   const [isRecording, setIsRecording] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [duration, setDuration] = useState(0)
@@ -64,7 +64,12 @@ export default function MeetingRecorder({ onMeetingProcessed }) {
   const startRecording = async () => {
     try {
       setError(null)
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } })
+      const audioConstraints = {
+        echoCancellation: true,
+        noiseSuppression: true,
+        ...(audioInputDeviceId ? { deviceId: { exact: audioInputDeviceId } } : {})
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints })
       streamRef.current = stream
       mediaRecorder.current = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' })
       audioChunks.current = []

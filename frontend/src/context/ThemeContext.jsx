@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
 const ThemeContext = createContext(null);
 
@@ -14,6 +14,30 @@ export function ThemeProvider({ children }) {
   });
 
   const [resolvedMode, setResolvedMode] = useState('dark');
+  const [dbLoaded, setDbLoaded] = useState(false);
+
+  // On mount, try to load theme from DB (async, non-blocking).
+  // If DB has a value, override localStorage. Otherwise keep localStorage value.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        // Dynamic import to avoid circular dependency with api.js
+        const { settingsApi } = await import('../services/api');
+        const res = await settingsApi.getUser();
+        const dbMode = res?.settings?.theme_mode;
+        if (!cancelled && dbMode && Object.values(THEME_MODES).includes(dbMode)) {
+          setMode(dbMode);
+          localStorage.setItem('entomate-theme-mode', dbMode);
+        }
+      } catch {
+        // Settings API not available (not logged in, backend down) — use localStorage
+      } finally {
+        if (!cancelled) setDbLoaded(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // Resolve system preference
   useEffect(() => {
@@ -48,15 +72,15 @@ export function ThemeProvider({ children }) {
     localStorage.setItem('entomate-theme-mode', mode);
   }, [resolvedMode, mode]);
 
-  const setThemeMode = (newMode) => {
+  const setThemeMode = useCallback((newMode) => {
     if (Object.values(THEME_MODES).includes(newMode)) {
       setMode(newMode);
     }
-  };
+  }, []);
 
-  const toggleMode = () => {
+  const toggleMode = useCallback(() => {
     setMode(resolvedMode === 'dark' ? 'light' : 'dark');
-  };
+  }, [resolvedMode]);
 
   const value = {
     mode,

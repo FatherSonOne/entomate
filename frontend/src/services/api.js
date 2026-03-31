@@ -938,6 +938,26 @@ export const intelligenceApi = {
   getRelationships: (dealId) => api.get(`/intelligence/relationships/${dealId}`)
 }
 
+// ========================================
+// SETTINGS API
+// ========================================
+export const settingsApi = {
+  // Get current user settings
+  getUser: () => api.get('/settings/user'),
+
+  // Update user settings (partial update)
+  updateUser: (data) => api.put('/settings/user', data),
+
+  // Get workspace settings (admin only)
+  getWorkspace: () => api.get('/settings/workspace'),
+
+  // Update workspace settings (admin only)
+  updateWorkspace: (data) => api.put('/settings/workspace', data),
+
+  // Get audit logs (admin only)
+  getAuditLogs: (params = {}) => api.get('/settings/audit-logs', { params })
+}
+
 // Create default export with all APIs
 const apiClient = {
   // Base axios instance
@@ -958,7 +978,8 @@ const apiClient = {
   workflows: workflowsApi,
   explainability: explainabilityApi,
   learning: learningApi,
-  intelligence: intelligenceApi
+  intelligence: intelligenceApi,
+  settings: settingsApi
 }
 
 export default apiClient

@@ -297,6 +297,9 @@ app.use('/api/templates', require('./routes/templates'));
 // Ecosystem Bridge (Pulse + Logos Vision cross-app communication)
 app.use('/api/ecosystem', require('./routes/ecosystem'));
 
+// User & Workspace Settings
+app.use('/api/settings', require('./routes/settings'));
+
 
 // ========================================
 // SPA FALLBACK (production only)

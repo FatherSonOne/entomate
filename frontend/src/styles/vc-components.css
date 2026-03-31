@@ -301,6 +301,43 @@
 .vinput::placeholder { color: var(--text-tertiary); }
 textarea.vinput { resize: vertical; min-height: 70px; }
 
+.vselect {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: calc(var(--vc-rad) * 0.6);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: var(--font-body, 'Space Grotesk', system-ui);
+  outline: none;
+  transition: all 0.2s;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 30px;
+}
+.vselect:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px var(--accent-primary-dim);
+}
+.vselect:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+/* Force readable option text in native dropdowns (light bg in all browsers) */
+.vselect option {
+  background: #1a1a2e;
+  color: #f0f0f0;
+}
+:root:not(.dark) .vselect option {
+  background: #ffffff;
+  color: #1a1a2e;
+}
+
 .vinput-group { position: relative; }
 .vinput-icon {
   position: absolute;
