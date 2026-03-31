@@ -4,7 +4,7 @@
  */
 
 import { upsertRelationship, RelationshipType } from './relationshipService';
-import type { EntomateMeeting, EntoamteActionItem, EntoamteProject, EntoamteProjectTask } from '../lib/supabase';
+import type { EntomateMeeting, EntoamateActionItem, EntoamateProject, EntoamateProjectTask } from '../lib/supabase';
 
 // ============================================
 // Meeting Relationships
@@ -169,7 +169,7 @@ export async function linkActionItemToTask(
  */
 export async function processActionItemRelationships(
   meetingId: string,
-  actionItems: EntoamteActionItem[]
+  actionItems: EntoamateActionItem[]
 ): Promise<void> {
   for (const item of actionItems) {
     await linkMeetingToActionItem(meetingId, item.id);
@@ -233,7 +233,7 @@ export async function linkTaskToMeeting(
 /**
  * Process a newly created task and create relationships
  */
-export async function processTaskRelationships(task: EntoamteProjectTask): Promise<void> {
+export async function processTaskRelationships(task: EntoamateProjectTask): Promise<void> {
   // Link task to project
   if (task.project_id) {
     await linkTaskToProject(task.id, task.project_id);
@@ -279,7 +279,7 @@ export async function linkProjectToDeal(
 /**
  * Process a newly created project and create relationships
  */
-export async function processProjectRelationships(project: EntoamteProject): Promise<void> {
+export async function processProjectRelationships(project: EntoamateProject): Promise<void> {
   // Link project to CRM deal if present
   if (project.crm_deal_id) {
     await linkProjectToDeal(project.id, project.crm_deal_id);
@@ -366,7 +366,7 @@ export async function linkPulseMessageToDeal(
 export async function processTasksFromMeeting(
   meetingId: string,
   projectId: string,
-  tasks: EntoamteProjectTask[],
+  tasks: EntoamateProjectTask[],
   actionItemMap?: Map<string, string> // taskId -> actionItemId
 ): Promise<void> {
   for (const task of tasks) {

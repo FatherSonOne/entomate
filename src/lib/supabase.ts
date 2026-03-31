@@ -35,7 +35,7 @@ export interface EntomateMeeting {
   updated_at: string
 }
 
-export interface EntoamteActionItem {
+export interface EntoamateActionItem {
   id: string
   meeting_id: string
   task_description: string
@@ -52,7 +52,7 @@ export interface EntoamteActionItem {
   updated_at: string
 }
 
-export interface EntoamteProject {
+export interface EntoamateProject {
   id: string
   name: string
   description?: string
@@ -68,7 +68,7 @@ export interface EntoamteProject {
   updated_at: string
 }
 
-export interface EntoamteProjectTask {
+export interface EntoamateProjectTask {
   id: string
   project_id: string
   title: string
@@ -133,7 +133,7 @@ export interface IntelligenceContextCacheRow {
   created_at: string
 }
 
-export interface EntoamteAutomation {
+export interface EntoamateAutomation {
   id: string
   name: string
   description?: string

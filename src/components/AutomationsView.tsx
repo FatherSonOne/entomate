@@ -11,7 +11,7 @@ import {
   type ActionType
 } from '../services/automationService'
 import { getProjects } from '../services/projectService'
-import type { EntoamteAutomation, EntoamteProject } from '../lib/supabase'
+import type { EntoamateAutomation, EntoamateProject } from '../lib/supabase'
 
 // ==================== CONSTANTS ====================
 
@@ -35,12 +35,12 @@ const ACTION_OPTIONS: { value: ActionType; label: string; description: string }[
 
 export const AutomationsView: React.FC = () => {
   // State
-  const [automations, setAutomations] = useState<EntoamteAutomation[]>([])
-  const [projects, setProjects] = useState<EntoamteProject[]>([])
+  const [automations, setAutomations] = useState<EntoamateAutomation[]>([])
+  const [projects, setProjects] = useState<EntoamateProject[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [showPresets, setShowPresets] = useState(false)
-  const [editingAutomation, setEditingAutomation] = useState<EntoamteAutomation | null>(null)
+  const [editingAutomation, setEditingAutomation] = useState<EntoamateAutomation | null>(null)
 
   // Form state
   const [formData, setFormData] = useState({
@@ -132,7 +132,7 @@ export const AutomationsView: React.FC = () => {
     }
   }
 
-  const startEdit = (automation: EntoamteAutomation) => {
+  const startEdit = (automation: EntoamateAutomation) => {
     setEditingAutomation(automation)
     setFormData({
       name: automation.name,

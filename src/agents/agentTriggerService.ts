@@ -23,7 +23,7 @@ export async function fireMeetingCompletedTrigger(
 
   // Load meeting data
   const { data: meeting } = await supabase
-    .from('entomate_meetings')
+    .from('meetings')
     .select('*')
     .eq('id', meetingId)
     .single();
@@ -303,7 +303,7 @@ export async function fireMeetingUpcomingTrigger(
 
   // Load meeting data
   const { data: meeting } = await supabase
-    .from('entomate_meetings')
+    .from('meetings')
     .select('*')
     .eq('id', meetingId)
     .single();

@@ -1,5 +1,5 @@
 // Pulse Chat Service - Posts meeting summaries and notifications to Pulse
-import { supabase, EntomateMeeting, EntoamteActionItem } from '../lib/supabase'
+import { supabase, EntomateMeeting, EntoamateActionItem } from '../lib/supabase'
 
 // ==================== PULSE CONFIGURATION ====================
 
@@ -197,7 +197,7 @@ export async function sendPulseNotification(notification: {
  */
 export function formatMeetingSummaryForPulse(
   meeting: EntomateMeeting,
-  actionItems: EntoamteActionItem[]
+  actionItems: EntoamateActionItem[]
 ): string {
   const lines: string[] = []
 
@@ -283,7 +283,7 @@ export function formatMeetingNotification(meeting: EntomateMeeting, actionItemCo
  */
 export async function postMeetingSummaryToPulse(
   meeting: EntomateMeeting,
-  actionItems: EntoamteActionItem[],
+  actionItems: EntoamateActionItem[],
   channelId?: string
 ): Promise<PostResult> {
   try {
@@ -318,7 +318,7 @@ export async function postMeetingSummaryToPulse(
     // Update meeting record with Pulse sync info
     if (result.success) {
       await supabase
-        .from('entomate_meetings')
+        .from('meetings')
         .update({
           pulse_channel_id: targetChannelId,
           pulse_synced_at: new Date().toISOString(),
@@ -342,7 +342,7 @@ export async function postMeetingSummaryToPulse(
  */
 export async function notifyUsersAboutMeeting(
   meeting: EntomateMeeting,
-  actionItems: EntoamteActionItem[],
+  actionItems: EntoamateActionItem[],
   userIds?: string[]
 ): Promise<PostResult[]> {
   const results: PostResult[] = []
@@ -378,12 +378,12 @@ export async function notifyUsersAboutMeeting(
  */
 export async function notifyAssigneesAboutActionItems(
   meeting: EntomateMeeting,
-  actionItems: EntoamteActionItem[]
+  actionItems: EntoamateActionItem[]
 ): Promise<PostResult[]> {
   const results: PostResult[] = []
 
   // Group action items by assignee
-  const itemsByAssignee = new Map<string, EntoamteActionItem[]>()
+  const itemsByAssignee = new Map<string, EntoamateActionItem[]>()
 
   for (const item of actionItems) {
     if (item.assigned_to_user_id) {
@@ -439,7 +439,7 @@ export async function getMeetingPulseSyncStatus(meetingId: string): Promise<{
   syncedAt?: string
 }> {
   const { data, error } = await supabase
-    .from('entomate_meetings')
+    .from('meetings')
     .select('pulse_channel_id, pulse_synced_at')
     .eq('id', meetingId)
     .single()

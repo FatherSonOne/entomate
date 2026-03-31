@@ -1,5 +1,14 @@
 /**
- * MeetingIntelligencePanel
+ * MeetingIntelligencePanel (TSX version — DEPRECATED)
+ *
+ * The canonical version is the self-contained JSX panel at:
+ *   frontend/src/components/intelligence/MeetingIntelligencePanel.jsx
+ *
+ * This TSX version is only used by MeetingsView.tsx (secondary UI, not wired in
+ * the main router). New features should go in the JSX version. This file will be
+ * removed once MeetingsView.tsx is retired or migrated to use the backend API.
+ *
+ * Original description:
  * Main panel for configuring intelligence profiles on meetings.
  * Orchestrates suggestion, profile selection, customization, and context preview.
  */

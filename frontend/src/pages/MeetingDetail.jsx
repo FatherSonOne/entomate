@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
   ArrowLeft, Clock, Users, FileText, CheckSquare, MessageSquare,
@@ -10,6 +10,7 @@ import ChatChannelSelector from '../components/ChatChannelSelector'
 import { VCButton, VCBadge, VCTimeline } from '../components/vc'
 import EcosystemSyncStatus from '../components/EcosystemSyncStatus'
 import MeetingIntelligencePanel from '../components/intelligence/MeetingIntelligencePanel'
+import { getSentimentEmoji } from '../utils/meetingHelpers'
 
 export default function MeetingDetail() {
   const { id } = useParams()
@@ -24,11 +25,7 @@ export default function MeetingDetail() {
   const [sharing, setSharing] = useState(false)
   const [shareResult, setShareResult] = useState(null)
 
-  useEffect(() => {
-    loadMeeting()
-  }, [id])
-
-  const loadMeeting = async () => {
+  const loadMeeting = useCallback(async () => {
     try {
       setLoading(true)
       const data = await meetingsApi.get(id)
@@ -38,7 +35,11 @@ export default function MeetingDetail() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [id])
+
+  useEffect(() => {
+    loadMeeting()
+  }, [loadMeeting])
 
   const handleAskQuestion = async (e) => {
     e.preventDefault()
@@ -133,14 +134,6 @@ export default function MeetingDetail() {
         </Link>
       </div>
     )
-  }
-
-  const getSentimentEmoji = (sentiment) => {
-    switch (sentiment) {
-      case 'Positive': return '😊'
-      case 'Negative': return '😟'
-      default: return '😐'
-    }
   }
 
   return (
@@ -263,6 +256,26 @@ export default function MeetingDetail() {
             </div>
           )}
 
+          {/* Audio Playback */}
+          {meeting.audio_file_url && (
+            <div className="vc p-5">
+              <h2
+                className="font-semibold mb-3 flex items-center gap-2"
+                style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
+              >
+                Recording
+              </h2>
+              <audio
+                controls
+                src={meeting.audio_file_url}
+                className="w-full"
+                style={{ borderRadius: '8px' }}
+              >
+                Your browser does not support the audio element.
+              </audio>
+            </div>
+          )}
+
           {/* Transcript */}
           <div className="vc p-5">
             <h2
@@ -362,8 +375,8 @@ export default function MeetingDetail() {
 
       {/* Share to Chat Modal */}
       {showShareModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-          <div className="vc rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
+        <div className="vc-confirm-overlay" onClick={() => setShowShareModal(false)}>
+          <div className="vc rounded-xl shadow-xl max-w-md w-full mx-4 p-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3
                 className="text-lg font-semibold"

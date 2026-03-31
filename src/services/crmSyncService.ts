@@ -7,7 +7,7 @@
 //
 // Uses logosVisionSupabase for CRM operations and main supabase for Entomate data.
 
-import { supabase, EntoamteActionItem, EntomateMeeting, EntoamteProject } from '../lib/supabase'
+import { supabase, EntoamateActionItem, EntomateMeeting, EntoamateProject } from '../lib/supabase'
 import {
   logosVisionSupabase,
   LogosVisionTeamMember,
@@ -120,7 +120,7 @@ export async function getAllTeamMembers(): Promise<LogosVisionTeamMember[]> {
  * Create a task in Logos Vision CRM from an Entomate action item
  */
 export async function createCrmTask(
-  actionItem: EntoamteActionItem,
+  actionItem: EntoamateActionItem,
   teamMemberId: string | null,
   meetingTitle?: string
 ): Promise<{ id: string } | null> {
@@ -167,7 +167,7 @@ export async function createCrmTask(
  * Sync a single action item to Logos Vision CRM
  */
 export async function syncActionItemToCrm(
-  actionItem: EntoamteActionItem,
+  actionItem: EntoamateActionItem,
   meetingTitle?: string
 ): Promise<SyncResult> {
   try {
@@ -195,7 +195,7 @@ export async function syncActionItemToCrm(
     if (!crmTask) {
       // Update action item with failed status
       await supabase
-        .from('entomate_action_items')
+        .from('action_items')
         .update({
           crm_sync_status: 'failed',
           updated_at: new Date().toISOString()
@@ -211,7 +211,7 @@ export async function syncActionItemToCrm(
 
     // Update action item with success status and CRM task ID
     await supabase
-      .from('entomate_action_items')
+      .from('action_items')
       .update({
         crm_sync_status: 'synced',
         crm_task_id: crmTask.id,
@@ -229,7 +229,7 @@ export async function syncActionItemToCrm(
 
     // Update action item with failed status
     await supabase
-      .from('entomate_action_items')
+      .from('action_items')
       .update({
         crm_sync_status: 'failed',
         updated_at: new Date().toISOString()
@@ -253,7 +253,7 @@ export async function syncMeetingActionItemsToCrm(
 ): Promise<SyncResult[]> {
   // Get all action items for the meeting
   const { data: actionItems, error } = await supabase
-    .from('entomate_action_items')
+    .from('action_items')
     .select('*')
     .eq('meeting_id', meetingId)
 
@@ -282,8 +282,8 @@ export async function syncMeetingActionItemsToCrm(
 export async function syncAllPendingActionItems(): Promise<SyncResult[]> {
   // Get all pending action items
   const { data: actionItems, error } = await supabase
-    .from('entomate_action_items')
-    .select('*, entomate_meetings(title)')
+    .from('action_items')
+    .select('*, meetings(title)')
     .eq('crm_sync_status', 'pending')
 
   if (error) {
@@ -298,7 +298,7 @@ export async function syncAllPendingActionItems(): Promise<SyncResult[]> {
   // Sync each action item
   const results: SyncResult[] = []
   for (const actionItem of actionItems) {
-    const meetingTitle = (actionItem as any).entomate_meetings?.title
+    const meetingTitle = (actionItem as any).meetings?.title
     const result = await syncActionItemToCrm(actionItem, meetingTitle)
     results.push(result)
   }
@@ -312,8 +312,8 @@ export async function syncAllPendingActionItems(): Promise<SyncResult[]> {
 export async function retryFailedSyncs(): Promise<SyncResult[]> {
   // Get all failed action items
   const { data: actionItems, error } = await supabase
-    .from('entomate_action_items')
-    .select('*, entomate_meetings(title)')
+    .from('action_items')
+    .select('*, meetings(title)')
     .eq('crm_sync_status', 'failed')
 
   if (error) {
@@ -328,7 +328,7 @@ export async function retryFailedSyncs(): Promise<SyncResult[]> {
   // Reset to pending and sync
   for (const actionItem of actionItems) {
     await supabase
-      .from('entomate_action_items')
+      .from('action_items')
       .update({ crm_sync_status: 'pending' })
       .eq('id', actionItem.id)
   }
@@ -336,7 +336,7 @@ export async function retryFailedSyncs(): Promise<SyncResult[]> {
   // Sync each action item
   const results: SyncResult[] = []
   for (const actionItem of actionItems) {
-    const meetingTitle = (actionItem as any).entomate_meetings?.title
+    const meetingTitle = (actionItem as any).meetings?.title
     const result = await syncActionItemToCrm(actionItem, meetingTitle)
     results.push(result)
   }
@@ -356,7 +356,7 @@ export async function getMeetingSyncStatus(meetingId: string): Promise<{
   failed: number
 }> {
   const { data: actionItems, error } = await supabase
-    .from('entomate_action_items')
+    .from('action_items')
     .select('crm_sync_status')
     .eq('meeting_id', meetingId)
 
@@ -446,7 +446,7 @@ export async function syncMeetingToCrm(
   try {
     // Get meeting data
     const { data: meeting, error: meetingError } = await supabase
-      .from('entomate_meetings')
+      .from('meetings')
       .select('*')
       .eq('id', meetingId)
       .single()
@@ -521,7 +521,7 @@ export async function syncMeetingViaBridge(
   try {
     // Load meeting data
     const { data: meeting, error: meetingError } = await supabase
-      .from('entomate_meetings')
+      .from('meetings')
       .select('*')
       .eq('id', meetingId)
       .single()
@@ -532,7 +532,7 @@ export async function syncMeetingViaBridge(
 
     // Load action items
     const { data: actionItems } = await supabase
-      .from('entomate_action_items')
+      .from('action_items')
       .select('*')
       .eq('meeting_id', meetingId)
 
@@ -569,7 +569,7 @@ export async function syncMeetingViaBridge(
     // Update action item sync statuses
     for (const item of actionItems || []) {
       await supabase
-        .from('entomate_action_items')
+        .from('action_items')
         .update({
           crm_sync_status: 'synced',
           updated_at: new Date().toISOString(),
@@ -642,7 +642,7 @@ export async function linkProjectToCrm(
  * Create a Logos Vision project from an Entomate project
  */
 export async function createProjectInCrm(
-  entoamteProject: EntoamteProject,
+  entoamteProject: EntoamateProject,
   clientId?: string
 ): Promise<ProjectSyncResult> {
   try {
@@ -735,7 +735,7 @@ export async function getLogosVisionClients(): Promise<{ id: string; name: strin
  */
 export async function getOverallSyncStatus(): Promise<SyncStatusSummary> {
   const { data: actionItems, error } = await supabase
-    .from('entomate_action_items')
+    .from('action_items')
     .select('crm_sync_status, updated_at')
     .order('updated_at', { ascending: false })
 

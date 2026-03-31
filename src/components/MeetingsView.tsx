@@ -8,7 +8,7 @@ import { indexMeeting } from '../search/indexer'
 import { LinkedRecordsPanel } from './LinkedRecordsPanel'
 import { MeetingIntelligencePanel } from './intelligence/MeetingIntelligencePanel'
 import { CoachingPanel, SentimentAnalysisCard } from '../phase3/components'
-import type { EntomateMeeting, EntoamteActionItem } from '../lib/supabase'
+import type { EntomateMeeting, EntoamateActionItem } from '../lib/supabase'
 
 // Helper to convert blob to base64
 const blobToBase64 = (blob: Blob): Promise<string> => {
@@ -42,7 +42,7 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({ onMeetingProcessed }
 
   // Results state
   const [processedMeeting, setProcessedMeeting] = useState<EntomateMeeting | null>(null)
-  const [actionItems, setActionItems] = useState<EntoamteActionItem[]>([])
+  const [actionItems, setActionItems] = useState<EntoamateActionItem[]>([])
   const [syncingItems, setSyncingItems] = useState<Set<string>>(new Set())
   const [syncStatus, setSyncStatus] = useState<{ total: number; synced: number; pending: number; failed: number } | null>(null)
 
@@ -152,7 +152,7 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({ onMeetingProcessed }
       })
 
       // Create action items
-      let createdItems: EntoamteActionItem[] = []
+      let createdItems: EntoamateActionItem[] = []
       if (processed.action_items.length > 0) {
         createdItems = await createActionItemsFromMeeting(
           meeting.id,
@@ -270,7 +270,7 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({ onMeetingProcessed }
   }
 
   // Handle manual sync retry for a single action item
-  const handleSyncItem = async (item: EntoamteActionItem) => {
+  const handleSyncItem = async (item: EntoamateActionItem) => {
     if (item.crm_sync_status === 'synced') return
 
     setSyncingItems(prev => new Set(prev).add(item.id))

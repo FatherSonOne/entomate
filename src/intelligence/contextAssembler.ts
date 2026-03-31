@@ -428,7 +428,7 @@ async function gatherContacts(
   for (const p of participants) {
     try {
       const { count } = await supabase
-        .from('entomate_meetings')
+        .from('meetings')
         .select('id', { count: 'exact', head: true })
         .contains('attendees', [p.name]);
 
@@ -467,7 +467,7 @@ async function gatherOrgInfo(
 
   // Count meetings involving this org's contacts
   const { count: meetingCount } = await supabase
-    .from('entomate_meetings')
+    .from('meetings')
     .select('id', { count: 'exact', head: true })
     .contains('attendees', [client.contact_person || orgName]);
 
@@ -528,7 +528,7 @@ async function gatherPastMeetings(
 
   for (const name of participantNames.slice(0, 3)) { // Limit to 3 lookups
     const { data } = await supabase
-      .from('entomate_meetings')
+      .from('meetings')
       .select('id, title, summary, key_points, decisions, created_at')
       .neq('id', currentMeetingId)
       .contains('attendees', [name])
@@ -548,7 +548,7 @@ async function gatherPastMeetings(
   // Also try participants column for older meetings
   for (const name of participantNames.slice(0, 3)) {
     const { data } = await supabase
-      .from('entomate_meetings')
+      .from('meetings')
       .select('id, title, summary, key_points, decisions, created_at')
       .neq('id', currentMeetingId)
       .contains('participants', [name])
@@ -575,7 +575,7 @@ async function gatherPastMeetings(
 
   for (const m of meetings) {
     const { data: actionItems } = await supabase
-      .from('entomate_action_items')
+      .from('action_items')
       .select('task_description')
       .eq('meeting_id', m.id)
       .neq('status', 'completed')
@@ -649,7 +649,7 @@ async function gatherTasks(
   // Entomate action items related to participants
   for (const name of participantNames.slice(0, 3)) {
     const { data } = await supabase
-      .from('entomate_action_items')
+      .from('action_items')
       .select('task_description, status, assigned_to_name, due_date, priority')
       .ilike('assigned_to_name', `%${name}%`)
       .neq('status', 'completed')
@@ -734,7 +734,7 @@ async function enrichParticipantsWithNotes(
 
 async function loadMeeting(meetingId: string): Promise<any | null> {
   const { data, error } = await supabase
-    .from('entomate_meetings')
+    .from('meetings')
     .select('*')
     .eq('id', meetingId)
     .single();

@@ -78,7 +78,7 @@ export async function indexMeetings(): Promise<IndexResult> {
   console.log('[Indexer] Starting meetings indexing...');
 
   const { data: meetings, error } = await supabase
-    .from('entomate_meetings')
+    .from('meetings')
     .select('id, title, transcript, summary, key_points, decisions, created_at')
     .not('transcript', 'is', null)
     .order('created_at', { ascending: false })
@@ -348,7 +348,7 @@ export async function indexActionItems(): Promise<IndexResult> {
   console.log('[Indexer] Starting action items indexing...');
 
   const { data: items, error } = await supabase
-    .from('entomate_action_items')
+    .from('action_items')
     .select('id, task_description, assigned_to_name, due_date, priority, status, meeting_id, created_at')
     .order('created_at', { ascending: false })
     .limit(500);
@@ -437,7 +437,7 @@ export async function reindexAll(): Promise<{
  */
 export async function indexMeeting(meetingId: string): Promise<boolean> {
   const { data: meeting, error } = await supabase
-    .from('entomate_meetings')
+    .from('meetings')
     .select('id, title, transcript, summary, key_points, decisions, created_at')
     .eq('id', meetingId)
     .single();

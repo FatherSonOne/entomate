@@ -1,4 +1,4 @@
-import { supabase, EntomateMeeting, EntoamteActionItem } from '../lib/supabase'
+import { supabase, EntomateMeeting, EntoamateActionItem } from '../lib/supabase'
 import {
   processMeetingRelationships,
   linkMeetingToActionItem
@@ -8,7 +8,7 @@ import {
 
 export async function createMeeting(meeting: Partial<EntomateMeeting>): Promise<EntomateMeeting | null> {
   const { data, error } = await supabase
-    .from('entomate_meetings')
+    .from('meetings')
     .insert([meeting])
     .select()
     .single()
@@ -33,7 +33,7 @@ export async function createMeeting(meeting: Partial<EntomateMeeting>): Promise<
 
 export async function getMeetings(): Promise<EntomateMeeting[]> {
   const { data, error } = await supabase
-    .from('entomate_meetings')
+    .from('meetings')
     .select('*')
     .order('created_at', { ascending: false })
 
@@ -46,7 +46,7 @@ export async function getMeetings(): Promise<EntomateMeeting[]> {
 
 export async function getMeetingById(id: string): Promise<EntomateMeeting | null> {
   const { data, error } = await supabase
-    .from('entomate_meetings')
+    .from('meetings')
     .select('*')
     .eq('id', id)
     .single()
@@ -60,7 +60,7 @@ export async function getMeetingById(id: string): Promise<EntomateMeeting | null
 
 export async function updateMeeting(id: string, updates: Partial<EntomateMeeting>): Promise<EntomateMeeting | null> {
   const { data, error } = await supabase
-    .from('entomate_meetings')
+    .from('meetings')
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq('id', id)
     .select()
@@ -75,7 +75,7 @@ export async function updateMeeting(id: string, updates: Partial<EntomateMeeting
 
 export async function deleteMeeting(id: string): Promise<boolean> {
   const { error } = await supabase
-    .from('entomate_meetings')
+    .from('meetings')
     .delete()
     .eq('id', id)
 
@@ -88,9 +88,9 @@ export async function deleteMeeting(id: string): Promise<boolean> {
 
 // ==================== ACTION ITEMS ====================
 
-export async function createActionItem(actionItem: Partial<EntoamteActionItem>): Promise<EntoamteActionItem | null> {
+export async function createActionItem(actionItem: Partial<EntoamateActionItem>): Promise<EntoamateActionItem | null> {
   const { data, error } = await supabase
-    .from('entomate_action_items')
+    .from('action_items')
     .insert([actionItem])
     .select()
     .single()
@@ -102,9 +102,9 @@ export async function createActionItem(actionItem: Partial<EntoamteActionItem>):
   return data
 }
 
-export async function getActionItemsByMeeting(meetingId: string): Promise<EntoamteActionItem[]> {
+export async function getActionItemsByMeeting(meetingId: string): Promise<EntoamateActionItem[]> {
   const { data, error } = await supabase
-    .from('entomate_action_items')
+    .from('action_items')
     .select('*')
     .eq('meeting_id', meetingId)
     .order('created_at', { ascending: true })
@@ -116,9 +116,9 @@ export async function getActionItemsByMeeting(meetingId: string): Promise<Entoam
   return data || []
 }
 
-export async function getAllActionItems(): Promise<EntoamteActionItem[]> {
+export async function getAllActionItems(): Promise<EntoamateActionItem[]> {
   const { data, error } = await supabase
-    .from('entomate_action_items')
+    .from('action_items')
     .select('*')
     .order('due_date', { ascending: true })
 
@@ -129,9 +129,9 @@ export async function getAllActionItems(): Promise<EntoamteActionItem[]> {
   return data || []
 }
 
-export async function updateActionItem(id: string, updates: Partial<EntoamteActionItem>): Promise<EntoamteActionItem | null> {
+export async function updateActionItem(id: string, updates: Partial<EntoamateActionItem>): Promise<EntoamateActionItem | null> {
   const { data, error } = await supabase
-    .from('entomate_action_items')
+    .from('action_items')
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq('id', id)
     .select()
@@ -146,7 +146,7 @@ export async function updateActionItem(id: string, updates: Partial<EntoamteActi
 
 export async function deleteActionItem(id: string): Promise<boolean> {
   const { error } = await supabase
-    .from('entomate_action_items')
+    .from('action_items')
     .delete()
     .eq('id', id)
 
@@ -161,15 +161,15 @@ export async function deleteActionItem(id: string): Promise<boolean> {
 
 export async function createActionItemsFromMeeting(
   meetingId: string,
-  actionItems: Partial<EntoamteActionItem>[]
-): Promise<EntoamteActionItem[]> {
+  actionItems: Partial<EntoamateActionItem>[]
+): Promise<EntoamateActionItem[]> {
   const itemsWithMeetingId = actionItems.map(item => ({
     ...item,
     meeting_id: meetingId
   }))
 
   const { data, error } = await supabase
-    .from('entomate_action_items')
+    .from('action_items')
     .insert(itemsWithMeetingId)
     .select()
 

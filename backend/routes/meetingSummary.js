@@ -10,6 +10,7 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const { supabase } = require('../config/supabase');
 const ai = require('../config/ai');
+const { authenticate } = require('../middleware/auth');
 const log = require('../utils/log');
 
 const router = express.Router();
@@ -18,7 +19,7 @@ const router = express.Router();
  * POST /api/meeting-summary/:id/regenerate
  * Regenerate AI summary for a meeting (widget support)
  */
-router.post('/:id/regenerate', async (req, res) => {
+router.post('/:id/regenerate', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -117,7 +118,7 @@ router.post('/:id/regenerate', async (req, res) => {
  * POST /api/meeting-summary/:id/publish-crm
  * Publish meeting summary to Logos CRM via shared-hub
  */
-router.post('/:id/publish-crm', async (req, res) => {
+router.post('/:id/publish-crm', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -257,7 +258,7 @@ router.post('/:id/publish-crm', async (req, res) => {
  * GET /api/meeting-summary/:id
  * Get meeting summary data for widget display
  */
-router.get('/:id', async (req, res) => {
+router.get('/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
 

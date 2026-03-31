@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { Mic, Square, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { Mic, Square, Loader2, AlertCircle } from 'lucide-react'
 import { meetingsApi } from '../services/api'
 import { useTheme } from '../context/ThemeContext'
+import { VCButton } from './vc'
 
 // Dev-Core Audio Visualizer
 function AudioVisualizer({ stream, isActive }) {
@@ -121,46 +122,79 @@ export default function MeetingRecorder({ onMeetingProcessed, audioInputDeviceId
   }
 
   return (
-    <div className="card p-4 space-y-3">
-      <h3 className="font-semibold text-content-primary text-base">New Recording</h3>
-      
+    <div className="vc p-4 space-y-3">
+      <h3
+        className="font-semibold text-base"
+        style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
+      >
+        New Recording
+      </h3>
+
       {error && (
-        <div className="p-2 bg-semantic-error-dim border border-semantic-error rounded-md flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-semantic-error flex-shrink-0" />
-          <p className="text-semantic-error font-medium text-xs">{error}</p>
+        <div
+          className="p-2 rounded-md flex items-center gap-2"
+          style={{
+            background: 'rgba(255,45,107,.08)',
+            border: '1px solid var(--accent-primary)'
+          }}
+        >
+          <AlertCircle className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
+          <p className="font-medium text-xs" style={{ color: 'var(--accent-primary)' }}>{error}</p>
         </div>
       )}
 
       <div>
-        <label className="label !text-xs !mb-1">Title (Optional)</label>
-        <input type="text" className="input !py-1.5" placeholder={`Meeting-${Date.now()}`} value={title} onChange={(e) => setTitle(e.target.value)} disabled={isRecording || isProcessing} />
+        <label
+          className="block text-xs font-medium mb-1"
+          style={{ color: 'var(--text-secondary)' }}
+        >
+          Title (Optional)
+        </label>
+        <input
+          type="text"
+          className="input"
+          style={{ padding: '6px 12px' }}
+          placeholder={`Meeting-${Date.now()}`}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          disabled={isRecording || isProcessing}
+        />
       </div>
 
-      <div className="flex flex-col items-center justify-center bg-surface-elevated border border-line-default rounded-md p-4 space-y-3">
+      <div
+        className="flex flex-col items-center justify-center rounded-lg p-4 space-y-3"
+        style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}
+      >
         {(isRecording || (duration > 0 && !isProcessing)) && (
-           <div className={`text-3xl font-mono font-bold ${isRecording ? 'text-semantic-error' : 'text-content-secondary'}`}>
+          <div
+            className="text-3xl font-bold"
+            style={{
+              fontFamily: 'var(--font-mono)',
+              color: isRecording ? 'var(--accent-primary)' : 'var(--text-secondary)'
+            }}
+          >
             {formatDuration(duration)}
           </div>
         )}
 
         {isRecording && <AudioVisualizer stream={streamRef.current} isActive={isRecording} />}
-        
+
         {isProcessing ? (
-            <div className="flex items-center gap-2 text-sm text-content-secondary font-medium">
-              <Loader2 className="w-4 h-4 text-accent-primary animate-spin" />
-              <span>Processing...</span>
-            </div>
-          ) : isRecording ? (
-            <button onClick={stopRecording} className="btn-highlight bg-semantic-error !shadow-red-500/20 w-full justify-center">
-              <Square className="w-4 h-4" />
-              <span>Stop Recording</span>
-            </button>
-          ) : (
-            <button onClick={startRecording} className="btn-highlight w-full justify-center">
-              <Mic className="w-4 h-4" />
-              <span>Start Recording</span>
-            </button>
-          )}
+          <div className="flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
+            <Loader2 className="w-4 h-4 animate-spin" style={{ color: 'var(--accent-primary)' }} />
+            <span>Processing...</span>
+          </div>
+        ) : isRecording ? (
+          <VCButton variant="primary" onClick={stopRecording} className="w-full justify-center">
+            <Square className="w-4 h-4" />
+            Stop Recording
+          </VCButton>
+        ) : (
+          <VCButton variant="primary" onClick={startRecording} className="w-full justify-center">
+            <Mic className="w-4 h-4" />
+            Start Recording
+          </VCButton>
+        )}
       </div>
     </div>
   )

@@ -1,5 +1,5 @@
 // Project Service - CRUD operations for Entomate projects and tasks
-import { supabase, EntoamteProject, EntoamteProjectTask } from '../lib/supabase'
+import { supabase, EntoamateProject, EntoamateProjectTask } from '../lib/supabase'
 import {
   processProjectRelationships,
   processTaskRelationships,
@@ -9,7 +9,7 @@ import { deleteRelationshipsForEntity } from '../graph/relationshipService'
 
 // ==================== PROJECTS ====================
 
-export async function createProject(project: Partial<EntoamteProject>): Promise<EntoamteProject | null> {
+export async function createProject(project: Partial<EntoamateProject>): Promise<EntoamateProject | null> {
   const { data, error } = await supabase
     .from('entomate_projects')
     .insert([{
@@ -39,7 +39,7 @@ export async function createProject(project: Partial<EntoamteProject>): Promise<
   return data
 }
 
-export async function getProjects(status?: 'active' | 'completed' | 'on_hold'): Promise<EntoamteProject[]> {
+export async function getProjects(status?: 'active' | 'completed' | 'on_hold'): Promise<EntoamateProject[]> {
   let query = supabase
     .from('entomate_projects')
     .select('*')
@@ -58,7 +58,7 @@ export async function getProjects(status?: 'active' | 'completed' | 'on_hold'): 
   return data || []
 }
 
-export async function getProjectById(id: string): Promise<EntoamteProject | null> {
+export async function getProjectById(id: string): Promise<EntoamateProject | null> {
   const { data, error } = await supabase
     .from('entomate_projects')
     .select('*')
@@ -72,7 +72,7 @@ export async function getProjectById(id: string): Promise<EntoamteProject | null
   return data
 }
 
-export async function updateProject(id: string, updates: Partial<EntoamteProject>): Promise<EntoamteProject | null> {
+export async function updateProject(id: string, updates: Partial<EntoamateProject>): Promise<EntoamateProject | null> {
   const { data, error } = await supabase
     .from('entomate_projects')
     .update({ ...updates, updated_at: new Date().toISOString() })
@@ -116,7 +116,7 @@ export async function deleteProject(id: string): Promise<boolean> {
 
 // ==================== PROJECT TASKS ====================
 
-export async function createProjectTask(task: Partial<EntoamteProjectTask>): Promise<EntoamteProjectTask | null> {
+export async function createProjectTask(task: Partial<EntoamateProjectTask>): Promise<EntoamateProjectTask | null> {
   const { data, error } = await supabase
     .from('entomate_project_tasks')
     .insert([{
@@ -147,7 +147,7 @@ export async function createProjectTask(task: Partial<EntoamteProjectTask>): Pro
   return data
 }
 
-export async function getTasksByProject(projectId: string): Promise<EntoamteProjectTask[]> {
+export async function getTasksByProject(projectId: string): Promise<EntoamateProjectTask[]> {
   const { data, error } = await supabase
     .from('entomate_project_tasks')
     .select('*')
@@ -161,7 +161,7 @@ export async function getTasksByProject(projectId: string): Promise<EntoamteProj
   return data || []
 }
 
-export async function getAllTasks(): Promise<EntoamteProjectTask[]> {
+export async function getAllTasks(): Promise<EntoamateProjectTask[]> {
   const { data, error } = await supabase
     .from('entomate_project_tasks')
     .select('*')
@@ -174,7 +174,7 @@ export async function getAllTasks(): Promise<EntoamteProjectTask[]> {
   return data || []
 }
 
-export async function getTaskById(id: string): Promise<EntoamteProjectTask | null> {
+export async function getTaskById(id: string): Promise<EntoamateProjectTask | null> {
   const { data, error } = await supabase
     .from('entomate_project_tasks')
     .select('*')
@@ -188,7 +188,7 @@ export async function getTaskById(id: string): Promise<EntoamteProjectTask | nul
   return data
 }
 
-export async function updateProjectTask(id: string, updates: Partial<EntoamteProjectTask>): Promise<EntoamteProjectTask | null> {
+export async function updateProjectTask(id: string, updates: Partial<EntoamateProjectTask>): Promise<EntoamateProjectTask | null> {
   const { data, error } = await supabase
     .from('entomate_project_tasks')
     .update({ ...updates, updated_at: new Date().toISOString() })
@@ -272,7 +272,7 @@ export async function createTasksFromMeetingActionItems(
     priority?: 'low' | 'medium' | 'high'
     action_item_id?: string  // Optional: link to original action item
   }>
-): Promise<EntoamteProjectTask[]> {
+): Promise<EntoamateProjectTask[]> {
   const tasksToCreate = actionItems.map(item => ({
     project_id: projectId,
     title: item.task_description,

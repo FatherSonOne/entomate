@@ -1,5 +1,5 @@
 // Automation Service - Handles automation rules and execution
-import { supabase, EntoamteAutomation, EntomateMeeting, EntoamteActionItem } from '../lib/supabase'
+import { supabase, EntoamateAutomation, EntomateMeeting, EntoamateActionItem } from '../lib/supabase'
 import { syncActionItemToCrm } from './crmSyncService'
 import { postMeetingSummaryToPulse, notifyAssigneesAboutActionItems } from './pulseChatService'
 import { createProjectTask } from './projectService'
@@ -49,7 +49,7 @@ export interface ActionConfig {
 
 // ==================== CRUD OPERATIONS ====================
 
-export async function createAutomation(automation: Partial<EntoamteAutomation>): Promise<EntoamteAutomation | null> {
+export async function createAutomation(automation: Partial<EntoamateAutomation>): Promise<EntoamateAutomation | null> {
   const { data, error } = await supabase
     .from('entomate_automations')
     .insert([{
@@ -69,7 +69,7 @@ export async function createAutomation(automation: Partial<EntoamteAutomation>):
   return data
 }
 
-export async function getAutomations(): Promise<EntoamteAutomation[]> {
+export async function getAutomations(): Promise<EntoamateAutomation[]> {
   const { data, error } = await supabase
     .from('entomate_automations')
     .select('*')
@@ -82,7 +82,7 @@ export async function getAutomations(): Promise<EntoamteAutomation[]> {
   return data || []
 }
 
-export async function getActiveAutomations(): Promise<EntoamteAutomation[]> {
+export async function getActiveAutomations(): Promise<EntoamateAutomation[]> {
   const { data, error } = await supabase
     .from('entomate_automations')
     .select('*')
@@ -96,7 +96,7 @@ export async function getActiveAutomations(): Promise<EntoamteAutomation[]> {
   return data || []
 }
 
-export async function getAutomationById(id: string): Promise<EntoamteAutomation | null> {
+export async function getAutomationById(id: string): Promise<EntoamateAutomation | null> {
   const { data, error } = await supabase
     .from('entomate_automations')
     .select('*')
@@ -110,7 +110,7 @@ export async function getAutomationById(id: string): Promise<EntoamteAutomation 
   return data
 }
 
-export async function updateAutomation(id: string, updates: Partial<EntoamteAutomation>): Promise<EntoamteAutomation | null> {
+export async function updateAutomation(id: string, updates: Partial<EntoamateAutomation>): Promise<EntoamateAutomation | null> {
   const { data, error } = await supabase
     .from('entomate_automations')
     .update({ ...updates, updated_at: new Date().toISOString() })
@@ -158,7 +158,7 @@ export function evaluateTrigger(
   config: TriggerConfig,
   context: {
     meeting?: EntomateMeeting
-    actionItems?: EntoamteActionItem[]
+    actionItems?: EntoamateActionItem[]
   }
 ): boolean {
   switch (trigger) {
@@ -203,7 +203,7 @@ export async function executeAction(
   config: ActionConfig,
   context: {
     meeting?: EntomateMeeting
-    actionItems?: EntoamteActionItem[]
+    actionItems?: EntoamateActionItem[]
   }
 ): Promise<ActionResult> {
   try {
@@ -305,7 +305,7 @@ export interface AutomationRunResult {
 
 export async function runAutomationsForMeeting(
   meeting: EntomateMeeting,
-  actionItems: EntoamteActionItem[]
+  actionItems: EntoamateActionItem[]
 ): Promise<AutomationRunResult[]> {
   const automations = await getActiveAutomations()
   const results: AutomationRunResult[] = []
@@ -395,7 +395,7 @@ export const PRESET_AUTOMATIONS = [
   }
 ]
 
-export async function createPresetAutomation(presetIndex: number): Promise<EntoamteAutomation | null> {
+export async function createPresetAutomation(presetIndex: number): Promise<EntoamateAutomation | null> {
   const preset = PRESET_AUTOMATIONS[presetIndex]
   if (!preset) return null
 

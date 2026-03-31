@@ -122,7 +122,7 @@ export async function findUpcomingMeetingsNeedingContext(
   const meetingIds = configs.map(c => c.meeting_id);
 
   const { data: meetings, error } = await supabase
-    .from('entomate_meetings')
+    .from('meetings')
     .select('id, title, start_time, scheduled_at, participants, attendees')
     .in('id', meetingIds)
     .order('start_time', { ascending: true });

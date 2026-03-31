@@ -5,26 +5,12 @@
  */
 
 const { supabase, supabaseAdmin } = require('../../config/supabase');
-const OpenAI = require('openai');
+const ai = require('../../config/ai');
 const log = require('../../utils/log');
 
 class MeetingPrepService {
   constructor() {
-    this.openai = null;
-    this.initializeAI();
-  }
-
-  /**
-   * Initialize OpenAI client if API key is available
-   */
-  initializeAI() {
-    const apiKey = process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY;
-    if (apiKey && process.env.OPENAI_API_KEY) {
-      this.openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-      log.info('[MeetingPrepService] AI client initialized');
-    } else {
-      log.warn('[MeetingPrepService] No AI API key configured');
-    }
+    // AI is handled by the shared ai module (supports Gemini + OpenAI)
   }
 
   /**
@@ -420,31 +406,17 @@ class MeetingPrepService {
   async generateTalkingPoints(context) {
     const { meeting, actionItems, sentimentHistory, dealContext } = context;
 
-    // If no AI client, return rule-based talking points
-    if (!this.openai) {
+    // If AI not configured, return rule-based talking points
+    if (!ai.isConfigured()) {
       return this.generateRuleBasedTalkingPoints(context);
     }
 
     try {
       const prompt = this.buildTalkingPointsPrompt(context);
+      const systemContext = 'You are an AI assistant helping prepare for business meetings. Generate concise, actionable talking points based on meeting context and history. Return them as a bullet list with - or * prefixes.';
 
-      const completion = await this.openai.chat.completions.create({
-        model: 'gpt-4-turbo-preview',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an AI assistant helping prepare for business meetings. Generate concise, actionable talking points based on meeting context and history.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 500
-      });
-
-      const response = completion.choices[0]?.message?.content || '';
+      const result = await ai.answerQuestion(prompt, systemContext);
+      const response = result.answer || '';
 
       // Parse talking points (expecting bullet list)
       const points = response
@@ -530,31 +502,17 @@ class MeetingPrepService {
         throw new Error('Meeting not found');
       }
 
-      // If no AI, return formatted summary
-      if (!this.openai) {
+      // If AI not configured, return formatted summary
+      if (!ai.isConfigured()) {
         return this.formatMeetingBrief(prep);
       }
 
       // Generate AI brief
       const prompt = this.buildBriefPrompt(prep);
+      const systemContext = 'You are an executive assistant preparing comprehensive meeting briefs. Create a well-structured, professional brief that helps the user be fully prepared.';
 
-      const completion = await this.openai.chat.completions.create({
-        model: 'gpt-4-turbo-preview',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an executive assistant preparing comprehensive meeting briefs. Create a well-structured, professional brief that helps the user be fully prepared.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 1500
-      });
-
-      return completion.choices[0]?.message?.content || this.formatMeetingBrief(prep);
+      const result = await ai.answerQuestion(prompt, systemContext);
+      return result.answer || this.formatMeetingBrief(prep);
     } catch (error) {
       log.error('[MeetingPrepService] generateMeetingBrief error:', { error: error.message || error });
       throw error;

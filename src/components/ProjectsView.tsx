@@ -14,7 +14,7 @@ import {
 import { LinkedRecordsPanel } from './LinkedRecordsPanel'
 import { TaskEtaBadge } from './PredictionBadge'
 import { useTaskEta } from '../hooks/usePredictions'
-import type { EntoamteProject, EntoamteProjectTask } from '../lib/supabase'
+import type { EntoamateProject, EntoamateProjectTask } from '../lib/supabase'
 
 // ==================== TYPES ====================
 
@@ -27,9 +27,9 @@ interface ProjectStats {
 }
 
 interface TaskRowProps {
-  task: EntoamteProjectTask
+  task: EntoamateProjectTask
   onStatusChange: (taskId: string, status: 'todo' | 'in_progress' | 'done') => void
-  onEdit: (task: EntoamteProjectTask) => void
+  onEdit: (task: EntoamateProjectTask) => void
   onDelete: (taskId: string) => void
   getTaskStatusColor: (status: string) => string
   getPriorityColor: (priority: string) => string
@@ -102,12 +102,12 @@ const TaskRow: React.FC<TaskRowProps> = ({
 
 export const ProjectsView: React.FC = () => {
   // Projects state
-  const [projects, setProjects] = useState<EntoamteProject[]>([])
-  const [selectedProject, setSelectedProject] = useState<EntoamteProject | null>(null)
+  const [projects, setProjects] = useState<EntoamateProject[]>([])
+  const [selectedProject, setSelectedProject] = useState<EntoamateProject | null>(null)
   const [projectStats, setProjectStats] = useState<Map<string, ProjectStats>>(new Map())
 
   // Tasks state
-  const [tasks, setTasks] = useState<EntoamteProjectTask[]>([])
+  const [tasks, setTasks] = useState<EntoamateProjectTask[]>([])
 
   // UI state
   const [viewMode, setViewMode] = useState<'list' | 'detail' | 'create'>('list')
@@ -132,7 +132,7 @@ export const ProjectsView: React.FC = () => {
   })
 
   const [showTaskForm, setShowTaskForm] = useState(false)
-  const [editingTask, setEditingTask] = useState<EntoamteProjectTask | null>(null)
+  const [editingTask, setEditingTask] = useState<EntoamateProjectTask | null>(null)
 
   // ==================== EFFECTS ====================
 
@@ -282,7 +282,7 @@ export const ProjectsView: React.FC = () => {
     }
   }
 
-  const startEditTask = (task: EntoamteProjectTask) => {
+  const startEditTask = (task: EntoamateProjectTask) => {
     setEditingTask(task)
     setTaskForm({
       title: task.title,

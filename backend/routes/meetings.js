@@ -6,6 +6,7 @@ const ai = require('../config/ai');
 const embeddingService = require('../services/embeddingService');
 const hubEventPublisher = require('../services/hubEventPublisher');
 const { getEcosystemBridge } = require('../services/ecosystemBridge');
+const { authenticate } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const schemas = require('../schemas/meetings');
 const log = require('../utils/log');
@@ -32,7 +33,7 @@ const upload = multer({
  * POST /api/meetings/process
  * Upload audio and process with Gemini AI
  */
-router.post('/process', upload.single('audio'), validate(schemas.process), async (req, res) => {
+router.post('/process', authenticate, upload.single('audio'), validate(schemas.process), async (req, res) => {
   try {
     const { title, attendees, projectId, crmDealId } = req.body;
 
@@ -49,22 +50,10 @@ router.post('/process', upload.single('audio'), validate(schemas.process), async
     // Step 1: Transcribe audio
     const transcript = await ai.transcribeAudio(req.file.buffer, req.file.mimetype);
 
-    // Step 2: Generate summary
-    const summaryData = await ai.generateSummary(transcript);
+    // Step 2: Run AI pipeline (summary, action items, embedding)
+    const { summaryData, actionItems, embedding } = await runAIPipeline(transcript, title);
 
-    // Step 3: Extract action items
-    const actionItems = await ai.extractActionItems(transcript);
-
-    // Step 4: Generate embedding for semantic search
-    let embedding = null;
-    try {
-      const textForEmbedding = `${title || ''} ${summaryData.summary} ${transcript.substring(0, 5000)}`;
-      embedding = await ai.generateEmbedding(textForEmbedding);
-    } catch (embeddingError) {
-      log.warn('Embedding generation failed:', embeddingError.message);
-    }
-
-    // Step 5: Upload audio to Supabase Storage (if configured)
+    // Step 3: Upload audio to Supabase Storage
     let audioUrl = null;
     if (supabase) {
       try {
@@ -86,8 +75,13 @@ router.post('/process', upload.single('audio'), validate(schemas.process), async
       }
     }
 
-    // Step 6: Save meeting to database
+    // Step 4: Save meeting to database
     const meetingId = uuidv4();
+    const now = new Date();
+    const durationMin = parseInt(req.body.duration) || parseDuration(summaryData.estimatedDuration) || 0;
+    const startTime = durationMin > 0
+      ? new Date(now.getTime() - durationMin * 60 * 1000).toISOString()
+      : now.toISOString();
     const meetingData = {
       id: meetingId,
       title: title || `Meeting ${new Date().toLocaleDateString()}`,
@@ -99,16 +93,17 @@ router.post('/process', upload.single('audio'), validate(schemas.process), async
       sentiment_score: summaryData.sentimentScore || 0.5,
       topics: summaryData.topics || [],
       attendees: parseAttendees(attendees),
-      duration_minutes: parseDuration(summaryData.estimatedDuration),
+      duration_minutes: durationMin || null,
+      start_time: startTime,
+      end_time: now.toISOString(),
       audio_file_url: audioUrl,
       project_id: projectId || null,
       crm_deal_id: crmDealId || null,
-      created_by: (req.user?.id && req.user.id !== 'anonymous') ? req.user.id : null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      created_by: req.user?.id || null,
+      created_at: now.toISOString(),
+      updated_at: now.toISOString()
     };
 
-    // Add embedding if available (stored as array)
     if (embedding) {
       meetingData.transcript_embedding = embedding;
     }
@@ -123,7 +118,6 @@ router.post('/process', upload.single('audio'), validate(schemas.process), async
 
       if (meetingError) {
         log.error('Meeting save error:', { error: meetingError.message || meetingError });
-        // Continue anyway - return data even if DB save fails
       } else {
         savedMeeting = meeting;
       }
@@ -131,124 +125,12 @@ router.post('/process', upload.single('audio'), validate(schemas.process), async
 
     log.info('Meeting saved:', savedMeeting.id);
 
-    // Step 7: Save action items
-    const savedActionItems = [];
-    for (const item of actionItems) {
-      const actionItemData = {
-        id: uuidv4(),
-        meeting_id: savedMeeting.id,
-        task_description: item.task,
-        context: item.context,
-        assigned_to_name: item.owner,
-        assigned_to_email: item.ownerEmail,
-        due_date: item.dueDate,
-        priority: item.priority?.toLowerCase() || 'medium',
-        status: 'open',
-        crm_sync_status: 'pending',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-
-      if (supabase) {
-        const { data: actionItem, error: actionError } = await supabase
-          .from('action_items')
-          .insert(actionItemData)
-          .select()
-          .single();
-
-        if (!actionError) {
-          savedActionItems.push(actionItem);
-        } else {
-          savedActionItems.push(actionItemData);
-        }
-      } else {
-        savedActionItems.push(actionItemData);
-      }
-    }
-
+    // Step 5: Save action items
+    const savedActionItems = await saveActionItems(savedMeeting.id, actionItems);
     log.info(`Saved ${savedActionItems.length} action items`);
 
-    // Step 8: Generate embeddings for semantic search (async, non-blocking)
-    setTimeout(async () => {
-      try {
-        await embeddingService.generateEmbeddingsForMeeting(
-          savedMeeting.id,
-          {
-            summary: savedMeeting.summary,
-            key_points: summaryData.keyPoints,
-            decisions: summaryData.decisions,
-            transcript: savedMeeting.transcript
-          },
-          savedActionItems
-        );
-        log.info(`Generated embeddings for meeting ${savedMeeting.id}`);
-      } catch (embeddingError) {
-        log.warn('Embedding generation failed:', embeddingError.message);
-      }
-
-      // Step 9: Ecosystem Bridge sync (Logos Vision + Pulse)
-      try {
-        const bridge = await getEcosystemBridge();
-
-        // Post meeting recap to Pulse
-        if (bridge.isConnected('pulse')) {
-          const recap = formatRecapFallback(savedMeeting, savedActionItems);
-          await bridge.postToPulse({
-            channel: 'entomate-meetings',
-            title: `Meeting processed: ${savedMeeting.title}`,
-            message: recap,
-            urgency: savedActionItems.some(i => i.priority === 'high') ? 'high' : 'normal',
-            metadata: { meetingId: savedMeeting.id }
-          });
-
-          // Post task assignments to Pulse
-          const highPriItems = savedActionItems.filter(i => i.priority === 'high');
-          if (highPriItems.length > 0) {
-            const taskMsg = highPriItems.map(i =>
-              `🔴 ${i.task_description} → ${i.assigned_to_name || 'Unassigned'} (due ${i.due_date || 'TBD'})`
-            ).join('\n');
-            await bridge.postToPulse({
-              channel: 'entomate-tasks',
-              title: `${highPriItems.length} high-priority task(s) from: ${savedMeeting.title}`,
-              message: taskMsg,
-              urgency: 'high'
-            });
-          }
-        }
-
-        // Sync meeting + action items to Logos Vision
-        if (bridge.isConnected('logos_vision')) {
-          await bridge.syncMeetingToLogosVision({
-            meeting: savedMeeting,
-            actionItems: savedActionItems
-          });
-
-          // Discover contacts from attendees
-          const attendees = savedMeeting.attendees || [];
-          for (const attendee of attendees) {
-            if (attendee.email) {
-              await bridge.syncContactToLogosVision({
-                email: attendee.email,
-                name: attendee.name,
-                meetingId: savedMeeting.id
-              });
-            }
-          }
-        }
-
-        // Legacy hub fallback (for backward compat during migration)
-        try {
-          await hubEventPublisher.meetingCompleted({
-            ...savedMeeting,
-            action_items: savedActionItems
-          });
-        } catch { /* hub may not be configured */ }
-
-        log.info(`Ecosystem sync complete for meeting ${savedMeeting.id}`);
-      } catch (syncError) {
-        log.warn('Ecosystem sync failed (non-blocking):', syncError.message);
-      }
-    }, 0);
+    // Step 6: Async post-processing (embeddings + ecosystem sync)
+    firePostProcessing(savedMeeting, summaryData, savedActionItems);
 
     // Return response
     res.json({
@@ -286,7 +168,7 @@ router.post('/process', upload.single('audio'), validate(schemas.process), async
  * POST /api/meetings/transcript
  * Process a text transcript (no audio)
  */
-router.post('/transcript', validate(schemas.transcript), async (req, res) => {
+router.post('/transcript', authenticate, validate(schemas.transcript), async (req, res) => {
   try {
     const { title, transcript, attendees, projectId, crmDealId } = req.body;
 
@@ -295,28 +177,17 @@ router.post('/transcript', validate(schemas.transcript), async (req, res) => {
     }
 
     if (!ai.isConfigured()) {
-      return res.status(503).json({ error: 'Gemini API not configured' });
+      return res.status(503).json({ error: 'AI API not configured' });
     }
 
     log.info('Processing transcript:', title || 'Untitled Meeting');
 
-    // Generate summary
-    const summaryData = await ai.generateSummary(transcript);
-
-    // Extract action items
-    const actionItems = await ai.extractActionItems(transcript);
-
-    // Generate embedding
-    let embedding = null;
-    try {
-      const textForEmbedding = `${title || ''} ${summaryData.summary} ${transcript.substring(0, 5000)}`;
-      embedding = await ai.generateEmbedding(textForEmbedding);
-    } catch (embeddingError) {
-      log.warn('Embedding generation failed:', embeddingError.message);
-    }
+    // Run AI pipeline (summary, action items, embedding)
+    const { summaryData, actionItems, embedding } = await runAIPipeline(transcript, title);
 
     // Save meeting
     const meetingId = uuidv4();
+    const now = new Date();
     const meetingData = {
       id: meetingId,
       title: title || `Meeting ${new Date().toLocaleDateString()}`,
@@ -329,11 +200,12 @@ router.post('/transcript', validate(schemas.transcript), async (req, res) => {
       topics: summaryData.topics || [],
       attendees: parseAttendees(attendees),
       duration_minutes: parseDuration(summaryData.estimatedDuration),
+      start_time: now.toISOString(),
       project_id: projectId || null,
       crm_deal_id: crmDealId || null,
-      created_by: (req.user?.id && req.user.id !== 'anonymous') ? req.user.id : null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      created_by: req.user?.id || null,
+      created_at: now.toISOString(),
+      updated_at: now.toISOString()
     };
 
     if (embedding) {
@@ -354,54 +226,10 @@ router.post('/transcript', validate(schemas.transcript), async (req, res) => {
     }
 
     // Save action items
-    const savedActionItems = [];
-    for (const item of actionItems) {
-      const actionItemData = {
-        id: uuidv4(),
-        meeting_id: savedMeeting.id,
-        task_description: item.task,
-        context: item.context,
-        assigned_to_name: item.owner,
-        assigned_to_email: item.ownerEmail,
-        due_date: item.dueDate,
-        priority: item.priority?.toLowerCase() || 'medium',
-        status: 'open',
-        crm_sync_status: 'pending',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
+    const savedActionItems = await saveActionItems(savedMeeting.id, actionItems);
 
-      if (supabase) {
-        const { data: actionItem, error } = await supabase
-          .from('action_items')
-          .insert(actionItemData)
-          .select()
-          .single();
-
-        savedActionItems.push(error ? actionItemData : actionItem);
-      } else {
-        savedActionItems.push(actionItemData);
-      }
-    }
-
-    // Generate embeddings for semantic search (async, non-blocking)
-    setTimeout(async () => {
-      try {
-        await embeddingService.generateEmbeddingsForMeeting(
-          savedMeeting.id,
-          {
-            summary: savedMeeting.summary,
-            key_points: summaryData.keyPoints,
-            decisions: summaryData.decisions,
-            transcript: savedMeeting.transcript
-          },
-          savedActionItems
-        );
-        log.info(`Generated embeddings for meeting ${savedMeeting.id}`);
-      } catch (embeddingError) {
-        log.warn('Embedding generation failed:', embeddingError.message);
-      }
-    }, 0);
+    // Async post-processing (embeddings + ecosystem sync)
+    firePostProcessing(savedMeeting, summaryData, savedActionItems);
 
     res.json({
       success: true,
@@ -431,7 +259,7 @@ router.post('/transcript', validate(schemas.transcript), async (req, res) => {
  * GET /api/meetings
  * List all meetings with pagination and filters
  */
-router.get('/', validate(schemas.list), async (req, res) => {
+router.get('/', authenticate, validate(schemas.list), async (req, res) => {
   try {
     const { limit = 20, offset = 0, projectId, search, startDate, endDate } = req.query;
 
@@ -449,7 +277,8 @@ router.get('/', validate(schemas.list), async (req, res) => {
     }
 
     if (search) {
-      query = query.or(`title.ilike.%${search}%,summary.ilike.%${search}%`);
+      const sanitized = search.replace(/[%_\\]/g, '\\$&');
+      query = query.or(`title.ilike.%${sanitized}%,summary.ilike.%${sanitized}%`);
     }
 
     if (startDate) {
@@ -482,7 +311,7 @@ router.get('/', validate(schemas.list), async (req, res) => {
  * GET /api/meetings/:id
  * Get meeting details with action items
  */
-router.get('/:id', async (req, res) => {
+router.get('/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -521,7 +350,7 @@ router.get('/:id', async (req, res) => {
  * PUT /api/meetings/:id
  * Update meeting
  */
-router.put('/:id', validate(schemas.update), async (req, res) => {
+router.put('/:id', authenticate, validate(schemas.update), async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
@@ -563,7 +392,7 @@ router.put('/:id', validate(schemas.update), async (req, res) => {
  * DELETE /api/meetings/:id
  * Delete meeting and its action items
  */
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -599,7 +428,7 @@ router.delete('/:id', async (req, res) => {
  * POST /api/meetings/:id/ask
  * Ask AI question about a specific meeting
  */
-router.post('/:id/ask', validate(schemas.ask), async (req, res) => {
+router.post('/:id/ask', authenticate, validate(schemas.ask), async (req, res) => {
   try {
     const { id } = req.params;
     const { question } = req.body;
@@ -661,7 +490,7 @@ ${meeting.transcript}
  * GET /api/meetings/:id/recap
  * Get formatted chat recap for a meeting
  */
-router.get('/:id/recap', async (req, res) => {
+router.get('/:id/recap', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -776,7 +605,8 @@ async function saveActionItems(meetingId, actionItems) {
  * Non-blocking — errors are logged but never thrown.
  */
 function firePostProcessing(savedMeeting, summaryData, savedActionItems) {
-  setTimeout(async () => {
+  // Fire-and-forget with top-level .catch() to prevent unhandled rejections
+  (async () => {
     try {
       await embeddingService.generateEmbeddingsForMeeting(
         savedMeeting.id,
@@ -849,7 +679,9 @@ function firePostProcessing(savedMeeting, summaryData, savedActionItems) {
     } catch (syncError) {
       log.warn('Ecosystem sync failed (non-blocking):', syncError.message);
     }
-  }, 0);
+  })().catch(err => {
+    log.error('Post-processing unexpected error:', err.message || err);
+  });
 }
 
 // ── Reprocess Endpoint ──
@@ -859,7 +691,7 @@ function firePostProcessing(savedMeeting, summaryData, savedActionItems) {
  * Re-run AI processing on an existing meeting (e.g., after ecosystem import).
  * Used by the ecosystem-inbound edge function after receiving a Pulse export.
  */
-router.post('/:id/reprocess', async (req, res) => {
+router.post('/:id/reprocess', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
 

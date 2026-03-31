@@ -122,7 +122,7 @@ async function calculateEngagementScore(customerId: string): Promise<number> {
     if (!meetingRelations || meetingRelations.length === 0) {
       // Fallback: check if customer_id field exists on meetings
       const { count: meetingCount } = await supabase
-        .from('entomate_meetings')
+        .from('meetings')
         .select('*', { count: 'exact', head: true })
         .eq('customer_id', customerId)
         .gte('created_at', thirtyDaysAgo.toISOString())
@@ -133,7 +133,7 @@ async function calculateEngagementScore(customerId: string): Promise<number> {
     // Count meetings from relationships in last 30 days
     const meetingIds = meetingRelations.map(r => r.target_id)
     const { count: meetingCount } = await supabase
-      .from('entomate_meetings')
+      .from('meetings')
       .select('*', { count: 'exact', head: true })
       .in('id', meetingIds)
       .gte('created_at', thirtyDaysAgo.toISOString())

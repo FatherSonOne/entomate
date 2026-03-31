@@ -1,17 +1,21 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Search, Clock, Users, MessageSquare, Trash2, AlertTriangle, RefreshCw } from 'lucide-react'
+import { Plus, Search, Clock, Users, MessageSquare, Trash2, AlertTriangle, RefreshCw, Loader2 } from 'lucide-react'
 import MeetingRecorder from '../components/MeetingRecorder'
 import { meetingsApi, settingsApi } from '../services/api'
 import { VCButton, VCBadge } from '../components/vc'
 import { useConfirm } from '../components/vc/ConfirmDialog'
 import { useToast } from '../components/vc/ToastProvider'
+import { getSentimentEmoji, getSentimentBadgeColor } from '../utils/meetingHelpers'
 
 export default function Meetings() {
   const confirm = useConfirm()
   const toast = useToast()
+  const PAGE_SIZE = 20
   const [meetings, setMeetings] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(false)
   const [error, setError] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [showRecorder, setShowRecorder] = useState(false)
@@ -30,13 +34,27 @@ export default function Meetings() {
     try {
       setLoading(true)
       setError(null)
-      const data = await meetingsApi.list({ limit: 50 })
+      const data = await meetingsApi.list({ limit: PAGE_SIZE, offset: 0 })
       setMeetings(data.meetings || [])
+      setHasMore(data.hasMore || false)
     } catch (err) {
       console.error('Failed to load meetings:', err)
       setError('Failed to load meetings. Please try again.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadMoreMeetings = async () => {
+    try {
+      setLoadingMore(true)
+      const data = await meetingsApi.list({ limit: PAGE_SIZE, offset: meetings.length })
+      setMeetings(prev => [...prev, ...(data.meetings || [])])
+      setHasMore(data.hasMore || false)
+    } catch (err) {
+      console.error('Failed to load more meetings:', err)
+    } finally {
+      setLoadingMore(false)
     }
   }
 
@@ -66,22 +84,6 @@ export default function Meetings() {
     meeting.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     meeting.summary?.toLowerCase().includes(searchQuery.toLowerCase())
   )
-
-  const getSentimentBadgeColor = (sentiment) => {
-    switch (sentiment) {
-      case 'Positive': return 'mint'
-      case 'Negative': return 'crimson'
-      default: return 'neutral'
-    }
-  }
-
-  const getSentimentEmoji = (sentiment) => {
-    switch (sentiment) {
-      case 'Positive': return '😊'
-      case 'Negative': return '😟'
-      default: return '😐'
-    }
-  }
 
   return (
     <div className="space-y-6">
@@ -172,76 +174,96 @@ export default function Meetings() {
             </p>
           </div>
         ) : (
-          <div className="divide-y" style={{ borderColor: 'rgba(248,240,242,.08)' }}>
-            {filteredMeetings.map((meeting) => (
-              <Link
-                key={meeting.id}
-                to={`/meetings/${meeting.id}`}
-                className="block p-4 sm:p-5 hover:bg-surface-muted transition-colors"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xl">{getSentimentEmoji(meeting.sentiment_label)}</span>
-                      <h3
-                        className="text-lg font-semibold truncate"
-                        style={{ color: 'var(--text-primary)' }}
-                      >
-                        {meeting.title}
-                      </h3>
-                      <VCBadge color={getSentimentBadgeColor(meeting.sentiment_label)}>
-                        {meeting.sentiment_label || 'Unknown'}
-                      </VCBadge>
-                    </div>
-
-                    {meeting.summary && (
-                      <p className="line-clamp-2 mb-3" style={{ color: 'var(--text-secondary)' }}>
-                        {meeting.summary}
-                      </p>
-                    )}
-
-                    <div className="flex flex-wrap items-center gap-4 text-sm" style={{ color: 'var(--text-tertiary)' }}>
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-4 h-4" />
-                        {new Date(meeting.created_at).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric'
-                        })}
-                      </span>
-
-                      {meeting.duration_minutes && (
-                        <span>{meeting.duration_minutes} min</span>
-                      )}
-
-                      {meeting.attendees?.length > 0 && (
-                        <span className="flex items-center gap-1">
-                          <Users className="w-4 h-4" />
-                          {meeting.attendees.length} attendees
-                        </span>
-                      )}
-
-                      {meeting.key_points?.length > 0 && (
-                        <VCBadge color="neutral">
-                          {meeting.key_points.length} key points
+          <>
+            <div className="divide-y" style={{ borderColor: 'rgba(248,240,242,.08)' }}>
+              {filteredMeetings.map((meeting) => (
+                <Link
+                  key={meeting.id}
+                  to={`/meetings/${meeting.id}`}
+                  className="block p-4 sm:p-5 hover:bg-surface-muted transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xl">{getSentimentEmoji(meeting.sentiment_label)}</span>
+                        <h3
+                          className="text-lg font-semibold truncate"
+                          style={{ color: 'var(--text-primary)' }}
+                        >
+                          {meeting.title}
+                        </h3>
+                        <VCBadge color={getSentimentBadgeColor(meeting.sentiment_label)}>
+                          {meeting.sentiment_label || 'Unknown'}
                         </VCBadge>
-                      )}
-                    </div>
-                  </div>
+                      </div>
 
-                  <VCButton
-                    variant="ghost"
-                    onClick={(e) => handleDelete(meeting.id, e)}
-                    className="p-2"
-                    title="Delete meeting"
-                    aria-label="Delete meeting"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </VCButton>
-                </div>
-              </Link>
-            ))}
-          </div>
+                      {meeting.summary && (
+                        <p className="line-clamp-2 mb-3" style={{ color: 'var(--text-secondary)' }}>
+                          {meeting.summary}
+                        </p>
+                      )}
+
+                      <div className="flex flex-wrap items-center gap-4 text-sm" style={{ color: 'var(--text-tertiary)' }}>
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-4 h-4" />
+                          {new Date(meeting.created_at).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })}
+                        </span>
+
+                        {meeting.duration_minutes && (
+                          <span>{meeting.duration_minutes} min</span>
+                        )}
+
+                        {meeting.attendees?.length > 0 && (
+                          <span className="flex items-center gap-1">
+                            <Users className="w-4 h-4" />
+                            {meeting.attendees.length} attendees
+                          </span>
+                        )}
+
+                        {meeting.key_points?.length > 0 && (
+                          <VCBadge color="neutral">
+                            {meeting.key_points.length} key points
+                          </VCBadge>
+                        )}
+                      </div>
+                    </div>
+
+                    <VCButton
+                      variant="ghost"
+                      onClick={(e) => handleDelete(meeting.id, e)}
+                      className="p-2"
+                      title="Delete meeting"
+                      aria-label="Delete meeting"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </VCButton>
+                  </div>
+                </Link>
+              ))}
+            </div>
+            {hasMore && !searchQuery && (
+              <div className="p-4 text-center">
+                <VCButton
+                  variant="secondary"
+                  onClick={loadMoreMeetings}
+                  disabled={loadingMore}
+                >
+                  {loadingMore ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Loading...
+                    </>
+                  ) : (
+                    'Load More'
+                  )}
+                </VCButton>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

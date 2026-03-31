@@ -206,7 +206,7 @@ async function getDealStats(dealId: string): Promise<DealStats> {
 
   if (meetingIds.length > 0) {
     const { data: meetings } = await supabase
-      .from('entomate_meetings')
+      .from('meetings')
       .select('id, sentiment_label, created_at')
       .in('id', meetingIds)
       .order('created_at', { ascending: false })
