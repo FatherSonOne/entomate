@@ -30,9 +30,9 @@ function addDays(date: Date, days: number): string {
  * Fetch task data from database
  */
 async function getTaskData(taskId: string): Promise<TaskData | null> {
-  // Try to fetch from entomate_project_tasks table
+  // Try to fetch from tasks table
   const { data, error } = await supabase
-    .from('entomate_project_tasks')
+    .from('tasks')
     .select('*')
     .eq('id', taskId)
     .single();
@@ -45,7 +45,7 @@ async function getTaskData(taskId: string): Promise<TaskData | null> {
   return {
     id: data.id,
     priority: data.priority || 'medium',
-    status: data.status || 'todo',
+    status: data.status || 'open',
     created_at: data.created_at,
     due_date: data.due_date,
     assignee_id: data.assigned_to
@@ -68,17 +68,17 @@ async function getTaskHistoryStats(
   // Get assignee workload if available
   if (taskData.assignee_id) {
     const { count } = await supabase
-      .from('entomate_project_tasks')
+      .from('tasks')
       .select('*', { count: 'exact', head: true })
       .eq('assigned_to', taskData.assignee_id)
-      .in('status', ['todo', 'in_progress']);
+      .in('status', ['open', 'in_progress']);
 
     assigneeOpenTasks = count || 0;
   }
 
   // Try to get average completion time from completed tasks
   const { data: completedTasks } = await supabase
-    .from('entomate_project_tasks')
+    .from('tasks')
     .select('created_at, updated_at, status')
     .eq('priority', taskData.priority)
     .eq('status', 'done')
@@ -137,7 +137,7 @@ export async function computeTaskEta(taskId: string): Promise<TaskEtaResult> {
   }
 
   // Status adjustment
-  if (task.status === 'todo') {
+  if (task.status === 'open') {
     extraDays += 1;
     adjustmentReasons.push('+1 day (not started)');
   }
@@ -207,9 +207,11 @@ async function storePrediction(
 }
 
 /**
- * Get latest prediction for a task
+ * Get latest prediction for a task (includes created_at for staleness checks)
  */
-export async function getLatestTaskEta(taskId: string): Promise<TaskEtaResult | null> {
+export async function getLatestTaskEta(
+  taskId: string
+): Promise<{ prediction: TaskEtaResult; createdAt: string } | null> {
   const prefixedId = formatEntityId('task', taskId);
 
   const { data, error } = await supabase
@@ -226,23 +228,32 @@ export async function getLatestTaskEta(taskId: string): Promise<TaskEtaResult | 
     return null;
   }
 
-  return data.predicted_value as TaskEtaResult;
+  return {
+    prediction: data.predicted_value as TaskEtaResult,
+    createdAt: data.created_at
+  };
 }
 
 /**
- * Batch compute ETAs for multiple tasks
+ * Batch compute ETAs for multiple tasks (parallel)
  */
 export async function computeTaskEtasBatch(
   taskIds: string[]
 ): Promise<Map<string, TaskEtaResult>> {
   const results = new Map<string, TaskEtaResult>();
 
-  for (const taskId of taskIds) {
-    try {
+  const settled = await Promise.allSettled(
+    taskIds.map(async (taskId) => {
       const result = await computeTaskEta(taskId);
-      results.set(taskId, result);
-    } catch (err) {
-      console.error(`[TaskEta] Failed for task ${taskId}:`, err);
+      return { taskId, result };
+    })
+  );
+
+  for (const outcome of settled) {
+    if (outcome.status === 'fulfilled') {
+      results.set(outcome.value.taskId, outcome.value.result);
+    } else {
+      console.error('[TaskEta] Failed for task:', outcome.reason);
     }
   }
 

@@ -9,16 +9,10 @@ const { authenticate } = require('../middleware/auth');
 const { apiLimiter } = require('../middleware/rateLimiter');
 const FeedbackService = require('../services/learning/FeedbackService');
 const OutcomeTracker = require('../services/learning/OutcomeTracker');
-const { createClient } = require('@supabase/supabase-js');
+const { supabaseAdmin: supabase } = require('../config/supabase');
 const log = require('../utils/log');
 const { validate } = require('../middleware/validate');
 const schemas = require('../schemas/learning');
-
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
-);
 
 /**
  * POST /api/learning/feedback/override
@@ -444,23 +438,10 @@ router.get(
       const userId = req.user.id;
       const { period = 'month' } = req.query;
 
-      // For now, return basic statistics
-      // In Phase 5, this will be enhanced with full report generation
-      const stats = await FeedbackService.getOverrideStats(userId, 30);
+      const daysMap = { week: 7, month: 30, quarter: 90 };
+      const days = daysMap[period] || 30;
 
-      // Get active patterns count
-      const { data: activePatterns } = await supabase
-        .from('learning_patterns')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('status', 'active');
-
-      const report = {
-        period,
-        overrideStats: stats,
-        activePatternsCount: activePatterns?.length || 0,
-        message: 'Full report generation will be implemented in Phase 5'
-      };
+      const report = await OutcomeTracker.getEffectivenessReport(userId, days);
 
       res.json({
         success: true,
@@ -669,11 +650,11 @@ router.get(
         if (stats && stats.total > 0) {
           effectiveness = stats.successRate || 0;
         }
-        // Week-over-week: compare last 7 days vs previous 7 days
-        const thisWeek = await FeedbackService.getOverrideStats(userId, 7);
-        const lastWeek = await FeedbackService.getOverrideStats(userId, 14);
-        const thisRate = thisWeek?.successRate || 0;
-        const lastRate = lastWeek?.successRate || 0;
+        // Week-over-week: compare days 0-7 vs days 7-14
+        const thisWeek = await FeedbackService.getOverrideStats(userId, 7, 0);
+        const lastWeek = await FeedbackService.getOverrideStats(userId, 14, 7);
+        const thisRate = thisWeek?.feedbackRate || 0;
+        const lastRate = lastWeek?.feedbackRate || 0;
         weekOverWeek = lastRate > 0
           ? Math.round(((thisRate - lastRate) / lastRate) * 100)
           : 0;

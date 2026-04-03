@@ -188,16 +188,25 @@ class FeedbackService {
    * @param {number} days - Number of days to look back
    * @returns {Object} Override statistics
    */
-  async getOverrideStats(userId, days = 30) {
+  async getOverrideStats(userId, days = 30, endDaysAgo = 0) {
     try {
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
 
-      const { data, error } = await this.supabase
+      const endDate = new Date();
+      endDate.setDate(endDate.getDate() - endDaysAgo);
+
+      let query = this.supabase
         .from('agent_overrides')
         .select('agent_type, feedback_reason')
         .eq('user_id', userId)
         .gte('created_at', startDate.toISOString());
+
+      if (endDaysAgo > 0) {
+        query = query.lte('created_at', endDate.toISOString());
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         log.error('[FeedbackService] Error fetching stats:', { error: error.message || error });

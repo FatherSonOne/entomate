@@ -337,11 +337,11 @@ async function storePrediction(
 }
 
 /**
- * Get latest prediction for a deal
+ * Get latest prediction for a deal (includes created_at for staleness checks)
  */
 export async function getLatestDealProbability(
   dealId: string
-): Promise<DealProbabilityResult | null> {
+): Promise<{ prediction: DealProbabilityResult; createdAt: string } | null> {
   const prefixedId = formatEntityId('deal', dealId);
 
   const { data, error } = await supabase
@@ -358,5 +358,8 @@ export async function getLatestDealProbability(
     return null;
   }
 
-  return data.predicted_value as DealProbabilityResult;
+  return {
+    prediction: data.predicted_value as DealProbabilityResult,
+    createdAt: data.created_at
+  };
 }

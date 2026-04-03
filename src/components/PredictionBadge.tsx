@@ -11,6 +11,7 @@ import {
   getConfidenceColor,
   formatPredictedDate
 } from '../hooks/usePredictions';
+import './PredictionBadge.css';
 
 interface PredictionTooltipProps {
   children: React.ReactNode;
@@ -39,8 +40,8 @@ function PredictionTooltip({ children, content }: PredictionTooltipProps) {
             transform: 'translateX(-50%)',
             marginBottom: '8px',
             padding: '12px',
-            backgroundColor: '#1f2937',
-            color: '#f9fafb',
+            backgroundColor: 'var(--bg-elevated, #1f2937)',
+            color: 'var(--text-primary, #f9fafb)',
             borderRadius: '8px',
             fontSize: '13px',
             whiteSpace: 'nowrap',
@@ -59,7 +60,7 @@ function PredictionTooltip({ children, content }: PredictionTooltipProps) {
               transform: 'translateX(-50%)',
               borderWidth: '6px',
               borderStyle: 'solid',
-              borderColor: '#1f2937 transparent transparent transparent'
+              borderColor: 'var(--bg-elevated, #1f2937) transparent transparent transparent'
             }}
           />
         </div>
@@ -96,7 +97,7 @@ export function DealProbabilityBadge({ prediction, loading, compact }: DealProba
           borderRadius: '50%',
           border: '2px solid #d1d5db',
           borderTopColor: '#9ca3af',
-          animation: 'spin 1s linear infinite',
+          animation: 'prediction-spin 1s linear infinite',
           marginRight: '6px'
         }} />
         ...
@@ -137,22 +138,22 @@ export function DealProbabilityBadge({ prediction, loading, compact }: DealProba
       <div style={{ fontWeight: 600, marginBottom: '8px' }}>
         Deal Win Probability: {probability}%
       </div>
-      <div style={{ fontSize: '12px', color: '#d1d5db', marginBottom: '8px' }}>
+      <div style={{ fontSize: '12px', color: 'var(--text-tertiary, #d1d5db)', marginBottom: '8px' }}>
         {explanation}
       </div>
       {riskFlags.length > 0 && (
         <div style={{ fontSize: '12px' }}>
-          <span style={{ color: '#fbbf24' }}>⚠️ Risk Factors:</span>
+          <span style={{ color: 'var(--accent-tertiary, #fbbf24)' }}>⚠️ Risk Factors:</span>
           <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
             {riskFlags.map((flag, i) => (
-              <li key={i} style={{ color: '#fbbf24' }}>
+              <li key={i} style={{ color: 'var(--accent-tertiary, #fbbf24)' }}>
                 {formatRiskFlag(flag)}
               </li>
             ))}
           </ul>
         </div>
       )}
-      <div style={{ fontSize: '10px', color: '#6b7280', marginTop: '8px' }}>
+      <div style={{ fontSize: '10px', color: 'var(--text-tertiary, #6b7280)', marginTop: '8px' }}>
         Model: {prediction.modelVersion}
       </div>
     </div>
@@ -193,7 +194,7 @@ export function TaskEtaBadge({ prediction, loading, compact }: TaskEtaBadgeProps
           borderRadius: '50%',
           border: '2px solid #d1d5db',
           borderTopColor: '#9ca3af',
-          animation: 'spin 1s linear infinite',
+          animation: 'prediction-spin 1s linear infinite',
           marginRight: '6px'
         }} />
         ...
@@ -238,7 +239,7 @@ export function TaskEtaBadge({ prediction, loading, compact }: TaskEtaBadgeProps
           day: 'numeric'
         })}
       </div>
-      <div style={{ fontSize: '12px', color: '#d1d5db', marginBottom: '8px' }}>
+      <div style={{ fontSize: '12px', color: 'var(--text-tertiary, #d1d5db)', marginBottom: '8px' }}>
         {explanation}
       </div>
       <div style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -257,7 +258,7 @@ export function TaskEtaBadge({ prediction, loading, compact }: TaskEtaBadgeProps
           {confidence}
         </span>
       </div>
-      <div style={{ fontSize: '10px', color: '#6b7280', marginTop: '8px' }}>
+      <div style={{ fontSize: '10px', color: 'var(--text-tertiary, #6b7280)', marginTop: '8px' }}>
         Model: {prediction.modelVersion}
       </div>
     </div>
@@ -282,20 +283,6 @@ function formatRiskFlag(flag: string): string {
     negative_sentiment: 'Negative meeting sentiment'
   };
   return flagMap[flag] || flag.replace(/_/g, ' ');
-}
-
-/**
- * Inline styles for spinner animation
- */
-const spinnerStyle = document.createElement('style');
-spinnerStyle.textContent = `
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
-`;
-if (typeof document !== 'undefined' && !document.querySelector('#prediction-spinner-style')) {
-  spinnerStyle.id = 'prediction-spinner-style';
-  document.head.appendChild(spinnerStyle);
 }
 
 export default { DealProbabilityBadge, TaskEtaBadge };

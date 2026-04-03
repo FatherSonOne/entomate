@@ -6,8 +6,12 @@
 const express = require('express');
 const router = express.Router();
 const { supabase } = require('../config/supabase');
+const { authenticate } = require('../middleware/auth');
 const reportService = require('../services/reportService');
 const log = require('../utils/log');
+
+// Require authentication for all report routes
+router.use(authenticate);
 
 /**
  * GET /api/reports/meeting/:id/pdf

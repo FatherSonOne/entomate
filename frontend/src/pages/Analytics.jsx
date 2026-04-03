@@ -4,15 +4,28 @@ import {
   CheckCircle, Mic, Zap, Bot, Target,
   Calendar, Download, RefreshCw
 } from 'lucide-react';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
+  ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area
+} from 'recharts';
 import api from '../services/api';
+import { reportsApi } from '../services/api';
 import { VCButton, VCBadge, VCIconBox } from '../components/vc';
 import ErrorState from '../components/vc/ErrorState';
+
+const CHART_COLORS = {
+  crimson: '#FF2D6B',
+  mint: '#00F5D4',
+  amber: '#FFB800',
+  muted: 'rgba(248,240,242,0.3)',
+};
 
 export default function Analytics() {
   const [dashboard, setDashboard] = useState(null);
   const [trends, setTrends] = useState(null);
   const [teamPerformance, setTeamPerformance] = useState(null);
   const [aiEffectiveness, setAIEffectiveness] = useState(null);
+  const [sentimentTrends, setSentimentTrends] = useState(null);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState('30d');
   const [activeTab, setActiveTab] = useState('overview');
@@ -24,21 +37,43 @@ export default function Analytics() {
   const fetchData = async () => {
     try {
       setLoading(true);
+      const periodDays = { '7d': 7, '30d': 30, '90d': 90, '1y': 365 };
+      const days = periodDays[period] || 30;
+      const end_date = new Date().toISOString();
+      const start_date = new Date(Date.now() - days * 86400000).toISOString();
+
       const [dashboardRes, trendsRes, teamRes, aiRes] = await Promise.all([
-        api.get('/analytics/dashboard'),
-        api.get(`/analytics/trends?period=${period}`),
-        api.get('/analytics/team-performance'),
-        api.get('/analytics/ai-effectiveness')
+        api.get('/analytics/dashboard', { params: { start_date, end_date } }),
+        api.get('/analytics/trends', { params: { period, start_date, end_date } }),
+        api.get('/analytics/team-performance', { params: { start_date, end_date } }),
+        api.get('/analytics/ai-effectiveness', { params: { start_date, end_date } })
       ]);
       setDashboard(dashboardRes.data.data);
       setTrends(trendsRes.data.data);
       setTeamPerformance(teamRes.data.data);
       setAIEffectiveness(aiRes.data.data);
+
+      // Fetch sentiment trends (non-blocking — don't fail the whole page)
+      api.get('/analytics/sentiment-trends', { params: { start_date, end_date } })
+        .then(res => setSentimentTrends(res.data.data))
+        .catch(() => {});
     } catch (error) {
       console.error('Failed to fetch analytics:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleExport = () => {
+    const exportMap = {
+      overview: reportsApi.downloadMeetingsCSV(),
+      meetings: reportsApi.downloadMeetingsCSV(),
+      tasks: reportsApi.downloadActionItemsCSV(),
+      ai: reportsApi.downloadMeetingsCSV(),
+      team: reportsApi.downloadActionItemsCSV(),
+    };
+    const url = exportMap[activeTab];
+    if (url) window.open(url, '_blank');
   };
 
   if (loading) {
@@ -118,6 +153,9 @@ export default function Analytics() {
             <option value="90d">Last 90 days</option>
             <option value="1y">Last year</option>
           </select>
+          <VCButton variant="ghost" onClick={handleExport} aria-label="Export CSV">
+            <Download className="h-4 w-4" />
+          </VCButton>
           <VCButton variant="ghost" onClick={fetchData} aria-label="Refresh">
             <RefreshCw className="h-4 w-4" />
           </VCButton>
@@ -414,7 +452,48 @@ export default function Analytics() {
             />
           </div>
 
-          {/* Trends Chart */}
+          {/* Sentiment Trends — Area Chart */}
+          {sentimentTrends && sentimentTrends.length > 0 && (
+            <div className="vc p-6">
+              <h3
+                className="font-semibold mb-4"
+                style={{ color: 'var(--text-primary)' }}
+              >
+                Sentiment Over Time
+              </h3>
+              <ResponsiveContainer width="100%" height={200}>
+                <AreaChart data={sentimentTrends} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(248,240,242,0.06)" />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 11, fill: 'var(--text-tertiary)' }}
+                    tickFormatter={(d) => {
+                      const dt = new Date(d);
+                      return `${dt.getMonth() + 1}/${dt.getDate()}`;
+                    }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis tick={{ fontSize: 11, fill: 'var(--text-tertiary)' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                  <RTooltip
+                    contentStyle={{
+                      background: 'var(--bg-elevated)',
+                      border: '1px solid rgba(248,240,242,0.1)',
+                      borderRadius: 8,
+                      color: 'var(--text-primary)',
+                      fontSize: 13,
+                    }}
+                    labelFormatter={(d) => new Date(d).toLocaleDateString()}
+                  />
+                  <Area type="monotone" dataKey="positive_count" stackId="1" stroke={CHART_COLORS.mint} fill={CHART_COLORS.mint} fillOpacity={0.3} name="Positive" />
+                  <Area type="monotone" dataKey="neutral_count" stackId="1" stroke={CHART_COLORS.amber} fill={CHART_COLORS.amber} fillOpacity={0.2} name="Neutral" />
+                  <Area type="monotone" dataKey="negative_count" stackId="1" stroke={CHART_COLORS.crimson} fill={CHART_COLORS.crimson} fillOpacity={0.2} name="Negative" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          {/* Meetings Over Time — Recharts */}
           {trends && trends.trends.length > 0 && (
             <div className="vc p-6">
               <h3
@@ -423,32 +502,39 @@ export default function Analytics() {
               >
                 Meetings Over Time
               </h3>
-              <div className="h-64 flex items-end gap-2">
-                {trends.trends.map((point, i) => (
-                  <div
-                    key={i}
-                    className="flex-1 rounded-t transition-colors relative group"
-                    style={{
-                      height: `${Math.max((point.count / Math.max(...trends.trends.map(t => t.count))) * 100, 5)}%`,
-                      background: 'var(--accent-primary, #FF2D6B)',
-                      opacity: 0.75,
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={trends.trends} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(248,240,242,0.06)" />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 11, fill: 'var(--text-tertiary)' }}
+                    tickFormatter={(d) => {
+                      const dt = new Date(d);
+                      return `${dt.getMonth() + 1}/${dt.getDate()}`;
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.opacity = '1' }}
-                    onMouseLeave={e => { e.currentTarget.style.opacity = '0.75' }}
-                  >
-                    <div
-                      className="absolute -top-8 left-1/2 transform -translate-x-1/2 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap"
-                      style={{ background: 'rgba(16,16,16,0.95)', border: '1px solid rgba(248,240,242,.1)' }}
-                    >
-                      {point.count} meetings
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="flex justify-between mt-2 text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                <span>{trends.trends[0]?.date}</span>
-                <span>{trends.trends[trends.trends.length - 1]?.date}</span>
-              </div>
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: 'var(--text-tertiary)' }}
+                    axisLine={false}
+                    tickLine={false}
+                    allowDecimals={false}
+                  />
+                  <RTooltip
+                    contentStyle={{
+                      background: 'var(--bg-elevated)',
+                      border: '1px solid rgba(248,240,242,0.1)',
+                      borderRadius: 8,
+                      color: 'var(--text-primary)',
+                      fontSize: 13,
+                    }}
+                    labelFormatter={(d) => new Date(d).toLocaleDateString()}
+                    formatter={(v) => [`${v} meetings`, 'Count']}
+                  />
+                  <Bar dataKey="count" fill={CHART_COLORS.crimson} radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           )}
         </div>
@@ -484,7 +570,7 @@ export default function Analytics() {
             />
           </div>
 
-          {/* Priority Distribution */}
+          {/* Priority Distribution — Pie Chart */}
           <div className="vc p-6">
             <h3
               className="font-semibold mb-4"
@@ -492,26 +578,47 @@ export default function Analytics() {
             >
               Tasks by Priority
             </h3>
-            <div className="space-y-3">
-              <StatusBar
-                label="High Priority"
-                value={dashboard.tasks.byPriority.high}
-                total={dashboard.tasks.total}
-                color="red"
-              />
-              <StatusBar
-                label="Medium Priority"
-                value={dashboard.tasks.byPriority.medium}
-                total={dashboard.tasks.total}
-                color="yellow"
-              />
-              <StatusBar
-                label="Low Priority"
-                value={dashboard.tasks.byPriority.low}
-                total={dashboard.tasks.total}
-                color="green"
-              />
-            </div>
+            {dashboard.tasks.total > 0 ? (
+              <div className="flex items-center gap-6">
+                <ResponsiveContainer width={160} height={160}>
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'High', value: dashboard.tasks.byPriority.high },
+                        { name: 'Medium', value: dashboard.tasks.byPriority.medium },
+                        { name: 'Low', value: dashboard.tasks.byPriority.low },
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={40}
+                      outerRadius={70}
+                      dataKey="value"
+                      strokeWidth={0}
+                    >
+                      <Cell fill={CHART_COLORS.crimson} />
+                      <Cell fill={CHART_COLORS.amber} />
+                      <Cell fill={CHART_COLORS.mint} />
+                    </Pie>
+                    <RTooltip
+                      contentStyle={{
+                        background: 'var(--bg-elevated)',
+                        border: '1px solid rgba(248,240,242,0.1)',
+                        borderRadius: 8,
+                        color: 'var(--text-primary)',
+                        fontSize: 13,
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="flex-1 space-y-3">
+                  <StatusBar label="High Priority" value={dashboard.tasks.byPriority.high} total={dashboard.tasks.total} color="red" />
+                  <StatusBar label="Medium Priority" value={dashboard.tasks.byPriority.medium} total={dashboard.tasks.total} color="yellow" />
+                  <StatusBar label="Low Priority" value={dashboard.tasks.byPriority.low} total={dashboard.tasks.total} color="green" />
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>No tasks in this period</p>
+            )}
           </div>
         </div>
       )}

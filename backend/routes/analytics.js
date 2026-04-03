@@ -2,8 +2,12 @@ const express = require('express');
 const router = express.Router();
 const { supabase } = require('../config/supabase');
 const { asyncHandler } = require('../middleware/errorHandler');
+const { authenticate } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const schemas = require('../schemas/analytics');
+
+// Require authentication for all analytics routes
+router.use(authenticate);
 
 /**
  * GET /api/analytics/dashboard
@@ -497,5 +501,95 @@ function groupByPeriod(items, groupBy, dateField, aggregator) {
     }))
     .sort((a, b) => a.date.localeCompare(b.date));
 }
+
+/**
+ * GET /api/analytics/sentiment-trends
+ * Get meeting sentiment trends over time
+ */
+router.get('/sentiment-trends', asyncHandler(async (req, res) => {
+  const { start_date, end_date } = req.query;
+
+  const endDate = end_date ? new Date(end_date) : new Date();
+  const startDate = start_date
+    ? new Date(start_date)
+    : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+  const { data: meetings } = await supabase
+    .from('meetings')
+    .select('created_at, sentiment_label, sentiment_score')
+    .gte('created_at', startDate.toISOString())
+    .lte('created_at', endDate.toISOString())
+    .order('created_at');
+
+  const trends = groupByPeriod(meetings || [], 'day', 'created_at', (items) => ({
+    total_meetings: items.length,
+    positive_count: items.filter(m => m.sentiment_label === 'Positive').length,
+    neutral_count: items.filter(m => m.sentiment_label === 'Neutral').length,
+    negative_count: items.filter(m => m.sentiment_label === 'Negative').length,
+    avg_sentiment_score: items.length > 0
+      ? Math.round(items.reduce((sum, m) => sum + (m.sentiment_score || 0), 0) / items.length * 100) / 100
+      : 0
+  }));
+
+  res.json({
+    success: true,
+    data: trends
+  });
+}));
+
+/**
+ * GET /api/analytics/predictions
+ * List stored predictions with optional filters
+ */
+router.get('/predictions', asyncHandler(async (req, res) => {
+  const { entity_type, prediction_type, entity_id, limit = 50 } = req.query;
+
+  let query = supabase
+    .from('predictions')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(parseInt(limit));
+
+  if (entity_type) query = query.eq('entity_type', entity_type);
+  if (prediction_type) query = query.eq('prediction_type', prediction_type);
+  if (entity_id) query = query.eq('entity_id', entity_id);
+
+  const { data, error } = await query;
+
+  if (error) throw error;
+
+  res.json({
+    success: true,
+    data: data || [],
+    count: data?.length || 0
+  });
+}));
+
+/**
+ * GET /api/analytics/predictions/:entityId/latest
+ * Get latest prediction for a specific entity
+ */
+router.get('/predictions/:entityId/latest', asyncHandler(async (req, res) => {
+  const { entityId } = req.params;
+  const { prediction_type } = req.query;
+
+  let query = supabase
+    .from('predictions')
+    .select('*')
+    .eq('entity_id', entityId)
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  if (prediction_type) query = query.eq('prediction_type', prediction_type);
+
+  const { data, error } = await query.single();
+
+  if (error && error.code !== 'PGRST116') throw error;
+
+  res.json({
+    success: true,
+    data: data || null
+  });
+}));
 
 module.exports = router;

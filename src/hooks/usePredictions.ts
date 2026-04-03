@@ -27,11 +27,19 @@ export function useDealProbability(dealId: string | null) {
 
     try {
       // Try to get cached prediction first
-      let result = await getLatestDealProbability(dealId);
+      const cached = await getLatestDealProbability(dealId);
 
       // If no cached prediction or it's stale (>1 hour), compute new one
-      if (!result) {
+      const STALENESS_MS = 60 * 60 * 1000;
+      const isStale = cached?.createdAt
+        ? (Date.now() - new Date(cached.createdAt).getTime()) > STALENESS_MS
+        : false;
+
+      let result: DealProbabilityResult;
+      if (!cached || isStale) {
         result = await computeDealProbability(dealId);
+      } else {
+        result = cached.prediction;
       }
 
       setPrediction(result);
@@ -91,11 +99,19 @@ export function useTaskEta(taskId: string | null) {
 
     try {
       // Try to get cached prediction first
-      let result = await getLatestTaskEta(taskId);
+      const cached = await getLatestTaskEta(taskId);
 
-      // If no cached prediction, compute new one
-      if (!result) {
+      // If no cached prediction or it's stale (>1 hour), compute new one
+      const STALENESS_MS = 60 * 60 * 1000;
+      const isStale = cached?.createdAt
+        ? (Date.now() - new Date(cached.createdAt).getTime()) > STALENESS_MS
+        : false;
+
+      let result: TaskEtaResult;
+      if (!cached || isStale) {
         result = await computeTaskEta(taskId);
+      } else {
+        result = cached.prediction;
       }
 
       setPrediction(result);
