@@ -9,26 +9,25 @@ import {
   X, Settings, Play, Trash2, Copy, Pin, PinOff,
   Plus, Minus, ChevronDown, ChevronUp, HelpCircle
 } from 'lucide-react'
+import { ExpressionField } from './ExpressionEditor'
 
 // Field type renderers
 const FieldRenderers = {
-  text: ({ field, value, onChange }) => (
-    <input
-      type="text"
-      value={value || ''}
-      onChange={(e) => onChange(field.name, e.target.value)}
-      placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
-      className="w-full px-3 py-2 text-sm border border-line-default rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+  text: ({ field, value, onChange, context }) => (
+    <ExpressionField
+      field={{ ...field, multiline: false }}
+      value={value}
+      onChange={onChange}
+      context={context}
     />
   ),
 
-  textarea: ({ field, value, onChange }) => (
-    <textarea
-      value={value || ''}
-      onChange={(e) => onChange(field.name, e.target.value)}
-      placeholder={field.placeholder}
-      rows={field.rows || 3}
-      className="w-full px-3 py-2 text-sm border border-line-default rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono"
+  textarea: ({ field, value, onChange, context }) => (
+    <ExpressionField
+      field={{ ...field, type: 'textarea', multiline: true }}
+      value={value}
+      onChange={onChange}
+      context={context}
     />
   ),
 
@@ -316,6 +315,21 @@ const nodeSchemas = {
     { name: 'headers', label: 'Headers', type: 'keyvalue', itemLabel: 'header' },
     { name: 'body', label: 'Request Body', type: 'json' }
   ],
+  send_pulse: [
+    { name: 'channel', label: 'Channel', type: 'select', options: [
+      { value: 'general', label: 'General' },
+      { value: 'sales', label: 'Sales' },
+      { value: 'projects', label: 'Projects' },
+      { value: 'customer-success', label: 'Customer Success' },
+      { value: 'meetings', label: 'Meetings' },
+      { value: 'auto', label: 'Auto (based on context)' }
+    ]},
+    { name: 'message', label: 'Message', type: 'textarea', rows: 4, placeholder: 'Meeting "{{title}}" processed with {{actionItems.length}} action items' },
+    { name: 'title', label: 'Title (optional)', type: 'text', placeholder: 'Notification title' },
+    { name: 'mentionOwner', label: 'Mention Owner', type: 'boolean', checkboxLabel: 'Mention the record owner' },
+    { name: 'mentionAssignee', label: 'Mention Assignee', type: 'boolean', checkboxLabel: 'Mention the assigned user' },
+    { name: 'includeLink', label: 'Include Link', type: 'boolean', checkboxLabel: 'Append link from input data' }
+  ],
   send_slack: [
     { name: 'channel', label: 'Channel', type: 'text', placeholder: '#general' },
     { name: 'message', label: 'Message', type: 'textarea', rows: 4 }
@@ -378,6 +392,92 @@ const nodeSchemas = {
       { value: 'subtract', label: 'Subtract Duration' }
     ]},
     { name: 'format', label: 'Format', type: 'text', placeholder: 'YYYY-MM-DD' }
+  ],
+
+  // Missing trigger schemas
+  meeting_processed: [
+    { name: 'conditions', label: 'Conditions', type: 'conditions' }
+  ],
+  action_item_created: [
+    { name: 'conditions', label: 'Conditions', type: 'conditions' }
+  ],
+  error: [
+    { name: 'listenTo', label: 'Listen To', type: 'select', options: [
+      { value: 'all', label: 'All Workflows' },
+      { value: 'specific', label: 'Specific Workflows' }
+    ]},
+    { name: 'workflowIds', label: 'Workflow IDs', type: 'text', placeholder: 'Comma-separated workflow IDs' }
+  ],
+  manual: [],
+
+  // Missing logic schemas
+  merge: [
+    { name: 'mode', label: 'Merge Mode', type: 'select', options: [
+      { value: 'append', label: 'Append' },
+      { value: 'merge_by_key', label: 'Merge by Key' },
+      { value: 'combine', label: 'Combine All' }
+    ]},
+    { name: 'mergeKey', label: 'Merge Key', type: 'text', placeholder: 'id' }
+  ],
+  split_batches: [
+    { name: 'batchSize', label: 'Batch Size', type: 'number', min: 1, default: 10 }
+  ],
+  aggregate: [
+    { name: 'field', label: 'Aggregate Field', type: 'text' },
+    { name: 'operation', label: 'Operation', type: 'select', options: [
+      { value: 'append', label: 'Append to Array' },
+      { value: 'sum', label: 'Sum' },
+      { value: 'count', label: 'Count' },
+      { value: 'concat', label: 'Concatenate' }
+    ]}
+  ],
+  stop_error: [
+    { name: 'errorMessage', label: 'Error Message', type: 'text', placeholder: 'Workflow stopped with error' }
+  ],
+
+  // Missing action schemas
+  execute_workflow: [
+    { name: 'workflowId', label: 'Workflow ID', type: 'text', placeholder: 'UUID of workflow to execute' },
+    { name: 'waitForCompletion', label: 'Wait for Completion', type: 'boolean', checkboxLabel: 'Wait for sub-workflow to finish', default: true }
+  ],
+  sync_crm: [
+    { name: 'operation', label: 'Operation', type: 'select', options: [
+      { value: 'create', label: 'Create Record' },
+      { value: 'update', label: 'Update Record' },
+      { value: 'upsert', label: 'Upsert Record' },
+      { value: 'lookup', label: 'Lookup Record' }
+    ]},
+    { name: 'objectType', label: 'Object Type', type: 'select', options: [
+      { value: 'contact', label: 'Contact' },
+      { value: 'deal', label: 'Deal' },
+      { value: 'company', label: 'Company' },
+      { value: 'note', label: 'Note' }
+    ]},
+    { name: 'fieldMappings', label: 'Field Mappings', type: 'keyvalue', itemLabel: 'mapping' }
+  ],
+  respond_webhook: [
+    { name: 'statusCode', label: 'Status Code', type: 'number', default: 200, min: 100, max: 599 },
+    { name: 'headers', label: 'Response Headers', type: 'keyvalue', itemLabel: 'header' },
+    { name: 'body', label: 'Response Body', type: 'json' }
+  ],
+  set_variable: [
+    { name: 'variableName', label: 'Variable Name', type: 'text', placeholder: 'myVariable' },
+    { name: 'value', label: 'Value', type: 'text' }
+  ],
+
+  // Missing AI schemas
+  ai_classify: [
+    { name: 'categories', label: 'Categories', type: 'keyvalue', itemLabel: 'category' },
+    { name: 'model', label: 'Model', type: 'select', options: [
+      { value: 'gpt-4', label: 'GPT-4' },
+      { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' },
+      { value: 'gemini-pro', label: 'Gemini Pro' }
+    ]},
+    { name: 'prompt', label: 'Classification Prompt', type: 'textarea', rows: 3 }
+  ],
+  detect_followups: [
+    { name: 'autoCreate', label: 'Auto-Create', type: 'boolean', checkboxLabel: 'Automatically create follow-up tasks', default: true },
+    { name: 'threshold', label: 'Confidence Threshold', type: 'number', min: 0, max: 1, step: 0.1, default: 0.7 }
   ]
 }
 
@@ -491,6 +591,7 @@ export default function NodeConfigPanel({
                     field={field}
                     value={config[field.name]}
                     onChange={handleFieldChange}
+                    context={{}}
                   />
                 </div>
               )

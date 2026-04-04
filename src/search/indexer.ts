@@ -403,29 +403,30 @@ export async function reindexAll(): Promise<{
   totalIndexed: number;
   results: Record<string, IndexResult>;
 }> {
-  console.log('[Indexer] Starting full reindex...');
+  console.log('[Indexer] Starting full reindex (parallel)...');
+
+  // Run all source types in parallel for faster reindexing
+  const [meetings, tasks, actionItems, projects, deals, pulseMessages] =
+    await Promise.allSettled([
+      indexMeetings(),
+      indexTasks(),
+      indexActionItems(),
+      indexProjects(),
+      indexDeals(),
+      indexPulseMessages()
+    ]);
 
   const results: Record<string, IndexResult> = {};
-  let totalIndexed = 0;
+  const fallback: IndexResult = { success: false, documentsIndexed: 0, errors: ['Indexing failed'] };
 
-  // Index each source type
-  results.meetings = await indexMeetings();
-  totalIndexed += results.meetings.documentsIndexed;
+  results.meetings = meetings.status === 'fulfilled' ? meetings.value : fallback;
+  results.tasks = tasks.status === 'fulfilled' ? tasks.value : fallback;
+  results.actionItems = actionItems.status === 'fulfilled' ? actionItems.value : fallback;
+  results.projects = projects.status === 'fulfilled' ? projects.value : fallback;
+  results.deals = deals.status === 'fulfilled' ? deals.value : fallback;
+  results.pulseMessages = pulseMessages.status === 'fulfilled' ? pulseMessages.value : fallback;
 
-  results.tasks = await indexTasks();
-  totalIndexed += results.tasks.documentsIndexed;
-
-  results.actionItems = await indexActionItems();
-  totalIndexed += results.actionItems.documentsIndexed;
-
-  results.projects = await indexProjects();
-  totalIndexed += results.projects.documentsIndexed;
-
-  results.deals = await indexDeals();
-  totalIndexed += results.deals.documentsIndexed;
-
-  results.pulseMessages = await indexPulseMessages();
-  totalIndexed += results.pulseMessages.documentsIndexed;
+  const totalIndexed = Object.values(results).reduce((sum, r) => sum + r.documentsIndexed, 0);
 
   console.log(`[Indexer] Full reindex complete. Total: ${totalIndexed} documents`);
 

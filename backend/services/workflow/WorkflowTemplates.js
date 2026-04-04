@@ -52,13 +52,14 @@ const WorkflowTemplates = {
         config: { autoCreate: true }
       },
       {
-        id: 'notify-slack',
+        id: 'notify-pulse',
         type: 'action',
-        subtype: 'send_slack',
+        subtype: 'send_pulse',
         position: { x: 100, y: 700 },
         config: {
-          channel: '#meetings',
-          message: '✨ Meeting "{{title}}" processed!\n\n📋 {{actionItems.length}} action items extracted\n🔄 {{followups.detected}} follow-ups detected'
+          channel: 'meetings',
+          message: '✨ Meeting "{{title}}" processed!\n\n📋 {{actionItems.length}} action items extracted\n🔄 {{followups.detected}} follow-ups detected',
+          mentionOwner: true
         }
       }
     ],
@@ -67,7 +68,7 @@ const WorkflowTemplates = {
       { id: 'c2', sourceNodeId: 'ai-priority', sourceOutput: 'main', targetNodeId: 'ai-deadline', targetInput: 'main' },
       { id: 'c3', sourceNodeId: 'ai-deadline', sourceOutput: 'main', targetNodeId: 'ai-assign', targetInput: 'main' },
       { id: 'c4', sourceNodeId: 'ai-assign', sourceOutput: 'main', targetNodeId: 'detect-followups', targetInput: 'main' },
-      { id: 'c5', sourceNodeId: 'detect-followups', sourceOutput: 'main', targetNodeId: 'notify-slack', targetInput: 'main' }
+      { id: 'c5', sourceNodeId: 'detect-followups', sourceOutput: 'main', targetNodeId: 'notify-pulse', targetInput: 'main' }
     ]
   },
 
@@ -110,6 +111,45 @@ const WorkflowTemplates = {
   },
 
   /**
+   * Webhook to Pulse
+   * Receive webhook and post to Pulse channel
+   */
+  webhookToPulse: {
+    id: 'template-webhook-pulse',
+    name: 'Webhook to Pulse',
+    description: 'Receive webhook data and post to a Pulse channel',
+    category: 'integrations',
+    icon: 'radio',
+    nodes: [
+      {
+        id: 'webhook-trigger',
+        type: 'trigger',
+        subtype: 'webhook',
+        position: { x: 100, y: 100 },
+        config: {
+          method: 'POST',
+          authentication: { type: 'none' },
+          responseMode: 'immediate'
+        }
+      },
+      {
+        id: 'pulse-notify',
+        type: 'action',
+        subtype: 'send_pulse',
+        position: { x: 100, y: 220 },
+        config: {
+          channel: 'general',
+          message: '📩 Webhook received:\n{{JSON.stringify(body, null, 2)}}',
+          mentionOwner: false
+        }
+      }
+    ],
+    connections: [
+      { id: 'c1', sourceNodeId: 'webhook-trigger', sourceOutput: 'main', targetNodeId: 'pulse-notify', targetInput: 'main' }
+    ]
+  },
+
+  /**
    * Daily Digest
    * Send daily summary at scheduled time
    */
@@ -133,11 +173,11 @@ const WorkflowTemplates = {
       {
         id: 'send-digest',
         type: 'action',
-        subtype: 'send_slack',
+        subtype: 'send_pulse',
         position: { x: 100, y: 220 },
         config: {
-          channel: '#team',
-          message: '📊 *Daily Digest* - {{date}}\n\nGood morning team! Here\'s your daily summary.'
+          channel: 'general',
+          message: '📊 Daily Digest - {{date}}\n\nGood morning team! Here\'s your daily summary.'
         }
       }
     ],

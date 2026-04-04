@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom'
 import { Plus, Search, FolderKanban, Calendar, DollarSign, Trash2, Target, TrendingUp, Archive } from 'lucide-react'
 import { projectsApi } from '../services/api'
 import { GuideCard, PageHeader, Skeleton } from '../components/SharedUI'
-import { VCButton, VCBadge } from '../components/vc'
+import { VCButton } from '../components/vc'
+import { getStatusBadge } from '../utils/badges'
 import { useConfirm } from '../components/vc/ConfirmDialog'
 import ErrorState from '../components/vc/ErrorState'
 
@@ -13,11 +14,16 @@ export default function Projects() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
   const [showCreate, setShowCreate] = useState(false)
-  const [newProject, setNewProject] = useState({ name: '', description: '' })
+  const [newProject, setNewProject] = useState({ name: '', description: '', startDate: '', endDate: '', tags: '', status: 'planning' })
   const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState(null)
   const [wizardStep, setWizardStep] = useState(0) // 0: Create, 1: Organize, 2: Track
   const [formErrors, setFormErrors] = useState({})
+  const [hasMore, setHasMore] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const PAGE_SIZE = 20
 
   useEffect(() => {
     loadProjects()
@@ -27,16 +33,30 @@ export default function Projects() {
     try {
       setError(null)
       setLoading(true)
-      const data = await projectsApi.list({ limit: 50 })
+      const data = await projectsApi.list({ limit: PAGE_SIZE, offset: 0 })
       setProjects(data.projects || [])
+      setHasMore(data.hasMore || false)
       if (data.projects && data.projects.length > 0) {
-        setWizardStep(2) // If projects exist, show track step
+        setWizardStep(2)
       }
     } catch (err) {
       console.error('Failed to load projects:', err)
       setError(err.message || 'Failed to load projects')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadMore = async () => {
+    try {
+      setLoadingMore(true)
+      const data = await projectsApi.list({ limit: PAGE_SIZE, offset: projects.length })
+      setProjects(prev => [...prev, ...(data.projects || [])])
+      setHasMore(data.hasMore || false)
+    } catch (err) {
+      console.error('Failed to load more projects:', err)
+    } finally {
+      setLoadingMore(false)
     }
   }
 
@@ -53,13 +73,22 @@ export default function Projects() {
 
     try {
       setCreating(true)
-      await projectsApi.create(newProject)
-      setNewProject({ name: '', description: '' })
+      setCreateError(null)
+      const payload = {
+        name: newProject.name,
+        description: newProject.description || undefined,
+        startDate: newProject.startDate || undefined,
+        endDate: newProject.endDate || undefined,
+        tags: newProject.tags ? newProject.tags.split(',').map(t => t.trim()).filter(Boolean) : undefined
+      }
+      await projectsApi.create(payload)
+      setNewProject({ name: '', description: '', startDate: '', endDate: '', tags: '', status: 'planning' })
       setShowCreate(false)
       setWizardStep(1)
       loadProjects()
     } catch (error) {
       console.error('Failed to create project:', error)
+      setCreateError(error.message || 'Failed to create project. Please try again.')
     } finally {
       setCreating(false)
     }
@@ -80,19 +109,11 @@ export default function Projects() {
     }
   }
 
-  const filteredProjects = projects.filter(project =>
-    project.name?.toLowerCase().includes(searchQuery.toLowerCase())
-  )
-
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'active':    return <VCBadge color="mint">{status}</VCBadge>
-      case 'planning':  return <VCBadge color="amber">{status}</VCBadge>
-      case 'completed': return <VCBadge color="neutral">{status}</VCBadge>
-      case 'archived':  return <VCBadge color="neutral">{status}</VCBadge>
-      default:          return <VCBadge color="neutral">{status}</VCBadge>
-    }
-  }
+  const filteredProjects = projects.filter(project => {
+    const matchesSearch = project.name?.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesStatus = statusFilter === 'all' || project.status === statusFilter
+    return matchesSearch && matchesStatus
+  })
 
   const getStatusIcon = (status) => {
     switch (status) {
@@ -167,6 +188,44 @@ export default function Projects() {
                 onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
               />
             </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="label">Start Date</label>
+                <input
+                  type="date"
+                  className="input"
+                  value={newProject.startDate}
+                  onChange={(e) => setNewProject({ ...newProject, startDate: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="label">End Date</label>
+                <input
+                  type="date"
+                  className="input"
+                  value={newProject.endDate}
+                  onChange={(e) => setNewProject({ ...newProject, endDate: e.target.value })}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="label">Tags</label>
+              <input
+                type="text"
+                className="input"
+                placeholder="e.g., marketing, q1, client-a (comma-separated)"
+                value={newProject.tags}
+                onChange={(e) => setNewProject({ ...newProject, tags: e.target.value })}
+              />
+            </div>
+            {createError && (
+              <div
+                className="p-3 rounded-lg text-sm"
+                style={{ background: 'rgba(239,68,68,.1)', color: '#EF4444', border: '1px solid rgba(239,68,68,.2)' }}
+              >
+                {createError}
+              </div>
+            )}
             <div className="flex gap-3">
               <VCButton type="submit" variant="primary" disabled={creating}>
                 {creating ? 'Creating...' : 'Create Project'}
@@ -174,7 +233,7 @@ export default function Projects() {
               <VCButton
                 type="button"
                 variant="secondary"
-                onClick={() => setShowCreate(false)}
+                onClick={() => { setShowCreate(false); setCreateError(null) }}
               >
                 Cancel
               </VCButton>
@@ -183,19 +242,32 @@ export default function Projects() {
         </div>
       )}
 
-      {/* Search */}
-      <div className="relative mb-6">
-        <Search
-          className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
-          style={{ color: 'var(--text-tertiary)' }}
-        />
-        <input
-          type="text"
-          placeholder="Search projects by name..."
-          className="input pl-10"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
+      {/* Search and Filter */}
+      <div className="flex gap-3 mb-6">
+        <div className="relative flex-1">
+          <Search
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
+            style={{ color: 'var(--text-tertiary)' }}
+          />
+          <input
+            type="text"
+            placeholder="Search projects by name..."
+            className="input pl-10"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+        <select
+          className="input w-40"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+        >
+          <option value="all">All Status</option>
+          <option value="planning">Planning</option>
+          <option value="active">Active</option>
+          <option value="completed">Completed</option>
+          <option value="archived">Archived</option>
+        </select>
       </div>
 
       {/* Projects grid */}
@@ -289,6 +361,19 @@ export default function Projects() {
             </Link>
           ))}
         </div>
+
+        {/* Load More */}
+        {hasMore && !searchQuery && statusFilter === 'all' && (
+          <div className="text-center mt-6">
+            <VCButton
+              variant="secondary"
+              onClick={loadMore}
+              disabled={loadingMore}
+            >
+              {loadingMore ? 'Loading...' : 'Load More Projects'}
+            </VCButton>
+          </div>
+        )}
       )}
     </div>
   )

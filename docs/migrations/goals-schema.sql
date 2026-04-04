@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS goals (
   progress NUMERIC(5,2) DEFAULT 0, -- 0-100 percentage
   key_results JSONB DEFAULT '[]'::jsonb, -- Array of key results
   related_tasks UUID[] DEFAULT '{}', -- Array of related task IDs
+  calendar_event_id TEXT, -- Google Calendar event ID for synced goals
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -31,8 +32,26 @@ CREATE INDEX IF NOT EXISTS idx_goals_owner ON goals(owner_id);
 -- Enable Row Level Security
 ALTER TABLE goals ENABLE ROW LEVEL SECURITY;
 
--- Policy to allow all operations (adjust based on your auth needs)
-CREATE POLICY "Allow all access to goals" ON goals FOR ALL USING (true);
+-- RLS policies with proper ownership checks
+CREATE POLICY "goals_select_policy" ON goals FOR SELECT
+  USING (goal_type = 'company' OR owner_id = auth.uid() OR team_id::text IN (SELECT team_id::text FROM users WHERE id = auth.uid()));
+
+CREATE POLICY "goals_insert_policy" ON goals FOR INSERT
+  WITH CHECK (owner_id = auth.uid() OR owner_id IS NULL);
+
+CREATE POLICY "goals_update_policy" ON goals FOR UPDATE
+  USING (owner_id = auth.uid() OR team_id::text IN (SELECT team_id::text FROM users WHERE id = auth.uid()));
+
+CREATE POLICY "goals_delete_policy" ON goals FOR DELETE
+  USING (owner_id = auth.uid());
+
+-- Auto-update updated_at timestamp
+CREATE OR REPLACE FUNCTION update_updated_at_column() RETURNS TRIGGER AS $$
+BEGIN NEW.updated_at = NOW(); RETURN NEW; END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER goals_updated_at BEFORE UPDATE ON goals
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Sample data for testing
 INSERT INTO goals (title, description, goal_type, quarter, status, progress, key_results) VALUES

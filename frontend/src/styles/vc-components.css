@@ -897,6 +897,20 @@ textarea.vinput { resize: vertical; min-height: 70px; }
 .kcard-footer  { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
 
 /* ============================================================
+   KANBAN BOARD LAYOUT  (.kanban)
+   ============================================================ */
+
+.kanban        { display: flex; gap: 16px; overflow-x: auto; padding: 4px 4px 12px; align-items: flex-start; }
+.kanban-col    { flex: 1; min-width: 260px; max-width: 320px; display: flex; flex-direction: column; background: var(--bg-elevated); border-radius: var(--vc-rad, 13px); overflow: hidden; }
+.kanban-header { padding: 12px 14px; border-bottom: 1px solid rgba(248,240,242,.08); }
+.kanban-count  { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; border-radius: 10px; font-size: 11px; font-weight: 700; font-family: var(--font-mono); padding: 0 6px; }
+
+@media (max-width: 900px) {
+  .kanban     { flex-direction: column; }
+  .kanban-col { min-width: 100%; max-width: 100%; }
+}
+
+/* ============================================================
    ENTRY ANIMATIONS
    ============================================================ */
 

@@ -33,6 +33,11 @@ class SchedulerService {
       this.scheduleOverdueCheck();
     }
 
+    // Schedule daily overdue tasks check (Every day at 9 AM)
+    if (process.env.ENABLE_OVERDUE_TASK_ALERTS !== 'false') {
+      this.scheduleOverdueTasksCheck();
+    }
+
     this.initialized = true;
     log.info('Scheduler service initialized');
   }
@@ -67,6 +72,94 @@ class SchedulerService {
 
     this.jobs.set('overdue-check', job);
     log.info('Scheduled overdue check for daily at 8 AM');
+  }
+
+  /**
+   * Schedule daily overdue tasks check (separate from action_items)
+   */
+  scheduleOverdueTasksCheck() {
+    const job = cron.schedule('0 9 * * *', async () => {
+      log.info('Running overdue tasks check job...');
+      await this.checkOverdueTasks();
+    }, {
+      timezone: process.env.TIMEZONE || 'America/New_York'
+    });
+
+    this.jobs.set('overdue-tasks', job);
+    log.info('Scheduled overdue tasks check for daily at 9 AM');
+  }
+
+  /**
+   * Check for overdue tasks and log them
+   */
+  async checkOverdueTasks() {
+    if (!supabase) {
+      log.info('Database not configured, skipping overdue tasks check');
+      return;
+    }
+
+    try {
+      const today = new Date().toISOString().split('T')[0];
+
+      const { data: overdueTasks, error } = await supabase
+        .from('tasks')
+        .select('id, title, priority, status, due_date, assigned_to, project_id')
+        .lt('due_date', today)
+        .neq('status', 'done')
+        .order('due_date', { ascending: true })
+        .limit(100);
+
+      if (error) throw error;
+
+      if (!overdueTasks || overdueTasks.length === 0) {
+        log.info('No overdue tasks found');
+        return;
+      }
+
+      log.info(`Found ${overdueTasks.length} overdue tasks`);
+
+      // Log overdue task details for monitoring
+      const highPriority = overdueTasks.filter(t => t.priority === 'high');
+      if (highPriority.length > 0) {
+        log.warn(`${highPriority.length} HIGH priority tasks are overdue`, {
+          tasks: highPriority.map(t => ({ id: t.id, title: t.title, due: t.due_date }))
+        });
+      }
+
+      // Send overdue task email alerts if email is configured
+      if (emailService.isConfigured()) {
+        // Group by assignee (user ID)
+        const byAssignee = new Map();
+        overdueTasks.forEach(task => {
+          const key = task.assigned_to || 'unassigned';
+          if (!byAssignee.has(key)) byAssignee.set(key, []);
+          byAssignee.get(key).push(task);
+        });
+
+        // Look up user emails and send alerts
+        for (const [assigneeId, tasks] of byAssignee) {
+          if (assigneeId === 'unassigned') continue;
+
+          try {
+            const { data: { user } } = await supabase.auth.admin.getUserById(assigneeId);
+            const email = user?.email;
+            if (!email) {
+              log.info(`No email found for user ${assigneeId}, skipping overdue task alert`);
+              continue;
+            }
+
+            await this.sendOverdueTaskAlert(email, tasks);
+            log.info(`Overdue task alert sent to ${email} for ${tasks.length} task(s)`);
+          } catch (err) {
+            log.error(`Failed to send overdue task alert for ${assigneeId}:`, { error: err.message || err });
+          }
+        }
+      }
+
+      return { checked: overdueTasks.length, highPriority: highPriority.length };
+    } catch (error) {
+      log.error('Failed to check overdue tasks:', { error: error.message || error });
+    }
   }
 
   /**
@@ -235,6 +328,65 @@ class SchedulerService {
     return emailService.sendEmail({
       to,
       subject: `Action Required: ${items.length} Overdue Item${items.length === 1 ? '' : 's'}`,
+      html
+    });
+  }
+
+  /**
+   * Send overdue task alert email
+   */
+  async sendOverdueTaskAlert(to, tasks) {
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #374151; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, #FF2D6B, #CC0044); color: white; padding: 25px; border-radius: 12px 12px 0 0; text-align: center; }
+          .content { background: #ffffff; padding: 25px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px; }
+          .item { padding: 12px 15px; background: #fef2f2; margin: 8px 0; border-radius: 6px; border-left: 3px solid #FF2D6B; }
+          .item-task { font-weight: 500; color: #111827; }
+          .item-meta { font-size: 12px; color: #6b7280; margin-top: 5px; }
+          .priority-high { border-left-color: #ef4444; background: #fef2f2; }
+          .priority-medium { border-left-color: #FFB800; background: #fffbeb; }
+          .priority-low { border-left-color: #00F5D4; background: #f0fdfa; }
+          .btn { display: inline-block; padding: 12px 24px; background: #FF2D6B; color: white; text-decoration: none; border-radius: 6px; margin-top: 15px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1 style="margin: 0; font-size: 20px;">Overdue Tasks</h1>
+            <p style="margin: 10px 0 0; opacity: 0.9;">You have ${tasks.length} overdue task${tasks.length === 1 ? '' : 's'}</p>
+          </div>
+          <div class="content">
+            ${tasks.map(task => {
+              const daysOverdue = Math.floor((new Date() - new Date(task.due_date)) / (1000 * 60 * 60 * 24));
+              return `
+                <div class="item priority-${task.priority || 'medium'}">
+                  <div class="item-task">${task.title}</div>
+                  <div class="item-meta">
+                    Priority: ${(task.priority || 'medium').toUpperCase()} |
+                    Due: ${new Date(task.due_date).toLocaleDateString()} (${daysOverdue} day${daysOverdue === 1 ? '' : 's'} overdue)
+                  </div>
+                </div>
+              `;
+            }).join('')}
+            <div style="text-align: center; margin-top: 25px;">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/tasks" class="btn">
+                View Tasks
+              </a>
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    return emailService.sendEmail({
+      to,
+      subject: `Action Required: ${tasks.length} Overdue Task${tasks.length === 1 ? '' : 's'}`,
       html
     });
   }

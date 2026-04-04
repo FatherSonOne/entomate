@@ -1,15 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Bot, Plus, Play, Pause, Trash2,
-  Activity, CheckCircle, Zap,
+  Activity, CheckCircle, Zap, Brain,
   ChevronRight, Layout, Search, X, Loader2, AlertCircle,
   Settings, BarChart3, TrendingUp, Clock, Target
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { GuideCard, PageHeader, Skeleton } from '../components/SharedUI';
 import ExplanationCard from '../components/explainability/ExplanationCard';
-import { VCButton, VCBadge, VCIconBox, VCInput } from '../components/vc';
+import { VCButton, VCBadge, VCIconBox, VCInput, VCSelect, VCTextarea } from '../components/vc';
 import ErrorState from '../components/vc/ErrorState';
+import { useConfirm } from '../components/vc/ConfirmDialog';
+import { useToast } from '../components/vc/ToastProvider';
 
 // Category icons mapping
 const categoryIcons = {
@@ -21,6 +24,24 @@ const categoryIcons = {
   'Sales Automation': '🎯',
   'Communication': '💬'
 };
+
+// Available trigger and action types for agent configuration
+const TRIGGER_TYPES = [
+  { value: 'meeting.completed', label: 'Meeting Completed' },
+  { value: 'task.overdue', label: 'Task Overdue' },
+  { value: 'deal.stage_changed', label: 'Deal Stage Changed' },
+  { value: 'action_item.missed_deadline', label: 'Action Item Missed Deadline' },
+  { value: 'meeting.upcoming', label: 'Meeting Upcoming' }
+];
+
+const ACTION_TYPES = [
+  { value: 'extract_action_items', label: 'Extract Action Items' },
+  { value: 'sync_to_crm', label: 'Sync to CRM' },
+  { value: 'post_to_pulse', label: 'Post to Pulse' },
+  { value: 'create_onboarding_project', label: 'Create Onboarding Project' },
+  { value: 'assign_task', label: 'Assign Task' },
+  { value: 'prepare_context', label: 'Prepare Context' }
+];
 
 export default function Agents() {
   const [agents, setAgents] = useState([]);
@@ -46,6 +67,23 @@ export default function Agents() {
     triggers: [],
     actions: []
   });
+
+  // Create Agent modal state
+  const [createForm, setCreateForm] = useState({
+    name: '',
+    description: '',
+    triggers: [],
+    actions: [],
+    enabled: true
+  });
+  const [creating, setCreating] = useState(false);
+
+  // Filter state
+  const [filterText, setFilterText] = useState('');
+
+  const confirm = useConfirm();
+  const toast = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchAgents();
@@ -122,6 +160,48 @@ export default function Agents() {
     }
   };
 
+  const deleteAgent = async (agentId) => {
+    const ok = await confirm({
+      title: 'Delete Agent',
+      message: 'Permanently delete this agent? This cannot be undone.',
+      confirmLabel: 'Delete',
+      variant: 'danger'
+    });
+    if (!ok) return;
+    try {
+      await api.delete(`/agents/${agentId}`);
+      toast.success('Deleted', 'Agent deleted successfully');
+      setSelectedAgent(null);
+      setWizardStep(0);
+      fetchAgents();
+    } catch (error) {
+      toast.error('Error', error.message || 'Failed to delete agent');
+    }
+  };
+
+  const handleCreateAgent = async () => {
+    if (!createForm.name.trim()) return;
+    try {
+      setCreating(true);
+      await api.post('/agents', {
+        name: createForm.name,
+        description: createForm.description,
+        agent_type: 'custom',
+        triggers: createForm.triggers.map(t => ({ type: t })),
+        actions: createForm.actions.map(a => ({ type: a })),
+        enabled: createForm.enabled
+      });
+      toast.success('Created', 'Agent created successfully');
+      setShowCreateModal(false);
+      setCreateForm({ name: '', description: '', triggers: [], actions: [], enabled: true });
+      fetchAgents();
+    } catch (error) {
+      toast.error('Error', error.message || 'Failed to create agent');
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const selectAgent = (agent) => {
     setSelectedAgent(agent);
     setWizardStep(2); // Jump to Monitor Performance
@@ -190,6 +270,39 @@ export default function Agents() {
   const filteredTemplates = selectedCategory === 'All'
     ? templates
     : templates.filter(t => t.category === selectedCategory);
+
+  // Filter agents by search text
+  const filteredAgents = filterText.trim()
+    ? agents.filter(a =>
+        a.name?.toLowerCase().includes(filterText.toLowerCase()) ||
+        a.description?.toLowerCase().includes(filterText.toLowerCase())
+      )
+    : agents;
+
+  // Compute avg duration from execution logs
+  const avgDuration = executionLogs.length > 0
+    ? (executionLogs.reduce((sum, log) => sum + (log.duration_ms || 0), 0) / executionLogs.length / 1000).toFixed(1)
+    : null;
+
+  // Compute 7-day execution chart data
+  const chartData = useMemo(() => {
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      days.push({ date: key, label: d.toLocaleDateString('en-US', { weekday: 'short' }), success: 0, failed: 0 });
+    }
+    for (const log of executionLogs) {
+      const logDate = (log.created_at || log.started_at || '').slice(0, 10);
+      const day = days.find(d => d.date === logDate);
+      if (day) {
+        if (log.success || log.status === 'success') day.success++;
+        else day.failed++;
+      }
+    }
+    return days;
+  }, [executionLogs]);
 
   return (
     <div className="animate-fade-in max-w-7xl mx-auto">
@@ -260,6 +373,8 @@ export default function Agents() {
               placeholder="Filter agents..."
               className="py-1 text-xs w-48"
               icon={<Search size={14} style={{ color: 'var(--text-tertiary)' }} />}
+              value={filterText}
+              onChange={(e) => setFilterText(e.target.value)}
             />
           </div>
 
@@ -273,9 +388,14 @@ export default function Agents() {
               <h3 className="text-lg font-medium mb-2" style={{ color: 'var(--text-primary)' }}>No active agents</h3>
               <VCButton variant="primary" onClick={() => setShowTemplates(true)} className="mt-2">Deploy First Agent</VCButton>
             </div>
+          ) : filteredAgents.length === 0 ? (
+            <div className="vc p-8 text-center border-dashed border-2">
+              <Search className="h-10 w-10 mx-auto mb-3" style={{ color: 'var(--text-tertiary)' }} />
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>No agents match "{filterText}"</p>
+            </div>
           ) : (
             <div className="space-y-3">
-              {agents.map((agent) => (
+              {filteredAgents.map((agent) => (
                 <div
                   key={agent.id}
                   onClick={() => selectAgent(agent)}
@@ -326,7 +446,7 @@ export default function Agents() {
                     >
                       {selectedAgent.enabled ? <Pause size={16} /> : <Play size={16} />}
                     </VCButton>
-                    <VCButton variant="ghost" size="sm">
+                    <VCButton variant="ghost" size="sm" onClick={() => deleteAgent(selectedAgent.id)}>
                       <Trash2 size={16} />
                     </VCButton>
                   </div>
@@ -570,6 +690,25 @@ export default function Agents() {
                       </VCButton>
                     </div>
                   ))}
+                  <VCSelect
+                    className="text-sm"
+                    value=""
+                    onChange={(e) => {
+                      if (e.target.value && !customizations.triggers.some(t => t.type === e.target.value)) {
+                        setCustomizations({
+                          ...customizations,
+                          triggers: [...customizations.triggers, { type: e.target.value }]
+                        });
+                      }
+                      e.target.value = '';
+                    }}
+                  >
+                    <option value="">Add trigger...</option>
+                    {TRIGGER_TYPES
+                      .filter(t => !customizations.triggers.some(ct => ct.type === t.value))
+                      .map(t => <option key={t.value} value={t.value}>{t.label}</option>)
+                    }
+                  </VCSelect>
                 </div>
               </div>
 
@@ -598,6 +737,25 @@ export default function Agents() {
                       </VCButton>
                     </div>
                   ))}
+                  <VCSelect
+                    className="text-sm"
+                    value=""
+                    onChange={(e) => {
+                      if (e.target.value && !customizations.actions.some(a => a.type === e.target.value)) {
+                        setCustomizations({
+                          ...customizations,
+                          actions: [...customizations.actions, { type: e.target.value }]
+                        });
+                      }
+                      e.target.value = '';
+                    }}
+                  >
+                    <option value="">Add action...</option>
+                    {ACTION_TYPES
+                      .filter(a => !customizations.actions.some(ca => ca.type === a.value))
+                      .map(a => <option key={a.value} value={a.value}>{a.label}</option>)
+                    }
+                  </VCSelect>
                 </div>
               </div>
 
@@ -637,6 +795,168 @@ export default function Agents() {
         </div>
       )}
 
+      {/* Create Agent Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowCreateModal(false)} />
+          <div className="relative rounded-lg shadow-xl w-full max-w-3xl max-h-[85vh] overflow-hidden" style={{ background: 'var(--bg-elevated)', border: '1px solid rgba(248,240,242,.08)' }}>
+            {/* Header */}
+            <div className="flex items-center justify-between p-4" style={{ borderBottom: '1px solid rgba(248,240,242,.08)' }}>
+              <div>
+                <h2 className="text-xl font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                  <Bot size={20} style={{ color: 'var(--accent-primary)' }} />
+                  Create Agent
+                </h2>
+                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Configure a custom AI agent</p>
+              </div>
+              <VCButton variant="ghost" size="sm" onClick={() => setShowCreateModal(false)}>
+                <X size={20} />
+              </VCButton>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 overflow-y-auto max-h-[calc(85vh-140px)] space-y-6">
+              {/* Name */}
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>Agent Name *</label>
+                <VCInput
+                  type="text"
+                  value={createForm.name}
+                  onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+                  placeholder="My Custom Agent"
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>Description</label>
+                <VCTextarea
+                  value={createForm.description}
+                  onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}
+                  rows={3}
+                  placeholder="What does this agent do?"
+                />
+              </div>
+
+              {/* Triggers */}
+              <div>
+                <label className="block text-sm font-medium mb-3 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                  <Zap size={16} style={{ color: 'var(--accent-secondary)' }} />
+                  Triggers
+                </label>
+                <div className="space-y-2">
+                  {createForm.triggers.map((trigger, idx) => (
+                    <div key={idx} className="flex items-center gap-3 p-3 rounded-md" style={{ background: 'var(--bg-elevated)', border: '1px solid rgba(248,240,242,.08)' }}>
+                      <span className="flex-1 text-sm" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
+                        {TRIGGER_TYPES.find(t => t.value === trigger)?.label || trigger}
+                      </span>
+                      <VCButton variant="ghost" size="sm" onClick={() => setCreateForm({
+                        ...createForm,
+                        triggers: createForm.triggers.filter((_, i) => i !== idx)
+                      })}>
+                        <X size={16} />
+                      </VCButton>
+                    </div>
+                  ))}
+                  <VCSelect
+                    className="text-sm"
+                    value=""
+                    onChange={(e) => {
+                      if (e.target.value && !createForm.triggers.includes(e.target.value)) {
+                        setCreateForm({ ...createForm, triggers: [...createForm.triggers, e.target.value] });
+                      }
+                      e.target.value = '';
+                    }}
+                  >
+                    <option value="">Add trigger...</option>
+                    {TRIGGER_TYPES
+                      .filter(t => !createForm.triggers.includes(t.value))
+                      .map(t => <option key={t.value} value={t.value}>{t.label}</option>)
+                    }
+                  </VCSelect>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div>
+                <label className="block text-sm font-medium mb-3 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                  <Target size={16} style={{ color: 'var(--accent-tertiary)' }} />
+                  Actions ({createForm.actions.length})
+                </label>
+                <div className="space-y-2">
+                  {createForm.actions.map((action, idx) => (
+                    <div key={idx} className="flex items-center gap-3 p-3 rounded-md" style={{ background: 'var(--bg-elevated)', border: '1px solid rgba(248,240,242,.08)' }}>
+                      <span className="w-6 h-6 rounded-sm flex items-center justify-center text-xs font-bold" style={{ background: 'var(--accent-primary)', color: '#fff' }}>
+                        {idx + 1}
+                      </span>
+                      <span className="flex-1 text-sm" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
+                        {ACTION_TYPES.find(a => a.value === action)?.label || action}
+                      </span>
+                      <VCButton variant="ghost" size="sm" onClick={() => setCreateForm({
+                        ...createForm,
+                        actions: createForm.actions.filter((_, i) => i !== idx)
+                      })}>
+                        <X size={16} />
+                      </VCButton>
+                    </div>
+                  ))}
+                  <VCSelect
+                    className="text-sm"
+                    value=""
+                    onChange={(e) => {
+                      if (e.target.value && !createForm.actions.includes(e.target.value)) {
+                        setCreateForm({ ...createForm, actions: [...createForm.actions, e.target.value] });
+                      }
+                      e.target.value = '';
+                    }}
+                  >
+                    <option value="">Add action...</option>
+                    {ACTION_TYPES
+                      .filter(a => !createForm.actions.includes(a.value))
+                      .map(a => <option key={a.value} value={a.value}>{a.label}</option>)
+                    }
+                  </VCSelect>
+                </div>
+              </div>
+
+              {/* Enabled Toggle */}
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={createForm.enabled}
+                  onChange={(e) => setCreateForm({ ...createForm, enabled: e.target.checked })}
+                  className="w-4 h-4 rounded"
+                  style={{ accentColor: 'var(--accent-primary)' }}
+                />
+                <label className="text-sm" style={{ color: 'var(--text-primary)' }}>Enable agent immediately after creation</label>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between p-4" style={{ borderTop: '1px solid rgba(248,240,242,.08)', background: 'rgba(16,16,16,.3)' }}>
+              <VCButton variant="secondary" onClick={() => setShowCreateModal(false)}>
+                Cancel
+              </VCButton>
+              <VCButton
+                variant="primary"
+                onClick={handleCreateAgent}
+                disabled={!createForm.name.trim() || creating}
+              >
+                {creating ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" /> Creating...
+                  </>
+                ) : (
+                  <>
+                    <Plus size={16} /> Create Agent
+                  </>
+                )}
+              </VCButton>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Monitor Performance Panel (Step 3) - Shows when agent is selected */}
       {selectedAgent && wizardStep === 2 && (
         <div className="mt-8 vc p-6 animate-fade-in" style={{ borderTop: '4px solid var(--accent-tertiary)' }}>
@@ -645,16 +965,26 @@ export default function Agents() {
               <BarChart3 size={24} style={{ color: 'var(--accent-tertiary)' }} />
               Performance Analytics
             </h3>
-            <VCButton
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setSelectedAgent(null);
-                setWizardStep(0);
-              }}
-            >
-              <X size={16} /> Close
-            </VCButton>
+            <div className="flex items-center gap-2">
+              <VCButton
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/settings', { state: { section: 'ai-learning' } })}
+                title="View AI Learning Insights"
+              >
+                <Brain size={16} /> Learning
+              </VCButton>
+              <VCButton
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSelectedAgent(null);
+                  setWizardStep(0);
+                }}
+              >
+                <X size={16} /> Close
+              </VCButton>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -681,7 +1011,7 @@ export default function Agents() {
                 <span className="text-xs uppercase" style={{ color: 'var(--text-tertiary)' }}>Avg Duration</span>
                 <Clock size={16} style={{ color: 'var(--text-tertiary)' }} />
               </div>
-              <div className="text-2xl font-bold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>2.4s</div>
+              <div className="text-2xl font-bold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{avgDuration ? `${avgDuration}s` : '—'}</div>
             </div>
 
             <div className="p-4 rounded-md" style={{ background: 'var(--bg-elevated)', border: '1px solid rgba(248,240,242,.08)' }}>
@@ -695,6 +1025,46 @@ export default function Agents() {
               <div className="text-2xl font-bold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{selectedAgent.enabled ? 'Active' : 'Paused'}</div>
             </div>
           </div>
+
+          {/* Execution History Chart */}
+          {executionLogs.length > 0 && (
+            <div className="mb-6">
+              <h4 className="text-xs font-mono uppercase mb-3" style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>7-Day Activity</h4>
+              <div className="flex items-end gap-1" style={{ height: '64px' }}>
+                {chartData.map((day) => {
+                  const total = day.success + day.failed;
+                  const maxTotal = Math.max(1, ...chartData.map(d => d.success + d.failed));
+                  const height = total > 0 ? Math.max(4, (total / maxTotal) * 56) : 4;
+                  const successRatio = total > 0 ? day.success / total : 1;
+                  return (
+                    <div key={day.date} className="flex-1 flex flex-col items-center gap-1">
+                      <div className="w-full flex flex-col justify-end" style={{ height: '56px' }}>
+                        {day.failed > 0 && (
+                          <div
+                            className="w-full rounded-t-sm"
+                            style={{ height: `${(1 - successRatio) * height}px`, background: 'var(--accent-primary)', opacity: 0.8 }}
+                          />
+                        )}
+                        <div
+                          className={`w-full ${day.failed > 0 ? '' : 'rounded-t-sm'} rounded-b-sm`}
+                          style={{ height: `${successRatio * height}px`, background: total > 0 ? 'var(--accent-secondary)' : 'rgba(248,240,242,.08)' }}
+                        />
+                      </div>
+                      <span className="text-[9px]" style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>{day.label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex items-center gap-4 mt-2">
+                <span className="flex items-center gap-1 text-[10px]" style={{ color: 'var(--text-tertiary)' }}>
+                  <span className="w-2 h-2 rounded-sm" style={{ background: 'var(--accent-secondary)' }} /> Success
+                </span>
+                <span className="flex items-center gap-1 text-[10px]" style={{ color: 'var(--text-tertiary)' }}>
+                  <span className="w-2 h-2 rounded-sm" style={{ background: 'var(--accent-primary)' }} /> Failed
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Execution Timeline */}
           <div>

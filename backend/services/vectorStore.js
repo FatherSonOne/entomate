@@ -2,6 +2,10 @@
  * Vector Store Service
  * Handles pgvector integration for semantic search and RAG
  *
+ * NOTE: This service is used by workflow/RAG nodes (RAGNodes.js, ragHandler.js),
+ * NOT by the search routes (/api/search). The search routes use embeddingService.js instead.
+ * See: backend/routes/search.js, backend/services/embeddingService.js
+ *
  * Features:
  * - Text embedding using OpenAI/Gemini
  * - Vector storage with metadata

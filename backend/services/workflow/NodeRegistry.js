@@ -307,6 +307,24 @@ class NodeRegistry {
       handler: ActionNodes.SendSlackNode
     });
 
+    this.register('action', 'send_pulse', {
+      name: 'Send to Pulse',
+      description: 'Post message to Pulse channel (preferred comm app)',
+      icon: 'radio',
+      category: 'action',
+      inputs: ['main'],
+      outputs: ['main'],
+      configSchema: {
+        channel: { type: 'string', default: 'general' },
+        message: { type: 'string', required: true },
+        title: { type: 'string' },
+        mentionOwner: { type: 'boolean', default: false },
+        mentionAssignee: { type: 'boolean', default: false },
+        includeLink: { type: 'boolean', default: false }
+      },
+      handler: ActionNodes.SendPulseNode
+    });
+
     this.register('action', 'send_email', {
       name: 'Send Email',
       description: 'Send email notification',

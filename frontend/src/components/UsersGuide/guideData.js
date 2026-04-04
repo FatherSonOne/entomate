@@ -1,8 +1,8 @@
 // ─── Entomate User Guide Data ─────────────────────────────────────────────
 // Version tracking — update these when guide content changes
 
-export const guideVersion = '1.1.0'
-export const guideUpdated = 'March 29, 2026'
+export const guideVersion = '1.2.0'
+export const guideUpdated = 'April 4, 2026'
 
 // ─── Version key for localStorage new-feature detection ───────────────────
 export const GUIDE_VERSION_KEY = 'entomate_guide_version'
@@ -16,7 +16,7 @@ export const CATEGORIES = [
   { label: 'Automation & AI',    ids: ['workflows', 'automations', 'agents'] },
   { label: 'Intelligence',       ids: ['search', 'analytics', 'reports'] },
   { label: 'Ecosystem',           ids: ['ecosystem', 'meeting-intelligence'] },
-  { label: 'Configuration',      ids: ['settings', 'troubleshooting'] },
+  { label: 'Configuration',      ids: ['settings', 'keyboard-shortcuts', 'troubleshooting'] },
 ]
 
 // ─── Section definitions ──────────────────────────────────────────────────
@@ -25,7 +25,7 @@ export const guideSections = [
   {
     id: 'introduction',
     title: 'Introduction',
-    icon: '📖',
+    icon: '\u{1F4D6}',
     summary: 'What Entomate is and how it helps your team turn meetings into action.',
     steps: [
       'Entomate is an AI-powered meeting intelligence platform.',
@@ -39,11 +39,11 @@ export const guideSections = [
         title: 'Key Concepts',
         description: 'The core building blocks of Entomate.',
         steps: [
-          'Meetings — Recorded sessions with AI-generated transcripts, summaries, and sentiment analysis.',
-          'Action Items — Tasks automatically extracted from meetings, with AI-suggested assignments and deadlines.',
-          'Workflows — Visual, node-based automations that connect meeting events to actions.',
-          'Agents — AI bots that run continuously, handling assignment, priority, and follow-up detection.',
-          'Goals — OKR-style goal hierarchies with key results and progress tracking.',
+          'Meetings \u2014 Recorded sessions with AI-generated transcripts, summaries, and sentiment analysis.',
+          'Action Items \u2014 Tasks automatically extracted from meetings, with AI-suggested assignments and deadlines.',
+          'Workflows \u2014 Visual, node-based automations that connect meeting events to actions.',
+          'Agents \u2014 AI bots that run continuously, handling assignment, priority, and follow-up detection.',
+          'Goals \u2014 OKR-style goal hierarchies with key results and progress tracking.',
         ],
       },
       {
@@ -58,15 +58,14 @@ export const guideSections = [
     ],
     tips: [
       'Use the Command Palette (Ctrl+K) for instant navigation to any page or action.',
-      'The sidebar groups features by category — Intelligence, Work, Automation, and Output.',
+      'The sidebar groups features by category \u2014 Intelligence, Work, Automation, and Output.',
     ],
   },
 
   {
     id: 'getting-started',
     title: 'Getting Started',
-    icon: '🚀',
-    badge: 'Updated',
+    icon: '\u{1F680}',
     summary: 'Create your account, sign in, and find your way around.',
     steps: [
       'Visit the Entomate landing page and click Get Started.',
@@ -80,10 +79,10 @@ export const guideSections = [
         title: 'Navigating the App',
         description: 'The sidebar is organized into four groups.',
         steps: [
-          'Intelligence — Dashboard, Meetings, Calendar, Search.',
-          'Work — Projects, Project Board, Tasks, Goals.',
-          'Automation — Workflows, Automations, AI Agents.',
-          'Output — Analytics, Reports.',
+          'Intelligence \u2014 Dashboard, Meetings, Calendar, Search.',
+          'Work \u2014 Projects, Project Board, Tasks, Goals.',
+          'Automation \u2014 Workflows, Automations, AI Agents.',
+          'Output \u2014 Analytics, Reports.',
           'Settings and your user profile are at the bottom of the sidebar.',
         ],
         note: 'Use keyboard shortcut Ctrl+K to open the Command Palette for quick navigation.',
@@ -91,20 +90,21 @@ export const guideSections = [
     ],
     tips: [
       'The top bar shows breadcrumbs so you always know where you are.',
-      'Toggle dark/light mode with the sun/moon icon in the top bar.',
+      'Toggle dark/light mode with the sun/moon icon in the top bar, or choose System to match your OS.',
     ],
   },
 
   {
     id: 'dashboard',
     title: 'Dashboard',
-    icon: '📊',
+    icon: '\u{1F4CA}',
     badge: 'Updated',
-    summary: 'Your home screen with real-time intelligence, quick actions, and system status.',
+    summary: 'Your home screen with real-time intelligence, new widgets, quick actions, and system status.',
     steps: [
       'Navigate to Dashboard from the sidebar (it\'s your landing page after sign-in).',
       'Review the ring gauges showing Meetings, Tasks, Projects, and Automations counts.',
       'Check the Intelligence Briefing card for a system snapshot.',
+      'Monitor the new Overdue Alert Banner, Team Workload, and Insights panels.',
       'Use the Quick Actions bar at the bottom for common tasks.',
     ],
     subsections: [
@@ -119,15 +119,55 @@ export const guideSections = [
         ],
       },
       {
+        id: 'dash-overdue',
+        title: 'Overdue Alert Banner',
+        description: 'Expandable alert showing overdue tasks.',
+        steps: [
+          'Appears when you have overdue items.',
+          'Click to expand and see each overdue task with assignee name.',
+          'Shows how many days late each item is.',
+        ],
+      },
+      {
+        id: 'dash-workload',
+        title: 'Team Workload Widget',
+        description: 'Stacked bar chart showing work distribution.',
+        steps: [
+          'Each bar represents a team member.',
+          'Segments show Done, In Progress, and Pending task counts.',
+          'Helps you spot who is overloaded at a glance.',
+        ],
+      },
+      {
+        id: 'dash-insights',
+        title: 'Insights & Trends Panel',
+        description: 'Three-column layout with charts.',
+        steps: [
+          'Sentiment Donut \u2014 Positive, Neutral, and Negative distribution.',
+          'Priority Bars \u2014 High, Medium, and Low priority breakdown.',
+          'Completion Ring \u2014 Overall task completion rate.',
+        ],
+      },
+      {
+        id: 'dash-automation-feed',
+        title: 'Automation Activity Feed',
+        description: 'Live feed of running automations.',
+        steps: [
+          'Lists all running automations with status badges.',
+          'Active and Paused statuses shown.',
+          'Monitor automation health without leaving the Dashboard.',
+        ],
+      },
+      {
         id: 'dash-quick',
         title: 'Quick Actions',
         description: 'A docked toolbar at the bottom of the Dashboard for instant access.',
         steps: [
-          'Start Meeting — Opens the meeting recorder.',
-          'New Task — Creates a task instantly.',
-          'New Project — Starts a new project.',
-          'AI Insights — Jumps to the Intelligence Dashboard.',
-          'Automations — Goes to the Automations page.',
+          'Start Meeting \u2014 Opens the meeting recorder.',
+          'New Task \u2014 Creates a task instantly.',
+          'New Project \u2014 Starts a new project.',
+          'AI Insights \u2014 Jumps to the Intelligence Dashboard.',
+          'Automations \u2014 Goes to the Automations page.',
         ],
       },
       {
@@ -147,27 +187,28 @@ export const guideSections = [
         steps: [
           'AI Provider indicator shows whether OpenAI or Gemini is connected.',
           'Database status confirms your Supabase connection is healthy.',
-          'Recent Meetings list shows your latest sessions with sentiment badges.',
-          'Open Tasks list highlights outstanding action items with priority indicators.',
+          'CRM status via Ecosystem Bridge (Logos Vision).',
+          'Pulse notification status via Ecosystem Bridge.',
+          'Color-coded dots: green (connected), orange (not configured), red (disconnected).',
         ],
       },
     ],
     tips: [
       'The greeting uses a typewriter animation and changes based on time of day.',
-      'Sentiment emojis: 😊 Positive, 😐 Neutral, 😟 Negative.',
+      'Sentiment emojis: Positive, Neutral, Negative.',
     ],
   },
 
   {
     id: 'meetings',
     title: 'Meetings',
-    icon: '🎙️',
+    icon: '\u{1F399}\uFE0F',
     badge: 'Updated',
-    summary: 'Record, transcribe, search, and manage all your meetings.',
+    summary: 'Record, transcribe, search, and manage all your meetings with bulk operations.',
     steps: [
       'Navigate to Meetings from the sidebar.',
       'Browse meeting cards showing title, sentiment, summary, date, duration, and attendee count.',
-      'Use the search bar to filter meetings by title or summary content.',
+      'Use the search bar to filter meetings by title or summary (server-side with auto-filtering).',
       'Click any meeting card to open its full detail view.',
       'Click New Meeting to open the recorder and start a new session.',
     ],
@@ -183,13 +224,24 @@ export const guideSections = [
         ],
       },
       {
+        id: 'mtg-bulk',
+        title: 'Bulk Operations',
+        description: 'Select and manage multiple meetings at once.',
+        steps: [
+          'Toggle selection mode with the checkbox icon.',
+          'Use Select All or Deselect All for quick selection.',
+          'Bulk Delete \u2014 Remove selected meetings (with confirmation).',
+          'Bulk Export \u2014 Export selected meetings as a Markdown file.',
+        ],
+      },
+      {
         id: 'mtg-sentiment',
         title: 'Sentiment Indicators',
         description: 'Each meeting has an AI-detected sentiment badge.',
         steps: [
-          '😊 Positive — shown in mint/green.',
-          '😐 Neutral — shown in gray.',
-          '😟 Negative — shown in crimson/red.',
+          'Positive \u2014 shown in mint/green.',
+          'Neutral \u2014 shown in gray.',
+          'Negative \u2014 shown in crimson/red.',
           'Sentiment is determined by AI analysis of the transcript tone.',
         ],
       },
@@ -205,23 +257,34 @@ export const guideSections = [
     ],
     tips: [
       'You can also start a meeting directly from the Dashboard using the Quick Actions bar.',
-      'Meetings are sorted by date with the most recent first.',
+      'Your preferred microphone is remembered between sessions. Set it in Settings > Audio & Recording.',
     ],
   },
 
   {
     id: 'meeting-details',
     title: 'Meeting Details',
-    icon: '📝',
+    icon: '\u{1F4DD}',
     badge: 'Updated',
-    summary: 'Deep dive into a single meeting with transcripts, AI analysis, intelligence profiles, and action items.',
+    summary: 'Deep dive into a single meeting with inline editing, transcripts, AI analysis, intelligence profiles, and action items.',
     steps: [
       'Click any meeting from the Meetings list to open its detail view.',
       'Review the AI-generated summary, key points timeline, and decisions timeline.',
-      'Scroll the full transcript in the transcript viewer.',
-      'Manage action items in the right-side panel — mark complete, delete, or create new ones.',
+      'Click any text field (title, summary, key points) to edit it inline.',
+      'Manage action items in the right-side panel \u2014 mark complete, delete, or create new ones.',
     ],
     subsections: [
+      {
+        id: 'md-inline',
+        title: 'Inline Editing',
+        description: 'Edit meeting content directly on the detail page.',
+        steps: [
+          'Click the meeting title, summary, or key points to enter edit mode.',
+          'Make your changes in the text field.',
+          'Click the checkmark to save, or press Escape to cancel.',
+          'Changes are saved to the database immediately.',
+        ],
+      },
       {
         id: 'md-ask-ai',
         title: 'Ask AI',
@@ -237,8 +300,9 @@ export const guideSections = [
         id: 'md-share',
         title: 'Sharing & Syncing',
         steps: [
-          'Share to Chat — Send a meeting recap to a connected chat channel (e.g., Slack).',
-          'Sync to CRM — Push action items and meeting data to your connected CRM.',
+          'Share to Chat \u2014 Send a meeting recap to a connected chat channel (e.g., Slack).',
+          'Sync to CRM \u2014 Push action items and meeting data to Logos Vision.',
+          'Sync to Calendar \u2014 Add the meeting to your Google Calendar.',
           'Select a channel from the channel selector dialog before sharing.',
         ],
       },
@@ -258,6 +322,7 @@ export const guideSections = [
         description: 'AI suggests the best analysis profile for your meeting.',
         steps: [
           'The panel appears when AI detects a matching intelligence profile.',
+          'A confidence score shows how well the profile fits.',
           'Accept the suggestion or choose a different profile.',
           'Fill in any custom fields the profile requires.',
           'The summary, focus areas, and action item extraction are shaped by the profile.',
@@ -266,7 +331,7 @@ export const guideSections = [
       },
     ],
     tips: [
-      'The Ask AI feature understands the full meeting context — try follow-up questions.',
+      'The Ask AI feature understands the full meeting context \u2014 try follow-up questions.',
       'Key Points and Decisions are displayed on visual timelines for quick scanning.',
       'Intelligence profiles enrich analysis with external context from contacts, CRM, and past meetings.',
     ],
@@ -275,8 +340,7 @@ export const guideSections = [
   {
     id: 'calendar',
     title: 'Calendar',
-    icon: '📅',
-    badge: 'Updated',
+    icon: '\u{1F4C5}',
     summary: 'Unified calendar view combining Google Calendar events, tasks, and goal deadlines.',
     steps: [
       'Navigate to Calendar from the sidebar.',
@@ -300,10 +364,21 @@ export const guideSections = [
         title: 'Upcoming Items',
         description: 'A 14-day look-ahead list below the calendar grid.',
         steps: [
-          'Action Items — Tasks with due dates, shown with a task icon.',
-          'Goal Deadlines — Key result and goal deadlines, shown with a target icon.',
-          'Calendar Events — Synced events from Google Calendar, shown with a calendar icon.',
+          'Action Items \u2014 Tasks with due dates, shown with a task icon.',
+          'Goal Deadlines \u2014 Key result and goal deadlines, shown with a target icon.',
+          'Calendar Events \u2014 Synced events from Google Calendar, shown with a calendar icon.',
           'Each item shows priority color and a link to its source.',
+        ],
+      },
+      {
+        id: 'cal-quick-schedule',
+        title: 'Quick Schedule',
+        description: 'Create calendar events on the fly.',
+        steps: [
+          'Open the Quick Schedule modal from the Calendar or Intelligence Dashboard.',
+          'Enter a title, date, time, and duration (15, 30, 45, or 60 minutes).',
+          'Optionally add notes.',
+          'Click Schedule to create the event.',
         ],
       },
       {
@@ -326,12 +401,11 @@ export const guideSections = [
   {
     id: 'tasks',
     title: 'Tasks',
-    icon: '✅',
-    badge: 'New',
+    icon: '\u2705',
     summary: 'Create, prioritize, and track action items with AI-powered recommendations.',
     steps: [
       'Navigate to Tasks from the sidebar.',
-      'A guided 3-step wizard appears: Create → Prioritize → Complete.',
+      'A guided 3-step wizard appears: Create \u2192 Prioritize \u2192 Complete.',
       'Fill in the task form with title, priority, and due date.',
       'Review the AI Recommendations panel for assignment, priority, and deadline suggestions.',
       'Accept or override any AI suggestion, then save.',
@@ -342,9 +416,9 @@ export const guideSections = [
         title: 'AI Recommendations',
         description: 'The AI suggests assignments, priorities, and deadlines for each task.',
         steps: [
-          'Assignment Suggestions — Who should own this task based on meeting context.',
-          'Priority Predictions — AI-recommended priority level.',
-          'Deadline Suggestions — Recommended due dates based on project timelines.',
+          'Assignment Suggestions \u2014 Who should own this task based on meeting context.',
+          'Priority Predictions \u2014 AI-recommended priority level.',
+          'Deadline Suggestions \u2014 Recommended due dates based on project timelines.',
           'Each recommendation includes an Explainability Card showing the reasoning.',
         ],
         note: 'The AI learns from your decisions over time. The more you accept or override, the better it gets.',
@@ -378,13 +452,13 @@ export const guideSections = [
   {
     id: 'projects',
     title: 'Projects',
-    icon: '📁',
+    icon: '\u{1F4C1}',
     summary: 'Organize tasks, meetings, and goals into project workspaces.',
     steps: [
       'Navigate to Projects from the sidebar.',
-      'Follow the 3-step wizard: Create → Organize → Track.',
+      'Follow the 3-step wizard: Create \u2192 Organize \u2192 Track.',
       'Enter a project name and optional description, then click Create.',
-      'Browse project cards in a grid layout — each shows status, deal value, and end date.',
+      'Browse project cards in a grid layout \u2014 each shows status, deal value, and end date.',
     ],
     subsections: [
       {
@@ -392,20 +466,20 @@ export const guideSections = [
         title: 'Project Details',
         description: 'Click any project card to open its detail view.',
         steps: [
-          'Stats Cards — Total Tasks, Completed, In Progress, and Open counts.',
-          'Tasks Section — Add tasks directly with title and priority.',
+          'Stats Cards \u2014 Total Tasks, Completed, In Progress, and Open counts.',
+          'Tasks Section \u2014 Add tasks directly with title and priority.',
           'Manage tasks with checkboxes and delete buttons.',
-          'Related Meetings — Meetings linked to this project with clickable links.',
+          'Related Meetings \u2014 Meetings linked to this project with clickable links.',
         ],
       },
       {
         id: 'proj-status',
         title: 'Status Indicators',
         steps: [
-          'Active — shown in mint/green.',
-          'Planning — shown in amber.',
-          'Completed — shown in gray.',
-          'Archived — shown in gray (dimmed).',
+          'Active \u2014 shown in mint/green.',
+          'Planning \u2014 shown in amber.',
+          'Completed \u2014 shown in gray.',
+          'Archived \u2014 shown in gray (dimmed).',
         ],
       },
     ],
@@ -418,13 +492,12 @@ export const guideSections = [
   {
     id: 'goals',
     title: 'Goals & OKRs',
-    icon: '🎯',
-    badge: 'New',
+    icon: '\u{1F3AF}',
     summary: 'Create and track Objectives and Key Results at Company, Team, and Individual levels.',
     steps: [
       'Navigate to Goals from the sidebar.',
       'Click New Goal and fill in the title, description, type, quarter, and optional parent goal.',
-      'View goals in Hierarchy (Company → Team → Individual) or List mode.',
+      'View goals in Hierarchy (Company \u2192 Team \u2192 Individual) or List mode.',
       'Click any goal to open the Detail Panel on the right.',
     ],
     subsections: [
@@ -453,10 +526,10 @@ export const guideSections = [
         id: 'goals-stats',
         title: 'Stats Overview',
         steps: [
-          'Total Goals — all goals across all levels.',
-          'Average Progress — mean completion percentage.',
-          'On Track — goals progressing as expected.',
-          'At Risk — goals behind schedule.',
+          'Total Goals \u2014 all goals across all levels.',
+          'Average Progress \u2014 mean completion percentage.',
+          'On Track \u2014 goals progressing as expected.',
+          'At Risk \u2014 goals behind schedule.',
         ],
       },
     ],
@@ -469,9 +542,9 @@ export const guideSections = [
   {
     id: 'workflows',
     title: 'Workflows',
-    icon: '🔀',
-    badge: 'New',
-    summary: 'Visual, node-based automations connecting triggers, conditions, and actions.',
+    icon: '\u{1F500}',
+    badge: 'Updated',
+    summary: 'Visual, node-based automations with debug panel, version history, and execution tracing.',
     steps: [
       'Navigate to Workflows from the sidebar.',
       'Browse existing workflows or click New Workflow.',
@@ -483,9 +556,9 @@ export const guideSections = [
         id: 'wf-templates',
         title: 'Quick Start Templates',
         steps: [
-          'Meeting Processing — Automatically process new meeting recordings.',
-          'Webhook to Slack — Route incoming webhooks to Slack channels.',
-          'Daily Digest — Generate and send daily summary reports.',
+          'Meeting Processing \u2014 Automatically process new meeting recordings.',
+          'Webhook to Slack \u2014 Route incoming webhooks to Slack channels.',
+          'Daily Digest \u2014 Generate and send daily summary reports.',
         ],
       },
       {
@@ -496,19 +569,29 @@ export const guideSections = [
           'Add nodes from the Node Palette on the left.',
           'Connect nodes by dragging from output to input ports.',
           'Click any node to configure its settings.',
-          'Use the toolbar to Save, Test (dry run), Execute, or manage the workflow.',
+          'Use the toolbar to Save, Test (dry run), Execute, Duplicate, or Delete the workflow.',
         ],
         note: 'Always use Test (dry run) before activating a workflow to verify behavior.',
+      },
+      {
+        id: 'wf-debug',
+        title: 'Debug & Trace Tools',
+        description: 'Advanced tools for inspecting workflow execution.',
+        steps: [
+          'Debug Panel \u2014 Inspect execution traces and see what happened at each step.',
+          'Execution Trace Viewer \u2014 Step through a run node by node with inputs, outputs, and timing.',
+          'Version History \u2014 Review previous versions of a workflow and roll back if needed.',
+        ],
       },
       {
         id: 'wf-manage',
         title: 'Managing Workflows',
         steps: [
-          'Activate/Pause — Toggle a workflow on or off.',
-          'Execute — Run a workflow immediately.',
-          'Duplicate — Create a copy for modification.',
-          'View History — See past execution logs.',
-          'Delete — Remove a workflow permanently.',
+          'Activate/Pause \u2014 Toggle a workflow on or off.',
+          'Execute \u2014 Run a workflow immediately.',
+          'Duplicate \u2014 Create a copy for modification.',
+          'View History \u2014 See past execution logs.',
+          'Delete \u2014 Remove a workflow permanently.',
         ],
       },
     ],
@@ -521,11 +604,11 @@ export const guideSections = [
   {
     id: 'automations',
     title: 'Automations',
-    icon: '⚡',
+    icon: '\u26A1',
     summary: 'Template-based automation rules with triggers, actions, and monitoring.',
     steps: [
       'Navigate to Automations from the sidebar.',
-      'Follow the 3-step wizard: Choose Template → Configure → Monitor.',
+      'Follow the 3-step wizard: Choose Template \u2192 Configure \u2192 Monitor.',
       'Browse templates by category: AI-Powered, CRM, or Integration.',
       'Click Custom Build to create your own from scratch.',
     ],
@@ -534,9 +617,9 @@ export const guideSections = [
         id: 'auto-templates',
         title: 'Template Categories',
         steps: [
-          'AI-Powered — Automations using AI agents (amber badge).',
-          'CRM — Automations syncing with your CRM (mint badge).',
-          'Integration — Cross-platform automations (crimson badge).',
+          'AI-Powered \u2014 Automations using AI agents (amber badge).',
+          'CRM \u2014 Automations syncing with your CRM (mint badge).',
+          'Integration \u2014 Cross-platform automations (crimson badge).',
         ],
       },
       {
@@ -567,12 +650,11 @@ export const guideSections = [
   {
     id: 'agents',
     title: 'AI Agents',
-    icon: '🤖',
-    badge: 'New',
+    icon: '\u{1F916}',
     summary: 'Deploy and manage intelligent bots for assignment, priority, and follow-up detection.',
     steps: [
       'Navigate to Agents from the sidebar.',
-      'Follow the 3-step wizard: Select Template → Customize → Monitor.',
+      'Follow the 3-step wizard: Select Template \u2192 Customize \u2192 Monitor.',
       'Browse templates by category (Sales, Meetings, Operations).',
       'Click Deploy on a template, customize name/trigger/actions, then activate.',
     ],
@@ -592,9 +674,9 @@ export const guideSections = [
         title: 'Agent Details',
         steps: [
           'Click an agent to open its detail panel.',
-          'Execution Logs — See what the agent has done recently.',
-          'Explanations — Understand why the agent made specific decisions.',
-          'Performance Metrics — Track success rates and execution counts.',
+          'Execution Logs \u2014 See what the agent has done recently.',
+          'Explanations \u2014 Understand why the agent made specific decisions.',
+          'Performance Metrics \u2014 Track success rates and execution counts.',
         ],
       },
       {
@@ -616,8 +698,7 @@ export const guideSections = [
   {
     id: 'search',
     title: 'Search',
-    icon: '🔍',
-    badge: 'Updated',
+    icon: '\u{1F50D}',
     summary: 'Find anything across your workspace with semantic and keyword search plus AI Q&A.',
     steps: [
       'Navigate to Search from the sidebar, or press Ctrl+/ to jump there.',
@@ -656,29 +737,43 @@ export const guideSections = [
     ],
     tips: [
       'Semantic search is great for questions like "meetings about budget concerns".',
-      'Keyword search is faster for exact term matching.',
+      'Use Ctrl+Enter to submit, Tab to switch search type, Ctrl+S to save a search.',
     ],
   },
 
   {
     id: 'analytics',
     title: 'Analytics',
-    icon: '📈',
-    summary: 'Performance metrics, AI effectiveness tracking, and team performance tables.',
+    icon: '\u{1F4C8}',
+    badge: 'Updated',
+    summary: 'Performance metrics with Recharts visualizations, CSV export, sentiment trends, and team performance tables.',
     steps: [
       'Navigate to Analytics from the sidebar.',
       'Select a time period: 7 days, 30 days, 90 days, or 1 year.',
       'Browse tabs: Overview, Meetings, Tasks, AI, and Team.',
-      'Click Refresh to update data for the selected period.',
+      'Click Refresh to update data, or Export to download as CSV.',
     ],
     subsections: [
       {
         id: 'ana-overview',
         title: 'Overview Tab',
         steps: [
-          'Key metric cards show meeting count, task count, and more.',
-          'Time Saved breakdown shows savings from transcription, summarization, action items, and automations.',
-          'Automation and AI agent performance stats are displayed below.',
+          'Key metric cards: Meetings Processed, Tasks Completed, Action Items, Automations Run.',
+          'Time Saved breakdown showing savings from transcription, summarization, action items, and automations.',
+          'Task Status breakdown: Completed, In Progress, Open, and Blocked.',
+          'Meeting Sentiment distribution: Positive, Neutral, and Negative.',
+          'Projects Overview: Total, Active, Completed, Planning, and total Deal Value.',
+        ],
+      },
+      {
+        id: 'ana-meetings',
+        title: 'Meetings Tab',
+        description: 'Charts and metrics focused on meeting activity.',
+        steps: [
+          'Total meetings count, total and average duration.',
+          'Average action items per meeting.',
+          'Sentiment Over Time \u2014 Area chart showing positive, neutral, and negative trends.',
+          'Meetings Over Time \u2014 Bar chart with daily meeting counts.',
         ],
       },
       {
@@ -696,13 +791,14 @@ export const guideSections = [
     tips: [
       'Check the Time Saved card to see exactly how much time AI is saving your team.',
       'The AI tab shows transcription accuracy and action item extraction rates.',
+      'Export analytics data as CSV for use in spreadsheets or BI tools.',
     ],
   },
 
   {
     id: 'reports',
     title: 'Reports & Exports',
-    icon: '📄',
+    icon: '\u{1F4C4}',
     summary: 'Generate PDF reports and export data as CSV.',
     steps: [
       'Navigate to Reports from the sidebar.',
@@ -715,18 +811,18 @@ export const guideSections = [
         id: 'rep-pdf',
         title: 'PDF Reports',
         steps: [
-          'Meeting Recap — Select a meeting from the dropdown and download a formatted PDF.',
-          'Goals & OKRs — Select a quarter and download a goals progress PDF.',
-          'Weekly Summary — Download a 7-day overview as a PDF.',
+          'Meeting Recap \u2014 Select a meeting from the dropdown and download a formatted PDF.',
+          'Goals & OKRs \u2014 Select a quarter and download a goals progress PDF.',
+          'Weekly Summary \u2014 Download a 7-day overview as a PDF.',
         ],
       },
       {
         id: 'rep-csv',
         title: 'CSV Exports',
         steps: [
-          'Meetings — Export all meeting data.',
-          'Action Items — Export all action items across all statuses.',
-          'Goals — Export all goals and key results.',
+          'Meetings \u2014 Export all meeting data.',
+          'Action Items \u2014 Export all action items across all statuses.',
+          'Goals \u2014 Export all goals and key results.',
         ],
       },
     ],
@@ -739,8 +835,7 @@ export const guideSections = [
   {
     id: 'ecosystem',
     title: 'Ecosystem Integration',
-    icon: '🌐',
-    badge: 'New',
+    icon: '\u{1F310}',
     summary: 'Connect Entomate with Pulse and Logos Vision for cross-app meeting sync and intelligence sharing.',
     steps: [
       'Navigate to Settings and open the Ecosystem section.',
@@ -801,11 +896,10 @@ export const guideSections = [
   {
     id: 'meeting-intelligence',
     title: 'Meeting Intelligence Profiles',
-    icon: '🧠',
-    badge: 'New',
+    icon: '\u{1F9E0}',
     summary: 'AI profiles that customize how your meetings are analyzed, summarized, and followed up.',
     steps: [
-      'Open a meeting or start a new one — the AI will suggest a matching intelligence profile.',
+      'Open a meeting or start a new one \u2014 the AI will suggest a matching intelligence profile.',
       'Accept the suggested profile or choose a different one from the list.',
       'Fill in any custom fields the profile requires (e.g., grant name, deal stage).',
       'The AI uses the profile to shape its summary, focus areas, and action item extraction.',
@@ -816,13 +910,13 @@ export const guideSections = [
         title: 'Built-In Profiles',
         description: 'Ready-to-use profiles for common meeting types.',
         steps: [
-          'Grant Specialist — Optimized for grant review and compliance meetings.',
-          'Sales Discovery — Focuses on pain points, budget signals, and next steps.',
-          'Client Check-In — Tracks relationship health and satisfaction.',
-          'Board Meeting — Captures governance decisions and strategic direction.',
-          'Internal Standup — Quick daily sync with blockers and progress.',
-          'Strategic Planning — Long-term goals, market analysis, and roadmap.',
-          'Vendor Negotiation — Contract terms, pricing, and commitments.',
+          'Grant Specialist \u2014 Optimized for grant review and compliance meetings.',
+          'Sales Discovery \u2014 Focuses on pain points, budget signals, and next steps.',
+          'Client Check-In \u2014 Tracks relationship health and satisfaction.',
+          'Board Meeting \u2014 Captures governance decisions and strategic direction.',
+          'Internal Standup \u2014 Quick daily sync with blockers and progress.',
+          'Strategic Planning \u2014 Long-term goals, market analysis, and roadmap.',
+          'Vendor Negotiation \u2014 Contract terms, pricing, and commitments.',
         ],
       },
       {
@@ -840,10 +934,10 @@ export const guideSections = [
         title: 'Context Sources',
         description: 'Profiles pull in external context to enrich analysis.',
         steps: [
-          'Contacts — Attendee history, roles, and relationship data.',
-          'CRM Deals — Active deal status, stage, and value.',
-          'Past Meetings — Previous meetings with same attendees for continuity.',
-          'Pulse Threads — Relevant conversations from the Pulse communication app.',
+          'Contacts \u2014 Attendee history, roles, and relationship data.',
+          'CRM Deals \u2014 Active deal status, stage, and value.',
+          'Past Meetings \u2014 Previous meetings with same attendees for continuity.',
+          'Pulse Threads \u2014 Relevant conversations from the Pulse communication app.',
         ],
       },
       {
@@ -866,33 +960,89 @@ export const guideSections = [
   {
     id: 'settings',
     title: 'Settings',
-    icon: '⚙️',
+    icon: '\u2699\uFE0F',
     badge: 'Updated',
-    summary: 'Configure appearance, integrations, AI learning, and system connections.',
+    summary: 'Configure appearance, audio, permissions, notifications, Slack, AI learning, and system connections.',
     steps: [
       'Navigate to Settings from the sidebar.',
-      'Toggle between Light and Dark mode under Appearance.',
+      'Choose Light, Dark, or System theme under Appearance.',
+      'Configure audio devices and recording quality under Audio & Recording.',
+      'Manage browser permissions, notifications, and Slack integration.',
       'Access the AI Learning Dashboard to manage patterns and feedback.',
-      'Click Test Connections to verify all integrations.',
     ],
     subsections: [
       {
-        id: 'set-ai',
-        title: 'AI Learning',
+        id: 'set-appearance',
+        title: 'Appearance',
         steps: [
-          'Open the Learning Dashboard to see what the AI has learned from your patterns.',
-          'Review detected patterns and approve or reject them.',
-          'The AI adjusts its suggestions based on your feedback.',
+          'Choose Light, Dark, or System theme with visual previews.',
+          'Enable Reduce Motion for accessibility (disables animations).',
+        ],
+      },
+      {
+        id: 'set-audio',
+        title: 'Audio & Recording',
+        description: 'Configure microphone, speakers, quality, and transcription.',
+        steps: [
+          'Select your microphone from the dropdown. Click refresh to re-scan.',
+          'Select your speakers or headphones.',
+          'Choose recording quality: Standard (64 kbps), High (128 kbps), or Maximum (256 kbps).',
+          'Choose transcription language from 14 options or Auto-Detect.',
+          'Toggle Auto-Sync to Calendar to add meetings to Google Calendar.',
+        ],
+      },
+      {
+        id: 'set-permissions',
+        title: 'Permissions',
+        description: 'View and manage browser permissions.',
+        steps: [
+          'Microphone (required), Camera, Notifications, and Clipboard.',
+          'Each shows its state: Granted (green), Denied (red), Not Granted (amber).',
+          'Click Grant Access or Retry to request permissions.',
+          'For denied permissions, follow browser instructions to re-enable.',
+        ],
+      },
+      {
+        id: 'set-notifications',
+        title: 'Notifications',
+        description: 'Control how and when Entomate notifies you.',
+        steps: [
+          'Email: Meeting Summaries, Overdue Reminders, Weekly Digest.',
+          'In-App: Task Assignments, Meeting Ready, Agent Suggestions.',
+          'Browser Push Notifications toggle.',
+          'Quiet Hours with configurable start and end times.',
+        ],
+      },
+      {
+        id: 'set-slack',
+        title: 'Slack Integration',
+        description: 'Connect Slack for automated notifications.',
+        steps: [
+          'View connection status and workspace name.',
+          'Test connection and select a default channel.',
+          'Toggle events: Meeting Completed, Deal Won, Overdue Reminders, New Action Items.',
+          'Save settings and send a test message to verify.',
+        ],
+      },
+      {
+        id: 'set-ai',
+        title: 'AI & Learning',
+        steps: [
+          'Summary Detail Level: Brief, Standard, or Detailed.',
+          'Auto-Assign Confidence Threshold slider (0.3 to 1.0, default 0.75).',
+          'Sentiment Analysis toggle.',
+          'Open the Learning Dashboard to review, approve, or reject AI-learned patterns.',
         ],
       },
       {
         id: 'set-connections',
         title: 'System Status',
         steps: [
-          'AI Provider — Whether OpenAI or Gemini is connected and working.',
-          'Database — Whether Supabase connection is active.',
-          'CRM Integration — Test your CRM connection.',
-          'Chat Integration — Test your Slack or chat platform connection.',
+          'AI Provider \u2014 Whether OpenAI or Gemini is connected and working.',
+          'Database \u2014 Whether Supabase connection is active.',
+          'CRM Integration \u2014 Logos Vision via Ecosystem Bridge.',
+          'Chat Integration \u2014 Pulse via Ecosystem Bridge.',
+          'Click Test All to verify all connections at once.',
         ],
       },
       {
@@ -923,9 +1073,28 @@ export const guideSections = [
   },
 
   {
+    id: 'keyboard-shortcuts',
+    title: 'Keyboard Shortcuts',
+    icon: '\u2328\uFE0F',
+    badge: 'New',
+    summary: 'Full list of keyboard shortcuts for navigation, actions, and search.',
+    steps: [
+      'Press Ctrl+? to show the keyboard shortcuts help overlay at any time.',
+      'General: Ctrl+K (Command Palette), Ctrl+/ (Search), Escape (close dialogs).',
+      'Navigation: G then D (Dashboard), G then M (Meetings), G then P (Projects), G then T (Tasks), G then S (Search).',
+      'Actions: Ctrl+M (New Meeting), Ctrl+P (New Project), Ctrl+T (New Task).',
+      'Search: Ctrl+Enter (submit), Tab (switch type), Ctrl+S (save search).',
+    ],
+    tips: [
+      'Navigation shortcuts use a two-key sequence: press G first, then the letter.',
+      'Shortcuts are platform-aware: Cmd on Mac, Ctrl on Windows.',
+    ],
+  },
+
+  {
     id: 'troubleshooting',
     title: 'Troubleshooting',
-    icon: '🔧',
+    icon: '\u{1F527}',
     summary: 'Common issues, fixes, and frequently asked questions.',
     steps: [
       'Check this section when you encounter problems with Entomate.',
@@ -949,8 +1118,19 @@ export const guideSections = [
         steps: [
           'Check the AI Provider status on the Settings page.',
           'Make sure your AI provider (OpenAI or Gemini) is connected.',
-          'Click Test Connections to verify.',
+          'Click Test All to verify connections.',
+          'Check Settings > Permissions to ensure microphone access is granted.',
           'If no action items appear, the meeting may not have a transcript yet.',
+        ],
+      },
+      {
+        id: 'ts-audio',
+        title: 'Audio & Microphone Issues',
+        steps: [
+          'Go to Settings > Audio & Recording and verify the correct microphone is selected.',
+          'Click the refresh button to re-scan for audio devices.',
+          'Check that your microphone is not muted at the operating system level.',
+          'Ensure microphone permission is Granted in Settings > Permissions.',
         ],
       },
       {
@@ -972,6 +1152,25 @@ export const guideSections = [
           'Verify that connected integrations are working in Settings.',
         ],
       },
+      {
+        id: 'ts-slack',
+        title: 'Slack Issues',
+        steps: [
+          'Go to Settings > Integrations > Slack and click Test Connection.',
+          'Verify a default channel is selected.',
+          'Use Send Test Message to verify the integration.',
+          'Check that notification event toggles are enabled.',
+        ],
+      },
+      {
+        id: 'ts-notifications',
+        title: 'Notification Issues',
+        steps: [
+          'Check Settings > Permissions to ensure Notifications permission is Granted.',
+          'Verify desired notification types are enabled in Settings > Notifications.',
+          'Check that Quiet Hours is not currently active.',
+        ],
+      },
     ],
     useCases: [
       {
@@ -979,7 +1178,7 @@ export const guideSections = [
         title: 'Can I use Entomate without recording meetings?',
         scenario: 'You want to use Tasks, Projects, Goals, Workflows, and Agents independently.',
         steps: [
-          'Yes — all features work independently of meeting recordings.',
+          'Yes \u2014 all features work independently of meeting recordings.',
           'Create tasks, projects, and goals directly from their respective pages.',
           'Workflows and automations can be triggered by events other than meetings.',
         ],
@@ -999,9 +1198,9 @@ export const guideSections = [
         title: 'Can I export my data?',
         scenario: 'You need to get your data out of Entomate for external analysis.',
         steps: [
-          'Go to the Reports page.',
-          'Download PDF reports for meeting recaps, goals, or weekly summaries.',
-          'Download CSV exports for meetings, action items, or goals.',
+          'Go to the Reports page for PDF reports and CSV data exports.',
+          'Export analytics data as CSV from the Analytics page.',
+          'Bulk export meetings as Markdown from the Meetings page.',
         ],
       },
       {
@@ -1015,9 +1214,29 @@ export const guideSections = [
           'API keys and secrets are managed through environment variables, never stored in code.',
         ],
       },
+      {
+        id: 'faq-languages',
+        title: 'What languages does transcription support?',
+        scenario: 'You need to transcribe meetings in a language other than English.',
+        steps: [
+          '14 languages are supported: English, Spanish, French, German, Portuguese, Italian, Dutch, Japanese, Korean, Chinese, Arabic, Hindi, and Russian.',
+          'Choose Auto-Detect to let the AI determine the language automatically.',
+          'Set your preferred language in Settings > Audio & Recording.',
+        ],
+      },
+      {
+        id: 'faq-quality',
+        title: 'Can I choose my recording quality?',
+        scenario: 'You want higher quality recordings for important meetings.',
+        steps: [
+          'Go to Settings > Audio & Recording.',
+          'Choose Standard (64 kbps), High (128 kbps), or Maximum (256 kbps).',
+          'Higher quality produces larger files but better transcription accuracy.',
+        ],
+      },
     ],
     tips: [
-      'Most issues can be diagnosed by clicking Test Connections in Settings.',
+      'Most issues can be diagnosed by clicking Test All in Settings > System Status.',
       'The AI Learning Dashboard lets you fine-tune AI behavior by approving or rejecting patterns.',
     ],
   },

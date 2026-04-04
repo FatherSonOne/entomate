@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { supabase } from './supabaseClient'
 import cache from './apiCache'
+import { downloadFile } from '../utils/downloadHelper'
 
 // Use relative URL to leverage Vite proxy, or fall back to full URL if configured
 const API_BASE_URL = import.meta.env.VITE_API_URL || ''
@@ -155,12 +156,10 @@ api.interceptors.response.use(
 
       // Retry the request with a fresh token
       try {
-        if (tokenGetter) {
-          const newToken = await tokenGetter()
-          if (newToken) {
-            config.headers.Authorization = `Bearer ${newToken}`
-            return api(config)
-          }
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.access_token) {
+          config.headers.Authorization = `Bearer ${session.access_token}`
+          return api(config)
         }
       } catch (refreshError) {
         console.debug('Token refresh failed:', refreshError.message)
@@ -249,6 +248,9 @@ export const meetingsApi = {
   // Get formatted recap
   getRecap: (id) => api.get(`/meetings/${id}/recap`),
 
+  // Update action item status
+  updateActionItem: (id, data) => api.patch(`/meetings/action-items/${id}`, data),
+
   // ========================================
   // AI Meeting Summary Widget API (Quick Win 1)
   // ========================================
@@ -286,7 +288,10 @@ export const projectsApi = {
   createFromDeal: (data) => api.post('/projects/from-deal', data),
 
   // Get project stats
-  getStats: (id) => api.get(`/projects/${id}/stats`)
+  getStats: (id) => api.get(`/projects/${id}/stats`),
+
+  // Get project-specific dashboard data
+  getDashboard: (id) => api.get(`/projects/${id}/dashboard`)
 }
 
 // ========================================
@@ -321,7 +326,16 @@ export const tasksApi = {
   bulkCreate: (tasks, projectId) => api.post('/tasks/bulk', { tasks, projectId }),
 
   // Bulk update status
-  bulkUpdateStatus: (taskIds, status) => api.put('/tasks/bulk/status', { taskIds, status })
+  bulkUpdateStatus: (taskIds, status) => api.put('/tasks/bulk/status', { taskIds, status }),
+
+  // Agent: Get ETA prediction
+  getEta: (id) => api.get(`/agent-tasks/${id}/eta`),
+
+  // Agent: Get overdue tasks
+  getOverdue: (params = {}) => api.get('/agent-tasks/overdue', { params }),
+
+  // Agent: Auto-assign task
+  autoAssign: (id, options = {}) => api.post(`/agent-tasks/${id}/auto-assign`, options)
 }
 
 // ========================================
@@ -380,21 +394,19 @@ export const searchApi = {
 
   // Ask question with streaming response (SSE)
   askStream: async (data, callbacks = {}) => {
-    const { onChunk, onCitations, onFollowUp, onComplete, onError } = callbacks
+    const { signal, onChunk, onCitations, onFollowUp, onComplete, onError } = callbacks
     // Use relative URL to work with Vite proxy
     const streamUrl = API_BASE_URL ? `${API_BASE_URL}/api/search/ask/stream` : '/api/search/ask/stream'
 
       // Get token for streaming request
       let authHeader = ''
-      if (tokenGetter) {
-        try {
-          const token = await tokenGetter()
-          if (token) {
-            authHeader = `Bearer ${token}`
-          }
-        } catch (error) {
-          console.debug('Failed to get token for streaming request:', error.message)
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.access_token) {
+          authHeader = `Bearer ${session.access_token}`
         }
+      } catch (error) {
+        console.debug('Failed to get token for streaming request:', error.message)
       }
 
       return fetch(streamUrl, {
@@ -403,7 +415,8 @@ export const searchApi = {
         'Content-Type': 'application/json',
         'Authorization': authHeader
       },
-      body: JSON.stringify(data)
+      body: JSON.stringify(data),
+      signal
     }).then(response => {
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
@@ -529,7 +542,10 @@ export const dashboardApi = {
   getOverdue: () => api.get('/dashboard/overdue'),
 
   // Get AI insights
-  getInsights: () => api.get('/dashboard/insights')
+  getInsights: () => api.get('/dashboard/insights'),
+
+  // Get project-based insights (from projects + tasks tables)
+  getProjectInsights: () => api.get('/dashboard/project-insights')
 }
 
 // ========================================
@@ -540,42 +556,40 @@ export const reportsApi = {
   getAvailable: () => api.get('/reports/available'),
 
   // Download meeting recap PDF
-  downloadMeetingPDF: (meetingId) => {
-    return `${API_BASE_URL}/api/reports/meeting/${meetingId}/pdf`
-  },
+  downloadMeetingPDF: (meetingId) =>
+    downloadFile(`/reports/meeting/${meetingId}/pdf`, 'meeting-recap.pdf'),
 
   // Download goals report PDF
-  downloadGoalsPDF: (quarter) => {
-    const params = quarter ? `?quarter=${quarter}` : ''
-    return `${API_BASE_URL}/api/reports/goals/pdf${params}`
-  },
+  downloadGoalsPDF: (quarter) =>
+    downloadFile('/reports/goals/pdf', 'goals-report.pdf', quarter ? { quarter } : {}),
 
   // Download project report PDF
-  downloadProjectPDF: (projectId) => {
-    return `${API_BASE_URL}/api/reports/project/${projectId}/pdf`
-  },
+  downloadProjectPDF: (projectId) =>
+    downloadFile(`/reports/project/${projectId}/pdf`, 'project-report.pdf'),
 
   // Download weekly summary PDF
-  downloadWeeklyPDF: () => {
-    return `${API_BASE_URL}/api/reports/weekly/pdf`
-  },
+  downloadWeeklyPDF: () =>
+    downloadFile('/reports/weekly/pdf', 'weekly-summary.pdf'),
 
   // Download meetings CSV
-  downloadMeetingsCSV: () => {
-    return `${API_BASE_URL}/api/reports/meetings/csv`
-  },
+  downloadMeetingsCSV: () =>
+    downloadFile('/reports/meetings/csv', 'meetings-export.csv'),
 
   // Download action items CSV
-  downloadActionItemsCSV: (params = {}) => {
-    const query = new URLSearchParams(params).toString()
-    return `${API_BASE_URL}/api/reports/action-items/csv${query ? `?${query}` : ''}`
-  },
+  downloadActionItemsCSV: (params = {}) =>
+    downloadFile('/reports/action-items/csv', 'action-items.csv', params),
 
   // Download goals CSV
-  downloadGoalsCSV: (params = {}) => {
-    const query = new URLSearchParams(params).toString()
-    return `${API_BASE_URL}/api/reports/goals/csv${query ? `?${query}` : ''}`
-  }
+  downloadGoalsCSV: (params = {}) =>
+    downloadFile('/reports/goals/csv', 'goals-export.csv', params),
+
+  // Download tasks CSV
+  downloadTasksCSV: (params = {}) =>
+    downloadFile('/reports/tasks/csv', 'tasks-export.csv', params),
+
+  // Send meeting recap email
+  sendMeetingRecap: (meetingId, email) =>
+    api.post('/reports/send-meeting-recap', { meetingId, email })
 }
 
 // ========================================
@@ -827,7 +841,10 @@ export const workflowsApi = {
     api.delete(`/workflows/${workflowId}/nodes/${nodeId}/pin`),
 
   // Get templates
-  getTemplates: () => api.get('/workflows/templates')
+  getTemplates: () => api.get('/workflows/templates'),
+
+  // Get specific template
+  getTemplate: (templateId) => api.get(`/workflows/templates/${templateId}`)
 }
 
 // ========================================
@@ -958,6 +975,77 @@ export const settingsApi = {
   getAuditLogs: (params = {}) => api.get('/settings/audit-logs', { params })
 }
 
+// ========================================
+// ASSISTANT API (Context-aware AI)
+// ========================================
+export const assistantApi = {
+  // Check assistant health
+  health: () => api.get('/assistant/health'),
+
+  // Stream a context-aware query (SSE)
+  queryStream: async (data, callbacks = {}) => {
+    const { signal, onChunk, onFollowUp, onComplete, onError } = callbacks
+    const streamUrl = API_BASE_URL ? `${API_BASE_URL}/api/assistant/query` : '/api/assistant/query'
+
+    let authHeader = ''
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.access_token) {
+        authHeader = `Bearer ${session.access_token}`
+      }
+    } catch (error) {
+      console.debug('Failed to get token for assistant stream:', error.message)
+    }
+
+    return fetch(streamUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': authHeader },
+      body: JSON.stringify(data),
+      signal,
+    }).then(response => {
+      if (!response.ok) {
+        throw new Error(`Assistant query failed: ${response.status}`)
+      }
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+
+      function read() {
+        return reader.read().then(({ done, value }) => {
+          if (done) return
+          const text = decoder.decode(value, { stream: true })
+          const lines = text.split('\n')
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const parsed = JSON.parse(line.slice(6))
+                switch (parsed.type) {
+                  case 'chunk':
+                    if (onChunk) onChunk(parsed.content)
+                    break
+                  case 'followUp':
+                    if (onFollowUp) onFollowUp(parsed.suggestions)
+                    break
+                  case 'complete':
+                    if (onComplete) onComplete(parsed)
+                    break
+                  case 'error':
+                    if (onError) onError(new Error(parsed.message))
+                    break
+                }
+              } catch { /* ignore parse errors for incomplete chunks */ }
+            }
+          }
+          return read()
+        })
+      }
+      return read()
+    }).catch(error => {
+      if (onError) onError(error)
+    })
+  },
+}
+
 // Create default export with all APIs
 const apiClient = {
   // Base axios instance
@@ -979,7 +1067,8 @@ const apiClient = {
   explainability: explainabilityApi,
   learning: learningApi,
   intelligence: intelligenceApi,
-  settings: settingsApi
+  settings: settingsApi,
+  assistant: assistantApi
 }
 
 export default apiClient

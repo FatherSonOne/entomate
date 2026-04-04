@@ -133,17 +133,3 @@ export interface IntelligenceContextCacheRow {
   created_at: string
 }
 
-export interface EntoamateAutomation {
-  id: string
-  name: string
-  description?: string
-  trigger_type: string
-  trigger_config: Record<string, any>
-  actions: Record<string, any>[]
-  is_active: boolean
-  created_by?: string
-  last_run_at?: string
-  run_count: number
-  created_at: string
-  updated_at: string
-}

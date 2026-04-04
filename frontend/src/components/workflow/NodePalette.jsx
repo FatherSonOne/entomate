@@ -56,6 +56,7 @@ const nodeCategories = [
     nodes: [
       { type: 'http_request', label: 'HTTP Request', description: 'Make API calls', icon: Globe },
       { type: 'execute_workflow', label: 'Execute Workflow', description: 'Run sub-workflow', icon: Workflow },
+      { type: 'send_pulse', label: 'Send Pulse', description: 'Post to Pulse channel', icon: MessageSquare },
       { type: 'send_slack', label: 'Send Slack', description: 'Send Slack message', icon: MessageSquare },
       { type: 'send_email', label: 'Send Email', description: 'Send email', icon: Mail },
       { type: 'create_task', label: 'Create Task', description: 'Create a task', icon: ListTodo },

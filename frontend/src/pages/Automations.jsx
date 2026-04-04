@@ -75,6 +75,7 @@ export default function Automations() {
   const [testingId, setTestingId] = useState(null)
   const [testResult, setTestResult] = useState(null)
   const [wizardStep, setWizardStep] = useState(0) // 0: Choose Template, 1: Configure, 2: Monitor
+  const [editingAutomation, setEditingAutomation] = useState(null)
 
   useEffect(() => {
     loadData()
@@ -197,14 +198,27 @@ export default function Automations() {
 
   const handleBuilderSave = async (automationData) => {
     try {
-      await automationsApi.create(automationData)
+      if (editingAutomation) {
+        await automationsApi.update(editingAutomation.id, automationData)
+        toast.success('Updated', `Automation "${automationData.name}" updated`)
+      } else {
+        await automationsApi.create(automationData)
+      }
       setShowBuilder(false)
+      setEditingAutomation(null)
       setWizardStep(1)
       loadData()
     } catch (error) {
-      console.error('Failed to create automation:', error)
-      toast.error('Error', 'Failed to create automation: ' + error.message)
+      console.error('Failed to save automation:', error)
+      toast.error('Error', 'Failed to save automation: ' + error.message)
     }
+  }
+
+  const handleEdit = (automation) => {
+    setEditingAutomation(automation)
+    setShowBuilder(true)
+    setShowCreate(false)
+    setWizardStep(1)
   }
 
   const handleBuilderTest = async (automationData) => {
@@ -367,8 +381,15 @@ export default function Automations() {
         <div className="mb-6 animate-fade-in">
           <AutomationBuilder
             onSave={handleBuilderSave}
-            onCancel={() => setShowBuilder(false)}
+            onCancel={() => { setShowBuilder(false); setEditingAutomation(null) }}
             onTest={handleBuilderTest}
+            initialData={editingAutomation ? {
+              name: editingAutomation.name,
+              description: editingAutomation.description,
+              trigger_type: editingAutomation.trigger_type,
+              trigger_config: editingAutomation.trigger_config || {},
+              actions: editingAutomation.actions || []
+            } : null}
           />
         </div>
       )}
@@ -652,6 +673,16 @@ export default function Automations() {
                       ) : (
                         <Eye size={16} />
                       )}
+                    </VCButton>
+
+                    <VCButton
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEdit(automation)}
+                      title="Edit"
+                      aria-label="Edit automation"
+                    >
+                      <Settings size={16} />
                     </VCButton>
 
                     <VCButton

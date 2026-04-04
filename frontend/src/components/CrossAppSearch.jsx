@@ -18,7 +18,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
   Search, X, Loader2, User, Video, DollarSign, Bell, Bot, GitBranch,
-  CheckSquare, Clock, ArrowRight, ExternalLink, Building2, AlertCircle
+  CheckSquare, Clock, ArrowRight, ExternalLink, AlertCircle
 } from 'lucide-react'
 import { useKeyboardShortcuts, formatShortcut } from '../hooks/useKeyboardShortcuts'
 
@@ -98,6 +98,7 @@ export default function CrossAppSearch({ isOpen, onClose }) {
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [recentSearches, setRecentSearches] = useState([])
   const [searchStats, setSearchStats] = useState(null)
+  const [hubMissing, setHubMissing] = useState(false)
 
   const inputRef = useRef(null)
   const listRef = useRef(null)
@@ -106,7 +107,7 @@ export default function CrossAppSearch({ isOpen, onClose }) {
 
   const { getToken } = useAuth()
 
-  // Load recent searches when opening
+  // Load recent searches and check hub status when opening
   useEffect(() => {
     if (isOpen) {
       setQuery('')
@@ -115,6 +116,11 @@ export default function CrossAppSearch({ isOpen, onClose }) {
       setSelectedIndex(0)
       setError(null)
       getRecentSearches(getToken).then(setRecentSearches)
+      // Check hub configuration status
+      fetch(`${API_BASE_URL}/api/cross-search/status`)
+        .then(r => r.json())
+        .then(data => setHubMissing(data.success && !data.hubConfigured))
+        .catch(() => {})
       setTimeout(() => inputRef.current?.focus(), 50)
     }
   }, [isOpen, getToken])
@@ -271,6 +277,14 @@ export default function CrossAppSearch({ isOpen, onClose }) {
               <X className="w-5 h-5" />
             </button>
           </div>
+
+          {/* Hub not configured notice */}
+          {hubMissing && (
+            <div className="flex items-center gap-2 px-4 py-2 text-xs border-b border-line-default" style={{ background: 'rgba(255,184,0,0.06)', color: 'var(--accent-tertiary, #f59e0b)' }}>
+              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+              <span>Cross-app hub not configured. Only local results are available. Set <code className="font-mono">HUB_SUPABASE_URL</code> to enable ecosystem search.</span>
+            </div>
+          )}
 
           {/* Results area */}
           <div ref={listRef} className="max-h-[60vh] overflow-y-auto">
@@ -467,9 +481,9 @@ export default function CrossAppSearch({ isOpen, onClose }) {
 export function useCrossAppSearch() {
   const [isOpen, setIsOpen] = useState(false)
 
-  // Register global keyboard shortcut (Cmd/Ctrl+K)
+  // Register global keyboard shortcut (Cmd/Ctrl+Shift+K)
   useKeyboardShortcuts({
-    'mod+k': {
+    'mod+shift+k': {
       callback: () => setIsOpen(true),
       allowInInput: false
     }

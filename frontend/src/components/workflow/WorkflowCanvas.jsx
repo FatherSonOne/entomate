@@ -4,7 +4,7 @@
  * The main visual workflow editor using React Flow
  */
 
-import React, { useState, useCallback, useRef, useMemo } from 'react'
+import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import {
   ReactFlow,
   Background,
@@ -54,14 +54,27 @@ function WorkflowCanvasInner({
   onChange,
   onDuplicate,
   onDelete,
-  onToggleActive
+  onToggleActive,
+  onNameChange
 }) {
   const reactFlowWrapper = useRef(null)
   const { fitView, zoomIn, zoomOut, getZoom, setViewport, screenToFlowPosition } = useReactFlow()
 
+  // Normalize backend connections to React Flow edge format
+  const initialEdges = useMemo(() => {
+    return (workflow?.connections || []).map(conn => ({
+      id: conn.id || `edge_${conn.sourceNodeId || conn.source}_${conn.targetNodeId || conn.target}`,
+      source: conn.sourceNodeId || conn.source,
+      sourceHandle: conn.sourceOutput || conn.sourceHandle || null,
+      target: conn.targetNodeId || conn.target,
+      targetHandle: conn.targetInput || conn.targetHandle || null,
+      type: conn.type || 'smoothstep'
+    }))
+  }, []) // Only compute once on mount
+
   // State
   const [nodes, setNodes, onNodesChange] = useNodesState(workflow?.nodes || [])
-  const [edges, setEdges, onEdgesChange] = useEdgesState(workflow?.connections || [])
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
   const [selectedNode, setSelectedNode] = useState(null)
   const [showGrid, setShowGrid] = useState(true)
   const [isDirty, setIsDirty] = useState(false)
@@ -73,23 +86,38 @@ function WorkflowCanvasInner({
   const [showDebugPanel, setShowDebugPanel] = useState(true)
   const [debugPanelExpanded, setDebugPanelExpanded] = useState(false)
 
-  // History for undo/redo
-  const [history, setHistory] = useState([{ nodes: [], edges: [] }])
-  const [historyIndex, setHistoryIndex] = useState(0)
+  // History for undo/redo — use refs to avoid stale closure bugs
+  const historyRef = useRef([{ nodes: [], edges: [] }])
+  const historyIndexRef = useRef(0)
+  const [, forceHistoryUpdate] = useState(0)
 
-  // Track changes
+  // Track changes — use functional updates to avoid stale state
   const markDirty = useCallback(() => {
     setIsDirty(true)
-    onChange?.({ nodes, edges })
-  }, [nodes, edges, onChange])
+    // Use setNodes/setEdges getters to get latest values
+    setNodes(currentNodes => {
+      setEdges(currentEdges => {
+        onChange?.({ nodes: currentNodes, edges: currentEdges })
+        return currentEdges
+      })
+      return currentNodes
+    })
+  }, [onChange, setNodes, setEdges])
 
-  // Save to history
+  // Save to history using refs for current state
   const saveToHistory = useCallback(() => {
-    const newHistory = history.slice(0, historyIndex + 1)
-    newHistory.push({ nodes: [...nodes], edges: [...edges] })
-    setHistory(newHistory)
-    setHistoryIndex(newHistory.length - 1)
-  }, [history, historyIndex, nodes, edges])
+    setNodes(currentNodes => {
+      setEdges(currentEdges => {
+        const newHistory = historyRef.current.slice(0, historyIndexRef.current + 1)
+        newHistory.push({ nodes: [...currentNodes], edges: [...currentEdges] })
+        historyRef.current = newHistory
+        historyIndexRef.current = newHistory.length - 1
+        forceHistoryUpdate(n => n + 1)
+        return currentEdges
+      })
+      return currentNodes
+    })
+  }, [setNodes, setEdges])
 
   // Handle connection
   const onConnect = useCallback((params) => {
@@ -263,40 +291,93 @@ function WorkflowCanvasInner({
   }, [])
 
   // Test node
-  const handleTestNode = useCallback((nodeId) => {
-    console.log('Testing node:', nodeId)
-    // TODO: Implement node testing
-  }, [])
+  const handleTestNode = useCallback(async (nodeId) => {
+    const node = nodes.find(n => n.id === nodeId)
+    if (!node) return
+
+    setIsExecuting(true)
+    try {
+      // Use the workflow test endpoint - the backend supports test mode
+      const result = await onTest?.()
+      if (result) {
+        setLastExecution(result)
+        // Find this node's execution in the result
+        const nodeExec = result?.nodeExecutions?.find(n => n.nodeId === nodeId)
+        if (nodeExec) {
+          setSelectedNode(node)
+        }
+      }
+    } catch (error) {
+      console.error('Node test failed:', error)
+      setLastExecution({ status: 'failed', error_message: error.message })
+    } finally {
+      setIsExecuting(false)
+    }
+  }, [nodes, onTest])
 
   // Undo
   const handleUndo = useCallback(() => {
-    if (historyIndex > 0) {
-      const newIndex = historyIndex - 1
-      setHistoryIndex(newIndex)
-      setNodes(history[newIndex].nodes)
-      setEdges(history[newIndex].edges)
+    if (historyIndexRef.current > 0) {
+      const newIndex = historyIndexRef.current - 1
+      historyIndexRef.current = newIndex
+      setNodes(historyRef.current[newIndex].nodes)
+      setEdges(historyRef.current[newIndex].edges)
+      forceHistoryUpdate(n => n + 1)
       markDirty()
     }
-  }, [history, historyIndex, setNodes, setEdges, markDirty])
+  }, [setNodes, setEdges, markDirty])
 
   // Redo
   const handleRedo = useCallback(() => {
-    if (historyIndex < history.length - 1) {
-      const newIndex = historyIndex + 1
-      setHistoryIndex(newIndex)
-      setNodes(history[newIndex].nodes)
-      setEdges(history[newIndex].edges)
+    if (historyIndexRef.current < historyRef.current.length - 1) {
+      const newIndex = historyIndexRef.current + 1
+      historyIndexRef.current = newIndex
+      setNodes(historyRef.current[newIndex].nodes)
+      setEdges(historyRef.current[newIndex].edges)
+      forceHistoryUpdate(n => n + 1)
       markDirty()
     }
-  }, [history, historyIndex, setNodes, setEdges, markDirty])
+  }, [setNodes, setEdges, markDirty])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Ctrl/Cmd+S — Save
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault()
+        handleSave()
+      }
+      // Ctrl/Cmd+Z — Undo
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault()
+        handleUndo()
+      }
+      // Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z — Redo
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+        e.preventDefault()
+        handleRedo()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleSave, handleUndo, handleRedo])
 
   // Save workflow
   const handleSave = useCallback(async () => {
     setIsSaving(true)
     try {
+      // Transform React Flow edges to backend connection format
+      const connections = edges.map(e => ({
+        id: e.id,
+        sourceNodeId: e.source,
+        sourceOutput: e.sourceHandle || 'main',
+        targetNodeId: e.target,
+        targetInput: e.targetHandle || 'main',
+        type: e.type || 'smoothstep'
+      }))
       await onSave?.({
         nodes,
-        connections: edges
+        connections
       })
       setIsDirty(false)
     } catch (error) {
@@ -396,8 +477,8 @@ function WorkflowCanvasInner({
         <WorkflowToolbar
           workflow={workflow}
           isDirty={isDirty}
-          canUndo={historyIndex > 0}
-          canRedo={historyIndex < history.length - 1}
+          canUndo={historyIndexRef.current > 0}
+          canRedo={historyIndexRef.current < historyRef.current.length - 1}
           isActive={workflow?.active}
           isSaving={isSaving}
           isExecuting={isExecuting}
@@ -417,6 +498,11 @@ function WorkflowCanvasInner({
           onExport={handleExport}
           onImport={handleImport}
           onBack={onBack}
+          onOpenHistory={() => {
+            setShowDebugPanel(true)
+            setDebugPanelExpanded(true)
+          }}
+          onNameChange={onNameChange}
         />
 
         {/* React Flow Canvas */}

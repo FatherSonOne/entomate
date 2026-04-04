@@ -30,7 +30,11 @@ class AutomationEngine {
       'auto_assign': this.handleAutoAssign.bind(this),
       'auto_prioritize': this.handleAutoPrioritize.bind(this),
       'suggest_deadline': this.handleSuggestDeadline.bind(this),
-      'detect_followups': this.handleDetectFollowups.bind(this)
+      'detect_followups': this.handleDetectFollowups.bind(this),
+      // Aliases for AI agent action types
+      'post_to_pulse': this.handlePostToChat.bind(this),
+      'create_onboarding_project': this.handleCreateProject.bind(this),
+      'assign_task': this.handleAutoAssign.bind(this)
     };
 
     // Retry configuration

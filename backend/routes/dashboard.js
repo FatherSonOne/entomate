@@ -4,10 +4,15 @@
  */
 
 const express = require('express');
-const { supabase } = require('../config/supabase');
+const { supabase, supabaseAdmin } = require('../config/supabase');
+const { authenticate } = require('../middleware/auth');
 const log = require('../utils/log');
+const { aggregateTeamWorkload } = require('../utils/teamWorkload');
 
 const router = express.Router();
+
+// Require authentication for all dashboard routes
+router.use(authenticate);
 
 /**
  * GET /api/dashboard/projects
@@ -485,6 +490,140 @@ router.get('/insights', async (req, res) => {
 });
 
 /**
+ * GET /api/dashboard/project-insights
+ * Get dashboard insights aggregated from projects + tasks tables (not meetings)
+ */
+router.get('/project-insights', async (req, res) => {
+  try {
+    log.info('Generating project-based insights...');
+
+    if (!supabase) {
+      return res.status(503).json({ error: 'Database not configured' });
+    }
+
+    // Get all projects
+    const { data: projects } = await supabase
+      .from('projects')
+      .select('id, name, status, start_date, end_date, created_at');
+
+    // Get all tasks
+    const { data: tasks } = await supabase
+      .from('tasks')
+      .select('id, project_id, status, priority, due_date, assigned_to, completed_at');
+
+    const allProjects = projects || [];
+    const allTasks = tasks || [];
+    const now = new Date();
+
+    // Project status counts
+    const projectStatusCounts = {
+      planning: allProjects.filter(p => p.status === 'planning').length,
+      active: allProjects.filter(p => p.status === 'active').length,
+      completed: allProjects.filter(p => p.status === 'completed').length,
+      archived: allProjects.filter(p => p.status === 'archived').length
+    };
+
+    // Task status counts
+    const statusCounts = {
+      open: allTasks.filter(t => t.status === 'open').length,
+      in_progress: allTasks.filter(t => t.status === 'in_progress').length,
+      review: allTasks.filter(t => t.status === 'review').length,
+      done: allTasks.filter(t => t.status === 'done').length,
+      blocked: allTasks.filter(t => t.status === 'blocked').length
+    };
+
+    // Priority counts
+    const priorityCounts = {
+      high: allTasks.filter(t => t.priority === 'high').length,
+      medium: allTasks.filter(t => t.priority === 'medium').length,
+      low: allTasks.filter(t => t.priority === 'low').length
+    };
+
+    // Overdue counts
+    const overdueItems = allTasks.filter(t =>
+      t.due_date && new Date(t.due_date) < now && t.status !== 'done'
+    ).length;
+
+    const overdueProjects = allProjects.filter(p =>
+      p.end_date && new Date(p.end_date) < now && p.status !== 'completed' && p.status !== 'archived'
+    ).length;
+
+    // Overall metrics
+    const totalProjects = allProjects.length;
+    const totalTasks = allTasks.length;
+    const completedTasks = statusCounts.done;
+    const overallCompletion = totalTasks > 0
+      ? Math.round((completedTasks / totalTasks) * 100)
+      : 0;
+
+    // Team workload from tasks (excludes unassigned for global view)
+    const teamWorkload = aggregateTeamWorkload(allTasks.filter(t => t.assigned_to));
+
+    // Generate insights
+    const insights = [];
+    if (overdueItems > 0) {
+      insights.push({
+        type: 'warning',
+        message: `You have ${overdueItems} overdue task${overdueItems > 1 ? 's' : ''} that need attention.`
+      });
+    }
+    if (overdueProjects > 0) {
+      insights.push({
+        type: 'warning',
+        message: `${overdueProjects} project${overdueProjects > 1 ? 's' : ''} past their end date.`
+      });
+    }
+    if (overallCompletion > 75) {
+      insights.push({
+        type: 'success',
+        message: `Great progress! Overall completion rate is ${overallCompletion}%.`
+      });
+    }
+    if (priorityCounts.high > 5) {
+      insights.push({
+        type: 'warning',
+        message: `${priorityCounts.high} high-priority tasks. Consider delegating or prioritizing.`
+      });
+    }
+    if (statusCounts.blocked > 0) {
+      insights.push({
+        type: 'warning',
+        message: `${statusCounts.blocked} task${statusCounts.blocked > 1 ? 's are' : ' is'} blocked.`
+      });
+    }
+    if (insights.length === 0 && totalProjects > 0) {
+      insights.push({
+        type: 'info',
+        message: `${totalProjects} project${totalProjects > 1 ? 's' : ''} with ${totalTasks} total tasks.`
+      });
+    }
+
+    res.json({
+      metrics: {
+        totalProjects,
+        totalTasks,
+        completedTasks,
+        overdueItems,
+        overdueProjects,
+        overallCompletion
+      },
+      projectStatusCounts,
+      statusCounts,
+      priorityCounts,
+      teamWorkload,
+      insights
+    });
+
+  } catch (error) {
+    log.error('Error generating project insights:', { error: error.message || error });
+    res.status(500).json({
+      error: 'Failed to generate project insights',
+      details: error.message
+    });
+  }
+});
+
+/**
  * GET /api/dashboard/summary
  * Quick summary stats for dashboard header
  */
@@ -524,6 +663,41 @@ router.get('/summary', async (req, res) => {
   } catch (error) {
     log.error('Error fetching summary:', { error: error.message || error });
     res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/dashboard/refresh-views
+ * Refresh materialized dashboard views (project_statistics, team_workload)
+ */
+router.post('/refresh-views', async (req, res) => {
+  try {
+    log.info('Refreshing materialized dashboard views...');
+
+    const { error } = await supabaseAdmin.rpc('refresh_dashboard_views');
+
+    if (error) {
+      // If materialized views don't exist yet, the function won't exist either
+      if (error.message?.includes('does not exist')) {
+        return res.json({
+          success: true,
+          message: 'Materialized views not yet created — using regular views'
+        });
+      }
+      throw error;
+    }
+
+    log.info('Dashboard views refreshed successfully');
+    res.json({
+      success: true,
+      message: 'Dashboard views refreshed'
+    });
+  } catch (error) {
+    log.error('Error refreshing views:', { error: error.message || error });
+    res.status(500).json({
+      error: 'Failed to refresh views',
+      details: error.message
+    });
   }
 });
 

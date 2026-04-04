@@ -26,7 +26,7 @@ const CACHE_TTL = {
  * POST /api/search
  * Full-text and semantic search across meetings, projects, tasks
  */
-router.post('/', async (req, res) => {
+router.post('/', authenticate, async (req, res) => {
   try {
     const {
       query,
@@ -184,7 +184,7 @@ router.post('/', async (req, res) => {
     const executionTime = Date.now() - startTime;
 
     // Log search to history
-    await logSearch(query, 'keyword', limitedResults.length, executionTime);
+    await logSearch(query, 'keyword', limitedResults.length, executionTime, req.user.id);
 
     const response = {
       query,
@@ -201,7 +201,7 @@ router.post('/', async (req, res) => {
 
   } catch (error) {
     log.error('Error searching:', { error: error.message || error });
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Search failed' });
   }
 });
 
@@ -209,7 +209,7 @@ router.post('/', async (req, res) => {
  * POST /api/search/semantic
  * Semantic search using embeddings
  */
-router.post('/semantic', async (req, res) => {
+router.post('/semantic', authenticate, async (req, res) => {
   try {
     const { query, limit = 10, threshold = 0.5 } = req.body;
 
@@ -249,7 +249,7 @@ router.post('/semantic', async (req, res) => {
     const executionTime = Date.now() - startTime;
 
     // Log search to history
-    await logSearch(query, 'semantic', results.length, executionTime);
+    await logSearch(query, 'semantic', results.length, executionTime, req.user.id);
 
     const response = {
       query,
@@ -266,7 +266,7 @@ router.post('/semantic', async (req, res) => {
 
   } catch (error) {
     log.error('Error in semantic search:', { error: error.message || error });
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Semantic search failed' });
   }
 });
 
@@ -274,7 +274,7 @@ router.post('/semantic', async (req, res) => {
  * POST /api/search/ask
  * Ask AI a question about meetings
  */
-router.post('/ask', async (req, res) => {
+router.post('/ask', authenticate, async (req, res) => {
   try {
     const { question, conversationId, meetingIds } = req.body;
 
@@ -295,7 +295,7 @@ router.post('/ask', async (req, res) => {
 
   } catch (error) {
     log.error('Error in ask endpoint:', { error: error.message || error });
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Failed to answer question' });
   }
 });
 
@@ -303,7 +303,7 @@ router.post('/ask', async (req, res) => {
  * POST /api/search/ask/stream
  * Ask AI a question with streaming response (SSE)
  */
-router.post('/ask/stream', async (req, res) => {
+router.post('/ask/stream', authenticate, async (req, res) => {
   try {
     const { question, conversationId, meetingIds } = req.body;
 
@@ -350,9 +350,9 @@ router.post('/ask/stream', async (req, res) => {
   } catch (error) {
     log.error('Error in streaming ask endpoint:', { error: error.message || error });
     if (!res.headersSent) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: 'Streaming failed' });
     } else {
-      res.write(`data: ${JSON.stringify({ type: 'error', message: error.message })}\n\n`);
+      res.write(`data: ${JSON.stringify({ type: 'error', message: 'An error occurred' })}\n\n`);
       res.end();
     }
   }
@@ -362,7 +362,7 @@ router.post('/ask/stream', async (req, res) => {
  * POST /api/search/ask/follow-up
  * Ask follow-up question in existing conversation
  */
-router.post('/ask/follow-up', async (req, res) => {
+router.post('/ask/follow-up', authenticate, async (req, res) => {
   try {
     const { question, conversationId } = req.body;
 
@@ -380,7 +380,7 @@ router.post('/ask/follow-up', async (req, res) => {
 
   } catch (error) {
     log.error('Follow-up error:', { error: error.message || error });
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Follow-up failed' });
   }
 });
 
@@ -388,7 +388,7 @@ router.post('/ask/follow-up', async (req, res) => {
  * GET /api/search/conversations
  * List all conversations
  */
-router.get('/conversations', async (req, res) => {
+router.get('/conversations', authenticate, async (req, res) => {
   try {
     const { limit = 20 } = req.query;
 
@@ -398,7 +398,7 @@ router.get('/conversations', async (req, res) => {
 
   } catch (error) {
     log.error('Error listing conversations:', { error: error.message || error });
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Failed to list conversations' });
   }
 });
 
@@ -406,7 +406,7 @@ router.get('/conversations', async (req, res) => {
  * GET /api/search/conversations/:id
  * Get conversation messages
  */
-router.get('/conversations/:id', async (req, res) => {
+router.get('/conversations/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -416,7 +416,7 @@ router.get('/conversations/:id', async (req, res) => {
 
   } catch (error) {
     log.error('Error fetching conversation:', { error: error.message || error });
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Failed to fetch conversation' });
   }
 });
 
@@ -424,7 +424,7 @@ router.get('/conversations/:id', async (req, res) => {
  * DELETE /api/search/conversations/:id
  * Delete a conversation
  */
-router.delete('/conversations/:id', async (req, res) => {
+router.delete('/conversations/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -434,7 +434,7 @@ router.delete('/conversations/:id', async (req, res) => {
 
   } catch (error) {
     log.error('Error deleting conversation:', { error: error.message || error });
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Failed to delete conversation' });
   }
 });
 
@@ -442,7 +442,7 @@ router.delete('/conversations/:id', async (req, res) => {
  * GET /api/search/history
  * Get search history
  */
-router.get('/history', async (req, res) => {
+router.get('/history', authenticate, async (req, res) => {
   try {
     const { limit = 50 } = req.query;
 
@@ -453,6 +453,7 @@ router.get('/history', async (req, res) => {
     const { data: history, error } = await supabase
       .from('search_history')
       .select('*')
+      .eq('user_id', req.user.id)
       .order('created_at', { ascending: false })
       .limit(parseInt(limit));
 
@@ -464,7 +465,7 @@ router.get('/history', async (req, res) => {
 
   } catch (error) {
     log.error('Error fetching history:', { error: error.message || error });
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Failed to fetch history' });
   }
 });
 
@@ -472,19 +473,19 @@ router.get('/history', async (req, res) => {
  * DELETE /api/search/history
  * Clear search history
  */
-router.delete('/history', async (req, res) => {
+router.delete('/history', authenticate, async (req, res) => {
   try {
     if (!supabase) {
       return res.json({ success: true });
     }
 
-    await supabase.from('search_history').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    await supabase.from('search_history').delete().eq('user_id', req.user.id);
 
     res.json({ success: true });
 
   } catch (error) {
     log.error('Error clearing history:', { error: error.message || error });
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Failed to clear history' });
   }
 });
 
@@ -492,7 +493,7 @@ router.delete('/history', async (req, res) => {
  * POST /api/search/save
  * Save a search
  */
-router.post('/save', async (req, res) => {
+router.post('/save', authenticate, async (req, res) => {
   try {
     const { name, query, searchType = 'semantic' } = req.body;
 
@@ -509,7 +510,8 @@ router.post('/save', async (req, res) => {
       .insert({
         name,
         query,
-        search_type: searchType
+        search_type: searchType,
+        user_id: req.user.id
       })
       .select()
       .single();
@@ -520,7 +522,7 @@ router.post('/save', async (req, res) => {
 
   } catch (error) {
     log.error('Error saving search:', { error: error.message || error });
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Failed to save search' });
   }
 });
 
@@ -528,7 +530,7 @@ router.post('/save', async (req, res) => {
  * GET /api/search/saved
  * Get saved searches
  */
-router.get('/saved', async (req, res) => {
+router.get('/saved', authenticate, async (req, res) => {
   try {
     if (!supabase) {
       return res.json({ saved: [] });
@@ -537,6 +539,7 @@ router.get('/saved', async (req, res) => {
     const { data, error } = await supabase
       .from('saved_searches')
       .select('*')
+      .eq('user_id', req.user.id)
       .order('created_at', { ascending: false });
 
     if (error && error.code !== '42P01') {
@@ -547,7 +550,7 @@ router.get('/saved', async (req, res) => {
 
   } catch (error) {
     log.error('Error fetching saved searches:', { error: error.message || error });
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Failed to fetch saved searches' });
   }
 });
 
@@ -555,7 +558,7 @@ router.get('/saved', async (req, res) => {
  * DELETE /api/search/saved/:id
  * Delete a saved search
  */
-router.delete('/saved/:id', async (req, res) => {
+router.delete('/saved/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -563,13 +566,13 @@ router.delete('/saved/:id', async (req, res) => {
       return res.json({ success: true });
     }
 
-    await supabase.from('saved_searches').delete().eq('id', id);
+    await supabase.from('saved_searches').delete().eq('id', id).eq('user_id', req.user.id);
 
     res.json({ success: true });
 
   } catch (error) {
     log.error('Error deleting saved search:', { error: error.message || error });
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Failed to delete saved search' });
   }
 });
 
@@ -724,7 +727,7 @@ router.get('/suggestions', authenticate, async (req, res) => {
 
   } catch (error) {
     log.error('Error getting suggestions:', { error: error.message || error });
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Failed to get suggestions' });
   }
 });
 
@@ -732,7 +735,7 @@ router.get('/suggestions', authenticate, async (req, res) => {
  * GET /api/search/recent
  * Get recent searches and activity
  */
-router.get('/recent', async (req, res) => {
+router.get('/recent', authenticate, async (req, res) => {
   try {
     if (!supabase) {
       return res.json({ recent: [] });
@@ -761,7 +764,7 @@ router.get('/recent', async (req, res) => {
 
   } catch (error) {
     log.error('Error getting recent:', { error: error.message || error });
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Failed to get recent items' });
   }
 });
 
@@ -769,7 +772,7 @@ router.get('/recent', async (req, res) => {
  * GET /api/search/analytics
  * Get comprehensive search analytics
  */
-router.get('/analytics', async (req, res) => {
+router.get('/analytics', authenticate, async (req, res) => {
   try {
     if (!supabase) {
       return res.json({ analytics: null });
@@ -794,8 +797,8 @@ router.get('/analytics', async (req, res) => {
         startDate = null;
     }
 
-    // Base query with optional date filter
-    let baseQuery = supabase.from('search_history').select('*');
+    // Base query with optional date filter, scoped to current user
+    let baseQuery = supabase.from('search_history').select('*').eq('user_id', req.user.id);
     if (startDate) {
       baseQuery = baseQuery.gte('created_at', startDate.toISOString());
     }
@@ -887,7 +890,7 @@ router.get('/analytics', async (req, res) => {
 
   } catch (error) {
     log.error('Error getting analytics:', { error: error.message || error });
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Failed to get analytics' });
   }
 });
 
@@ -895,7 +898,7 @@ router.get('/analytics', async (req, res) => {
  * POST /api/search/export
  * Export search results to CSV or JSON
  */
-router.post('/export', async (req, res) => {
+router.post('/export', authenticate, async (req, res) => {
   try {
     const { results, format = 'csv', query = '', searchType = '' } = req.body;
 
@@ -959,7 +962,7 @@ router.post('/export', async (req, res) => {
 
   } catch (error) {
     log.error('Error exporting results:', { error: error.message || error });
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Export failed' });
   }
 });
 
@@ -978,7 +981,7 @@ function escapeCsvField(field) {
 /**
  * Helper: Log search to history
  */
-async function logSearch(query, searchType, resultsCount, executionTime) {
+async function logSearch(query, searchType, resultsCount, executionTime, userId) {
   try {
     if (!supabase) return;
 
@@ -988,7 +991,8 @@ async function logSearch(query, searchType, resultsCount, executionTime) {
         query,
         search_type: searchType,
         results_count: resultsCount,
-        execution_time: executionTime
+        execution_time: executionTime,
+        user_id: userId
       });
   } catch (error) {
     // Non-critical, don't throw
@@ -1007,7 +1011,7 @@ router.get('/cache/stats', authenticate, async (req, res) => {
       suggestionCache: suggestionCache.getStats()
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Failed to get cache stats' });
   }
 });
 
@@ -1015,7 +1019,7 @@ router.get('/cache/stats', authenticate, async (req, res) => {
  * POST /api/search/cache/invalidate
  * Invalidate cache (called when new content is added)
  */
-router.post('/cache/invalidate', async (req, res) => {
+router.post('/cache/invalidate', authenticate, async (req, res) => {
   try {
     const { pattern } = req.body;
 
@@ -1031,7 +1035,7 @@ router.post('/cache/invalidate', async (req, res) => {
     log.info(`Cache invalidated: ${cleared} entries cleared`);
     res.json({ success: true, cleared });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Cache invalidation failed' });
   }
 });
 

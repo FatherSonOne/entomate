@@ -1,52 +1,89 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  Plus, Search, Filter, CheckSquare, Clock, AlertCircle, Trash2, Circle, CheckCircle2, Target
+  Plus, Search, CheckSquare, Clock, AlertCircle, Trash2, Circle, CheckCircle2,
+  LayoutList, Kanban, ChevronLeft, ChevronRight, Edit3, ArrowUpDown, ArrowUp, ArrowDown,
+  X, CheckCheck
 } from 'lucide-react'
 import { tasksApi } from '../services/api'
-import { GuideCard, PageHeader, Skeleton } from '../components/SharedUI'
-import { AgentRecommendationPanel } from '../components/intelligence'
-import { ExplanationModal } from '../components/explainability'
+import { PageHeader, Skeleton } from '../components/SharedUI'
 import { VCButton, VCBadge } from '../components/vc'
 import { useConfirm } from '../components/vc/ConfirmDialog'
+import { useToast } from '../components/vc/ToastProvider'
 import ErrorState from '../components/vc/ErrorState'
+import KanbanBoard from '../components/KanbanBoard'
+import TaskEditModal from '../components/TaskEditModal'
+
+const PAGE_SIZE = 25
+
+const STATUS_LABELS = {
+  all: 'All',
+  open: 'Open',
+  in_progress: 'In Progress',
+  review: 'Review',
+  done: 'Done',
+  blocked: 'Blocked'
+}
+
+const SORT_OPTIONS = [
+  { value: 'created_at', label: 'Created' },
+  { value: 'due_date', label: 'Due Date' },
+  { value: 'priority', label: 'Priority' },
+  { value: 'status', label: 'Status' },
+  { value: 'title', label: 'Title' }
+]
 
 export default function Tasks() {
   const confirm = useConfirm()
+  const toast = useToast()
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [tagFilter, setTagFilter] = useState(null)
   const [showCreate, setShowCreate] = useState(false)
-  const [newTask, setNewTask] = useState({ title: '', priority: 'medium', dueDate: '' })
+  const [newTask, setNewTask] = useState({ title: '', description: '', priority: 'medium', dueDate: '', tags: '' })
   const [creating, setCreating] = useState(false)
-  const [wizardStep, setWizardStep] = useState(0) // 0: Create, 1: Prioritize, 2: Complete
   const [formErrors, setFormErrors] = useState({})
+  const [viewMode, setViewMode] = useState('list')
+  const [page, setPage] = useState(0)
+  const [hasMore, setHasMore] = useState(false)
+  const [totalCount, setTotalCount] = useState(0)
+  const [editingTask, setEditingTask] = useState(null)
+  const [sortBy, setSortBy] = useState('created_at')
+  const [sortDir, setSortDir] = useState('desc')
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [bulkAction, setBulkAction] = useState(false)
+  const searchTimerRef = useRef(null)
 
-  // AI Recommendations state
-  const [recommendations, setRecommendations] = useState(null)
-  const [loadingRecommendations, setLoadingRecommendations] = useState(false)
-  const [showExplanation, setShowExplanation] = useState(false)
-  const [explanationData, setExplanationData] = useState(null)
+  // Debounce search input
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+    searchTimerRef.current = setTimeout(() => {
+      setDebouncedSearch(searchQuery)
+      setPage(0)
+    }, 300)
+    return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current) }
+  }, [searchQuery])
 
   useEffect(() => {
-    loadTasks()
-  }, [statusFilter])
+    if (viewMode === 'list') loadTasks()
+  }, [statusFilter, debouncedSearch, page, viewMode, sortBy, sortDir])
 
   const loadTasks = async () => {
     try {
       setError(null)
       setLoading(true)
-      const params = { limit: 100 }
-      if (statusFilter !== 'all') {
-        params.status = statusFilter
-      }
+      const params = { limit: PAGE_SIZE, offset: page * PAGE_SIZE, sortBy, sortDir }
+      if (statusFilter !== 'all') params.status = statusFilter
+      if (debouncedSearch) params.search = debouncedSearch
       const data = await tasksApi.list(params)
       setTasks(data.tasks || [])
-      if (data.tasks && data.tasks.length > 0) {
-        setWizardStep(2) // If tasks exist, show complete step
-      }
+      setHasMore(data.hasMore || false)
+      setTotalCount(data.count || 0)
+      setSelectedIds(new Set())
     } catch (err) {
       console.error('Failed to load tasks:', err)
       setError(err.message || 'Failed to load tasks')
@@ -54,6 +91,18 @@ export default function Tasks() {
       setLoading(false)
     }
   }
+
+  // Collect all unique tags from loaded tasks for filtering
+  const allTags = useMemo(() => {
+    const tagSet = new Set()
+    tasks.forEach(t => (t.tags || []).forEach(tag => tagSet.add(tag)))
+    return [...tagSet].sort()
+  }, [tasks])
+
+  // Filter by tag (client-side, on loaded page)
+  const displayedTasks = tagFilter
+    ? tasks.filter(t => (t.tags || []).includes(tagFilter))
+    : tasks
 
   const validate = () => {
     const errs = {}
@@ -69,13 +118,21 @@ export default function Tasks() {
 
     try {
       setCreating(true)
-      await tasksApi.create(newTask)
-      setNewTask({ title: '', priority: 'medium', dueDate: '' })
+      const payload = {
+        title: newTask.title,
+        priority: newTask.priority,
+        dueDate: newTask.dueDate || undefined,
+        description: newTask.description || undefined,
+        tags: newTask.tags ? newTask.tags.split(',').map(t => t.trim()).filter(Boolean) : undefined
+      }
+      await tasksApi.create(payload)
+      setNewTask({ title: '', description: '', priority: 'medium', dueDate: '', tags: '' })
       setShowCreate(false)
-      setWizardStep(1)
       loadTasks()
+      toast.success('Created', 'Task created successfully')
     } catch (error) {
       console.error('Failed to create task:', error)
+      toast.error('Error', error.message || 'Failed to create task')
     } finally {
       setCreating(false)
     }
@@ -87,6 +144,7 @@ export default function Tasks() {
       loadTasks()
     } catch (error) {
       console.error('Failed to complete task:', error)
+      toast.error('Error', 'Failed to complete task')
     }
   }
 
@@ -96,6 +154,7 @@ export default function Tasks() {
       loadTasks()
     } catch (error) {
       console.error('Failed to reopen task:', error)
+      toast.error('Error', 'Failed to reopen task')
     }
   }
 
@@ -106,88 +165,87 @@ export default function Tasks() {
     try {
       await tasksApi.delete(id)
       setTasks(tasks.filter(t => t.id !== id))
+      toast.success('Deleted', 'Task deleted')
     } catch (error) {
       console.error('Failed to delete task:', error)
+      toast.error('Error', 'Failed to delete task')
     }
   }
 
-  // Fetch AI recommendations when title changes
-  useEffect(() => {
-    const fetchRecommendations = async () => {
-      if (!newTask.title || newTask.title.length < 5) {
-        setRecommendations(null)
-        return
-      }
-
-      try {
-        setLoadingRecommendations(true)
-        // Call the agent recommendations API
-        const response = await fetch('/api/agents/recommendations', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            taskTitle: newTask.title,
-            context: { existingTasks: tasks.length }
-          })
-        })
-        const data = await response.json()
-        if (data.success) {
-          setRecommendations(data.recommendations)
-        }
-      } catch (error) {
-        console.error('Failed to fetch recommendations:', error)
-      } finally {
-        setLoadingRecommendations(false)
-      }
-    }
-
-    // Debounce the API call
-    const timeoutId = setTimeout(fetchRecommendations, 800)
-    return () => clearTimeout(timeoutId)
-  }, [newTask.title, tasks.length])
-
-  const handleAcceptRecommendation = (type, value) => {
-    if (type === 'assignment') {
-      setNewTask({ ...newTask, assignedTo: value })
-    } else if (type === 'priority') {
-      setNewTask({ ...newTask, priority: value })
-    } else if (type === 'deadline') {
-      setNewTask({ ...newTask, dueDate: value })
-    }
-  }
-
-  const handleOverrideRecommendation = async (type, aiValue, userValue, reason) => {
-    // Capture feedback for the learning system
-    try {
-      await fetch('/api/learning/feedback', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          agentType: type === 'assignment' ? 'assignment' : type === 'priority' ? 'priority' : 'deadline',
-          recommendation: aiValue,
-          userChoice: userValue,
-          reason,
-          context: { taskTitle: newTask.title }
-        })
-      })
-    } catch (error) {
-      console.error('Failed to capture feedback:', error)
-    }
-  }
-
-  const handleShowExplanation = (type, data) => {
-    setExplanationData({
-      agentType: type,
-      recommendation: data.value,
-      confidence: data.confidence,
-      factors: data.factors || []
+  // Bulk operations
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
     })
-    setShowExplanation(true)
   }
 
-  const filteredTasks = tasks.filter(task =>
-    task.title?.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const toggleSelectAll = () => {
+    if (selectedIds.size === displayedTasks.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(displayedTasks.map(t => t.id)))
+    }
+  }
+
+  const handleBulkStatus = async (status) => {
+    if (selectedIds.size === 0) return
+    const ok = await confirm({
+      title: 'Bulk Update',
+      message: `Mark ${selectedIds.size} task(s) as "${status}"?`,
+      confirmLabel: 'Update',
+      variant: 'primary'
+    })
+    if (!ok) return
+
+    try {
+      await tasksApi.bulkUpdateStatus([...selectedIds], status)
+      toast.success('Updated', `${selectedIds.size} task(s) updated to ${status}`)
+      setSelectedIds(new Set())
+      loadTasks()
+    } catch (error) {
+      console.error('Bulk status update failed:', error)
+      toast.error('Error', 'Bulk update failed')
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return
+    const ok = await confirm({
+      title: 'Delete Tasks',
+      message: `Delete ${selectedIds.size} task(s)? This cannot be undone.`,
+      confirmLabel: 'Delete All',
+      variant: 'danger'
+    })
+    if (!ok) return
+
+    try {
+      let deleted = 0
+      for (const id of selectedIds) {
+        await tasksApi.delete(id)
+        deleted++
+      }
+      toast.success('Deleted', `${deleted} task(s) deleted`)
+      setSelectedIds(new Set())
+      loadTasks()
+    } catch (error) {
+      console.error('Bulk delete failed:', error)
+      toast.error('Error', 'Some tasks could not be deleted')
+      loadTasks()
+    }
+  }
+
+  const handleSort = (field) => {
+    if (sortBy === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortBy(field)
+      setSortDir(field === 'title' ? 'asc' : 'desc')
+    }
+    setPage(0)
+  }
 
   const isOverdue = (dueDate) => {
     if (!dueDate) return false
@@ -205,11 +263,18 @@ export default function Tasks() {
 
   const getStatusBadge = (status) => {
     switch (status) {
-      case 'done':        return <VCBadge color="mint">{status}</VCBadge>
+      case 'done':        return <VCBadge color="mint">Done</VCBadge>
       case 'in_progress': return <VCBadge color="amber">In Progress</VCBadge>
-      case 'blocked':     return <VCBadge color="crimson">{status}</VCBadge>
+      case 'review':      return <VCBadge color="phosphor">Review</VCBadge>
+      case 'blocked':     return <VCBadge color="crimson">Blocked</VCBadge>
+      case 'open':        return <VCBadge color="neutral">Open</VCBadge>
       default:            return <VCBadge color="neutral">{status}</VCBadge>
     }
+  }
+
+  const SortIcon = ({ field }) => {
+    if (sortBy !== field) return <ArrowUpDown size={12} style={{ opacity: 0.3 }} />
+    return sortDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
   }
 
   if (error) return (
@@ -228,7 +293,6 @@ export default function Tasks() {
             variant="primary"
             onClick={() => {
               setShowCreate(!showCreate)
-              setWizardStep(0)
               setFormErrors({})
             }}
           >
@@ -236,12 +300,6 @@ export default function Tasks() {
             New Task
           </VCButton>
         }
-      />
-
-      <GuideCard
-        title="Task Workflow"
-        steps={['Create Task', 'Set Priority', 'Complete & Review']}
-        activeStep={wizardStep}
       />
 
       {/* Create form */}
@@ -265,6 +323,17 @@ export default function Tasks() {
                 required
               />
               {formErrors.title && <span style={{ color: 'var(--c)', fontSize: 12, marginTop: 2, display: 'block' }}>{formErrors.title}</span>}
+            </div>
+            <div>
+              <label className="label">Description</label>
+              <textarea
+                className="input"
+                placeholder="Add details about this task..."
+                value={newTask.description}
+                onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
+                rows={3}
+                style={{ resize: 'vertical', minHeight: 60 }}
+              />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -290,34 +359,16 @@ export default function Tasks() {
                 {formErrors.dueDate && <span style={{ color: 'var(--c)', fontSize: 12, marginTop: 2, display: 'block' }}>{formErrors.dueDate}</span>}
               </div>
             </div>
-
-            {/* AI Recommendations Panel */}
-            {(recommendations || loadingRecommendations) && newTask.title.length >= 5 && (
-              <div className="animate-fade-in">
-                {loadingRecommendations ? (
-                  <div
-                    className="border rounded-lg p-6 text-center"
-                    style={{ background: 'var(--bg-elevated)', borderColor: 'rgba(248,240,242,.08)' }}
-                  >
-                    <div
-                      className="inline-block animate-spin rounded-full h-8 w-8 border-b-2"
-                      style={{ borderColor: 'var(--accent-primary)' }}
-                    ></div>
-                    <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                      Getting AI recommendations...
-                    </p>
-                  </div>
-                ) : recommendations ? (
-                  <AgentRecommendationPanel
-                    recommendations={recommendations}
-                    onAccept={handleAcceptRecommendation}
-                    onOverride={handleOverrideRecommendation}
-                    onExplain={handleShowExplanation}
-                    taskData={newTask}
-                  />
-                ) : null}
-              </div>
-            )}
+            <div>
+              <label className="label">Tags</label>
+              <input
+                type="text"
+                className="input"
+                placeholder="Comma-separated tags (e.g. urgent, design, backend)"
+                value={newTask.tags}
+                onChange={(e) => setNewTask({ ...newTask, tags: e.target.value })}
+              />
+            </div>
 
             <div className="flex gap-3">
               <VCButton type="submit" variant="primary" disabled={creating}>
@@ -335,8 +386,8 @@ export default function Tasks() {
         </div>
       )}
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-6">
+      {/* Filters + View Toggle */}
+      <div className="flex flex-col sm:flex-row gap-4 mb-4">
         <div className="relative flex-1">
           <Search
             className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
@@ -344,161 +395,376 @@ export default function Tasks() {
           />
           <input
             type="text"
-            placeholder="Search tasks by title..."
+            placeholder="Search tasks..."
             className="input pl-10"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        <div className="flex gap-2 flex-wrap">
-          {['all', 'open', 'in_progress', 'done'].map((status) => (
-            <VCButton
-              key={status}
-              onClick={() => setStatusFilter(status)}
-              variant={statusFilter === status ? 'primary' : 'ghost'}
-              size="sm"
+        <div className="flex gap-2 items-center">
+          {/* Sort dropdown */}
+          {viewMode === 'list' && (
+            <select
+              className="input"
+              value={sortBy}
+              onChange={(e) => handleSort(e.target.value)}
+              style={{ fontSize: 13, padding: '6px 10px', width: 'auto', minWidth: 120 }}
             >
-              {status === 'all' ? 'All' :
-               status === 'in_progress' ? 'In Progress' :
-               status.charAt(0).toUpperCase() + status.slice(1)}
-            </VCButton>
-          ))}
+              {SORT_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>
+                  Sort: {opt.label} {sortBy === opt.value ? (sortDir === 'asc' ? '\u2191' : '\u2193') : ''}
+                </option>
+              ))}
+            </select>
+          )}
+
+          <div className="flex border rounded-lg overflow-hidden" style={{ borderColor: 'rgba(248,240,242,.12)' }}>
+            <button
+              onClick={() => setViewMode('list')}
+              className="p-2 transition-colors"
+              style={{
+                background: viewMode === 'list' ? 'var(--accent-primary)' : 'transparent',
+                color: viewMode === 'list' ? '#fff' : 'var(--text-tertiary)'
+              }}
+              title="List view"
+            >
+              <LayoutList size={16} />
+            </button>
+            <button
+              onClick={() => setViewMode('kanban')}
+              className="p-2 transition-colors"
+              style={{
+                background: viewMode === 'kanban' ? 'var(--accent-primary)' : 'transparent',
+                color: viewMode === 'kanban' ? '#fff' : 'var(--text-tertiary)'
+              }}
+              title="Board view"
+            >
+              <Kanban size={16} />
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Tasks list */}
-      <div className="vc">
-        {loading ? (
-          <Skeleton className="h-16" count={8} />
-        ) : filteredTasks.length === 0 ? (
-          <div
-            className="p-12 text-center border-dashed border-2 m-4 rounded-lg"
-            style={{ borderColor: 'rgba(248,240,242,.08)' }}
-          >
-            <CheckSquare className="w-16 h-16 mx-auto mb-4 opacity-50" style={{ color: 'var(--text-tertiary)' }} />
-            <h3
-              className="text-xl font-bold mb-2"
-              style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
-            >
-              No tasks found
-            </h3>
-            <p className="mb-6" style={{ color: 'var(--text-secondary)' }}>
-              {searchQuery || statusFilter !== 'all'
-                ? 'Try adjusting your filters'
-                : 'Create your first task to get started'
-              }
-            </p>
+      {/* Status filters (list view only) */}
+      {viewMode === 'list' && (
+        <div className="flex gap-2 flex-wrap mb-4">
+          {Object.entries(STATUS_LABELS).map(([value, label]) => (
             <VCButton
-              variant="primary"
-              onClick={() => {
-                setShowCreate(true)
-                setWizardStep(0)
+              key={value}
+              onClick={() => { setStatusFilter(value); setPage(0) }}
+              variant={statusFilter === value ? 'primary' : 'ghost'}
+              size="sm"
+            >
+              {label}
+            </VCButton>
+          ))}
+        </div>
+      )}
+
+      {/* Tag filter chips */}
+      {viewMode === 'list' && allTags.length > 0 && (
+        <div className="flex gap-1.5 flex-wrap mb-4 items-center">
+          <span className="text-xs mr-1" style={{ color: 'var(--text-tertiary)' }}>Tags:</span>
+          {allTags.map(tag => (
+            <button
+              key={tag}
+              onClick={() => setTagFilter(tagFilter === tag ? null : tag)}
+              className="px-2 py-0.5 rounded-full text-xs transition-colors"
+              style={{
+                background: tagFilter === tag ? 'var(--accent-primary)' : 'rgba(248,240,242,.08)',
+                color: tagFilter === tag ? '#fff' : 'var(--text-secondary)',
+                border: '1px solid',
+                borderColor: tagFilter === tag ? 'var(--accent-primary)' : 'rgba(248,240,242,.12)'
               }}
             >
-              <Plus size={16} />
-              Create Task
+              {tag}
+            </button>
+          ))}
+          {tagFilter && (
+            <button
+              onClick={() => setTagFilter(null)}
+              className="text-xs flex items-center gap-1 px-1.5 py-0.5"
+              style={{ color: 'var(--text-tertiary)' }}
+            >
+              <X size={12} /> Clear
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div
+          className="flex items-center gap-3 p-3 rounded-lg mb-4 animate-fade-in"
+          style={{ background: 'rgba(255,45,107,.08)', border: '1px solid rgba(255,45,107,.2)' }}
+        >
+          <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+            {selectedIds.size} selected
+          </span>
+          <div className="flex gap-2 ml-auto">
+            <VCButton size="sm" variant="ghost" onClick={() => handleBulkStatus('done')}>
+              <CheckCheck size={14} /> Mark Done
+            </VCButton>
+            <VCButton size="sm" variant="ghost" onClick={() => handleBulkStatus('in_progress')}>
+              In Progress
+            </VCButton>
+            <VCButton size="sm" variant="ghost" onClick={() => handleBulkStatus('blocked')}>
+              Blocked
+            </VCButton>
+            <VCButton size="sm" variant="danger" onClick={handleBulkDelete}>
+              <Trash2 size={14} /> Delete
+            </VCButton>
+            <VCButton size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
+              <X size={14} /> Cancel
             </VCButton>
           </div>
-        ) : (
-          <div className="divide-y" style={{ borderColor: 'rgba(248,240,242,.08)' }}>
-            {filteredTasks.map((task) => (
+        </div>
+      )}
+
+      {/* Kanban View */}
+      {viewMode === 'kanban' ? (
+        <KanbanBoard onTaskUpdate={loadTasks} />
+      ) : (
+        <>
+          {/* Tasks list */}
+          <div className="vc">
+            {loading ? (
+              <Skeleton className="h-16" count={8} />
+            ) : displayedTasks.length === 0 ? (
               <div
-                key={task.id}
-                className={`p-4 flex items-center gap-4 transition-colors group ${
-                  task.status === 'done' ? 'opacity-60' : ''
-                }`}
-                style={{ ['--hover-bg']: 'var(--bg-elevated)' }}
-                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-elevated)'}
-                onMouseLeave={e => e.currentTarget.style.background = ''}
+                className="p-12 text-center border-dashed border-2 m-4 rounded-lg"
+                style={{ borderColor: 'rgba(248,240,242,.08)' }}
               >
-                <button
-                  onClick={() => task.status === 'done' ? handleReopen(task.id) : handleComplete(task.id)}
-                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                    task.status === 'done' ? 'text-white' : ''
-                  }`}
-                  style={task.status === 'done'
-                    ? { background: 'var(--m)', borderColor: 'var(--m)' }
-                    : { borderColor: 'var(--text-tertiary)' }
+                <CheckSquare className="w-16 h-16 mx-auto mb-4 opacity-50" style={{ color: 'var(--text-tertiary)' }} />
+                <h3
+                  className="text-xl font-bold mb-2"
+                  style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
+                >
+                  No tasks found
+                </h3>
+                <p className="mb-6" style={{ color: 'var(--text-secondary)' }}>
+                  {debouncedSearch || statusFilter !== 'all' || tagFilter
+                    ? 'Try adjusting your filters'
+                    : 'Create your first task to get started'
                   }
-                  aria-label={task.status === 'done' ? 'Reopen task' : 'Complete task'}
-                >
-                  {task.status === 'done' ? (
-                    <CheckCircle2 size={16} />
-                  ) : (
-                    <Circle size={16} className="opacity-0 group-hover:opacity-100" />
-                  )}
-                </button>
-
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <p
-                      className={`font-medium ${task.status === 'done' ? 'line-through' : ''}`}
-                      style={{ color: task.status === 'done' ? 'var(--text-tertiary)' : 'var(--text-primary)' }}
-                    >
-                      {task.title}
-                    </p>
-                    {task.due_date && isOverdue(task.due_date) && task.status !== 'done' && (
-                      <AlertCircle size={16} style={{ color: 'var(--accent-primary)' }} />
-                    )}
-                  </div>
-                  <div
-                    className="flex items-center gap-3 text-xs"
-                    style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}
-                  >
-                    {task.due_date && (
-                      <span
-                        className="flex items-center gap-1"
-                        style={isOverdue(task.due_date) && task.status !== 'done'
-                          ? { color: 'var(--accent-primary)' }
-                          : {}
-                        }
-                      >
-                        <Clock size={12} />
-                        {new Date(task.due_date).toLocaleDateString()}
-                      </span>
-                    )}
-                    {task.project_id && (
-                      <Link
-                        to={`/projects/${task.project_id}`}
-                        style={{ color: 'var(--accent-primary)' }}
-                        className="hover:underline"
-                      >
-                        View Project
-                      </Link>
-                    )}
-                  </div>
-                </div>
-
-                {getPriorityBadge(task.priority)}
-                {getStatusBadge(task.status)}
-
+                </p>
                 <VCButton
-                  variant="danger"
-                  size="sm"
-                  onClick={() => handleDelete(task.id)}
-                  className="p-2 opacity-0 group-hover:opacity-100 transition-all"
-                  title="Delete task"
-                  aria-label="Delete task"
+                  variant="primary"
+                  onClick={() => setShowCreate(true)}
                 >
-                  <Trash2 size={16} />
+                  <Plus size={16} />
+                  Create Task
                 </VCButton>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+            ) : (
+              <>
+                {/* Column header with select-all */}
+                <div
+                  className="px-4 py-2 flex items-center gap-4 text-xs border-b"
+                  style={{ color: 'var(--text-tertiary)', borderColor: 'rgba(248,240,242,.08)', fontFamily: 'var(--font-mono)' }}
+                >
+                  <button
+                    onClick={toggleSelectAll}
+                    className="w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 transition-colors"
+                    style={{
+                      borderColor: selectedIds.size > 0 ? 'var(--accent-primary)' : 'var(--text-tertiary)',
+                      background: selectedIds.size === displayedTasks.length && displayedTasks.length > 0 ? 'var(--accent-primary)' : 'transparent',
+                      color: selectedIds.size === displayedTasks.length && displayedTasks.length > 0 ? '#fff' : 'var(--text-tertiary)'
+                    }}
+                    title="Select all"
+                  >
+                    {selectedIds.size === displayedTasks.length && displayedTasks.length > 0 && <CheckCircle2 size={12} />}
+                  </button>
+                  <span className="w-6" /> {/* spacer for complete button */}
+                  <button onClick={() => handleSort('title')} className="flex items-center gap-1 flex-1 hover:opacity-80">
+                    Task <SortIcon field="title" />
+                  </button>
+                  <button onClick={() => handleSort('priority')} className="flex items-center gap-1 hover:opacity-80" style={{ width: 80 }}>
+                    Priority <SortIcon field="priority" />
+                  </button>
+                  <button onClick={() => handleSort('status')} className="flex items-center gap-1 hover:opacity-80" style={{ width: 90 }}>
+                    Status <SortIcon field="status" />
+                  </button>
+                  <span style={{ width: 64 }} />
+                </div>
 
-      {/* Explanation Modal */}
-      {showExplanation && explanationData && (
-        <ExplanationModal
-          isOpen={showExplanation}
-          onClose={() => setShowExplanation(false)}
-          explanation={{
-            agentType: explanationData.agentType,
-            recommendation: explanationData.recommendation,
-            confidence: explanationData.confidence,
-            factors: explanationData.factors,
-            timestamp: new Date().toISOString()
+                <div className="divide-y" style={{ borderColor: 'rgba(248,240,242,.08)' }}>
+                  {displayedTasks.map((task) => (
+                    <div
+                      key={task.id}
+                      className={`p-4 flex items-center gap-4 transition-colors group ${
+                        task.status === 'done' ? 'opacity-60' : ''
+                      } ${selectedIds.has(task.id) ? '' : ''}`}
+                      style={selectedIds.has(task.id) ? { background: 'rgba(255,45,107,.04)' } : {}}
+                      onMouseEnter={e => { if (!selectedIds.has(task.id)) e.currentTarget.style.background = 'var(--bg-elevated)' }}
+                      onMouseLeave={e => { if (!selectedIds.has(task.id)) e.currentTarget.style.background = '' }}
+                    >
+                      {/* Checkbox */}
+                      <button
+                        onClick={() => toggleSelect(task.id)}
+                        className="w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 transition-colors"
+                        style={{
+                          borderColor: selectedIds.has(task.id) ? 'var(--accent-primary)' : 'var(--text-tertiary)',
+                          background: selectedIds.has(task.id) ? 'var(--accent-primary)' : 'transparent',
+                          color: '#fff'
+                        }}
+                      >
+                        {selectedIds.has(task.id) && <CheckCircle2 size={12} />}
+                      </button>
+
+                      {/* Complete toggle */}
+                      <button
+                        onClick={() => task.status === 'done' ? handleReopen(task.id) : handleComplete(task.id)}
+                        className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                          task.status === 'done' ? 'text-white' : ''
+                        }`}
+                        style={task.status === 'done'
+                          ? { background: 'var(--m)', borderColor: 'var(--m)' }
+                          : { borderColor: 'var(--text-tertiary)' }
+                        }
+                        aria-label={task.status === 'done' ? 'Reopen task' : 'Complete task'}
+                      >
+                        {task.status === 'done' ? (
+                          <CheckCircle2 size={16} />
+                        ) : (
+                          <Circle size={16} className="opacity-0 group-hover:opacity-100" />
+                        )}
+                      </button>
+
+                      {/* Task content */}
+                      <div
+                        className="flex-1 min-w-0 cursor-pointer"
+                        onClick={() => setEditingTask(task)}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <p
+                            className={`font-medium ${task.status === 'done' ? 'line-through' : ''}`}
+                            style={{ color: task.status === 'done' ? 'var(--text-tertiary)' : 'var(--text-primary)' }}
+                          >
+                            {task.title}
+                          </p>
+                          {task.due_date && isOverdue(task.due_date) && task.status !== 'done' && (
+                            <AlertCircle size={16} style={{ color: 'var(--accent-primary)' }} />
+                          )}
+                        </div>
+                        <div
+                          className="flex items-center gap-3 text-xs"
+                          style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}
+                        >
+                          {task.due_date && (
+                            <span
+                              className="flex items-center gap-1"
+                              style={isOverdue(task.due_date) && task.status !== 'done'
+                                ? { color: 'var(--accent-primary)' }
+                                : {}
+                              }
+                            >
+                              <Clock size={12} />
+                              {new Date(task.due_date).toLocaleDateString()}
+                            </span>
+                          )}
+                          {task.tags && task.tags.length > 0 && (
+                            <span className="flex items-center gap-1">
+                              {task.tags.slice(0, 3).map((tag, i) => (
+                                <span
+                                  key={i}
+                                  className="px-1.5 py-0.5 rounded text-xs cursor-pointer"
+                                  style={{
+                                    background: tagFilter === tag ? 'var(--accent-primary)' : 'rgba(248,240,242,.08)',
+                                    color: tagFilter === tag ? '#fff' : 'var(--text-secondary)'
+                                  }}
+                                  onClick={(e) => { e.stopPropagation(); setTagFilter(tagFilter === tag ? null : tag) }}
+                                >
+                                  {tag}
+                                </span>
+                              ))}
+                              {task.tags.length > 3 && (
+                                <span style={{ color: 'var(--text-tertiary)' }}>+{task.tags.length - 3}</span>
+                              )}
+                            </span>
+                          )}
+                          {task.project_id && (
+                            <Link
+                              to={`/projects/${task.project_id}`}
+                              style={{ color: 'var(--accent-primary)' }}
+                              className="hover:underline"
+                              onClick={e => e.stopPropagation()}
+                            >
+                              View Project
+                            </Link>
+                          )}
+                        </div>
+                      </div>
+
+                      {getPriorityBadge(task.priority)}
+                      {getStatusBadge(task.status)}
+
+                      <button
+                        onClick={() => setEditingTask(task)}
+                        className="p-2 opacity-0 group-hover:opacity-100 transition-all rounded"
+                        style={{ color: 'var(--text-tertiary)' }}
+                        title="Edit task"
+                        aria-label="Edit task"
+                      >
+                        <Edit3 size={16} />
+                      </button>
+
+                      <VCButton
+                        variant="danger"
+                        size="sm"
+                        onClick={() => handleDelete(task.id)}
+                        className="p-2 opacity-0 group-hover:opacity-100 transition-all"
+                        title="Delete task"
+                        aria-label="Delete task"
+                      >
+                        <Trash2 size={16} />
+                      </VCButton>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Pagination */}
+          {!loading && tasks.length > 0 && (
+            <div className="flex items-center justify-between mt-4 px-2">
+              <span className="text-sm" style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                {totalCount > 0 ? `${page * PAGE_SIZE + 1}-${Math.min((page + 1) * PAGE_SIZE, totalCount)} of ${totalCount}` : ''}
+              </span>
+              <div className="flex gap-2">
+                <VCButton
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setPage(p => Math.max(0, p - 1))}
+                  disabled={page === 0}
+                >
+                  <ChevronLeft size={16} />
+                  Prev
+                </VCButton>
+                <VCButton
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setPage(p => p + 1)}
+                  disabled={!hasMore}
+                >
+                  Next
+                  <ChevronRight size={16} />
+                </VCButton>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Edit Modal */}
+      {editingTask && (
+        <TaskEditModal
+          task={editingTask}
+          onClose={() => setEditingTask(null)}
+          onSaved={() => {
+            setEditingTask(null)
+            loadTasks()
           }}
         />
       )}

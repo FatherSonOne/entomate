@@ -2,10 +2,15 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const { supabase } = require('../config/supabase');
 const { validate } = require('../middleware/validate');
+const { authenticate } = require('../middleware/auth');
 const schemas = require('../schemas/projects');
 const log = require('../utils/log');
+const { aggregateTeamWorkload } = require('../utils/teamWorkload');
 
 const router = express.Router();
+
+// Require authentication for all project routes
+router.use(authenticate);
 
 /**
  * POST /api/projects
@@ -28,7 +33,7 @@ router.post('/', validate(schemas.create), async (req, res) => {
       status: 'planning',
       start_date: startDate || null,
       end_date: endDate || null,
-      owner_id: req.user?.id || 'anonymous',
+      owner_id: req.user.id,
       team_ids: teamIds || [],
       tags: tags || [],
       settings: {},
@@ -270,7 +275,7 @@ router.post('/from-deal', validate(schemas.fromDeal), async (req, res) => {
       status: 'planning',
       start_date: new Date().toISOString().split('T')[0],
       end_date: expectedCloseDate || null,
-      owner_id: req.user?.id || 'anonymous',
+      owner_id: req.user.id,
       team_ids: [],
       tags: ['from-crm'],
       settings: { sourceType: 'crm_deal' },
@@ -401,6 +406,98 @@ router.get('/:id/stats', async (req, res) => {
 
   } catch (error) {
     log.error('Error getting project stats:', { error: error.message || error });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/projects/:id/dashboard
+ * Get project-specific dashboard data (tasks-based, not meetings-based)
+ */
+router.get('/:id/dashboard', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!supabase) {
+      return res.status(503).json({ error: 'Database not configured' });
+    }
+
+    // Verify project exists
+    const { data: project, error: projectError } = await supabase
+      .from('projects')
+      .select('id, name, status, start_date, end_date')
+      .eq('id', id)
+      .single();
+
+    if (projectError) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    // Get all tasks for this project
+    const { data: tasks } = await supabase
+      .from('tasks')
+      .select('id, title, status, priority, due_date, assigned_to, completed_at, created_at, updated_at')
+      .eq('project_id', id)
+      .order('created_at', { ascending: false });
+
+    const allTasks = tasks || [];
+    const now = new Date();
+
+    // Task status counts
+    const taskStats = {
+      open: allTasks.filter(t => t.status === 'open').length,
+      in_progress: allTasks.filter(t => t.status === 'in_progress').length,
+      review: allTasks.filter(t => t.status === 'review').length,
+      done: allTasks.filter(t => t.status === 'done').length,
+      blocked: allTasks.filter(t => t.status === 'blocked').length
+    };
+
+    // Priority counts
+    const priorityStats = {
+      high: allTasks.filter(t => t.priority === 'high').length,
+      medium: allTasks.filter(t => t.priority === 'medium').length,
+      low: allTasks.filter(t => t.priority === 'low').length
+    };
+
+    // Overdue count
+    const overdueCount = allTasks.filter(t =>
+      t.due_date && new Date(t.due_date) < now && t.status !== 'done'
+    ).length;
+
+    // Completion rate
+    const totalTasks = allTasks.length;
+    const completionRate = totalTasks > 0
+      ? Math.round((taskStats.done / totalTasks) * 100)
+      : 0;
+
+    // Team workload from tasks
+    const teamWorkload = aggregateTeamWorkload(allTasks);
+
+    // Recent activity (last 10 task updates)
+    const timeline = allTasks
+      .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+      .slice(0, 10)
+      .map(t => ({
+        id: t.id,
+        title: t.title,
+        status: t.status,
+        updatedAt: t.updated_at,
+        completedAt: t.completed_at
+      }));
+
+    res.json({
+      project,
+      taskStats,
+      priorityStats,
+      overdueCount,
+      completionRate,
+      totalTasks,
+      teamWorkload,
+      timeline
+    });
+
+  } catch (error) {
+    log.error('Error getting project dashboard:', { error: error.message || error });
     res.status(500).json({ error: error.message });
   }
 });

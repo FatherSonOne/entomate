@@ -1,5 +1,5 @@
 import React from 'react'
-import { X, Command, Search, Mic, FolderKanban, CheckSquare, HelpCircle } from 'lucide-react'
+import { X, Command, Search, Mic, FolderKanban, CheckSquare, HelpCircle, Sparkles } from 'lucide-react'
 import { useKeyboardShortcuts, getModKey } from '../hooks/useKeyboardShortcuts'
 
 const shortcutGroups = [
@@ -7,7 +7,7 @@ const shortcutGroups = [
     title: 'General',
     shortcuts: [
       { keys: ['mod', 'K'], description: 'Open command palette', icon: Command },
-      { keys: ['mod', '/'], description: 'Focus search', icon: Search },
+      { keys: ['mod', '/'], description: 'Toggle Entomate AI', icon: Sparkles },
       { keys: ['mod', '?'], description: 'Show keyboard shortcuts', icon: HelpCircle },
       { keys: ['Esc'], description: 'Close dialogs/modals' },
     ]

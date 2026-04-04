@@ -1,7 +1,7 @@
 # Entomate User Guide
 
-**Version:** 1.0.0
-**Date:** March 29, 2026
+**Version:** 1.2.0
+**Last Updated:** April 4, 2026
 
 Welcome to the Entomate User Guide. This document covers every feature of the platform and walks you through how to use each one.
 
@@ -72,7 +72,7 @@ At the bottom of the sidebar you will find **Settings** and your **User Profile*
 
 **Tip:** Press **Ctrl+K** to open the Command Palette. It lets you jump to any page, run actions, and search without touching the mouse.
 
-**Tip:** Toggle between dark and light mode by clicking the sun/moon icon in the top bar.
+**Tip:** Toggle between dark and light mode by clicking the sun/moon icon in the top bar. You can also choose "System" to match your operating system preference.
 
 ---
 
@@ -86,12 +86,32 @@ At the top of the Dashboard you will see four ring gauges showing progress for *
 
 ### Intelligence Briefing
 
-Below the gauges, the Intelligence Briefing provides:
+Below the gauges, the Intelligence Briefing provides a live system snapshot:
 
-- **Action item status** — How many items are open, in progress, or completed.
+- **Action item status** — How many items are open, in progress, or completed, with AI priority ranking active.
 - **Stakeholder cards** — Key people across your meetings and their involvement.
 - **Sentiment trends** — How the tone of your meetings has shifted over time.
 - **Relationship insights** — Patterns in how you interact with contacts and teams.
+
+### Overdue Alert Banner
+
+When you have overdue items, an expandable alert banner appears at the top of the Dashboard. Click it to see a list of overdue tasks with the assignee name and how many days late each item is.
+
+### Team Workload Widget
+
+A stacked bar chart shows how work is distributed across team members. Each bar breaks down tasks into Done, In Progress, and Pending segments so you can spot who is overloaded.
+
+### Insights and Trends Panel
+
+A three-column layout presents:
+
+- **Sentiment Donut** — A donut chart breaking down Positive, Neutral, and Negative sentiment across recent meetings.
+- **Priority Bars** — A horizontal bar chart showing the distribution of High, Medium, and Low priority items.
+- **Completion Ring** — A ring gauge showing your overall task completion rate.
+
+### Automation Activity Feed
+
+A live feed lists your running automations with status badges (Active or Paused). This lets you monitor automation health without leaving the Dashboard.
 
 ### Daily Briefing
 
@@ -99,7 +119,7 @@ The Daily Briefing highlights tasks that are overdue or due today, along with ov
 
 ### System Status
 
-A compact panel shows the health of your connected services: AI provider status, database connectivity, the count of recent meetings, and open tasks.
+A compact panel shows the health of your connected services: AI provider status, database connectivity, CRM connection via Ecosystem Bridge, and Pulse notification status via Ecosystem Bridge. Each service has a color-coded dot — green for connected, orange for not configured, and red for disconnected.
 
 ### Quick Actions
 
@@ -108,10 +128,10 @@ A Quick Actions bar lets you immediately:
 - **Start Meeting** — Begin recording a new meeting.
 - **New Task** — Create a task manually.
 - **New Project** — Set up a new project.
-- **AI Insights** — Open the AI analysis view.
+- **AI Insights** — Open the Intelligence Dashboard.
 - **Automations** — Jump to your automation library.
 
-**Tip:** The greeting at the top of the Dashboard changes based on the time of day — morning, afternoon, or evening.
+**Tip:** The greeting at the top of the Dashboard uses a typewriter animation and changes based on the time of day — morning, afternoon, or evening.
 
 **Tip:** Sentiment is displayed with emoji indicators: Positive, Neutral, and Negative, so you can read the mood at a glance.
 
@@ -123,7 +143,14 @@ The Meetings page is where you browse, search, and record all of your meetings.
 
 ### Browsing Meetings
 
-Meetings appear as cards showing the title, a sentiment badge, a short summary, the date, duration, and attendees. Scroll through or use the search bar to find a specific meeting by title or summary text.
+Meetings appear as cards showing the title, a sentiment badge, a short summary, the date, duration, and attendees. Use the search bar to filter meetings by title or summary text. Search uses server-side filtering with a short delay so results appear as you type.
+
+### Selection Mode and Bulk Operations
+
+1. Click the selection toggle to enter selection mode.
+2. Use the checkboxes to select individual meetings, or click **Select All**.
+3. Click **Bulk Delete** to remove selected meetings (with a confirmation prompt).
+4. Click **Bulk Export** to export selected meetings as a Markdown file.
 
 ### Recording a New Meeting
 
@@ -141,6 +168,8 @@ Meetings appear as cards showing the title, a sentiment badge, a short summary, 
 
 **Tip:** You can also start a meeting from the Dashboard Quick Actions bar without navigating to the Meetings page first.
 
+**Tip:** Your preferred microphone is remembered between sessions. Set it in Settings under Audio and Recording.
+
 ---
 
 ## 5. Meeting Details
@@ -149,9 +178,13 @@ Click any meeting card to open the full detail view. This is where Entomate's in
 
 ### Summary and Timelines
 
-- **AI-Generated Summary** — A concise overview of the meeting written by AI.
-- **Key Points Timeline** — Important moments laid out in order.
+- **AI-Generated Summary** — A concise overview of the meeting written by AI. Click to edit inline.
+- **Key Points Timeline** — Important moments laid out in order. Click to edit.
 - **Decisions Timeline** — Specific decisions that were made, in sequence.
+
+### Inline Editing
+
+You can edit the meeting title, summary, and key points directly on the detail page. Click the text to enter edit mode, make your changes, and click the checkmark to save.
 
 ### Transcript
 
@@ -174,12 +207,13 @@ Type a question about the meeting into the Ask AI box and get an answer drawn fr
 ### Sharing and Syncing
 
 - **Share to Chat** — Send a meeting recap to Slack. Choose the target channel from a selector.
-- **Sync to CRM** — Push action items to your connected CRM system.
+- **Sync to CRM** — Push action items to your connected CRM system (Logos Vision).
+- **Sync to Calendar** — Add the meeting to your Google Calendar.
 - **Ecosystem sync status** — An indicator shows whether the meeting has been synced to connected Pulse and Logos Vision apps.
 
 ### Meeting Intelligence Panel
 
-The AI suggests intelligence profiles based on the meeting content. These profiles customize how the analysis is run. See [Meeting Intelligence Profiles](#17-meeting-intelligence-profiles) for details.
+The AI suggests intelligence profiles based on the meeting content. These profiles customize how the analysis is run. The panel shows a confidence score for each suggestion. You can accept the suggestion, choose a different profile, or dismiss it entirely. See [Meeting Intelligence Profiles](#17-meeting-intelligence-profiles) for details.
 
 ---
 
@@ -210,6 +244,10 @@ A 14-day look-ahead panel shows everything coming up soon:
 
 At the top of the page, quick stat cards show your event count, due tasks, goal deadlines, and overdue count.
 
+### Quick Scheduling
+
+Use the Quick Schedule modal to create calendar events on the fly. Set a title, date, time, duration (15, 30, 45, or 60 minutes), and optional notes. This modal is also available from the Intelligence Dashboard.
+
 ### Syncing Tasks
 
 Click the **Sync Tasks** button to push your Entomate action items to Google Calendar as events, so they appear alongside your other commitments.
@@ -226,6 +264,8 @@ Search lets you find anything across your workspace, whether you know the exact 
 
 - **Semantic Search** — The AI understands meaning, not just keywords. Great for queries like "meetings about budget concerns" even if the word "budget" was never used explicitly.
 - **Keyword Search** — Traditional exact-text matching for when you know the specific term.
+
+Press **Tab** on the Search page to switch between search modes.
 
 ### Ask AI
 
@@ -247,6 +287,8 @@ Your recent searches are saved automatically. You can also pin frequently used s
 If you have Ecosystem Integration enabled, search extends across Pulse and Logos Vision. You can find contacts, meetings, and deals from all three apps in a single query.
 
 **Tip:** Semantic search is especially powerful for finding meetings about a topic when you do not remember the exact words used.
+
+**Tip:** Use **Ctrl+/** to jump to the Search page from anywhere. Use **Ctrl+Enter** to submit a search, and **Ctrl+S** to save the current search.
 
 ---
 
@@ -392,6 +434,8 @@ The Workflow Builder opens in full-screen mode, giving you plenty of room to des
 - **Save** — Save your workflow at any time.
 - **Test** — Run a dry test to see what would happen without actually executing actions.
 - **Execute** — Run the workflow for real.
+- **Duplicate** — Create a copy of the workflow for modification.
+- **Delete** — Remove a workflow permanently (with confirmation).
 
 ### Quick Start Templates
 
@@ -415,6 +459,8 @@ From the Workflows list, you can:
 
 - **Expression Editor** — Map dynamic data between nodes using expressions.
 - **Debug Panel** — Inspect execution traces to understand exactly what happened at each step.
+- **Version History** — Review previous versions of a workflow and roll back if needed.
+- **Execution Trace Viewer** — Step through a workflow run node by node to see inputs, outputs, and timing.
 
 **Tip:** Always use the Test (dry run) feature before activating a workflow. This catches configuration issues before they affect real data.
 
@@ -520,20 +566,30 @@ Choose from the following time ranges at the top of the page:
 - **90 days**
 - **1 year**
 
+Click **Refresh** to update data for the selected period. Click **Export** to download the analytics as a CSV file.
+
 ### Tabs
 
 #### Overview
 
-Key metrics across all areas, plus a **Time Saved** breakdown showing how much time AI has saved you through:
+Key metrics across all areas, including:
 
-- Transcription
-- Summarization
-- Action item extraction
-- Automations
+- **Meetings Processed** — Total meetings analyzed.
+- **Tasks Completed** — Tasks finished in the period.
+- **Action Items** — Total action items extracted.
+- **Automations Run** — Automation executions in the period.
+- **Time Saved** breakdown showing how much time AI has saved you through transcription, summarization, action item extraction, and automations.
+- **Task Status** breakdown — Completed, In Progress, Open, and Blocked counts.
+- **Meeting Sentiment** — Distribution of Positive, Neutral, and Negative meetings.
+- **Projects Overview** — Total, Active, Completed, Planning counts and total deal value.
 
 #### Meetings
 
-Statistics about meeting frequency, duration, and trends.
+- Total meetings count.
+- Total and average duration.
+- Average action items per meeting.
+- **Sentiment Over Time** — An area chart showing positive, neutral, and negative trends.
+- **Meetings Over Time** — A bar chart showing daily meeting counts.
 
 #### Tasks
 
@@ -541,7 +597,7 @@ Task creation, completion rates, and throughput over time.
 
 #### AI
 
-Performance metrics for AI features, including transcription accuracy and extraction rates.
+Performance metrics for AI features, including transcription accuracy, action item extraction rates, and automation success rates.
 
 #### Team
 
@@ -549,7 +605,8 @@ A per-member performance table showing:
 
 - Tasks created
 - Tasks completed
-- Completion rate
+- Completion rate (with color-coded badge)
+- High priority task count
 - Average days to complete
 
 **Tip:** Check the Time Saved card regularly to see the concrete impact AI is having on your team's productivity.
@@ -584,7 +641,7 @@ Download raw data as CSV files for:
 
 ## 16. Ecosystem Integration
 
-Ecosystem Integration is a new feature that connects Entomate with two companion apps: **Pulse** (a communication platform) and **Logos Vision** (a CRM). Together, these three apps form a unified ecosystem where data flows automatically between them.
+Ecosystem Integration connects Entomate with two companion apps: **Pulse** (a communication platform) and **Logos Vision** (a CRM). Together, these three apps form a unified ecosystem where data flows automatically between them.
 
 ### Setting Up Connections
 
@@ -606,7 +663,7 @@ The ecosystem tracks relationships across apps. A contact in Logos Vision, a con
 
 ### Event Log
 
-The event log shows all inbound and outbound sync events. If a sync fails, you can retry it directly from the log.
+The event log shows all inbound and outbound sync events. Each event displays direction, status, timestamp, and processing time. If a sync fails, you can retry it directly from the log.
 
 **Tip:** Test your connections regularly in Ecosystem Settings. This catches expired tokens or configuration drift before they cause sync failures.
 
@@ -614,7 +671,7 @@ The event log shows all inbound and outbound sync events. If a sync fails, you c
 
 ## 17. Meeting Intelligence Profiles
 
-Meeting Intelligence Profiles are a new feature that lets AI customize its analysis based on the type of meeting you are in. Different meetings need different focus areas, and profiles make that automatic.
+Meeting Intelligence Profiles let AI customize its analysis based on the type of meeting you are in. Different meetings need different focus areas, and profiles make that automatic.
 
 ### Built-In Profiles
 
@@ -639,11 +696,11 @@ Each profile defines:
 
 ### AI Profile Suggestions
 
-The AI suggests profiles based on your meeting content. It uses keyword matching and recurring patterns to recommend the best fit. Over time, it learns which profiles work best for your meetings.
+The AI suggests profiles based on your meeting content. It analyzes the meeting title, attendees, and content keywords, then matches against profile suggestion rules. A confidence score indicates how well the profile fits. You can always override or dismiss a suggestion.
 
 ### Custom Fields
 
-Each profile can include custom fields for user input, letting you provide additional context that shapes the analysis (for example, the grant program name or the client account number).
+Each profile can include custom fields for user input, letting you provide additional context that shapes the analysis (for example, the grant program name or the client account number). Field types include text, dropdown, and date pickers.
 
 ### Context Sources
 
@@ -652,6 +709,7 @@ Profiles can pull in additional context from:
 - Contacts
 - CRM deals
 - Past meetings
+- Pulse threads
 
 This extra context helps the AI produce more relevant and accurate analysis.
 
@@ -675,36 +733,75 @@ The Settings page is where you configure Entomate to work the way you want.
 
 ### Appearance
 
-Toggle between **Light** and **Dark** mode to suit your preference.
+- Toggle between **Light**, **Dark**, and **System** mode. Each option shows a visual preview.
+- Enable **Reduce Motion** for accessibility. This disables animations throughout the app.
 
-### AI Learning Dashboard
+### Audio and Recording
 
-Review the patterns the AI has learned from your usage:
+Configure your audio devices and recording preferences:
 
-- View learned patterns and their confidence levels.
-- Approve or reject specific patterns.
-- Customize how the AI adapts to your preferences.
+1. **Microphone** — Select your preferred audio input device from the dropdown. Click the refresh button to re-scan devices.
+2. **Speakers/Headphones** — Select your audio output device.
+3. **Recording Quality** — Choose between Standard (64 kbps), High (128 kbps), or Maximum (256 kbps).
+4. **Transcription Language** — Select from 14 languages (English, Spanish, French, German, Portuguese, Italian, Dutch, Japanese, Korean, Chinese, Arabic, Hindi, Russian) or choose Auto-Detect.
+5. **Auto-Sync to Calendar** — Toggle this on to automatically add meetings to your Google Calendar.
 
-### System Status
+### Permissions
 
-Check the health of all connected services:
+View and manage browser permissions required by Entomate:
 
-- AI provider status
-- Database connectivity
-- CRM integration
-- Chat integration (Slack)
+- **Microphone** (required) — Needed for recording meetings.
+- **Camera** — For video features.
+- **Notifications** — For push notification alerts.
+- **Clipboard** — For copy/paste functionality.
 
-### Ecosystem Settings
+Each permission shows its current state: Granted (green), Denied (red), Not Yet Granted (amber), or Unavailable (gray). Click **Grant Access** to request a permission, or **Retry** if one was denied. If a permission was denied, follow the instructions to re-enable it through your browser's address bar.
+
+### Notifications
+
+Control how and when Entomate notifies you:
+
+- **Email Notifications** — Toggle Meeting Summaries, Overdue Reminders, and Weekly Digest on or off.
+- **In-App Notifications** — Toggle Task Assignments, Meeting Ready, and Agent Suggestions.
+- **Browser Push Notifications** — Enable or disable push notifications (requires Notifications permission).
+- **Quiet Hours** — Set a time window during which notifications are silenced. Choose the start and end time.
+
+### Integrations
+
+#### Slack Integration
+
+1. View your Slack connection status and workspace name.
+2. Click **Test Connection** to verify.
+3. Select a **Default Channel** for Entomate messages.
+4. Toggle notification events: Meeting Completed, Deal Won, Overdue Reminders, New Action Items.
+5. Click **Save Slack Settings** to apply.
+6. Use **Send Test Message** to verify the integration works.
+
+#### Ecosystem Settings
 
 Manage your Pulse and Logos Vision connections. See [Ecosystem Integration](#16-ecosystem-integration) for details.
 
-### Configuration Guide
+### AI and Learning
 
-A built-in guide walks you through environment variable setup and links to provider documentation for each connected service.
+Fine-tune how the AI behaves:
+
+- **Summary Detail Level** — Choose Brief, Standard, or Detailed for AI-generated meeting summaries.
+- **Auto-Assign Confidence Threshold** — Adjust the slider (0.3 to 1.0) to control how confident the AI must be before automatically assigning tasks. Default is 0.75.
+- **Sentiment Analysis** — Toggle sentiment detection on or off.
+- **Learning Patterns** — Click **Manage Learning Patterns** to open the full Learning Dashboard where you can review, approve, or reject AI-learned patterns.
+
+### System Status
+
+Check the health of all connected services by clicking **Test All**:
+
+- **AI Provider** — Whether OpenAI or Gemini is connected and working.
+- **Database** — Whether Supabase connection is active with live query verification.
+- **CRM Integration** — Logos Vision task synchronization status via Ecosystem Bridge.
+- **Chat Integration** — Pulse team notifications and meeting recaps via Ecosystem Bridge.
 
 ### About
 
-View the current version number and the technology stack powering Entomate.
+View the current version number, design system (Void Crimson), and the technology stack powering Entomate.
 
 **Tip:** Test your connections regularly from the System Status panel. Catching issues early prevents surprises during important meetings.
 
@@ -712,17 +809,44 @@ View the current version number and the technology stack powering Entomate.
 
 ## 19. Keyboard Shortcuts
 
-Entomate supports keyboard shortcuts to help you navigate and act quickly. Here are the available shortcuts:
+Entomate supports keyboard shortcuts to help you navigate and act quickly. Press **Ctrl+?** to see these shortcuts at any time.
+
+### General
 
 | Shortcut | Action |
 |---|---|
 | **Ctrl+K** | Open Command Palette |
+| **Ctrl+/** | Toggle Entomate AI / Go to Search |
 | **Ctrl+?** | Show keyboard shortcuts help |
-| **Ctrl+/** | Go to Search |
-| **Ctrl+M** | Start a New Meeting |
-| **Arrow keys** | Navigate options in menus and lists |
-| **Enter** | Execute or select the highlighted option |
 | **Escape** | Close dialogs, modals, and panels |
+
+### Navigation
+
+| Shortcut | Action |
+|---|---|
+| **G then D** | Go to Dashboard |
+| **G then M** | Go to Meetings |
+| **G then P** | Go to Projects |
+| **G then T** | Go to Tasks |
+| **G then S** | Go to Search |
+
+### Actions
+
+| Shortcut | Action |
+|---|---|
+| **Ctrl+M** | Start a New Meeting |
+| **Ctrl+P** | Create a New Project |
+| **Ctrl+T** | Create a New Task |
+
+### Search Page
+
+| Shortcut | Action |
+|---|---|
+| **Ctrl+Enter** | Submit search |
+| **Tab** | Switch search type (Semantic / Keyword) |
+| **Ctrl+S** | Save current search |
+
+**Tip:** Navigation shortcuts use a two-key sequence: press **G** first, then the letter for the destination. You do not need to hold G down.
 
 ---
 
@@ -741,8 +865,15 @@ If something is not working as expected, check the common issues below before re
 #### Meetings not recording or transcribing
 
 - Go to **Settings** and check the AI provider status under System Status.
-- Click **Test Connections** to verify the AI service is reachable.
+- Click **Test All** to verify the AI service is reachable.
+- Check **Settings > Permissions** to make sure microphone access is granted.
 - Make sure your browser has microphone permissions enabled.
+
+#### No audio input detected
+
+- Go to **Settings > Audio and Recording** and check that the correct microphone is selected.
+- Click the refresh button to re-scan for audio devices.
+- Check that your microphone is not muted at the operating system level.
 
 #### Calendar not showing events
 
@@ -755,20 +886,38 @@ If something is not working as expected, check the common issues below before re
 - Use the **Test** button to run a dry test and check for errors.
 - Review the **Execution History** for error messages.
 
+#### Slack messages not sending
+
+- Go to **Settings > Integrations > Slack** and click **Test Connection**.
+- Verify that a default channel is selected.
+- Use **Send Test Message** to verify the integration.
+
+#### Notifications not appearing
+
+- Go to **Settings > Permissions** and check that Notifications permission is Granted.
+- Go to **Settings > Notifications** and make sure your desired notification types are enabled.
+- Check that Quiet Hours is not currently active.
+
 ### Frequently Asked Questions
 
 **Can I use Entomate without recording meetings?**
 Yes. You can create tasks, projects, goals, and workflows manually without ever recording a meeting. The meeting intelligence features are optional.
 
 **How does the AI learn from my feedback?**
-Entomate tracks patterns in your decisions. When you accept, override, or adjust an AI recommendation, the system records that preference and factors it into future suggestions. Over time, recommendations become more aligned with how you work.
+Entomate tracks patterns in your decisions. When you accept, override, or adjust an AI recommendation, the system records that preference and factors it into future suggestions. Over time, recommendations become more aligned with how you work. You can review learned patterns in Settings under AI and Learning.
 
 **Can I export my data?**
-Yes. Go to the **Reports** page to generate PDF reports or download CSV exports of your meetings, action items, and goals.
+Yes. Go to the **Reports** page to generate PDF reports or download CSV exports of your meetings, action items, and goals. You can also export analytics data as CSV from the Analytics page.
 
 **Is my data secure?**
 Yes. Entomate uses Supabase with Row Level Security (RLS), which means your data is isolated to your account at the database level. No other user can access your information.
 
+**What languages does transcription support?**
+Entomate supports 14 transcription languages including English, Spanish, French, German, Portuguese, Italian, Dutch, Japanese, Korean, Chinese, Arabic, Hindi, and Russian. You can also choose Auto-Detect to let the AI determine the language.
+
+**Can I choose my recording quality?**
+Yes. Go to Settings > Audio and Recording to choose between Standard (64 kbps), High (128 kbps), or Maximum (256 kbps) recording quality.
+
 ---
 
-*This guide covers Entomate version 1.0.0. For questions or feedback, reach out through the app or your team's support channel.*
+*This guide covers Entomate version 1.2.0. For questions or feedback, reach out through the app or your team's support channel.*

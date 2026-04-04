@@ -1,6 +1,15 @@
 /**
- * Search View Component
- * Ask Assistant with RAG-powered answers and citations
+ * @deprecated This component is not mounted in the frontend router.
+ * RAG citation rendering and search features have been ported to:
+ *   - frontend/src/components/search/AskAIPanel.jsx (citation badges, streaming)
+ *   - frontend/src/components/search/SearchResults.jsx (result highlighting, pagination)
+ *   - frontend/src/pages/Search.jsx (orchestrator)
+ *
+ * The src/search/ modules (embedder, retriever, indexer, citations, ragAnswer)
+ * remain functional for backend/service use. This UI component can be removed
+ * once all features are verified in the frontend Search page.
+ *
+ * Original: Search View Component — Ask Assistant with RAG-powered answers and citations
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';

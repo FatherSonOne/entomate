@@ -31,12 +31,11 @@ export default function QuickScheduleModal({ isOpen, onClose, context }) {
       const endTime = new Date(startTime.getTime() + form.duration * 60000)
 
       await api.calendar.createEvent({
-        summary: form.title,
-        start: startTime.toISOString(),
-        end: endTime.toISOString(),
-        description: form.notes,
-        source: 'intelligence_dashboard',
-        relatedId: context?.relatedId
+        title: form.title,
+        startDate: startTime.toISOString(),
+        endDate: endTime.toISOString(),
+        description: form.notes || `Source: Intelligence Dashboard${context?.relatedId ? ` | Related: ${context.relatedId}` : ''}`,
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
       })
 
       toast.success('Scheduled', `"${form.title}" added to calendar`)

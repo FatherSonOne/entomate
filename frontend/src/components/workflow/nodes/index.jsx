@@ -48,6 +48,7 @@ const nodeIcons = {
   // Actions
   http_request: Globe,
   execute_workflow: Workflow,
+  send_pulse: MessageSquare,
   send_slack: MessageSquare,
   send_email: Mail,
   create_task: ListTodo,
@@ -77,7 +78,7 @@ const nodeIcons = {
 const getCategory = (type) => {
   const triggerTypes = ['webhook', 'schedule', 'meeting_processed', 'action_item_created', 'error', 'manual']
   const logicTypes = ['if', 'switch', 'merge', 'split_batches', 'loop', 'aggregate', 'filter', 'wait', 'stop_error']
-  const actionTypes = ['http_request', 'execute_workflow', 'send_slack', 'send_email', 'create_task', 'sync_crm', 'respond_webhook', 'set_variable', 'code']
+  const actionTypes = ['http_request', 'execute_workflow', 'send_pulse', 'send_slack', 'send_email', 'create_task', 'sync_crm', 'respond_webhook', 'set_variable', 'code']
   const aiTypes = ['ai_agent', 'ai_prompt', 'ai_extract', 'ai_classify', 'detect_followups', 'ai_summarize']
 
   if (triggerTypes.includes(type)) return 'trigger'

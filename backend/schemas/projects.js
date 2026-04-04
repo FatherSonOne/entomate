@@ -10,7 +10,7 @@ const create = z.object({
     endDate: z.string().optional().nullable(),
     teamIds: z.array(z.string()).optional(),
     tags: z.array(z.string()).optional()
-  }).passthrough(),
+  }).strict(),
   query: z.object({}).passthrough(),
   params: z.object({}).passthrough()
 });
@@ -39,7 +39,7 @@ const update = z.object({
     team_ids: z.array(z.string()).optional(),
     tags: z.array(z.string()).optional(),
     settings: z.record(z.any()).optional()
-  }).passthrough(),
+  }).strict(),
   query: z.object({}).passthrough(),
   params: z.object({
     id: z.string().uuid()
@@ -53,7 +53,7 @@ const fromDeal = z.object({
     dealValue: z.number().optional().nullable(),
     contactName: z.string().optional().nullable(),
     expectedCloseDate: z.string().optional().nullable()
-  }),
+  }).strict(),
   query: z.object({}).passthrough(),
   params: z.object({}).passthrough()
 });

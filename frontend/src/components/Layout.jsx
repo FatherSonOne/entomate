@@ -36,6 +36,10 @@ import { useToast } from './vc/ToastProvider'
 import '../styles/navigation.css'
 import VCCanvas from './vc/VCCanvas'
 import Logo from './Logo'
+import CrossAppSearch, { useCrossAppSearch } from './CrossAppSearch'
+import EntoAssistant from './EntoAssistant/EntoAssistant'
+import EntoAssistantButton from './EntoAssistant/EntoAssistantButton'
+import EntoAIProactiveChecker from './EntoAssistant/EntoAIProactiveChecker'
 
 // Grouped navigation structure — 4 sections
 const navGroups = [
@@ -107,6 +111,8 @@ export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [shortcutsHelpOpen, setShortcutsHelpOpen] = useState(false)
+  const [assistantOpen, setAssistantOpen] = useState(false)
+  const [proactiveSuggestion, setProactiveSuggestion] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
   const { isDark, toggleMode } = useTheme()
@@ -117,6 +123,7 @@ export default function Layout() {
     navigate('/sign-in')
   }
 
+  const { isOpen: crossAppSearchOpen, close: closeCrossAppSearch } = useCrossAppSearch()
   const { hasNew: guideHasNew, dismiss: dismissGuideNew, newCount: guideNewCount } = useGuideNewFeatures()
   const toast = useToast()
 
@@ -143,7 +150,7 @@ export default function Layout() {
   useKeyboardShortcuts({
     'mod+k': () => setCommandPaletteOpen(true),
     'mod+?': () => setShortcutsHelpOpen(true),
-    'mod+/': () => navigate('/search'),
+    'mod+/': () => { setAssistantOpen(prev => !prev); setProactiveSuggestion(false) },
     'mod+m': () => navigate('/meetings?new=true'),
   })
 
@@ -207,8 +214,14 @@ export default function Layout() {
             ))}
           </nav>
 
-          {/* Footer: Guide + Settings + User */}
+          {/* Footer: AI + Guide + Settings + User */}
           <div className="nl-footer">
+            <EntoAssistantButton
+              onClick={() => { setAssistantOpen(prev => !prev); setProactiveSuggestion(false) }}
+              isOpen={assistantOpen}
+              hasProactiveSuggestion={proactiveSuggestion}
+            />
+
             <NavLink
               to="/guide"
               data-icon="guide"
@@ -380,6 +393,21 @@ export default function Layout() {
         isOpen={shortcutsHelpOpen}
         onClose={() => setShortcutsHelpOpen(false)}
       />
+
+      {/* Cross-App Search (Cmd/Ctrl+K) */}
+      <CrossAppSearch
+        isOpen={crossAppSearchOpen}
+        onClose={closeCrossAppSearch}
+      />
+
+      {/* Entomate AI Assistant */}
+      <EntoAssistant
+        isOpen={assistantOpen}
+        onClose={() => setAssistantOpen(false)}
+      />
+
+      {/* Proactive suggestion checker (headless) */}
+      <EntoAIProactiveChecker onProactiveChange={setProactiveSuggestion} />
     </div>
   )
 }

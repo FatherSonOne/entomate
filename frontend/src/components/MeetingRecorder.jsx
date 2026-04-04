@@ -56,6 +56,7 @@ export default function MeetingRecorder({ onMeetingProcessed, audioInputDeviceId
   const [duration, setDuration] = useState(0)
   const [error, setError] = useState(null)
   const [title, setTitle] = useState('')
+  const [attendeesInput, setAttendeesInput] = useState('')
 
   const mediaRecorder = useRef(null)
   const audioChunks = useRef([])
@@ -101,10 +102,14 @@ export default function MeetingRecorder({ onMeetingProcessed, audioInputDeviceId
       formData.append('audio', audioBlob, 'meeting.webm')
       formData.append('title', title || `Meeting-${Date.now()}`)
       formData.append('duration', Math.ceil(duration / 60))
-      
+      if (attendeesInput.trim()) {
+        formData.append('attendees', attendeesInput.trim())
+      }
+
       const result = await meetingsApi.processAudio(formData)
-      
+
       setTitle('')
+      setAttendeesInput('')
       setDuration(0)
       if (onMeetingProcessed) onMeetingProcessed(result)
 
@@ -157,6 +162,24 @@ export default function MeetingRecorder({ onMeetingProcessed, audioInputDeviceId
           placeholder={`Meeting-${Date.now()}`}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
+          disabled={isRecording || isProcessing}
+        />
+      </div>
+
+      <div>
+        <label
+          className="block text-xs font-medium mb-1"
+          style={{ color: 'var(--text-secondary)' }}
+        >
+          Attendees (Optional)
+        </label>
+        <input
+          type="text"
+          className="input"
+          style={{ padding: '6px 12px' }}
+          placeholder="Comma-separated names or emails"
+          value={attendeesInput}
+          onChange={(e) => setAttendeesInput(e.target.value)}
           disabled={isRecording || isProcessing}
         />
       </div>

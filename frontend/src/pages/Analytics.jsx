@@ -13,6 +13,46 @@ import { reportsApi } from '../services/api';
 import { VCButton, VCBadge, VCIconBox } from '../components/vc';
 import ErrorState from '../components/vc/ErrorState';
 
+// ==================== TYPE DEFINITIONS ====================
+
+/**
+ * @typedef {{ meetingsProcessed: number, tasksCreated: number, tasksCompleted: number, actionItemsExtracted: number, automationsRun: number, activeProjects: number }} DashboardOverview
+ * @typedef {{ total: number, totalDuration: number, avgDuration: number, sentiment: { positive: number, neutral: number, negative: number }, avgActionItemsPerMeeting: number }} MeetingMetrics
+ * @typedef {{ total: number, completed: number, inProgress: number, open: number, blocked: number, completionRate: number, byPriority: { high: number, medium: number, low: number } }} TaskMetrics
+ * @typedef {{ total: number, synced: number, pending: number, completed: number, syncRate: number }} ActionItemMetrics
+ * @typedef {{ totalRuns: number, successful: number, failed: number, successRate: number }} AutomationMetrics
+ * @typedef {{ total: number, byStatus: { planning: number, active: number, completed: number, archived: number }, totalDealValue: number }} ProjectMetrics
+ *
+ * @typedef {{
+ *   period: { start: string, end: string },
+ *   overview: DashboardOverview,
+ *   meetings: MeetingMetrics,
+ *   tasks: TaskMetrics,
+ *   actionItems: ActionItemMetrics,
+ *   automations: AutomationMetrics,
+ *   projects: ProjectMetrics
+ * }} DashboardData
+ *
+ * @typedef {{ date: string, count: number, totalDuration: number }} TrendPoint
+ * @typedef {{ period: string, groupBy: string, startDate: string, endDate: string, trends: TrendPoint[] }} TrendsData
+ *
+ * @typedef {{ userId: string, userName: string, email: string, tasksCreated: number, tasksCompleted: number, completionRate: number, highPriorityCompleted: number, avgCompletionDays: number | null }} TeamMember
+ * @typedef {{ period: { start: string, end: string }, teamMembers: TeamMember[] }} TeamPerformanceData
+ *
+ * @typedef {{
+ *   transcription: { meetingsProcessed: number, successRate: number },
+ *   summarization: { meetingsSummarized: number, avgKeyPoints: number },
+ *   actionItemExtraction: { totalExtracted: number, avgPerMeeting: number },
+ *   automations: { totalExecutions: number, successful: number, failed: number, successRate: number, avgDuration: number },
+ *   aiAgents: { totalExecutions: number, successful: number, successRate: number, avgFeedbackRating: number | null },
+ *   timeSaved: { estimatedMinutes: number, breakdown: { transcription: number, summarization: number, actionItems: number, automations: number } }
+ * }} AIEffectivenessData
+ *
+ * @typedef {{ date: string, total_meetings: number, positive_count: number, neutral_count: number, negative_count: number, avg_sentiment_score: number }} SentimentTrendPoint
+ */
+
+// ==================== CONSTANTS ====================
+
 const CHART_COLORS = {
   crimson: '#FF2D6B',
   mint: '#00F5D4',
@@ -21,13 +61,20 @@ const CHART_COLORS = {
 };
 
 export default function Analytics() {
+  /** @type {[DashboardData | null, Function]} */
   const [dashboard, setDashboard] = useState(null);
+  /** @type {[TrendsData | null, Function]} */
   const [trends, setTrends] = useState(null);
+  /** @type {[TeamPerformanceData | null, Function]} */
   const [teamPerformance, setTeamPerformance] = useState(null);
+  /** @type {[AIEffectivenessData | null, Function]} */
   const [aiEffectiveness, setAIEffectiveness] = useState(null);
+  /** @type {[SentimentTrendPoint[] | null, Function]} */
   const [sentimentTrends, setSentimentTrends] = useState(null);
   const [loading, setLoading] = useState(true);
+  /** @type {['7d' | '30d' | '90d' | '1y', Function]} */
   const [period, setPeriod] = useState('30d');
+  /** @type {['overview' | 'meetings' | 'tasks' | 'ai' | 'team', Function]} */
   const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
@@ -64,16 +111,21 @@ export default function Analytics() {
     }
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     const exportMap = {
-      overview: reportsApi.downloadMeetingsCSV(),
-      meetings: reportsApi.downloadMeetingsCSV(),
-      tasks: reportsApi.downloadActionItemsCSV(),
-      ai: reportsApi.downloadMeetingsCSV(),
-      team: reportsApi.downloadActionItemsCSV(),
+      overview: () => reportsApi.downloadMeetingsCSV(),
+      meetings: () => reportsApi.downloadMeetingsCSV(),
+      tasks: () => reportsApi.downloadActionItemsCSV(),
+      ai: () => reportsApi.downloadMeetingsCSV(),
+      team: () => reportsApi.downloadActionItemsCSV(),
     };
-    const url = exportMap[activeTab];
-    if (url) window.open(url, '_blank');
+    const download = exportMap[activeTab];
+    if (!download) return;
+    try {
+      await download();
+    } catch (error) {
+      console.error('Failed to export:', error);
+    }
   };
 
   if (loading) {
@@ -875,6 +927,9 @@ export default function Analytics() {
   );
 }
 
+/**
+ * @param {{ icon: import('lucide-react').LucideIcon, label: string, value: string | number, total?: number, color: 'purple' | 'blue' | 'green' | 'yellow' | 'red' | 'gray' }} props
+ */
 function MetricCard({ icon: Icon, label, value, total, color }) {
   const iconColors = {
     purple: { bg: 'rgba(255,184,0,0.1)',  color: 'var(--accent-tertiary)' },
@@ -917,6 +972,9 @@ function MetricCard({ icon: Icon, label, value, total, color }) {
   );
 }
 
+/**
+ * @param {{ label: string, value: number, total: number, color: 'green' | 'blue' | 'yellow' | 'red' | 'gray' }} props
+ */
 function StatusBar({ label, value, total, color }) {
   const percent = total > 0 ? (value / total) * 100 : 0;
   const barColors = {

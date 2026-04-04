@@ -70,6 +70,51 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 /**
+ * GET /api/workflows/templates
+ * Get available workflow templates
+ */
+router.get('/templates', async (req, res) => {
+  try {
+    const WorkflowTemplates = require('../services/workflow/WorkflowTemplates');
+    const templates = Object.values(WorkflowTemplates).map(t => ({
+      id: t.id,
+      name: t.name,
+      description: t.description,
+      category: t.category,
+      icon: t.icon,
+      nodeCount: t.nodes?.length || 0,
+      connectionCount: t.connections?.length || 0
+    }));
+
+    res.json({ success: true, data: templates });
+  } catch (error) {
+    log.error('[Workflows] Templates error:', { error: error.message || error });
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/workflows/templates/:templateId
+ * Get a specific template with full node/connection data
+ */
+router.get('/templates/:templateId', async (req, res) => {
+  try {
+    const { templateId } = req.params;
+    const WorkflowTemplates = require('../services/workflow/WorkflowTemplates');
+    const template = Object.values(WorkflowTemplates).find(t => t.id === templateId);
+
+    if (!template) {
+      return res.status(404).json({ success: false, error: 'Template not found' });
+    }
+
+    res.json({ success: true, data: template });
+  } catch (error) {
+    log.error('[Workflows] Template error:', { error: error.message || error });
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
  * GET /api/workflows/:id
  * Get a single workflow with full details
  */
@@ -221,6 +266,32 @@ router.put('/:id', authenticate, validate(schemas.update), async (req, res) => {
           details: validationResult.errors
         });
       }
+    }
+
+    // Save current state as a version before updating
+    const { data: currentWorkflow } = await supabase
+      .from('workflows')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (currentWorkflow && (nodes || connections)) {
+      await supabase
+        .from('workflow_versions')
+        .insert({
+          workflow_id: id,
+          version_number: currentWorkflow.version || 1,
+          name: currentWorkflow.name,
+          description: currentWorkflow.description,
+          nodes: currentWorkflow.nodes,
+          connections: currentWorkflow.connections,
+          settings: currentWorkflow.settings,
+          change_summary: change_summary || null,
+          created_by: req.user?.id
+        });
+
+      // Increment version
+      updateData.version = (currentWorkflow.version || 1) + 1;
     }
 
     const { data: workflow, error } = await supabase
@@ -754,11 +825,26 @@ router.delete('/:id/nodes/:nodeId/pin', authenticate, async (req, res) => {
 /**
  * Validate workflow structure
  */
+// Trigger node types — matches the frontend NodePalette taxonomy
+const TRIGGER_TYPES = new Set([
+  'trigger', 'webhook', 'schedule', 'meeting_processed',
+  'action_item_created', 'error', 'manual'
+]);
+
+function isTriggerNode(node) {
+  return node.type === 'trigger' || TRIGGER_TYPES.has(node.type) || TRIGGER_TYPES.has(node.subtype);
+}
+
 function validateWorkflow({ nodes, connections }) {
   const errors = [];
 
-  // Check for at least one trigger node
-  const triggerNodes = nodes.filter(n => n.type === 'trigger');
+  // Allow empty workflows (new/template workflows start with no nodes)
+  if (nodes.length === 0) {
+    return { valid: true, errors: [] };
+  }
+
+  // Check for at least one trigger node (flat type or type/subtype format)
+  const triggerNodes = nodes.filter(isTriggerNode);
   if (triggerNodes.length === 0) {
     errors.push('Workflow must have at least one trigger node');
   }
@@ -776,12 +862,15 @@ function validateWorkflow({ nodes, connections }) {
   }
 
   // Validate connections reference existing nodes
+  // Support both React Flow format (source/target) and backend format (sourceNodeId/targetNodeId)
   for (const conn of connections) {
-    if (!nodeIds.has(conn.sourceNodeId)) {
-      errors.push(`Connection references non-existent source node: ${conn.sourceNodeId}`);
+    const sourceId = conn.sourceNodeId || conn.source;
+    const targetId = conn.targetNodeId || conn.target;
+    if (sourceId && !nodeIds.has(sourceId)) {
+      errors.push(`Connection references non-existent source node: ${sourceId}`);
     }
-    if (!nodeIds.has(conn.targetNodeId)) {
-      errors.push(`Connection references non-existent target node: ${conn.targetNodeId}`);
+    if (targetId && !nodeIds.has(targetId)) {
+      errors.push(`Connection references non-existent target node: ${targetId}`);
     }
   }
 

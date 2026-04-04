@@ -1,7 +1,8 @@
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
-const { supabase } = require('../config/supabase');
+const { supabaseAdmin: supabase } = require('../config/supabase');
 const automationScheduler = require('../services/automationScheduler');
+const automationEngine = require('../services/automationEngine');
 const { authenticate, authorize, optionalAuth, apiKeyAuth } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const schemas = require('../schemas/automations');
@@ -14,7 +15,7 @@ automationScheduler.initialize().catch(err => {
   log.error('Failed to initialize automation scheduler:', { error: err.message || err });
 });
 
-// Automation trigger types
+// Automation trigger types (canonical: snake_case)
 const TRIGGER_TYPES = {
   MEETING_ENDED: 'meeting_ended',
   DEAL_CREATED: 'deal_created',
@@ -31,7 +32,7 @@ const TRIGGER_TYPES = {
   TASK_OVERDUE: 'task_overdue'
 };
 
-// Automation action types
+// Automation action types (canonical: snake_case)
 const ACTION_TYPES = {
   CREATE_TASK: 'create_task',
   CREATE_PROJECT: 'create_project',
@@ -42,12 +43,31 @@ const ACTION_TYPES = {
   NOTIFY_USER: 'notify_user'
 };
 
+// Normalize trigger types from alternative naming schemes
+// TSX service uses: meeting_completed, high_priority_detected, keyword_detected, sentiment_negative
+// Agents framework uses: meeting.completed, task.overdue, deal.stage_changed
+const TRIGGER_ALIASES = {
+  'meeting_completed': 'meeting_ended',
+  'meeting.completed': 'meeting_ended',
+  'meeting.upcoming': 'meeting_ended',
+  'task.overdue': 'task_overdue',
+  'deal.stage_changed': 'deal_stage_changed',
+  'action_item.missed_deadline': 'task_overdue',
+  'high_priority_detected': 'action_item_created',
+  'keyword_detected': 'meeting_ended',
+  'sentiment_negative': 'meeting_ended',
+};
+
+function normalizeTriggerType(triggerType) {
+  return TRIGGER_ALIASES[triggerType] || triggerType;
+}
+
 /**
  * POST /api/automations
  * Create a new automation
- * Uses optionalAuth to allow creation without login during development
+ * Requires authentication
  */
-router.post('/', optionalAuth, validate(schemas.create), async (req, res) => {
+router.post('/', authenticate, validate(schemas.create), async (req, res) => {
   try {
     const {
       name,
@@ -160,84 +180,61 @@ router.get('/', validate(schemas.list), async (req, res) => {
 
 /**
  * GET /api/automations/templates
- * Get pre-built automation templates (includes workflow templates)
+ * Single source of truth: merges DB templates, engine AI templates, and workflow templates
  */
-router.get('/templates', (req, res) => {
+router.get('/templates', async (req, res) => {
   const { category } = req.query;
 
-  // Basic automation templates
-  const basicTemplates = [
-    {
-      id: 'meeting-to-crm',
-      name: 'Meeting → CRM Sync',
-      description: 'When a meeting ends, extract action items and sync them to CRM',
-      triggerType: TRIGGER_TYPES.MEETING_ENDED,
-      triggerConfig: {},
-      category: 'integration',
-      icon: '🔄',
-      actions: [
-        { type: ACTION_TYPES.SYNC_ACTION_ITEMS, config: { syncAll: true } },
-        { type: ACTION_TYPES.POST_TO_CHAT, config: { includeActionItems: true } }
-      ]
-    },
-    {
-      id: 'deal-kickoff',
-      name: 'Deal → Project Kickoff',
-      description: 'When a new deal is created, create a project with default tasks',
-      triggerType: TRIGGER_TYPES.DEAL_CREATED,
-      triggerConfig: { minDealValue: 0 },
-      category: 'integration',
-      icon: '💼',
-      actions: [
-        { type: ACTION_TYPES.CREATE_PROJECT, config: { fromDeal: true } },
-        { type: ACTION_TYPES.NOTIFY_USER, config: { message: 'New project created from deal' } }
-      ]
-    },
-    {
-      id: 'task-notification',
-      name: 'Task Completed → Notify',
-      description: 'When a task is completed, notify the project owner',
-      triggerType: TRIGGER_TYPES.TASK_COMPLETED,
-      triggerConfig: {},
-      category: 'integration',
-      icon: '✅',
-      actions: [
-        { type: ACTION_TYPES.NOTIFY_USER, config: { notifyOwner: true } }
-      ]
-    },
-    {
-      id: 'action-item-task',
-      name: 'Action Item → Task',
-      description: 'When action items are extracted, create tasks automatically',
-      triggerType: TRIGGER_TYPES.ACTION_ITEM_CREATED,
-      triggerConfig: { priorityFilter: ['high', 'medium'] },
-      category: 'integration',
-      icon: '📋',
-      actions: [
-        { type: ACTION_TYPES.CREATE_TASK, config: { fromActionItem: true } }
-      ]
-    },
-    {
-      id: 'daily-digest',
-      name: 'Daily Digest',
-      description: 'Send a daily summary of meetings and tasks',
-      triggerType: TRIGGER_TYPES.SCHEDULED,
-      triggerConfig: { cron: '0 9 * * *' },
-      category: 'integration',
-      icon: '📅',
-      actions: [
-        { type: ACTION_TYPES.POST_TO_CHAT, config: { dailyDigest: true } }
-      ]
+  // 1. Load templates from database (canonical source)
+  let dbTemplates = [];
+  if (supabase) {
+    try {
+      const { data } = await supabase
+        .from('automation_templates')
+        .select('*')
+        .order('popular_count', { ascending: false });
+      dbTemplates = (data || []).map(t => ({
+        id: t.id,
+        name: t.name,
+        description: t.description,
+        category: t.category || 'integration',
+        icon: t.icon || '⚡',
+        triggerType: t.trigger_type,
+        triggerConfig: t.trigger_config || {},
+        actions: t.actions || [],
+        source: 'db'
+      }));
+    } catch (err) {
+      log.warn('Could not load DB templates:', err.message);
     }
-  ];
+  }
 
-  // Try to load workflow templates (including CRM)
+  // 2. Load AI-powered templates from the automation engine
+  let engineTemplates = [];
+  try {
+    const rawTemplates = automationEngine.getTemplates();
+    engineTemplates = rawTemplates
+      .filter(t => !dbTemplates.some(db => db.id === t.id)) // Deduplicate against DB
+      .map(t => ({
+        id: t.id,
+        name: t.name,
+        description: t.description,
+        category: t.category || (t.icon === '🤖' || t.icon === '📊' || t.icon === '📅' || t.icon === '✨' || t.icon === '🔄' || t.icon === '🚀' ? 'ai' : 'integration'),
+        icon: t.icon || '⚡',
+        triggerType: t.trigger_type,
+        triggerConfig: t.trigger_config || {},
+        actions: t.actions || [],
+        source: 'engine'
+      }));
+  } catch (err) {
+    log.warn('Could not load engine templates:', err.message);
+  }
+
+  // 3. Load workflow templates (CRM, multi-node)
   let workflowTemplates = [];
   try {
     const WorkflowTemplates = require('../services/workflow/WorkflowTemplates');
     const allWorkflowTemplates = WorkflowTemplates.getAllTemplates();
-
-    // Convert workflow templates to automation-compatible format
     workflowTemplates = allWorkflowTemplates.map(t => ({
       id: t.id,
       name: t.name,
@@ -251,14 +248,15 @@ router.get('/templates', (req, res) => {
       actions: t.nodes?.filter(n => !n.type?.includes('trigger')).map(n => ({
         type: n.type,
         config: n.parameters || {}
-      })) || []
+      })) || [],
+      source: 'workflow'
     }));
   } catch (err) {
     log.warn('Could not load workflow templates:', err.message);
   }
 
-  // Combine all templates
-  let allTemplates = [...basicTemplates, ...workflowTemplates];
+  // Combine all templates (DB first as canonical, then engine, then workflow)
+  let allTemplates = [...dbTemplates, ...engineTemplates, ...workflowTemplates];
 
   // Filter by category if specified
   if (category && category !== 'all') {
@@ -305,7 +303,7 @@ router.get('/:id', async (req, res) => {
  * PUT /api/automations/:id
  * Update automation
  */
-router.put('/:id', optionalAuth, validate(schemas.update), async (req, res) => {
+router.put('/:id', authenticate, validate(schemas.update), async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
@@ -350,7 +348,7 @@ router.put('/:id', optionalAuth, validate(schemas.update), async (req, res) => {
  * DELETE /api/automations/:id
  * Delete automation
  */
-router.delete('/:id', optionalAuth, async (req, res) => {
+router.delete('/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -389,7 +387,7 @@ router.delete('/:id', optionalAuth, async (req, res) => {
  * POST /api/automations/:id/toggle
  * Enable or disable automation
  */
-router.post('/:id/toggle', optionalAuth, validate(schemas.toggle), async (req, res) => {
+router.post('/:id/toggle', authenticate, validate(schemas.toggle), async (req, res) => {
   try {
     const { id } = req.params;
     const { enabled } = req.body;
@@ -438,7 +436,7 @@ router.post('/:id/toggle', optionalAuth, validate(schemas.toggle), async (req, r
  * POST /api/automations/:id/execute
  * Manually execute an automation
  */
-router.post('/:id/execute', optionalAuth, validate(schemas.execute), async (req, res) => {
+router.post('/:id/execute', authenticate, validate(schemas.execute), async (req, res) => {
   try {
     const { id } = req.params;
     const { triggerData } = req.body;
@@ -555,7 +553,8 @@ router.get('/:id/logs', async (req, res) => {
  */
 router.post('/trigger', apiKeyAuth, validate(schemas.trigger), async (req, res) => {
   try {
-    const { triggerType, triggerData } = req.body;
+    const { triggerType: rawTriggerType, triggerData } = req.body;
+    const triggerType = normalizeTriggerType(rawTriggerType);
 
     if (!triggerType) {
       return res.status(400).json({ error: 'Trigger type is required' });
@@ -565,7 +564,7 @@ router.post('/trigger', apiKeyAuth, validate(schemas.trigger), async (req, res) 
       return res.json({ triggered: 0, results: [] });
     }
 
-    // Find matching automations
+    // Find matching automations (check both normalized and original type)
     const { data: automations } = await supabase
       .from('automations')
       .select('*')
@@ -660,35 +659,9 @@ function shouldTrigger(config, data) {
   return true;
 }
 
-// Helper function to execute an action
+// Delegate action execution to the real automation engine
 async function executeAction(action, triggerData, automation) {
-  log.info(`Executing action: ${action.type}`);
-
-  switch (action.type) {
-    case ACTION_TYPES.CREATE_TASK:
-      return { message: 'Task creation queued', data: triggerData };
-
-    case ACTION_TYPES.CREATE_PROJECT:
-      return { message: 'Project creation queued', data: triggerData };
-
-    case ACTION_TYPES.UPDATE_CRM:
-      return { message: 'CRM update queued', data: triggerData };
-
-    case ACTION_TYPES.POST_TO_CHAT:
-      return { message: 'Chat message queued', data: triggerData };
-
-    case ACTION_TYPES.SEND_EMAIL:
-      return { message: 'Email queued', data: triggerData };
-
-    case ACTION_TYPES.SYNC_ACTION_ITEMS:
-      return { message: 'Action items sync queued', data: triggerData };
-
-    case ACTION_TYPES.NOTIFY_USER:
-      return { message: 'Notification queued', data: triggerData };
-
-    default:
-      throw new Error(`Unknown action type: ${action.type}`);
-  }
+  return automationEngine.executeAction(action, triggerData);
 }
 
 /**
@@ -711,7 +684,7 @@ router.get('/scheduler/status', (req, res) => {
  * POST /api/automations/:id/schedule
  * Manually schedule/reschedule an automation
  */
-router.post('/:id/schedule', optionalAuth, async (req, res) => {
+router.post('/:id/schedule', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -750,7 +723,7 @@ router.post('/:id/schedule', optionalAuth, async (req, res) => {
  * POST /api/automations/:id/test
  * Test automation with sample data (dry-run)
  */
-router.post('/:id/test', optionalAuth, validate(schemas.test), async (req, res) => {
+router.post('/:id/test', authenticate, validate(schemas.test), async (req, res) => {
   try {
     const { id } = req.params;
     const { sampleData = {} } = req.body;

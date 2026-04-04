@@ -204,7 +204,7 @@ export default function ExecutionTraceViewer({
       setLoading(true)
       setError(null)
       const response = await workflowsApi.getExecution(workflowId, executionId)
-      setExecution(response.execution)
+      setExecution(response.data)
     } catch (err) {
       setError(err.message || 'Failed to load execution')
     } finally {

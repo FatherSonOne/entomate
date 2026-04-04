@@ -11,7 +11,20 @@ const { validate } = require('../middleware/validate');
 const schemas = require('../schemas/meetings');
 const log = require('../utils/log');
 
+const calendarService = require('../services/calendarService');
+
 const router = express.Router();
+
+/**
+ * Extract calendar tokens from request (session, cookie, or header)
+ */
+function getCalendarTokens(req) {
+  if (req.session?.calendarTokens) return req.session.calendarTokens;
+  if (req.cookies?.calendar_tokens) {
+    try { return JSON.parse(req.cookies.calendar_tokens); } catch { return null; }
+  }
+  return null;
+}
 
 // Configure multer for memory storage
 const upload = multer({
@@ -129,8 +142,11 @@ router.post('/process', authenticate, upload.single('audio'), validate(schemas.p
     const savedActionItems = await saveActionItems(savedMeeting.id, actionItems);
     log.info(`Saved ${savedActionItems.length} action items`);
 
-    // Step 6: Async post-processing (embeddings + ecosystem sync)
-    firePostProcessing(savedMeeting, summaryData, savedActionItems);
+    // Step 6: Async post-processing (embeddings + ecosystem sync + calendar auto-sync)
+    firePostProcessing(savedMeeting, summaryData, savedActionItems, {
+      userId: req.user?.id,
+      calendarTokens: getCalendarTokens(req)
+    });
 
     // Return response
     res.json({
@@ -228,8 +244,11 @@ router.post('/transcript', authenticate, validate(schemas.transcript), async (re
     // Save action items
     const savedActionItems = await saveActionItems(savedMeeting.id, actionItems);
 
-    // Async post-processing (embeddings + ecosystem sync)
-    firePostProcessing(savedMeeting, summaryData, savedActionItems);
+    // Async post-processing (embeddings + ecosystem sync + calendar auto-sync)
+    firePostProcessing(savedMeeting, summaryData, savedActionItems, {
+      userId: req.user?.id,
+      calendarTokens: getCalendarTokens(req)
+    });
 
     res.json({
       success: true,
@@ -425,6 +444,42 @@ router.delete('/:id', authenticate, async (req, res) => {
 });
 
 /**
+ * PATCH /api/meetings/action-items/:id
+ * Toggle action item status (open/done)
+ */
+router.patch('/action-items/:id', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!supabase) {
+      return res.status(503).json({ error: 'Database not configured' });
+    }
+
+    const allowedStatuses = ['open', 'done'];
+    if (!status || !allowedStatuses.includes(status)) {
+      return res.status(400).json({ error: 'Status must be "open" or "done"' });
+    }
+
+    const { data: item, error } = await supabase
+      .from('action_items')
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(404).json({ error: 'Action item not found' });
+    }
+
+    res.json(item);
+  } catch (error) {
+    log.error('Error updating action item:', { error: error.message || error });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * POST /api/meetings/:id/ask
  * Ask AI question about a specific meeting
  */
@@ -604,7 +659,7 @@ async function saveActionItems(meetingId, actionItems) {
  * Fire async post-processing: embeddings + ecosystem bridge sync.
  * Non-blocking — errors are logged but never thrown.
  */
-function firePostProcessing(savedMeeting, summaryData, savedActionItems) {
+function firePostProcessing(savedMeeting, summaryData, savedActionItems, ctx = {}) {
   // Fire-and-forget with top-level .catch() to prevent unhandled rejections
   (async () => {
     try {
@@ -678,6 +733,30 @@ function firePostProcessing(savedMeeting, summaryData, savedActionItems) {
       log.info(`Ecosystem sync complete for meeting ${savedMeeting.id}`);
     } catch (syncError) {
       log.warn('Ecosystem sync failed (non-blocking):', syncError.message);
+    }
+
+    // Calendar auto-sync (if user has enabled it and has calendar connected)
+    try {
+      if (ctx.userId && ctx.calendarTokens && calendarService.isConfigured()) {
+        // Check user setting for auto_sync_meetings_to_calendar
+        let autoSync = false;
+        if (supabase) {
+          const { data: settings } = await supabase
+            .from('user_settings')
+            .select('meetings_json')
+            .eq('user_id', ctx.userId)
+            .single();
+
+          autoSync = settings?.meetings_json?.auto_sync_meetings_to_calendar === true;
+        }
+
+        if (autoSync) {
+          await calendarService.createEventFromMeeting(ctx.calendarTokens, savedMeeting);
+          log.info(`Auto-synced meeting ${savedMeeting.id} to Google Calendar`);
+        }
+      }
+    } catch (calendarError) {
+      log.warn('Calendar auto-sync failed (non-blocking):', calendarError.message);
     }
   })().catch(err => {
     log.error('Post-processing unexpected error:', err.message || err);
@@ -765,8 +844,11 @@ router.post('/:id/reprocess', authenticate, async (req, res) => {
     // Build the updated meeting object for post-processing
     const updatedMeeting = { ...meeting, ...updateData };
 
-    // Fire async post-processing (embeddings + ecosystem sync)
-    firePostProcessing(updatedMeeting, summaryData, savedActionItems);
+    // Fire async post-processing (embeddings + ecosystem sync + calendar auto-sync)
+    firePostProcessing(updatedMeeting, summaryData, savedActionItems, {
+      userId: req.user?.id,
+      calendarTokens: getCalendarTokens(req)
+    });
 
     res.json({
       success: true,

@@ -266,7 +266,7 @@ export default function VersionHistoryPanel({
       setLoading(true)
       setError(null)
       const response = await workflowsApi.getVersions(workflowId)
-      setVersions(response.versions || [])
+      setVersions(response.data || [])
     } catch (err) {
       setError(err.message || 'Failed to load versions')
     } finally {
@@ -280,7 +280,7 @@ export default function VersionHistoryPanel({
     try {
       setLoadingVersions(prev => ({ ...prev, [version.version_number]: true }))
       const response = await workflowsApi.getVersion(workflowId, version.version_number)
-      const fullVersion = response.version
+      const fullVersion = response.data
 
       setVersions(prev => prev.map(v =>
         v.version_number === version.version_number ? fullVersion : v

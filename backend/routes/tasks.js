@@ -2,10 +2,14 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const { supabase } = require('../config/supabase');
 const { validate } = require('../middleware/validate');
+const { authenticate } = require('../middleware/auth');
 const schemas = require('../schemas/tasks');
 const log = require('../utils/log');
 
 const router = express.Router();
+
+// Require authentication for all task routes
+router.use(authenticate);
 
 /**
  * POST /api/tasks
@@ -83,17 +87,24 @@ router.get('/', validate(schemas.list), async (req, res) => {
       priority,
       assignedTo,
       search,
-      overdue
+      overdue,
+      sortBy = 'created_at',
+      sortDir = 'desc'
     } = req.query;
 
     if (!supabase) {
       return res.json({ tasks: [], count: 0, hasMore: false });
     }
 
+    // Validate sort field to prevent injection
+    const allowedSortFields = ['created_at', 'due_date', 'priority', 'status', 'title', 'updated_at'];
+    const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'created_at';
+    const safeSortDir = sortDir === 'asc' ? true : false;
+
     let query = supabase
       .from('tasks')
       .select('*', { count: 'exact' })
-      .order('created_at', { ascending: false });
+      .order(safeSortBy, { ascending: safeSortDir });
 
     if (projectId) {
       query = query.eq('project_id', projectId);

@@ -11,7 +11,7 @@ const create = z.object({
     startDate: z.string().optional().nullable(),
     tags: z.array(z.string()).optional(),
     parentTaskId: z.string().uuid().optional().nullable()
-  }).passthrough(),
+  }).strict(),
   query: z.object({}).passthrough(),
   params: z.object({}).passthrough()
 });
@@ -22,6 +22,7 @@ const list = z.object({
     limit: z.string().regex(/^\d+$/).optional(),
     offset: z.string().regex(/^\d+$/).optional(),
     projectId: z.string().uuid().optional(),
+    project_id: z.string().uuid().optional(),
     status: z.string().optional(),
     priority: z.string().optional(),
     assignedTo: z.string().optional(),
@@ -43,7 +44,7 @@ const update = z.object({
     project_id: z.string().uuid().optional().nullable(),
     tags: z.array(z.string()).optional(),
     custom_fields: z.record(z.any()).optional()
-  }).passthrough(),
+  }).strict(),
   query: z.object({}).passthrough(),
   params: z.object({
     id: z.string().uuid()
@@ -53,7 +54,7 @@ const update = z.object({
 const assign = z.object({
   body: z.object({
     assignedTo: z.string().nullable()
-  }).passthrough(),
+  }).strict(),
   query: z.object({}).passthrough(),
   params: z.object({
     id: z.string().uuid()
@@ -72,7 +73,7 @@ const bulkCreate = z.object({
       projectId: z.string().uuid().optional().nullable()
     })).min(1, 'Tasks array is required'),
     projectId: z.string().uuid().optional().nullable()
-  }).passthrough(),
+  }).strict(),
   query: z.object({}).passthrough(),
   params: z.object({}).passthrough()
 });
@@ -81,7 +82,7 @@ const bulkStatus = z.object({
   body: z.object({
     taskIds: z.array(z.string().uuid()).min(1, 'Task IDs array is required'),
     status: z.enum(['open', 'in_progress', 'review', 'done', 'blocked'])
-  }),
+  }).strict(),
   query: z.object({}).passthrough(),
   params: z.object({}).passthrough()
 });

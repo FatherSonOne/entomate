@@ -38,9 +38,12 @@ export default function WorkflowToolbar({
   onDuplicate,
   onDelete,
   onBack,
+  onNameChange,
   showGrid
 }) {
   const [showMenu, setShowMenu] = useState(false)
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [editName, setEditName] = useState('')
 
   return (
     <div className="h-14 bg-surface border-b border-line-default flex items-center justify-between px-4">
@@ -55,11 +58,45 @@ export default function WorkflowToolbar({
           <span className="text-sm">Back</span>
         </button>
 
-        {/* Workflow name */}
+        {/* Workflow name — click to edit */}
         <div className="flex items-center gap-2">
-          <h1 className="text-lg font-semibold text-content-primary max-w-xs truncate">
-            {workflow?.name || 'Untitled Workflow'}
-          </h1>
+          {isEditingName ? (
+            <input
+              type="text"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              onBlur={() => {
+                if (editName.trim() && editName !== workflow?.name) {
+                  onNameChange?.(editName.trim())
+                }
+                setIsEditingName(false)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  if (editName.trim() && editName !== workflow?.name) {
+                    onNameChange?.(editName.trim())
+                  }
+                  setIsEditingName(false)
+                }
+                if (e.key === 'Escape') {
+                  setIsEditingName(false)
+                }
+              }}
+              autoFocus
+              className="text-lg font-semibold text-content-primary max-w-xs bg-transparent border-b-2 border-accent-primary focus:outline-none"
+            />
+          ) : (
+            <h1
+              className="text-lg font-semibold text-content-primary max-w-xs truncate cursor-pointer hover:opacity-80"
+              onClick={() => {
+                setEditName(workflow?.name || '')
+                setIsEditingName(true)
+              }}
+              title="Click to rename"
+            >
+              {workflow?.name || 'Untitled Workflow'}
+            </h1>
+          )}
           {isDirty && (
             <span className="w-2 h-2 vc-bg-warning rounded-full" title="Unsaved changes" />
           )}

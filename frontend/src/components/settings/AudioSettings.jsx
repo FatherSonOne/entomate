@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect } from 'react'
-import { Mic, Volume2, RefreshCw, AlertCircle, Settings2 } from 'lucide-react'
+import { Mic, Volume2, RefreshCw, AlertCircle, Settings2, CalendarPlus } from 'lucide-react'
 import { VCButton, VCSelect, VCIconBox } from '../vc'
 import { useAudioDevices } from '../../hooks/useAudioDevices'
 
@@ -214,6 +214,49 @@ export default function AudioSettings({ meetingsJson, onUpdateJson }) {
           <option value="hi">Hindi</option>
           <option value="ru">Russian</option>
         </VCSelect>
+      </div>
+
+      {/* Auto-Sync to Calendar */}
+      <div
+        className="p-4 rounded-lg"
+        style={{ background: 'var(--bg-elevated)', border: '1px solid var(--b1)' }}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <VCIconBox color="mint">
+              <CalendarPlus className="w-5 h-5" />
+            </VCIconBox>
+            <div>
+              <span
+                className="text-sm font-medium block"
+                style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}
+              >
+                Auto-Sync to Calendar
+              </span>
+              <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                Automatically add new meetings to Google Calendar after processing
+              </span>
+            </div>
+          </div>
+          <button
+            role="switch"
+            aria-checked={!!m.auto_sync_meetings_to_calendar}
+            onClick={() => onUpdateJson('auto_sync_meetings_to_calendar', !m.auto_sync_meetings_to_calendar)}
+            className="relative w-11 h-6 rounded-full transition-colors"
+            style={{
+              background: m.auto_sync_meetings_to_calendar
+                ? 'var(--accent-secondary)'
+                : 'rgba(248,240,242,.15)'
+            }}
+          >
+            <span
+              className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform"
+              style={{
+                transform: m.auto_sync_meetings_to_calendar ? 'translateX(20px)' : 'translateX(0)'
+              }}
+            />
+          </button>
+        </div>
       </div>
     </div>
   )

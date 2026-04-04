@@ -1,24 +1,34 @@
 import { useState, useEffect } from 'react'
-import {
-  FileText, Download, Calendar, Target, CheckSquare,
-  Users, FileSpreadsheet, Loader2, Clock, ChevronDown,
-  Building2, BarChart3
-} from 'lucide-react'
+import { FileText } from 'lucide-react'
 import { useToast } from '../components/vc/ToastProvider'
-import { reportsApi, meetingsApi } from '../services/api'
+import { reportsApi, meetingsApi, projectsApi } from '../services/api'
 import api from '../services/api'
-import { VCButton, VCBadge, VCIconBox } from '../components/vc'
+import { supabase } from '../services/supabaseClient'
 import ErrorState from '../components/vc/ErrorState'
+import PDFReportsSection from '../components/reports/PDFReportsSection'
+import CSVExportSection from '../components/reports/CSVExportSection'
+import ReportsQuickStats from '../components/reports/ReportsQuickStats'
+import ReportsLoadingSkeleton from '../components/reports/ReportsLoadingSkeleton'
+import EffectivenessReport from '../components/learning/EffectivenessReport'
 
 export default function Reports() {
   const toast = useToast()
   const [meetings, setMeetings] = useState([])
   const [goals, setGoals] = useState([])
+  const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [generating, setGenerating] = useState(null)
   const [selectedMeeting, setSelectedMeeting] = useState('')
   const [selectedQuarter, setSelectedQuarter] = useState('')
+  const [selectedProject, setSelectedProject] = useState('')
+  const [actionItemStatus, setActionItemStatus] = useState('')
+  const [goalsCsvQuarter, setGoalsCsvQuarter] = useState('')
+  const [sendingEmail, setSendingEmail] = useState(false)
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [previewUrl, setPreviewUrl] = useState(null)
+  const [showEffectiveness, setShowEffectiveness] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -28,54 +38,119 @@ export default function Reports() {
     try {
       setError(null)
       setLoading(true)
-      const [meetingsRes, goalsRes] = await Promise.all([
+      const [meetingsRes, goalsRes, projectsRes] = await Promise.all([
         meetingsApi.list({ limit: 50 }).catch(() => ({ meetings: [] })),
-        api.get('/goals').catch(() => ({ data: [] }))
+        api.get('/goals').catch(() => ({ data: [] })),
+        projectsApi.list({ limit: 100 }).catch(() => ({ projects: [] }))
       ])
       setMeetings(meetingsRes.meetings || [])
       setGoals(goalsRes.data || [])
+      setProjects(projectsRes.projects || [])
     } catch (error) {
       console.error('Failed to load data:', error)
+      setError(error.message || 'Failed to load report data. Please try again.')
     } finally {
       setLoading(false)
     }
   }
 
   const handleDownload = async (type, params = {}) => {
+    // Append date range if set
+    if (dateFrom) params.from = dateFrom
+    if (dateTo) params.to = dateTo
+
     setGenerating(type)
     try {
-      let url
       switch (type) {
         case 'meeting-pdf':
           if (!params.meetingId) return toast.info('Info', 'Please select a meeting')
-          url = reportsApi.downloadMeetingPDF(params.meetingId)
+          await reportsApi.downloadMeetingPDF(params.meetingId)
           break
         case 'goals-pdf':
-          url = reportsApi.downloadGoalsPDF(params.quarter)
+          await reportsApi.downloadGoalsPDF(params.quarter)
           break
         case 'weekly-pdf':
-          url = reportsApi.downloadWeeklyPDF()
+          await reportsApi.downloadWeeklyPDF()
           break
         case 'meetings-csv':
-          url = reportsApi.downloadMeetingsCSV()
+          await reportsApi.downloadMeetingsCSV()
           break
         case 'action-items-csv':
-          url = reportsApi.downloadActionItemsCSV(params)
+          await reportsApi.downloadActionItemsCSV(params)
           break
         case 'goals-csv':
-          url = reportsApi.downloadGoalsCSV(params)
+          await reportsApi.downloadGoalsCSV(params)
+          break
+        case 'tasks-csv':
+          await reportsApi.downloadTasksCSV(params)
+          break
+        case 'project-pdf':
+          if (!params.projectId) return toast.info('Info', 'Please select a project')
+          await reportsApi.downloadProjectPDF(params.projectId)
+          break
+        default:
+          return
+      }
+    } catch (error) {
+      console.error('Failed to generate report:', error)
+      toast.error('Error', 'Failed to generate report. Please try again.')
+    } finally {
+      setGenerating(null)
+    }
+  }
+
+  const handlePreview = async (type, params = {}) => {
+    setGenerating(type)
+    try {
+      let path
+      switch (type) {
+        case 'meeting-pdf':
+          if (!params.meetingId) return toast.info('Info', 'Please select a meeting')
+          path = `/reports/meeting/${params.meetingId}/pdf`
+          break
+        case 'goals-pdf':
+          path = `/reports/goals/pdf${params.quarter ? `?quarter=${params.quarter}` : ''}`
+          break
+        case 'weekly-pdf':
+          path = '/reports/weekly/pdf'
+          break
+        case 'project-pdf':
+          if (!params.projectId) return toast.info('Info', 'Please select a project')
+          path = `/reports/project/${params.projectId}/pdf`
           break
         default:
           return
       }
 
-      // Open download in new tab
-      window.open(url, '_blank')
+      const response = await api.get(path, { responseType: 'blob' })
+      const blob = new Blob([response.data], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      setPreviewUrl(url)
     } catch (error) {
-      console.error('Failed to generate report:', error)
-      toast.error('Error', 'Failed to generate report. Please try again.')
+      console.error('Failed to preview report:', error)
+      toast.error('Error', 'Failed to preview report.')
     } finally {
-      setTimeout(() => setGenerating(null), 1000)
+      setGenerating(null)
+    }
+  }
+
+  const handleSendRecap = async () => {
+    if (!selectedMeeting) return toast.info('Info', 'Please select a meeting')
+    setSendingEmail(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const email = session?.user?.email
+      if (!email) {
+        toast.error('Error', 'Could not determine your email address')
+        return
+      }
+      await reportsApi.sendMeetingRecap(selectedMeeting, email)
+      toast.success('Sent', `Meeting recap emailed to ${email}`)
+    } catch (error) {
+      console.error('Failed to send recap:', error)
+      toast.error('Error', 'Failed to send meeting recap email.')
+    } finally {
+      setSendingEmail(false)
     }
   }
 
@@ -92,349 +167,117 @@ export default function Reports() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--accent-primary)' }} />
-      </div>
-    )
+    return <ReportsLoadingSkeleton />
+  }
+
+  if (error) {
+    return <ErrorState message={error} onRetry={loadData} />
   }
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1
-          className="text-2xl font-bold flex items-center gap-2"
-          style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}
-        >
-          <FileText className="h-7 w-7" style={{ color: 'var(--accent-primary)' }} />
-          Reports &amp; Export
-        </h1>
-        <p style={{ color: 'var(--text-tertiary)' }} className="mt-1">
-          Generate PDF reports and export data to CSV
-        </p>
-      </div>
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div>
+          <h1
+            className="text-2xl font-bold flex items-center gap-2"
+            style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}
+          >
+            <FileText className="h-7 w-7" style={{ color: 'var(--accent-primary)' }} />
+            Reports &amp; Export
+          </h1>
+          <p style={{ color: 'var(--text-tertiary)' }} className="mt-1">
+            Generate PDF reports and export data to CSV
+          </p>
+        </div>
 
-      {/* PDF Reports Section */}
-      <div className="vc p-6">
-        <h2
-          className="text-lg font-semibold mb-4 flex items-center gap-2"
-          style={{ color: 'var(--text-primary)' }}
-        >
-          <FileText className="h-5 w-5" style={{ color: 'var(--accent-primary)' }} />
-          PDF Reports
-        </h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* Meeting Recap */}
-          <div className="vc p-4 transition-colors">
-            <div className="flex items-start gap-3 mb-3">
-              <VCIconBox color="mint" size="sm">
-                <Calendar className="h-5 w-5" />
-              </VCIconBox>
-              <div>
-                <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>Meeting Recap</h3>
-                <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
-                  PDF summary with action items and decisions
-                </p>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <select
-                value={selectedMeeting}
-                onChange={(e) => setSelectedMeeting(e.target.value)}
-                className="input text-sm"
-              >
-                <option value="">Select a meeting...</option>
-                {meetings.map(meeting => (
-                  <option key={meeting.id} value={meeting.id}>
-                    {meeting.title || 'Untitled'} - {new Date(meeting.created_at).toLocaleDateString()}
-                  </option>
-                ))}
-              </select>
-              <VCButton
-                variant="primary"
-                className="w-full text-sm"
-                onClick={() => handleDownload('meeting-pdf', { meetingId: selectedMeeting })}
-                disabled={!selectedMeeting || generating === 'meeting-pdf'}
-              >
-                {generating === 'meeting-pdf' ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <Download className="h-4 w-4 mr-2" />
-                )}
-                Download PDF
-              </VCButton>
-            </div>
-          </div>
-
-          {/* Goals Report */}
-          <div className="vc p-4 transition-colors">
-            <div className="flex items-start gap-3 mb-3">
-              <VCIconBox color="amber" size="sm">
-                <Target className="h-5 w-5" />
-              </VCIconBox>
-              <div>
-                <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>Goals &amp; OKRs</h3>
-                <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
-                  Progress report for all goals
-                </p>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <select
-                value={selectedQuarter}
-                onChange={(e) => setSelectedQuarter(e.target.value)}
-                className="input text-sm"
-              >
-                {getQuarterOptions().map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-              <VCButton
-                variant="primary"
-                className="w-full text-sm"
-                onClick={() => handleDownload('goals-pdf', { quarter: selectedQuarter })}
-                disabled={generating === 'goals-pdf'}
-              >
-                {generating === 'goals-pdf' ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <Download className="h-4 w-4 mr-2" />
-                )}
-                Download PDF
-              </VCButton>
-            </div>
-          </div>
-
-          {/* Weekly Summary */}
-          <div className="vc p-4 transition-colors">
-            <div className="flex items-start gap-3 mb-3">
-              <VCIconBox color="mint" size="sm">
-                <Clock className="h-5 w-5" />
-              </VCIconBox>
-              <div>
-                <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>Weekly Summary</h3>
-                <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
-                  Overview of the past 7 days
-                </p>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <div className="text-sm py-2" style={{ color: 'var(--text-tertiary)' }}>
-                Includes meetings, tasks, and overdue items
-              </div>
-              <VCButton
-                variant="primary"
-                className="w-full text-sm"
-                onClick={() => handleDownload('weekly-pdf')}
-                disabled={generating === 'weekly-pdf'}
-              >
-                {generating === 'weekly-pdf' ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <Download className="h-4 w-4 mr-2" />
-                )}
-                Download PDF
-              </VCButton>
-            </div>
-          </div>
+        {/* Date Range Filter */}
+        <div className="flex items-center gap-2">
+          <label className="text-sm" style={{ color: 'var(--text-tertiary)' }}>From</label>
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="input text-sm"
+          />
+          <label className="text-sm" style={{ color: 'var(--text-tertiary)' }}>To</label>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="input text-sm"
+          />
+          {(dateFrom || dateTo) && (
+            <button
+              onClick={() => { setDateFrom(''); setDateTo('') }}
+              className="text-xs px-2 py-1 rounded"
+              style={{ color: 'var(--accent-primary)', background: 'rgba(255,45,107,0.1)' }}
+            >
+              Clear
+            </button>
+          )}
         </div>
       </div>
 
-      {/* CSV Export Section */}
-      <div className="vc p-6">
-        <h2
-          className="text-lg font-semibold mb-4 flex items-center gap-2"
-          style={{ color: 'var(--text-primary)' }}
-        >
-          <FileSpreadsheet className="h-5 w-5" style={{ color: 'var(--accent-secondary)' }} />
-          CSV Export
-        </h2>
+      {/* PDF Reports */}
+      <PDFReportsSection
+        meetings={meetings}
+        projects={projects}
+        generating={generating}
+        selectedMeeting={selectedMeeting}
+        setSelectedMeeting={setSelectedMeeting}
+        selectedQuarter={selectedQuarter}
+        setSelectedQuarter={setSelectedQuarter}
+        selectedProject={selectedProject}
+        setSelectedProject={setSelectedProject}
+        sendingEmail={sendingEmail}
+        onDownload={handleDownload}
+        onPreview={handlePreview}
+        onSendRecap={handleSendRecap}
+        getQuarterOptions={getQuarterOptions}
+      />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* Meetings Export */}
-          <div className="vc p-4 transition-colors">
-            <div className="flex items-start gap-3 mb-3">
-              <VCIconBox color="mint" size="sm">
-                <Calendar className="h-5 w-5" />
-              </VCIconBox>
-              <div>
-                <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>Meetings</h3>
-                <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
-                  Export all meetings data
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>{meetings.length} meetings</span>
-              <VCButton
-                variant="ghost"
-                size="sm"
-                onClick={() => handleDownload('meetings-csv')}
-                disabled={generating === 'meetings-csv'}
-                aria-label="Download meetings CSV"
-              >
-                {generating === 'meetings-csv' ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4" />
-                )}
-              </VCButton>
-            </div>
-          </div>
-
-          {/* Action Items Export */}
-          <div className="vc p-4 transition-colors">
-            <div className="flex items-start gap-3 mb-3">
-              <VCIconBox color="amber" size="sm">
-                <CheckSquare className="h-5 w-5" />
-              </VCIconBox>
-              <div>
-                <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>Action Items</h3>
-                <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
-                  Export all action items
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>All statuses</span>
-              <VCButton
-                variant="ghost"
-                size="sm"
-                onClick={() => handleDownload('action-items-csv')}
-                disabled={generating === 'action-items-csv'}
-                aria-label="Download action items CSV"
-              >
-                {generating === 'action-items-csv' ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4" />
-                )}
-              </VCButton>
-            </div>
-          </div>
-
-          {/* Goals Export */}
-          <div className="vc p-4 transition-colors">
-            <div className="flex items-start gap-3 mb-3">
-              <VCIconBox color="amber" size="sm">
-                <Target className="h-5 w-5" />
-              </VCIconBox>
-              <div>
-                <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>Goals</h3>
-                <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
-                  Export all goals data
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>{goals.length} goals</span>
-              <VCButton
-                variant="ghost"
-                size="sm"
-                onClick={() => handleDownload('goals-csv')}
-                disabled={generating === 'goals-csv'}
-                aria-label="Download goals CSV"
-              >
-                {generating === 'goals-csv' ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4" />
-                )}
-              </VCButton>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* CSV Export */}
+      <CSVExportSection
+        meetings={meetings}
+        goals={goals}
+        generating={generating}
+        actionItemStatus={actionItemStatus}
+        setActionItemStatus={setActionItemStatus}
+        goalsCsvQuarter={goalsCsvQuarter}
+        setGoalsCsvQuarter={setGoalsCsvQuarter}
+        onDownload={handleDownload}
+        getQuarterOptions={getQuarterOptions}
+      />
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="vc p-4">
-          <div className="flex items-center gap-3">
-            <VCIconBox color="mint" size="sm">
-              <Calendar className="h-5 w-5" />
-            </VCIconBox>
-            <div>
-              <p
-                style={{
-                  fontFamily: 'var(--font-display)',
-                  fontWeight: 700,
-                  fontSize: 24,
-                  color: 'var(--text-primary)',
-                }}
-              >
-                {meetings.length}
-              </p>
-              <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Meetings</p>
-            </div>
-          </div>
-        </div>
+      <ReportsQuickStats meetings={meetings} goals={goals} />
 
-        <div className="vc p-4">
-          <div className="flex items-center gap-3">
-            <VCIconBox color="amber" size="sm">
-              <Target className="h-5 w-5" />
-            </VCIconBox>
-            <div>
-              <p
-                style={{
-                  fontFamily: 'var(--font-display)',
-                  fontWeight: 700,
-                  fontSize: 24,
-                  color: 'var(--text-primary)',
-                }}
-              >
-                {goals.length}
-              </p>
-              <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Goals</p>
-            </div>
+      {/* Learning Effectiveness */}
+      <div className="vc p-6">
+        <button
+          onClick={() => setShowEffectiveness(!showEffectiveness)}
+          className="w-full flex items-center justify-between"
+        >
+          <h2
+            className="text-lg font-semibold flex items-center gap-2"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            <FileText className="h-5 w-5" style={{ color: 'var(--accent-primary)' }} />
+            Learning Effectiveness
+          </h2>
+          <span
+            className="text-sm"
+            style={{ color: 'var(--text-tertiary)' }}
+          >
+            {showEffectiveness ? 'Hide' : 'Show'}
+          </span>
+        </button>
+        {showEffectiveness && (
+          <div className="mt-4">
+            <EffectivenessReport days={30} />
           </div>
-        </div>
-
-        <div className="vc p-4">
-          <div className="flex items-center gap-3">
-            <VCIconBox color="mint" size="sm">
-              <CheckSquare className="h-5 w-5" />
-            </VCIconBox>
-            <div>
-              <p
-                style={{
-                  fontFamily: 'var(--font-display)',
-                  fontWeight: 700,
-                  fontSize: 24,
-                  color: 'var(--text-primary)',
-                }}
-              >
-                {goals.filter(g => g.status === 'completed').length}
-              </p>
-              <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Completed</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="vc p-4">
-          <div className="flex items-center gap-3">
-            <VCIconBox color="amber" size="sm">
-              <BarChart3 className="h-5 w-5" />
-            </VCIconBox>
-            <div>
-              <p
-                style={{
-                  fontFamily: 'var(--font-display)',
-                  fontWeight: 700,
-                  fontSize: 24,
-                  color: 'var(--text-primary)',
-                }}
-              >
-                {goals.length > 0
-                  ? Math.round(goals.reduce((sum, g) => sum + (g.progress || 0), 0) / goals.length)
-                  : 0}%
-              </p>
-              <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Avg Progress</p>
-            </div>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Info */}
@@ -452,9 +295,42 @@ export default function Reports() {
           <li>• PDF reports are generated on-demand and downloaded to your device</li>
           <li>• CSV exports can be opened in Excel, Google Sheets, or any spreadsheet app</li>
           <li>• Weekly summaries include data from the past 7 days</li>
+          <li>• Use the date range filter to scope exports to a specific period</li>
           <li>• All reports reflect the most current data at time of generation</li>
         </ul>
       </div>
+
+      {/* PDF Preview Modal */}
+      {previewUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ background: 'rgba(0,0,0,0.7)' }}
+          onClick={() => { URL.revokeObjectURL(previewUrl); setPreviewUrl(null) }}
+        >
+          <div
+            className="relative w-full max-w-4xl h-[80vh] rounded-lg overflow-hidden"
+            style={{ background: 'var(--bg-primary)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-3" style={{ borderBottom: '1px solid var(--border-default)' }}>
+              <h3 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>PDF Preview</h3>
+              <button
+                onClick={() => { URL.revokeObjectURL(previewUrl); setPreviewUrl(null) }}
+                className="text-sm px-3 py-1 rounded"
+                style={{ color: 'var(--text-tertiary)' }}
+              >
+                Close
+              </button>
+            </div>
+            <iframe
+              src={previewUrl}
+              className="w-full"
+              style={{ height: 'calc(100% - 48px)' }}
+              title="PDF Preview"
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

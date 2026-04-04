@@ -2,13 +2,12 @@ import React, { useState, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
   ArrowLeft, FolderKanban, BarChart3, Users, CheckCircle2,
-  Clock, AlertTriangle, TrendingUp, RefreshCw, Calendar,
+  Clock, AlertTriangle, TrendingUp, RefreshCw,
   PieChart, Activity
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart as RechartsPie, Pie, Cell, Legend,
-  LineChart, Line, Area, AreaChart
+  PieChart as RechartsPie, Pie, Cell, Legend
 } from 'recharts'
 import { dashboardApi, projectsApi } from '../services/api'
 import KanbanBoard from '../components/KanbanBoard'
@@ -18,7 +17,9 @@ const COLORS = ['#10B981', '#F59E0B', '#EF4444', '#6366F1', '#8B5CF6']
 const STATUS_COLORS = {
   open: '#6B7280',
   in_progress: '#3B82F6',
-  done: '#10B981'
+  review: '#8B5CF6',
+  done: '#10B981',
+  blocked: '#EF4444'
 }
 
 export default function ProjectDashboard() {
@@ -42,15 +43,23 @@ export default function ProjectDashboard() {
   const loadProjectDashboard = async () => {
     try {
       setLoading(true)
-      const [projectData, dashData, workloadData] = await Promise.all([
-        projectsApi.get(id).catch(() => null),
-        dashboardApi.getProject(id).catch(() => null),
-        dashboardApi.getTeamWorkload().catch(() => ({ workload: [] }))
-      ])
+      const dashData = await projectsApi.getDashboard(id).catch(() => null)
 
-      setProject(projectData)
-      setDashboardData(dashData)
-      setTeamWorkload(workloadData.workload || [])
+      if (dashData) {
+        setProject(dashData.project)
+        setDashboardData({
+          taskStats: dashData.taskStats,
+          priorityStats: dashData.priorityStats,
+          overdueCount: dashData.overdueCount,
+          completionRate: dashData.completionRate,
+          totalTasks: dashData.totalTasks
+        })
+        setTeamWorkload(dashData.teamWorkload || [])
+      } else {
+        // Fallback: load project directly
+        const projectData = await projectsApi.get(id).catch(() => null)
+        setProject(projectData)
+      }
     } catch (error) {
       console.error('Failed to load project dashboard:', error)
     } finally {
@@ -61,47 +70,17 @@ export default function ProjectDashboard() {
   const loadGlobalDashboard = async () => {
     try {
       setLoading(true)
-      const [insightsData, workloadData, overdueData] = await Promise.all([
-        dashboardApi.getInsights().catch(() => null),
-        dashboardApi.getTeamWorkload().catch(() => ({ workload: [] })),
-        dashboardApi.getOverdue().catch(() => ({ overdue: [], count: 0 }))
-      ])
+      const data = await dashboardApi.getProjectInsights().catch(() => null)
 
-      // Map insights data to dashboard format
-      setDashboardData({
-        taskStats: insightsData?.statusCounts || { open: 0, in_progress: 0, done: 0 },
-        priorityStats: insightsData?.priorityCounts || { high: 0, medium: 0, low: 0 },
-        overdueCount: overdueData?.count || insightsData?.metrics?.overdueItems || 0
-      })
-      setTeamWorkload(workloadData.workload || [])
-
-      // Generate insights from data
-      const generatedInsights = []
-      if (insightsData?.metrics?.overdueItems > 0) {
-        generatedInsights.push({
-          type: 'warning',
-          message: `You have ${insightsData.metrics.overdueItems} overdue action items that need attention.`
+      if (data) {
+        setDashboardData({
+          taskStats: data.statusCounts || { open: 0, in_progress: 0, done: 0 },
+          priorityStats: data.priorityCounts || { high: 0, medium: 0, low: 0 },
+          overdueCount: data.metrics?.overdueItems || 0
         })
+        setTeamWorkload(data.teamWorkload || [])
+        setInsights(data.insights || [])
       }
-      if (insightsData?.metrics?.overallCompletion > 75) {
-        generatedInsights.push({
-          type: 'success',
-          message: `Great progress! Your overall completion rate is ${insightsData.metrics.overallCompletion}%.`
-        })
-      }
-      if (insightsData?.priorityCounts?.high > 5) {
-        generatedInsights.push({
-          type: 'warning',
-          message: `You have ${insightsData.priorityCounts.high} high-priority tasks. Consider delegating or prioritizing.`
-        })
-      }
-      if (generatedInsights.length === 0 && insightsData?.metrics?.totalProjects > 0) {
-        generatedInsights.push({
-          type: 'info',
-          message: `You have ${insightsData.metrics.totalProjects} projects with ${insightsData.metrics.totalItems} total action items.`
-        })
-      }
-      setInsights(generatedInsights)
     } catch (error) {
       console.error('Failed to load dashboard:', error)
     } finally {
@@ -126,8 +105,10 @@ export default function ProjectDashboard() {
     return [
       { name: 'To Do', value: stats.open || 0, color: STATUS_COLORS.open },
       { name: 'In Progress', value: stats.in_progress || 0, color: STATUS_COLORS.in_progress },
-      { name: 'Done', value: stats.done || 0, color: STATUS_COLORS.done }
-    ]
+      { name: 'Review', value: stats.review || 0, color: STATUS_COLORS.review },
+      { name: 'Done', value: stats.done || 0, color: STATUS_COLORS.done },
+      { name: 'Blocked', value: stats.blocked || 0, color: STATUS_COLORS.blocked }
+    ].filter(item => item.value > 0)
   }
 
   const getPriorityData = () => {

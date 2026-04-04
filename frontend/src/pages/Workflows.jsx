@@ -33,7 +33,7 @@ export default function Workflows() {
     try {
       setLoading(true)
       const response = await workflowsApi.list()
-      setWorkflows(response.workflows || [])
+      setWorkflows(response.data || [])
     } catch (error) {
       console.error('Failed to load workflows:', error)
     } finally {
@@ -50,7 +50,7 @@ export default function Workflows() {
         connections: [],
         active: false
       })
-      navigate(`/workflows/${response.workflow.id}`)
+      navigate(`/workflows/${response.data.id}`)
     } catch (error) {
       console.error('Failed to create workflow:', error)
     }
@@ -74,10 +74,10 @@ export default function Workflows() {
     try {
       const original = await workflowsApi.get(id)
       const response = await workflowsApi.create({
-        name: `${original.workflow.name} (copy)`,
-        description: original.workflow.description,
-        nodes: original.workflow.nodes,
-        connections: original.workflow.connections,
+        name: `${original.data.name} (copy)`,
+        description: original.data.description,
+        nodes: original.data.nodes,
+        connections: original.data.connections,
         active: false
       })
       loadWorkflows()
@@ -109,16 +109,20 @@ export default function Workflows() {
     }
   }
 
-  const handleCreateFromTemplate = async (templateName, nodes, connections) => {
+  const handleCreateFromTemplate = async (templateId) => {
     try {
+      // Fetch the full template data
+      const templateResponse = await workflowsApi.getTemplate(templateId)
+      const template = templateResponse.data
+
       const response = await workflowsApi.create({
-        name: templateName,
-        description: '',
-        nodes: nodes || [],
-        connections: connections || [],
+        name: template.name,
+        description: template.description || '',
+        nodes: template.nodes || [],
+        connections: template.connections || [],
         active: false
       })
-      navigate(`/workflows/${response.workflow.id}`)
+      navigate(`/workflows/${response.data.id}`)
     } catch (error) {
       console.error('Failed to create workflow from template:', error)
     }
@@ -364,7 +368,7 @@ export default function Workflows() {
         <h3 className="font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>Quick Start Templates</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div
-            onClick={() => handleCreateFromTemplate('Meeting Processing', [], [])}
+            onClick={() => handleCreateFromTemplate('template-meeting-processing')}
             className="p-4 rounded-lg cursor-pointer transition-colors group hover:bg-black/20"
             style={{ border: '1px solid rgba(248,240,242,.08)' }}
           >
@@ -379,7 +383,7 @@ export default function Workflows() {
             </p>
           </div>
           <div
-            onClick={() => handleCreateFromTemplate('Webhook to Slack', [], [])}
+            onClick={() => handleCreateFromTemplate('template-webhook-pulse')}
             className="p-4 rounded-lg cursor-pointer transition-colors group hover:bg-black/20"
             style={{ border: '1px solid rgba(248,240,242,.08)' }}
           >
@@ -387,14 +391,14 @@ export default function Workflows() {
               <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors" style={{ background: 'rgba(0,245,212,.1)', border: '1px solid rgba(0,245,212,.2)' }}>
                 <Zap className="w-4 h-4" style={{ color: 'var(--accent-secondary)' }} />
               </div>
-              <h4 className="font-medium" style={{ color: 'var(--text-primary)' }}>Webhook to Slack</h4>
+              <h4 className="font-medium" style={{ color: 'var(--text-primary)' }}>Webhook to Pulse</h4>
             </div>
             <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
-              Receive webhook events and post formatted messages to Slack
+              Receive webhook events and post to Pulse channels
             </p>
           </div>
           <div
-            onClick={() => handleCreateFromTemplate('Daily Digest', [], [])}
+            onClick={() => handleCreateFromTemplate('template-daily-digest')}
             className="p-4 rounded-lg cursor-pointer transition-colors group hover:bg-black/20"
             style={{ border: '1px solid rgba(248,240,242,.08)' }}
           >

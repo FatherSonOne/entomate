@@ -245,6 +245,9 @@ app.use('/api/integrations', require('./routes/integrations'));
 // AI Agents
 app.use('/api/agents', require('./routes/agents'));
 
+// Agent Task Intelligence (ETA, overdue, auto-assign)
+app.use('/api/agent-tasks', require('./routes/agentTasks'));
+
 // Goals & OKRs
 app.use('/api/goals', require('./routes/goals'));
 
@@ -299,6 +302,9 @@ app.use('/api/ecosystem', require('./routes/ecosystem'));
 
 // User & Workspace Settings
 app.use('/api/settings', require('./routes/settings'));
+
+// AI Assistant (context-aware streaming)
+app.use('/api/assistant', require('./routes/assistant'));
 
 
 // ========================================

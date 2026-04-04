@@ -96,24 +96,31 @@ Please answer the question using only the context provided. Include citations fo
 
     let answer = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
+    // Check if the AI legitimately says it couldn't find the info — accept without citations
+    const notFoundPatterns = ["couldn't find", "could not find", 'not found', 'no information',
+      'no relevant', 'unable to find', "don't have", 'do not have', 'no data', 'no matching'];
+    const isNotFoundAnswer = notFoundPatterns.some(p => answer.toLowerCase().includes(p));
+
+    if (isNotFoundAnswer) {
+      return {
+        question,
+        answer,
+        citations: [],
+        retrieval: {
+          count: contextItems.length,
+          topSources: counts
+        }
+      };
+    }
+
     // Validate citations in the answer
     const validCitationIds = citations.map(c => c.id);
     const validation = validateCitations(answer, validCitationIds);
 
-    // If answer has no citations or invalid citations, replace with "not found"
     if (!validation.valid) {
       console.warn('[RAG] Citation validation failed:', validation.issues);
-
-      // If the answer mentions not finding info, that's okay
-      if (answer.toLowerCase().includes("couldn't find") ||
-          answer.toLowerCase().includes('not found') ||
-          answer.toLowerCase().includes('no information')) {
-        answer = "I couldn't find that information in your data.";
-      } else {
-        // Otherwise, the model may be hallucinating - reject the answer
-        console.warn('[RAG] Rejecting answer due to citation issues');
-        answer = "I couldn't find that information in your data.";
-      }
+      // The model may be hallucinating — reject the answer
+      answer = "I couldn't find that information in your data.";
     }
 
     return {

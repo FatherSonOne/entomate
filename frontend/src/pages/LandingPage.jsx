@@ -2,6 +2,633 @@ import React, { useEffect, useRef } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
+/* ════════════════════════════════════════════════════════
+   ANIMATED SVG ICONS — replace every emoji on the page
+   Each icon has idle animation + CSS hover amplification
+   ════════════════════════════════════════════════════════ */
+
+// ── Pillar & Section Icons ──
+
+const IconMicrophone = ({ size = 20 }) => (
+  <svg className="ani-icon" width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="12" y="4" width="8" height="16" rx="4" fill="none" stroke="var(--crimson)" strokeWidth="2">
+      <animate attributeName="opacity" values="1;0.6;1" dur="2s" repeatCount="indefinite"/>
+    </rect>
+    <path d="M8 18 C8 24 12 26 16 26 C20 26 24 24 24 18" stroke="var(--crimson)" strokeWidth="2" strokeLinecap="round" fill="none">
+      <animate attributeName="d" values="M8 18 C8 24 12 26 16 26 C20 26 24 24 24 18;M8 16 C8 24 12 27 16 27 C20 27 24 24 24 16;M8 18 C8 24 12 26 16 26 C20 26 24 24 24 18" dur="3s" repeatCount="indefinite"/>
+    </path>
+    <line x1="16" y1="26" x2="16" y2="30" stroke="var(--crimson)" strokeWidth="2" strokeLinecap="round"/>
+    {/* Sound waves */}
+    <path d="M26 10 Q30 16 26 22" stroke="var(--amber)" strokeWidth="1.5" strokeLinecap="round" fill="none" opacity="0">
+      <animate attributeName="opacity" values="0;0.7;0" dur="1.5s" repeatCount="indefinite"/>
+    </path>
+    <path d="M28 8 Q34 16 28 24" stroke="var(--amber)" strokeWidth="1" strokeLinecap="round" fill="none" opacity="0">
+      <animate attributeName="opacity" values="0;0.4;0" dur="1.5s" begin="0.3s" repeatCount="indefinite"/>
+    </path>
+  </svg>
+)
+
+const IconWorkflow = ({ size = 20 }) => (
+  <svg className="ani-icon" width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    {/* Lightning bolt */}
+    <polygon points="18,2 10,18 16,18 14,30 22,14 16,14" fill="none" stroke="var(--mint)" strokeWidth="1.8" strokeLinejoin="round">
+      <animate attributeName="stroke" values="var(--mint);var(--amber);var(--mint)" dur="3s" repeatCount="indefinite"/>
+    </polygon>
+    {/* Energy spark at tip */}
+    <circle cx="14" cy="30" r="1" fill="var(--mint)" opacity="0">
+      <animate attributeName="opacity" values="0;1;0" dur="1.5s" repeatCount="indefinite"/>
+      <animate attributeName="r" values="1;3;1" dur="1.5s" repeatCount="indefinite"/>
+    </circle>
+    {/* Surrounding pulse ring */}
+    <circle cx="16" cy="16" r="14" fill="none" stroke="var(--mint)" strokeWidth="0.5" opacity="0" strokeDasharray="4 4">
+      <animate attributeName="opacity" values="0;0.4;0" dur="2.5s" repeatCount="indefinite"/>
+      <animate attributeName="r" values="10;15" dur="2.5s" repeatCount="indefinite"/>
+    </circle>
+  </svg>
+)
+
+const IconAgents = ({ size = 20 }) => (
+  <svg className="ani-icon" width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    {/* Four-pointed star / sparkle */}
+    <path d="M16 2 L18 12 L28 16 L18 20 L16 30 L14 20 L4 16 L14 12 Z" fill="none" stroke="var(--amber)" strokeWidth="1.5" strokeLinejoin="round">
+      <animateTransform attributeName="transform" type="rotate" values="0 16 16;360 16 16" dur="12s" repeatCount="indefinite"/>
+    </path>
+    {/* Inner sparkle */}
+    <path d="M16 8 L17 14 L22 16 L17 18 L16 24 L15 18 L10 16 L15 14 Z" fill="var(--amber)" opacity="0.4">
+      <animate attributeName="opacity" values="0.4;0.9;0.4" dur="2s" repeatCount="indefinite"/>
+    </path>
+    {/* Orbiting dots */}
+    <circle cx="16" cy="4" r="1.5" fill="var(--crimson)">
+      <animateTransform attributeName="transform" type="rotate" values="0 16 16;360 16 16" dur="4s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="16" cy="4" r="1.5" fill="var(--mint)">
+      <animateTransform attributeName="transform" type="rotate" values="120 16 16;480 16 16" dur="4s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="16" cy="4" r="1.5" fill="var(--amber)">
+      <animateTransform attributeName="transform" type="rotate" values="240 16 16;600 16 16" dur="4s" repeatCount="indefinite"/>
+    </circle>
+  </svg>
+)
+
+const IconTasks = ({ size = 20 }) => (
+  <svg className="ani-icon" width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    {/* Checkbox */}
+    <rect x="4" y="4" width="24" height="24" rx="5" stroke="var(--crimson)" strokeWidth="2" fill="none"/>
+    {/* Animated checkmark */}
+    <path d="M9 16 L14 21 L23 11" stroke="var(--mint)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none" strokeDasharray="24" strokeDashoffset="24">
+      <animate attributeName="stroke-dashoffset" values="24;0;0;24" dur="3s" repeatCount="indefinite"/>
+    </path>
+    {/* Celebration spark */}
+    <circle cx="24" cy="8" r="0" fill="var(--amber)">
+      <animate attributeName="r" values="0;0;3;0" dur="3s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0;0;1;0" dur="3s" repeatCount="indefinite"/>
+    </circle>
+  </svg>
+)
+
+const IconAnalytics = ({ size = 20 }) => (
+  <svg className="ani-icon" width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    {/* Bar chart bars with staggered growth */}
+    <rect x="4" y="20" width="5" height="0" rx="1" fill="var(--crimson)">
+      <animate attributeName="height" values="0;10;10;0" dur="3s" repeatCount="indefinite"/>
+      <animate attributeName="y" values="28;18;18;28" dur="3s" repeatCount="indefinite"/>
+    </rect>
+    <rect x="11" y="20" width="5" height="0" rx="1" fill="var(--mint)">
+      <animate attributeName="height" values="0;18;18;0" dur="3s" begin="0.2s" repeatCount="indefinite"/>
+      <animate attributeName="y" values="28;10;10;28" dur="3s" begin="0.2s" repeatCount="indefinite"/>
+    </rect>
+    <rect x="18" y="20" width="5" height="0" rx="1" fill="var(--amber)">
+      <animate attributeName="height" values="0;14;14;0" dur="3s" begin="0.4s" repeatCount="indefinite"/>
+      <animate attributeName="y" values="28;14;14;28" dur="3s" begin="0.4s" repeatCount="indefinite"/>
+    </rect>
+    <rect x="25" y="20" width="5" height="0" rx="1" fill="var(--crimson)" opacity="0.7">
+      <animate attributeName="height" values="0;22;22;0" dur="3s" begin="0.6s" repeatCount="indefinite"/>
+      <animate attributeName="y" values="28;6;6;28" dur="3s" begin="0.6s" repeatCount="indefinite"/>
+    </rect>
+    {/* Trend line */}
+    <polyline points="6,22 14,14 20,18 28,6" stroke="var(--amber)" strokeWidth="1.5" strokeLinecap="round" fill="none" strokeDasharray="40" strokeDashoffset="40">
+      <animate attributeName="stroke-dashoffset" values="40;0;0;40" dur="3s" begin="0.8s" repeatCount="indefinite"/>
+    </polyline>
+  </svg>
+)
+
+const IconIntegrations = ({ size = 20 }) => (
+  <svg className="ani-icon" width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    {/* Chain link */}
+    <path d="M12 16 L6 16 A5 5 0 0 1 6 6 L12 6" stroke="var(--amber)" strokeWidth="2" strokeLinecap="round" fill="none"/>
+    <path d="M20 6 L26 6 A5 5 0 0 1 26 16 L20 16" stroke="var(--amber)" strokeWidth="2" strokeLinecap="round" fill="none"/>
+    <line x1="11" y1="11" x2="21" y2="11" stroke="var(--amber)" strokeWidth="2" strokeLinecap="round">
+      <animate attributeName="x2" values="21;23;21" dur="2s" repeatCount="indefinite"/>
+    </line>
+    {/* Data flow dots */}
+    <circle r="1.5" fill="var(--mint)">
+      <animateMotion dur="2s" repeatCount="indefinite" path="M11,11 L21,11"/>
+    </circle>
+    <circle r="1.5" fill="var(--crimson)">
+      <animateMotion dur="2s" begin="0.7s" repeatCount="indefinite" path="M11,11 L21,11"/>
+    </circle>
+    {/* Connection pulse */}
+    <circle cx="16" cy="22" r="2" fill="none" stroke="var(--amber)" strokeWidth="1" opacity="0">
+      <animate attributeName="r" values="2;8;2" dur="2.5s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.6;0;0.6" dur="2.5s" repeatCount="indefinite"/>
+    </circle>
+  </svg>
+)
+
+const IconRobot = ({ size = 20 }) => (
+  <svg className="ani-icon" width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    {/* Head */}
+    <rect x="6" y="10" width="20" height="16" rx="4" stroke="var(--crimson)" strokeWidth="1.8" fill="none"/>
+    {/* Antenna */}
+    <line x1="16" y1="10" x2="16" y2="4" stroke="var(--crimson)" strokeWidth="1.5" strokeLinecap="round"/>
+    <circle cx="16" cy="3" r="2" fill="var(--amber)">
+      <animate attributeName="r" values="2;3;2" dur="1.5s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="1;0.5;1" dur="1.5s" repeatCount="indefinite"/>
+    </circle>
+    {/* Eyes */}
+    <circle cx="12" cy="18" r="2.5" fill="var(--mint)">
+      <animate attributeName="fill" values="var(--mint);var(--amber);var(--mint)" dur="4s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="20" cy="18" r="2.5" fill="var(--mint)">
+      <animate attributeName="fill" values="var(--mint);var(--amber);var(--mint)" dur="4s" begin="0.2s" repeatCount="indefinite"/>
+    </circle>
+    {/* Mouth */}
+    <rect x="12" y="22" width="8" height="2" rx="1" fill="var(--crimson)" opacity="0.5"/>
+    {/* Scan effect */}
+    <line x1="6" y1="14" x2="26" y2="14" stroke="var(--mint)" strokeWidth="0.5" opacity="0">
+      <animate attributeName="y1" values="10;26;10" dur="3s" repeatCount="indefinite"/>
+      <animate attributeName="y2" values="10;26;10" dur="3s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0;0.5;0" dur="3s" repeatCount="indefinite"/>
+    </line>
+  </svg>
+)
+
+const IconReports = ({ size = 20 }) => (
+  <svg className="ani-icon" width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    {/* Upward trend arrow */}
+    <polyline points="4,26 12,16 18,20 28,6" stroke="var(--mint)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" strokeDasharray="50" strokeDashoffset="50">
+      <animate attributeName="stroke-dashoffset" values="50;0" dur="2s" fill="freeze" repeatCount="indefinite"/>
+    </polyline>
+    {/* Arrow head */}
+    <polygon points="28,6 22,6 28,12" fill="var(--mint)" opacity="0">
+      <animate attributeName="opacity" values="0;0;1" dur="2s" repeatCount="indefinite"/>
+    </polygon>
+    {/* Sparkle at peak */}
+    <circle cx="28" cy="6" r="0" fill="var(--amber)">
+      <animate attributeName="r" values="0;0;4;0" dur="2s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0;0;0.8;0" dur="2s" repeatCount="indefinite"/>
+    </circle>
+    {/* Grid lines */}
+    <line x1="4" y1="28" x2="28" y2="28" stroke="var(--text-muted)" strokeWidth="0.5" opacity="0.3"/>
+    <line x1="4" y1="4" x2="4" y2="28" stroke="var(--text-muted)" strokeWidth="0.5" opacity="0.3"/>
+  </svg>
+)
+
+// ── Deep Feature Icons ──
+
+const IconTarget = ({ size = 16 }) => (
+  <svg className="ani-icon" width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="16" cy="16" r="13" stroke="var(--crimson)" strokeWidth="1.5" fill="none" opacity="0.3"/>
+    <circle cx="16" cy="16" r="9" stroke="var(--crimson)" strokeWidth="1.5" fill="none" opacity="0.5"/>
+    <circle cx="16" cy="16" r="5" stroke="var(--crimson)" strokeWidth="1.5" fill="none" opacity="0.8"/>
+    <circle cx="16" cy="16" r="2" fill="var(--crimson)">
+      <animate attributeName="r" values="2;3;2" dur="1.5s" repeatCount="indefinite"/>
+    </circle>
+    {/* Crosshairs */}
+    <line x1="16" y1="1" x2="16" y2="6" stroke="var(--crimson)" strokeWidth="1" opacity="0.4"/>
+    <line x1="16" y1="26" x2="16" y2="31" stroke="var(--crimson)" strokeWidth="1" opacity="0.4"/>
+    <line x1="1" y1="16" x2="6" y2="16" stroke="var(--crimson)" strokeWidth="1" opacity="0.4"/>
+    <line x1="26" y1="16" x2="31" y2="16" stroke="var(--crimson)" strokeWidth="1" opacity="0.4"/>
+    {/* Pulse ring */}
+    <circle cx="16" cy="16" r="2" fill="none" stroke="var(--amber)" strokeWidth="1" opacity="0">
+      <animate attributeName="r" values="2;14" dur="2s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.8;0" dur="2s" repeatCount="indefinite"/>
+    </circle>
+  </svg>
+)
+
+const IconPerson = ({ size = 16 }) => (
+  <svg className="ani-icon" width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="16" cy="10" r="6" stroke="var(--mint)" strokeWidth="1.8" fill="none"/>
+    <path d="M4 28 C4 22 9 18 16 18 C23 18 28 22 28 28" stroke="var(--mint)" strokeWidth="1.8" strokeLinecap="round" fill="none"/>
+    {/* Assignment arrow */}
+    <path d="M24 6 L28 10 L24 14" stroke="var(--amber)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" opacity="0">
+      <animate attributeName="opacity" values="0;1;0" dur="2s" repeatCount="indefinite"/>
+    </path>
+    <line x1="18" y1="10" x2="28" y2="10" stroke="var(--amber)" strokeWidth="1.5" strokeLinecap="round" opacity="0">
+      <animate attributeName="opacity" values="0;1;0" dur="2s" repeatCount="indefinite"/>
+    </line>
+  </svg>
+)
+
+const IconCalendar = ({ size = 16 }) => (
+  <svg className="ani-icon" width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="4" y="6" width="24" height="22" rx="3" stroke="var(--amber)" strokeWidth="1.8" fill="none"/>
+    <line x1="4" y1="13" x2="28" y2="13" stroke="var(--amber)" strokeWidth="1.5"/>
+    <line x1="10" y1="4" x2="10" y2="9" stroke="var(--amber)" strokeWidth="2" strokeLinecap="round"/>
+    <line x1="22" y1="4" x2="22" y2="9" stroke="var(--amber)" strokeWidth="2" strokeLinecap="round"/>
+    {/* Date dot */}
+    <circle cx="16" cy="21" r="2.5" fill="var(--crimson)">
+      <animate attributeName="r" values="2.5;3.5;2.5" dur="2s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="1;0.6;1" dur="2s" repeatCount="indefinite"/>
+    </circle>
+  </svg>
+)
+
+const IconFeedback = ({ size = 16 }) => (
+  <svg className="ani-icon" width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    {/* Circular arrows */}
+    <path d="M26 16 A10 10 0 0 1 6 16" stroke="var(--mint)" strokeWidth="1.8" strokeLinecap="round" fill="none"/>
+    <path d="M6 16 A10 10 0 0 1 26 16" stroke="var(--crimson)" strokeWidth="1.8" strokeLinecap="round" fill="none"/>
+    {/* Arrow heads */}
+    <polygon points="26,16 22,12 22,20" fill="var(--mint)"/>
+    <polygon points="6,16 10,12 10,20" fill="var(--crimson)"/>
+    {/* Spinning */}
+    <animateTransform attributeName="transform" type="rotate" values="0 16 16;360 16 16" dur="6s" repeatCount="indefinite"/>
+  </svg>
+)
+
+const IconDNA = ({ size = 16 }) => (
+  <svg className="ani-icon" width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    {/* Double helix strands */}
+    <path d="M8 2 Q16 8 24 8 Q16 14 8 14 Q16 20 24 20 Q16 26 8 26 Q16 32 24 32" stroke="var(--crimson)" strokeWidth="1.5" fill="none" strokeLinecap="round">
+      <animate attributeName="d" values="M8 2 Q16 8 24 8 Q16 14 8 14 Q16 20 24 20 Q16 26 8 26 Q16 32 24 32;M8 2 Q16 6 24 2 Q16 8 8 8 Q16 14 24 14 Q16 20 8 20 Q16 26 24 26;M8 2 Q16 8 24 8 Q16 14 8 14 Q16 20 24 20 Q16 26 8 26 Q16 32 24 32" dur="4s" repeatCount="indefinite"/>
+    </path>
+    <path d="M24 2 Q16 8 8 8 Q16 14 24 14 Q16 20 8 20 Q16 26 24 26 Q16 32 8 32" stroke="var(--mint)" strokeWidth="1.5" fill="none" strokeLinecap="round">
+      <animate attributeName="d" values="M24 2 Q16 8 8 8 Q16 14 24 14 Q16 20 8 20 Q16 26 24 26 Q16 32 8 32;M24 2 Q16 6 8 2 Q16 8 24 8 Q16 14 8 14 Q16 20 24 20 Q16 26 8 26;M24 2 Q16 8 8 8 Q16 14 24 14 Q16 20 8 20 Q16 26 24 26 Q16 32 8 32" dur="4s" repeatCount="indefinite"/>
+    </path>
+    {/* Cross rungs */}
+    <line x1="12" y1="8" x2="20" y2="8" stroke="var(--amber)" strokeWidth="1" opacity="0.5"/>
+    <line x1="12" y1="14" x2="20" y2="14" stroke="var(--amber)" strokeWidth="1" opacity="0.5"/>
+    <line x1="12" y1="20" x2="20" y2="20" stroke="var(--amber)" strokeWidth="1" opacity="0.5"/>
+    <line x1="12" y1="26" x2="20" y2="26" stroke="var(--amber)" strokeWidth="1" opacity="0.5"/>
+  </svg>
+)
+
+// ── Integration Chip Icons ──
+
+const IconSlack = ({ size = 16 }) => (
+  <svg className="ani-icon" width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    {/* Slack hash shape */}
+    <rect x="6" y="12" width="8" height="3" rx="1.5" fill="#E01E5A"/>
+    <rect x="18" y="12" width="8" height="3" rx="1.5" fill="#36C5F0"/>
+    <rect x="6" y="18" width="8" height="3" rx="1.5" fill="#2EB67D"/>
+    <rect x="18" y="18" width="8" height="3" rx="1.5" fill="#ECB22E"/>
+    <rect x="12" y="6" width="3" height="8" rx="1.5" fill="#36C5F0"/>
+    <rect x="17" y="6" width="3" height="8" rx="1.5" fill="#E01E5A"/>
+    <rect x="12" y="18" width="3" height="8" rx="1.5" fill="#ECB22E"/>
+    <rect x="17" y="18" width="3" height="8" rx="1.5" fill="#2EB67D"/>
+    {/* Pulse glow */}
+    <rect x="6" y="6" width="20" height="20" rx="4" fill="none" stroke="#E01E5A" strokeWidth="0.5" opacity="0">
+      <animate attributeName="opacity" values="0;0.4;0" dur="3s" repeatCount="indefinite"/>
+    </rect>
+  </svg>
+)
+
+const IconSalesforce = ({ size = 16 }) => (
+  <svg className="ani-icon" width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    {/* Cloud shape */}
+    <path d="M8 22 A6 6 0 0 1 8 12 A8 8 0 0 1 24 12 A6 6 0 0 1 24 22 Z" fill="#00A1E0" opacity="0.9">
+      <animate attributeName="opacity" values="0.9;0.6;0.9" dur="3s" repeatCount="indefinite"/>
+    </path>
+    <text x="16" y="19" textAnchor="middle" fill="white" fontSize="8" fontWeight="bold" fontFamily="var(--font-display)">SF</text>
+  </svg>
+)
+
+const IconHubSpot = ({ size = 16 }) => (
+  <svg className="ani-icon" width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    {/* Sprocket / gear shape */}
+    <circle cx="16" cy="16" r="5" stroke="#FF7A59" strokeWidth="2" fill="none">
+      <animateTransform attributeName="transform" type="rotate" values="0 16 16;360 16 16" dur="8s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="16" cy="16" r="2" fill="#FF7A59"/>
+    {/* Spokes */}
+    <line x1="16" y1="5" x2="16" y2="9" stroke="#FF7A59" strokeWidth="2" strokeLinecap="round">
+      <animateTransform attributeName="transform" type="rotate" values="0 16 16;360 16 16" dur="8s" repeatCount="indefinite"/>
+    </line>
+    <line x1="16" y1="23" x2="16" y2="27" stroke="#FF7A59" strokeWidth="2" strokeLinecap="round">
+      <animateTransform attributeName="transform" type="rotate" values="0 16 16;360 16 16" dur="8s" repeatCount="indefinite"/>
+    </line>
+    <line x1="5" y1="16" x2="9" y2="16" stroke="#FF7A59" strokeWidth="2" strokeLinecap="round">
+      <animateTransform attributeName="transform" type="rotate" values="0 16 16;360 16 16" dur="8s" repeatCount="indefinite"/>
+    </line>
+    <line x1="23" y1="16" x2="27" y2="16" stroke="#FF7A59" strokeWidth="2" strokeLinecap="round">
+      <animateTransform attributeName="transform" type="rotate" values="0 16 16;360 16 16" dur="8s" repeatCount="indefinite"/>
+    </line>
+  </svg>
+)
+
+const IconGoogleCal = ({ size = 16 }) => (
+  <svg className="ani-icon" width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="4" y="6" width="24" height="22" rx="3" stroke="#4285F4" strokeWidth="1.5" fill="none"/>
+    <line x1="4" y1="13" x2="28" y2="13" stroke="#4285F4" strokeWidth="1"/>
+    <line x1="10" y1="4" x2="10" y2="9" stroke="#EA4335" strokeWidth="2" strokeLinecap="round"/>
+    <line x1="22" y1="4" x2="22" y2="9" stroke="#EA4335" strokeWidth="2" strokeLinecap="round"/>
+    <rect x="9" y="16" width="4" height="4" rx="1" fill="#34A853" opacity="0.8"/>
+    <rect x="15" y="16" width="4" height="4" rx="1" fill="#FBBC05" opacity="0.8"/>
+    <rect x="21" y="16" width="4" height="4" rx="1" fill="#EA4335" opacity="0.8">
+      <animate attributeName="opacity" values="0.8;0.4;0.8" dur="2s" repeatCount="indefinite"/>
+    </rect>
+  </svg>
+)
+
+const IconWebhook = ({ size = 16 }) => (
+  <svg className="ani-icon" width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    {/* Three interlocking hooks */}
+    <path d="M16 10 L16 18 A5 5 0 0 0 21 23" stroke="var(--crimson)" strokeWidth="2" strokeLinecap="round" fill="none"/>
+    <path d="M22 14 L16 18 L10 14" stroke="var(--mint)" strokeWidth="2" strokeLinecap="round" fill="none"/>
+    <circle cx="16" cy="8" r="3" fill="var(--crimson)" opacity="0.7"/>
+    <circle cx="10" cy="24" r="3" fill="var(--mint)" opacity="0.7"/>
+    <circle cx="22" cy="24" r="3" fill="var(--amber)" opacity="0.7"/>
+    {/* Data pulse */}
+    <circle cx="16" cy="18" r="1" fill="var(--amber)">
+      <animate attributeName="r" values="1;6;1" dur="2s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.8;0;0.8" dur="2s" repeatCount="indefinite"/>
+    </circle>
+  </svg>
+)
+
+const IconTeams = ({ size = 16 }) => (
+  <svg className="ani-icon" width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="4" y="8" width="18" height="16" rx="2" fill="#5B5FC7" opacity="0.9"/>
+    <text x="13" y="19" textAnchor="middle" fill="white" fontSize="10" fontWeight="bold" fontFamily="var(--font-display)">T</text>
+    <circle cx="24" cy="10" r="5" fill="#5B5FC7" opacity="0.6"/>
+    <rect x="20" y="16" width="8" height="8" rx="2" fill="#5B5FC7" opacity="0.7"/>
+  </svg>
+)
+
+const IconEmail = ({ size = 16 }) => (
+  <svg className="ani-icon" width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="3" y="7" width="26" height="18" rx="3" stroke="var(--crimson)" strokeWidth="1.8" fill="none"/>
+    <path d="M3 10 L16 19 L29 10" stroke="var(--crimson)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+    {/* Send animation — flap closing */}
+    <path d="M3 10 L16 19 L29 10" stroke="var(--amber)" strokeWidth="1" strokeLinecap="round" fill="none" opacity="0">
+      <animate attributeName="opacity" values="0;0.6;0" dur="3s" repeatCount="indefinite"/>
+      <animate attributeName="d" values="M3 10 L16 19 L29 10;M3 7 L16 14 L29 7;M3 10 L16 19 L29 10" dur="3s" repeatCount="indefinite"/>
+    </path>
+  </svg>
+)
+
+const IconCron = ({ size = 16 }) => (
+  <svg className="ani-icon" width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="16" cy="16" r="13" stroke="var(--mint)" strokeWidth="1.8" fill="none"/>
+    {/* Clock hands */}
+    <line x1="16" y1="16" x2="16" y2="8" stroke="var(--mint)" strokeWidth="2" strokeLinecap="round">
+      <animateTransform attributeName="transform" type="rotate" values="0 16 16;360 16 16" dur="6s" repeatCount="indefinite"/>
+    </line>
+    <line x1="16" y1="16" x2="22" y2="16" stroke="var(--amber)" strokeWidth="1.5" strokeLinecap="round">
+      <animateTransform attributeName="transform" type="rotate" values="0 16 16;360 16 16" dur="60s" repeatCount="indefinite"/>
+    </line>
+    <circle cx="16" cy="16" r="2" fill="var(--mint)"/>
+    {/* Tick marks */}
+    <line x1="16" y1="3" x2="16" y2="5" stroke="var(--mint)" strokeWidth="1" opacity="0.5"/>
+    <line x1="16" y1="27" x2="16" y2="29" stroke="var(--mint)" strokeWidth="1" opacity="0.5"/>
+    <line x1="3" y1="16" x2="5" y2="16" stroke="var(--mint)" strokeWidth="1" opacity="0.5"/>
+    <line x1="27" y1="16" x2="29" y2="16" stroke="var(--mint)" strokeWidth="1" opacity="0.5"/>
+  </svg>
+)
+
+// ── Adaptive Section Icons ──
+
+const IconFeedbackLoop = ({ size = 28 }) => (
+  <svg className="ani-icon" width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M6 16 A10 10 0 0 1 26 16" stroke="var(--crimson)" strokeWidth="2" strokeLinecap="round" fill="none" strokeDasharray="32" strokeDashoffset="0">
+      <animate attributeName="stroke-dashoffset" values="0;-64" dur="3s" repeatCount="indefinite"/>
+    </path>
+    <path d="M26 16 A10 10 0 0 1 6 16" stroke="var(--mint)" strokeWidth="2" strokeLinecap="round" fill="none" strokeDasharray="32" strokeDashoffset="0">
+      <animate attributeName="stroke-dashoffset" values="0;-64" dur="3s" repeatCount="indefinite"/>
+    </path>
+    <polygon points="26,16 22,12 22,20" fill="var(--crimson)">
+      <animate attributeName="opacity" values="1;0.4;1" dur="1.5s" repeatCount="indefinite"/>
+    </polygon>
+    <polygon points="6,16 10,12 10,20" fill="var(--mint)">
+      <animate attributeName="opacity" values="1;0.4;1" dur="1.5s" begin="0.75s" repeatCount="indefinite"/>
+    </polygon>
+  </svg>
+)
+
+const IconPattern = ({ size = 28 }) => (
+  <svg className="ani-icon" width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    {/* Neural network nodes */}
+    <circle cx="6" cy="8" r="3" fill="var(--crimson)" opacity="0.8"/>
+    <circle cx="6" cy="24" r="3" fill="var(--crimson)" opacity="0.8"/>
+    <circle cx="16" cy="10" r="3" fill="var(--amber)" opacity="0.8"/>
+    <circle cx="16" cy="22" r="3" fill="var(--amber)" opacity="0.8"/>
+    <circle cx="26" cy="16" r="3" fill="var(--mint)" opacity="0.8">
+      <animate attributeName="r" values="3;4;3" dur="2s" repeatCount="indefinite"/>
+    </circle>
+    {/* Connections */}
+    <line x1="8" y1="9" x2="14" y2="10" stroke="var(--crimson)" strokeWidth="1" opacity="0.4"/>
+    <line x1="8" y1="23" x2="14" y2="22" stroke="var(--crimson)" strokeWidth="1" opacity="0.4"/>
+    <line x1="18" y1="11" x2="24" y2="15" stroke="var(--amber)" strokeWidth="1" opacity="0.4"/>
+    <line x1="18" y1="21" x2="24" y2="17" stroke="var(--amber)" strokeWidth="1" opacity="0.4"/>
+    {/* Data pulse along connections */}
+    <circle r="1.5" fill="var(--amber)">
+      <animateMotion dur="2s" repeatCount="indefinite" path="M8,9 L14,10 L18,11 L24,15"/>
+      <animate attributeName="opacity" values="0.8;0.2;0.8" dur="2s" repeatCount="indefinite"/>
+    </circle>
+  </svg>
+)
+
+const IconOutcome = ({ size = 28 }) => (
+  <svg className="ani-icon" width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    {/* Gauge arc */}
+    <path d="M6 24 A12 12 0 0 1 26 24" stroke="var(--elevated)" strokeWidth="3" strokeLinecap="round" fill="none"/>
+    <path d="M6 24 A12 12 0 0 1 26 24" stroke="url(#gauge-grad)" strokeWidth="3" strokeLinecap="round" fill="none" strokeDasharray="38" strokeDashoffset="38">
+      <animate attributeName="stroke-dashoffset" values="38;8;38" dur="3s" repeatCount="indefinite"/>
+    </path>
+    <defs>
+      <linearGradient id="gauge-grad" x1="0%" y1="0%" x2="100%">
+        <stop offset="0%" stopColor="var(--crimson)"/>
+        <stop offset="50%" stopColor="var(--amber)"/>
+        <stop offset="100%" stopColor="var(--mint)"/>
+      </linearGradient>
+    </defs>
+    {/* Needle */}
+    <line x1="16" y1="24" x2="16" y2="12" stroke="var(--text-primary)" strokeWidth="1.5" strokeLinecap="round">
+      <animateTransform attributeName="transform" type="rotate" values="-60 16 24;60 16 24;-60 16 24" dur="3s" repeatCount="indefinite"/>
+    </line>
+    <circle cx="16" cy="24" r="2" fill="var(--text-primary)"/>
+  </svg>
+)
+
+const IconAlert = ({ size = 28 }) => (
+  <svg className="ani-icon" width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    {/* Light bulb shape */}
+    <path d="M12 24 L20 24 L20 22 C20 20 24 18 24 12 A8 8 0 0 0 8 12 C8 18 12 20 12 22 Z" stroke="var(--amber)" strokeWidth="1.8" fill="none"/>
+    {/* Filament glow */}
+    <path d="M13 14 Q16 18 19 14" stroke="var(--amber)" strokeWidth="1.5" fill="none">
+      <animate attributeName="stroke" values="var(--amber);var(--crimson);var(--amber)" dur="2s" repeatCount="indefinite"/>
+    </path>
+    {/* Bottom lines */}
+    <line x1="13" y1="26" x2="19" y2="26" stroke="var(--amber)" strokeWidth="1.5" strokeLinecap="round"/>
+    <line x1="14" y1="28" x2="18" y2="28" stroke="var(--amber)" strokeWidth="1.5" strokeLinecap="round"/>
+    {/* Glow rays */}
+    <line x1="16" y1="1" x2="16" y2="3" stroke="var(--amber)" strokeWidth="1" opacity="0" strokeLinecap="round">
+      <animate attributeName="opacity" values="0;0.7;0" dur="2s" repeatCount="indefinite"/>
+    </line>
+    <line x1="4" y1="12" x2="6" y2="12" stroke="var(--amber)" strokeWidth="1" opacity="0" strokeLinecap="round">
+      <animate attributeName="opacity" values="0;0.7;0" dur="2s" begin="0.3s" repeatCount="indefinite"/>
+    </line>
+    <line x1="26" y1="12" x2="28" y2="12" stroke="var(--amber)" strokeWidth="1" opacity="0" strokeLinecap="round">
+      <animate attributeName="opacity" values="0;0.7;0" dur="2s" begin="0.6s" repeatCount="indefinite"/>
+    </line>
+  </svg>
+)
+
+// ── Ecosystem Icons ──
+
+const IconSearch = ({ size = 28 }) => (
+  <svg className="ani-icon" width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="14" cy="14" r="9" stroke="var(--mint)" strokeWidth="2" fill="none"/>
+    <line x1="21" y1="21" x2="28" y2="28" stroke="var(--mint)" strokeWidth="2.5" strokeLinecap="round"/>
+    {/* Scanning sweep */}
+    <circle cx="14" cy="14" r="0" fill="none" stroke="var(--crimson)" strokeWidth="1" opacity="0">
+      <animate attributeName="r" values="0;9;0" dur="2.5s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0;0.5;0" dur="2.5s" repeatCount="indefinite"/>
+    </circle>
+    {/* Found dot */}
+    <circle cx="14" cy="14" r="2" fill="var(--amber)" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;0" dur="2.5s" repeatCount="indefinite"/>
+    </circle>
+  </svg>
+)
+
+const IconBridge = ({ size = 28 }) => (
+  <svg className="ani-icon" width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    {/* Plug shape */}
+    <rect x="2" y="11" width="10" height="10" rx="2" stroke="var(--crimson)" strokeWidth="1.5" fill="none"/>
+    <rect x="20" y="11" width="10" height="10" rx="2" stroke="var(--mint)" strokeWidth="1.5" fill="none"/>
+    {/* Connection line */}
+    <line x1="12" y1="16" x2="20" y2="16" stroke="var(--amber)" strokeWidth="2" strokeLinecap="round" strokeDasharray="2 2">
+      <animate attributeName="stroke-dashoffset" values="0;-8" dur="1s" repeatCount="indefinite"/>
+    </line>
+    {/* Energy dots traveling */}
+    <circle r="2" fill="var(--amber)">
+      <animateMotion dur="1.5s" repeatCount="indefinite" path="M12,16 L20,16"/>
+    </circle>
+    <circle r="1.5" fill="var(--crimson)">
+      <animateMotion dur="1.5s" begin="0.5s" repeatCount="indefinite" path="M20,16 L12,16"/>
+    </circle>
+    {/* Prongs */}
+    <line x1="5" y1="11" x2="5" y2="8" stroke="var(--crimson)" strokeWidth="1.5" strokeLinecap="round"/>
+    <line x1="9" y1="11" x2="9" y2="8" stroke="var(--crimson)" strokeWidth="1.5" strokeLinecap="round"/>
+    <line x1="23" y1="11" x2="23" y2="8" stroke="var(--mint)" strokeWidth="1.5" strokeLinecap="round"/>
+    <line x1="27" y1="11" x2="27" y2="8" stroke="var(--mint)" strokeWidth="1.5" strokeLinecap="round"/>
+  </svg>
+)
+
+const IconUnifiedWorkflow = ({ size = 28 }) => (
+  <svg className="ani-icon" width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    {/* Three converging arrows */}
+    <path d="M4 6 L16 16" stroke="var(--crimson)" strokeWidth="2" strokeLinecap="round"/>
+    <path d="M4 26 L16 16" stroke="var(--mint)" strokeWidth="2" strokeLinecap="round"/>
+    <path d="M16 16 L28 16" stroke="var(--amber)" strokeWidth="2" strokeLinecap="round">
+      <animate attributeName="x2" values="28;30;28" dur="1.5s" repeatCount="indefinite"/>
+    </path>
+    {/* Arrow head */}
+    <polygon points="28,16 24,12 24,20" fill="var(--amber)">
+      <animate attributeName="points" values="28,16 24,12 24,20;30,16 26,12 26,20;28,16 24,12 24,20" dur="1.5s" repeatCount="indefinite"/>
+    </polygon>
+    {/* Central merge node */}
+    <circle cx="16" cy="16" r="3" fill="var(--surface)" stroke="var(--text-primary)" strokeWidth="1.5">
+      <animate attributeName="r" values="3;4;3" dur="2s" repeatCount="indefinite"/>
+    </circle>
+    {/* Source dots */}
+    <circle cx="4" cy="6" r="2.5" fill="var(--crimson)"/>
+    <circle cx="4" cy="26" r="2.5" fill="var(--mint)"/>
+  </svg>
+)
+
+// ── Power User Icons ──
+
+const IconDocument = ({ size = 28 }) => (
+  <svg className="ani-icon" width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M8 4 L20 4 L26 10 L26 28 L8 28 Z" stroke="var(--crimson)" strokeWidth="1.8" fill="none" strokeLinejoin="round"/>
+    <path d="M20 4 L20 10 L26 10" stroke="var(--crimson)" strokeWidth="1.8" fill="none" strokeLinejoin="round"/>
+    {/* Text lines appearing */}
+    <line x1="12" y1="16" x2="22" y2="16" stroke="var(--text-muted)" strokeWidth="1.5" strokeLinecap="round" opacity="0">
+      <animate attributeName="opacity" values="0;0.6;0.6;0" dur="3s" repeatCount="indefinite"/>
+    </line>
+    <line x1="12" y1="20" x2="20" y2="20" stroke="var(--text-muted)" strokeWidth="1.5" strokeLinecap="round" opacity="0">
+      <animate attributeName="opacity" values="0;0;0.6;0" dur="3s" repeatCount="indefinite"/>
+    </line>
+    <line x1="12" y1="24" x2="18" y2="24" stroke="var(--text-muted)" strokeWidth="1.5" strokeLinecap="round" opacity="0">
+      <animate attributeName="opacity" values="0;0;0;0.6" dur="3s" repeatCount="indefinite"/>
+    </line>
+  </svg>
+)
+
+const IconLock = ({ size = 28 }) => (
+  <svg className="ani-icon" width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="6" y="14" width="20" height="14" rx="3" stroke="var(--amber)" strokeWidth="2" fill="none"/>
+    <path d="M10 14 L10 10 A6 6 0 0 1 22 10 L22 14" stroke="var(--amber)" strokeWidth="2" strokeLinecap="round" fill="none"/>
+    {/* Keyhole */}
+    <circle cx="16" cy="21" r="2.5" fill="var(--amber)">
+      <animate attributeName="fill" values="var(--amber);var(--mint);var(--amber)" dur="3s" repeatCount="indefinite"/>
+    </circle>
+    <rect x="15" y="22" width="2" height="4" rx="1" fill="var(--amber)"/>
+    {/* Shield glow */}
+    <rect x="6" y="14" width="20" height="14" rx="3" fill="none" stroke="var(--mint)" strokeWidth="0.5" opacity="0">
+      <animate attributeName="opacity" values="0;0.5;0" dur="3s" repeatCount="indefinite"/>
+    </rect>
+  </svg>
+)
+
+// ── Workflow Trail Sparkle ──
+
+const IconSparkle = ({ size = 12 }) => (
+  <svg className="ani-icon" width={size} height={size} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M8 0 L9 6 L16 8 L9 10 L8 16 L7 10 L0 8 L7 6 Z" fill="var(--amber)">
+      <animateTransform attributeName="transform" type="rotate" values="0 8 8;360 8 8" dur="6s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite"/>
+    </path>
+  </svg>
+)
+
+// ── Guide Preview Icons (rendered inside mapped cards) ──
+
+const IconChat = ({ size = 28 }) => (
+  <svg className="ani-icon" width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M4 6 L28 6 A2 2 0 0 1 28 6 L28 22 A2 2 0 0 1 26 24 L10 24 L4 28 Z" stroke="var(--crimson)" strokeWidth="1.8" fill="none" strokeLinejoin="round"/>
+    {/* Typing dots */}
+    <circle cx="11" cy="15" r="1.5" fill="var(--crimson)">
+      <animate attributeName="opacity" values="1;0.3;1" dur="1.2s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="16" cy="15" r="1.5" fill="var(--crimson)">
+      <animate attributeName="opacity" values="1;0.3;1" dur="1.2s" begin="0.2s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="21" cy="15" r="1.5" fill="var(--crimson)">
+      <animate attributeName="opacity" values="1;0.3;1" dur="1.2s" begin="0.4s" repeatCount="indefinite"/>
+    </circle>
+  </svg>
+)
+
+const IconShuffle = ({ size = 28 }) => (
+  <svg className="ani-icon" width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M4 10 L12 10 L20 22 L28 22" stroke="var(--mint)" strokeWidth="2" strokeLinecap="round" fill="none"/>
+    <path d="M4 22 L12 22 L20 10 L28 10" stroke="var(--crimson)" strokeWidth="2" strokeLinecap="round" fill="none"/>
+    <polygon points="28,10 24,6 24,14" fill="var(--crimson)">
+      <animate attributeName="opacity" values="1;0.4;1" dur="2s" repeatCount="indefinite"/>
+    </polygon>
+    <polygon points="28,22 24,18 24,26" fill="var(--mint)">
+      <animate attributeName="opacity" values="1;0.4;1" dur="2s" begin="1s" repeatCount="indefinite"/>
+    </polygon>
+  </svg>
+)
+
+const GUIDE_ICONS = {
+  mic: IconMicrophone,
+  tasks: IconTasks,
+  shuffle: IconShuffle,
+  robot: IconRobot,
+  target: IconTarget,
+  search: IconSearch,
+  chat: IconChat,
+  analytics: IconAnalytics,
+  calendar: IconCalendar,
+}
+
 export default function LandingPage() {
   const { isSignedIn, loading: isLoading } = useAuth()
   const isLoaded = !isLoading
@@ -124,11 +751,11 @@ export default function LandingPage() {
           </a>
 
           <ul className="nav-links">
+            <li><a href="#story">Story</a></li>
             <li><a href="#trifecto">The Trifecto</a></li>
             <li><a href="#features">Features</a></li>
             <li><a href="#integrations">Integrations</a></li>
             <li><a href="#guide">User Guide</a></li>
-            <li><a href="#logos">Branding</a></li>
           </ul>
 
           <div className="nav-cta">
@@ -162,28 +789,29 @@ export default function LandingPage() {
 
             <p className="hero-sub">
               Entomate connects your meetings, tasks, and team into intelligent workflows.
-              165+ automations, 4 AI agents, and deep integrations — all from a single visual canvas.
+              4 AI agents, a visual automation canvas, and deep integrations that close the loop
+              from decision to execution.
             </p>
 
             <div className="hero-actions">
-              <Link to="/sign-in" className="btn-primary btn-large">Start Automating Free</Link>
-              <a href="#features" className="btn-ghost btn-large">See All Features &rarr;</a>
+              <Link to="/sign-in" className="btn-primary btn-large">Start Automating &rarr;</Link>
+              <a href="#story" className="btn-ghost btn-large">Our Story</a>
             </div>
 
             <div className="hero-stats">
               <div className="stat-item">
-                <span className="stat-num">165<span>+</span></span>
-                <span className="stat-label">Features Built</span>
-              </div>
-              <div className="stat-divider"></div>
-              <div className="stat-item">
-                <span className="stat-num">62<span>+</span></span>
-                <span className="stat-label">AI-Powered</span>
-              </div>
-              <div className="stat-divider"></div>
-              <div className="stat-item">
                 <span className="stat-num">4</span>
                 <span className="stat-label">AI Agents</span>
+              </div>
+              <div className="stat-divider"></div>
+              <div className="stat-item">
+                <span className="stat-num">7<span>+</span></span>
+                <span className="stat-label">Integrations</span>
+              </div>
+              <div className="stat-divider"></div>
+              <div className="stat-item">
+                <span className="stat-num">3</span>
+                <span className="stat-label">Connected Apps</span>
               </div>
               <div className="stat-divider"></div>
               <div className="stat-item">
@@ -303,11 +931,68 @@ export default function LandingPage() {
             </div>
             <div className="wf-node ai wf-node-hero-ai">
               <span className="wf-node-dot"></span>
-              &#10022; Priority Agent
+              <IconSparkle size={10}/> Priority Agent
             </div>
             <div className="wf-node action wf-node-hero-action">
               <span className="wf-node-dot"></span>
               &rarr; Slack + CRM
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── THE STORY ── */}
+      <section className="story" id="story">
+        <div className="container">
+          <div className="story-header">
+            <div className="section-label">Why Entomate Exists</div>
+            <h2 className="section-title">Meetings produce decisions.<br />Decisions need <span className="story-highlight">execution.</span></h2>
+          </div>
+
+          <div className="story-grid">
+            <div className="story-step">
+              <div className="story-step-num">01</div>
+              <h3>The Problem</h3>
+              <p>
+                Teams hold meeting after meeting. Decisions get made, action items get
+                assigned, follow-ups get promised. Then everyone goes back to their
+                desk — and nothing happens. The gap between decision and execution is
+                where productivity goes to die.
+              </p>
+            </div>
+
+            <div className="story-step">
+              <div className="story-step-num">02</div>
+              <h3>The Insight</h3>
+              <p>
+                What if your meetings could execute themselves? What if every recording
+                was automatically transcribed, every action item tracked, every follow-up
+                scheduled, and every decision pushed into your CRM and project tools —
+                without anyone lifting a finger?
+              </p>
+            </div>
+
+            <div className="story-step">
+              <div className="story-step-num">03</div>
+              <h3>The Solution</h3>
+              <p>
+                Entomate is the execution layer for your team. Upload a meeting recording
+                and four AI agents go to work — prioritizing tasks, assigning owners,
+                setting deadlines, and detecting follow-ups. Then the visual workflow
+                engine routes everything to Slack, your CRM, and your calendar
+                automatically.
+              </p>
+            </div>
+          </div>
+
+          <div className="story-audience">
+            <div className="story-audience-label">Built for</div>
+            <div className="story-audience-tags">
+              <span className="audience-tag">Operations Teams</span>
+              <span className="audience-tag">Project Managers</span>
+              <span className="audience-tag">Team Leads</span>
+              <span className="audience-tag">Startup Founders</span>
+              <span className="audience-tag">Agency Directors</span>
             </div>
           </div>
         </div>
@@ -328,7 +1013,24 @@ export default function LandingPage() {
           <div className="trifecto-grid">
             {/* Logos Vision */}
             <div className="trifecto-card">
-              <div className="trifecto-icon logos-vision">&#129504;</div>
+              <div className="trifecto-icon logos-vision">
+                <svg width="28" height="28" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  {/* Eye shape — outer */}
+                  <path d="M6 32 C6 32 20 14 32 14 C44 14 58 32 58 32 C58 32 44 50 32 50 C20 50 6 32 6 32Z" stroke="#22D3EE" strokeWidth="2.5" fill="none" opacity="0.9"/>
+                  {/* Iris circle */}
+                  <circle cx="32" cy="32" r="10" stroke="#3B82F6" strokeWidth="2" fill="none" opacity="0.8"/>
+                  {/* Pupil core */}
+                  <circle cx="32" cy="32" r="4" fill="#22D3EE"/>
+                  {/* Neural nodes */}
+                  <circle cx="12" cy="24" r="2" fill="#22D3EE" opacity="0.5"/>
+                  <circle cx="52" cy="24" r="2" fill="#22D3EE" opacity="0.5"/>
+                  <circle cx="12" cy="40" r="2" fill="#3B82F6" opacity="0.5"/>
+                  <circle cx="52" cy="40" r="2" fill="#3B82F6" opacity="0.5"/>
+                  {/* Connecting lines */}
+                  <line x1="14" y1="24" x2="22" y2="28" stroke="#22D3EE" strokeWidth="1" opacity="0.3"/>
+                  <line x1="50" y1="24" x2="42" y2="28" stroke="#22D3EE" strokeWidth="1" opacity="0.3"/>
+                </svg>
+              </div>
               <div className="trifecto-product-name">Logos Vision</div>
               <div className="trifecto-product-role">The Mind</div>
               <p>
@@ -342,7 +1044,14 @@ export default function LandingPage() {
 
             {/* Pulse */}
             <div className="trifecto-card">
-              <div className="trifecto-icon pulse">&#128172;</div>
+              <div className="trifecto-icon pulse">
+                <svg width="28" height="28" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  {/* Q shape — the QntmEcos mark */}
+                  <path d="M 40 10 A 28 28 0 1 1 40 68" stroke="#f43f5e" strokeWidth="5" strokeLinecap="round" fill="none" />
+                  <line x1="54" y1="56" x2="68" y2="72" stroke="#f43f5e" strokeWidth="5" strokeLinecap="round" />
+                  <circle cx="40" cy="40" r="5" fill="#f43f5e" />
+                </svg>
+              </div>
               <div className="trifecto-product-name">Pulse</div>
               <div className="trifecto-product-role">The Voice</div>
               <p>
@@ -356,11 +1065,22 @@ export default function LandingPage() {
 
             {/* Entomate - ACTIVE */}
             <div className="trifecto-card active">
-              <div className="trifecto-icon entomate">&#9889;</div>
+              <div className="trifecto-icon entomate">
+                <svg width="28" height="28" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+                  <polyline points="6,30 6,20 9,16 11,14 11,11 12,14 13,11 14,14 15,10 16,14 17,11 17,15" fill="none" stroke="#FF2D6B" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                  <polygon points="6,30 6,20 10,22 12,26 10,30" fill="#FF2D6B" opacity="0.25" />
+                  <polyline points="30,30 30,20 27,16 25,14 25,11 24,14 23,11 22,14 21,10 20,14 19,11 19,15" fill="none" stroke="#FF2D6B" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                  <polygon points="30,30 30,20 26,22 24,26 26,30" fill="#FF2D6B" opacity="0.25" />
+                  <rect x="14" y="16" width="8" height="1.5" rx="0.75" fill="#FF2D6B" />
+                  <rect x="14" y="19" width="6" height="1.5" rx="0.75" fill="#FF2D6B" opacity="0.7" />
+                  <rect x="14" y="22" width="8" height="1.5" rx="0.75" fill="#FF2D6B" />
+                  <circle cx="18" cy="14" r="2.5" fill="#FFB800" opacity="0.9" />
+                </svg>
+              </div>
               <div className="trifecto-product-name">Entomate</div>
               <div className="trifecto-product-role active">The Hands — You Are Here</div>
               <p>
-                Visual workflow automation, 4 specialized AI agents, and 10+ integrations
+                Visual workflow automation, 4 specialized AI agents, and 7+ integrations
                 that turn your meetings and decisions into executed action — automatically.
               </p>
               <a href="#features" className="trifecto-link crimson-link">
@@ -385,7 +1105,7 @@ export default function LandingPage() {
           <div className="pillars-grid">
             {/* Pillar 1: Meeting Intelligence */}
             <div className="pillar-card">
-              <div className="pillar-accent crimson">&#127897;&#65039;</div>
+              <div className="pillar-accent crimson"><IconMicrophone size={20}/></div>
               <h3>Meeting Intelligence</h3>
               <p>
                 Upload recordings, get instant transcripts, AI summaries, extracted decisions,
@@ -403,7 +1123,7 @@ export default function LandingPage() {
 
             {/* Pillar 2: Workflow Automation */}
             <div className="pillar-card">
-              <div className="pillar-accent mint">&#9889;</div>
+              <div className="pillar-accent mint"><IconWorkflow size={20}/></div>
               <h3>Visual Workflow Builder</h3>
               <p>
                 Drag-and-drop node canvas with conditional logic, expression editor, webhook
@@ -421,7 +1141,7 @@ export default function LandingPage() {
 
             {/* Pillar 3: AI Agents */}
             <div className="pillar-card">
-              <div className="pillar-accent amber">&#10022;</div>
+              <div className="pillar-accent amber"><IconAgents size={20}/></div>
               <h3>AI Agent Orchestra</h3>
               <p>
                 Four specialized agents — Assignment, Priority, Deadline, Follow-up — each with
@@ -439,7 +1159,7 @@ export default function LandingPage() {
 
             {/* Pillar 4: Task & Goals */}
             <div className="pillar-card">
-              <div className="pillar-accent crimson">&#9989;</div>
+              <div className="pillar-accent crimson"><IconTasks size={20}/></div>
               <h3>Tasks &amp; OKRs</h3>
               <p>
                 Full task lifecycle from creation to completion, with AI-recommended priority,
@@ -457,7 +1177,7 @@ export default function LandingPage() {
 
             {/* Pillar 5: Analytics */}
             <div className="pillar-card">
-              <div className="pillar-accent mint">&#128202;</div>
+              <div className="pillar-accent mint"><IconAnalytics size={20}/></div>
               <h3>Intelligence &amp; Analytics</h3>
               <p>
                 Morning briefing, deal risk alerts, relationship health scores, and a full
@@ -475,7 +1195,7 @@ export default function LandingPage() {
 
             {/* Pillar 6: Integrations */}
             <div className="pillar-card">
-              <div className="pillar-accent amber">&#128279;</div>
+              <div className="pillar-accent amber"><IconIntegrations size={20}/></div>
               <h3>Deep Integrations</h3>
               <p>
                 Bidirectional sync with Slack, Salesforce, HubSpot, Google Calendar, and
@@ -488,6 +1208,42 @@ export default function LandingPage() {
                 <li>Inbound + outbound webhooks</li>
                 <li>Email action item delivery</li>
                 <li>Integration health monitoring</li>
+              </ul>
+            </div>
+
+            {/* Pillar 7: AI Assistant */}
+            <div className="pillar-card">
+              <div className="pillar-accent crimson"><IconRobot size={20}/></div>
+              <h3>Ento AI Assistant</h3>
+              <p>
+                A context-aware AI chat assistant that understands your workspace —
+                ask it anything, get proactive suggestions, and prepare for meetings automatically.
+              </p>
+              <ul className="feature-list">
+                <li>Streaming natural-language chat</li>
+                <li>Context from meetings, tasks &amp; goals</li>
+                <li>Proactive AI suggestions</li>
+                <li>Meeting preparation briefs</li>
+                <li>Natural-language Q&amp;A across data</li>
+                <li>RAG-powered workspace search</li>
+              </ul>
+            </div>
+
+            {/* Pillar 8: Reports & Learning */}
+            <div className="pillar-card">
+              <div className="pillar-accent mint"><IconReports size={20}/></div>
+              <h3>Reports &amp; Adaptive AI</h3>
+              <p>
+                Export branded PDF recaps and CSV data. Meanwhile, Entomate's learning system
+                watches how you override AI suggestions and improves over time.
+              </p>
+              <ul className="feature-list">
+                <li>Branded PDF meeting recaps</li>
+                <li>CSV data exports</li>
+                <li>Learning from user overrides</li>
+                <li>Pattern detection &amp; auto-suggest</li>
+                <li>Outcome tracking &amp; effectiveness</li>
+                <li>Deal risk &amp; relationship scoring</li>
               </ul>
             </div>
           </div>
@@ -545,7 +1301,7 @@ export default function LandingPage() {
               </p>
 
               <div className="deep-feature-item">
-                <div className="deep-feature-icon">&#127919;</div>
+                <div className="deep-feature-icon"><IconTarget size={16}/></div>
                 <div className="deep-feature-text">
                   <h4>Priority Agent</h4>
                   <p>Analyzes meeting sentiment, deadlines, and business context to assign High/Medium/Low priority automatically.</p>
@@ -553,7 +1309,7 @@ export default function LandingPage() {
               </div>
 
               <div className="deep-feature-item">
-                <div className="deep-feature-icon">&#128100;</div>
+                <div className="deep-feature-icon"><IconPerson size={16}/></div>
                 <div className="deep-feature-text">
                   <h4>Assignment Agent</h4>
                   <p>Matches tasks to team members based on skillset, current workload, and historical performance.</p>
@@ -561,7 +1317,7 @@ export default function LandingPage() {
               </div>
 
               <div className="deep-feature-item">
-                <div className="deep-feature-icon">&#128197;</div>
+                <div className="deep-feature-icon"><IconCalendar size={16}/></div>
                 <div className="deep-feature-text">
                   <h4>Deadline Agent</h4>
                   <p>Calculates realistic due dates by factoring in task complexity, team capacity, and sprint commitments.</p>
@@ -575,7 +1331,7 @@ export default function LandingPage() {
             <div className="deep-visual">
               <div className="agent-card">
                 <div className="agent-header">
-                  <span className="agent-name">&#10022; Priority Agent — Decision Trace</span>
+                  <span className="agent-name"><IconSparkle size={12}/> Priority Agent — Decision Trace</span>
                   <span className="agent-confidence">Confidence: <span className="confidence-num">94%</span></span>
                 </div>
                 <div className="agent-body">
@@ -624,7 +1380,7 @@ export default function LandingPage() {
               </p>
 
               <div className="deep-feature-item">
-                <div className="deep-feature-icon">&#128202;</div>
+                <div className="deep-feature-icon"><IconAnalytics size={16}/></div>
                 <div className="deep-feature-text">
                   <h4>Factor Analysis</h4>
                   <p>See exactly what data points influenced each recommendation, weighted by importance.</p>
@@ -632,7 +1388,7 @@ export default function LandingPage() {
               </div>
 
               <div className="deep-feature-item">
-                <div className="deep-feature-icon">&#128260;</div>
+                <div className="deep-feature-icon"><IconFeedback size={16}/></div>
                 <div className="deep-feature-text">
                   <h4>Feedback Loop</h4>
                   <p>Accept or reject recommendations. Each override teaches the model to improve future suggestions.</p>
@@ -640,7 +1396,7 @@ export default function LandingPage() {
               </div>
 
               <div className="deep-feature-item">
-                <div className="deep-feature-icon">&#129516;</div>
+                <div className="deep-feature-icon"><IconDNA size={16}/></div>
                 <div className="deep-feature-text">
                   <h4>Pattern Learning</h4>
                   <p>Entomate discovers recurring patterns in your workflow and suggests automating them permanently.</p>
@@ -652,23 +1408,60 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── ADAPTIVE INTELLIGENCE ── */}
+      <section className="adaptive" id="adaptive">
+        <div className="container">
+          <div className="adaptive-header">
+            <div className="section-label">Adaptive Intelligence</div>
+            <h2 className="section-title">AI that gets smarter<br />every time you use it.</h2>
+            <p className="section-sub" style={{ margin: '0 auto', maxWidth: 600, textAlign: 'center' }}>
+              Every time you override an AI recommendation, Entomate learns. It detects patterns
+              in your decisions, tracks outcomes, and continuously improves its suggestions.
+            </p>
+          </div>
+
+          <div className="adaptive-grid">
+            <div className="adaptive-card">
+              <div className="adaptive-icon"><IconFeedbackLoop/></div>
+              <h3>Feedback-Driven Learning</h3>
+              <p>Accept or reject any AI suggestion. Each override is captured, analyzed, and fed back into the model so future recommendations match your judgment.</p>
+            </div>
+            <div className="adaptive-card">
+              <div className="adaptive-icon"><IconPattern/></div>
+              <h3>Pattern Detection</h3>
+              <p>Entomate discovers recurring patterns in how your team works — repeated task types, common assignees, typical deadlines — and suggests automating them.</p>
+            </div>
+            <div className="adaptive-card">
+              <div className="adaptive-icon"><IconOutcome/></div>
+              <h3>Outcome Tracking</h3>
+              <p>Every AI-assisted decision is tracked to completion. Did the priority call land? Was the deadline realistic? The system measures and adjusts.</p>
+            </div>
+            <div className="adaptive-card">
+              <div className="adaptive-icon"><IconAlert/></div>
+              <h3>Proactive Alerts</h3>
+              <p>Deal risk scoring, relationship health monitoring, and meeting prep briefs — delivered before you need to ask, based on real intelligence signals.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ── METRICS ── */}
       <section className="metrics">
         <div className="container">
           <div className="metrics-grid">
             <div className="metric-item">
-              <div className="metric-num">62<span className="unit">+</span></div>
-              <div className="metric-label">AI-powered features across meetings, tasks, workflows, and insights</div>
-              <div className="metric-sub">// ai_features_total</div>
-            </div>
-            <div className="metric-item">
               <div className="metric-num">4</div>
-              <div className="metric-label">Specialized AI agents with explainability, confidence scores, and learning</div>
+              <div className="metric-label">Specialized AI agents with explainability, confidence scores, and adaptive learning</div>
               <div className="metric-sub">// ai_agents_deployed</div>
             </div>
             <div className="metric-item">
-              <div className="metric-num">10<span className="unit">+</span></div>
-              <div className="metric-label">Third-party integrations: Slack, Salesforce, HubSpot, Google, Webhooks</div>
+              <div className="metric-num">3</div>
+              <div className="metric-label">Connected apps in the Trifecto ecosystem: Logos Vision, Pulse, and Entomate</div>
+              <div className="metric-sub">// trifecto_apps</div>
+            </div>
+            <div className="metric-item">
+              <div className="metric-num">7<span className="unit">+</span></div>
+              <div className="metric-label">Integrations: Slack, Salesforce, HubSpot, Google Calendar, Webhooks, Email, Cron</div>
               <div className="metric-sub">// integrations_live</div>
             </div>
             <div className="metric-item">
@@ -699,81 +1492,92 @@ export default function LandingPage() {
             <div className="orbit-center">E</div>
 
             <div className="integration-chip chip-slack">
-              <span className="chip-icon">&#128172;</span> Slack
+              <span className="chip-icon"><IconSlack size={16}/></span> Slack
             </div>
             <div className="integration-chip chip-salesforce">
-              <span className="chip-icon">&#9729;&#65039;</span> Salesforce
+              <span className="chip-icon"><IconSalesforce size={16}/></span> Salesforce
             </div>
             <div className="integration-chip chip-hubspot">
-              <span className="chip-icon">&#129522;</span> HubSpot
+              <span className="chip-icon"><IconHubSpot size={16}/></span> HubSpot
             </div>
             <div className="integration-chip chip-gcal">
-              <span className="chip-icon">&#128197;</span> Google Calendar
+              <span className="chip-icon"><IconGoogleCal size={16}/></span> Google Calendar
             </div>
             <div className="integration-chip chip-webhook">
-              <span className="chip-icon">&#128279;</span> Webhooks
+              <span className="chip-icon"><IconWebhook size={16}/></span> Webhooks
             </div>
-            <div className="integration-chip chip-teams">
-              <span className="chip-icon">&#128225;</span> Teams
+            <div className="integration-chip chip-teams coming-soon">
+              <span className="chip-icon"><IconTeams size={16}/></span> Teams <span className="chip-soon">soon</span>
             </div>
             <div className="integration-chip chip-email">
-              <span className="chip-icon">&#9993;&#65039;</span> Email
+              <span className="chip-icon"><IconEmail size={16}/></span> Email
             </div>
             <div className="integration-chip chip-cron">
-              <span className="chip-icon">&#9201;&#65039;</span> Cron Jobs
+              <span className="chip-icon"><IconCron size={16}/></span> Cron Jobs
             </div>
           </div>
         </div>
       </section>
 
-      {/* ── LOGO SHOWCASE ── */}
-      <section className="logo-showcase" id="logos">
+      {/* ── TRIFECTO ECOSYSTEM ── */}
+      <section className="ecosystem" id="ecosystem">
         <div className="container">
-          <div className="section-label">Brand Identity</div>
-          <h2 className="section-title">Choose a logo direction.</h2>
-          <p className="section-sub">
-            Four concepts built around the Void x Crimson palette and the
-            "Hands of the Trifecto" identity. Click to select.
-          </p>
-
-          <div className="logo-confirmed-banner">
-            <span className="logo-confirmed-icon">&#10022;</span>
-            Option C — "The Hands of the Trifecto" — confirmed direction
-          </div>
-
-          <div className="logo-render-grid">
-            <div className="logo-render-card featured">
-              <div className="logo-render-label">Primary Mark</div>
-              <img src="/logos/logo-c-refined.png" alt="Entomate Primary Logo — Refined Hands" />
-              <div className="logo-render-caption">Two geometric hands + amber circuit node + E letterform + wordmark</div>
-            </div>
-
-            <div className="logo-render-card">
-              <div className="logo-render-label">Icon Only</div>
-              <img src="/logos/logo-c-icon.png" alt="Entomate Icon Mark" />
-              <div className="logo-render-caption">Low-poly hands framing E bars — app icon / favicon usage</div>
-            </div>
-
-            <div className="logo-render-card">
-              <div className="logo-render-label">Horizontal Lockup</div>
-              <img src="/logos/logo-c-horizontal.png" alt="Entomate Horizontal Logo" />
-              <div className="logo-render-caption">Compact mark + wordmark + "automate everything" tagline</div>
-            </div>
-
-            <div className="logo-render-card">
-              <div className="logo-render-label">Light Mode</div>
-              <img src="/logos/logo-c-light.png" alt="Entomate Light Mode Logo" className="logo-img-light" />
-              <div className="logo-render-caption">Deep crimson on white — print / light UI usage</div>
-            </div>
-          </div>
-
-          <div className="logo-hero-preview">
-            <div className="logo-render-label logo-hero-label">Brand Hero Image — "The Hands of the Trifecto"</div>
-            <img src="/logos/logo-c-hero.png" alt="Entomate Hero Brand Image" />
-            <p className="logo-render-caption logo-hero-caption">
-              Wire-frame geometric hands reaching toward each other, crimson + neon mint energy streaming between fingertips.
-              For use in landing pages, pitch decks, and marketing materials.
+          <div className="ecosystem-header">
+            <div className="section-label">The Trifecto Ecosystem</div>
+            <h2 className="section-title">Three apps. One intelligence layer.</h2>
+            <p className="section-sub" style={{ margin: '0 auto', maxWidth: 620, textAlign: 'center' }}>
+              Entomate doesn't work alone. It connects to Logos Vision (CRM) and Pulse (communication)
+              through the Ecosystem Bridge — sharing contacts, decisions, and intelligence in real time.
             </p>
+          </div>
+
+          <div className="ecosystem-grid">
+            <div className="ecosystem-card">
+              <div className="ecosystem-icon"><IconSearch/></div>
+              <h3>Cross-App Search</h3>
+              <p>Search across all three Trifecto apps from a single input. Find contacts in Logos Vision, messages in Pulse, and tasks in Entomate — together.</p>
+            </div>
+            <div className="ecosystem-card">
+              <div className="ecosystem-icon"><IconBridge/></div>
+              <h3>Ecosystem Bridge</h3>
+              <p>Real-time data sharing between apps. When Entomate creates a task from a meeting, it can push the contact to Logos Vision and notify the team in Pulse.</p>
+            </div>
+            <div className="ecosystem-card">
+              <div className="ecosystem-icon"><IconUnifiedWorkflow/></div>
+              <h3>Unified Workflows</h3>
+              <p>Build automations that span all three apps. Trigger in Entomate, enrich in Logos Vision, notify in Pulse — all from the visual canvas.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── POWER USERS ── */}
+      <section className="power-users" id="power">
+        <div className="container">
+          <div className="section-label">Built for Power Users</div>
+          <h2 className="section-title">The details that<br />make the difference.</h2>
+
+          <div className="power-grid">
+            <div className="power-card">
+              <kbd className="power-kbd">&#8984;K</kbd>
+              <h4>Command Palette</h4>
+              <p>Jump to any page, task, or meeting with a keyboard shortcut. Navigate your entire workspace without touching the mouse.</p>
+            </div>
+            <div className="power-card">
+              <span className="power-icon-img"><IconDocument size={28}/></span>
+              <h4>PDF &amp; CSV Exports</h4>
+              <p>Export branded meeting recaps as PDF or download any data view as CSV. Built-in report generation with your brand colors.</p>
+            </div>
+            <div className="power-card">
+              <span className="power-icon-img"><IconGoogleCal size={28}/></span>
+              <h4>Google Calendar Sync</h4>
+              <p>Full OAuth integration with Google Calendar. See your meetings, sync events, and trigger automations from calendar activity.</p>
+            </div>
+            <div className="power-card">
+              <span className="power-icon-img"><IconLock size={28}/></span>
+              <h4>Secrets Vault</h4>
+              <p>Store API credentials and tokens securely in an encrypted vault. Use them in workflow actions without exposing keys in plaintext.</p>
+            </div>
           </div>
         </div>
       </section>
@@ -790,19 +1594,25 @@ export default function LandingPage() {
 
           <div className="guide-preview-grid">
             {[
-              { icon: '🎙️', title: 'Meetings', desc: 'Record, transcribe, and analyze meetings with AI-powered sentiment detection.' },
-              { icon: '✅', title: 'Tasks & AI', desc: 'AI suggests assignments, priorities, and deadlines — with full explainability.' },
-              { icon: '🔀', title: 'Workflows', desc: 'Visual node-based automations connecting triggers to actions across your tools.' },
-              { icon: '🤖', title: 'AI Agents', desc: 'Deploy intelligent bots for assignment, priority detection, and follow-ups.' },
-              { icon: '🎯', title: 'Goals & OKRs', desc: 'Track objectives at Company, Team, and Individual levels with key results.' },
-              { icon: '🔍', title: 'Search & AI Q&A', desc: 'Semantic search across your workspace with natural-language AI question answering.' },
-            ].map((item, i) => (
-              <div key={i} className="guide-preview-card">
-                <span className="guide-preview-icon">{item.icon}</span>
-                <h3 className="guide-preview-title">{item.title}</h3>
-                <p className="guide-preview-desc">{item.desc}</p>
-              </div>
-            ))}
+              { iconKey: 'mic', title: 'Meetings', desc: 'Upload recordings, get transcripts, summaries, action items, and sentiment — all AI-powered.' },
+              { iconKey: 'tasks', title: 'Tasks & AI', desc: 'AI suggests assignments, priorities, and deadlines — with full explainability cards.' },
+              { iconKey: 'shuffle', title: 'Workflows', desc: 'Visual node-based automations connecting triggers to actions across your tools.' },
+              { iconKey: 'robot', title: 'AI Agents', desc: 'Four specialized agents for assignment, priority, deadlines, and follow-up detection.' },
+              { iconKey: 'target', title: 'Goals & OKRs', desc: 'Track objectives at Company, Team, and Individual levels with measurable key results.' },
+              { iconKey: 'search', title: 'Search & AI Q&A', desc: 'Semantic search across your workspace with natural-language AI question answering.' },
+              { iconKey: 'chat', title: 'Ento Assistant', desc: 'Context-aware AI chat that answers questions, gives proactive suggestions, and preps you for meetings.' },
+              { iconKey: 'analytics', title: 'Reports & Analytics', desc: 'PDF meeting recaps, CSV exports, analytics dashboards, and AI effectiveness tracking.' },
+              { iconKey: 'calendar', title: 'Calendar & Scheduling', desc: 'Google Calendar OAuth integration with event sync and calendar-triggered automations.' },
+            ].map((item, i) => {
+              const GuideIcon = GUIDE_ICONS[item.iconKey]
+              return (
+                <div key={i} className="guide-preview-card">
+                  <span className="guide-preview-icon"><GuideIcon size={28}/></span>
+                  <h3 className="guide-preview-title">{item.title}</h3>
+                  <p className="guide-preview-desc">{item.desc}</p>
+                </div>
+              )
+            })}
           </div>
 
           <div style={{ textAlign: 'center', marginTop: 32 }}>
@@ -917,6 +1727,90 @@ export default function LandingPage() {
           pointer-events: none;
           z-index: 0;
           opacity: 0.5;
+        }
+
+        /* ── ANIMATED SVG ICONS ── */
+        .landing-page .ani-icon {
+          display: inline-block;
+          vertical-align: middle;
+          transition: transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1), filter 300ms ease;
+        }
+
+        /* Hover amplification on parent containers */
+        .landing-page .pillar-card:hover .ani-icon,
+        .landing-page .trifecto-card:hover .ani-icon,
+        .landing-page .deep-feature-item:hover .ani-icon,
+        .landing-page .adaptive-card:hover .ani-icon,
+        .landing-page .ecosystem-card:hover .ani-icon,
+        .landing-page .power-card:hover .ani-icon,
+        .landing-page .guide-preview-card:hover .ani-icon,
+        .landing-page .integration-chip:hover .ani-icon {
+          transform: scale(1.25) rotate(5deg);
+          filter: drop-shadow(0 0 8px var(--crimson-glow));
+        }
+
+        /* Specific color glows per accent */
+        .landing-page .pillar-accent.mint:hover .ani-icon,
+        .landing-page .ecosystem-card:hover .ani-icon {
+          filter: drop-shadow(0 0 8px rgba(0, 245, 212, 0.5));
+        }
+
+        .landing-page .pillar-accent.amber:hover .ani-icon {
+          filter: drop-shadow(0 0 8px rgba(255, 184, 0, 0.5));
+        }
+
+        .landing-page .trifecto-icon.logos-vision:hover .ani-icon {
+          filter: drop-shadow(0 0 8px rgba(34, 211, 238, 0.5));
+        }
+
+        .landing-page .trifecto-icon.pulse:hover .ani-icon {
+          filter: drop-shadow(0 0 8px rgba(244, 63, 94, 0.5));
+        }
+
+        /* Gentle idle float for section icons */
+        .landing-page .pillar-accent .ani-icon,
+        .landing-page .adaptive-icon .ani-icon,
+        .landing-page .ecosystem-icon .ani-icon {
+          animation: icon-idle-float 4s ease-in-out infinite;
+        }
+
+        @keyframes icon-idle-float {
+          0%, 100% { transform: translateY(0px); }
+          50%      { transform: translateY(-2px); }
+        }
+
+        /* On hover, override the idle float with the pop */
+        .landing-page .pillar-card:hover .pillar-accent .ani-icon,
+        .landing-page .adaptive-card:hover .adaptive-icon .ani-icon,
+        .landing-page .ecosystem-card:hover .ecosystem-icon .ani-icon {
+          animation: none;
+          transform: scale(1.25) rotate(5deg);
+        }
+
+        /* Guide preview icon sizing */
+        .landing-page .guide-preview-icon {
+          display: flex;
+          align-items: center;
+          height: 32px;
+          margin-bottom: 12px;
+        }
+
+        .landing-page .guide-preview-icon .ani-icon {
+          width: 28px;
+          height: 28px;
+        }
+
+        /* Power card icon area */
+        .landing-page .power-icon-img {
+          display: flex;
+          align-items: center;
+          height: 32px;
+          margin-bottom: 16px;
+        }
+
+        /* Agent name inline icon */
+        .landing-page .agent-name .ani-icon {
+          margin-right: 4px;
         }
 
         /* ── TYPOGRAPHY ── */
@@ -1474,13 +2368,13 @@ export default function LandingPage() {
         }
 
         .landing-page .trifecto-icon.logos-vision {
-          background: rgba(139, 92, 246, 0.12);
-          border: 1px solid rgba(139, 92, 246, 0.25);
+          background: rgba(34, 211, 238, 0.10);
+          border: 1px solid rgba(34, 211, 238, 0.25);
         }
 
         .landing-page .trifecto-icon.pulse {
-          background: rgba(0, 245, 212, 0.10);
-          border: 1px solid rgba(0, 245, 212, 0.25);
+          background: rgba(244, 63, 94, 0.10);
+          border: 1px solid rgba(244, 63, 94, 0.25);
         }
 
         .landing-page .trifecto-icon.entomate {
@@ -1542,7 +2436,7 @@ export default function LandingPage() {
 
         .landing-page .pillars-grid {
           display: grid;
-          grid-template-columns: repeat(3, 1fr);
+          grid-template-columns: repeat(4, 1fr);
           gap: 24px;
         }
 
@@ -1986,84 +2880,6 @@ export default function LandingPage() {
         .landing-page .chip-email     { bottom: 25%;left: 35%; }
         .landing-page .chip-cron      { top: 10%;  left: 42%; }
 
-        /* ── LOGO SHOWCASE ── */
-        .landing-page .logo-showcase {
-          padding: 120px 0;
-          text-align: center;
-        }
-
-        .landing-page .logo-showcase .section-sub {
-          margin: 0 auto 64px;
-        }
-
-        .landing-page .logo-options {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 24px;
-          margin-bottom: 40px;
-        }
-
-        .landing-page .logo-option {
-          background: var(--surface);
-          border: 2px solid var(--border);
-          border-radius: var(--radius-xl);
-          padding: 40px 24px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 16px;
-          cursor: pointer;
-          transition: all 200ms ease;
-          position: relative;
-        }
-
-        .landing-page .logo-option:hover {
-          border-color: var(--border-glow);
-          transform: translateY(-4px);
-        }
-
-        .landing-page .logo-option.selected {
-          border-color: var(--crimson);
-          box-shadow: 0 0 0 1px rgba(255, 45, 107, 0.20), 0 8px 32px rgba(255, 45, 107, 0.15);
-        }
-
-        .landing-page .logo-option.selected::before {
-          content: '\\2713 Selected';
-          position: absolute;
-          top: 12px;
-          right: 12px;
-          font-size: 10px;
-          font-weight: 700;
-          font-family: var(--font-mono);
-          color: var(--crimson);
-          text-transform: uppercase;
-          letter-spacing: 0.08em;
-        }
-
-        .landing-page .logo-opt-mark {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 8px;
-        }
-
-        .landing-page .logo-opt-label {
-          font-size: 11px;
-          font-weight: 600;
-          color: var(--text-muted);
-          text-transform: uppercase;
-          letter-spacing: 0.10em;
-          font-family: var(--font-mono);
-        }
-
-        .landing-page .logo-opt-name {
-          font-family: var(--font-display);
-          font-size: 14px;
-          font-weight: 700;
-          color: var(--text-primary);
-          text-align: center;
-        }
-
         /* ── METRICS ── */
         .landing-page .metrics {
           padding: 80px 0;
@@ -2180,6 +2996,271 @@ export default function LandingPage() {
           }
         }
 
+        /* ── THE STORY SECTION ── */
+        .landing-page .story {
+          padding: 120px 0;
+          background: linear-gradient(to bottom, transparent, rgba(255, 45, 107, 0.02) 50%, transparent);
+        }
+
+        .landing-page .story-header {
+          text-align: center;
+          margin-bottom: 72px;
+        }
+
+        .landing-page .story-highlight {
+          color: var(--crimson);
+          text-shadow: 0 0 40px rgba(255, 45, 107, 0.3);
+        }
+
+        .landing-page .story-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 2px;
+          background: var(--border);
+          border-radius: var(--radius-xl);
+          overflow: hidden;
+          margin-bottom: 48px;
+        }
+
+        .landing-page .story-step {
+          background: var(--surface);
+          padding: 40px 32px;
+          position: relative;
+        }
+
+        .landing-page .story-step-num {
+          font-family: var(--font-mono);
+          font-size: 11px;
+          font-weight: 600;
+          color: var(--crimson);
+          letter-spacing: 0.10em;
+          margin-bottom: 16px;
+        }
+
+        .landing-page .story-step h3 {
+          font-size: 20px;
+          font-weight: 700;
+          color: var(--text-primary);
+          margin-bottom: 12px;
+        }
+
+        .landing-page .story-step p {
+          font-size: 14px;
+          color: var(--text-secondary);
+          line-height: 1.75;
+        }
+
+        .landing-page .story-audience {
+          text-align: center;
+        }
+
+        .landing-page .story-audience-label {
+          font-family: var(--font-mono);
+          font-size: 10px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.14em;
+          color: var(--text-muted);
+          margin-bottom: 16px;
+        }
+
+        .landing-page .story-audience-tags {
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: center;
+          gap: 10px;
+        }
+
+        .landing-page .audience-tag {
+          padding: 8px 16px;
+          border: 1px solid var(--border);
+          border-radius: 100px;
+          font-size: 13px;
+          font-weight: 500;
+          color: var(--text-secondary);
+          background: var(--surface);
+          transition: all 150ms ease;
+        }
+
+        .landing-page .audience-tag:hover {
+          border-color: var(--border-glow);
+          color: var(--crimson);
+        }
+
+        /* ── ADAPTIVE INTELLIGENCE SECTION ── */
+        .landing-page .adaptive {
+          padding: 120px 0;
+        }
+
+        .landing-page .adaptive-header {
+          text-align: center;
+          margin-bottom: 64px;
+        }
+
+        .landing-page .adaptive-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 20px;
+        }
+
+        .landing-page .adaptive-card {
+          background: var(--surface);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-xl);
+          padding: 32px 24px;
+          transition: border-color 200ms ease, transform 200ms ease;
+        }
+
+        .landing-page .adaptive-card:hover {
+          border-color: var(--border-glow);
+          transform: translateY(-4px);
+        }
+
+        .landing-page .adaptive-icon {
+          font-size: 28px;
+          margin-bottom: 16px;
+          display: block;
+        }
+
+        .landing-page .adaptive-card h3 {
+          font-size: 16px;
+          font-weight: 700;
+          color: var(--text-primary);
+          margin-bottom: 10px;
+        }
+
+        .landing-page .adaptive-card p {
+          font-size: 13px;
+          color: var(--text-secondary);
+          line-height: 1.7;
+        }
+
+        /* ── COMING SOON CHIP ── */
+        .landing-page .integration-chip.coming-soon {
+          opacity: 0.5;
+        }
+
+        .landing-page .chip-soon {
+          font-size: 9px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          color: var(--amber);
+          padding: 1px 5px;
+          border: 1px solid rgba(255, 184, 0, 0.3);
+          border-radius: 4px;
+          background: rgba(255, 184, 0, 0.08);
+        }
+
+        /* ── TRIFECTO ECOSYSTEM SECTION ── */
+        .landing-page .ecosystem {
+          padding: 120px 0;
+          background: linear-gradient(to bottom, transparent, rgba(0, 245, 212, 0.02) 50%, transparent);
+        }
+
+        .landing-page .ecosystem-header {
+          text-align: center;
+          margin-bottom: 64px;
+        }
+
+        .landing-page .ecosystem-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 24px;
+        }
+
+        .landing-page .ecosystem-card {
+          background: var(--surface);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-xl);
+          padding: 32px;
+          transition: border-color 200ms ease, transform 200ms ease;
+        }
+
+        .landing-page .ecosystem-card:hover {
+          border-color: rgba(0, 245, 212, 0.25);
+          transform: translateY(-4px);
+        }
+
+        .landing-page .ecosystem-icon {
+          font-size: 28px;
+          margin-bottom: 16px;
+          display: block;
+        }
+
+        .landing-page .ecosystem-card h3 {
+          font-size: 18px;
+          font-weight: 700;
+          color: var(--text-primary);
+          margin-bottom: 10px;
+        }
+
+        .landing-page .ecosystem-card p {
+          font-size: 14px;
+          color: var(--text-secondary);
+          line-height: 1.75;
+        }
+
+        /* ── POWER USERS SECTION ── */
+        .landing-page .power-users {
+          padding: 120px 0;
+        }
+
+        .landing-page .power-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 20px;
+          margin-top: 48px;
+        }
+
+        .landing-page .power-card {
+          background: var(--surface);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-xl);
+          padding: 32px 24px;
+          transition: border-color 200ms ease, transform 200ms ease;
+        }
+
+        .landing-page .power-card:hover {
+          border-color: var(--border-glow);
+          transform: translateY(-4px);
+        }
+
+        .landing-page .power-kbd {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 6px 12px;
+          background: var(--elevated);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-sm);
+          font-family: var(--font-mono);
+          font-size: 14px;
+          font-weight: 600;
+          color: var(--crimson);
+          margin-bottom: 16px;
+          box-shadow: 0 2px 0 rgba(255, 255, 255, 0.06);
+        }
+
+        .landing-page .power-icon-img {
+          font-size: 28px;
+          display: block;
+          margin-bottom: 16px;
+        }
+
+        .landing-page .power-card h4 {
+          font-size: 16px;
+          font-weight: 700;
+          color: var(--text-primary);
+          margin-bottom: 10px;
+        }
+
+        .landing-page .power-card p {
+          font-size: 13px;
+          color: var(--text-secondary);
+          line-height: 1.7;
+        }
+
         /* ── CTA SECTION ── */
         .landing-page .cta-section {
           padding: 160px 0;
@@ -2280,99 +3361,11 @@ export default function LandingPage() {
         }
 
         .landing-page .trifecto-pip:hover { opacity: 1; }
-        .landing-page .trifecto-pip.lv     { background: #8B5CF6; }
-        .landing-page .trifecto-pip.pulse  { background: #00F5D4; color: #080808; }
+        .landing-page .trifecto-pip.lv     { background: #22D3EE; color: #080808; }
+        .landing-page .trifecto-pip.pulse  { background: #f43f5e; }
         .landing-page .trifecto-pip.ent    { background: var(--crimson); opacity: 1; }
 
-        /* ── LOGO SHOWCASE — CONFIRMED DIRECTION ── */
-        .landing-page .logo-confirmed-banner {
-          display: inline-flex;
-          align-items: center;
-          gap: 10px;
-          padding: 10px 20px;
-          background: rgba(255, 45, 107, 0.08);
-          border: 1px solid rgba(255, 45, 107, 0.30);
-          border-radius: 100px;
-          font-family: var(--font-mono);
-          font-size: 12px;
-          font-weight: 500;
-          color: var(--crimson);
-          letter-spacing: 0.04em;
-          margin-bottom: 48px;
-        }
-
-        .landing-page .logo-confirmed-icon {
-          font-size: 14px;
-          color: var(--amber);
-        }
-
-        .landing-page .logo-render-grid {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 20px;
-          margin-bottom: 40px;
-        }
-
-        .landing-page .logo-render-card {
-          background: var(--surface);
-          border: 1px solid var(--border);
-          border-radius: var(--radius-xl);
-          overflow: hidden;
-          transition: border-color 200ms ease, transform 200ms ease;
-        }
-
-        .landing-page .logo-render-card:hover {
-          border-color: var(--border-glow);
-          transform: translateY(-3px);
-        }
-
-        .landing-page .logo-render-card.featured {
-          border-color: rgba(255, 45, 107, 0.35);
-          box-shadow: 0 0 0 1px rgba(255, 45, 107, 0.10), 0 8px 32px rgba(255, 45, 107, 0.12);
-        }
-
-        .landing-page .logo-render-card img {
-          width: 100%;
-          aspect-ratio: 1;
-          object-fit: cover;
-          display: block;
-        }
-
-        .landing-page .logo-render-label {
-          font-family: var(--font-mono);
-          font-size: 10px;
-          font-weight: 600;
-          text-transform: uppercase;
-          letter-spacing: 0.12em;
-          color: var(--crimson);
-          padding: 12px 16px 8px;
-        }
-
-        .landing-page .logo-render-caption {
-          font-size: 12px;
-          color: var(--text-muted);
-          padding: 10px 16px 16px;
-          line-height: 1.5;
-        }
-
-        .landing-page .logo-hero-preview {
-          background: var(--surface);
-          border: 1px solid var(--border);
-          border-radius: var(--radius-xl);
-          padding: 24px;
-          text-align: left;
-        }
-
-        .landing-page .logo-hero-preview img {
-          width: 100%;
-          border-radius: var(--radius-lg);
-          display: block;
-        }
-
-        .landing-page .logo-light-bg {
-          background: #fff;
-          border-radius: 12px;
-        }
+        /* (Logo showcase CSS removed — section replaced with Ecosystem + Power Users) */
 
         /* ── HERO WORKFLOW TRAIL ── */
         .landing-page .wf-trail-line {
@@ -2409,22 +3402,7 @@ export default function LandingPage() {
         .landing-page .factor-w-95 { width: 95%; }
         .landing-page .factor-w-62 { width: 62%; }
 
-        /* ── LOGO LIGHT CARD IMAGE ── */
-        .landing-page .logo-img-light {
-          background: #fff;
-          border-radius: 12px;
-        }
-
-        /* ── LOGO HERO PREVIEW LABEL ── */
-        .landing-page .logo-hero-label {
-          text-align: left;
-          margin-bottom: 20px;
-        }
-
-        .landing-page .logo-hero-caption {
-          margin-top: 16px;
-          padding: 0 0 8px;
-        }
+        /* (Logo hero CSS removed — section replaced) */
 
         /* ── CTA HIGHLIGHT ── */
         .landing-page .cta-highlight { color: var(--crimson); }
@@ -2456,9 +3434,11 @@ export default function LandingPage() {
           .landing-page .pillars-grid { grid-template-columns: 1fr 1fr; }
           .landing-page .trifecto-grid { grid-template-columns: 1fr; }
           .landing-page .hero-visual { display: none; }
-          .landing-page .logo-options { grid-template-columns: 1fr 1fr; }
           .landing-page .metrics-grid { grid-template-columns: 1fr 1fr; }
-          .landing-page .logo-render-grid { grid-template-columns: 1fr 1fr; }
+          .landing-page .story-grid { grid-template-columns: 1fr; }
+          .landing-page .adaptive-grid { grid-template-columns: 1fr 1fr; }
+          .landing-page .ecosystem-grid { grid-template-columns: 1fr; }
+          .landing-page .power-grid { grid-template-columns: 1fr 1fr; }
         }
 
         @media (max-width: 768px) {
@@ -2469,10 +3449,10 @@ export default function LandingPage() {
           .landing-page .hero-stats { flex-wrap: wrap; gap: 20px; }
           .landing-page .stat-divider { display: none; }
           .landing-page .metrics-grid { grid-template-columns: 1fr; }
-          .landing-page .logo-options { grid-template-columns: 1fr; }
           .landing-page .integration-orbit { height: 280px; }
           .landing-page .chip-gcal, .landing-page .chip-cron, .landing-page .chip-email { display: none; }
-          .landing-page .logo-render-grid { grid-template-columns: 1fr; }
+          .landing-page .adaptive-grid { grid-template-columns: 1fr; }
+          .landing-page .power-grid { grid-template-columns: 1fr; }
         }
       `}</style>
     </div>

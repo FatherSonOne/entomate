@@ -489,6 +489,107 @@ router.post('/:id/link-task', validate(schemas.linkTask), asyncHandler(async (re
   });
 }));
 
+/**
+ * DELETE /api/goals/:id/link-task/:taskId
+ * Unlink a task from a goal
+ */
+router.delete('/:id/link-task/:taskId', asyncHandler(async (req, res) => {
+  const { id, taskId } = req.params;
+
+  if (!isValidUUID(id) || !isValidUUID(taskId)) {
+    return res.status(400).json({ success: false, error: 'Invalid ID' });
+  }
+
+  const { data: goal, error: fetchError } = await supabase
+    .from('goals')
+    .select('related_tasks')
+    .eq('id', id)
+    .single();
+
+  if (fetchError) throw fetchError;
+
+  const relatedTasks = (goal.related_tasks || []).filter(t => t !== taskId);
+
+  const { data, error } = await supabase
+    .from('goals')
+    .update({ related_tasks: relatedTasks, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  res.json({ success: true, data, message: 'Task unlinked from goal' });
+}));
+
+/**
+ * GET /api/goals/:id/history
+ * Get progress history for a goal
+ */
+router.get('/:id/history', asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  if (!isValidUUID(id)) {
+    return res.status(400).json({ success: false, error: 'Invalid goal ID' });
+  }
+
+  const { data, error } = await supabase
+    .from('goal_progress_history')
+    .select('*')
+    .eq('goal_id', id)
+    .order('created_at', { ascending: false })
+    .limit(50);
+
+  if (isTableMissing(error)) {
+    return res.json({ success: true, data: [], notice: 'Progress history table not yet created.' });
+  }
+  if (error) throw error;
+
+  res.json({ success: true, data });
+}));
+
+/**
+ * POST /api/goals/:id/history
+ * Log a progress snapshot (called automatically on KR updates or manually)
+ */
+router.post('/:id/history', asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { note } = req.body;
+
+  if (!isValidUUID(id)) {
+    return res.status(400).json({ success: false, error: 'Invalid goal ID' });
+  }
+
+  // Get current goal state
+  const { data: goal, error: fetchError } = await supabase
+    .from('goals')
+    .select('progress, status, key_results')
+    .eq('id', id)
+    .single();
+
+  if (fetchError) throw fetchError;
+
+  const { data, error } = await supabase
+    .from('goal_progress_history')
+    .insert({
+      goal_id: id,
+      progress: goal.progress,
+      status: goal.status,
+      key_results_snapshot: goal.key_results,
+      note: note || null,
+      user_id: req.user?.id || null
+    })
+    .select()
+    .single();
+
+  if (isTableMissing(error)) {
+    return res.json({ success: true, data: null, notice: 'Progress history table not yet created.' });
+  }
+  if (error) throw error;
+
+  res.json({ success: true, data });
+}));
+
 // Helper function to get current quarter
 function getCurrentQuarter() {
   const now = new Date();

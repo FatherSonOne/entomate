@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import {
   GripVertical, Clock, User, AlertTriangle, CheckCircle2,
-  Circle, ArrowRight, Plus, MoreHorizontal
+  Circle, ArrowRight, Eye, Ban, Plus
 } from 'lucide-react'
-import { dashboardApi, tasksApi } from '../services/api'
+import { tasksApi } from '../services/api'
 import { VCBadge } from './vc'
 
 // VC Design System color mapping per column status
@@ -13,6 +13,7 @@ const COLUMN_VC_COLOR = {
   in_progress: 'var(--accent-tertiary, #FFB800)',
   review:      'var(--accent-secondary, #00F5D4)',
   done:        'var(--accent-primary, #FF2D6B)',
+  blocked:     '#EF4444',
 }
 
 const COLUMN_COUNT_BADGE_COLOR = {
@@ -20,6 +21,7 @@ const COLUMN_COUNT_BADGE_COLOR = {
   in_progress: 'rgba(255,184,0,.12)',
   review:      'rgba(0,245,212,.12)',
   done:        'rgba(255,45,107,.12)',
+  blocked:     'rgba(239,68,68,.12)',
 }
 
 const COLUMN_COUNT_TEXT_COLOR = {
@@ -27,12 +29,15 @@ const COLUMN_COUNT_TEXT_COLOR = {
   in_progress: 'var(--accent-tertiary, #FFB800)',
   review:      'var(--accent-secondary, #00F5D4)',
   done:        'var(--accent-primary, #FF2D6B)',
+  blocked:     '#EF4444',
 }
 
 const COLUMNS = [
   { id: 'open', title: 'To Do', icon: Circle },
   { id: 'in_progress', title: 'In Progress', icon: ArrowRight },
-  { id: 'done', title: 'Done', icon: CheckCircle2 }
+  { id: 'review', title: 'Review', icon: Eye },
+  { id: 'done', title: 'Done', icon: CheckCircle2 },
+  { id: 'blocked', title: 'Blocked', icon: Ban }
 ]
 
 export default function KanbanBoard({ projectId, onTaskUpdate }) {
@@ -40,6 +45,9 @@ export default function KanbanBoard({ projectId, onTaskUpdate }) {
   const [loading, setLoading] = useState(true)
   const [draggedTask, setDraggedTask] = useState(null)
   const [dragOverColumn, setDragOverColumn] = useState(null)
+  const [quickAddColumn, setQuickAddColumn] = useState(null)
+  const [quickAddTitle, setQuickAddTitle] = useState('')
+  const [quickAdding, setQuickAdding] = useState(false)
 
   useEffect(() => {
     loadTasks()
@@ -120,6 +128,26 @@ export default function KanbanBoard({ projectId, onTaskUpdate }) {
       case 'medium': return 'amber'
       case 'low':    return 'neutral'
       default:       return 'neutral'
+    }
+  }
+
+  const handleQuickAdd = async (status) => {
+    if (!quickAddTitle.trim()) return
+    setQuickAdding(true)
+    try {
+      await tasksApi.create({
+        title: quickAddTitle.trim(),
+        projectId: projectId || undefined,
+        status
+      })
+      setQuickAddTitle('')
+      setQuickAddColumn(null)
+      loadTasks()
+      if (onTaskUpdate) onTaskUpdate()
+    } catch (error) {
+      console.error('Failed to create task:', error)
+    } finally {
+      setQuickAdding(false)
     }
   }
 
@@ -206,16 +234,21 @@ export default function KanbanBoard({ projectId, onTaskUpdate }) {
             </div>
 
             {/* Tasks */}
-            <div className="p-2 min-h-[300px] space-y-2">
-              {columnTasks.length === 0 ? (
+            <div className="p-2 min-h-[200px] space-y-2">
+              {columnTasks.length === 0 && !isOver && (
                 <div
-                  className="text-center py-8 text-sm"
+                  className="text-center py-6 text-sm"
                   style={{ color: 'var(--text-tertiary)' }}
                 >
-                  {isOver ? 'Drop here' : 'No tasks'}
+                  No tasks
                 </div>
-              ) : (
-                columnTasks.map(task => (
+              )}
+              {isOver && columnTasks.length === 0 && (
+                <div className="text-center py-6 text-sm" style={{ color: headerColor }}>
+                  Drop here
+                </div>
+              )}
+              {columnTasks.map(task => (
                   <div
                     key={task.id}
                     draggable
@@ -237,7 +270,7 @@ export default function KanbanBoard({ projectId, onTaskUpdate }) {
                       />
                       <div className="flex-1 min-w-0">
                         <Link
-                          to={`/tasks/${task.id}`}
+                          to={task.project_id ? `/projects/${task.project_id}` : '#'}
                           className="kcard-title line-clamp-2"
                           onClick={(e) => e.stopPropagation()}
                         >
@@ -310,6 +343,52 @@ export default function KanbanBoard({ projectId, onTaskUpdate }) {
                     </div>
                   </div>
                 ))
+              }
+
+              {/* Quick-add task */}
+              {quickAddColumn === column.id ? (
+                <div className="p-2">
+                  <input
+                    type="text"
+                    className="input w-full"
+                    placeholder="Task title..."
+                    value={quickAddTitle}
+                    onChange={(e) => setQuickAddTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleQuickAdd(column.id)
+                      if (e.key === 'Escape') { setQuickAddColumn(null); setQuickAddTitle('') }
+                    }}
+                    autoFocus
+                    disabled={quickAdding}
+                    style={{ fontSize: 12, padding: '6px 10px' }}
+                  />
+                  <div className="flex gap-2 mt-1">
+                    <button
+                      onClick={() => handleQuickAdd(column.id)}
+                      disabled={quickAdding || !quickAddTitle.trim()}
+                      className="text-xs font-medium px-2 py-1 rounded"
+                      style={{ color: 'var(--accent-primary)', background: 'rgba(255,45,107,.08)' }}
+                    >
+                      {quickAdding ? '...' : 'Add'}
+                    </button>
+                    <button
+                      onClick={() => { setQuickAddColumn(null); setQuickAddTitle('') }}
+                      className="text-xs px-2 py-1"
+                      style={{ color: 'var(--text-tertiary)' }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => { setQuickAddColumn(column.id); setQuickAddTitle('') }}
+                  className="w-full p-2 flex items-center gap-1 text-xs rounded transition-colors"
+                  style={{ color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer' }}
+                >
+                  <Plus className="w-3 h-3" />
+                  Add task
+                </button>
               )}
             </div>
           </div>

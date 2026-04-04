@@ -14,6 +14,17 @@ const log = require('../utils/log');
 router.use(authenticate);
 
 /**
+ * Helper: get meeting IDs owned by a user (for scoping action_items)
+ */
+async function getUserMeetingIds(userId) {
+  const { data } = await supabase
+    .from('meetings')
+    .select('id')
+    .eq('created_by', userId);
+  return (data || []).map(m => m.id);
+}
+
+/**
  * GET /api/reports/meeting/:id/pdf
  * Generate PDF recap for a specific meeting
  */
@@ -25,11 +36,12 @@ router.get('/meeting/:id/pdf', async (req, res) => {
       return res.status(503).json({ error: 'Database not configured' });
     }
 
-    // Get meeting details
+    // Get meeting details (scoped to current user)
     const { data: meeting, error: meetingError } = await supabase
       .from('meetings')
       .select('*')
       .eq('id', id)
+      .eq('created_by', req.user.id)
       .single();
 
     if (meetingError || !meeting) {
@@ -71,8 +83,8 @@ router.get('/goals/pdf', async (req, res) => {
       return res.status(503).json({ error: 'Database not configured' });
     }
 
-    // Get goals
-    let query = supabase.from('goals').select('*');
+    // Get goals (scoped to current user)
+    let query = supabase.from('goals').select('*').eq('owner_id', req.user.id);
     if (quarter) {
       query = query.eq('quarter', quarter);
     }
@@ -121,11 +133,12 @@ router.get('/project/:id/pdf', async (req, res) => {
       return res.status(503).json({ error: 'Database not configured' });
     }
 
-    // Get project stats
+    // Get project stats (scoped to current user)
     const { data: project, error: projectError } = await supabase
       .from('project_statistics')
       .select('*')
       .eq('id', id)
+      .eq('owner_id', req.user.id)
       .single();
 
     if (projectError && projectError.code !== 'PGRST116') {
@@ -134,6 +147,7 @@ router.get('/project/:id/pdf', async (req, res) => {
         .from('meetings')
         .select('*')
         .eq('id', id)
+        .eq('created_by', req.user.id)
         .single();
 
       if (!meeting) {
@@ -201,10 +215,15 @@ router.get('/weekly/pdf', async (req, res) => {
     weekAgo.setDate(weekAgo.getDate() - 7);
     const weekAgoISO = weekAgo.toISOString();
 
+    // Scope all queries to current user
+    const meetingIds = await getUserMeetingIds(req.user.id);
+
     const [meetingsRes, actionItemsRes, goalsRes] = await Promise.all([
-      supabase.from('meetings').select('*').gte('created_at', weekAgoISO).order('created_at', { ascending: false }),
-      supabase.from('action_items').select('*').order('created_at', { ascending: false }),
-      supabase.from('goals').select('*').eq('status', 'active')
+      supabase.from('meetings').select('*').eq('created_by', req.user.id).gte('created_at', weekAgoISO).order('created_at', { ascending: false }),
+      meetingIds.length > 0
+        ? supabase.from('action_items').select('*').in('meeting_id', meetingIds).order('created_at', { ascending: false })
+        : Promise.resolve({ data: [] }),
+      supabase.from('goals').select('*').eq('owner_id', req.user.id).eq('status', 'active')
     ]);
 
     const period = `${weekAgo.toLocaleDateString()} - ${new Date().toLocaleDateString()}`;
@@ -241,6 +260,7 @@ router.get('/meetings/csv', async (req, res) => {
     const { data: meetings, error } = await supabase
       .from('meetings')
       .select('*')
+      .eq('created_by', req.user.id)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -268,7 +288,16 @@ router.get('/action-items/csv', async (req, res) => {
       return res.status(503).json({ error: 'Database not configured' });
     }
 
-    let query = supabase.from('action_items').select('*');
+    // Scope action items to user's meetings
+    const meetingIds = await getUserMeetingIds(req.user.id);
+    if (meetingIds.length === 0) {
+      const csv = reportService.generateActionItemsCSV([]);
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="action-items-export-${Date.now()}.csv"`);
+      return res.send(csv);
+    }
+
+    let query = supabase.from('action_items').select('*').in('meeting_id', meetingIds);
 
     if (status && status !== 'all') {
       query = query.eq('status', status);
@@ -293,6 +322,48 @@ router.get('/action-items/csv', async (req, res) => {
 });
 
 /**
+ * GET /api/reports/tasks/csv
+ * Export tasks as CSV
+ */
+router.get('/tasks/csv', async (req, res) => {
+  try {
+    const { status, priority, projectId, assignedTo } = req.query;
+
+    if (!supabase) {
+      return res.status(503).json({ error: 'Database not configured' });
+    }
+
+    let query = supabase.from('tasks').select('*');
+
+    if (status && status !== 'all') {
+      query = query.eq('status', status);
+    }
+    if (priority && priority !== 'all') {
+      query = query.eq('priority', priority);
+    }
+    if (projectId) {
+      query = query.eq('project_id', projectId);
+    }
+    if (assignedTo) {
+      query = query.eq('assigned_to', assignedTo);
+    }
+
+    const { data: tasks, error } = await query.order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    const csv = reportService.generateTasksCSV(tasks || []);
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="tasks-export-${Date.now()}.csv"`);
+    res.send(csv);
+  } catch (error) {
+    log.error('Error generating tasks CSV:', { error: error.message || error });
+    res.status(500).json({ error: 'Failed to generate CSV', details: error.message });
+  }
+});
+
+/**
  * GET /api/reports/goals/csv
  * Export all goals as CSV
  */
@@ -304,7 +375,7 @@ router.get('/goals/csv', async (req, res) => {
       return res.status(503).json({ error: 'Database not configured' });
     }
 
-    let query = supabase.from('goals').select('*');
+    let query = supabase.from('goals').select('*').eq('owner_id', req.user.id);
 
     if (quarter) {
       query = query.eq('quarter', quarter);
@@ -390,6 +461,14 @@ router.get('/available', (req, res) => {
         endpoint: '/api/reports/goals/csv',
         format: 'csv',
         params: ['quarter (optional)', 'type (optional)']
+      },
+      {
+        id: 'tasks-csv',
+        name: 'Tasks Export',
+        description: 'CSV export of tasks',
+        endpoint: '/api/reports/tasks/csv',
+        format: 'csv',
+        params: ['status (optional)', 'priority (optional)', 'projectId (optional)', 'assignedTo (optional)']
       }
     ]
   });
@@ -462,11 +541,12 @@ router.post('/send-meeting-recap', async (req, res) => {
       return res.status(503).json({ error: 'Email service not configured' });
     }
 
-    // Get meeting
+    // Get meeting (scoped to current user)
     const { data: meeting, error: meetingError } = await supabase
       .from('meetings')
       .select('*')
       .eq('id', meetingId)
+      .eq('created_by', req.user.id)
       .single();
 
     if (meetingError || !meeting) {

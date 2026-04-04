@@ -6,6 +6,7 @@
 const { google } = require('googleapis');
 const { addDays, addHours, format, parseISO, startOfDay, endOfDay } = require('date-fns');
 const log = require('../utils/log');
+const { supabase } = require('../config/supabase');
 
 class CalendarService {
   constructor() {
@@ -83,9 +84,19 @@ class CalendarService {
 
     const auth = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/api/calendar/callback'
     );
     auth.setCredentials(tokens);
+
+    // Listen for automatic token refreshes so expired access_tokens are renewed
+    auth.on('tokens', (newTokens) => {
+      // Merge with existing tokens (refresh_token may not be re-issued)
+      Object.assign(tokens, newTokens);
+      if (typeof tokens._onRefresh === 'function') {
+        tokens._onRefresh(tokens);
+      }
+    });
 
     return google.calendar({ version: 'v3', auth });
   }
@@ -161,6 +172,11 @@ class CalendarService {
       event.colorId = eventData.colorId;
     }
 
+    // Add recurrence rule (RRULE format)
+    if (eventData.recurrence) {
+      event.recurrence = [eventData.recurrence];
+    }
+
     const response = await calendar.events.insert({
       calendarId,
       resource: event,
@@ -225,6 +241,12 @@ class CalendarService {
       throw new Error('Action item has no due date');
     }
 
+    // Skip if already synced to calendar
+    if (actionItem.calendar_event_id) {
+      log.info(`Action item ${actionItem.id} already synced (event: ${actionItem.calendar_event_id}), skipping`);
+      return { id: actionItem.calendar_event_id, summary: actionItem.task_description, alreadySynced: true };
+    }
+
     const dueDate = parseISO(actionItem.due_date);
 
     const eventData = {
@@ -243,13 +265,26 @@ class CalendarService {
       }
     };
 
-    return this.createEvent(tokens, eventData, calendarId);
+    const event = await this.createEvent(tokens, eventData, calendarId);
+
+    // Track the calendar event ID to prevent duplicates
+    if (supabase && actionItem.id) {
+      await supabase.from('action_items').update({ calendar_event_id: event.id }).eq('id', actionItem.id);
+    }
+
+    return event;
   }
 
   /**
    * Create event from meeting
    */
   async createEventFromMeeting(tokens, meeting, calendarId = 'primary') {
+    // Skip if already synced to calendar
+    if (meeting.calendar_event_id) {
+      log.info(`Meeting ${meeting.id} already synced (event: ${meeting.calendar_event_id}), skipping`);
+      return { id: meeting.calendar_event_id, summary: meeting.title, alreadySynced: true };
+    }
+
     const eventData = {
       title: meeting.title || 'Meeting Recap Available',
       description: this.buildMeetingDescription(meeting),
@@ -264,7 +299,14 @@ class CalendarService {
       eventData.allDay = false;
     }
 
-    return this.createEvent(tokens, eventData, calendarId);
+    const event = await this.createEvent(tokens, eventData, calendarId);
+
+    // Track the calendar event ID to prevent duplicates
+    if (supabase && meeting.id) {
+      await supabase.from('meetings').update({ calendar_event_id: event.id }).eq('id', meeting.id);
+    }
+
+    return event;
   }
 
   /**
@@ -273,6 +315,12 @@ class CalendarService {
   async createEventFromGoal(tokens, goal, calendarId = 'primary') {
     if (!goal.target_date) {
       throw new Error('Goal has no target date');
+    }
+
+    // Skip if already synced to calendar
+    if (goal.calendar_event_id) {
+      log.info(`Goal ${goal.id} already synced (event: ${goal.calendar_event_id}), skipping`);
+      return { id: goal.calendar_event_id, summary: goal.title, alreadySynced: true };
     }
 
     const targetDate = parseISO(goal.target_date);
@@ -293,7 +341,14 @@ class CalendarService {
       }
     };
 
-    return this.createEvent(tokens, eventData, calendarId);
+    const event = await this.createEvent(tokens, eventData, calendarId);
+
+    // Track the calendar event ID to prevent duplicates
+    if (supabase && goal.id) {
+      await supabase.from('goals').update({ calendar_event_id: event.id }).eq('id', goal.id);
+    }
+
+    return event;
   }
 
   /**

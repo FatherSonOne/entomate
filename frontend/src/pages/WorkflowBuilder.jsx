@@ -32,7 +32,7 @@ export default function WorkflowBuilder() {
       setLoading(true)
       setError(null)
       const response = await workflowsApi.get(id)
-      setWorkflow(response.workflow)
+      setWorkflow(response.data)
     } catch (err) {
       console.error('Failed to load workflow:', err)
       setError(err.message || 'Failed to load workflow')
@@ -51,8 +51,8 @@ export default function WorkflowBuilder() {
         connections: data.connections,
         settings: workflow.settings
       })
-      setWorkflow(response.workflow)
-      return response.workflow
+      setWorkflow(response.data)
+      return response.data
     } catch (err) {
       console.error('Failed to save workflow:', err)
       setSaveError(err.message || 'Failed to save workflow')
@@ -94,6 +94,15 @@ export default function WorkflowBuilder() {
     }))
   }
 
+  const handleNameChange = async (newName) => {
+    try {
+      await workflowsApi.update(id, { name: newName })
+      setWorkflow(prev => ({ ...prev, name: newName }))
+    } catch (err) {
+      console.error('Failed to update workflow name:', err)
+    }
+  }
+
   const handleToggleActive = async () => {
     try {
       await workflowsApi.toggle(id, !workflow.active)
@@ -112,7 +121,7 @@ export default function WorkflowBuilder() {
         connections: workflow.connections,
         active: false
       })
-      navigate(`/workflows/${response.workflow.id}`)
+      navigate(`/workflows/${response.data.id}`)
     } catch (err) {
       console.error('Failed to duplicate workflow:', err)
     }
@@ -212,6 +221,7 @@ export default function WorkflowBuilder() {
           onToggleActive={handleToggleActive}
           onDuplicate={handleDuplicate}
           onDelete={handleDelete}
+          onNameChange={handleNameChange}
         />
       </div>
     </div>

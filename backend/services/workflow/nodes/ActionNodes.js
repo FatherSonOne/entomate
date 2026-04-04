@@ -327,6 +327,153 @@ class SendSlackNode extends BaseNode {
 }
 
 /**
+ * Send Pulse Node - Post to Pulse channels (preferred Entomate comm app)
+ *
+ * Routes via Ecosystem Bridge API, falls back to direct pulse_messages insert.
+ * Supports auto-channel routing, {{template}} variables, and @mentions.
+ */
+class SendPulseNode extends BaseNode {
+  static async execute(config, inputData, context) {
+    const {
+      channel = 'general',
+      message,
+      mentionOwner = false,
+      mentionAssignee = false,
+      includeLink = false
+    } = config;
+
+    const resolvedChannel = this.resolveChannel(
+      this.interpolate(channel, inputData),
+      inputData
+    );
+    let resolvedMessage = this.interpolate(message, inputData);
+
+    // Add mentions
+    const mentions = [];
+    if (mentionOwner && inputData.ownerId) {
+      mentions.push(`@${inputData.ownerName || inputData.ownerId}`);
+    }
+    if (mentionAssignee && inputData.assigneeId) {
+      mentions.push(`@${inputData.assigneeName || inputData.assigneeId}`);
+    }
+    if (mentions.length > 0) {
+      resolvedMessage = `${mentions.join(' ')} ${resolvedMessage}`;
+    }
+
+    // Add link if configured
+    if (includeLink && inputData.link) {
+      resolvedMessage += `\n🔗 ${inputData.link}`;
+    }
+
+    log.info(`[SendPulseNode] Posting to Pulse channel: ${resolvedChannel}`);
+
+    // Post via Ecosystem Bridge — the only correct cross-app path.
+    // Pulse's entomateService.handleBotMessage() resolves/creates bot channels
+    // and inserts into chat_messages with bot_content, is_bot_message=true.
+    // Direct Supabase inserts won't work (different database + wrong table schema).
+    const apiBaseUrl = process.env.PULSE_API_URL || process.env.API_BASE_URL || '';
+    if (!apiBaseUrl) {
+      throw new Error('Pulse API URL not configured (set PULSE_API_URL or API_BASE_URL)');
+    }
+
+    try {
+      // Map channel name to Pulse bot channel purpose
+      const channelPurpose = this.mapChannelToPurpose(resolvedChannel);
+
+      const response = await fetch(`${apiBaseUrl}/api/ecosystem/pulse`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channel: channelPurpose,
+          message: resolvedMessage,
+          title: config.title ? this.interpolate(config.title, inputData) : undefined,
+          urgency: config.urgency || 'normal',
+          metadata: {
+            source: 'entomate_workflow',
+            workflow_id: context.workflowId,
+            execution_id: context.executionId,
+            node_id: context.nodeId
+          }
+        })
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text().catch(() => response.statusText);
+        throw new Error(`Pulse bridge returned ${response.status}: ${errorBody}`);
+      }
+
+      const data = await response.json();
+      log.info('[SendPulseNode] Posted via Ecosystem Bridge');
+      return {
+        output: 'main',
+        data: {
+          ...inputData,
+          pulse: {
+            success: true,
+            messageId: data.eventLogId || data.id || data.messageId,
+            channel: resolvedChannel,
+            channelPurpose,
+            message: resolvedMessage,
+            viaBridge: true
+          }
+        }
+      };
+    } catch (err) {
+      log.error('[SendPulseNode] Failed to post:', { error: err.message || err });
+      throw new Error(`Pulse message failed: ${err.message}`);
+    }
+  }
+
+  /**
+   * Resolve 'auto' channel based on input data context
+   */
+  static resolveChannel(channel, data) {
+    if (channel === 'auto') {
+      if (data.dealId || data.deal_id) return 'sales';
+      if (data.projectId || data.project_id) return 'projects';
+      if (data.customerId || data.customer_id) return 'customer-success';
+      if (data.meetingId || data.meeting_id) return 'meetings';
+      return 'general';
+    }
+    return channel;
+  }
+
+  /**
+   * Map user-facing channel names to Pulse bot channel purposes.
+   * Pulse's entomateService.resolveOrCreateBotChannel() uses these
+   * to find or create entomate-* channels in the workspace.
+   */
+  static mapChannelToPurpose(channel) {
+    const purposeMap = {
+      'general': 'automations',
+      'meetings': 'meetings',
+      'sales': 'alerts',
+      'projects': 'alerts',
+      'customer-success': 'alerts',
+      'alerts': 'alerts',
+      'action-items': 'action_items',
+      'automations': 'automations'
+    };
+    return purposeMap[channel] || 'automations';
+  }
+
+  static getTestData() {
+    return {
+      message: 'Test message from workflow',
+      channel: 'general'
+    };
+  }
+
+  static validate(config) {
+    const errors = [];
+    if (!config.message) {
+      errors.push('Message is required');
+    }
+    return { valid: errors.length === 0, errors };
+  }
+}
+
+/**
  * Send Email Node
  */
 class SendEmailNode extends BaseNode {
@@ -628,6 +775,7 @@ module.exports = {
   HttpRequestNode,
   ExecuteWorkflowNode,
   SendSlackNode,
+  SendPulseNode,
   SendEmailNode,
   CreateTaskNode,
   SyncCrmNode,

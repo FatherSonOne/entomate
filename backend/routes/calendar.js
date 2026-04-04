@@ -8,6 +8,7 @@ const router = express.Router();
 const { supabase } = require('../config/supabase');
 const calendarService = require('../services/calendarService');
 const log = require('../utils/log');
+const { authenticate } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const schemas = require('../schemas/calendar');
 
@@ -18,9 +19,31 @@ calendarService.initialize();
  * GET /api/calendar/status
  * Check calendar integration status
  */
-router.get('/status', (req, res) => {
+router.get('/status', async (req, res) => {
   const isConfigured = calendarService.isConfigured();
-  const hasTokens = !!req.session?.calendarTokens;
+
+  // Check for tokens in session first, then DB
+  let hasTokens = !!req.session?.calendarTokens;
+  if (!hasTokens && supabase) {
+    // Try to resolve user from Authorization header (optional — non-blocking)
+    try {
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith('Bearer ')) {
+        const token = authHeader.split(' ')[1];
+        const { data: { user } } = await supabase.auth.getUser(token);
+        if (user?.id) {
+          const { data } = await supabase
+            .from('user_settings')
+            .select('calendar_json')
+            .eq('user_id', user.id)
+            .single();
+          hasTokens = !!data?.calendar_json?.tokens;
+        }
+      }
+    } catch (e) {
+      // Not critical — fall through to session check
+    }
+  }
 
   res.json({
     configured: isConfigured,
@@ -67,18 +90,17 @@ router.get('/callback', async (req, res) => {
 
     const tokens = await calendarService.getTokensFromCode(code);
 
-    // Store tokens in session (in production, store in database)
+    // Store tokens in session as immediate transport
     if (!req.session) {
       req.session = {};
     }
     req.session.calendarTokens = tokens;
 
-    // Also store in a cookie for stateless access
-    res.cookie('calendar_tokens', JSON.stringify(tokens), {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
-    });
+    // Also persist to DB if we can identify the user (session or cookie may carry user ID)
+    // The frontend will also trigger a save on the next authenticated request via requireCalendar
+    if (req.session?.userId) {
+      saveTokensToDB(req.session.userId, tokens);
+    }
 
     // Redirect to frontend
     const returnUrl = state || '/calendar';
@@ -95,7 +117,15 @@ router.get('/callback', async (req, res) => {
  * POST /api/calendar/disconnect
  * Disconnect calendar integration
  */
-router.post('/disconnect', (req, res) => {
+router.post('/disconnect', authenticate, async (req, res) => {
+  // Clear DB tokens
+  if (supabase && req.user?.id) {
+    await supabase
+      .from('user_settings')
+      .update({ calendar_json: {} })
+      .eq('user_id', req.user.id);
+  }
+  // Clear session/cookie fallbacks
   if (req.session) {
     delete req.session.calendarTokens;
   }
@@ -104,41 +134,84 @@ router.post('/disconnect', (req, res) => {
 });
 
 /**
- * Middleware to get tokens from session or cookie
+ * Get tokens — checks DB first, then session/cookie as fallback.
+ * If tokens are found in session/cookie but not yet in DB, saves them (migration path).
  */
-const getTokens = (req) => {
-  if (req.session?.calendarTokens) {
-    return req.session.calendarTokens;
+const getTokens = async (req) => {
+  // 1. Check DB (preferred storage)
+  if (supabase && req.user?.id) {
+    try {
+      const { data } = await supabase
+        .from('user_settings')
+        .select('calendar_json')
+        .eq('user_id', req.user.id)
+        .single();
+
+      if (data?.calendar_json?.tokens) {
+        return data.calendar_json.tokens;
+      }
+    } catch (e) {
+      // Table may not have the column yet — fall through
+    }
   }
+
+  // 2. Session fallback
+  if (req.session?.calendarTokens) {
+    const tokens = req.session.calendarTokens;
+    // Migrate to DB if user is known
+    saveTokensToDB(req.user?.id, tokens);
+    return tokens;
+  }
+
+  // 3. Cookie fallback
   if (req.cookies?.calendar_tokens) {
     try {
-      return JSON.parse(req.cookies.calendar_tokens);
+      const tokens = JSON.parse(req.cookies.calendar_tokens);
+      saveTokensToDB(req.user?.id, tokens);
+      return tokens;
     } catch (e) {
       return null;
     }
   }
-  // For testing, allow tokens in header
-  if (req.headers['x-calendar-tokens']) {
-    try {
-      return JSON.parse(req.headers['x-calendar-tokens']);
-    } catch (e) {
-      return null;
-    }
-  }
+
   return null;
+};
+
+/**
+ * Persist calendar tokens to user_settings DB (non-blocking)
+ */
+const saveTokensToDB = (userId, tokens) => {
+  if (!supabase || !userId || !tokens) return;
+  const calendarJson = { tokens, connected_at: new Date().toISOString() };
+  supabase
+    .from('user_settings')
+    .upsert({ user_id: userId, calendar_json: calendarJson }, { onConflict: 'user_id' })
+    .then(({ error }) => {
+      if (error) log.warn('Failed to save calendar tokens to DB:', error.message);
+    });
 };
 
 /**
  * Middleware to require calendar connection
  */
-const requireCalendar = (req, res, next) => {
-  const tokens = getTokens(req);
+const requireCalendar = async (req, res, next) => {
+  const tokens = await getTokens(req);
   if (!tokens) {
     return res.status(401).json({
       error: 'Calendar not connected',
       authUrl: calendarService.isConfigured() ? '/api/calendar/auth' : null
     });
   }
+  // Attach refresh callback so calendarService can persist updated tokens
+  tokens._onRefresh = (updatedTokens) => {
+    // Save refreshed tokens to DB
+    saveTokensToDB(req.user?.id, updatedTokens);
+    // Also update session for current request
+    if (req.session) {
+      req.session.calendarTokens = updatedTokens;
+    }
+  };
+
   req.calendarTokens = tokens;
   next();
 };
@@ -147,7 +220,7 @@ const requireCalendar = (req, res, next) => {
  * GET /api/calendar/calendars
  * List user's calendars
  */
-router.get('/calendars', requireCalendar, async (req, res) => {
+router.get('/calendars', authenticate, requireCalendar, async (req, res) => {
   try {
     const calendars = await calendarService.listCalendars(req.calendarTokens);
     res.json({
@@ -169,7 +242,7 @@ router.get('/calendars', requireCalendar, async (req, res) => {
  * GET /api/calendar/events
  * Get calendar events
  */
-router.get('/events', requireCalendar, async (req, res) => {
+router.get('/events', authenticate, requireCalendar, async (req, res) => {
   try {
     const { calendarId, days = 30 } = req.query;
     const { addDays } = require('date-fns');
@@ -204,7 +277,7 @@ router.get('/events', requireCalendar, async (req, res) => {
  * POST /api/calendar/events
  * Create a calendar event
  */
-router.post('/events', requireCalendar, validate(schemas.createEvent), async (req, res) => {
+router.post('/events', authenticate, requireCalendar, validate(schemas.createEvent), async (req, res) => {
   try {
     const { calendarId = 'primary', ...eventData } = req.body;
 
@@ -232,7 +305,7 @@ router.post('/events', requireCalendar, validate(schemas.createEvent), async (re
  * PATCH /api/calendar/events/:eventId
  * Update a calendar event
  */
-router.patch('/events/:eventId', requireCalendar, validate(schemas.updateEvent), async (req, res) => {
+router.patch('/events/:eventId', authenticate, requireCalendar, validate(schemas.updateEvent), async (req, res) => {
   try {
     const { eventId } = req.params;
     const { calendarId = 'primary', ...eventData } = req.body;
@@ -257,7 +330,7 @@ router.patch('/events/:eventId', requireCalendar, validate(schemas.updateEvent),
  * DELETE /api/calendar/events/:eventId
  * Delete a calendar event
  */
-router.delete('/events/:eventId', requireCalendar, async (req, res) => {
+router.delete('/events/:eventId', authenticate, requireCalendar, async (req, res) => {
   try {
     const { eventId } = req.params;
     const { calendarId = 'primary' } = req.query;
@@ -275,7 +348,7 @@ router.delete('/events/:eventId', requireCalendar, async (req, res) => {
  * POST /api/calendar/sync/action-item/:id
  * Sync a single action item to calendar
  */
-router.post('/sync/action-item/:id', requireCalendar, async (req, res) => {
+router.post('/sync/action-item/:id', authenticate, requireCalendar, validate(schemas.syncActionItem), async (req, res) => {
   try {
     const { id } = req.params;
     const { calendarId = 'primary' } = req.body;
@@ -318,7 +391,7 @@ router.post('/sync/action-item/:id', requireCalendar, async (req, res) => {
  * POST /api/calendar/sync/action-items
  * Sync all action items with due dates to calendar
  */
-router.post('/sync/action-items', requireCalendar, async (req, res) => {
+router.post('/sync/action-items', authenticate, requireCalendar, validate(schemas.syncActionItems), async (req, res) => {
   try {
     const { calendarId = 'primary', meetingId } = req.body;
 
@@ -362,7 +435,7 @@ router.post('/sync/action-items', requireCalendar, async (req, res) => {
  * POST /api/calendar/sync/goal/:id
  * Sync a goal deadline to calendar
  */
-router.post('/sync/goal/:id', requireCalendar, async (req, res) => {
+router.post('/sync/goal/:id', authenticate, requireCalendar, validate(schemas.syncGoal), async (req, res) => {
   try {
     const { id } = req.params;
     const { calendarId = 'primary' } = req.body;
@@ -405,7 +478,7 @@ router.post('/sync/goal/:id', requireCalendar, async (req, res) => {
  * POST /api/calendar/sync/meeting/:id
  * Sync meeting to calendar
  */
-router.post('/sync/meeting/:id', requireCalendar, async (req, res) => {
+router.post('/sync/meeting/:id', authenticate, requireCalendar, validate(schemas.syncMeeting), async (req, res) => {
   try {
     const { id } = req.params;
     const { calendarId = 'primary' } = req.body;
@@ -444,31 +517,34 @@ router.post('/sync/meeting/:id', requireCalendar, async (req, res) => {
  * GET /api/calendar/upcoming
  * Get upcoming deadlines and events combined view
  */
-router.get('/upcoming', requireCalendar, async (req, res) => {
+router.get('/upcoming', authenticate, async (req, res) => {
   try {
     const { days = 14 } = req.query;
-    const { addDays, parseISO, isBefore } = require('date-fns');
+    const { addDays } = require('date-fns');
 
     const now = new Date();
     const endDate = addDays(now, parseInt(days));
 
-    // Get calendar events
+    // Get calendar events (only if Google Calendar is connected)
     let calendarEvents = [];
-    try {
-      const events = await calendarService.getEvents(req.calendarTokens, {
-        timeMin: now.toISOString(),
-        timeMax: endDate.toISOString()
-      });
-      calendarEvents = events.map(e => ({
-        type: 'calendar',
-        id: e.id,
-        title: e.summary,
-        date: e.start?.dateTime || e.start?.date,
-        allDay: !e.start?.dateTime,
-        source: 'google_calendar'
-      }));
-    } catch (e) {
-      log.info('Could not fetch calendar events:', e.message);
+    const tokens = await getTokens(req);
+    if (tokens && calendarService.isConfigured()) {
+      try {
+        const events = await calendarService.getEvents(tokens, {
+          timeMin: now.toISOString(),
+          timeMax: endDate.toISOString()
+        });
+        calendarEvents = events.map(e => ({
+          type: 'calendar',
+          id: e.id,
+          title: e.summary,
+          date: e.start?.dateTime || e.start?.date,
+          allDay: !e.start?.dateTime,
+          source: 'google_calendar'
+        }));
+      } catch (e) {
+        log.info('Could not fetch calendar events:', e.message);
+      }
     }
 
     // Get action items with due dates

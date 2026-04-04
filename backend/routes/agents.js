@@ -10,6 +10,7 @@ const explanationAnalytics = require('../services/explainability/ExplanationAnal
 const log = require('../utils/log');
 const { validate } = require('../middleware/validate');
 const schemas = require('../schemas/agents');
+const agentTemplates = require('../services/agentTemplates');
 
 /**
  * GET /api/agents
@@ -36,36 +37,15 @@ router.get('/', authenticate, asyncHandler(async (req, res) => {
  * GET /api/agents/templates
  * Get predefined agent templates
  */
-router.get('/templates', authenticate, (req, res) => {
-  try {
-    // Force reload templates by clearing require cache if needed
-    delete require.cache[require.resolve('../services/agentTemplates')];
-    const agentTemplates = require('../services/agentTemplates');
-    const templates = agentTemplates.getAllTemplates();
-    
-    log.info(`[Agents] Returning ${templates.length} templates`);
-    log.info(`[Agents] Template IDs:`, templates.map(t => t.id).join(', '));
-    
-    const response = {
-      success: true,
-      data: templates,
-      count: templates.length,
-      _debug: {
-        source: 'agentTemplates.getAllTemplates()',
-        timestamp: new Date().toISOString()
-      }
-    };
-    
-    res.json(response);
-  } catch (error) {
-    log.error('[Agents] Error getting templates:', { error: error.message || error });
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      data: []
-    });
-  }
-});
+router.get('/templates', authenticate, asyncHandler(async (req, res) => {
+  const templates = agentTemplates.getAllTemplates();
+
+  res.json({
+    success: true,
+    data: templates,
+    count: templates.length
+  });
+}));
 
 /**
  * POST /api/agents
@@ -513,15 +493,15 @@ router.post('/apply-suggestions', authenticate, validate(schemas.applySuggestion
  * GET /api/agents/orchestrator/logs
  * Get recent agent orchestration logs
  */
-router.get('/orchestrator/logs', authenticate, (req, res) => {
+router.get('/orchestrator/logs', authenticate, asyncHandler(async (req, res) => {
   const limit = parseInt(req.query.limit) || 20;
-  const logs = agentOrchestrator.getExecutionLogs(limit);
+  const logs = await agentOrchestrator.getExecutionLogs(limit);
 
   res.json({
     success: true,
     data: logs,
     count: logs.length
   });
-});
+}));
 
 module.exports = router;

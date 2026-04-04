@@ -8,6 +8,7 @@ const cron = require('node-cron');
 const { supabase } = require('../config/supabase');
 const { v4: uuidv4 } = require('uuid');
 const log = require('../utils/log');
+let automationEngine = null; // Lazy-loaded to avoid circular dependency
 
 class AutomationScheduler {
   constructor() {
@@ -185,13 +186,13 @@ class AutomationScheduler {
   }
 
   /**
-   * Execute an action (placeholder - actual implementation in actionExecutor)
+   * Execute an action via the automation engine
    */
   async executeAction(action, triggerData, automation) {
-    // This would call the actual action executor
-    // For now, return success with placeholder
-    log.info(`Executing action: ${action.type}`);
-    return { message: `Action ${action.type} executed`, triggerData };
+    if (!automationEngine) {
+      automationEngine = require('./automationEngine');
+    }
+    return automationEngine.executeAction(action, triggerData);
   }
 
   /**
@@ -199,10 +200,11 @@ class AutomationScheduler {
    */
   getNextRunTime(cronExpression) {
     try {
-      // Parse cron to get next run
-      // This is a simplified version - real implementation would use a cron parser
-      return new Date(Date.now() + 60000).toISOString(); // Placeholder
+      const { parseExpression } = require('cron-parser');
+      const interval = parseExpression(cronExpression);
+      return interval.next().toISOString();
     } catch (error) {
+      log.warn(`Failed to parse cron expression "${cronExpression}":`, error.message);
       return null;
     }
   }
