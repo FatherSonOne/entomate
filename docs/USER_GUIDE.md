@@ -1,7 +1,7 @@
 # Entomate User Guide
 
-**Version:** 1.2.0
-**Last Updated:** April 4, 2026
+**Version:** 1.4.0
+**Last Updated:** April 5, 2026
 
 Welcome to the Entomate User Guide. This document covers every feature of the platform and walks you through how to use each one.
 
@@ -22,13 +22,14 @@ Welcome to the Entomate User Guide. This document covers every feature of the pl
 11. [Workflows](#11-workflows)
 12. [Automations](#12-automations)
 13. [AI Agents](#13-ai-agents)
-14. [Analytics](#14-analytics)
-15. [Reports & Exports](#15-reports--exports)
-16. [Ecosystem Integration](#16-ecosystem-integration)
-17. [Meeting Intelligence Profiles](#17-meeting-intelligence-profiles)
-18. [Settings](#18-settings)
-19. [Keyboard Shortcuts](#19-keyboard-shortcuts)
-20. [Troubleshooting & FAQ](#20-troubleshooting--faq)
+14. [Ento AI Assistant](#14-ento-ai-assistant)
+15. [Analytics](#15-analytics)
+16. [Reports & Exports](#16-reports--exports)
+17. [Ecosystem Integration](#17-ecosystem-integration)
+18. [Meeting Intelligence Profiles](#18-meeting-intelligence-profiles)
+19. [Settings](#19-settings)
+20. [Keyboard Shortcuts](#20-keyboard-shortcuts)
+21. [Troubleshooting & FAQ](#21-troubleshooting--faq)
 
 ---
 
@@ -213,7 +214,7 @@ Type a question about the meeting into the Ask AI box and get an answer drawn fr
 
 ### Meeting Intelligence Panel
 
-The AI suggests intelligence profiles based on the meeting content. These profiles customize how the analysis is run. The panel shows a confidence score for each suggestion. You can accept the suggestion, choose a different profile, or dismiss it entirely. See [Meeting Intelligence Profiles](#17-meeting-intelligence-profiles) for details.
+The AI suggests intelligence profiles based on the meeting content. These profiles customize how the analysis is run. The panel shows a confidence score for each suggestion. You can accept the suggestion, choose a different profile, or dismiss it entirely. See [Meeting Intelligence Profiles](#18-meeting-intelligence-profiles) for details.
 
 ---
 
@@ -296,6 +297,13 @@ If you have Ecosystem Integration enabled, search extends across Pulse and Logos
 
 Tasks in Entomate are created from meetings or manually, and the AI helps you prioritize and assign them intelligently.
 
+### View Modes
+
+The Tasks page offers two ways to view your work:
+
+- **List View** — A paginated table with sorting and search. Click the list icon in the top-right toggle to switch to this view.
+- **Board View (Kanban)** — Visual columns (To Do, In Progress, Review, Done, Blocked) with drag-and-drop. Click the board icon to switch.
+
 ### Creating a Task
 
 Entomate uses a 3-step wizard:
@@ -317,9 +325,27 @@ Each recommendation comes with an **Explainability Card** that shows the reasoni
 ### Managing Tasks
 
 - **Filter** by status: All, Open, In Progress, or Done.
-- **Search** tasks by keyword.
+- **Filter by tag** — Click a tag chip to see only tasks with that tag.
+- **Search** tasks by keyword (with auto-filtering as you type).
+- **Sort** by created date, due date, priority, status, or title. Toggle ascending or descending.
 - **Complete** a task by clicking its animated checkbox.
 - **Delete** tasks you no longer need.
+
+### Editing a Task
+
+Click a task to open the Task Edit Modal. From here you can:
+
+1. Update the title, description, status, and priority.
+2. Set or change the due date.
+3. Add or remove tags.
+4. Create and manage **subtasks** — smaller items that break down the main task.
+5. View the **AI ETA prediction** — an estimated completion date based on task complexity and your team's historical pace.
+
+### Bulk Operations
+
+1. Enable bulk selection mode.
+2. Select individual tasks or use Select All.
+3. Apply a status change to all selected tasks at once (for example, mark multiple tasks as Done).
 
 ### Visual Indicators
 
@@ -328,6 +354,8 @@ Each recommendation comes with an **Explainability Card** that shows the reasoni
 - **Project links** let you jump to the associated project.
 
 **Tip:** Tasks created from meetings include a link back to the source meeting, so you always have the full context.
+
+**Tip:** Use the Board View for a quick visual overview and drag tasks between columns to update their status instantly.
 
 ---
 
@@ -553,7 +581,53 @@ You can provide feedback on agent decisions, which helps the system improve over
 
 ---
 
-## 14. Analytics
+## 14. Ento AI Assistant
+
+The Ento AI Assistant is a context-aware chat panel built into every page of Entomate. It understands what you are currently working on and can answer questions, offer suggestions, and help you get things done faster.
+
+### Opening the Assistant
+
+Press **Ctrl+/** (or **Cmd+/** on Mac) to toggle the assistant panel on the right side of the screen. You can also click the AI Assistant button at the bottom of the sidebar.
+
+### Chatting with Ento
+
+Type a question or request into the input field and press Enter. Ento responds in real time with streaming text, so you can see the answer as it is being generated.
+
+Examples of things you can ask:
+
+- "Summarize my last meeting"
+- "What action items are overdue?"
+- "Help me draft a follow-up email for the Q3 review"
+- "What did we decide about the budget?"
+
+### Context Awareness
+
+Ento automatically knows which page and section you are viewing. If you are on a Meeting Detail page, it has access to that meeting's transcript, summary, and action items. If you are on the Tasks page, it knows about your current tasks and priorities.
+
+### Conversation History
+
+Your conversation with Ento is preserved during your browser session (up to 50 messages). If you close the panel and reopen it, your previous messages are still there. Starting a new browser session clears the history.
+
+### Proactive Suggestions
+
+Ento monitors your workspace in the background and will show a notification badge on its button when something needs your attention:
+
+- **Overdue tasks** that have passed their due date
+- **Upcoming meetings** scheduled within the next hour
+
+You do not need to ask for these alerts — they appear automatically.
+
+### Aborting a Response
+
+If Ento is generating a long response and you want to stop it, click the stop button that appears while the response is streaming.
+
+**Tip:** Ento remembers what you asked earlier in the same session, so you can ask follow-up questions naturally — "Tell me more about that" or "What about the other project?"
+
+**Tip:** The assistant is available from every page. You never need to navigate away from what you are doing to ask a question.
+
+---
+
+## 15. Analytics
 
 Analytics gives you a data-driven view of how your team uses Entomate and the value it delivers.
 
@@ -613,7 +687,7 @@ A per-member performance table showing:
 
 ---
 
-## 15. Reports & Exports
+## 16. Reports & Exports
 
 The Reports page lets you generate polished documents and data exports from your workspace.
 
@@ -634,12 +708,14 @@ Generate formatted PDF documents for:
 Download raw data as CSV files for:
 
 - **Meetings** — All meeting records.
-- **Action Items** — Every action item with status and metadata.
-- **Goals** — Goal and key result data.
+- **Action Items** — Every action item with status and metadata. Filter by status (All, Open, Completed, or Missed) before exporting.
+- **Goals** — Goal and key result data. Select a quarter to scope the export.
+- **Tasks** — All tasks with status, priority, tags, and assignee information.
+- **Automations** — Automation execution logs showing run history, status, and timing.
 
 ---
 
-## 16. Ecosystem Integration
+## 17. Ecosystem Integration
 
 Ecosystem Integration connects Entomate with two companion apps: **Pulse** (a communication platform) and **Logos Vision** (a CRM). Together, these three apps form a unified ecosystem where data flows automatically between them.
 
@@ -669,7 +745,7 @@ The event log shows all inbound and outbound sync events. Each event displays di
 
 ---
 
-## 17. Meeting Intelligence Profiles
+## 18. Meeting Intelligence Profiles
 
 Meeting Intelligence Profiles let AI customize its analysis based on the type of meeting you are in. Different meetings need different focus areas, and profiles make that automatic.
 
@@ -727,7 +803,7 @@ A quality feedback rating system lets you rate the output of each profile, which
 
 ---
 
-## 18. Settings
+## 19. Settings
 
 The Settings page is where you configure Entomate to work the way you want.
 
@@ -779,7 +855,7 @@ Control how and when Entomate notifies you:
 
 #### Ecosystem Settings
 
-Manage your Pulse and Logos Vision connections. See [Ecosystem Integration](#16-ecosystem-integration) for details.
+Manage your Pulse and Logos Vision connections. See [Ecosystem Integration](#17-ecosystem-integration) for details.
 
 ### AI and Learning
 
@@ -807,7 +883,7 @@ View the current version number, design system (Void Crimson), and the technolog
 
 ---
 
-## 19. Keyboard Shortcuts
+## 20. Keyboard Shortcuts
 
 Entomate supports keyboard shortcuts to help you navigate and act quickly. Press **Ctrl+?** to see these shortcuts at any time.
 
@@ -816,7 +892,7 @@ Entomate supports keyboard shortcuts to help you navigate and act quickly. Press
 | Shortcut | Action |
 |---|---|
 | **Ctrl+K** | Open Command Palette |
-| **Ctrl+/** | Toggle Entomate AI / Go to Search |
+| **Ctrl+/** | Toggle Ento AI Assistant |
 | **Ctrl+?** | Show keyboard shortcuts help |
 | **Escape** | Close dialogs, modals, and panels |
 
@@ -850,7 +926,7 @@ Entomate supports keyboard shortcuts to help you navigate and act quickly. Press
 
 ---
 
-## 20. Troubleshooting & FAQ
+## 21. Troubleshooting & FAQ
 
 If something is not working as expected, check the common issues below before reaching out for support.
 
@@ -920,4 +996,4 @@ Yes. Go to Settings > Audio and Recording to choose between Standard (64 kbps), 
 
 ---
 
-*This guide covers Entomate version 1.2.0. For questions or feedback, reach out through the app or your team's support channel.*
+*This guide covers Entomate version 1.3.0. For questions or feedback, reach out through the app or your team's support channel.*

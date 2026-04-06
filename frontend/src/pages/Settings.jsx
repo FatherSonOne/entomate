@@ -3,9 +3,12 @@ import { useLocation } from 'react-router-dom'
 import {
   Settings as SettingsIcon, Database, Cpu, Palette, Sun, Moon, Monitor,
   Brain, ArrowLeft, Mic, Bell, Link2, RefreshCw, CheckCircle2,
-  XCircle, AlertCircle, Loader2, MessageSquare, Info, Shield
+  XCircle, AlertCircle, Loader2, MessageSquare, Info, Shield, CreditCard, Building2,
+  Trash2, Archive
 } from 'lucide-react'
 import { integrationsApi, checkHealth, settingsApi } from '../services/api'
+import { useOrg } from '../contexts/OrgContext'
+import { TENANT_PLAN_LABELS, PLAN_BADGE_COLORS, TENANT_PLAN_LIMITS } from '../constants/plans'
 import { useTheme, THEME_MODES } from '../context/ThemeContext'
 import LearningDashboard from '../components/learning/LearningDashboard'
 import EcosystemSettings from '../components/EcosystemSettings'
@@ -13,13 +16,17 @@ import SlackSettings from '../components/settings/SlackSettings'
 import AudioSettings from '../components/settings/AudioSettings'
 import NotificationSettings from '../components/settings/NotificationSettings'
 import PermissionsSettings from '../components/settings/PermissionsSettings'
+import BillingSettings from '../components/settings/BillingSettings'
 import { VCButton, VCIconBox, VCBadge } from '../components/vc'
+import DeleteOrgDialog from '../components/settings/DeleteOrgDialog'
 
 // ── Settings Sections ──
 const SECTIONS = [
+  { id: 'organization', label: 'Organization', icon: Building2 },
   { id: 'appearance', label: 'Appearance', icon: Palette },
   { id: 'audio',      label: 'Audio & Recording', icon: Mic },
   { id: 'permissions', label: 'Permissions', icon: Shield },
+  { id: 'billing',    label: 'Plan & Billing', icon: CreditCard },
   { id: 'notifications', label: 'Notifications', icon: Bell },
   { id: 'integrations', label: 'Integrations', icon: Link2 },
   { id: 'ai-learning', label: 'AI & Learning', icon: Brain },
@@ -29,7 +36,8 @@ const SECTIONS = [
 
 export default function Settings() {
   const location = useLocation()
-  const [activeSection, setActiveSection] = useState('appearance')
+  const [activeSection, setActiveSection] = useState('organization')
+  const orgContext = useOrg()
   const DEFAULTS = {
     theme_mode: 'dark',
     reduce_motion: false,
@@ -53,6 +61,9 @@ export default function Settings() {
   const [testingChat, setTestingChat] = useState(false)
   const [crmTestResult, setCrmTestResult] = useState(null)
   const [chatTestResult, setChatTestResult] = useState(null)
+
+  const [deleteDialogMode, setDeleteDialogMode] = useState(null) // 'soft' | 'hard' | null
+  const [deleteLoading, setDeleteLoading] = useState(false)
 
   const { mode, setThemeMode } = useTheme()
 
@@ -250,6 +261,118 @@ export default function Settings() {
       {/* Content Panel */}
       <div className="flex-1 min-w-0 space-y-6 pb-12">
 
+        {/* ═══════ ORGANIZATION ═══════ */}
+        {activeSection === 'organization' && (
+          <>
+            <SectionHeader title="Organization" subtitle="Manage your organization details and plan" />
+
+            {orgContext.org && (
+              <div className="vc p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3
+                      className="font-semibold text-base"
+                      style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}
+                    >
+                      {orgContext.org.name}
+                    </h3>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                      {orgContext.org.slug}
+                    </p>
+                  </div>
+                  <span className={`px-3 py-1 text-sm font-medium rounded-full ${PLAN_BADGE_COLORS[orgContext.org.plan] || PLAN_BADGE_COLORS.free}`}>
+                    {TENANT_PLAN_LABELS[orgContext.org.plan] || 'Free'}
+                  </span>
+                </div>
+
+                <div
+                  className="p-3 rounded-lg"
+                  style={{ background: 'var(--bg-elevated)', border: '1px solid var(--b1)' }}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Workflow runs/mo</span>
+                    <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                      {(TENANT_PLAN_LIMITS[orgContext.org.plan] || 100) >= 50000 ? 'Unlimited' : (TENANT_PLAN_LIMITS[orgContext.org.plan] || 100).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Team members</span>
+                    <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                      {orgContext.orgMembers.length}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Your role</span>
+                    <span className="text-sm font-medium capitalize" style={{ color: 'var(--text-primary)' }}>
+                      {orgContext.myRole || 'member'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Danger Zone — owner/admin only */}
+            {orgContext.org && (orgContext.myRole === 'owner' || orgContext.myRole === 'admin') && (
+              <div
+                className="p-5 space-y-4 rounded-xl"
+                style={{ border: '1px solid rgba(255,45,107,.3)', background: 'rgba(255,45,107,.03)' }}
+              >
+                <div>
+                  <h3
+                    className="font-semibold text-base"
+                    style={{ color: 'var(--accent-primary, #FF2D6B)', fontFamily: 'var(--font-display)' }}
+                  >
+                    Danger Zone
+                  </h3>
+                  <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>
+                    These actions affect your entire organization. Your personal projects, tasks, and automations are not affected by organization deletion.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <VCButton
+                    variant="amber"
+                    onClick={() => setDeleteDialogMode('soft')}
+                  >
+                    <Archive className="w-4 h-4" /> Archive Organization
+                  </VCButton>
+                  {orgContext.myRole === 'owner' && (
+                    <VCButton
+                      variant="danger"
+                      onClick={() => setDeleteDialogMode('hard')}
+                    >
+                      <Trash2 className="w-4 h-4" /> Permanently Delete
+                    </VCButton>
+                  )}
+                </div>
+
+                <DeleteOrgDialog
+                  orgName={orgContext.org.name}
+                  mode={deleteDialogMode || 'soft'}
+                  isOpen={deleteDialogMode !== null}
+                  isLoading={deleteLoading}
+                  onCancel={() => setDeleteDialogMode(null)}
+                  onConfirm={async () => {
+                    setDeleteLoading(true)
+                    try {
+                      if (deleteDialogMode === 'soft') {
+                        await orgContext.softDeleteOrg(orgContext.org.id)
+                      } else {
+                        await orgContext.hardDeleteOrg(orgContext.org.id)
+                      }
+                      setDeleteDialogMode(null)
+                    } catch (err) {
+                      console.error('Delete org failed:', err)
+                    } finally {
+                      setDeleteLoading(false)
+                    }
+                  }}
+                />
+              </div>
+            )}
+          </>
+        )}
+
         {/* ═══════ APPEARANCE ═══════ */}
         {activeSection === 'appearance' && (
           <>
@@ -338,6 +461,13 @@ export default function Settings() {
           <>
             <SectionHeader title="Permissions" subtitle="Manage browser permissions Entomate needs to function" />
             <PermissionsSettings />
+          </>
+        )}
+
+        {activeSection === 'billing' && (
+          <>
+            <SectionHeader title="Plan & Billing" subtitle="Manage your subscription and usage" />
+            <BillingSettings />
           </>
         )}
 

@@ -1,6 +1,7 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { guideSections, CATEGORIES, guideVersion, guideUpdated } from '../components/UsersGuide/guideData'
 
 /* ════════════════════════════════════════════════════════
    ANIMATED SVG ICONS — replace every emoji on the page
@@ -617,18 +618,6 @@ const IconShuffle = ({ size = 28 }) => (
   </svg>
 )
 
-const GUIDE_ICONS = {
-  mic: IconMicrophone,
-  tasks: IconTasks,
-  shuffle: IconShuffle,
-  robot: IconRobot,
-  target: IconTarget,
-  search: IconSearch,
-  chat: IconChat,
-  analytics: IconAnalytics,
-  calendar: IconCalendar,
-}
-
 export default function LandingPage() {
   const { isSignedIn, loading: isLoading } = useAuth()
   const isLoaded = !isLoading
@@ -716,6 +705,29 @@ export default function LandingPage() {
       observer.disconnect()
       sectionObserver.disconnect()
     }
+  }, [])
+
+  // ── Guide accordion state ──
+  const [guideOpen, setGuideOpen] = useState(false)          // master toggle
+  const [openCats, setOpenCats] = useState(new Set())         // open category indices
+  const [openSections, setOpenSections] = useState(new Set()) // open section ids
+
+  const toggleCat = useCallback((idx) => {
+    setOpenCats(prev => { const n = new Set(prev); n.has(idx) ? n.delete(idx) : n.add(idx); return n })
+  }, [])
+
+  const toggleSection = useCallback((id) => {
+    setOpenSections(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  }, [])
+
+  const expandAllGuide = useCallback(() => {
+    setOpenCats(new Set(CATEGORIES.map((_, i) => i)))
+    setOpenSections(new Set(guideSections.map(s => s.id)))
+  }, [])
+
+  const collapseAllGuide = useCallback(() => {
+    setOpenCats(new Set())
+    setOpenSections(new Set())
   }, [])
 
   if (isLoaded && isSignedIn) {
@@ -908,7 +920,7 @@ export default function LandingPage() {
 
             {/* Hero hands image */}
             <div className="hero-hands-img">
-              <img src="/logos/logo-c-hero.png" alt="Entomate — The Hands of the Trifecto" />
+              <img src="/brand/hero-hands.png" alt="Entomate — The Hands of the Trifecto" />
             </div>
 
             {/* Workflow trail — clockwise arc connecting trigger → AI → action around the hands */}
@@ -1008,6 +1020,88 @@ export default function LandingPage() {
               Logos Vision, Pulse, and Entomate are built to work together as a complete
               operational stack for modern teams.
             </p>
+          </div>
+
+          {/* Neural Radar Animation — Mind / Voice / Hands convergence */}
+          <div className="trifecto-neural">
+            <div className="trifecto-neural-glow"></div>
+            <svg viewBox="0 0 520 290" xmlns="http://www.w3.org/2000/svg">
+              <line x1="0" y1="72" x2="520" y2="72" stroke="#00F5D4" strokeWidth="0.4" strokeDasharray="4 8" opacity="0.08"/>
+              <line x1="0" y1="218" x2="520" y2="218" stroke="#00F5D4" strokeWidth="0.4" strokeDasharray="4 8" opacity="0.08"/>
+              <line x1="260" y1="0" x2="260" y2="290" stroke="#FF2D6B" strokeWidth="0.4" strokeDasharray="4 8" opacity="0.06"/>
+
+              {/* Logos Vision (purple) */}
+              <ellipse cx="260" cy="145" rx="200" ry="110" fill="none" stroke="#8B5CF6" strokeWidth="0.8" strokeDasharray="400" strokeDashoffset="400" opacity="0.5">
+                <animate attributeName="stroke-dashoffset" values="400;0;400" dur="6s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0;0.5;0" dur="6s" repeatCount="indefinite"/>
+              </ellipse>
+              {/* Pulse (mint) */}
+              <ellipse cx="260" cy="145" rx="160" ry="88" fill="none" stroke="#00F5D4" strokeWidth="0.8" strokeDasharray="340" strokeDashoffset="340" opacity="0.5">
+                <animate attributeName="stroke-dashoffset" values="340;0;340" dur="6s" begin="1s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0;0.5;0" dur="6s" begin="1s" repeatCount="indefinite"/>
+              </ellipse>
+              {/* Entomate (crimson) */}
+              <ellipse cx="260" cy="145" rx="120" ry="66" fill="none" stroke="#FF2D6B" strokeWidth="1" strokeDasharray="280" strokeDashoffset="280" opacity="0.6">
+                <animate attributeName="stroke-dashoffset" values="280;0;280" dur="6s" begin="2s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0;0.6;0" dur="6s" begin="2s" repeatCount="indefinite"/>
+              </ellipse>
+
+              {/* Center convergence node */}
+              <circle cx="260" cy="145" r="5" fill="#FF2D6B">
+                <animate attributeName="r" values="5;12;5" dur="3s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0.8;1;0.8" dur="3s" repeatCount="indefinite"/>
+              </circle>
+
+              {/* Ripple rings */}
+              <circle cx="260" cy="145" r="5" fill="none" stroke="#8B5CF6" strokeWidth="1.2" opacity="0.7">
+                <animate attributeName="r" values="5;70" dur="3s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0.7;0" dur="3s" repeatCount="indefinite"/>
+              </circle>
+              <circle cx="260" cy="145" r="5" fill="none" stroke="#00F5D4" strokeWidth="1" opacity="0.5">
+                <animate attributeName="r" values="5;70" dur="3s" begin="1s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0.5;0" dur="3s" begin="1s" repeatCount="indefinite"/>
+              </circle>
+              <circle cx="260" cy="145" r="5" fill="none" stroke="#FF2D6B" strokeWidth="0.8" opacity="0.5">
+                <animate attributeName="r" values="5;70" dur="3s" begin="2s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0.5;0" dur="3s" begin="2s" repeatCount="indefinite"/>
+              </circle>
+
+              {/* Product labels */}
+              <circle cx="260" cy="35" r="4" fill="#8B5CF6" opacity="0.8">
+                <animate attributeName="opacity" values="0.4;0.9;0.4" dur="4s" repeatCount="indefinite"/>
+              </circle>
+              <text x="260" y="20" textAnchor="middle" fill="#8B5CF6" fontFamily="'JetBrains Mono', monospace" fontSize="9" letterSpacing="0.1em" opacity="0.6">THE MIND</text>
+
+              <circle cx="60" cy="145" r="4" fill="#00F5D4" opacity="0.8">
+                <animate attributeName="opacity" values="0.4;0.9;0.4" dur="4s" begin="1.3s" repeatCount="indefinite"/>
+              </circle>
+              <text x="60" y="132" textAnchor="middle" fill="#00F5D4" fontFamily="'JetBrains Mono', monospace" fontSize="9" letterSpacing="0.1em" opacity="0.6">THE VOICE</text>
+
+              <circle cx="460" cy="145" r="4" fill="#FF2D6B" opacity="0.8">
+                <animate attributeName="opacity" values="0.4;0.9;0.4" dur="4s" begin="0.6s" repeatCount="indefinite"/>
+              </circle>
+              <text x="460" y="132" textAnchor="middle" fill="#FF2D6B" fontFamily="'JetBrains Mono', monospace" fontSize="9" letterSpacing="0.1em" opacity="0.6">THE HANDS</text>
+
+              {/* Traveling particles converging to center */}
+              <circle r="2.5" fill="#8B5CF6" opacity="0.8">
+                <animate attributeName="cx" values="260;260" dur="3s" repeatCount="indefinite"/>
+                <animate attributeName="cy" values="35;145" dur="3s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0.8;0" dur="3s" repeatCount="indefinite"/>
+                <animate attributeName="r" values="2.5;1" dur="3s" repeatCount="indefinite"/>
+              </circle>
+              <circle r="2.5" fill="#00F5D4" opacity="0.8">
+                <animate attributeName="cx" values="60;260" dur="3s" begin="1s" repeatCount="indefinite"/>
+                <animate attributeName="cy" values="145;145" dur="3s" begin="1s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0.8;0" dur="3s" begin="1s" repeatCount="indefinite"/>
+                <animate attributeName="r" values="2.5;1" dur="3s" begin="1s" repeatCount="indefinite"/>
+              </circle>
+              <circle r="2.5" fill="#FF2D6B" opacity="0.8">
+                <animate attributeName="cx" values="460;260" dur="3s" begin="2s" repeatCount="indefinite"/>
+                <animate attributeName="cy" values="145;145" dur="3s" begin="2s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0.8;0" dur="3s" begin="2s" repeatCount="indefinite"/>
+                <animate attributeName="r" values="2.5;1" dur="3s" begin="2s" repeatCount="indefinite"/>
+              </circle>
+            </svg>
           </div>
 
           <div className="trifecto-grid">
@@ -1583,41 +1677,180 @@ export default function LandingPage() {
       </section>
 
       {/* ── USER GUIDE ── */}
-      <section className="guide-preview" id="guide">
+      <section className="guide-section" id="guide">
         <div className="container">
-          <div className="section-label">User Guide</div>
-          <h2 className="section-title">Everything you need to know,<br />in one place.</h2>
-          <p className="section-sub" style={{ margin: '0 auto', maxWidth: 600 }}>
-            Entomate comes with a built-in interactive User Guide covering every feature —
-            from meeting recording to AI agents. It updates automatically when new features ship.
-          </p>
-
-          <div className="guide-preview-grid">
-            {[
-              { iconKey: 'mic', title: 'Meetings', desc: 'Upload recordings, get transcripts, summaries, action items, and sentiment — all AI-powered.' },
-              { iconKey: 'tasks', title: 'Tasks & AI', desc: 'AI suggests assignments, priorities, and deadlines — with full explainability cards.' },
-              { iconKey: 'shuffle', title: 'Workflows', desc: 'Visual node-based automations connecting triggers to actions across your tools.' },
-              { iconKey: 'robot', title: 'AI Agents', desc: 'Four specialized agents for assignment, priority, deadlines, and follow-up detection.' },
-              { iconKey: 'target', title: 'Goals & OKRs', desc: 'Track objectives at Company, Team, and Individual levels with measurable key results.' },
-              { iconKey: 'search', title: 'Search & AI Q&A', desc: 'Semantic search across your workspace with natural-language AI question answering.' },
-              { iconKey: 'chat', title: 'Ento Assistant', desc: 'Context-aware AI chat that answers questions, gives proactive suggestions, and preps you for meetings.' },
-              { iconKey: 'analytics', title: 'Reports & Analytics', desc: 'PDF meeting recaps, CSV exports, analytics dashboards, and AI effectiveness tracking.' },
-              { iconKey: 'calendar', title: 'Calendar & Scheduling', desc: 'Google Calendar OAuth integration with event sync and calendar-triggered automations.' },
-            ].map((item, i) => {
-              const GuideIcon = GUIDE_ICONS[item.iconKey]
-              return (
-                <div key={i} className="guide-preview-card">
-                  <span className="guide-preview-icon"><GuideIcon size={28}/></span>
-                  <h3 className="guide-preview-title">{item.title}</h3>
-                  <p className="guide-preview-desc">{item.desc}</p>
-                </div>
-              )
-            })}
+          <div className="guide-section-header">
+            <div className="section-label">User Guide</div>
+            <h2 className="section-title">Everything you need to know,<br />in one place.</h2>
+            <p className="section-sub" style={{ margin: '0 auto', maxWidth: 600, textAlign: 'center' }}>
+              {guideSections.length} sections covering every feature in Entomate.
+              Click to explore — or sign in for the full interactive guide.
+            </p>
           </div>
+
+          {/* Master toggle */}
+          <div className="guide-master-toggle">
+            <button
+              className={`guide-toggle-btn${guideOpen ? ' is-open' : ''}`}
+              onClick={() => setGuideOpen(prev => !prev)}
+              aria-expanded={guideOpen}
+            >
+              <span className="guide-toggle-icon">
+                <svg width="20" height="20" viewBox="0 0 32 32" fill="none" className="ani-icon">
+                  <path d="M6 4 L20 4 L26 10 L26 28 L6 28 Z" stroke="var(--crimson)" strokeWidth="1.8" fill="none" strokeLinejoin="round"/>
+                  <path d="M20 4 L20 10 L26 10" stroke="var(--crimson)" strokeWidth="1.8" fill="none" strokeLinejoin="round"/>
+                  <line x1="10" y1="16" x2="22" y2="16" stroke="var(--text-muted)" strokeWidth="1.2" strokeLinecap="round"/>
+                  <line x1="10" y1="20" x2="19" y2="20" stroke="var(--text-muted)" strokeWidth="1.2" strokeLinecap="round"/>
+                  <line x1="10" y1="24" x2="16" y2="24" stroke="var(--text-muted)" strokeWidth="1.2" strokeLinecap="round"/>
+                </svg>
+              </span>
+              <span className="guide-toggle-text">
+                {guideOpen ? 'Hide User Guide' : 'Open User Guide'}
+              </span>
+              <span className="guide-toggle-meta">v{guideVersion} &middot; {guideUpdated}</span>
+              <span className={`guide-chevron${guideOpen ? ' is-open' : ''}`}>&rsaquo;</span>
+            </button>
+
+            {guideOpen && (
+              <div className="guide-expand-controls">
+                <button className="guide-ctrl-btn" onClick={expandAllGuide}>Expand All</button>
+                <button className="guide-ctrl-btn" onClick={collapseAllGuide}>Collapse All</button>
+              </div>
+            )}
+          </div>
+
+          {/* Collapsible guide body */}
+          {guideOpen && (
+            <div className="guide-body">
+              {CATEGORIES.map((cat, catIdx) => (
+                <div key={catIdx} className="guide-category">
+                  <button
+                    className={`guide-cat-header${openCats.has(catIdx) ? ' is-open' : ''}`}
+                    onClick={() => toggleCat(catIdx)}
+                    aria-expanded={openCats.has(catIdx)}
+                  >
+                    <span className="guide-cat-label">{cat.label}</span>
+                    <span className="guide-cat-count">{cat.ids.length}</span>
+                    <span className={`guide-chevron${openCats.has(catIdx) ? ' is-open' : ''}`}>&rsaquo;</span>
+                  </button>
+
+                  {openCats.has(catIdx) && (
+                    <div className="guide-cat-body">
+                      {cat.ids.map(sectionId => {
+                        const section = guideSections.find(s => s.id === sectionId)
+                        if (!section) return null
+                        const isOpen = openSections.has(sectionId)
+
+                        return (
+                          <div key={sectionId} className="guide-entry">
+                            <button
+                              className={`guide-entry-header${isOpen ? ' is-open' : ''}`}
+                              onClick={() => toggleSection(sectionId)}
+                              aria-expanded={isOpen}
+                            >
+                              <span className="guide-entry-icon">{section.icon}</span>
+                              <span className="guide-entry-title">{section.title}</span>
+                              {section.badge && (
+                                <span className={`guide-badge guide-badge--${section.badge === 'New' ? 'new' : 'updated'}`}>
+                                  {section.badge}
+                                </span>
+                              )}
+                              <span className={`guide-chevron${isOpen ? ' is-open' : ''}`}>&rsaquo;</span>
+                            </button>
+
+                            {isOpen && (
+                              <div className="guide-entry-body">
+                                <p className="guide-entry-summary">{section.summary}</p>
+
+                                {/* Steps */}
+                                {section.steps?.length > 0 && (
+                                  <div className="guide-steps">
+                                    <div className="guide-steps-label">How to use it</div>
+                                    <ol className="guide-step-list">
+                                      {section.steps.map((step, i) => (
+                                        <li key={i} className="guide-step-item">
+                                          <span className="guide-step-num">{i + 1}</span>
+                                          <span>{step}</span>
+                                        </li>
+                                      ))}
+                                    </ol>
+                                  </div>
+                                )}
+
+                                {/* Subsections */}
+                                {section.subsections?.length > 0 && (
+                                  <div className="guide-subsections">
+                                    <div className="guide-steps-label">Features &amp; Details</div>
+                                    {section.subsections.map(sub => (
+                                      <details key={sub.id} className="guide-sub-detail">
+                                        <summary className="guide-sub-summary">{sub.title}</summary>
+                                        <div className="guide-sub-body">
+                                          {sub.description && <p className="guide-sub-desc">{sub.description}</p>}
+                                          <ol className="guide-step-list guide-step-list--sm">
+                                            {sub.steps.map((step, i) => (
+                                              <li key={i} className="guide-step-item guide-step-item--sm">
+                                                <span className="guide-step-num guide-step-num--sm">{i + 1}</span>
+                                                <span>{step}</span>
+                                              </li>
+                                            ))}
+                                          </ol>
+                                          {sub.note && <div className="guide-note"><IconAlert size={14}/> {sub.note}</div>}
+                                        </div>
+                                      </details>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {/* Tips */}
+                                {section.tips?.length > 0 && (
+                                  <div className="guide-tips">
+                                    <div className="guide-steps-label">Pro Tips</div>
+                                    {section.tips.map((tip, i) => (
+                                      <div key={i} className="guide-tip">
+                                        <span className="guide-tip-arrow">&rarr;</span>
+                                        <span>{tip}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {/* Use cases */}
+                                {section.useCases?.length > 0 && (
+                                  <div className="guide-subsections">
+                                    <div className="guide-steps-label">Use Cases</div>
+                                    {section.useCases.map(uc => (
+                                      <details key={uc.id} className="guide-sub-detail guide-sub-detail--uc">
+                                        <summary className="guide-sub-summary">{uc.title}</summary>
+                                        <div className="guide-sub-body">
+                                          <p className="guide-sub-desc"><strong>Scenario:</strong> {uc.scenario}</p>
+                                          <ol className="guide-step-list guide-step-list--sm">
+                                            {uc.steps.map((step, i) => (
+                                              <li key={i} className="guide-step-item guide-step-item--sm">
+                                                <span className="guide-step-num guide-step-num--sm">{i + 1}</span>
+                                                <span>{step}</span>
+                                              </li>
+                                            ))}
+                                          </ol>
+                                        </div>
+                                      </details>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
 
           <div style={{ textAlign: 'center', marginTop: 32 }}>
             <Link to="/sign-in" className="btn-primary btn-large">
-              Read the Full Guide &rarr;
+              Full Interactive Guide &rarr;
             </Link>
           </div>
         </div>
@@ -1743,7 +1976,7 @@ export default function LandingPage() {
         .landing-page .adaptive-card:hover .ani-icon,
         .landing-page .ecosystem-card:hover .ani-icon,
         .landing-page .power-card:hover .ani-icon,
-        .landing-page .guide-preview-card:hover .ani-icon,
+        .landing-page .guide-entry:hover .ani-icon,
         .landing-page .integration-chip:hover .ani-icon {
           transform: scale(1.25) rotate(5deg);
           filter: drop-shadow(0 0 8px var(--crimson-glow));
@@ -1787,17 +2020,10 @@ export default function LandingPage() {
           transform: scale(1.25) rotate(5deg);
         }
 
-        /* Guide preview icon sizing */
-        .landing-page .guide-preview-icon {
-          display: flex;
-          align-items: center;
-          height: 32px;
-          margin-bottom: 12px;
-        }
-
-        .landing-page .guide-preview-icon .ani-icon {
-          width: 28px;
-          height: 28px;
+        /* Guide note icon */
+        .landing-page .guide-note .ani-icon {
+          flex-shrink: 0;
+          margin-top: 1px;
         }
 
         /* Power card icon area */
@@ -2424,6 +2650,35 @@ export default function LandingPage() {
         .landing-page .trifecto-link.crimson-link { color: var(--crimson); }
         .landing-page .trifecto-link.crimson-link:hover { color: #FF5585; }
 
+        /* Trifecto neural animation */
+        .landing-page .trifecto-neural {
+          position: relative;
+          width: 100%;
+          max-width: 520px;
+          margin: 0 auto 60px;
+          aspect-ratio: 16 / 9;
+        }
+        .landing-page .trifecto-neural svg {
+          width: 100%;
+          height: 100%;
+        }
+        .landing-page .trifecto-neural-glow {
+          position: absolute;
+          inset: 0;
+          border-radius: 50%;
+          background: radial-gradient(ellipse at center,
+            rgba(255, 45, 107, 0.08) 0%,
+            rgba(0, 245, 212, 0.04) 40%,
+            transparent 70%
+          );
+          pointer-events: none;
+          animation: trifecto-glow-pulse 4s ease-in-out infinite;
+        }
+        @keyframes trifecto-glow-pulse {
+          0%, 100% { opacity: 0.6; }
+          50%      { opacity: 1; }
+        }
+
         /* ── FEATURE PILLARS ── */
         .landing-page .pillars {
           padding: 120px 0;
@@ -2930,70 +3185,459 @@ export default function LandingPage() {
           font-family: var(--font-mono);
         }
 
-        /* ── USER GUIDE PREVIEW ── */
-        .landing-page .guide-preview {
+        /* ── USER GUIDE SECTION ── */
+        .landing-page .guide-section {
           padding: 120px 0;
-          text-align: center;
           position: relative;
         }
 
-        .landing-page .guide-preview-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 20px;
-          margin-top: 48px;
+        .landing-page .guide-section-header {
+          text-align: center;
+          margin-bottom: 48px;
+        }
+
+        /* Master toggle button */
+        .landing-page .guide-master-toggle {
           max-width: 900px;
-          margin-left: auto;
-          margin-right: auto;
+          margin: 0 auto 24px;
         }
 
-        .landing-page .guide-preview-card {
-          padding: 28px 24px;
-          border-radius: 12px;
-          border: 1px solid rgba(248,240,242,.06);
-          background: rgba(255,255,255,0.02);
+        .landing-page .guide-toggle-btn {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          padding: 18px 24px;
+          background: var(--surface);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-xl);
+          cursor: pointer;
+          transition: all 200ms ease;
+          font-family: var(--font-body);
           text-align: left;
-          transition: border-color 0.25s, background 0.25s, transform 0.25s;
         }
 
-        .landing-page .guide-preview-card:hover {
-          border-color: rgba(255,45,107,0.2);
-          background: rgba(255,255,255,0.04);
-          transform: translateY(-2px);
+        .landing-page .guide-toggle-btn:hover {
+          border-color: var(--border-glow);
+          background: var(--elevated);
         }
 
-        .landing-page .guide-preview-icon {
-          font-size: 28px;
-          display: block;
-          margin-bottom: 12px;
+        .landing-page .guide-toggle-btn.is-open {
+          border-color: rgba(255, 45, 107, 0.30);
+          background: var(--elevated);
+          border-radius: var(--radius-xl) var(--radius-xl) 0 0;
         }
 
-        .landing-page .guide-preview-title {
+        .landing-page .guide-toggle-icon {
+          width: 36px;
+          height: 36px;
+          border-radius: var(--radius-md);
+          background: rgba(255, 45, 107, 0.10);
+          border: 1px solid rgba(255, 45, 107, 0.20);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+
+        .landing-page .guide-toggle-text {
           font-size: 16px;
-          font-weight: 600;
-          color: #fafafa;
-          margin: 0 0 8px;
+          font-weight: 700;
+          color: var(--text-primary);
+          flex: 1;
+          font-family: var(--font-display);
           letter-spacing: -0.01em;
         }
 
-        .landing-page .guide-preview-desc {
+        .landing-page .guide-toggle-meta {
+          font-family: var(--font-mono);
+          font-size: 11px;
+          color: var(--text-muted);
+          letter-spacing: 0.04em;
+        }
+
+        .landing-page .guide-expand-controls {
+          display: flex;
+          justify-content: flex-end;
+          gap: 8px;
+          padding: 8px 16px;
+          background: var(--elevated);
+          border-left: 1px solid var(--border);
+          border-right: 1px solid var(--border);
+          border-color: rgba(255, 45, 107, 0.30);
+        }
+
+        .landing-page .guide-ctrl-btn {
+          padding: 4px 12px;
+          font-size: 11px;
+          font-weight: 600;
+          font-family: var(--font-mono);
+          color: var(--text-muted);
+          background: transparent;
+          border: 1px solid var(--border);
+          border-radius: var(--radius-sm);
+          cursor: pointer;
+          transition: all 150ms ease;
+        }
+
+        .landing-page .guide-ctrl-btn:hover {
+          color: var(--crimson);
+          border-color: rgba(255, 45, 107, 0.3);
+        }
+
+        /* Chevron */
+        .landing-page .guide-chevron {
+          font-size: 20px;
+          font-weight: 600;
+          color: var(--text-muted);
+          transition: transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+          flex-shrink: 0;
+          line-height: 1;
+        }
+
+        .landing-page .guide-chevron.is-open {
+          transform: rotate(90deg);
+          color: var(--crimson);
+        }
+
+        /* Guide body */
+        .landing-page .guide-body {
+          max-width: 900px;
+          margin: 0 auto;
+          background: var(--surface);
+          border: 1px solid rgba(255, 45, 107, 0.30);
+          border-top: none;
+          border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+          overflow: hidden;
+          animation: guide-slide-in 300ms ease;
+        }
+
+        @keyframes guide-slide-in {
+          from { opacity: 0; max-height: 0; }
+          to   { opacity: 1; max-height: 5000px; }
+        }
+
+        /* Category */
+        .landing-page .guide-category {
+          border-bottom: 1px solid var(--border);
+        }
+
+        .landing-page .guide-category:last-child {
+          border-bottom: none;
+        }
+
+        .landing-page .guide-cat-header {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 16px 24px;
+          background: transparent;
+          border: none;
+          cursor: pointer;
+          font-family: var(--font-body);
+          transition: background 150ms ease;
+        }
+
+        .landing-page .guide-cat-header:hover {
+          background: rgba(255, 255, 255, 0.02);
+        }
+
+        .landing-page .guide-cat-header.is-open {
+          background: rgba(255, 45, 107, 0.04);
+        }
+
+        .landing-page .guide-cat-label {
+          font-family: var(--font-display);
+          font-size: 15px;
+          font-weight: 700;
+          color: var(--text-primary);
+          flex: 1;
+          text-align: left;
+        }
+
+        .landing-page .guide-cat-count {
+          font-family: var(--font-mono);
+          font-size: 10px;
+          font-weight: 600;
+          color: var(--crimson);
+          padding: 2px 8px;
+          background: rgba(255, 45, 107, 0.08);
+          border-radius: 100px;
+        }
+
+        /* Category body */
+        .landing-page .guide-cat-body {
+          padding: 0 12px 12px;
+          animation: guide-slide-in 200ms ease;
+        }
+
+        /* Section entry */
+        .landing-page .guide-entry {
+          border: 1px solid var(--border);
+          border-radius: var(--radius-md);
+          margin-bottom: 6px;
+          overflow: hidden;
+          transition: border-color 200ms ease;
+        }
+
+        .landing-page .guide-entry:hover {
+          border-color: rgba(255, 255, 255, 0.12);
+        }
+
+        .landing-page .guide-entry-header {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 12px 16px;
+          background: transparent;
+          border: none;
+          cursor: pointer;
+          font-family: var(--font-body);
+          transition: background 150ms ease;
+        }
+
+        .landing-page .guide-entry-header:hover {
+          background: rgba(255, 255, 255, 0.02);
+        }
+
+        .landing-page .guide-entry-header.is-open {
+          background: rgba(255, 45, 107, 0.04);
+          border-bottom: 1px solid var(--border);
+        }
+
+        .landing-page .guide-entry-icon {
+          font-size: 18px;
+          width: 28px;
+          text-align: center;
+          flex-shrink: 0;
+        }
+
+        .landing-page .guide-entry-title {
+          font-size: 14px;
+          font-weight: 600;
+          color: var(--text-primary);
+          flex: 1;
+          text-align: left;
+        }
+
+        .landing-page .guide-badge {
+          font-family: var(--font-mono);
+          font-size: 9px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          padding: 2px 8px;
+          border-radius: 100px;
+        }
+
+        .landing-page .guide-badge--new {
+          background: rgba(0, 245, 212, 0.12);
+          color: var(--mint);
+          border: 1px solid rgba(0, 245, 212, 0.25);
+        }
+
+        .landing-page .guide-badge--updated {
+          background: rgba(255, 184, 0, 0.12);
+          color: var(--amber);
+          border: 1px solid rgba(255, 184, 0, 0.25);
+        }
+
+        /* Entry body */
+        .landing-page .guide-entry-body {
+          padding: 16px 20px;
+          animation: guide-slide-in 200ms ease;
+        }
+
+        .landing-page .guide-entry-summary {
+          font-size: 14px;
+          color: var(--text-secondary);
+          line-height: 1.7;
+          margin-bottom: 20px;
+          padding-left: 38px;
+        }
+
+        .landing-page .guide-steps-label {
+          font-family: var(--font-mono);
+          font-size: 10px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.12em;
+          color: var(--crimson);
+          margin-bottom: 10px;
+          padding-left: 38px;
+        }
+
+        .landing-page .guide-step-list {
+          list-style: none;
+          margin: 0 0 20px;
+          padding: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          padding-left: 38px;
+        }
+
+        .landing-page .guide-step-item {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
           font-size: 13px;
-          color: #94a3b8;
+          color: var(--text-secondary);
+          line-height: 1.6;
+        }
+
+        .landing-page .guide-step-num {
+          width: 22px;
+          height: 22px;
+          border-radius: 50%;
+          background: rgba(255, 45, 107, 0.10);
+          border: 1px solid rgba(255, 45, 107, 0.20);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-family: var(--font-mono);
+          font-size: 10px;
+          font-weight: 700;
+          color: var(--crimson);
+          flex-shrink: 0;
+          margin-top: 1px;
+        }
+
+        .landing-page .guide-step-list--sm { padding-left: 0; }
+
+        .landing-page .guide-step-item--sm { font-size: 12px; }
+
+        .landing-page .guide-step-num--sm {
+          width: 18px;
+          height: 18px;
+          font-size: 9px;
+        }
+
+        /* Subsection <details> */
+        .landing-page .guide-sub-detail {
+          margin-left: 38px;
+          margin-bottom: 6px;
+          border: 1px solid var(--border);
+          border-radius: var(--radius-sm);
+          overflow: hidden;
+          transition: border-color 150ms ease;
+        }
+
+        .landing-page .guide-sub-detail:hover {
+          border-color: rgba(255, 255, 255, 0.12);
+        }
+
+        .landing-page .guide-sub-detail[open] {
+          border-color: rgba(255, 45, 107, 0.20);
+        }
+
+        .landing-page .guide-sub-detail--uc {
+          border-color: rgba(139, 92, 246, 0.15);
+        }
+
+        .landing-page .guide-sub-detail--uc[open] {
+          border-color: rgba(139, 92, 246, 0.30);
+        }
+
+        .landing-page .guide-sub-summary {
+          padding: 10px 14px;
+          font-size: 13px;
+          font-weight: 600;
+          color: var(--text-primary);
+          cursor: pointer;
+          transition: background 150ms ease;
+          list-style: none;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .landing-page .guide-sub-summary::-webkit-details-marker { display: none; }
+
+        .landing-page .guide-sub-summary::before {
+          content: '\\25B8';
+          color: var(--crimson);
+          font-size: 11px;
+          transition: transform 200ms ease;
+        }
+
+        .landing-page .guide-sub-detail[open] > .guide-sub-summary::before {
+          transform: rotate(90deg);
+        }
+
+        .landing-page .guide-sub-summary:hover {
+          background: rgba(255, 255, 255, 0.02);
+        }
+
+        .landing-page .guide-sub-body {
+          padding: 12px 14px 14px;
+          border-top: 1px solid var(--border);
+        }
+
+        .landing-page .guide-sub-desc {
+          font-size: 12px;
+          color: var(--text-secondary);
+          line-height: 1.6;
+          margin-bottom: 10px;
+        }
+
+        .landing-page .guide-note {
+          font-size: 12px;
+          color: var(--amber);
+          padding: 8px 12px;
+          background: rgba(255, 184, 0, 0.06);
+          border: 1px solid rgba(255, 184, 0, 0.15);
+          border-radius: var(--radius-sm);
+          margin-top: 10px;
+          display: flex;
+          align-items: flex-start;
+          gap: 8px;
           line-height: 1.5;
-          margin: 0;
         }
 
+        /* Tips */
+        .landing-page .guide-tips {
+          padding-left: 38px;
+          margin-bottom: 16px;
+        }
+
+        .landing-page .guide-tip {
+          display: flex;
+          align-items: flex-start;
+          gap: 8px;
+          font-size: 12px;
+          color: var(--text-secondary);
+          line-height: 1.6;
+          padding: 4px 0;
+        }
+
+        .landing-page .guide-tip-arrow {
+          color: var(--mint);
+          font-family: var(--font-mono);
+          flex-shrink: 0;
+          margin-top: 1px;
+        }
+
+        /* Subsections container */
+        .landing-page .guide-subsections {
+          margin-bottom: 16px;
+        }
+
+        .landing-page .guide-subsections .guide-steps-label {
+          margin-bottom: 8px;
+        }
+
+        /* Responsive */
         @media (max-width: 768px) {
-          .landing-page .guide-preview-grid {
-            grid-template-columns: 1fr;
-            gap: 12px;
-          }
-        }
-
-        @media (min-width: 769px) and (max-width: 1024px) {
-          .landing-page .guide-preview-grid {
-            grid-template-columns: repeat(2, 1fr);
-          }
+          .landing-page .guide-toggle-meta { display: none; }
+          .landing-page .guide-entry-body { padding: 12px; }
+          .landing-page .guide-entry-summary,
+          .landing-page .guide-steps-label,
+          .landing-page .guide-step-list,
+          .landing-page .guide-tips { padding-left: 0; }
+          .landing-page .guide-sub-detail { margin-left: 0; }
         }
 
         /* ── THE STORY SECTION ── */
@@ -3433,6 +4077,7 @@ export default function LandingPage() {
         @media (max-width: 1024px) {
           .landing-page .pillars-grid { grid-template-columns: 1fr 1fr; }
           .landing-page .trifecto-grid { grid-template-columns: 1fr; }
+          .landing-page .trifecto-neural { max-width: 320px; margin-bottom: 40px; }
           .landing-page .hero-visual { display: none; }
           .landing-page .metrics-grid { grid-template-columns: 1fr 1fr; }
           .landing-page .story-grid { grid-template-columns: 1fr; }

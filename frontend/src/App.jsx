@@ -1,6 +1,7 @@
 import React, { Suspense } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import ProtectedRoute from './components/ProtectedRoute'
+import OrgSetupGate from './components/teams/OrgSetupGate'
 import Layout from './components/Layout'
 import PageLoader from './components/PageLoader'
 
@@ -39,7 +40,7 @@ export default function App() {
           <Route path="/auth/callback" element={<AuthCallback />} />
 
           {/* Protected routes */}
-          <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+          <Route path="/" element={<ProtectedRoute><OrgSetupGate><Layout /></OrgSetupGate></ProtectedRoute>}>
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="meetings" element={<Meetings />} />
             <Route path="meetings/:id" element={<MeetingDetail />} />

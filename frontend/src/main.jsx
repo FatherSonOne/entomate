@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import ErrorBoundary from './components/ErrorBoundary'
 import { AuthProvider } from './contexts/AuthContext'
+import { OrgProvider } from './contexts/OrgContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { ToastProvider } from './components/vc/ToastProvider'
 import { ConfirmProvider } from './components/vc/ConfirmDialog'
@@ -17,6 +18,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <ErrorBoundary>
     <AuthProvider>
+      <OrgProvider>
       <ThemeProvider>
         <ToastProvider>
           <ConfirmProvider>
@@ -24,6 +26,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           </ConfirmProvider>
         </ToastProvider>
       </ThemeProvider>
+      </OrgProvider>
     </AuthProvider>
     </ErrorBoundary>
   </React.StrictMode>

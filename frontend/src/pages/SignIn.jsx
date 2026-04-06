@@ -93,7 +93,7 @@ export default function SignInPage() {
           <ul className="entomate-signin-bullets">
             {[
               'AI agents that act, not just advise',
-              '24+ native integrations',
+              '7+ native integrations',
               'Smart automations triggered by any event',
               'Real-time task & deadline intelligence',
             ].map((text) => (
@@ -248,8 +248,8 @@ export default function SignInPage() {
             <div className="entomate-signin-terms">
               <p>
                 By continuing, you agree to our{' '}
-                <a href="/terms">Terms of Service</a> and{' '}
-                <a href="/privacy">Privacy Policy</a>.
+                <a href="https://entomate.app/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a> and{' '}
+                <a href="https://entomate.app/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>.
               </p>
             </div>
           </div>
@@ -261,7 +261,7 @@ export default function SignInPage() {
               </svg>
               Secure Encryption
             </span>
-            <a href="/privacy" className="entomate-signin-security-badge">
+            <a href="https://entomate.app/privacy" target="_blank" rel="noopener noreferrer" className="entomate-signin-security-badge">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
                 <path d="M7 11V7a5 5 0 0110 0v4"/>

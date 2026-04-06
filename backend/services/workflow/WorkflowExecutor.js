@@ -9,7 +9,7 @@
  * - Loop/batch processing
  */
 
-const { supabase } = require('../../config/supabase');
+const { supabase, supabaseAdmin } = require('../../config/supabase');
 const NodeRegistry = require('./NodeRegistry');
 const log = require('../../utils/log');
 
@@ -83,6 +83,20 @@ class WorkflowExecutor {
       execution.durationMs = Date.now() - new Date(execution.startedAt).getTime();
 
       await this.saveExecution(execution);
+
+      // Track workflow run usage for billing
+      if (supabaseAdmin && workflow.workspace_id) {
+        const now = new Date();
+        const periodStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+        const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+        supabaseAdmin.rpc('increment_usage', {
+          p_workspace_id: workflow.workspace_id,
+          p_metric: 'workflow_runs',
+          p_quantity: 1,
+          p_period_start: periodStart,
+          p_period_end: periodEnd,
+        }).then(() => {}).catch(() => {});
+      }
 
       log.info(`[WorkflowExecutor] Execution ${executionId} completed successfully`);
 

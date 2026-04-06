@@ -1,8 +1,8 @@
 // ─── Entomate User Guide Data ─────────────────────────────────────────────
 // Version tracking — update these when guide content changes
 
-export const guideVersion = '1.2.0'
-export const guideUpdated = 'April 4, 2026'
+export const guideVersion = '1.4.0'
+export const guideUpdated = 'April 5, 2026'
 
 // ─── Version key for localStorage new-feature detection ───────────────────
 export const GUIDE_VERSION_KEY = 'entomate_guide_version'
@@ -13,7 +13,7 @@ export const CATEGORIES = [
   { label: 'Start Here',         ids: ['introduction', 'getting-started', 'dashboard'] },
   { label: 'Meetings & Time',    ids: ['meetings', 'meeting-details', 'calendar'] },
   { label: 'Work Management',    ids: ['tasks', 'projects', 'goals'] },
-  { label: 'Automation & AI',    ids: ['workflows', 'automations', 'agents'] },
+  { label: 'Automation & AI',    ids: ['workflows', 'automations', 'agents', 'ento-assistant'] },
   { label: 'Intelligence',       ids: ['search', 'analytics', 'reports'] },
   { label: 'Ecosystem',           ids: ['ecosystem', 'meeting-intelligence'] },
   { label: 'Configuration',      ids: ['settings', 'keyboard-shortcuts', 'troubleshooting'] },
@@ -402,15 +402,27 @@ export const guideSections = [
     id: 'tasks',
     title: 'Tasks',
     icon: '\u2705',
-    summary: 'Create, prioritize, and track action items with AI-powered recommendations.',
+    badge: 'Updated',
+    summary: 'Create, prioritize, and track action items with AI recommendations, Kanban board, subtasks, and ETA predictions.',
     steps: [
       'Navigate to Tasks from the sidebar.',
+      'Switch between List View (paginated table) and Board View (Kanban) using the toggle icons.',
       'A guided 3-step wizard appears: Create \u2192 Prioritize \u2192 Complete.',
       'Fill in the task form with title, priority, and due date.',
       'Review the AI Recommendations panel for assignment, priority, and deadline suggestions.',
       'Accept or override any AI suggestion, then save.',
     ],
     subsections: [
+      {
+        id: 'task-views',
+        title: 'View Modes',
+        description: 'Two ways to see and manage your tasks.',
+        steps: [
+          'List View \u2014 Paginated table with sorting by created date, due date, priority, status, or title.',
+          'Board View (Kanban) \u2014 Visual columns (To Do, In Progress, Review, Done, Blocked) with drag-and-drop.',
+          'Use the toggle icons in the top-right corner to switch views.',
+        ],
+      },
       {
         id: 'task-ai',
         title: 'AI Recommendations',
@@ -424,13 +436,35 @@ export const guideSections = [
         note: 'The AI learns from your decisions over time. The more you accept or override, the better it gets.',
       },
       {
+        id: 'task-edit',
+        title: 'Editing a Task',
+        description: 'Click a task to open the edit modal with full details.',
+        steps: [
+          'Update title, description, status, priority, and due date.',
+          'Add or remove tags to organize your tasks.',
+          'Create and manage subtasks \u2014 smaller items that break down the main task.',
+          'View the AI ETA prediction \u2014 an estimated completion date based on task complexity and team pace.',
+        ],
+      },
+      {
         id: 'task-manage',
         title: 'Managing Tasks',
         steps: [
           'Filter tasks by status: All, Open, In Progress, or Done.',
-          'Search tasks by title using the search bar.',
+          'Filter by tag \u2014 click a tag chip to narrow results.',
+          'Search tasks by title using the search bar (auto-filtering as you type).',
+          'Sort ascending or descending by any column.',
           'Complete a task by clicking the animated checkbox.',
           'Delete a task using the delete button on any row.',
+        ],
+      },
+      {
+        id: 'task-bulk',
+        title: 'Bulk Operations',
+        steps: [
+          'Enable bulk selection mode.',
+          'Select individual tasks or use Select All.',
+          'Apply a status change to all selected tasks at once.',
         ],
       },
       {
@@ -446,6 +480,7 @@ export const guideSections = [
     tips: [
       'Click the Explainability Card on any recommendation to see why the AI made that suggestion.',
       'Tasks created from meetings are automatically linked back to the source meeting.',
+      'Use Board View for a quick visual overview \u2014 drag tasks between columns to update status instantly.',
     ],
   },
 
@@ -696,6 +731,59 @@ export const guideSections = [
   },
 
   {
+    id: 'ento-assistant',
+    title: 'Ento AI Assistant',
+    icon: '\u{1F4AC}',
+    badge: 'New',
+    summary: 'A context-aware AI chat assistant available from every page. Ask questions, get proactive suggestions, and work faster.',
+    steps: [
+      'Press Ctrl+/ (or Cmd+/ on Mac) to toggle the assistant panel.',
+      'Type a question or request and press Enter to get a streaming AI response.',
+      'Ento understands which page you are on and uses that context to give relevant answers.',
+      'Your conversation is preserved during the browser session (up to 50 messages).',
+      'A notification badge appears on the assistant button when you have overdue tasks or upcoming meetings.',
+    ],
+    subsections: [
+      {
+        id: 'ento-context',
+        title: 'Context Awareness',
+        description: 'Ento automatically knows what you are working on.',
+        steps: [
+          'On a Meeting Detail page, Ento has access to the transcript, summary, and action items.',
+          'On the Tasks page, Ento knows about your current tasks and priorities.',
+          'On any other page, Ento uses the section context to tailor its responses.',
+        ],
+      },
+      {
+        id: 'ento-proactive',
+        title: 'Proactive Suggestions',
+        description: 'Ento monitors your workspace in the background and alerts you when something needs attention.',
+        steps: [
+          'Overdue tasks \u2014 alerts when tasks pass their due date.',
+          'Upcoming meetings \u2014 notifies you about meetings within the next hour.',
+          'Alerts appear as a badge on the assistant button \u2014 no pop-ups.',
+        ],
+        note: 'Proactive checks run every 10 minutes in the background.',
+      },
+      {
+        id: 'ento-conversation',
+        title: 'Conversation & History',
+        steps: [
+          'Ento remembers your earlier messages within the same session.',
+          'Ask follow-up questions naturally (e.g., "Tell me more about that").',
+          'Click the stop button to abort a response mid-stream.',
+          'Conversation history clears when you start a new browser session.',
+        ],
+      },
+    ],
+    tips: [
+      'You can ask Ento to summarize meetings, draft follow-ups, or explain action items.',
+      'The assistant is available from every page \u2014 you never need to navigate away.',
+      'Responses are streamed in real time so you can start reading immediately.',
+    ],
+  },
+
+  {
     id: 'search',
     title: 'Search',
     icon: '\u{1F50D}',
@@ -819,10 +907,13 @@ export const guideSections = [
       {
         id: 'rep-csv',
         title: 'CSV Exports',
+        badge: 'Updated',
         steps: [
           'Meetings \u2014 Export all meeting data.',
-          'Action Items \u2014 Export all action items across all statuses.',
-          'Goals \u2014 Export all goals and key results.',
+          'Action Items \u2014 Filter by status (All, Open, Completed, Missed) then export.',
+          'Goals \u2014 Select a quarter, then export goals and key results.',
+          'Tasks \u2014 Export all tasks with status, priority, tags, and assignee info.',
+          'Automations \u2014 Export automation execution logs with run history and timing.',
         ],
       },
     ],
@@ -1080,7 +1171,7 @@ export const guideSections = [
     summary: 'Full list of keyboard shortcuts for navigation, actions, and search.',
     steps: [
       'Press Ctrl+? to show the keyboard shortcuts help overlay at any time.',
-      'General: Ctrl+K (Command Palette), Ctrl+/ (Search), Escape (close dialogs).',
+      'General: Ctrl+K (Command Palette), Ctrl+/ (Toggle Ento AI Assistant), Escape (close dialogs).',
       'Navigation: G then D (Dashboard), G then M (Meetings), G then P (Projects), G then T (Tasks), G then S (Search).',
       'Actions: Ctrl+M (New Meeting), Ctrl+P (New Project), Ctrl+T (New Task).',
       'Search: Ctrl+Enter (submit), Tab (switch type), Ctrl+S (save search).',
