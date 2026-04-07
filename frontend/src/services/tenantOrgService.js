@@ -79,12 +79,35 @@ async function getCurrentOrg() {
 
   const { data, error } = await supabase
     .from('org_members')
-    .select('org_id, tenant_organizations(*)')
+    .select('org_id, tenant_organizations!inner(*)')
     .eq('user_id', user.id)
+    .is('tenant_organizations.deleted_at', null)
     .limit(1)
     .maybeSingle()
 
-  if (error) throw error
+  if (error) {
+    // If the join fails (e.g. RLS), try a simpler query
+    console.warn('getCurrentOrg: join query failed, trying fallback', error.message)
+    const { data: memberData } = await supabase
+      .from('org_members')
+      .select('org_id')
+      .eq('user_id', user.id)
+      .limit(1)
+      .maybeSingle()
+
+    if (!memberData) return null
+
+    const { data: orgData } = await supabase
+      .from('tenant_organizations')
+      .select('*')
+      .eq('id', memberData.org_id)
+      .is('deleted_at', null)
+      .maybeSingle()
+
+    if (!orgData) return null
+    return mapDbToOrg(orgData)
+  }
+
   if (!data || !data.tenant_organizations) return null
 
   return mapDbToOrg(data.tenant_organizations)

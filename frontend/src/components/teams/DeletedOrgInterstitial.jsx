@@ -50,11 +50,15 @@ export default function DeletedOrgInterstitial() {
     setIsCreating(true)
     try {
       await hardDeleteOrg(deletedOrg.id)
-    } catch {
-      // Best-effort cleanup
+      // hardDeleteOrg already calls fetchOrg() internally,
+      // which clears deletedOrg → OrgSetupGate shows wizard
+    } catch (err) {
+      console.error('Failed to clean up archived org:', err)
+      // Even if hard-delete fails, the updated create_org_for_user RPC
+      // will auto-clean stale memberships, so we can still proceed.
+      // Clear deletedOrg so the wizard appears.
+      setIsCreating(false)
     }
-    setIsCreating(false)
-    // After hard-delete, fetchOrg in context will find no org → OrgSetupGate shows wizard
   }
 
   return (
