@@ -233,7 +233,7 @@ function DashboardHero({ stats, loading, navigate, recorderRef }) {
           {loading ? (
             <div className="vc" style={{ flex:1, padding:'16px 18px' }}>
               {[80, 65, 90, 55].map((w, i) => (
-                <div key={i} style={{ height:12, marginBottom:10, borderRadius:6, background:'rgba(248,240,242,.06)', width:`${w}%`, animation:'pulse 1.5s ease-in-out infinite' }} />
+                <div key={i} className="en-skeleton" style={{ height:12, marginBottom:10, borderRadius:6, width:`${w}%` }} />
               ))}
             </div>
           ) : (

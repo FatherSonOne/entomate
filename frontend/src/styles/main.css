@@ -400,6 +400,23 @@
     animation: en-shimmer 1.5s linear infinite;
   }
 
+  /* ── SKELETON LOADER (LoadingSkeletons.jsx) ── */
+  .en-skeleton {
+    background: linear-gradient(90deg,
+      var(--bg-elevated, #101010) 0%,
+      rgba(255, 45, 107, 0.06) 40%,
+      rgba(0, 212, 180, 0.04) 60%,
+      var(--bg-elevated, #101010) 100%
+    );
+    background-size: 300% 100%;
+    animation: en-skeleton-shimmer 2s ease-in-out infinite;
+  }
+
+  @keyframes en-skeleton-shimmer {
+    0% { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
+  }
+
   /* ── GLASS PANEL ── */
   .glass-panel {
     background: var(--bg-elevated);

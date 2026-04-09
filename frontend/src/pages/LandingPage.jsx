@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { guideSections, CATEGORIES, guideVersion, guideUpdated } from '../components/UsersGuide/guideData'
+import { Logo } from '../components/Logo'
 
 /* ════════════════════════════════════════════════════════
    ANIMATED SVG ICONS — replace every emoji on the page
@@ -622,6 +623,7 @@ export default function LandingPage() {
   const { isSignedIn, loading: isLoading } = useAuth()
   const isLoaded = !isLoading
   const landingRef = useRef(null)
+  const heroCanvasRef = useRef(null)
 
   // Load Google Fonts
   useEffect(() => {
@@ -645,6 +647,304 @@ export default function LandingPage() {
       document.head.removeChild(link)
       document.head.removeChild(preconnect1)
       document.head.removeChild(preconnect2)
+    }
+  }, [])
+
+  // ── Hero neural-network canvas animation ─────────────────────────────────────
+  useEffect(() => {
+    const canvas = heroCanvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    let isVisible = true
+    const visObs = new IntersectionObserver(([entry]) => { isVisible = entry.isIntersecting }, { threshold: 0 })
+    visObs.observe(canvas)
+
+    const CRIMSON = '#FF2D6B'
+    const MINT    = '#00F5D4'
+    const AMBER   = '#FFB800'
+    const COLORS  = [CRIMSON, MINT, AMBER]
+    const GLOW    = 1.0
+    const CONNECT_DIST_FRAC = 0.30  // fraction of canvas width — bigger = more connections
+    const N_NODES = 50
+    const N_HUBS  = 10
+
+    let W = 0, H = 0, rafId = 0, time = 0
+
+    // ── Node types ──
+    // Hubs: large, slow, named — represent key automation concepts
+    // Regular: small, drift around, form the mesh
+    const nodes = []
+    const pings = []   // data pulses traveling between nodes
+    const ripples = [] // expanding rings when a ping arrives
+
+    function makeNode(isHub, idx) {
+      const color = COLORS[idx % 3]
+      const pad = 40  // keep nodes away from edges
+      return {
+        x:  pad + Math.random() * (W - pad * 2),
+        y:  pad + Math.random() * (H - pad * 2),
+        vx: (Math.random() - 0.5) * (isHub ? 0.25 : 0.55),
+        vy: (Math.random() - 0.5) * (isHub ? 0.25 : 0.55),
+        r:  isHub ? 5 + Math.random() * 4 : 2 + Math.random() * 3,
+        color,
+        alpha: isHub ? 1.0 : 0.45 + Math.random() * 0.35,
+        isHub,
+        pulsePhase: Math.random() * Math.PI * 2,
+      }
+    }
+
+    function buildNodes() {
+      nodes.length = 0
+      pings.length = 0
+      ripples.length = 0
+      for (let i = 0; i < N_HUBS; i++) nodes.push(makeNode(true, i))
+      for (let i = 0; i < N_NODES - N_HUBS; i++) nodes.push(makeNode(false, i))
+    }
+
+    // ── Spawn a data ping between two connected nodes ──
+    function spawnPing(fromIdx, toIdx) {
+      const from = nodes[fromIdx]
+      const to = nodes[toIdx]
+      if (!from || !to) return
+      // Use the source node's color, or blend
+      pings.push({
+        fromIdx, toIdx,
+        progress: 0,           // 0 → 1
+        speed: 0.006 + Math.random() * 0.010,
+        size: 3 + Math.random() * 3,
+        color: from.color,
+        trail: [],             // recent positions for comet tail
+      })
+    }
+
+    // ── Spawn a ripple at a position ──
+    function spawnRipple(x, y, color) {
+      ripples.push({ x, y, r: 0, maxR: 30 + Math.random() * 25, alpha: 0.75, color })
+    }
+
+    const resize = () => {
+      const dpr = window.devicePixelRatio || 1
+      W = canvas.offsetWidth
+      H = canvas.offsetHeight
+      if (W === 0 || H === 0) return  // not laid out yet
+      canvas.width  = W * dpr
+      canvas.height = H * dpr
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      buildNodes()  // always rebuild with correct dimensions
+    }
+
+    // ── Find active connections (edges) each frame ──
+    function getEdges() {
+      const edges = []
+      const maxDist = W * CONNECT_DIST_FRAC
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          const dx = nodes[i].x - nodes[j].x
+          const dy = nodes[i].y - nodes[j].y
+          const dist = Math.sqrt(dx * dx + dy * dy)
+          if (dist < maxDist) {
+            edges.push({ i, j, dist, strength: 1 - dist / maxDist })
+          }
+        }
+      }
+      return edges
+    }
+
+    // ── Ping spawning timer ──
+    let pingTimer = 0
+    const PING_INTERVAL = 12 // frames between new pings — frequent for lively feel
+
+    // ── Main loop ──
+    const loop = () => {
+      rafId = requestAnimationFrame(loop)
+      if (!isVisible) return
+      ctx.clearRect(0, 0, W, H)
+      time += 0.016
+
+      // ── Drift nodes — bounce off edges ──
+      nodes.forEach(n => {
+        n.x += n.vx
+        n.y += n.vy
+        if (n.x < n.r)     { n.x = n.r;     n.vx = Math.abs(n.vx) }
+        if (n.x > W - n.r) { n.x = W - n.r; n.vx = -Math.abs(n.vx) }
+        if (n.y < n.r)     { n.y = n.r;     n.vy = Math.abs(n.vy) }
+        if (n.y > H - n.r) { n.y = H - n.r; n.vy = -Math.abs(n.vy) }
+      })
+
+      const edges = getEdges()
+
+      // ── Draw connection lines ──
+      edges.forEach(e => {
+        const a = nodes[e.i], b = nodes[e.j]
+        const hasHub = a.isHub || b.isHub
+        const bothHub = a.isHub && b.isHub
+        const alpha = e.strength * (bothHub ? 0.45 : hasHub ? 0.28 : 0.15)
+        ctx.beginPath()
+        ctx.moveTo(a.x, a.y)
+        ctx.lineTo(b.x, b.y)
+        ctx.strokeStyle = a.color
+        ctx.lineWidth = bothHub ? 1.2 : hasHub ? 0.8 : 0.5
+        ctx.globalAlpha = alpha
+        // Glow on hub connections
+        if (hasHub) {
+          ctx.shadowColor = a.color
+          ctx.shadowBlur = 6
+        }
+        ctx.stroke()
+        ctx.shadowBlur = 0
+      })
+
+      // ── Spawn pings along random edges ──
+      pingTimer++
+      if (pingTimer >= PING_INTERVAL && edges.length > 0) {
+        pingTimer = 0
+        // Pick a random edge, prefer hub connections
+        const hubEdges = edges.filter(e => nodes[e.i].isHub || nodes[e.j].isHub)
+        const pool = hubEdges.length > 3 ? hubEdges : edges
+        const edge = pool[Math.floor(Math.random() * pool.length)]
+        // Random direction
+        if (Math.random() > 0.5) {
+          spawnPing(edge.i, edge.j)
+        } else {
+          spawnPing(edge.j, edge.i)
+        }
+      }
+
+      // ── Update & draw pings ──
+      for (let p = pings.length - 1; p >= 0; p--) {
+        const ping = pings[p]
+        ping.progress += ping.speed
+
+        if (ping.progress >= 1) {
+          // Ping arrived — spawn ripple at destination
+          const dest = nodes[ping.toIdx]
+          if (dest) spawnRipple(dest.x, dest.y, ping.color)
+          pings.splice(p, 1)
+          continue
+        }
+
+        const from = nodes[ping.fromIdx]
+        const to = nodes[ping.toIdx]
+        if (!from || !to) { pings.splice(p, 1); continue }
+
+        const px = from.x + (to.x - from.x) * ping.progress
+        const py = from.y + (to.y - from.y) * ping.progress
+
+        // Store trail position
+        ping.trail.push({ x: px, y: py })
+        if (ping.trail.length > 8) ping.trail.shift()
+
+        // Draw comet trail
+        ping.trail.forEach((pt, ti) => {
+          const trailAlpha = (ti / ping.trail.length) * 0.5
+          ctx.beginPath()
+          ctx.arc(pt.x, pt.y, ping.size * (0.3 + 0.7 * ti / ping.trail.length), 0, Math.PI * 2)
+          ctx.fillStyle = ping.color
+          ctx.globalAlpha = trailAlpha * GLOW
+          ctx.fill()
+        })
+
+        // Draw ping head
+        ctx.beginPath()
+        ctx.arc(px, py, ping.size, 0, Math.PI * 2)
+        ctx.fillStyle = ping.color
+        ctx.globalAlpha = 0.9
+        ctx.shadowColor = ping.color
+        ctx.shadowBlur = 14 * GLOW
+        ctx.fill()
+        ctx.shadowBlur = 0
+      }
+
+      // ── Update & draw ripples ──
+      for (let r = ripples.length - 1; r >= 0; r--) {
+        const rip = ripples[r]
+        rip.r += 0.8
+        rip.alpha -= 0.012
+        if (rip.alpha <= 0 || rip.r > rip.maxR) { ripples.splice(r, 1); continue }
+
+        ctx.beginPath()
+        ctx.arc(rip.x, rip.y, rip.r, 0, Math.PI * 2)
+        ctx.strokeStyle = rip.color
+        ctx.lineWidth = 2
+        ctx.globalAlpha = rip.alpha
+        ctx.shadowColor = rip.color
+        ctx.shadowBlur = 8
+        ctx.stroke()
+        ctx.shadowBlur = 0
+      }
+
+      // ── Draw nodes ──
+      nodes.forEach((n) => {
+        const pulse = 0.65 + 0.35 * Math.sin(time * 1.5 + n.pulsePhase)
+        const r = n.r * (0.9 + 0.1 * pulse)
+
+        // Outer glow halo
+        if (n.isHub) {
+          ctx.beginPath()
+          ctx.arc(n.x, n.y, r * 5, 0, Math.PI * 2)
+          const grad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r * 5)
+          grad.addColorStop(0, n.color + '35')
+          grad.addColorStop(0.5, n.color + '12')
+          grad.addColorStop(1, n.color + '00')
+          ctx.fillStyle = grad
+          ctx.globalAlpha = pulse
+          ctx.fill()
+        } else {
+          // Small glow for regular nodes too
+          ctx.beginPath()
+          ctx.arc(n.x, n.y, r * 3, 0, Math.PI * 2)
+          const grad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r * 3)
+          grad.addColorStop(0, n.color + '18')
+          grad.addColorStop(1, n.color + '00')
+          ctx.fillStyle = grad
+          ctx.globalAlpha = pulse * 0.6
+          ctx.fill()
+        }
+
+        // Core dot
+        ctx.beginPath()
+        ctx.arc(n.x, n.y, r, 0, Math.PI * 2)
+        ctx.fillStyle = n.color
+        ctx.globalAlpha = n.alpha * pulse
+        ctx.shadowColor = n.color
+        ctx.shadowBlur = n.isHub ? 18 : 8
+        ctx.fill()
+        ctx.shadowBlur = 0
+
+        // White hot-center on hubs
+        if (n.isHub) {
+          ctx.beginPath()
+          ctx.arc(n.x, n.y, r * 0.4, 0, Math.PI * 2)
+          ctx.fillStyle = '#ffffff'
+          ctx.globalAlpha = 0.45 * pulse
+          ctx.fill()
+        }
+      })
+
+      // ── Central ambient glow ──
+      const cx = W * 0.50, cy = H * 0.45
+      const gr = ctx.createRadialGradient(cx, cy, 0, cx, cy, W * 0.48)
+      gr.addColorStop(0,   `rgba(255,45,107,${(0.10 * GLOW).toFixed(2)})`)
+      gr.addColorStop(0.35, `rgba(255,184,0,${(0.05 * GLOW).toFixed(2)})`)
+      gr.addColorStop(0.65, `rgba(0,245,212,${(0.03 * GLOW).toFixed(2)})`)
+      gr.addColorStop(1,   'rgba(0,0,0,0)')
+      ctx.beginPath()
+      ctx.arc(cx, cy, W * 0.48, 0, Math.PI * 2)
+      ctx.fillStyle = gr
+      ctx.globalAlpha = 1
+      ctx.fill()
+    }
+
+    resize()
+    window.addEventListener('resize', resize)
+    loop()
+
+    return () => {
+      cancelAnimationFrame(rafId)
+      window.removeEventListener('resize', resize)
+      visObs.disconnect()
     }
   }, [])
 
@@ -741,25 +1041,7 @@ export default function LandingPage() {
       <nav>
         <div className="container">
           <a href="#" className="nav-logo">
-            <div className="nav-logo-mark">
-              <svg width="36" height="36" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
-                <polyline points="6,30 6,20 9,16 11,14 11,11 12,14 13,11 14,14 15,10 16,14 17,11 17,15" fill="none" stroke="#FF2D6B" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                <polygon points="6,30 6,20 10,22 12,26 10,30" fill="#FF2D6B" opacity="0.25" />
-                <polyline points="30,30 30,20 27,16 25,14 25,11 24,14 23,11 22,14 21,10 20,14 19,11 19,15" fill="none" stroke="#FF2D6B" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                <polygon points="30,30 30,20 26,22 24,26 26,30" fill="#FF2D6B" opacity="0.25" />
-                <rect x="14" y="16" width="8" height="1.5" rx="0.75" fill="#FF2D6B" />
-                <rect x="14" y="19" width="6" height="1.5" rx="0.75" fill="#FF2D6B" opacity="0.7" />
-                <rect x="14" y="22" width="8" height="1.5" rx="0.75" fill="#FF2D6B" />
-                <circle cx="18" cy="14" r="2.5" fill="#FFB800" opacity="0.9">
-                  <animate attributeName="opacity" values="0.9;0.4;0.9" dur="2s" repeatCount="indefinite" />
-                </circle>
-                <circle cx="18" cy="14" r="4" fill="#FFB800" opacity="0.15">
-                  <animate attributeName="r" values="4;6;4" dur="2s" repeatCount="indefinite" />
-                  <animate attributeName="opacity" values="0.15;0;0.15" dur="2s" repeatCount="indefinite" />
-                </circle>
-              </svg>
-            </div>
-            <span className="nav-logo-text">entomate</span>
+            <Logo variant="mark" size="sm" withText={true} />
           </a>
 
           <ul className="nav-links">
@@ -779,176 +1061,82 @@ export default function LandingPage() {
 
       {/* ── HERO ── */}
       <section className="hero">
-        <div className="hero-aurora">
-          <div className="aurora-blob aurora-blob-1"></div>
-          <div className="aurora-blob aurora-blob-2"></div>
-          <div className="aurora-blob aurora-blob-3"></div>
-        </div>
+        {/* Canvas — automation circuit graphic, right 65%, full height */}
+        <canvas
+          ref={heroCanvasRef}
+          className="hero-circuit-canvas"
+          aria-hidden="true"
+        />
+
+        {/* Grid overlay — radial mask focuses on the canvas region */}
         <div className="hero-grid"></div>
 
-        <div className="container">
-          <div className="hero-content">
-            <div className="hero-badge">
-              <span className="hero-badge-dot"></span>
-              The Hands of the Trifecto
+        {/* Grain texture — premium organic feel */}
+        <div className="hero-grain-overlay" aria-hidden="true"></div>
+
+        {/* Left gradient fade — text readable against canvas glow */}
+        <div className="hero-fade" aria-hidden="true"></div>
+
+        {/* Text content — left column, vertically centered */}
+        <div className="hero-content animate-blur-reveal blur-delay-0">
+          <div className="hero-badge animate-blur-reveal blur-delay-1">
+            <span className="hero-badge-dot"></span>
+            The Hands of the Trifecto
+          </div>
+
+          <h1>
+            Automate<br />
+            <span className="ha-gradient">everything</span><br />
+            that matters.
+          </h1>
+
+          <p className="hero-sub animate-blur-reveal blur-delay-2">
+            Entomate connects your meetings, tasks, and team into intelligent workflows.
+            4 AI agents, a visual automation canvas, and deep integrations that close the loop
+            from decision to execution.
+          </p>
+
+          <div className="hero-actions animate-blur-reveal blur-delay-3">
+            <Link to="/sign-in" className="hero-cta">Start Automating &rarr;</Link>
+            <a href="#story" className="btn-ghost btn-large">Our Story</a>
+          </div>
+
+          <div className="hero-stats animate-blur-reveal blur-delay-4">
+            <div className="stat-item">
+              <span className="stat-num">4</span>
+              <span className="stat-label">AI Agents</span>
             </div>
-
-            <h1>
-              Automate<br />
-              <span className="highlight">everything</span><br />
-              that matters.
-            </h1>
-
-            <p className="hero-sub">
-              Entomate connects your meetings, tasks, and team into intelligent workflows.
-              4 AI agents, a visual automation canvas, and deep integrations that close the loop
-              from decision to execution.
-            </p>
-
-            <div className="hero-actions">
-              <Link to="/sign-in" className="btn-primary btn-large">Start Automating &rarr;</Link>
-              <a href="#story" className="btn-ghost btn-large">Our Story</a>
+            <div className="stat-divider"></div>
+            <div className="stat-item">
+              <span className="stat-num">7<span>+</span></span>
+              <span className="stat-label">Integrations</span>
             </div>
-
-            <div className="hero-stats">
-              <div className="stat-item">
-                <span className="stat-num">4</span>
-                <span className="stat-label">AI Agents</span>
-              </div>
-              <div className="stat-divider"></div>
-              <div className="stat-item">
-                <span className="stat-num">7<span>+</span></span>
-                <span className="stat-label">Integrations</span>
-              </div>
-              <div className="stat-divider"></div>
-              <div className="stat-item">
-                <span className="stat-num">3</span>
-                <span className="stat-label">Connected Apps</span>
-              </div>
-              <div className="stat-divider"></div>
-              <div className="stat-item">
-                <span className="stat-num">&infin;</span>
-                <span className="stat-label">Workflows Possible</span>
-              </div>
+            <div className="stat-divider"></div>
+            <div className="stat-item">
+              <span className="stat-num">3</span>
+              <span className="stat-label">Connected Apps</span>
+            </div>
+            <div className="stat-divider"></div>
+            <div className="stat-item">
+              <span className="stat-num">&infin;</span>
+              <span className="stat-label">Workflows Possible</span>
             </div>
           </div>
         </div>
 
-        {/* Brand hero visual — Animated Hands of the Trifecto */}
-        <div className="hero-visual">
-          <div className="hero-visual-wrap">
-            {/* Background glow */}
-            <div className="hands-bg-glow"></div>
-
-            {/* Scan line overlay */}
-            <div className="hands-scan-line"></div>
-
-            {/* Animated SVG particles & neural arcs */}
-            <svg className="hands-particles" viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg">
-              {/* Neural arcs between hand centers — calibrated to fingertip meeting point (400, 210) */}
-              <path d="M280 220 Q400 150 520 220" fill="none" stroke="#FF2D6B" strokeWidth="1.5" strokeDasharray="300" strokeDashoffset="300" opacity="0.6">
-                <animate attributeName="stroke-dashoffset" values="300;0;300" dur="4s" repeatCount="indefinite"/>
-                <animate attributeName="opacity" values="0;0.7;0" dur="4s" repeatCount="indefinite"/>
-              </path>
-              <path d="M260 210 Q400 120 540 210" fill="none" stroke="#00F5D4" strokeWidth="1" strokeDasharray="350" strokeDashoffset="350" opacity="0.4">
-                <animate attributeName="stroke-dashoffset" values="350;0;350" dur="4s" begin="0.5s" repeatCount="indefinite"/>
-                <animate attributeName="opacity" values="0;0.5;0" dur="4s" begin="0.5s" repeatCount="indefinite"/>
-              </path>
-              <path d="M290 235 Q400 190 510 235" fill="none" stroke="#FFB800" strokeWidth="1" strokeDasharray="260" strokeDashoffset="260" opacity="0.5">
-                <animate attributeName="stroke-dashoffset" values="260;0;260" dur="4s" begin="1s" repeatCount="indefinite"/>
-                <animate attributeName="opacity" values="0;0.6;0" dur="4s" begin="1s" repeatCount="indefinite"/>
-              </path>
-
-              {/* Center neural node — at fingertip meeting point */}
-              <circle cx="400" cy="210" r="4" fill="#FF2D6B">
-                <animate attributeName="r" values="4;10;4" dur="2s" repeatCount="indefinite"/>
-                <animate attributeName="opacity" values="0.8;1;0.8" dur="2s" repeatCount="indefinite"/>
-              </circle>
-
-              {/* Ripple rings from center */}
-              <circle cx="400" cy="210" r="4" fill="none" stroke="#FF2D6B" strokeWidth="1.5" opacity="0.8">
-                <animate attributeName="r" values="4;60" dur="2.5s" repeatCount="indefinite"/>
-                <animate attributeName="opacity" values="0.8;0" dur="2.5s" repeatCount="indefinite"/>
-              </circle>
-              <circle cx="400" cy="210" r="4" fill="none" stroke="#FFB800" strokeWidth="1" opacity="0.6">
-                <animate attributeName="r" values="4;60" dur="2.5s" begin="0.8s" repeatCount="indefinite"/>
-                <animate attributeName="opacity" values="0.6;0" dur="2.5s" begin="0.8s" repeatCount="indefinite"/>
-              </circle>
-              <circle cx="400" cy="210" r="4" fill="none" stroke="#00F5D4" strokeWidth="0.8" opacity="0.5">
-                <animate attributeName="r" values="4;60" dur="2.5s" begin="1.6s" repeatCount="indefinite"/>
-                <animate attributeName="opacity" values="0.5;0" dur="2.5s" begin="1.6s" repeatCount="indefinite"/>
-              </circle>
-
-              {/* Left hand energy particles */}
-              <circle cx="140" cy="220" r="3" fill="#FF2D6B" opacity="0.9">
-                <animate attributeName="cx" values="140;300" dur="3s" repeatCount="indefinite"/>
-                <animate attributeName="cy" values="220;212" dur="3s" repeatCount="indefinite"/>
-                <animate attributeName="opacity" values="0.9;0" dur="3s" repeatCount="indefinite"/>
-                <animate attributeName="r" values="3;1" dur="3s" repeatCount="indefinite"/>
-              </circle>
-              <circle cx="160" cy="200" r="2" fill="#00F5D4" opacity="0.7">
-                <animate attributeName="cx" values="160;290" dur="3s" begin="0.4s" repeatCount="indefinite"/>
-                <animate attributeName="cy" values="200;208" dur="3s" begin="0.4s" repeatCount="indefinite"/>
-                <animate attributeName="opacity" values="0.7;0" dur="3s" begin="0.4s" repeatCount="indefinite"/>
-              </circle>
-
-              {/* Right hand energy particles */}
-              <circle cx="660" cy="220" r="3" fill="#FF2D6B" opacity="0.9">
-                <animate attributeName="cx" values="660;500" dur="3s" repeatCount="indefinite"/>
-                <animate attributeName="cy" values="220;212" dur="3s" repeatCount="indefinite"/>
-                <animate attributeName="opacity" values="0.9;0" dur="3s" repeatCount="indefinite"/>
-                <animate attributeName="r" values="3;1" dur="3s" repeatCount="indefinite"/>
-              </circle>
-              <circle cx="640" cy="200" r="2" fill="#FFB800" opacity="0.7">
-                <animate attributeName="cx" values="640;510" dur="3s" begin="0.6s" repeatCount="indefinite"/>
-                <animate attributeName="cy" values="200;208" dur="3s" begin="0.6s" repeatCount="indefinite"/>
-                <animate attributeName="opacity" values="0.7;0" dur="3s" begin="0.6s" repeatCount="indefinite"/>
-              </circle>
-
-              {/* Lightning arc flashes */}
-              <path d="M315 245 L335 238 L325 250 L345 244" stroke="#FFD040" strokeWidth="1.5" fill="none" strokeLinecap="round" opacity="0">
-                <animate attributeName="opacity" values="0;0;1;0;0" dur="5s" repeatCount="indefinite"/>
-              </path>
-              <path d="M455 244 L475 250 L465 238 L485 245" stroke="#FFD040" strokeWidth="1.5" fill="none" strokeLinecap="round" opacity="0">
-                <animate attributeName="opacity" values="0;0;0;1;0" dur="5s" repeatCount="indefinite"/>
-              </path>
-
-              {/* Subtle circuit lines */}
-              <line x1="0" y1="80" x2="800" y2="80" stroke="#00F5D4" strokeWidth="0.5" strokeDasharray="4 8" opacity="0.1"/>
-              <line x1="0" y1="420" x2="800" y2="420" stroke="#00F5D4" strokeWidth="0.5" strokeDasharray="4 8" opacity="0.1"/>
-            </svg>
-
-            {/* Hero hands image */}
-            <div className="hero-hands-img">
-              <img src="/brand/hero-hands.png" alt="Entomate — The Hands of the Trifecto" />
-            </div>
-
-            {/* Workflow trail — clockwise arc connecting trigger → AI → action around the hands */}
-            <svg className="wf-trail-line" viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg">
-              <path d="M160 90 Q400 60 620 160 Q700 300 580 410"
-                    fill="none" stroke="url(#trail-grad)" strokeWidth="1" strokeDasharray="6 4" opacity="0.35">
-                <animate attributeName="stroke-dashoffset" values="0;-40" dur="3s" repeatCount="indefinite"/>
-              </path>
-              <defs>
-                <linearGradient id="trail-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#FF2D6B"/>
-                  <stop offset="50%" stopColor="#FFB800"/>
-                  <stop offset="100%" stopColor="#00F5D4"/>
-                </linearGradient>
-              </defs>
-            </svg>
-            <div className="wf-node trigger wf-node-hero-trigger">
-              <span className="wf-node-dot"></span>
-              meeting_ended
-            </div>
-            <div className="wf-node ai wf-node-hero-ai">
-              <span className="wf-node-dot"></span>
-              <IconSparkle size={10}/> Priority Agent
-            </div>
-            <div className="wf-node action wf-node-hero-action">
-              <span className="wf-node-dot"></span>
-              &rarr; Slack + CRM
-            </div>
+        {/* Floating workflow nodes — positioned over the canvas area */}
+        <div className="hero-wf-nodes" aria-hidden="true">
+          <div className="wf-node trigger wf-node-hero-trigger animate-blur-reveal blur-delay-3">
+            <span className="wf-node-dot"></span>
+            meeting_ended
+          </div>
+          <div className="wf-node ai wf-node-hero-ai animate-blur-reveal blur-delay-4">
+            <span className="wf-node-dot"></span>
+            Priority Agent
+          </div>
+          <div className="wf-node action wf-node-hero-action animate-blur-reveal blur-delay-5">
+            <span className="wf-node-dot"></span>
+            &rarr; Slack + CRM
           </div>
         </div>
       </section>
@@ -1878,19 +2066,7 @@ export default function LandingPage() {
           <div className="footer-inner">
             <div className="footer-left">
               <a href="#" className="nav-logo footer-logo-link">
-                <div className="nav-logo-mark">
-                  <svg width="36" height="36" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
-                    <polyline points="6,30 6,20 9,16 11,14 11,11 12,14 13,11 14,14 15,10 16,14 17,11 17,15" fill="none" stroke="#FF2D6B" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                    <polygon points="6,30 6,20 10,22 12,26 10,30" fill="#FF2D6B" opacity="0.25" />
-                    <polyline points="30,30 30,20 27,16 25,14 25,11 24,14 23,11 22,14 21,10 20,14 19,11 19,15" fill="none" stroke="#FF2D6B" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                    <polygon points="30,30 30,20 26,22 24,26 26,30" fill="#FF2D6B" opacity="0.25" />
-                    <rect x="14" y="16" width="8" height="1.5" rx="0.75" fill="#FF2D6B" />
-                    <rect x="14" y="19" width="6" height="1.5" rx="0.75" fill="#FF2D6B" opacity="0.7" />
-                    <rect x="14" y="22" width="8" height="1.5" rx="0.75" fill="#FF2D6B" />
-                    <circle cx="18" cy="14" r="2.5" fill="#FFB800" opacity="0.9" />
-                  </svg>
-                </div>
-                <span className="nav-logo-text footer-logo-text">entomate</span>
+                <Logo variant="mark" size="sm" withText={true} />
               </a>
               <span className="footer-text">The Hands of the Trifecto</span>
             </div>
@@ -2086,31 +2262,12 @@ export default function LandingPage() {
         .landing-page .nav-logo {
           display: flex;
           align-items: center;
-          gap: 10px;
           text-decoration: none;
-        }
-
-        .landing-page .nav-logo-mark {
-          width: 36px;
-          height: 36px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-          filter: drop-shadow(0 0 8px rgba(255, 45, 107, 0.5));
           transition: filter 300ms ease;
         }
 
-        .landing-page .nav-logo:hover .nav-logo-mark {
-          filter: drop-shadow(0 0 16px rgba(255, 45, 107, 0.8));
-        }
-
-        .landing-page .nav-logo-text {
-          font-family: var(--font-display);
-          font-weight: 700;
-          font-size: 20px;
-          color: var(--text-primary);
-          letter-spacing: -0.02em;
+        .landing-page .nav-logo:hover {
+          filter: drop-shadow(0 0 12px rgba(255, 45, 107, 0.5));
         }
 
         .landing-page .nav-links {
@@ -2182,89 +2339,113 @@ export default function LandingPage() {
           border-radius: var(--radius-lg);
         }
 
-        /* ── HERO ── */
+        /* ══════════════════════════════════════════
+           HERO — The Hands of the Trifecto
+           All animations: GPU-only (transform + opacity)
+           ══════════════════════════════════════════ */
+        /* ══════════════════════════════════════════════════════════
+           HERO — Asymmetric canvas layout (inspired by Pulse)
+           Canvas right 65% · Grid overlay · Grain · Gradient fade
+           ══════════════════════════════════════════════════════════ */
         .landing-page .hero {
           position: relative;
           min-height: 100vh;
           display: flex;
           align-items: center;
-          padding-top: 64px;
           overflow: hidden;
+          background: var(--void, #080808);
         }
 
-        .landing-page .hero-aurora {
+        /* Canvas — automation circuit graphic, right 65%, full height */
+        .landing-page .hero-circuit-canvas {
           position: absolute;
-          inset: 0;
+          top: 0;
+          right: 0;
+          width: 65%;
+          height: 100%;
           pointer-events: none;
+          z-index: 1;
         }
 
-        .landing-page .aurora-blob {
-          position: absolute;
-          border-radius: 50%;
-          filter: blur(80px);
-          animation: aurora-drift 12s ease-in-out infinite alternate;
-          will-change: transform;
-        }
-
-        .landing-page .aurora-blob-1 {
-          width: 600px;
-          height: 400px;
-          background: radial-gradient(ellipse, rgba(255, 45, 107, 0.18) 0%, transparent 70%);
-          top: -100px;
-          left: -100px;
-          animation-delay: 0s;
-        }
-        .landing-page .aurora-blob-2 {
-          width: 500px;
-          height: 500px;
-          background: radial-gradient(ellipse, rgba(0, 245, 212, 0.07) 0%, transparent 70%);
-          top: 30%;
-          right: -100px;
-          animation-delay: -4s;
-        }
-        .landing-page .aurora-blob-3 {
-          width: 400px;
-          height: 300px;
-          background: radial-gradient(ellipse, rgba(255, 184, 0, 0.06) 0%, transparent 70%);
-          bottom: 10%;
-          left: 30%;
-          animation-delay: -8s;
-        }
-
-        @keyframes aurora-drift {
-          from { transform: translate(0, 0) scale(1); }
-          to   { transform: translate(40px, 30px) scale(1.08); }
-        }
-
+        /* Grid overlay — radial mask focuses on the canvas region */
         .landing-page .hero-grid {
           position: absolute;
           inset: 0;
-          background-image:
-            linear-gradient(rgba(255, 45, 107, 0.04) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255, 45, 107, 0.04) 1px, transparent 1px);
-          background-size: 60px 60px;
-          mask-image: radial-gradient(ellipse 80% 80% at 50% 40%, black 30%, transparent 100%);
           pointer-events: none;
+          z-index: 2;
+          background-image:
+            linear-gradient(rgba(255, 45, 107, 0.07) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 45, 107, 0.07) 1px, transparent 1px);
+          background-size: 52px 52px;
+          -webkit-mask-image: radial-gradient(ellipse at 72% 50%, black 25%, transparent 72%);
+          mask-image: radial-gradient(ellipse at 72% 50%, black 25%, transparent 72%);
         }
 
+        /* Grain texture overlay — premium organic feel */
+        .landing-page .hero-grain-overlay {
+          position: absolute;
+          inset: 0;
+          opacity: 0.32;
+          mix-blend-mode: overlay;
+          pointer-events: none;
+          z-index: 4;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.68' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23g)' opacity='1'/%3E%3C/svg%3E");
+          background-size: 180px 180px;
+        }
+
+        /* Left gradient fade — text readable against canvas glow */
+        .landing-page .hero-fade {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          z-index: 3;
+          background: linear-gradient(90deg,
+            var(--void, #080808) 30%,
+            rgba(8, 8, 8, 0.82) 50%,
+            rgba(8, 8, 8, 0.40) 65%,
+            transparent 80%
+          );
+        }
+
+        /* ── Blur-reveal entrance animation ── */
+        @keyframes blur-reveal {
+          from { opacity: 0; filter: blur(14px); transform: translateY(22px); }
+          to   { opacity: 1; filter: blur(0px);  transform: translateY(0); }
+        }
+        .landing-page .animate-blur-reveal {
+          animation: blur-reveal 0.95s cubic-bezier(0.16, 1, 0.3, 1) both;
+          opacity: 0;
+        }
+        .landing-page .blur-delay-0 { animation-delay: 0.12s; }
+        .landing-page .blur-delay-1 { animation-delay: 0.32s; }
+        .landing-page .blur-delay-2 { animation-delay: 0.52s; }
+        .landing-page .blur-delay-3 { animation-delay: 0.72s; }
+        .landing-page .blur-delay-4 { animation-delay: 0.92s; }
+        .landing-page .blur-delay-5 { animation-delay: 1.12s; }
+
+        /* ── Hero text content — left column ── */
         .landing-page .hero-content {
           position: relative;
-          z-index: 1;
-          max-width: 760px;
+          z-index: 10;
+          padding: max(120px, 10vh) 64px 64px;
+          max-width: 52%;
+          width: 100%;
         }
 
         .landing-page .hero-badge {
           display: inline-flex;
           align-items: center;
           gap: 8px;
-          padding: 6px 14px;
-          border: 1px solid rgba(255, 45, 107, 0.30);
+          padding: 6px 14px 6px 10px;
+          border: 1px solid rgba(255, 45, 107, 0.28);
           border-radius: 100px;
-          background: rgba(255, 45, 107, 0.06);
+          background: rgba(255, 255, 255, 0.04);
+          -webkit-backdrop-filter: blur(12px);
+          backdrop-filter: blur(12px);
           font-family: var(--font-mono);
           font-size: 11px;
           font-weight: 500;
-          color: var(--crimson);
+          color: rgba(255, 45, 107, 0.9);
           letter-spacing: 0.08em;
           text-transform: uppercase;
           margin-bottom: 28px;
@@ -2275,14 +2456,12 @@ export default function LandingPage() {
           height: 6px;
           border-radius: 50%;
           background: var(--crimson);
-          box-shadow: 0 0 8px var(--crimson);
-          animation: pulse-dot 2s ease-in-out infinite;
-          will-change: opacity;
+          box-shadow: 0 0 12px var(--crimson);
+          animation: hero-dot-pulse 4s ease-in-out infinite;
         }
-
-        @keyframes pulse-dot {
+        @keyframes hero-dot-pulse {
           0%, 100% { opacity: 1; }
-          50%       { opacity: 0.3; }
+          50%      { opacity: 0.35; }
         }
 
         .landing-page .hero h1 {
@@ -2295,7 +2474,7 @@ export default function LandingPage() {
           overflow: visible;
         }
 
-        .landing-page .hero h1 .highlight {
+        .landing-page .hero h1 .ha-gradient {
           color: var(--crimson);
           text-shadow: 0 0 40px rgba(255, 45, 107, 0.4);
           display: inline-block;
@@ -2308,7 +2487,7 @@ export default function LandingPage() {
           font-weight: 400;
           color: var(--text-secondary);
           line-height: 1.65;
-          max-width: 580px;
+          max-width: 540px;
           margin-bottom: 40px;
         }
 
@@ -2317,6 +2496,29 @@ export default function LandingPage() {
           align-items: center;
           gap: 16px;
           flex-wrap: wrap;
+        }
+
+        /* ── CTA button — gradient with glow ── */
+        .landing-page .hero-cta {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 14px 32px;
+          border-radius: 12px;
+          background: linear-gradient(135deg, #FF2D6B 0%, #FFB800 100%);
+          color: #ffffff;
+          font-weight: 700;
+          font-size: 16px;
+          text-decoration: none;
+          box-shadow: 0 8px 32px rgba(255, 45, 107, 0.35);
+          transition: all 0.2s ease;
+        }
+        .landing-page .hero-cta:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 14px 40px rgba(255, 45, 107, 0.50);
+        }
+        .landing-page .hero-cta:active {
+          transform: scale(0.97);
         }
 
         .landing-page .hero-stats {
@@ -2358,139 +2560,50 @@ export default function LandingPage() {
           background: var(--border);
         }
 
-        /* ── HERO VISUAL (right side) — Animated Hands ── */
-        .landing-page .hero-visual {
+        /* ── Floating workflow nodes over canvas ── */
+        .landing-page .hero-wf-nodes {
           position: absolute;
-          right: -60px;
-          top: 50%;
-          transform: translateY(-50%);
-          width: 900px;
-          pointer-events: none;
-        }
-
-        .landing-page .hero-visual-wrap {
-          position: relative;
-          width: 100%;
-          aspect-ratio: 8/5;
-          overflow: visible;
-          -webkit-mask-image: radial-gradient(ellipse 85% 80% at 50% 45%, black 50%, transparent 100%);
-          mask-image: radial-gradient(ellipse 85% 80% at 50% 45%, black 50%, transparent 100%);
-        }
-
-        .landing-page .hands-bg-glow {
-          position: absolute;
-          inset: -20%;
-          background:
-            radial-gradient(ellipse 50% 45% at 50% 45%, rgba(255,45,107,0.12) 0%, transparent 70%),
-            radial-gradient(ellipse 25% 25% at 30% 55%, rgba(0,245,212,0.06) 0%, transparent 70%),
-            radial-gradient(ellipse 25% 25% at 70% 55%, rgba(0,245,212,0.06) 0%, transparent 70%),
-            radial-gradient(ellipse 20% 20% at 50% 42%, rgba(255,184,0,0.08) 0%, transparent 60%);
-          animation: hands-glow-pulse 4s ease-in-out infinite;
-          pointer-events: none;
-        }
-
-        @keyframes hands-glow-pulse {
-          0%, 100% { opacity: 0.7; }
-          50%       { opacity: 1; }
-        }
-
-        .landing-page .hands-scan-line {
-          position: absolute;
-          inset: 0;
-          pointer-events: none;
-          z-index: 10;
-          overflow: hidden;
-        }
-        .landing-page .hands-scan-line::after {
-          content: '';
-          position: absolute;
-          width: 100%;
-          height: 2px;
-          background: linear-gradient(90deg, transparent, rgba(255,45,107,0.35), transparent);
-          box-shadow: 0 0 12px rgba(255,45,107,0.25);
-          animation: hands-scan 4s linear infinite;
-        }
-
-        @keyframes hands-scan {
-          0%   { transform: translateY(-100%); opacity: 0; }
-          5%   { opacity: 0.6; }
-          95%  { opacity: 0.6; }
-          100% { transform: translateY(300%); opacity: 0; }
-        }
-
-        .landing-page .hands-particles {
-          position: absolute;
-          inset: 0;
-          width: 100%;
+          top: 0;
+          right: 0;
+          width: 65%;
           height: 100%;
           pointer-events: none;
-          z-index: 5;
-        }
-
-        .landing-page .hero-hands-img {
-          position: relative;
-          z-index: 2;
-          width: 100%;
-          height: 100%;
-          overflow: hidden;
-        }
-
-        .landing-page .hero-hands-img img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          object-position: center 30%;
-          mix-blend-mode: lighten;
-          animation: hands-float 4s ease-in-out infinite;
-        }
-
-        @keyframes hands-float {
-          0%, 100% { transform: translateY(0px) scale(1); }
-          50%       { transform: translateY(-10px) scale(1.015); }
+          z-index: 12;
         }
 
         .landing-page .wf-node {
           position: absolute;
           border-radius: var(--radius-md);
-          padding: 6px 10px;
-          font-size: 9px;
+          padding: 8px 14px;
+          font-size: 10px;
           font-weight: 600;
           font-family: var(--font-mono);
           display: flex;
           align-items: center;
-          gap: 5px;
+          gap: 6px;
           white-space: nowrap;
-          backdrop-filter: blur(12px);
           border: 1px solid;
-          animation: node-float 6s ease-in-out infinite alternate;
-          will-change: transform;
           z-index: 15;
           opacity: 0.85;
           transition: opacity 0.3s ease;
         }
-        .landing-page .hero-visual-wrap:hover .wf-node {
-          opacity: 1;
-        }
 
         .landing-page .wf-node.trigger {
-          background: rgba(255, 45, 107, 0.10);
+          background: rgba(20, 8, 12, 0.88);
           border-color: rgba(255, 45, 107, 0.35);
           color: var(--crimson);
-          animation-delay: 0s;
         }
 
         .landing-page .wf-node.action {
-          background: rgba(0, 245, 212, 0.08);
+          background: rgba(8, 16, 14, 0.88);
           border-color: rgba(0, 245, 212, 0.25);
           color: var(--mint);
-          animation-delay: -2s;
         }
 
         .landing-page .wf-node.ai {
-          background: rgba(255, 184, 0, 0.08);
+          background: rgba(16, 14, 8, 0.88);
           border-color: rgba(255, 184, 0, 0.25);
           color: var(--amber);
-          animation-delay: -4s;
         }
 
         .landing-page .wf-node-dot {
@@ -2499,14 +2612,13 @@ export default function LandingPage() {
           border-radius: 50%;
           flex-shrink: 0;
         }
-        .landing-page .trigger .wf-node-dot  { background: var(--crimson); box-shadow: 0 0 6px var(--crimson); }
-        .landing-page .action .wf-node-dot   { background: var(--mint); box-shadow: 0 0 6px var(--mint); }
-        .landing-page .ai .wf-node-dot       { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+        .landing-page .trigger .wf-node-dot  { background: var(--crimson); box-shadow: 0 0 8px var(--crimson); }
+        .landing-page .action .wf-node-dot   { background: var(--mint); box-shadow: 0 0 8px var(--mint); }
+        .landing-page .ai .wf-node-dot       { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
 
-        @keyframes node-float {
-          from { transform: translateY(0px); }
-          to   { transform: translateY(-10px); }
-        }
+        .landing-page .wf-node-hero-trigger { top: 18%; left: 15%; }
+        .landing-page .wf-node-hero-ai      { top: 40%; right: 12%; left: auto; }
+        .landing-page .wf-node-hero-action   { bottom: 22%; right: 20%; left: auto; }
 
         /* ── SECTION SHARED ── */
         .landing-page section {
@@ -4011,19 +4123,7 @@ export default function LandingPage() {
 
         /* (Logo showcase CSS removed — section replaced with Ecosystem + Power Users) */
 
-        /* ── HERO WORKFLOW TRAIL ── */
-        .landing-page .wf-trail-line {
-          position: absolute;
-          inset: 0;
-          width: 100%;
-          height: 100%;
-          pointer-events: none;
-          z-index: 12;
-        }
-
-        .landing-page .wf-node-hero-trigger { top: 10%; left: 12%; }
-        .landing-page .wf-node-hero-ai      { top: 22%; right: 10%; left: auto; }
-        .landing-page .wf-node-hero-action  { bottom: 10%; right: 18%; left: auto; }
+        /* (old hero node positions removed — now in main hero CSS block) */
 
         /* ── TRIFECTO CENTERED SUB ── */
         .landing-page .trifecto-sub { margin: 0 auto; }
@@ -4054,8 +4154,6 @@ export default function LandingPage() {
         /* ── FOOTER NAV LOGO LINK ── */
         .landing-page .footer-logo-link { text-decoration: none; }
 
-        .landing-page .footer-logo-text { font-size: 16px; }
-
         /* ── FOOTER TRIFECTO LABEL ── */
         .landing-page .footer-trifecto-label {
           font-size: 11px;
@@ -4078,7 +4176,10 @@ export default function LandingPage() {
           .landing-page .pillars-grid { grid-template-columns: 1fr 1fr; }
           .landing-page .trifecto-grid { grid-template-columns: 1fr; }
           .landing-page .trifecto-neural { max-width: 320px; margin-bottom: 40px; }
-          .landing-page .hero-visual { display: none; }
+          .landing-page .hero-circuit-canvas { width: 100%; opacity: 0.3; }
+          .landing-page .hero-fade { background: linear-gradient(180deg, var(--void, #080808) 10%, rgba(8,8,8,0.60) 40%, transparent 70%); }
+          .landing-page .hero-content { max-width: 100%; padding: 10vh 32px 48px; }
+          .landing-page .hero-wf-nodes { display: none; }
           .landing-page .metrics-grid { grid-template-columns: 1fr 1fr; }
           .landing-page .story-grid { grid-template-columns: 1fr; }
           .landing-page .adaptive-grid { grid-template-columns: 1fr 1fr; }

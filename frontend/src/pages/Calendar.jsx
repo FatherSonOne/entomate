@@ -11,6 +11,7 @@ import {
 import { calendarApi, meetingsApi } from '../services/api'
 import { VCButton } from '../components/vc'
 import ErrorState from '../components/vc/ErrorState'
+import { FullPageLoader } from '../components/EntoLoader'
 
 export default function Calendar() {
   const toast = useToast()
@@ -370,11 +371,7 @@ export default function Calendar() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--accent-primary)' }} />
-      </div>
-    )
+    return <FullPageLoader label="Loading calendar..." />;
   }
 
   if (error) return (

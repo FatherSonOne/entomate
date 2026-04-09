@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { SectionLoader } from '../EntoLoader';
 import {
   TrendingUp,
   TrendingDown,
@@ -39,11 +40,7 @@ export default function EffectivenessReport({ days = 30, className = '' }) {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <div className="animate-spin rounded-full h-8 w-8 vc-spinner"></div>
-      </div>
-    );
+    return <SectionLoader label="Analyzing effectiveness..." />;
   }
 
   if (error) {

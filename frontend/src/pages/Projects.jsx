@@ -7,6 +7,7 @@ import { VCButton } from '../components/vc'
 import { getStatusBadge } from '../utils/badges'
 import { useConfirm } from '../components/vc/ConfirmDialog'
 import ErrorState from '../components/vc/ErrorState'
+import { ProjectCardSkeleton } from '../components/LoadingSkeletons'
 
 export default function Projects() {
   const confirm = useConfirm()
@@ -272,9 +273,7 @@ export default function Projects() {
 
       {/* Projects grid */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <Skeleton className="h-40" count={6} />
-        </div>
+        <ProjectCardSkeleton count={6} />
       ) : filteredProjects.length === 0 ? (
         <div className="vc p-12 text-center border-dashed border-2" style={{ background: 'var(--bg-elevated)' }}>
           <FolderKanban className="w-16 h-16 mx-auto mb-4 opacity-50" style={{ color: 'var(--text-tertiary)' }} />
@@ -299,6 +298,7 @@ export default function Projects() {
           </VCButton>
         </div>
       ) : (
+        <>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredProjects.map((project) => (
             <Link
@@ -374,6 +374,7 @@ export default function Projects() {
             </VCButton>
           </div>
         )}
+        </>
       )}
     </div>
   )

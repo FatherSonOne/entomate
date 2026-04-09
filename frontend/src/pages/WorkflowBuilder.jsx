@@ -11,6 +11,7 @@ import { workflowsApi } from '../services/api'
 import WorkflowCanvas from '../components/workflow/WorkflowCanvas'
 import { VCButton, VCBadge } from '../components/vc'
 import { useConfirm } from '../components/vc/ConfirmDialog'
+import { FullPageLoader } from '../components/EntoLoader'
 
 export default function WorkflowBuilder() {
   const { id } = useParams()
@@ -139,20 +140,7 @@ export default function WorkflowBuilder() {
   }
 
   if (loading) {
-    return (
-      <div
-        className="h-screen flex items-center justify-center"
-        style={{ background: 'var(--bg0, #080808)' }}
-      >
-        <div className="vc text-center" style={{ padding: '2rem 3rem' }}>
-          <Loader2
-            className="w-8 h-8 animate-spin mx-auto mb-4"
-            style={{ color: 'var(--accent-primary, #FF2D6B)' }}
-          />
-          <p style={{ color: 'var(--text-secondary)', margin: 0 }}>Loading workflow...</p>
-        </div>
-      </div>
-    )
+    return <FullPageLoader label="Loading workflow..." />;
   }
 
   if (error) {

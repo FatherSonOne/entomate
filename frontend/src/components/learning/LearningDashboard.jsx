@@ -9,6 +9,7 @@ import { useConfirm } from '../vc/ConfirmDialog';
 import PatternCard from './PatternCard';
 import PatternApprovalModal from './PatternApprovalModal';
 import EffectivenessReport from './EffectivenessReport';
+import { FullPageLoader } from '../EntoLoader';
 
 /**
  * Learning Dashboard Component
@@ -114,11 +115,7 @@ export default function LearningDashboard() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 vc-spinner"></div>
-      </div>
-    );
+    return <FullPageLoader label="Loading learning dashboard..." />;
   }
 
   return (

@@ -12,6 +12,7 @@ import api from '../services/api';
 import { reportsApi } from '../services/api';
 import { VCButton, VCBadge, VCIconBox } from '../components/vc';
 import ErrorState from '../components/vc/ErrorState';
+import { AnalyticsSkeleton } from '../components/LoadingSkeletons';
 
 // ==================== TYPE DEFINITIONS ====================
 
@@ -129,14 +130,7 @@ export default function Analytics() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div
-          className="animate-spin rounded-full h-8 w-8 border-b-2"
-          style={{ borderColor: 'var(--accent-primary)' }}
-        />
-      </div>
-    );
+    return <AnalyticsSkeleton />;
   }
 
   if (!dashboard && !loading) {

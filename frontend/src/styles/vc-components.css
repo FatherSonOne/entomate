@@ -963,6 +963,131 @@ textarea.vinput { resize: vertical; min-height: 70px; }
 /* Fill/star colors (for rating stars etc) */
 .vc-fill-warning   { color: var(--a) !important; fill: var(--a) !important; }
 
-/* Spinner */
+/* Spinner (legacy) */
 .vc-spinner { border-color: transparent; border-top-color: var(--c); animation: spin 0.6s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ============================================
+   ENTOMATE LOADER SYSTEM — EntoLoader.jsx
+   Neural-branded spinners, dots, pulse, orbit
+   ============================================ */
+
+/* ── Spinner variant (default) ────────────── */
+.en-loader-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.en-loader-arc {
+  transform-origin: center;
+  animation: en-arc-spin 0.9s linear infinite;
+}
+
+@keyframes en-arc-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Dots variant ─────────────────────────── */
+.en-loader-dots-wrap {
+  display: inline-flex;
+  align-items: center;
+}
+
+.en-loader-dot-item {
+  border-radius: 50%;
+  animation: en-dot-bounce 1.4s ease-in-out infinite;
+}
+
+/* ── Pulse variant ────────────────────────── */
+.en-loader-pulse-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.en-loader-pulse-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1.5px solid;
+  opacity: 0;
+  animation: en-pulse-expand 2s ease-out infinite;
+}
+
+.en-loader-pulse-ring-2 {
+  animation-delay: 1s;
+}
+
+.en-loader-pulse-core {
+  border-radius: 50%;
+  animation: en-pulse-core 2s ease-in-out infinite;
+}
+
+@keyframes en-pulse-expand {
+  0% { transform: scale(0.3); opacity: 0.8; }
+  100% { transform: scale(1); opacity: 0; }
+}
+
+@keyframes en-pulse-core {
+  0%, 100% { transform: scale(1); opacity: 0.7; }
+  50% { transform: scale(1.2); opacity: 1; }
+}
+
+/* ── Orbit variant ────────────────────────── */
+.en-loader-orbit-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.en-loader-orbit-track {
+  position: absolute;
+  inset: 10%;
+  border-radius: 50%;
+  border: 1.5px solid;
+}
+
+.en-loader-orbit-dot {
+  position: absolute;
+  width: 20%;
+  height: 20%;
+  border-radius: 50%;
+  animation: en-orbit-rotate 1.8s linear infinite;
+  /* The dot orbits around the center */
+  offset-path: circle(40% at 50% 50%);
+  offset-distance: 0%;
+}
+
+.en-loader-orbit-dot-2 {
+  width: 14%;
+  height: 14%;
+  animation: en-orbit-rotate 2.6s linear infinite reverse;
+  offset-distance: 50%;
+}
+
+@keyframes en-orbit-rotate {
+  to { offset-distance: 100%; }
+}
+
+/* Fallback for browsers without offset-path */
+@supports not (offset-path: circle(40% at 50% 50%)) {
+  .en-loader-orbit-dot {
+    top: 0;
+    left: 50%;
+    transform-origin: 50% 250%;
+    animation: en-orbit-fallback 1.8s linear infinite;
+  }
+  .en-loader-orbit-dot-2 {
+    bottom: 0;
+    right: 50%;
+    transform-origin: 50% -150%;
+    animation: en-orbit-fallback 2.6s linear infinite reverse;
+  }
+  @keyframes en-orbit-fallback {
+    to { transform: rotate(360deg); }
+  }
+}

@@ -13,6 +13,7 @@ import { VCButton, VCBadge, VCIconBox, VCInput, VCSelect, VCTextarea } from '../
 import ErrorState from '../components/vc/ErrorState';
 import { useConfirm } from '../components/vc/ConfirmDialog';
 import { useToast } from '../components/vc/ToastProvider';
+import { AgentCardSkeleton } from '../components/LoadingSkeletons';
 
 // Category icons mapping
 const categoryIcons = {
@@ -379,9 +380,7 @@ export default function Agents() {
           </div>
 
           {loading ? (
-            <div className="space-y-3">
-              <Skeleton className="h-24 w-full" count={3} />
-            </div>
+            <AgentCardSkeleton count={3} />
           ) : agents.length === 0 ? (
             <div className="vc p-8 text-center border-dashed border-2">
               <Bot className="h-12 w-12 mx-auto mb-4" style={{ color: 'var(--text-tertiary)' }} />

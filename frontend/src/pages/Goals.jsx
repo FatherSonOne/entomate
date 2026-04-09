@@ -11,6 +11,7 @@ import { useConfirm } from '../components/vc/ConfirmDialog';
 import { VCButton, VCBadge, VCProgress } from '../components/vc';
 import { useToast } from '../components/vc/ToastProvider';
 import ErrorState from '../components/vc/ErrorState';
+import { FullPageLoader } from '../components/EntoLoader';
 
 const STATUS_OPTIONS = [
   { value: 'planning', label: 'Planning', color: 'neutral' },
@@ -284,11 +285,7 @@ export default function Goals() {
   const paginatedGoals = goals.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: 'var(--accent-primary)' }} />
-      </div>
-    );
+    return <FullPageLoader label="Loading goals..." />;
   }
 
   if (error) return (

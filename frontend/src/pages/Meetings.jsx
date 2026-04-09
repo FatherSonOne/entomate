@@ -10,6 +10,7 @@ import { VCButton, VCBadge } from '../components/vc'
 import { useConfirm } from '../components/vc/ConfirmDialog'
 import { useToast } from '../components/vc/ToastProvider'
 import { getSentimentEmoji, getSentimentBadgeColor } from '../utils/meetingHelpers'
+import { MeetingCardSkeleton } from '../components/LoadingSkeletons'
 
 export default function Meetings() {
   const confirm = useConfirm()
@@ -263,9 +264,8 @@ export default function Meetings() {
       {/* Meetings list */}
       <div className="vc">
         {loading ? (
-          <div className="p-8 text-center">
-            <div className="spinner mx-auto mb-4" />
-            <p style={{ color: 'var(--text-tertiary)' }}>Loading meetings...</p>
+          <div className="p-4">
+            <MeetingCardSkeleton count={4} />
           </div>
         ) : error ? (
           <div className="p-8 text-center">
