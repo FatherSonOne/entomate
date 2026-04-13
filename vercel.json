@@ -1,7 +1,7 @@
 {
-  "buildCommand": "cd frontend && npm install && npm run build && mv dist/index.html dist/app.html && mkdir -p dist/logos && cp -r ../output/logos/. dist/logos/ && cp ../output/landing/index.html dist/index.html",
+  "buildCommand": "cd frontend && npm install && npm run build && mkdir -p dist/logos && cp -r ../output/logos/. dist/logos/",
   "outputDirectory": "frontend/dist",
   "rewrites": [
-    { "source": "/(.*)", "destination": "/app.html" }
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
