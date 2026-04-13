@@ -13,6 +13,7 @@ import { reportsApi } from '../services/api';
 import { VCButton, VCBadge, VCIconBox } from '../components/vc';
 import ErrorState from '../components/vc/ErrorState';
 import { AnalyticsSkeleton } from '../components/LoadingSkeletons';
+import { SentimentPositive, SentimentNeutral, SentimentNegative } from '../components/icons/AnimatedIcons';
 
 // ==================== TYPE DEFINITIONS ====================
 
@@ -318,7 +319,7 @@ export default function Analytics() {
                     className="w-16 h-16 rounded-full flex items-center justify-center mb-2"
                     style={{ background: 'rgba(0,245,212,0.12)' }}
                   >
-                    <span className="text-2xl">😊</span>
+                    <SentimentPositive size={28} />
                   </div>
                   <p
                     style={{
@@ -337,7 +338,7 @@ export default function Analytics() {
                     className="w-16 h-16 rounded-full flex items-center justify-center mb-2"
                     style={{ background: 'rgba(248,240,242,0.06)' }}
                   >
-                    <span className="text-2xl">😐</span>
+                    <SentimentNeutral size={28} />
                   </div>
                   <p
                     style={{
@@ -356,7 +357,7 @@ export default function Analytics() {
                     className="w-16 h-16 rounded-full flex items-center justify-center mb-2"
                     style={{ background: 'rgba(255,45,107,0.12)' }}
                   >
-                    <span className="text-2xl">😟</span>
+                    <SentimentNegative size={28} />
                   </div>
                   <p
                     style={{

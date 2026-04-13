@@ -6,7 +6,13 @@ import {
   CATEGORIES,
   GUIDE_VERSION_KEY,
 } from './guideData'
+import AnimatedIcon from '../icons/AnimatedIcons'
 import './UsersGuide.css'
+
+/** Resolve an icon key string to an animated SVG component */
+function GuideIcon({ name, size = 22 }) {
+  return <AnimatedIcon name={name} size={size} />
+}
 
 // ─── Helpers ──────────────────────────────────────────
 
@@ -182,7 +188,7 @@ function SectionDetail({ section, query }) {
     <div className="ug-detail" ref={detailRef}>
       {/* Header */}
       <div className="ug-detail-header">
-        <div className="ug-detail-icon">{section.icon}</div>
+        <div className="ug-detail-icon"><GuideIcon name={section.icon} size={28} /></div>
         <div className="ug-detail-header-text">
           <h2 className="ug-detail-title">
             {highlightText(section.title, query)}
@@ -305,7 +311,7 @@ function SearchResults({ query, results, onSelect }) {
         return (
           <div key={section.id} className="ug-result-card" onClick={() => onSelect(section.id)} role="button" tabIndex={0} onKeyDown={e => e.key === 'Enter' && onSelect(section.id)}>
             <div className="ug-result-title">
-              <span className="ug-result-icon">{section.icon}</span>
+              <span className="ug-result-icon"><GuideIcon name={section.icon} size={18} /></span>
               <span>{highlightText(section.title, query)}</span>
               <Badge badge={section.badge} />
             </div>
@@ -346,7 +352,7 @@ function GuideSidebar({ activeId, onSelect }) {
                   onKeyDown={e => e.key === 'Enter' && onSelect(s.id)}
                   aria-current={activeId === s.id ? 'page' : undefined}
                 >
-                  <span className="ug-sidebar-icon">{s.icon}</span>
+                  <span className="ug-sidebar-icon"><GuideIcon name={s.icon} size={18} /></span>
                   <span className="ug-sidebar-label">{s.title}</span>
                   {s.badge && <Badge badge={s.badge} />}
                 </div>

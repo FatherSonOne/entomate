@@ -1,7 +1,7 @@
 # Entomate User Guide
 
-**Version:** 1.4.0
-**Last Updated:** April 5, 2026
+**Version:** 1.5.0
+**Last Updated:** April 12, 2026
 
 Welcome to the Entomate User Guide. This document covers every feature of the platform and walks you through how to use each one.
 
@@ -11,25 +11,27 @@ Welcome to the Entomate User Guide. This document covers every feature of the pl
 
 1. [Introduction](#1-introduction)
 2. [Getting Started](#2-getting-started)
-3. [Dashboard](#3-dashboard)
-4. [Meetings](#4-meetings)
-5. [Meeting Details](#5-meeting-details)
-6. [Calendar](#6-calendar)
-7. [Search](#7-search)
-8. [Tasks](#8-tasks)
-9. [Projects & Project Board](#9-projects--project-board)
-10. [Goals & OKRs](#10-goals--okrs)
-11. [Workflows](#11-workflows)
-12. [Automations](#12-automations)
-13. [AI Agents](#13-ai-agents)
-14. [Ento AI Assistant](#14-ento-ai-assistant)
-15. [Analytics](#15-analytics)
-16. [Reports & Exports](#16-reports--exports)
-17. [Ecosystem Integration](#17-ecosystem-integration)
-18. [Meeting Intelligence Profiles](#18-meeting-intelligence-profiles)
-19. [Settings](#19-settings)
-20. [Keyboard Shortcuts](#20-keyboard-shortcuts)
-21. [Troubleshooting & FAQ](#21-troubleshooting--faq)
+3. [Organizations & Teams](#3-organizations--teams)
+4. [Billing & Plans](#4-billing--plans)
+5. [Dashboard](#5-dashboard)
+6. [Meetings](#6-meetings)
+7. [Meeting Details](#7-meeting-details)
+8. [Calendar](#8-calendar)
+9. [Search](#9-search)
+10. [Tasks](#10-tasks)
+11. [Projects & Project Board](#11-projects--project-board)
+12. [Goals & OKRs](#12-goals--okrs)
+13. [Workflows](#13-workflows)
+14. [Automations](#14-automations)
+15. [AI Agents](#15-ai-agents)
+16. [Ento AI Assistant](#16-ento-ai-assistant)
+17. [Analytics](#17-analytics)
+18. [Reports & Exports](#18-reports--exports)
+19. [Ecosystem Integration](#19-ecosystem-integration)
+20. [Meeting Intelligence Profiles](#20-meeting-intelligence-profiles)
+21. [Settings](#21-settings)
+22. [Keyboard Shortcuts](#22-keyboard-shortcuts)
+23. [Troubleshooting & FAQ](#23-troubleshooting--faq)
 
 ---
 
@@ -58,7 +60,17 @@ Setting up Entomate takes just a minute. There is no complex configuration requi
 1. Visit the Entomate landing page.
 2. Click **Get Started**.
 3. Sign in with your Google account (authentication is handled securely through Supabase OAuth).
-4. You will be redirected to your Dashboard automatically.
+4. A branded loading screen with an animated neural catalyst logo tracks your session setup progress.
+5. If this is your first time, you will be guided through organization setup (see [Organizations & Teams](#3-organizations--teams)).
+6. Once your organization is ready, you will be redirected to your Dashboard automatically.
+
+### Accepting a Team Invitation
+
+If someone has invited you to their organization, you will see an invitation banner after signing in.
+
+1. Review the banner showing your invited role and the invitation expiration date.
+2. Click **Accept Invitation** to join the organization immediately.
+3. You will be taken to the Dashboard with full access to the team workspace.
 
 ### Navigating the Sidebar
 
@@ -77,7 +89,99 @@ At the bottom of the sidebar you will find **Settings** and your **User Profile*
 
 ---
 
-## 3. Dashboard
+## 3. Organizations & Teams
+
+Entomate is built around organizations. Every workspace belongs to an organization, and team members collaborate within that shared context.
+
+### Creating an Organization
+
+When you sign in for the first time, a two-step wizard guides you through setup:
+
+1. **Name your organization** — Enter a name (2 to 100 characters). A URL-safe slug is generated automatically below the input field.
+2. **Choose a plan** — Select from Free, Starter, Pro, Business, or Ecosystem. Each plan card shows monthly pricing, team member limits, workflow run limits, and the number of included features. Plans marked "Popular" or "Full Suite" are highlighted.
+
+After completing the wizard, your organization is created and you land on the Dashboard.
+
+### Team Members and Roles
+
+Organization members have roles that determine their access level:
+
+- **Owner** — Full control over the organization, billing, and member management.
+- **Admin** — Can manage members and most settings.
+- **Member** — Standard access to all workspace features.
+
+### Managing Your Organization
+
+You can manage your organization from **Settings**:
+
+- View and invite team members.
+- Change member roles.
+- Transfer ownership to another member.
+
+### Archiving and Deleting an Organization
+
+If you need to close an organization:
+
+1. Go to **Settings** and find the danger zone section.
+2. Click **Archive Organization** to soft-delete it.
+3. Members lose access immediately, and pending invitations stop working.
+4. You have **30 days** to restore the organization before it is permanently deleted.
+
+If you change your mind during the 30-day window, an interstitial screen appears when you sign in showing the archived organization with a countdown of days remaining. From here you can:
+
+- **Restore** — Undo the archive and bring the organization back.
+- **Permanently Delete** — Remove it immediately (requires typing the organization name to confirm).
+- **Start Fresh** — Create a new organization and clean up the old one.
+
+**Tip:** Your personal data (account, profile) is never affected when an organization is archived or deleted.
+
+**Tip:** Permanent deletion requires you to type the organization name as confirmation, preventing accidental data loss.
+
+---
+
+## 4. Billing & Plans
+
+Entomate offers five plan tiers to match your team's needs. You can manage your subscription from **Settings > Billing**.
+
+### Plan Tiers
+
+| Plan | Price | Team Members | Workflow Runs/Month | Highlights |
+|------|-------|--------------|---------------------|------------|
+| **Free** | $0 | 3 | 100 | Basic features |
+| **Starter** | Monthly/Yearly | 5 | 500 | Basic integrations |
+| **Pro** | Monthly/Yearly | 15 | 5,000 | Webhooks, scheduling (Popular) |
+| **Business** | Monthly/Yearly | Unlimited | 50,000 | API access, custom functions |
+| **Ecosystem** | Monthly/Yearly | Unlimited | 50,000 | Unlocks Pulse + Logos Vision (Full Suite) |
+
+### Billing Dashboard
+
+The Billing page in Settings shows:
+
+- **Current Plan Card** — Your active plan name, status badge (Active, Trial, Past Due, or Free), and renewal date. Click **Manage** to open the Stripe billing portal.
+- **Usage Meters** — Three progress bars tracking your Workflows, Runs per month, and Integrations against your plan limits. Bars change color from green to yellow to red as you approach limits.
+- **Billing Cycle Toggle** — Switch between Monthly and Yearly pricing. Yearly billing saves you two months.
+- **Plan Comparison Cards** — Browse all plans side by side with feature lists and upgrade buttons.
+- **Invoice History** — A table of past invoices with date, amount, status, and download links.
+
+### Upgrading or Changing Plans
+
+1. Go to **Settings > Billing**.
+2. Toggle Monthly or Yearly billing.
+3. Click **Upgrade** on the plan you want.
+4. Complete payment through the secure Stripe checkout.
+5. Your new plan takes effect immediately.
+
+### Feature Gating
+
+Some features are only available on higher-tier plans. When you reach a plan limit or try to access a feature above your tier, Entomate shows an upgrade prompt explaining what plan you need.
+
+**Tip:** Watch the usage meters to avoid hitting limits unexpectedly. If a bar turns yellow, it is time to consider upgrading.
+
+**Tip:** Yearly billing saves you two months compared to paying monthly.
+
+---
+
+## 5. Dashboard
 
 The Dashboard is your home screen. It gives you an at-a-glance summary of everything happening across your workspace so you can decide where to focus.
 
@@ -138,7 +242,7 @@ A Quick Actions bar lets you immediately:
 
 ---
 
-## 4. Meetings
+## 6. Meetings
 
 The Meetings page is where you browse, search, and record all of your meetings.
 
@@ -173,7 +277,7 @@ Meetings appear as cards showing the title, a sentiment badge, a short summary, 
 
 ---
 
-## 5. Meeting Details
+## 7. Meeting Details
 
 Click any meeting card to open the full detail view. This is where Entomate's intelligence really shines, giving you a complete breakdown of what happened and what needs to happen next.
 
@@ -214,11 +318,11 @@ Type a question about the meeting into the Ask AI box and get an answer drawn fr
 
 ### Meeting Intelligence Panel
 
-The AI suggests intelligence profiles based on the meeting content. These profiles customize how the analysis is run. The panel shows a confidence score for each suggestion. You can accept the suggestion, choose a different profile, or dismiss it entirely. See [Meeting Intelligence Profiles](#18-meeting-intelligence-profiles) for details.
+The AI suggests intelligence profiles based on the meeting content. These profiles customize how the analysis is run. The panel shows a confidence score for each suggestion. You can accept the suggestion, choose a different profile, or dismiss it entirely. See [Meeting Intelligence Profiles](#20-meeting-intelligence-profiles) for details.
 
 ---
 
-## 6. Calendar
+## 8. Calendar
 
 The Calendar gives you a unified view of your schedule, tasks, and goals in one place.
 
@@ -257,7 +361,7 @@ Click the **Sync Tasks** button to push your Entomate action items to Google Cal
 
 ---
 
-## 7. Search
+## 9. Search
 
 Search lets you find anything across your workspace, whether you know the exact words or just the general idea.
 
@@ -293,7 +397,7 @@ If you have Ecosystem Integration enabled, search extends across Pulse and Logos
 
 ---
 
-## 8. Tasks
+## 10. Tasks
 
 Tasks in Entomate are created from meetings or manually, and the AI helps you prioritize and assign them intelligently.
 
@@ -359,7 +463,7 @@ Click a task to open the Task Edit Modal. From here you can:
 
 ---
 
-## 9. Projects & Project Board
+## 11. Projects & Project Board
 
 Projects group related tasks, meetings, and goals together. The Project Board gives you a visual way to manage work across your team.
 
@@ -399,7 +503,7 @@ The Board page presents your projects and tasks as a Kanban board:
 
 ---
 
-## 10. Goals & OKRs
+## 12. Goals & OKRs
 
 Goals in Entomate follow the OKR (Objectives and Key Results) framework, letting you set high-level objectives and track measurable outcomes.
 
@@ -444,7 +548,7 @@ At the top of the Goals page, summary cards show:
 
 ---
 
-## 11. Workflows
+## 13. Workflows
 
 Workflows let you build custom automation pipelines using a visual, node-based editor. This is the most powerful automation tool in Entomate.
 
@@ -494,7 +598,7 @@ From the Workflows list, you can:
 
 ---
 
-## 12. Automations
+## 14. Automations
 
 Automations are simpler than workflows and are based on pre-built templates. They are ideal for common tasks that do not need a custom pipeline.
 
@@ -538,7 +642,7 @@ Every automation keeps a log of past runs showing success or failure status and 
 
 ---
 
-## 13. AI Agents
+## 15. AI Agents
 
 AI Agents are intelligent bots that handle specialized work automatically. Deploy them from templates or customize them for your needs.
 
@@ -581,7 +685,7 @@ You can provide feedback on agent decisions, which helps the system improve over
 
 ---
 
-## 14. Ento AI Assistant
+## 16. Ento AI Assistant
 
 The Ento AI Assistant is a context-aware chat panel built into every page of Entomate. It understands what you are currently working on and can answer questions, offer suggestions, and help you get things done faster.
 
@@ -627,7 +731,7 @@ If Ento is generating a long response and you want to stop it, click the stop bu
 
 ---
 
-## 15. Analytics
+## 17. Analytics
 
 Analytics gives you a data-driven view of how your team uses Entomate and the value it delivers.
 
@@ -687,7 +791,7 @@ A per-member performance table showing:
 
 ---
 
-## 16. Reports & Exports
+## 18. Reports & Exports
 
 The Reports page lets you generate polished documents and data exports from your workspace.
 
@@ -715,7 +819,7 @@ Download raw data as CSV files for:
 
 ---
 
-## 17. Ecosystem Integration
+## 19. Ecosystem Integration
 
 Ecosystem Integration connects Entomate with two companion apps: **Pulse** (a communication platform) and **Logos Vision** (a CRM). Together, these three apps form a unified ecosystem where data flows automatically between them.
 
@@ -745,7 +849,7 @@ The event log shows all inbound and outbound sync events. Each event displays di
 
 ---
 
-## 18. Meeting Intelligence Profiles
+## 20. Meeting Intelligence Profiles
 
 Meeting Intelligence Profiles let AI customize its analysis based on the type of meeting you are in. Different meetings need different focus areas, and profiles make that automatic.
 
@@ -803,7 +907,7 @@ A quality feedback rating system lets you rate the output of each profile, which
 
 ---
 
-## 19. Settings
+## 21. Settings
 
 The Settings page is where you configure Entomate to work the way you want.
 
@@ -855,7 +959,7 @@ Control how and when Entomate notifies you:
 
 #### Ecosystem Settings
 
-Manage your Pulse and Logos Vision connections. See [Ecosystem Integration](#17-ecosystem-integration) for details.
+Manage your Pulse and Logos Vision connections. See [Ecosystem Integration](#19-ecosystem-integration) for details.
 
 ### AI and Learning
 
@@ -883,7 +987,7 @@ View the current version number, design system (Void Crimson), and the technolog
 
 ---
 
-## 20. Keyboard Shortcuts
+## 22. Keyboard Shortcuts
 
 Entomate supports keyboard shortcuts to help you navigate and act quickly. Press **Ctrl+?** to see these shortcuts at any time.
 
@@ -926,7 +1030,7 @@ Entomate supports keyboard shortcuts to help you navigate and act quickly. Press
 
 ---
 
-## 21. Troubleshooting & FAQ
+## 23. Troubleshooting & FAQ
 
 If something is not working as expected, check the common issues below before reaching out for support.
 
@@ -994,6 +1098,15 @@ Entomate supports 14 transcription languages including English, Spanish, French,
 **Can I choose my recording quality?**
 Yes. Go to Settings > Audio and Recording to choose between Standard (64 kbps), High (128 kbps), or Maximum (256 kbps) recording quality.
 
+**How do I invite team members to my organization?**
+Go to Settings and use the team management section to send invitations. Invitees receive a banner when they sign in, showing their invited role and expiration date. They can accept with one click.
+
+**What happens if I archive my organization?**
+Archiving soft-deletes the organization. Members lose access immediately, but you have 30 days to restore it. After 30 days, the organization and its data are permanently deleted. Your personal account is not affected.
+
+**Can I change my plan later?**
+Yes. Go to Settings > Billing at any time to upgrade, downgrade, or switch between monthly and yearly billing. Changes take effect immediately.
+
 ---
 
-*This guide covers Entomate version 1.3.0. For questions or feedback, reach out through the app or your team's support channel.*
+*This guide covers Entomate version 1.5.0. For questions or feedback, reach out through the app or your team's support channel.*

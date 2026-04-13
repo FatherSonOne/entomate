@@ -7,6 +7,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Brain, ChevronDown, ChevronUp, RefreshCw, X, Check, Sliders, Loader2 } from 'lucide-react'
 import { supabase } from '../../services/supabaseClient'
+import { ProfileIcon } from '../icons/AnimatedIcons'
 
 // ==================== SUGGESTION ENGINE (inline) ====================
 
@@ -251,9 +252,9 @@ export default function MeetingIntelligencePanel({
             Meeting Intelligence
           </span>
           {selectedProfile && (
-            <span className="text-xs px-2 py-0.5 rounded-full"
+            <span className="text-xs px-2 py-0.5 rounded-full inline-flex items-center gap-1"
               style={{ background: 'var(--accent-primary-dim)', color: 'var(--accent-primary)' }}>
-              {selectedProfile.icon} {selectedProfile.name}
+              <ProfileIcon emoji={selectedProfile.icon} size={14} /> {selectedProfile.name}
             </span>
           )}
           {state === 'ready' && (
@@ -278,7 +279,7 @@ export default function MeetingIntelligencePanel({
               boxShadow: suggestions[0].confidence >= 0.8 ? '0 0 20px var(--accent-primary-glow)' : undefined,
             }}>
               <div className="flex items-start gap-3">
-                <span className="text-2xl">{suggestions[0].profile.icon}</span>
+                <ProfileIcon emoji={suggestions[0].profile.icon} size={28} />
                 <div className="flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
@@ -338,7 +339,7 @@ export default function MeetingIntelligencePanel({
                           {Math.round(suggestion.confidence * 100)}%
                         </span>
                       )}
-                      <span className="text-xl">{profile.icon}</span>
+                      <ProfileIcon emoji={profile.icon} size={22} />
                       <span className="text-xs font-medium leading-tight" style={{ color: 'var(--text-primary)' }}>
                         {profile.name}
                       </span>

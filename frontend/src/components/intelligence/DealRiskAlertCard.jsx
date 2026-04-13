@@ -1,5 +1,6 @@
 import React from 'react'
 import { AlertTriangle, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { StatusLow, StatusMedium, StatusHigh, StatusCritical, StatusUnknown } from '../icons/AnimatedIcons'
 import ExpandableCard from './ExpandableCard'
 import RiskFactorBreakdown from './RiskFactorBreakdown'
 import PredictionGauge from './PredictionGauge'
@@ -34,19 +35,15 @@ export default function DealRiskAlertCard({ data, onAction }) {
     }
   }
 
-  // Risk level emoji
-  const getRiskEmoji = (level) => {
+  // Risk level icon
+  const getRiskIcon = (level) => {
+    const size = 16
     switch (level) {
-      case 'low':
-        return '🟢'
-      case 'medium':
-        return '🟡'
-      case 'high':
-        return '🟠'
-      case 'critical':
-        return '🔴'
-      default:
-        return '⚪'
+      case 'low':      return <StatusLow size={size} />
+      case 'medium':   return <StatusMedium size={size} />
+      case 'high':     return <StatusHigh size={size} />
+      case 'critical': return <StatusCritical size={size} />
+      default:         return <StatusUnknown size={size} />
     }
   }
 
@@ -83,7 +80,7 @@ export default function DealRiskAlertCard({ data, onAction }) {
           </p>
         </div>
         <div className={`px-3 py-1.5 rounded-lg border font-medium text-sm flex items-center gap-2 ${getRiskColor(riskScore.level)}`}>
-          <span>{getRiskEmoji(riskScore.level)}</span>
+          <span className="flex items-center">{getRiskIcon(riskScore.level)}</span>
           <span>Risk: {riskScore.score}/100</span>
         </div>
       </div>
@@ -105,8 +102,8 @@ export default function DealRiskAlertCard({ data, onAction }) {
           <div className="space-y-2">
             {riskFactors.slice(0, 3).map((factor, index) => (
               <div key={index} className="flex items-start gap-2 text-sm">
-                <span className={`font-semibold ${getImpactColor(factor.impact)}`}>
-                  {factor.impact === 'high' ? '🔴' : factor.impact === 'medium' ? '🟡' : '🟢'}
+                <span className={`flex items-center ${getImpactColor(factor.impact)}`}>
+                  {factor.impact === 'high' ? <StatusCritical size={14} /> : factor.impact === 'medium' ? <StatusMedium size={14} /> : <StatusLow size={14} />}
                 </span>
                 <div className="flex-1">
                   <p className="text-content-primary">{factor.factor}</p>

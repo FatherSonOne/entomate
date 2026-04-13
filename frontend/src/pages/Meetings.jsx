@@ -9,7 +9,7 @@ import { meetingsApi, settingsApi } from '../services/api'
 import { VCButton, VCBadge } from '../components/vc'
 import { useConfirm } from '../components/vc/ConfirmDialog'
 import { useToast } from '../components/vc/ToastProvider'
-import { getSentimentEmoji, getSentimentBadgeColor } from '../utils/meetingHelpers'
+import { getSentimentIcon, getSentimentBadgeColor } from '../utils/meetingHelpers'
 import { MeetingCardSkeleton } from '../components/LoadingSkeletons'
 
 export default function Meetings() {
@@ -324,7 +324,7 @@ export default function Meetings() {
                       )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xl">{getSentimentEmoji(meeting.sentiment_label)}</span>
+                          <span className="flex items-center">{getSentimentIcon(meeting.sentiment_label, 22)}</span>
                           <h3
                             className="text-lg font-semibold truncate"
                             style={{ color: 'var(--text-primary)' }}

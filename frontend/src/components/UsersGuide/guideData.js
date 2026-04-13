@@ -1,8 +1,8 @@
 // ─── Entomate User Guide Data ─────────────────────────────────────────────
 // Version tracking — update these when guide content changes
 
-export const guideVersion = '1.4.0'
-export const guideUpdated = 'April 5, 2026'
+export const guideVersion = '1.5.0'
+export const guideUpdated = 'April 12, 2026'
 
 // ─── Version key for localStorage new-feature detection ───────────────────
 export const GUIDE_VERSION_KEY = 'entomate_guide_version'
@@ -10,7 +10,7 @@ export const GUIDE_VERSION_KEY = 'entomate_guide_version'
 // ─── Categories (sidebar grouping) ────────────────────────────────────────
 
 export const CATEGORIES = [
-  { label: 'Start Here',         ids: ['introduction', 'getting-started', 'dashboard'] },
+  { label: 'Start Here',         ids: ['introduction', 'getting-started', 'organizations', 'billing', 'dashboard'] },
   { label: 'Meetings & Time',    ids: ['meetings', 'meeting-details', 'calendar'] },
   { label: 'Work Management',    ids: ['tasks', 'projects', 'goals'] },
   { label: 'Automation & AI',    ids: ['workflows', 'automations', 'agents', 'ento-assistant'] },
@@ -25,7 +25,7 @@ export const guideSections = [
   {
     id: 'introduction',
     title: 'Introduction',
-    icon: '\u{1F4D6}',
+    icon: 'book',
     summary: 'What Entomate is and how it helps your team turn meetings into action.',
     steps: [
       'Entomate is an AI-powered meeting intelligence platform.',
@@ -65,13 +65,16 @@ export const guideSections = [
   {
     id: 'getting-started',
     title: 'Getting Started',
-    icon: '\u{1F680}',
-    summary: 'Create your account, sign in, and find your way around.',
+    icon: 'rocket',
+    badge: 'Updated',
+    summary: 'Create your account, sign in, set up your organization, and find your way around.',
     steps: [
       'Visit the Entomate landing page and click Get Started.',
       'Sign in with your Google account through Supabase OAuth.',
-      'You will be redirected to the Dashboard automatically.',
-      'The sidebar on the left provides links to every section of the app.',
+      'A branded loading screen tracks your session setup progress.',
+      'If this is your first time, you will be guided through organization setup.',
+      'If you have a team invitation, accept it from the banner that appears.',
+      'Once your organization is ready, you land on the Dashboard.',
     ],
     subsections: [
       {
@@ -95,9 +98,111 @@ export const guideSections = [
   },
 
   {
+    id: 'organizations',
+    title: 'Organizations & Teams',
+    icon: 'users',
+    badge: 'New',
+    summary: 'Create organizations, invite team members, manage roles, and handle archiving or deletion.',
+    steps: [
+      'After your first sign-in, a two-step wizard guides you through creating an organization.',
+      'Name your organization and choose a plan (Free, Starter, Pro, Business, or Ecosystem).',
+      'Invite team members from Settings — they see a banner on sign-in with one-click acceptance.',
+      'Manage member roles: Owner, Admin, or Member.',
+    ],
+    subsections: [
+      {
+        id: 'org-create',
+        title: 'Creating an Organization',
+        description: 'A two-step wizard for new users.',
+        steps: [
+          'Step 1: Enter a name (2–100 characters). A URL-safe slug is generated automatically.',
+          'Step 2: Choose a plan. Each card shows pricing, team limits, run limits, and features.',
+          'Plans marked Popular or Full Suite are highlighted for easy comparison.',
+        ],
+      },
+      {
+        id: 'org-invite',
+        title: 'Accepting an Invitation',
+        description: 'Join an existing organization through a team invite.',
+        steps: [
+          'A highlighted banner shows your invited role and the expiration date.',
+          'Click Accept Invitation to join immediately.',
+          'You land on the Dashboard with full team access.',
+        ],
+      },
+      {
+        id: 'org-archive',
+        title: 'Archiving & Deleting',
+        description: 'Soft-delete with a 30-day recovery window.',
+        steps: [
+          'Archive from Settings to soft-delete the organization.',
+          'Members lose access immediately; invitations stop working.',
+          'A recovery screen shows days remaining before permanent deletion.',
+          'Restore, permanently delete, or start fresh from the recovery screen.',
+          'Permanent deletion requires typing the organization name to confirm.',
+        ],
+      },
+    ],
+    tips: [
+      'Your personal account is never affected when an organization is archived or deleted.',
+      'You can restore an archived organization at any time during the 30-day window.',
+    ],
+  },
+
+  {
+    id: 'billing',
+    title: 'Billing & Plans',
+    icon: 'credit-card',
+    badge: 'New',
+    summary: 'Manage your subscription, monitor usage, compare plans, and view invoices.',
+    steps: [
+      'Go to Settings > Billing to view your current plan, usage, and invoices.',
+      'Toggle between Monthly and Yearly billing (yearly saves two months).',
+      'Compare plans side by side and click Upgrade to change tiers.',
+      'Click Manage to open the Stripe billing portal for payment details.',
+    ],
+    subsections: [
+      {
+        id: 'bill-plans',
+        title: 'Plan Tiers',
+        description: 'Five plans from Free to Ecosystem.',
+        steps: [
+          'Free — 3 members, 100 runs/month, basic features.',
+          'Starter — 5 members, 500 runs/month, basic integrations.',
+          'Pro — 15 members, 5,000 runs/month, webhooks and scheduling (Popular).',
+          'Business — Unlimited members, 50,000 runs/month, API access.',
+          'Ecosystem — Same as Business, plus Pulse and Logos Vision apps (Full Suite).',
+        ],
+      },
+      {
+        id: 'bill-usage',
+        title: 'Usage Meters',
+        description: 'Track your consumption against plan limits.',
+        steps: [
+          'Three progress bars: Workflows, Runs/month, and Integrations.',
+          'Bars change color from green to yellow to red as you approach limits.',
+          'An upgrade prompt appears when you hit a limit.',
+        ],
+      },
+      {
+        id: 'bill-invoices',
+        title: 'Invoice History',
+        steps: [
+          'View past invoices with date, amount, and status.',
+          'Download individual invoices for your records.',
+        ],
+      },
+    ],
+    tips: [
+      'Watch the usage meters — when a bar turns yellow, consider upgrading.',
+      'Yearly billing saves you two months compared to monthly.',
+    ],
+  },
+
+  {
     id: 'dashboard',
     title: 'Dashboard',
-    icon: '\u{1F4CA}',
+    icon: 'bar-chart',
     badge: 'Updated',
     summary: 'Your home screen with real-time intelligence, new widgets, quick actions, and system status.',
     steps: [
@@ -202,7 +307,7 @@ export const guideSections = [
   {
     id: 'meetings',
     title: 'Meetings',
-    icon: '\u{1F399}\uFE0F',
+    icon: 'microphone',
     badge: 'Updated',
     summary: 'Record, transcribe, search, and manage all your meetings with bulk operations.',
     steps: [
@@ -264,7 +369,7 @@ export const guideSections = [
   {
     id: 'meeting-details',
     title: 'Meeting Details',
-    icon: '\u{1F4DD}',
+    icon: 'memo',
     badge: 'Updated',
     summary: 'Deep dive into a single meeting with inline editing, transcripts, AI analysis, intelligence profiles, and action items.',
     steps: [
@@ -340,7 +445,7 @@ export const guideSections = [
   {
     id: 'calendar',
     title: 'Calendar',
-    icon: '\u{1F4C5}',
+    icon: 'calendar',
     summary: 'Unified calendar view combining Google Calendar events, tasks, and goal deadlines.',
     steps: [
       'Navigate to Calendar from the sidebar.',
@@ -401,7 +506,7 @@ export const guideSections = [
   {
     id: 'tasks',
     title: 'Tasks',
-    icon: '\u2705',
+    icon: 'check-circle',
     badge: 'Updated',
     summary: 'Create, prioritize, and track action items with AI recommendations, Kanban board, subtasks, and ETA predictions.',
     steps: [
@@ -487,7 +592,7 @@ export const guideSections = [
   {
     id: 'projects',
     title: 'Projects',
-    icon: '\u{1F4C1}',
+    icon: 'folder',
     summary: 'Organize tasks, meetings, and goals into project workspaces.',
     steps: [
       'Navigate to Projects from the sidebar.',
@@ -527,7 +632,7 @@ export const guideSections = [
   {
     id: 'goals',
     title: 'Goals & OKRs',
-    icon: '\u{1F3AF}',
+    icon: 'target',
     summary: 'Create and track Objectives and Key Results at Company, Team, and Individual levels.',
     steps: [
       'Navigate to Goals from the sidebar.',
@@ -577,7 +682,7 @@ export const guideSections = [
   {
     id: 'workflows',
     title: 'Workflows',
-    icon: '\u{1F500}',
+    icon: 'workflow',
     badge: 'Updated',
     summary: 'Visual, node-based automations with debug panel, version history, and execution tracing.',
     steps: [
@@ -639,7 +744,7 @@ export const guideSections = [
   {
     id: 'automations',
     title: 'Automations',
-    icon: '\u26A1',
+    icon: 'lightning',
     summary: 'Template-based automation rules with triggers, actions, and monitoring.',
     steps: [
       'Navigate to Automations from the sidebar.',
@@ -685,7 +790,7 @@ export const guideSections = [
   {
     id: 'agents',
     title: 'AI Agents',
-    icon: '\u{1F916}',
+    icon: 'bot',
     summary: 'Deploy and manage intelligent bots for assignment, priority, and follow-up detection.',
     steps: [
       'Navigate to Agents from the sidebar.',
@@ -733,8 +838,7 @@ export const guideSections = [
   {
     id: 'ento-assistant',
     title: 'Ento AI Assistant',
-    icon: '\u{1F4AC}',
-    badge: 'New',
+    icon: 'chat',
     summary: 'A context-aware AI chat assistant available from every page. Ask questions, get proactive suggestions, and work faster.',
     steps: [
       'Press Ctrl+/ (or Cmd+/ on Mac) to toggle the assistant panel.',
@@ -786,7 +890,7 @@ export const guideSections = [
   {
     id: 'search',
     title: 'Search',
-    icon: '\u{1F50D}',
+    icon: 'search',
     summary: 'Find anything across your workspace with semantic and keyword search plus AI Q&A.',
     steps: [
       'Navigate to Search from the sidebar, or press Ctrl+/ to jump there.',
@@ -832,7 +936,7 @@ export const guideSections = [
   {
     id: 'analytics',
     title: 'Analytics',
-    icon: '\u{1F4C8}',
+    icon: 'trending',
     badge: 'Updated',
     summary: 'Performance metrics with Recharts visualizations, CSV export, sentiment trends, and team performance tables.',
     steps: [
@@ -886,7 +990,7 @@ export const guideSections = [
   {
     id: 'reports',
     title: 'Reports & Exports',
-    icon: '\u{1F4C4}',
+    icon: 'document',
     summary: 'Generate PDF reports and export data as CSV.',
     steps: [
       'Navigate to Reports from the sidebar.',
@@ -926,7 +1030,7 @@ export const guideSections = [
   {
     id: 'ecosystem',
     title: 'Ecosystem Integration',
-    icon: '\u{1F310}',
+    icon: 'globe',
     summary: 'Connect Entomate with Pulse and Logos Vision for cross-app meeting sync and intelligence sharing.',
     steps: [
       'Navigate to Settings and open the Ecosystem section.',
@@ -987,7 +1091,7 @@ export const guideSections = [
   {
     id: 'meeting-intelligence',
     title: 'Meeting Intelligence Profiles',
-    icon: '\u{1F9E0}',
+    icon: 'brain',
     summary: 'AI profiles that customize how your meetings are analyzed, summarized, and followed up.',
     steps: [
       'Open a meeting or start a new one \u2014 the AI will suggest a matching intelligence profile.',
@@ -1051,9 +1155,9 @@ export const guideSections = [
   {
     id: 'settings',
     title: 'Settings',
-    icon: '\u2699\uFE0F',
+    icon: 'gear',
     badge: 'Updated',
-    summary: 'Configure appearance, audio, permissions, notifications, Slack, AI learning, and system connections.',
+    summary: 'Configure appearance, audio, permissions, notifications, Slack, AI learning, billing, organization, and system connections.',
     steps: [
       'Navigate to Settings from the sidebar.',
       'Choose Light, Dark, or System theme under Appearance.',
@@ -1166,8 +1270,7 @@ export const guideSections = [
   {
     id: 'keyboard-shortcuts',
     title: 'Keyboard Shortcuts',
-    icon: '\u2328\uFE0F',
-    badge: 'New',
+    icon: 'keyboard',
     summary: 'Full list of keyboard shortcuts for navigation, actions, and search.',
     steps: [
       'Press Ctrl+? to show the keyboard shortcuts help overlay at any time.',
@@ -1185,7 +1288,7 @@ export const guideSections = [
   {
     id: 'troubleshooting',
     title: 'Troubleshooting',
-    icon: '\u{1F527}',
+    icon: 'wrench',
     summary: 'Common issues, fixes, and frequently asked questions.',
     steps: [
       'Check this section when you encounter problems with Entomate.',
@@ -1323,6 +1426,29 @@ export const guideSections = [
           'Go to Settings > Audio & Recording.',
           'Choose Standard (64 kbps), High (128 kbps), or Maximum (256 kbps).',
           'Higher quality produces larger files but better transcription accuracy.',
+        ],
+      },
+      {
+        id: 'faq-org-archive',
+        title: 'What happens if I archive my organization?',
+        scenario: 'You need to understand the soft-delete recovery window.',
+        badge: 'New',
+        steps: [
+          'Archiving soft-deletes the organization. Members lose access immediately.',
+          'You have 30 days to restore it from the recovery screen.',
+          'After 30 days the organization and its data are permanently deleted.',
+          'Your personal account and profile are not affected.',
+        ],
+      },
+      {
+        id: 'faq-plan-change',
+        title: 'Can I change my plan later?',
+        scenario: 'You want to upgrade, downgrade, or switch billing cycles.',
+        badge: 'New',
+        steps: [
+          'Go to Settings > Billing at any time.',
+          'Toggle between Monthly and Yearly billing.',
+          'Click Upgrade on the plan you want — changes take effect immediately.',
         ],
       },
     ],

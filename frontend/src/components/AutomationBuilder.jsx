@@ -4,15 +4,19 @@ import {
   Play, AlertCircle, CheckCircle2, Bot, Bell, Mail, MessageSquare,
   Database, ArrowRight, Settings, X, Eye, Sparkles
 } from 'lucide-react'
+import {
+  TriggerMeetingProcessed, TriggerMeetingEnded, TriggerActionItem,
+  TriggerTaskCompleted, TriggerDealCreated, TriggerScheduled
+} from './icons/AnimatedIcons'
 
 // Available trigger types
 const TRIGGER_TYPES = [
-  { id: 'meeting_processed', name: 'Meeting Processed', icon: '📝', description: 'When a meeting is transcribed and analyzed' },
-  { id: 'meeting_ended', name: 'Meeting Ended', icon: '🎙️', description: 'When a meeting recording ends' },
-  { id: 'action_item_created', name: 'Action Item Created', icon: '📋', description: 'When a new action item is extracted' },
-  { id: 'task_completed', name: 'Task Completed', icon: '✅', description: 'When a task is marked complete' },
-  { id: 'deal_created', name: 'Deal Created', icon: '💰', description: 'When a CRM deal is created' },
-  { id: 'scheduled', name: 'Scheduled', icon: '🕐', description: 'Run on a schedule (cron)' },
+  { id: 'meeting_processed', name: 'Meeting Processed', icon: <TriggerMeetingProcessed size={18} />, description: 'When a meeting is transcribed and analyzed' },
+  { id: 'meeting_ended', name: 'Meeting Ended', icon: <TriggerMeetingEnded size={18} />, description: 'When a meeting recording ends' },
+  { id: 'action_item_created', name: 'Action Item Created', icon: <TriggerActionItem size={18} />, description: 'When a new action item is extracted' },
+  { id: 'task_completed', name: 'Task Completed', icon: <TriggerTaskCompleted size={18} />, description: 'When a task is marked complete' },
+  { id: 'deal_created', name: 'Deal Created', icon: <TriggerDealCreated size={18} />, description: 'When a CRM deal is created' },
+  { id: 'scheduled', name: 'Scheduled', icon: <TriggerScheduled size={18} />, description: 'Run on a schedule (cron)' },
 ]
 
 // Available action types
@@ -199,7 +203,7 @@ export default function AutomationBuilder({ onSave, onCancel, onTest, initialDat
                 }`}
               >
                 <div className="flex items-start gap-3">
-                  <span className="text-2xl">{trigger.icon}</span>
+                  <span className="flex items-center justify-center w-8 h-8">{trigger.icon}</span>
                   <div>
                     <h5 className="font-medium text-content-primary">{trigger.name}</h5>
                     <p className="text-sm text-content-tertiary mt-1">{trigger.description}</p>
@@ -438,7 +442,7 @@ export default function AutomationBuilder({ onSave, onCancel, onTest, initialDat
             <h5 className="font-medium text-content-primary mb-3">Automation Summary</h5>
 
             <div className="flex items-center gap-3 mb-3">
-              <span className="text-xl">{getTriggerType(triggerType)?.icon}</span>
+              <span className="flex items-center">{getTriggerType(triggerType)?.icon}</span>
               <div>
                 <p className="text-sm font-medium text-content-primary">
                   Trigger: {getTriggerType(triggerType)?.name}

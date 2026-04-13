@@ -11,7 +11,7 @@ import { VCButton, VCBadge, VCTimeline } from '../components/vc'
 import { useToast } from '../components/vc/ToastProvider'
 import EcosystemSyncStatus from '../components/EcosystemSyncStatus'
 import MeetingIntelligencePanel from '../components/intelligence/MeetingIntelligencePanel'
-import { getSentimentEmoji } from '../utils/meetingHelpers'
+import { getSentimentIcon } from '../utils/meetingHelpers'
 
 export default function MeetingDetail() {
   const { id } = useParams()
@@ -241,7 +241,7 @@ export default function MeetingDetail() {
         </Link>
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-2">
-            <span className="text-2xl">{getSentimentEmoji(meeting.sentiment_label)}</span>
+            <span className="flex items-center">{getSentimentIcon(meeting.sentiment_label, 28)}</span>
             {editingTitle ? (
               <div className="flex items-center gap-2 flex-1">
                 <input

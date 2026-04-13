@@ -7,6 +7,7 @@ import {
   GitBranch, Database, Globe, Layers, Presentation, UserPlus,
   AlertOctagon, Users, Workflow, Activity
 } from 'lucide-react'
+import AnimatedIcon, { iconRegistry } from '../components/icons/AnimatedIcons'
 
 // Map icon name strings to Lucide components for workflow templates
 const ICON_MAP = {
@@ -32,13 +33,18 @@ const ICON_MAP = {
   'settings': Settings
 }
 
-// Render icon - handles both emoji strings and Lucide icon names
+// Render icon - handles animated icon keys, Lucide icon names, and legacy React elements
 const renderTemplateIcon = (iconName, className = "w-6 h-6") => {
   if (!iconName) return <Workflow className={className} />
 
-  // Check if it's an emoji (starts with non-alphanumeric or is a single character)
-  if (/^[\u{1F300}-\u{1F9FF}]/u.test(iconName) || iconName.length <= 2) {
-    return <span className="text-2xl">{iconName}</span>
+  // If it's already a React element (JSX), render directly
+  if (React.isValidElement(iconName)) {
+    return iconName
+  }
+
+  // Check animated icon registry first
+  if (iconRegistry[iconName]) {
+    return <AnimatedIcon name={iconName} size={24} />
   }
 
   // Look up Lucide icon component

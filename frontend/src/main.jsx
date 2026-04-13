@@ -15,6 +15,9 @@ import './styles/main.css'
 // Import Void × Crimson component system
 import './styles/vc-components.css'
 
+// Import animated icon system
+import './styles/animated-icons.css'
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <ErrorBoundary>
