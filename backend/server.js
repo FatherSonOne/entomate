@@ -306,6 +306,9 @@ app.use('/api/settings', require('./routes/settings'));
 // AI Assistant (context-aware streaming)
 app.use('/api/assistant', require('./routes/assistant'));
 
+// Meeting bot fleet (admin) + bot status callbacks
+app.use('/api/admin/bots', require('./routes/bots'));
+
 
 // ========================================
 // SPA FALLBACK (production only)

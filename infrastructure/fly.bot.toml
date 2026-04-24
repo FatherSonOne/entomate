@@ -1,0 +1,36 @@
+# Fly.io app config for the Entomate bot fleet (P1.1).
+#
+# The app container holds the bot image; individual sessions are launched
+# on-demand as Machines by backend/services/botOrchestrator.js using the
+# Machines API. No [http_service] block — Machines are single-shot workers
+# that auto-destroy on exit, not a web service.
+#
+# First-time setup:
+#   fly apps create entomate-bot-fleet --org <your-org>
+#   fly secrets set FLY_API_TOKEN=...
+#   fly deploy --config infrastructure/fly.bot.toml \
+#              --dockerfile infrastructure/bot-image/Dockerfile \
+#              --build-only \
+#              --image-label latest
+#
+# The orchestrator then launches machines by reference to
+# registry.fly.io/entomate-bot-fleet:latest.
+
+app = "entomate-bot-fleet"
+primary_region = "iad"
+
+[build]
+  dockerfile = "infrastructure/bot-image/Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  LOG_LEVEL = "info"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 2048
+
+[metrics]
+  port = 9091
+  path = "/metrics"

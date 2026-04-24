@@ -1,0 +1,17 @@
+{
+  "name": "entomate-bot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Entomate meeting bot — Puppeteer-driven headless Chromium capturing meeting audio. Runs as a per-session Fly.io Machine.",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "build:docker": "docker build -t entomate-bot:local ."
+  },
+  "dependencies": {
+    "puppeteer-core": "^23.6.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
