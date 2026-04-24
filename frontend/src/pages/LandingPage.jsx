@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { guideSections, CATEGORIES, guideVersion, guideUpdated } from '../components/UsersGuide/guideData'
-import { Logo } from '../components/Logo'
+import { Logo, CircuitEMark } from '../components/Logo'
+import BackToTop from '../components/BackToTop'
 
 /* ════════════════════════════════════════════════════════
    ANIMATED SVG ICONS — replace every emoji on the page
@@ -1036,6 +1037,7 @@ export default function LandingPage() {
 
   return (
     <div className="landing-page" ref={landingRef}>
+      <BackToTop />
 
       {/* ── NAVIGATION ── */}
       <nav>
@@ -1296,21 +1298,35 @@ export default function LandingPage() {
             {/* Logos Vision */}
             <div className="trifecto-card">
               <div className="trifecto-icon logos-vision">
-                <svg width="28" height="28" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  {/* Eye shape — outer */}
-                  <path d="M6 32 C6 32 20 14 32 14 C44 14 58 32 58 32 C58 32 44 50 32 50 C20 50 6 32 6 32Z" stroke="#22D3EE" strokeWidth="2.5" fill="none" opacity="0.9"/>
-                  {/* Iris circle */}
-                  <circle cx="32" cy="32" r="10" stroke="#3B82F6" strokeWidth="2" fill="none" opacity="0.8"/>
-                  {/* Pupil core */}
-                  <circle cx="32" cy="32" r="4" fill="#22D3EE"/>
-                  {/* Neural nodes */}
-                  <circle cx="12" cy="24" r="2" fill="#22D3EE" opacity="0.5"/>
-                  <circle cx="52" cy="24" r="2" fill="#22D3EE" opacity="0.5"/>
-                  <circle cx="12" cy="40" r="2" fill="#3B82F6" opacity="0.5"/>
-                  <circle cx="52" cy="40" r="2" fill="#3B82F6" opacity="0.5"/>
-                  {/* Connecting lines */}
-                  <line x1="14" y1="24" x2="22" y2="28" stroke="#22D3EE" strokeWidth="1" opacity="0.3"/>
-                  <line x1="50" y1="24" x2="42" y2="28" stroke="#22D3EE" strokeWidth="1" opacity="0.3"/>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Logos Vision">
+                  {/* Compass-rose radial strokes */}
+                  <g stroke="#22D3EE" strokeWidth="1" strokeLinecap="round">
+                    <line x1="12" y1="6.5" x2="12" y2="3.5" />
+                    <line x1="16.95" y1="7.05" x2="18.5" y2="5.5" />
+                    <line x1="17.5" y1="12" x2="20.5" y2="12" />
+                    <line x1="16.95" y1="16.95" x2="18.5" y2="18.5" />
+                    <line x1="12" y1="17.5" x2="12" y2="20.5" />
+                    <line x1="7.05" y1="16.95" x2="5.5" y2="18.5" />
+                    <line x1="6.5" y1="12" x2="3.5" y2="12" />
+                    <line x1="7.05" y1="7.05" x2="5.5" y2="5.5" />
+                  </g>
+                  {/* Corner nodes */}
+                  <g fill="#22D3EE">
+                    <circle cx="12" cy="2" r="1.3" />
+                    <circle cx="19.5" cy="4.5" r="1.3" />
+                    <circle cx="22" cy="12" r="1.3" />
+                    <circle cx="19.5" cy="19.5" r="1.3" />
+                    <circle cx="12" cy="22" r="1.3" />
+                    <circle cx="4.5" cy="19.5" r="1.3" />
+                    <circle cx="2" cy="12" r="1.3" />
+                    <circle cx="4.5" cy="4.5" r="1.3" />
+                  </g>
+                  {/* Center figure */}
+                  <path
+                    fill="#22D3EE"
+                    fillRule="evenodd"
+                    d="M12 17.5a5.5 5.5 0 100-11 5.5 5.5 0 000 11zM12 12a2.5 2.5 0 100-5 2.5 2.5 0 000 5zm-3 4a1 1 0 011-1h4a1 1 0 011 1v-1.5a2.5 2.5 0 00-5 0V16z"
+                  />
                 </svg>
               </div>
               <div className="trifecto-product-name">Logos Vision</div>
@@ -1348,16 +1364,7 @@ export default function LandingPage() {
             {/* Entomate - ACTIVE */}
             <div className="trifecto-card active">
               <div className="trifecto-icon entomate">
-                <svg width="28" height="28" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
-                  <polyline points="6,30 6,20 9,16 11,14 11,11 12,14 13,11 14,14 15,10 16,14 17,11 17,15" fill="none" stroke="#FF2D6B" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                  <polygon points="6,30 6,20 10,22 12,26 10,30" fill="#FF2D6B" opacity="0.25" />
-                  <polyline points="30,30 30,20 27,16 25,14 25,11 24,14 23,11 22,14 21,10 20,14 19,11 19,15" fill="none" stroke="#FF2D6B" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                  <polygon points="30,30 30,20 26,22 24,26 26,30" fill="#FF2D6B" opacity="0.25" />
-                  <rect x="14" y="16" width="8" height="1.5" rx="0.75" fill="#FF2D6B" />
-                  <rect x="14" y="19" width="6" height="1.5" rx="0.75" fill="#FF2D6B" opacity="0.7" />
-                  <rect x="14" y="22" width="8" height="1.5" rx="0.75" fill="#FF2D6B" />
-                  <circle cx="18" cy="14" r="2.5" fill="#FFB800" opacity="0.9" />
-                </svg>
+                <CircuitEMark size={28} />
               </div>
               <div className="trifecto-product-name">Entomate</div>
               <div className="trifecto-product-role active">The Hands — You Are Here</div>
@@ -2072,8 +2079,8 @@ export default function LandingPage() {
             </div>
 
             <div className="footer-links">
-              <a href="#">Privacy</a>
-              <a href="#">Terms</a>
+              <Link to="/privacy">Privacy</Link>
+              <Link to="/terms">Terms</Link>
               <a href="#">Docs</a>
               <a href="#">Status</a>
             </div>

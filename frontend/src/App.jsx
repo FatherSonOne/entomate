@@ -27,6 +27,8 @@ const UsersGuide = React.lazy(() => import('./components/UsersGuide/UsersGuide')
 const SignIn = React.lazy(() => import('./pages/SignIn'))
 const AuthCallback = React.lazy(() => import('./pages/AuthCallback'))
 const LandingPage = React.lazy(() => import('./pages/LandingPage'))
+const PrivacyPolicy = React.lazy(() => import('./pages/PrivacyPolicy'))
+const Terms = React.lazy(() => import('./pages/Terms'))
 const NotFound = React.lazy(() => import('./pages/NotFound'))
 
 export default function App() {
@@ -36,6 +38,8 @@ export default function App() {
         <Routes>
           {/* Public routes */}
           <Route path="/" element={<LandingPage />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<Terms />} />
           <Route path="/sign-in" element={<SignIn />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
 
