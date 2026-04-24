@@ -1,0 +1,104 @@
+name: Cost Anomaly
+description: Flag a workspace, time range, or line item where variable COGS is higher than expected
+title: "[Cost] "
+labels: ["type: bug", "area: cost-ops", "cost-risk", "priority: P1"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Open this whenever the cost-monitoring dashboard surfaces anomalous spend — per-workspace, per-bot-session, or aggregate. Even small anomalies are worth capturing; at NPO pricing, margin is tight and patterns matter.
+
+  - type: input
+    id: workspace
+    attributes:
+      label: Affected Workspace(s)
+      description: Workspace ID or name. Use `aggregate` for platform-wide anomalies.
+      placeholder: "ws_abc123"
+    validations:
+      required: true
+
+  - type: input
+    id: detected-at
+    attributes:
+      label: Detected At
+      description: When was the anomaly first visible in the dashboard?
+      placeholder: "2026-05-14 09:45 UTC"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: line-item
+    attributes:
+      label: Line Item
+      options:
+        - "Bot compute (VM hours)"
+        - "Bot egress (bandwidth)"
+        - "Deepgram transcription"
+        - "LLM summarization"
+        - "LLM embeddings"
+        - "Storage"
+        - "Multiple / composite"
+        - "Unknown"
+    validations:
+      required: true
+
+  - type: input
+    id: expected
+    attributes:
+      label: Expected Cost
+      description: Based on current COGS model (see plan §8)
+      placeholder: "$0.71/meeting-hour"
+    validations:
+      required: true
+
+  - type: input
+    id: actual
+    attributes:
+      label: Actual Cost
+      description: What we observed
+      placeholder: "$2.34/meeting-hour"
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Dashboard screenshot, query output, or log snippet. Include time range.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: suspected-cause
+    attributes:
+      label: Suspected Cause
+      options:
+        - "Runaway bot session (failed to terminate)"
+        - "Workspace exceeding fair-use limits"
+        - "Misconfigured retry loop"
+        - "Vendor price increase"
+        - "Inefficient prompt / token bloat"
+        - "Bot VM oversubscription / idle time"
+        - "Compromised credentials (abuse)"
+        - "Unknown — needs investigation"
+    validations:
+      required: true
+
+  - type: textarea
+    id: immediate-mitigation
+    attributes:
+      label: Immediate Mitigation
+      description: What action was taken (if any) to stop the bleed? E.g., killed runaway sessions, capped workspace, paused feature.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: triage
+    attributes:
+      label: Triage Flags
+      options:
+        - label: Workspace contacted (if NPO-facing)
+        - label: Billing team notified (if billing impact)
+        - label: Pricing doc needs revisit (affects COGS model)
+        - label: Requires code change (not just ops action)
+        - label: Root-cause analysis required before closing

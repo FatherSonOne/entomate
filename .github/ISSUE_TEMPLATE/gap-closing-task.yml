@@ -1,0 +1,110 @@
+name: Gap-Closing Task
+description: A task from the gap-closing roadmap (P1.x, P2.x, P3.x, P4.x)
+title: "[Gap] "
+labels: ["type: feature"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for any task tied to `ENTOMATE_GAP_CLOSING_PLAN.md`. If the work isn't in the plan, either (a) add it to the plan first, or (b) use a different template.
+
+  - type: input
+    id: task-id
+    attributes:
+      label: Task ID
+      description: Matches an ID in the gap-closing plan (e.g., `P1.2`, `P2.4`). Use `n/a` if this is a sub-task not yet in the plan.
+      placeholder: "P1.2"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: phase
+    attributes:
+      label: Phase
+      options:
+        - "Phase 1 — Meet Bot + Table Stakes"
+        - "Phase 1.5 — Zoom + Teams Expansion"
+        - "Phase 2 — Differentiators"
+        - "Phase 3 — Foundation Tier"
+        - "Phase 4 — Ecosystem Depth"
+        - "Cross-cutting / ongoing"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: tier-impact
+    attributes:
+      label: Tier Impact
+      description: Which pricing tier's value prop does this support?
+      options:
+        - steward
+        - mission
+        - foundation
+        - all
+    validations:
+      required: true
+
+  - type: input
+    id: estimate
+    attributes:
+      label: Effort Estimate (eng-weeks)
+      description: From the plan, or your re-estimate. Flag if materially higher than plan.
+      placeholder: "2.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What & Why
+      description: One paragraph on what this task does and why it matters for the tier/phase. Assume the reader has read the plan.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: Specific, testable conditions for "done." Use checkbox list.
+      value: |
+        - [ ]
+        - [ ]
+        - [ ]
+    validations:
+      required: true
+
+  - type: textarea
+    id: ecosystem-angle
+    attributes:
+      label: Ecosystem Angle
+      description: How does this tie to Pulse or Logos Vision? If no angle exists, explain why the feature is still worth building.
+    validations:
+      required: false
+
+  - type: textarea
+    id: success-metric
+    attributes:
+      label: Success Metric
+      description: How will we know this shipped well? Quantify where possible.
+      placeholder: "e.g., bot auto-join success rate ≥97% across 100 Meet sessions"
+    validations:
+      required: true
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: Other issues, external approvals, design-partner input, etc.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: risk-flags
+    attributes:
+      label: Risk Flags
+      options:
+        - label: Touches bot reliability (requires regression test)
+        - label: Affects variable COGS (requires cost-ops review)
+        - label: Requires legal review (consent, retention, PII)
+        - label: Requires design-partner sign-off before GA
+        - label: Blocks a milestone exit criterion

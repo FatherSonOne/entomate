@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Gap-Closing Plan
+    url: https://github.com/Aegis-FM/entomate/blob/main/docs/plans/ENTOMATE_GAP_CLOSING_PLAN.md
+    about: Read the gap-closing plan before opening a feature task.
+  - name: Pricing Reference
+    url: https://github.com/Aegis-FM/entomate/blob/main/docs/plans/ENTOMATE_PRICING.md
+    about: Current tier structure and margin assumptions.

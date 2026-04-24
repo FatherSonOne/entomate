@@ -1,0 +1,116 @@
+name: Design Partner Feedback
+description: Capture structured feedback from an NPO design partner
+title: "[DP Feedback] "
+labels: ["type: design-partner", "status: needs-design-partner-review"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for any substantive feedback from a design partner — feature gaps, pain points, confusion, quotes worth preserving for marketing. One issue per distinct piece of feedback so they can be triaged individually.
+
+  - type: input
+    id: partner
+    attributes:
+      label: NPO / Partner Name
+      placeholder: "Riverside Community Foundation"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: partner-size
+    attributes:
+      label: Partner Size
+      options:
+        - "Small (1–5 staff)"
+        - "Medium (10–50 staff)"
+        - "Large (100+ staff)"
+    validations:
+      required: true
+
+  - type: input
+    id: contact
+    attributes:
+      label: Primary Contact
+      description: Name + role of the person who gave the feedback
+      placeholder: "Jane Doe, ED"
+    validations:
+      required: true
+
+  - type: input
+    id: session-date
+    attributes:
+      label: Feedback Session Date
+      placeholder: "2026-05-14"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: feedback-type
+    attributes:
+      label: Feedback Type
+      options:
+        - "Feature gap (wants something we don't have)"
+        - "Usability issue (has it, can't use it)"
+        - "Bug / reliability issue"
+        - "Pricing / tier concern"
+        - "Positive signal / quote for marketing"
+        - "Ecosystem integration request"
+        - "Workflow confusion"
+        - "Other"
+    validations:
+      required: true
+
+  - type: textarea
+    id: quote
+    attributes:
+      label: Direct Quote (if applicable)
+      description: Preserve their words. These are gold for marketing and for sharpening product copy.
+      placeholder: "\"I need to know which board member actually agreed to what — the summary buries it.\""
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What were they trying to do? What happened? What did they expect?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - "Blocker — they've stopped using the product"
+        - "High — workaround exists but painful"
+        - "Medium — annoyance that reduces value"
+        - "Low — nice-to-have"
+        - "Positive — not a problem, just recording"
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshot-link
+    attributes:
+      label: Screenshots / Recording Link
+      description: Loom, Figma, or image paste.
+    validations:
+      required: false
+
+  - type: textarea
+    id: proposed-action
+    attributes:
+      label: Proposed Action
+      description: What should we do with this feedback? Link to a gap-closing-task issue if creating one.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: permissions
+    attributes:
+      label: Permissions
+      options:
+        - label: Partner has consented to anonymized quote use in product/marketing
+        - label: Partner has consented to named case-study use
+        - label: Partner has requested this feedback be kept private (do not repeat)
