@@ -14,24 +14,44 @@
 'use strict';
 
 const fs = require('fs');
-const puppeteer = require('puppeteer-core');
+const puppeteerCore = require('puppeteer-core');
+const { addExtra } = require('puppeteer-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+
+// Wrap puppeteer-core with the puppeteer-extra plugin system and enable
+// stealth — defeats the basic automation fingerprints Google Meet checks for
+// (navigator.webdriver, missing chrome.runtime, suspicious UA, etc.).
+const puppeteer = addExtra(puppeteerCore);
+puppeteer.use(StealthPlugin());
 
 const TERMINAL_STATUSES = new Set(['completed', 'failed', 'stopped', 'timeout']);
 
 function readEnv() {
   const config = {
+    // Per-session config (set by orchestrator at Machine launch)
     sessionId: process.env.BOT_SESSION_ID,
     workspaceId: process.env.BOT_WORKSPACE_ID,
     meetingId: process.env.BOT_MEETING_ID,
     meetingUrl: process.env.BOT_MEETING_URL,
     platform: process.env.BOT_PLATFORM || 'meet',
-    botName: process.env.BOT_DISPLAY_NAME || 'Entomate Notetaker',
     maxDurationMs: parseInt(process.env.BOT_MAX_DURATION_MS || `${3 * 60 * 60 * 1000}`, 10),
     callbackUrl: process.env.BOT_CALLBACK_URL || '',
     callbackToken: process.env.BOT_CALLBACK_TOKEN || '',
+
+    // Runtime
     audioDir: process.env.BOT_AUDIO_DIR || '/tmp/bot-audio',
     chromiumPath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
-    headless: process.env.BOT_HEADLESS !== 'false'
+    headless: process.env.BOT_HEADLESS !== 'false',
+
+    // Meet Mate identity — used by drivers/<platform>.js to authenticate the
+    // headless Chromium session before joining the meeting. P1.2 Pass 2 adds
+    // the actual login flow that consumes these.
+    identity: {
+      email: process.env.MEET_MATE_EMAIL || '',
+      password: process.env.MEET_MATE_PASSWORD || '',
+      totpSecret: process.env.MEET_MATE_TOTP_SECRET || '',
+      displayName: process.env.MEET_MATE_DISPLAY_NAME || 'Meet Mate'
+    }
   };
 
   const required = ['sessionId', 'workspaceId', 'meetingId', 'meetingUrl'];
@@ -91,21 +111,28 @@ async function launchBrowser(config) {
 }
 
 /**
- * P1.1 placeholder. P1.2 replaces this with a real platform driver that:
- *   1. Navigates to the meeting URL
- *   2. Sets display name + microphone off + camera off
- *   3. Submits join request, handles waiting room
- *   4. Announces in chat
- *   5. Starts loopback audio capture → streams to Deepgram
- *   6. Monitors meeting-ended signals
+ * P1.1 placeholder. P1.2 Pass 2 replaces this with a real platform driver
+ * dispatched from src/drivers/<platform>.js that:
+ *   1. Logs the bot in as the Meet Mate Google account using config.identity
+ *      (email + password + TOTP via otplib)
+ *   2. Navigates to the meeting URL
+ *   3. Sets display name + microphone off + camera off
+ *   4. Submits join request, handles waiting room
+ *   5. Announces in chat
+ *   6. Starts loopback audio capture → streams to Deepgram
+ *   7. Monitors meeting-ended signals
  */
 async function runPlatformDriver(browser, config) {
   const page = await browser.newPage();
   try {
-    slog('info', 'navigate', { url: config.meetingUrl, platform: config.platform });
+    slog('info', 'navigate', {
+      url: config.meetingUrl,
+      platform: config.platform,
+      hasIdentity: Boolean(config.identity.email && config.identity.totpSecret)
+    });
     await page.goto(config.meetingUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await reportStatus(config, 'in_call', { placeholder: true });
-    slog('info', 'placeholder_dwell', { note: 'P1.2 replaces this with real driver' });
+    slog('info', 'placeholder_dwell', { note: 'P1.2 Pass 2 replaces this with real driver' });
     await new Promise((resolve) => setTimeout(resolve, 5000));
   } finally {
     await page.close().catch(() => {});

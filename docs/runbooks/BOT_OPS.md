@@ -21,13 +21,26 @@ reuse across sessions. Session state lives in `bot_sessions` (Supabase).
 
 ## Required env / secrets (backend)
 
+### Fly fleet
 | Var | Where | Purpose |
 |---|---|---|
 | `FLY_API_TOKEN` | Render backend secret | Fly Machines API auth |
 | `FLY_BOT_APP_NAME` | default `entomate-bot-fleet` | Fly app that owns the bots |
 | `FLY_BOT_IMAGE` | default `registry.fly.io/entomate-bot-fleet:latest` | Bot image reference |
 | `FLY_BOT_REGION` | default `sjc` | Fly region (San Jose, near Supabase us-west-2) |
-| `BOT_CALLBACK_BASE_URL` | e.g. `https://api.entomate.com` | Base URL the bot POSTs status to |
+| `BOT_CALLBACK_BASE_URL` | e.g. `https://entomate.onrender.com` | Base URL the bot POSTs status to |
+
+### Meet Mate identity (orchestrator passes these to each Machine at launch)
+| Var | Notes |
+|---|---|
+| `MEET_MATE_EMAIL` | Bot Google account email |
+| `MEET_MATE_PASSWORD` | Bot Google account password |
+| `MEET_MATE_TOTP_SECRET` | Raw base32 TOTP seed; consumed by `otplib` to clear 2SV |
+| `MEET_MATE_DISPLAY_NAME` | Default `Meet Mate`; per-launch override possible via `botName` |
+| `MEET_MATE_RECOVERY_EMAIL` | Backend-only metadata (not passed to Machine) |
+| `MEET_MATE_BACKUP_CODES_REF` | Backend-only metadata (pointer to password manager) |
+| `MEET_MATE_ACCOUNT_TYPE` | Backend-only — `workspace` or `personal` |
+| `MEET_MATE_WORKSPACE_DOMAIN` | Backend-only metadata |
 
 ## First-time setup
 

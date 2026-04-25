@@ -28,6 +28,7 @@ docker build -t entomate-bot:local .
 
 ## Env vars (consumed at runtime)
 
+### Per-session (set by orchestrator at Machine launch)
 | Var | Required | Purpose |
 |---|---|---|
 | `BOT_SESSION_ID` | yes | UUID of the `bot_sessions` row |
@@ -35,10 +36,20 @@ docker build -t entomate-bot:local .
 | `BOT_MEETING_ID` | yes | Entomate meeting ID |
 | `BOT_MEETING_URL` | yes | Platform URL (Meet/Zoom/Teams link) |
 | `BOT_PLATFORM` | no (default `meet`) | One of `meet` / `zoom` / `teams` |
-| `BOT_DISPLAY_NAME` | no | Participant name shown in-meeting |
 | `BOT_MAX_DURATION_MS` | no | Hard timeout; default 3h |
 | `BOT_CALLBACK_URL` | no | POST target for status updates |
 | `BOT_CALLBACK_TOKEN` | no | Bearer token for the callback |
+
+### Meet Mate identity (passed through from backend env, used by login driver)
+| Var | Required for join? | Purpose |
+|---|---|---|
+| `MEET_MATE_EMAIL` | yes (P1.2 Pass 2+) | Bot Google account email |
+| `MEET_MATE_PASSWORD` | yes | Bot Google account password |
+| `MEET_MATE_TOTP_SECRET` | yes | Raw base32 TOTP seed for 2SV (consumed by `otplib`) |
+| `MEET_MATE_DISPLAY_NAME` | no (default `Meet Mate`) | Participant name rendered in Meet UI |
+
+> Pass 1 reads these into `config.identity` but does not yet log in.
+> Pass 2 implements the full login + Meet join flow.
 
 See [`docs/runbooks/BOT_OPS.md`](../../docs/runbooks/BOT_OPS.md) for ops
 procedures.

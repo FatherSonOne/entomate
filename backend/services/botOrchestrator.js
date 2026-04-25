@@ -93,6 +93,24 @@ async function launchBotSession(p) {
     });
   if (insertErr) throw new Error(`bot_sessions insert failed: ${insertErr.message}`);
 
+  // Meet Mate identity creds are passed through from backend env to the
+  // Machine. They live on the backend as MEET_MATE_*, mirrored 1:1 into the
+  // Machine's env so the bot doesn't have to translate naming.
+  const meetMateEmail = process.env.MEET_MATE_EMAIL || '';
+  const meetMatePassword = process.env.MEET_MATE_PASSWORD || '';
+  const meetMateTotpSecret = process.env.MEET_MATE_TOTP_SECRET || '';
+  const meetMateDisplayName =
+    botName || process.env.MEET_MATE_DISPLAY_NAME || 'Meet Mate';
+
+  if (!meetMateEmail || !meetMatePassword || !meetMateTotpSecret) {
+    log.warn('Bot launch missing Meet Mate identity env — bot will fail at login', {
+      sessionId,
+      hasEmail: Boolean(meetMateEmail),
+      hasPassword: Boolean(meetMatePassword),
+      hasTotpSecret: Boolean(meetMateTotpSecret)
+    });
+  }
+
   const machineConfig = {
     region: REGION,
     config: {
@@ -106,12 +124,17 @@ async function launchBotSession(p) {
         BOT_MEETING_ID: meetingId,
         BOT_MEETING_URL: meetingUrl,
         BOT_PLATFORM: platform,
-        BOT_DISPLAY_NAME: botName || 'Entomate Notetaker',
         BOT_MAX_DURATION_MS: String(maxDurationMs || DEFAULT_MAX_DURATION_MS),
         BOT_CALLBACK_URL: CALLBACK_BASE
           ? `${CALLBACK_BASE}/api/admin/bots/${sessionId}/callback`
           : '',
-        BOT_CALLBACK_TOKEN: callbackToken
+        BOT_CALLBACK_TOKEN: callbackToken,
+
+        // Meet Mate identity — consumed by src/drivers/<platform>.js (P1.2 Pass 2)
+        MEET_MATE_EMAIL: meetMateEmail,
+        MEET_MATE_PASSWORD: meetMatePassword,
+        MEET_MATE_TOTP_SECRET: meetMateTotpSecret,
+        MEET_MATE_DISPLAY_NAME: meetMateDisplayName
       },
       metadata: { session_id: sessionId, workspace_id: workspaceId, platform }
     }
