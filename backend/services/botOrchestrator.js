@@ -1,12 +1,22 @@
 /**
- * Bot Orchestrator — Fly.io Machines client.
+ * Bot Orchestrator — Recall.ai client.
  *
- * Launches per-session meeting bots as ephemeral Fly Machines, tracks state
- * in the `bot_sessions` table, and exposes launch / stop / list / logs for
- * admin operations and future schedulers.
+ * Launches per-meeting recording bots via Recall.ai's API instead of
+ * spinning our own Fly Machines. Recall handles bot identity, anti-bot
+ * detection, audio capture, and platform-specific quirks (Meet/Zoom/
+ * Teams). We track session state in `bot_sessions` and react to Recall
+ * webhook events posted to /api/admin/bots/recall-webhook.
  *
- * See docs/plans/ENTOMATE_GAP_CLOSING_PLAN.md (P1.1) and
- * docs/runbooks/BOT_OPS.md.
+ * Decision: pivoted from in-house Fly bot (P1.2 Pass 2) after Google
+ * served CAPTCHA challenges to our datacenter IP + headless Chromium
+ * combo. See docs/plans/ENTOMATE_GAP_CLOSING_PLAN.md §8 for the original
+ * build-vs-buy tradeoff. To be revisited at M-PR pricing checkpoint.
+ *
+ * Env vars:
+ *   RECALL_API_KEY         — required, from Recall.ai dashboard
+ *   RECALL_API_BASE        — default https://us-east-1.recall.ai/api/v1
+ *   RECALL_WEBHOOK_TOKEN   — random secret matched in webhook URL query
+ *   BOT_CALLBACK_BASE_URL  — public URL of this backend (for webhook)
  */
 
 'use strict';
@@ -15,61 +25,59 @@ const crypto = require('crypto');
 const { supabaseAdmin } = require('../config/supabase');
 const log = require('../utils/log');
 
-// All bot_sessions mutations bypass RLS; end-user reads go through the public
-// anon client elsewhere via the `bot_sessions_select` policy.
+const RECALL_API_BASE = process.env.RECALL_API_BASE || 'https://us-east-1.recall.ai/api/v1';
+const CALLBACK_BASE = process.env.BOT_CALLBACK_BASE_URL || '';
+const DEFAULT_BOT_NAME = 'Meet Mate';
+
 const db = () => {
   if (!supabaseAdmin) throw new Error('SUPABASE_SERVICE_KEY is not set');
   return supabaseAdmin;
 };
 
-const FLY_API = 'https://api.machines.dev/v1';
-const APP = process.env.FLY_BOT_APP_NAME || 'entomate-bot-fleet';
-const IMAGE = process.env.FLY_BOT_IMAGE || `registry.fly.io/${APP}:latest`;
-const REGION = process.env.FLY_BOT_REGION || 'sjc';
-const CALLBACK_BASE = process.env.BOT_CALLBACK_BASE_URL || '';
-const DEFAULT_MAX_DURATION_MS = 3 * 60 * 60 * 1000;
-
 function authHeaders() {
-  const token = process.env.FLY_API_TOKEN;
-  if (!token) throw new Error('FLY_API_TOKEN is not set');
+  const token = process.env.RECALL_API_KEY;
+  if (!token) throw new Error('RECALL_API_KEY is not set');
   return {
-    Authorization: `Bearer ${token}`,
+    Authorization: `Token ${token}`,
     'Content-Type': 'application/json'
   };
 }
 
-async function flyFetch(path, options = {}) {
-  const res = await fetch(`${FLY_API}${path}`, {
+async function recallFetch(path, options = {}) {
+  const res = await fetch(`${RECALL_API_BASE}${path}`, {
     ...options,
     headers: { ...authHeaders(), ...(options.headers || {}) }
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    throw new Error(`Fly API ${res.status} @ ${path}: ${text.slice(0, 500)}`);
+    throw new Error(`Recall API ${res.status} @ ${path}: ${text.slice(0, 500)}`);
   }
   if (res.status === 204) return null;
   const ct = res.headers.get('content-type') || '';
   return ct.includes('application/json') ? res.json() : res.text();
 }
 
-function hashToken(token) {
-  return crypto.createHash('sha256').update(token).digest('hex');
+function webhookUrl(sessionId) {
+  if (!CALLBACK_BASE) return '';
+  const token = process.env.RECALL_WEBHOOK_TOKEN || '';
+  const params = new URLSearchParams({ session: sessionId });
+  if (token) params.set('token', token);
+  return `${CALLBACK_BASE}/api/admin/bots/recall-webhook?${params.toString()}`;
 }
 
 /**
  * Launch a new bot session.
  *
  * @param {Object} p
- * @param {string} p.workspaceId   org_id
+ * @param {string} p.workspaceId
  * @param {string} p.meetingId
  * @param {string} p.meetingUrl
  * @param {'meet'|'zoom'|'teams'} p.platform
  * @param {string} [p.botName]
- * @param {number} [p.maxDurationMs]
- * @returns {Promise<{sessionId: string, machineId: string}>}
+ * @returns {Promise<{sessionId: string, recallBotId: string}>}
  */
 async function launchBotSession(p) {
-  const { workspaceId, meetingId, meetingUrl, platform, botName, maxDurationMs } = p || {};
+  const { workspaceId, meetingId, meetingUrl, platform, botName } = p || {};
   if (!workspaceId || !meetingId || !meetingUrl || !platform) {
     throw new Error('launchBotSession: workspaceId, meetingId, meetingUrl, platform are required');
   }
@@ -78,7 +86,6 @@ async function launchBotSession(p) {
   }
 
   const sessionId = crypto.randomUUID();
-  const callbackToken = crypto.randomBytes(32).toString('hex');
 
   const { error: insertErr } = await db()
     .from('bot_sessions')
@@ -89,99 +96,68 @@ async function launchBotSession(p) {
       platform,
       status: 'pending',
       meeting_url: meetingUrl,
-      callback_token_hash: hashToken(callbackToken)
+      callback_token_hash: 'recall' // legacy column; not used in Recall path
     });
   if (insertErr) throw new Error(`bot_sessions insert failed: ${insertErr.message}`);
 
-  // Meet Mate identity creds are passed through from backend env to the
-  // Machine. They live on the backend as MEET_MATE_*, mirrored 1:1 into the
-  // Machine's env so the bot doesn't have to translate naming.
-  const meetMateEmail = process.env.MEET_MATE_EMAIL || '';
-  const meetMatePassword = process.env.MEET_MATE_PASSWORD || '';
-  const meetMateTotpSecret = process.env.MEET_MATE_TOTP_SECRET || '';
-  const meetMateDisplayName =
-    botName || process.env.MEET_MATE_DISPLAY_NAME || 'Meet Mate';
-
-  if (!meetMateEmail || !meetMatePassword || !meetMateTotpSecret) {
-    log.warn('Bot launch missing Meet Mate identity env — bot will fail at login', {
-      sessionId,
-      hasEmail: Boolean(meetMateEmail),
-      hasPassword: Boolean(meetMatePassword),
-      hasTotpSecret: Boolean(meetMateTotpSecret)
-    });
-  }
-
-  const machineConfig = {
-    region: REGION,
-    config: {
-      image: IMAGE,
-      auto_destroy: true,
-      restart: { policy: 'no' },
-      guest: { cpu_kind: 'shared', cpus: 2, memory_mb: 4096 },
-      env: {
-        BOT_SESSION_ID: sessionId,
-        BOT_WORKSPACE_ID: workspaceId,
-        BOT_MEETING_ID: meetingId,
-        BOT_MEETING_URL: meetingUrl,
-        BOT_PLATFORM: platform,
-        BOT_MAX_DURATION_MS: String(maxDurationMs || DEFAULT_MAX_DURATION_MS),
-        BOT_CALLBACK_URL: CALLBACK_BASE
-          ? `${CALLBACK_BASE}/api/admin/bots/${sessionId}/callback`
-          : '',
-        BOT_CALLBACK_TOKEN: callbackToken,
-
-        // Meet Mate identity — consumed by src/drivers/<platform>.js (P1.2 Pass 2)
-        MEET_MATE_EMAIL: meetMateEmail,
-        MEET_MATE_PASSWORD: meetMatePassword,
-        MEET_MATE_TOTP_SECRET: meetMateTotpSecret,
-        MEET_MATE_DISPLAY_NAME: meetMateDisplayName
-      },
-      metadata: { session_id: sessionId, workspace_id: workspaceId, platform }
+  const recallPayload = {
+    meeting_url: meetingUrl,
+    bot_name: botName || DEFAULT_BOT_NAME,
+    webhook_url: webhookUrl(sessionId),
+    metadata: {
+      session_id: sessionId,
+      workspace_id: workspaceId,
+      meeting_id: meetingId,
+      platform
     }
   };
 
-  let machine;
+  let bot;
   try {
-    machine = await flyFetch(`/apps/${APP}/machines`, {
+    bot = await recallFetch('/bot/', {
       method: 'POST',
-      body: JSON.stringify(machineConfig)
+      body: JSON.stringify(recallPayload)
     });
   } catch (err) {
     await db()
       .from('bot_sessions')
       .update({
         status: 'failed',
-        failure_reason: `launch_failed: ${err.message}`,
+        failure_reason: `recall_launch_failed: ${err.message}`,
         ended_at: new Date().toISOString()
       })
       .eq('id', sessionId);
-    log.error('Bot launch failed', { sessionId, error: err.message });
+    log.error('Recall bot launch failed', { sessionId, error: err.message });
     throw err;
   }
 
   const { error: updErr } = await db()
     .from('bot_sessions')
-    .update({ status: 'launching', machine_id: machine.id, started_at: new Date().toISOString() })
+    .update({
+      status: 'launching',
+      recall_bot_id: bot.id,
+      started_at: new Date().toISOString()
+    })
     .eq('id', sessionId);
   if (updErr) log.warn('bot_sessions post-launch update failed', { sessionId, error: updErr.message });
 
-  log.info('Bot session launched', { sessionId, machineId: machine.id, platform });
-  return { sessionId, machineId: machine.id };
+  log.info('Recall bot launched', { sessionId, recallBotId: bot.id, platform });
+  return { sessionId, recallBotId: bot.id };
 }
 
 /**
- * Stop a running bot session (manual kill via admin).
+ * Stop a running bot session.
  */
 async function stopBotSession(sessionId, reason = 'manual_stop') {
   const { data: session, error } = await db()
     .from('bot_sessions')
-    .select('machine_id, status')
+    .select('recall_bot_id, status')
     .eq('id', sessionId)
     .single();
   if (error || !session) throw new Error(`Session not found: ${sessionId}`);
-  if (!session.machine_id) throw new Error(`Session ${sessionId} has no machine_id`);
+  if (!session.recall_bot_id) throw new Error(`Session ${sessionId} has no recall_bot_id`);
 
-  await flyFetch(`/apps/${APP}/machines/${session.machine_id}?force=true`, { method: 'DELETE' });
+  await recallFetch(`/bot/${session.recall_bot_id}/leave_call/`, { method: 'POST' });
 
   const { error: updErr } = await db()
     .from('bot_sessions')
@@ -189,8 +165,8 @@ async function stopBotSession(sessionId, reason = 'manual_stop') {
     .eq('id', sessionId);
   if (updErr) log.warn('bot_sessions post-stop update failed', { sessionId, error: updErr.message });
 
-  log.info('Bot session stopped', { sessionId, machineId: session.machine_id, reason });
-  return { sessionId, machineId: session.machine_id };
+  log.info('Recall bot stopped', { sessionId, recallBotId: session.recall_bot_id, reason });
+  return { sessionId, recallBotId: session.recall_bot_id };
 }
 
 async function listActiveSessions() {
@@ -203,50 +179,80 @@ async function listActiveSessions() {
   return data || [];
 }
 
-async function getSessionLogs(sessionId, limit = 500) {
+/**
+ * Fetch the bot's full state from Recall (status history, recording URL,
+ * transcript URL once available). Useful for admin debugging and for
+ * recovering from missed webhooks.
+ */
+async function getRecallBotState(sessionId) {
   const { data: session, error } = await db()
     .from('bot_sessions')
-    .select('machine_id')
+    .select('recall_bot_id')
     .eq('id', sessionId)
     .single();
-  if (error || !session?.machine_id) throw new Error(`Session ${sessionId} has no machine_id`);
-  return flyFetch(`/apps/${APP}/machines/${session.machine_id}/logs?limit=${limit}`);
+  if (error || !session?.recall_bot_id) throw new Error(`Session ${sessionId} has no recall_bot_id`);
+  return recallFetch(`/bot/${session.recall_bot_id}/`);
 }
 
 /**
- * Bot → orchestrator status callback. Token is verified against
- * bot_sessions.callback_token_hash (SHA-256).
+ * Map Recall's status codes to our bot_sessions.status enum.
  */
-async function handleBotCallback(sessionId, rawToken, payload) {
-  if (!sessionId || !rawToken) throw new Error('Missing session or token');
+function mapRecallStatus(code) {
+  const map = {
+    ready: 'pending',
+    joining_call: 'joining',
+    in_waiting_room: 'joining',
+    in_call_not_recording: 'in_call',
+    in_call_recording: 'in_call',
+    recording_done: 'completed',
+    call_ended: 'completed',
+    done: 'completed',
+    fatal: 'failed',
+    timeout: 'timeout'
+  };
+  return map[code] || null;
+}
 
-  const { data: session, error } = await db()
-    .from('bot_sessions')
-    .select('callback_token_hash, status')
-    .eq('id', sessionId)
-    .single();
-  if (error || !session) throw new Error('Session not found');
+/**
+ * Process an inbound Recall webhook event. The token query param is
+ * verified by the route layer before this is called.
+ *
+ * @param {string} sessionId — from webhook URL ?session=...
+ * @param {Object} payload   — Recall webhook body (event + data)
+ */
+async function handleRecallWebhook(sessionId, payload) {
+  if (!sessionId) throw new Error('Missing session id');
 
-  const provided = hashToken(rawToken);
-  if (
-    provided.length !== session.callback_token_hash.length ||
-    !crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(session.callback_token_hash))
-  ) {
-    throw new Error('Invalid callback token');
-  }
+  const event = payload?.event;
+  const data = payload?.data || {};
+  const statusCode = data?.status?.code;
+  const mapped = mapRecallStatus(statusCode);
 
-  const update = { last_callback_at: new Date().toISOString() };
-  if (payload?.status) update.status = payload.status;
-  if (payload?.error) update.failure_reason = payload.error;
-  if (['completed', 'failed', 'timeout', 'stopped'].includes(payload?.status)) {
+  log.info('Recall webhook', { sessionId, event, statusCode, mapped });
+
+  const update = {};
+  if (mapped) update.status = mapped;
+  if (mapped && ['completed', 'failed', 'stopped', 'timeout'].includes(mapped)) {
     update.ended_at = new Date().toISOString();
   }
 
-  const { error: updErr } = await db()
-    .from('bot_sessions')
-    .update(update)
-    .eq('id', sessionId);
-  if (updErr) throw updErr;
+  // Recall sends the recording URL on bot.done or bot.recording.done
+  if (event === 'bot.done' || event === 'bot.recording.done') {
+    if (data?.recording?.media_url) update.recording_url = data.recording.media_url;
+    if (data?.transcript?.url) update.transcript_url = data.transcript.url;
+  }
+
+  if (event === 'bot.fatal' && data?.fatal_reason) {
+    update.failure_reason = String(data.fatal_reason).slice(0, 500);
+  }
+
+  if (Object.keys(update).length > 0) {
+    const { error: updErr } = await db()
+      .from('bot_sessions')
+      .update(update)
+      .eq('id', sessionId);
+    if (updErr) throw updErr;
+  }
 
   return { ok: true };
 }
@@ -255,7 +261,7 @@ module.exports = {
   launchBotSession,
   stopBotSession,
   listActiveSessions,
-  getSessionLogs,
-  handleBotCallback,
-  _internal: { hashToken, flyFetch }
+  getRecallBotState,
+  handleRecallWebhook,
+  _internal: { mapRecallStatus, recallFetch }
 };

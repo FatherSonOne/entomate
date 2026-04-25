@@ -1,9 +1,10 @@
 /**
  * Bot admin routes — mounted at /api/admin/bots.
  *
- * All management endpoints are admin-only; the callback endpoint is
- * authenticated by the bearer token baked into the Machine at launch
- * (verified inside the orchestrator).
+ * Recall.ai-backed (after pivoting from in-house Fly bots, see
+ * botOrchestrator.js header). Admin endpoints unchanged externally;
+ * the callback endpoint is replaced by a Recall webhook receiver
+ * authenticated by a shared token in the URL query string.
  */
 
 const express = require('express');
@@ -13,12 +14,12 @@ const log = require('../utils/log');
 
 const router = express.Router();
 
-/** POST /api/admin/bots/launch — manually launch a bot session. */
+/** POST /api/admin/bots/launch — launch a new bot session. */
 router.post('/launch', authenticate, authorize(['admin']), async (req, res) => {
   try {
-    const { workspaceId, meetingId, meetingUrl, platform, botName, maxDurationMs } = req.body || {};
+    const { workspaceId, meetingId, meetingUrl, platform, botName } = req.body || {};
     const result = await orchestrator.launchBotSession({
-      workspaceId, meetingId, meetingUrl, platform, botName, maxDurationMs
+      workspaceId, meetingId, meetingUrl, platform, botName
     });
     res.status(201).json(result);
   } catch (err) {
@@ -38,7 +39,7 @@ router.get('/', authenticate, authorize(['admin']), async (req, res) => {
   }
 });
 
-/** DELETE /api/admin/bots/:sessionId — manual kill. */
+/** DELETE /api/admin/bots/:sessionId — stop. */
 router.delete('/:sessionId', authenticate, authorize(['admin']), async (req, res) => {
   try {
     const reason = req.body?.reason || 'manual_stop';
@@ -50,37 +51,41 @@ router.delete('/:sessionId', authenticate, authorize(['admin']), async (req, res
   }
 });
 
-/** GET /api/admin/bots/:sessionId/logs — recent Fly logs. */
-router.get('/:sessionId/logs', authenticate, authorize(['admin']), async (req, res) => {
+/** GET /api/admin/bots/:sessionId/state — fetch full Recall bot state. */
+router.get('/:sessionId/state', authenticate, authorize(['admin']), async (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit, 10) || 500, 5000);
-    const logs = await orchestrator.getSessionLogs(req.params.sessionId, limit);
-    res.json({ logs });
+    const state = await orchestrator.getRecallBotState(req.params.sessionId);
+    res.json(state);
   } catch (err) {
-    log.error('Bot logs failed', { error: err.message });
-    res.status(400).json({ error: 'Bot logs failed', message: err.message });
+    log.error('Bot state failed', { error: err.message });
+    res.status(400).json({ error: 'Bot state failed', message: err.message });
   }
 });
 
 /**
- * POST /api/admin/bots/:sessionId/callback — bot status ping.
+ * POST /api/admin/bots/recall-webhook?session=<id>&token=<secret>
  *
- * Called from inside the running Machine with its bearer token. Not gated by
- * the Supabase auth middleware — token is matched against the row's
- * callback_token_hash inside the orchestrator.
+ * Recall posts status events here. Token in query string is matched
+ * against RECALL_WEBHOOK_TOKEN env (set on this backend + as part of
+ * webhook_url passed to Recall at bot launch).
  */
-router.post('/:sessionId/callback', async (req, res) => {
+router.post('/recall-webhook', async (req, res) => {
   try {
-    const auth = req.headers.authorization || '';
-    if (!auth.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Missing bearer token' });
+    const { session, token } = req.query;
+    const expected = process.env.RECALL_WEBHOOK_TOKEN || '';
+    if (!session) {
+      return res.status(400).json({ error: 'Missing session query param' });
     }
-    const token = auth.slice(7);
-    const result = await orchestrator.handleBotCallback(req.params.sessionId, token, req.body || {});
+    if (expected && token !== expected) {
+      log.warn('Recall webhook rejected: bad token', { session });
+      return res.status(401).json({ error: 'Invalid webhook token' });
+    }
+
+    const result = await orchestrator.handleRecallWebhook(String(session), req.body || {});
     res.json(result);
   } catch (err) {
-    log.warn('Bot callback rejected', { error: err.message });
-    res.status(401).json({ error: 'Callback rejected', message: err.message });
+    log.warn('Recall webhook handler failed', { error: err.message });
+    res.status(400).json({ error: 'Webhook handler failed', message: err.message });
   }
 });
 

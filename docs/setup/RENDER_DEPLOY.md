@@ -50,28 +50,19 @@ In the service's **Environment** tab, fill in each `sync: false` var:
 |---|---|
 | `GEMINI_API_KEY` | Google AI Studio (secret) |
 
-### Meet Mate — bot Google account (from your password manager)
-| Var | Notes |
-|---|---|
-| `MEET_MATE_EMAIL` | the dedicated bot email |
-| `MEET_MATE_PASSWORD` | the dedicated bot password (secret) |
-| `MEET_MATE_TOTP_SECRET` | the **raw** base32 TOTP seed (not the QR image) |
-| `MEET_MATE_RECOVERY_EMAIL` | admin email for account-recovery alerts |
-| `MEET_MATE_BACKUP_CODES_REF` | pointer string, e.g. `1Password: <vault> / Meet Mate / Backup Codes` — never the codes themselves |
-| `MEET_MATE_WORKSPACE_DOMAIN` | only if account is on Google Workspace |
-
-`MEET_MATE_DISPLAY_NAME` and `MEET_MATE_ACCOUNT_TYPE` come pre-set with
-sensible defaults (`Meet Mate` and `workspace`) — adjust only if needed.
-
-### Bot fleet (Fly.io) — leave blank for now if you haven't done Fly setup yet
+### Bot fleet (Recall.ai) — leave blank for now if not signed up yet
 | Var | When to set |
 |---|---|
-| `FLY_API_TOKEN` | After Fly.io account + bot-fleet app created |
-| `BOT_CALLBACK_BASE_URL` | After this Render service is live — set it to `https://<service-name>.onrender.com` |
+| `RECALL_API_KEY` | After signing up at https://recall.ai and copying the API key |
+| `RECALL_WEBHOOK_TOKEN` | Generate a random 24-byte hex: `node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"` |
+| `BOT_CALLBACK_BASE_URL` | After this Render service is live — set to `https://<service-name>.onrender.com` |
 
-> The backend will start fine without `FLY_API_TOKEN`. Bot launch endpoints
-> will fail with a clear error message. That's the expected state until P1.2a
-> Pass 2 is ready for end-to-end testing.
+`RECALL_API_BASE` defaults to `https://us-east-1.recall.ai/api/v1` — adjust
+only if your Recall account is in a different region.
+
+> The backend will start fine without `RECALL_API_KEY`. Bot launch endpoints
+> will fail with a clear error message. That's the expected state until you
+> add the key.
 
 ## Step 3 — Trigger first deploy
 

@@ -1,139 +1,128 @@
 # Bot Ops Runbook
 
-Operational procedures for the Entomate meeting-bot fleet. Covers the
-skeleton shipped in **P1.1** — expand as P1.2 (Meet driver), P1.3
-(reliability), and P1.5 (fleet monitoring) land.
+Operational procedures for the Entomate meeting-bot fleet. Bots are run
+by [Recall.ai](https://recall.ai) — they handle bot identity, anti-bot
+detection, audio capture, and platform quirks across Meet/Zoom/Teams.
+Entomate stores per-meeting state in `bot_sessions` and reacts to Recall
+webhook events.
+
+> **Why Recall and not in-house?** We initially built our own headless-
+> Chromium bot (Fly Machines + Puppeteer + stealth plugin) under
+> P1.1/P1.2. Google CAPTCHA-blocked the datacenter IP login on first try.
+> See `docs/plans/ENTOMATE_GAP_CLOSING_PLAN.md` §8 for the build-vs-buy
+> tradeoff and the M-PR pricing checkpoint where we revisit this.
 
 Source:
-- Bot image: [`infrastructure/bot-image/`](../../infrastructure/bot-image/)
 - Orchestrator: [`backend/services/botOrchestrator.js`](../../backend/services/botOrchestrator.js)
 - Admin routes: [`backend/routes/bots.js`](../../backend/routes/bots.js)
-- Fly config: [`infrastructure/bot-image/fly.toml`](../../infrastructure/bot-image/fly.toml)
+- Schema: [`supabase/migrations/20260423000001_bot_sessions.sql`](../../supabase/migrations/20260423000001_bot_sessions.sql) + [`20260425000001_bot_sessions_recall.sql`](../../supabase/migrations/20260425000001_bot_sessions_recall.sql)
 
 ## Architecture in one paragraph
 
-Each meeting spawns a dedicated Fly.io Machine running the bot image.
-`botOrchestrator.launchBotSession()` calls the Fly Machines API with a
-per-session env bundle (session ID, meeting URL, callback token). The Machine
-boots, runs the platform driver, reports status back via a bearer-token
-callback, then exits. Fly auto-destroys the Machine on exit, so there is no
-reuse across sessions. Session state lives in `bot_sessions` (Supabase).
+`botOrchestrator.launchBotSession()` POSTs to Recall.ai's `/bot/`
+endpoint with the meeting URL and a webhook URL pointing at our
+`/api/admin/bots/recall-webhook` route. Recall spins up its own bot
+infrastructure, joins the meeting, captures + transcribes, and posts
+status events to our webhook. We update `bot_sessions` from those
+events and surface admin endpoints (launch / stop / list / state) for
+operators.
 
 ## Required env / secrets (backend)
 
-### Fly fleet
-| Var | Where | Purpose |
-|---|---|---|
-| `FLY_API_TOKEN` | Render backend secret | Fly Machines API auth |
-| `FLY_BOT_APP_NAME` | default `entomate-bot-fleet` | Fly app that owns the bots |
-| `FLY_BOT_IMAGE` | default `registry.fly.io/entomate-bot-fleet:latest` | Bot image reference |
-| `FLY_BOT_REGION` | default `sjc` | Fly region (San Jose, near Supabase us-west-2) |
-| `BOT_CALLBACK_BASE_URL` | e.g. `https://entomate.onrender.com` | Base URL the bot POSTs status to |
-
-### Meet Mate identity (orchestrator passes these to each Machine at launch)
 | Var | Notes |
 |---|---|
-| `MEET_MATE_EMAIL` | Bot Google account email |
-| `MEET_MATE_PASSWORD` | Bot Google account password |
-| `MEET_MATE_TOTP_SECRET` | Raw base32 TOTP seed; consumed by `otplib` to clear 2SV |
-| `MEET_MATE_DISPLAY_NAME` | Default `Meet Mate`; per-launch override possible via `botName` |
-| `MEET_MATE_RECOVERY_EMAIL` | Backend-only metadata (not passed to Machine) |
-| `MEET_MATE_BACKUP_CODES_REF` | Backend-only metadata (pointer to password manager) |
-| `MEET_MATE_ACCOUNT_TYPE` | Backend-only — `workspace` or `personal` |
-| `MEET_MATE_WORKSPACE_DOMAIN` | Backend-only metadata |
+| `RECALL_API_KEY` | From Recall.ai dashboard. Required. |
+| `RECALL_API_BASE` | Default `https://us-east-1.recall.ai/api/v1` |
+| `RECALL_WEBHOOK_TOKEN` | Random 24-byte hex. Generate with: `node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"`. Used to authenticate Recall webhook calls back to us. |
+| `BOT_CALLBACK_BASE_URL` | Public URL of this backend, e.g. `https://entomate.onrender.com`. Recall posts webhooks to `<base>/api/admin/bots/recall-webhook`. |
 
 ## First-time setup
 
-```bash
-# 1. Create the Fly app (one-time)
-fly apps create entomate-bot-fleet --org <org>
-
-# 2. Build & push the image (run from infrastructure/bot-image/)
-cd infrastructure/bot-image
-fly deploy --build-only --push --image-label latest --app entomate-bot-fleet
-cd -
-
-# 3. Set backend secrets (Render dashboard or CLI)
-render env set FLY_API_TOKEN=<token>
-render env set BOT_CALLBACK_BASE_URL=https://api.entomate.com
-```
-
-## Running the migration
-
-```bash
-supabase db push   # applies supabase/migrations/20260423000001_bot_sessions.sql
-```
+1. **Recall.ai account.** Sign up at https://recall.ai → dashboard → copy
+   your API key.
+2. **Render env.** Set `RECALL_API_KEY`, `RECALL_WEBHOOK_TOKEN`, and
+   `BOT_CALLBACK_BASE_URL` in the Render service Environment tab.
+3. **DB migration.**
+   ```bash
+   supabase db push
+   ```
+   Applies both the original `20260423000001_bot_sessions.sql` and the
+   Recall extension `20260425000001_bot_sessions_recall.sql`.
+4. **Webhook URL** is computed at launch time as
+   `{BOT_CALLBACK_BASE_URL}/api/admin/bots/recall-webhook?session=<id>&token=<RECALL_WEBHOOK_TOKEN>`.
+   Recall stores it per-bot at creation; nothing to register up-front.
 
 ## Admin endpoints (all require admin role)
 
 ```bash
 # Launch
-curl -X POST https://api.entomate.com/api/admin/bots/launch \
+curl -X POST https://entomate.onrender.com/api/admin/bots/launch \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "workspaceId": "<org-uuid>",
-    "meetingId": "<meeting-uuid>",
-    "meetingUrl": "https://meet.google.com/abc-defg-hij",
-    "platform": "meet"
+    "meetingId":   "<meeting-uuid>",
+    "meetingUrl":  "https://meet.google.com/abc-defg-hij",
+    "platform":    "meet"
   }'
 
 # List active
-curl https://api.entomate.com/api/admin/bots \
+curl https://entomate.onrender.com/api/admin/bots \
   -H "Authorization: Bearer $ACCESS_TOKEN"
 
-# Kill
-curl -X DELETE https://api.entomate.com/api/admin/bots/<session-id> \
+# Stop (force-leave the meeting)
+curl -X DELETE https://entomate.onrender.com/api/admin/bots/<session-id> \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"reason": "stuck in joining state"}'
 
-# Logs
-curl https://api.entomate.com/api/admin/bots/<session-id>/logs?limit=500 \
+# Full Recall bot state (status history, recording_url, transcript_url)
+curl https://entomate.onrender.com/api/admin/bots/<session-id>/state \
   -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
 
-## Manual bot kill (when admin API is unavailable)
+## Manual cleanup (when admin API is unavailable)
 
-Use the Fly CLI as a fallback:
+Stop a bot directly via Recall:
 
 ```bash
-fly machines list --app entomate-bot-fleet
-fly machine destroy <machine-id> --app entomate-bot-fleet --force
+curl -X POST "https://us-east-1.recall.ai/api/v1/bot/<recall_bot_id>/leave_call/" \
+  -H "Authorization: Token $RECALL_API_KEY"
 ```
 
-Then mark the row manually:
+Then mark the row:
 
 ```sql
 update public.bot_sessions
 set status = 'stopped',
-    failure_reason = 'manual_fly_kill',
+    failure_reason = 'manual_recall_kill',
     ended_at = now()
 where id = '<session-id>';
 ```
 
-## Log retrieval
+## Webhook event mapping
 
-```bash
-fly logs --app entomate-bot-fleet --machine <machine-id> --since 30m
-```
+Recall status code → our `bot_sessions.status`:
 
-Or use the admin logs endpoint (pulls through the Machines API).
+| Recall code | Our status |
+|---|---|
+| `ready` | `pending` |
+| `joining_call`, `in_waiting_room` | `joining` |
+| `in_call_not_recording`, `in_call_recording` | `in_call` |
+| `recording_done`, `call_ended`, `done` | `completed` |
+| `fatal` | `failed` |
+| `timeout` | `timeout` |
 
-## Known limits (P1.1 skeleton)
-
-- `runPlatformDriver` is a placeholder that navigates to the URL and exits
-  after ~5s. Real Meet join logic lands in **P1.2**.
-- No reconnect on network drop — **P1.3**.
-- No per-bot alerting on join-failure spikes — **P1.5**.
-- No cost rollup — **P1.9**.
+`recording_url` and `transcript_url` populate on `bot.done` /
+`bot.recording.done` events.
 
 ## Troubleshooting
 
 | Symptom | Likely cause | Action |
 |---|---|---|
-| `FLY_API_TOKEN is not set` at launch | Backend secret missing | Set in Render dashboard, redeploy |
-| `Fly API 404 @ /apps/entomate-bot-fleet/machines` | App not created | Run `fly apps create entomate-bot-fleet` |
-| Bot in `pending` > 30s, no `machine_id` | Fly API error on launch | Check row's `failure_reason`; verify `FLY_BOT_IMAGE` exists |
-| Callback returns 401 `Invalid callback token` | Race between insert and bot boot, or wrong token | Confirm bot env matches the hash in DB; rotate by stopping and relaunching |
-| Session stuck in `in_call`, `ended_at` null | Bot died without final callback | Kill via admin API; P1.3 reliability harness will address this |
+| `RECALL_API_KEY is not set` at launch | Backend secret missing | Set in Render env, redeploy |
+| `Recall API 401` | Wrong/expired key | Rotate in Recall dashboard, update Render env |
+| `Recall API 400` "invalid meeting_url" | Malformed URL | Confirm URL works in a regular browser |
+| Webhook returns 401 in Render logs | Token mismatch | Confirm `RECALL_WEBHOOK_TOKEN` in Render matches what was set when bot was launched (Recall stores it at creation; rotate by relaunching) |
+| Session stuck in `joining`, no webhooks | Recall bot couldn't enter meeting | Check Recall dashboard for the bot's status; usually a meeting permission issue |
+| `recording_url` never populated | Meeting never started or bot was kicked | `getRecallBotState` shows the full status history |
