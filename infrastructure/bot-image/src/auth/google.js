@@ -32,6 +32,16 @@ const LOGGED_IN_HOSTS = ['myaccount.google.com', 'accounts.google.com/AccountCho
  * Run the full Google sign-in. Throws on any failure with a descriptive
  * message; never returns "false" — caller catches the throw.
  */
+async function logPageState(page, label) {
+  try {
+    const url = page.url();
+    const title = await page.title().catch(() => '(no title)');
+    slog('info', 'page_state', { label, url, title });
+  } catch (err) {
+    slog('warn', 'page_state_failed', { label, error: err.message });
+  }
+}
+
 async function loginToGoogle(page, identity, { audioDir } = {}) {
   if (!identity?.email || !identity?.password || !identity?.totpSecret) {
     throw new Error('Google login requires email, password, totpSecret');
@@ -39,22 +49,34 @@ async function loginToGoogle(page, identity, { audioDir } = {}) {
 
   slog('info', 'google_login_start', { email: maskEmail(identity.email) });
 
-  await page.goto(SIGNIN_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
-  await screenshot(page, audioDir, 'google-01-signin-loaded');
+  try {
+    await page.goto(SIGNIN_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await logPageState(page, 'after_signin_goto');
+    await screenshot(page, audioDir, 'google-01-signin-loaded');
 
-  await submitEmail(page, identity.email);
-  await screenshot(page, audioDir, 'google-02-email-submitted');
+    await submitEmail(page, identity.email);
+    await logPageState(page, 'after_email_submit');
+    await screenshot(page, audioDir, 'google-02-email-submitted');
 
-  await submitPassword(page, identity.password);
-  await screenshot(page, audioDir, 'google-03-password-submitted');
+    await submitPassword(page, identity.password);
+    await logPageState(page, 'after_password_submit');
+    await screenshot(page, audioDir, 'google-03-password-submitted');
 
-  await handle2SV(page, identity.totpSecret, audioDir);
-  await screenshot(page, audioDir, 'google-04-after-2sv');
+    await handle2SV(page, identity.totpSecret, audioDir);
+    await logPageState(page, 'after_2sv');
+    await screenshot(page, audioDir, 'google-04-after-2sv');
 
-  await waitForLoggedIn(page);
-  await screenshot(page, audioDir, 'google-05-logged-in');
+    await waitForLoggedIn(page);
+    await logPageState(page, 'logged_in');
+    await screenshot(page, audioDir, 'google-05-logged-in');
 
-  slog('info', 'google_login_success', { url: page.url() });
+    slog('info', 'google_login_success', { url: page.url() });
+  } catch (err) {
+    // Log page state at failure so we can see exactly where Google left us
+    await logPageState(page, 'login_failed').catch(() => {});
+    await screenshot(page, audioDir, 'google-error-state').catch(() => {});
+    throw err;
+  }
 }
 
 async function submitEmail(page, email) {
