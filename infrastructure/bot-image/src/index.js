@@ -86,34 +86,29 @@ async function launchBrowser(config) {
     throw new Error(`Chromium binary not runnable: ${err.message}`);
   }
 
+  // Debug mode for Pass 2a launch troubleshooting: minimal flag set,
+  // verbose stderr, longer timeout. Once we see a DevTools URL, we'll add
+  // flags back one at a time to find the offender.
   return puppeteer.launch({
     executablePath: config.chromiumPath,
-    // Legacy headless. The 'new' headless mode silently hangs in some
-    // container setups; legacy mode reliably prints the DevTools WS URL
-    // that Puppeteer waits for.
     headless: config.headless ? true : false,
-    // dumpio mirrors Chromium's stderr into our logs so launch failures
-    // surface as "missing lib" / "sandbox failure" instead of an opaque
-    // 30s WS-URL timeout.
     dumpio: true,
+    timeout: 90000, // 30s default → 90s; some Fly Machines are slow to init
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
       '--disable-gpu',
-      '--disable-software-rasterizer',
       '--no-first-run',
       '--no-default-browser-check',
-      '--no-zygote',
-      '--use-fake-ui-for-media-stream',
-      '--autoplay-policy=no-user-gesture-required',
-      '--enable-usermedia-screen-capturing',
-      '--allow-http-screen-capture',
-      '--disable-blink-features=AutomationControlled',
-      '--remote-debugging-address=0.0.0.0',
-      '--window-size=1280,720'
+      '--enable-logging=stderr',
+      '--v=1' // Chromium verbose logging — surfaces what step is hanging
     ],
-    defaultViewport: { width: 1280, height: 720 }
+    defaultViewport: { width: 1280, height: 720 },
+    env: {
+      ...process.env,
+      CHROME_LOG_FILE: 'stderr'
+    }
   });
 }
 
