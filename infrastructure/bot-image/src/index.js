@@ -74,16 +74,24 @@ async function launchBrowser(config) {
   return puppeteer.launch({
     executablePath: config.chromiumPath,
     headless: config.headless ? 'new' : false,
+    // dumpio surfaces Chromium's own stderr/stdout into our logs — without
+    // it, a launch failure is just "WS endpoint URL never appeared" with no
+    // hint at the real cause (missing lib, sandbox issue, etc.).
+    dumpio: true,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
       '--disable-gpu',
+      '--disable-software-rasterizer',
+      '--no-first-run',
+      '--no-default-browser-check',
       '--use-fake-ui-for-media-stream',
       '--autoplay-policy=no-user-gesture-required',
       '--enable-usermedia-screen-capturing',
       '--allow-http-screen-capture',
       '--disable-blink-features=AutomationControlled',
+      '--user-data-dir=/tmp/chromium-data',
       '--window-size=1280,720'
     ],
     defaultViewport: { width: 1280, height: 720 }

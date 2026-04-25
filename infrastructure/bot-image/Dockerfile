@@ -11,10 +11,16 @@ FROM node:20-bookworm-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Chromium pulls in its runtime libs via apt's Recommends, so we install
+# WITHOUT --no-install-recommends here. With it, the chromium binary lands but
+# can't start — Puppeteer then errors with "WS endpoint URL never appeared".
+# Other (slim) packages are added in a second layer below with the flag, so we
+# don't bloat the image with tini/xvfb recommends.
+RUN apt-get update && apt-get install -y \
       chromium \
       chromium-common \
       chromium-sandbox \
+ && apt-get install -y --no-install-recommends \
       dbus-x11 \
       fonts-liberation \
       fonts-noto-color-emoji \
