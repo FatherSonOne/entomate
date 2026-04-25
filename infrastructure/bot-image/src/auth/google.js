@@ -86,18 +86,27 @@ async function submitEmail(page, email) {
   await page.click(emailSelector, { clickCount: 3 });
   await page.type(emailSelector, email, { delay: 40 });
 
-  // Click Next; sometimes there's a navigation, sometimes just a SPA transition
+  // Submit by pressing Enter — fragile button selectors (e.g.
+  // `button[jsname][type="button"]`) match "Forgot email?" or "Create
+  // account" before "Next" depending on DOM order. Enter triggers the
+  // form's submit handler unambiguously.
   const navP = page
     .waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 })
     .catch(() => null);
-  await page.click('#identifierNext button, #identifierNext, button[jsname][type="button"]');
+  await page.keyboard.press('Enter');
   await navP;
-  // Belt-and-suspenders — wait for password input to appear (or a body-text
-  // change that signals an error)
+
+  // Wait for password input to appear (or a body-text change signaling an
+  // error). If we landed on /usernamerecovery the form submitted to the
+  // wrong endpoint — surface a clear error rather than the generic timeout.
   await page
     .waitForSelector('input[type="password"]', { visible: true, timeout: 15000 })
     .catch(() => null);
 
+  const url = page.url();
+  if (/usernamerecovery|forgot/.test(url)) {
+    throw new Error(`Email submission landed on recovery flow: ${url}`);
+  }
   const errorText = await bodyMatches(page, /couldn'?t find your Google Account/i);
   if (errorText) {
     throw new Error(`Email rejected by Google: ${errorText}`);
@@ -109,10 +118,12 @@ async function submitPassword(page, password) {
   await page.waitForSelector(pwSelector, { visible: true, timeout: 15000 });
   await page.type(pwSelector, password, { delay: 40 });
 
+  // Same reasoning as submitEmail — press Enter rather than clicking a
+  // button that might match the wrong target ("Forgot password?" etc.).
   const navP = page
     .waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 20000 })
     .catch(() => null);
-  await page.click('#passwordNext button, #passwordNext, button[jsname][type="button"]');
+  await page.keyboard.press('Enter');
   await navP;
 
   // Wait for either a 2SV screen or a logged-in redirect; ignore timeout —
