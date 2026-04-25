@@ -3,6 +3,8 @@
  * Catches all errors and returns consistent error responses
  */
 
+const log = require('../utils/log');
+
 class AppError extends Error {
   constructor(message, statusCode, code = 'INTERNAL_ERROR') {
     super(message);
