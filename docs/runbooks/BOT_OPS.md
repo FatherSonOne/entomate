@@ -8,7 +8,7 @@ Source:
 - Bot image: [`infrastructure/bot-image/`](../../infrastructure/bot-image/)
 - Orchestrator: [`backend/services/botOrchestrator.js`](../../backend/services/botOrchestrator.js)
 - Admin routes: [`backend/routes/bots.js`](../../backend/routes/bots.js)
-- Fly config: [`infrastructure/fly.bot.toml`](../../infrastructure/fly.bot.toml)
+- Fly config: [`infrastructure/bot-image/fly.toml`](../../infrastructure/bot-image/fly.toml)
 
 ## Architecture in one paragraph
 
@@ -48,10 +48,10 @@ reuse across sessions. Session state lives in `bot_sessions` (Supabase).
 # 1. Create the Fly app (one-time)
 fly apps create entomate-bot-fleet --org <org>
 
-# 2. Build & push the image (from repo root)
-fly deploy --config infrastructure/fly.bot.toml \
-           --build-only --push --image-label latest \
-           --app entomate-bot-fleet
+# 2. Build & push the image (run from infrastructure/bot-image/)
+cd infrastructure/bot-image
+fly deploy --build-only --push --image-label latest --app entomate-bot-fleet
+cd -
 
 # 3. Set backend secrets (Render dashboard or CLI)
 render env set FLY_API_TOKEN=<token>

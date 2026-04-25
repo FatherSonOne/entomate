@@ -5,14 +5,14 @@
 # Machines API. No [http_service] block — Machines are single-shot workers
 # that auto-destroy on exit, not a web service.
 #
-# First-time setup (run from repo root):
+# First-time setup (run from THIS directory — infrastructure/bot-image/):
+#   cd infrastructure/bot-image
 #   fly apps create entomate-bot-fleet --org <your-org>
-#   fly deploy --config infrastructure/fly.bot.toml \
-#              --build-only --push --image-label latest \
-#              --app entomate-bot-fleet
+#   fly deploy --build-only --push --image-label latest --app entomate-bot-fleet
 #
-# The dockerfile path in [build] is relative to THIS toml's directory
-# (infrastructure/), not the repo root.
+# Why run from this directory: build context is scoped to bot-image/, so
+# COPY only sees bot deps (not the repo root entomate@1.0.0 package.json
+# with its husky prepare script).
 #
 # The orchestrator then launches machines by reference to
 # registry.fly.io/entomate-bot-fleet:latest.
@@ -21,8 +21,7 @@ app = "entomate-bot-fleet"
 primary_region = "sjc"  # San Jose — matches Render oregon + Supabase us-west-2
 
 [build]
-  # Path is relative to this toml's directory (infrastructure/), NOT repo root.
-  dockerfile = "bot-image/Dockerfile"
+  dockerfile = "Dockerfile"
 
 [env]
   NODE_ENV = "production"
