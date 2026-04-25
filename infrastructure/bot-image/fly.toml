@@ -29,7 +29,7 @@ primary_region = "sjc"  # San Jose — matches Render oregon + Supabase us-west-
 
 [[vm]]
   cpu_kind = "shared"
-  cpus = 1
+  cpus = 2          # shared-cpu-1x caps at 2GB; need 2x for 4GB ceiling
   memory_mb = 4096  # Chromium V8 needs >2GB for CodeRange on 64-bit headless
 
 [metrics]

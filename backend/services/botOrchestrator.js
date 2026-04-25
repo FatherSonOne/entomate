@@ -117,7 +117,7 @@ async function launchBotSession(p) {
       image: IMAGE,
       auto_destroy: true,
       restart: { policy: 'no' },
-      guest: { cpu_kind: 'shared', cpus: 1, memory_mb: 4096 },
+      guest: { cpu_kind: 'shared', cpus: 2, memory_mb: 4096 },
       env: {
         BOT_SESSION_ID: sessionId,
         BOT_WORKSPACE_ID: workspaceId,
