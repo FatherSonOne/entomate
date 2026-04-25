@@ -37,6 +37,31 @@ async function logPageState(page, label) {
     const url = page.url();
     const title = await page.title().catch(() => '(no title)');
     slog('info', 'page_state', { label, url, title });
+
+    // Dump visible buttons + email/password input state so we can see what
+    // the bot actually sees on this page, not just the URL.
+    const detail = await page.evaluate(() => {
+      const buttons = Array.from(document.querySelectorAll('button, [role="button"]'))
+        .filter((b) => b.offsetParent !== null && b.getBoundingClientRect().width > 0)
+        .slice(0, 12)
+        .map((b) => ({
+          tag: b.tagName,
+          text: (b.innerText || b.textContent || '').trim().slice(0, 40),
+          aria: b.getAttribute('aria-label'),
+          id: b.id || null,
+          jsname: b.getAttribute('jsname')
+        }));
+      const emailEl = document.querySelector('input[type="email"], #identifierId');
+      const pwEl = document.querySelector('input[type="password"]');
+      const bodyText = (document.body?.innerText || '').replace(/\s+/g, ' ').slice(0, 240);
+      return {
+        buttons,
+        emailValue: emailEl ? { length: emailEl.value.length, hasAt: emailEl.value.includes('@') } : null,
+        hasPasswordInput: Boolean(pwEl),
+        bodySample: bodyText
+      };
+    });
+    slog('info', 'page_detail', { label, ...detail });
   } catch (err) {
     slog('warn', 'page_state_failed', { label, error: err.message });
   }
