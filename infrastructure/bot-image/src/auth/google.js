@@ -86,14 +86,19 @@ async function submitEmail(page, email) {
   await page.click(emailSelector, { clickCount: 3 });
   await page.type(emailSelector, email, { delay: 40 });
 
-  // Submit by pressing Enter — fragile button selectors (e.g.
-  // `button[jsname][type="button"]`) match "Forgot email?" or "Create
-  // account" before "Next" depending on DOM order. Enter triggers the
-  // form's submit handler unambiguously.
+  // Click the visible "Next" button by exact text match. CSS selectors
+  // like `button[jsname][type="button"]` matched "Forgot email?" before
+  // "Next" depending on DOM order. Pressing Enter alone didn't work on
+  // Google v3/signin (their form intercepts the keypress). Text match is
+  // unambiguous; Enter remains as a fallback if the button isn't found.
   const navP = page
-    .waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 })
+    .waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 20000 })
     .catch(() => null);
-  await page.keyboard.press('Enter');
+  const nextClicked = await clickByText(page, 'button', 'next', { exact: true });
+  if (!nextClicked) {
+    slog('warn', 'email_next_button_not_found_pressing_enter');
+    await page.keyboard.press('Enter');
+  }
   await navP;
 
   // Wait for password input to appear (or a body-text change signaling an
@@ -118,12 +123,16 @@ async function submitPassword(page, password) {
   await page.waitForSelector(pwSelector, { visible: true, timeout: 15000 });
   await page.type(pwSelector, password, { delay: 40 });
 
-  // Same reasoning as submitEmail — press Enter rather than clicking a
-  // button that might match the wrong target ("Forgot password?" etc.).
+  // Same reasoning as submitEmail — exact-match "Next" click, Enter
+  // fallback. Avoids matching "Forgot password?" or other decoys.
   const navP = page
     .waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 20000 })
     .catch(() => null);
-  await page.keyboard.press('Enter');
+  const nextClicked = await clickByText(page, 'button', 'next', { exact: true });
+  if (!nextClicked) {
+    slog('warn', 'password_next_button_not_found_pressing_enter');
+    await page.keyboard.press('Enter');
+  }
   await navP;
 
   // Wait for either a 2SV screen or a logged-in redirect; ignore timeout —

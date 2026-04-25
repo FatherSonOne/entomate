@@ -45,15 +45,17 @@ async function readInnerText(handle) {
 }
 
 /**
- * Click the first element matching `selector` whose innerText contains `text`
- * (case-insensitive). Returns true if a click happened, false otherwise.
+ * Click the first element matching `selector` whose innerText contains
+ * (or, if `exact: true`, equals) `text`. Case-insensitive. Returns true
+ * if a click happened, false otherwise.
  */
-async function clickByText(page, selector, text) {
+async function clickByText(page, selector, text, { exact = false } = {}) {
   const target = String(text).toLowerCase();
   const handles = await page.$$(selector);
   for (const handle of handles) {
-    const txt = await readInnerText(handle);
-    if (txt.toLowerCase().includes(target)) {
+    const txt = (await readInnerText(handle)).trim().toLowerCase();
+    const match = exact ? txt === target : txt.includes(target);
+    if (match) {
       await handle.click();
       return true;
     }
