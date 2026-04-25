@@ -48,10 +48,10 @@ reuse across sessions. Session state lives in `bot_sessions` (Supabase).
 # 1. Create the Fly app (one-time)
 fly apps create entomate-bot-fleet --org <org>
 
-# 2. Build & push the image
+# 2. Build & push the image (from repo root)
 fly deploy --config infrastructure/fly.bot.toml \
-           --dockerfile infrastructure/bot-image/Dockerfile \
-           --build-only --image-label latest
+           --build-only --push --image-label latest \
+           --app entomate-bot-fleet
 
 # 3. Set backend secrets (Render dashboard or CLI)
 render env set FLY_API_TOKEN=<token>
