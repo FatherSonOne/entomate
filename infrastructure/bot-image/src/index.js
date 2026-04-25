@@ -13,6 +13,7 @@
 'use strict';
 
 const fs = require('fs');
+const { execFileSync } = require('child_process');
 const puppeteerCore = require('puppeteer-core');
 const { addExtra } = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
@@ -71,12 +72,29 @@ function readEnv() {
 }
 
 async function launchBrowser(config) {
+  // Pre-flight: confirm the binary actually runs. If this throws, the
+  // problem is the image — not Puppeteer or selectors. execFileSync is
+  // shell-free (no command injection surface).
+  try {
+    const out = execFileSync(config.chromiumPath, ['--version'], {
+      encoding: 'utf8',
+      timeout: 10000
+    });
+    slog('info', 'chromium_version', { version: out.trim() });
+  } catch (err) {
+    slog('error', 'chromium_check_failed', { error: err.message });
+    throw new Error(`Chromium binary not runnable: ${err.message}`);
+  }
+
   return puppeteer.launch({
     executablePath: config.chromiumPath,
-    headless: config.headless ? 'new' : false,
-    // dumpio surfaces Chromium's own stderr/stdout into our logs — without
-    // it, a launch failure is just "WS endpoint URL never appeared" with no
-    // hint at the real cause (missing lib, sandbox issue, etc.).
+    // Legacy headless. The 'new' headless mode silently hangs in some
+    // container setups; legacy mode reliably prints the DevTools WS URL
+    // that Puppeteer waits for.
+    headless: config.headless ? true : false,
+    // dumpio mirrors Chromium's stderr into our logs so launch failures
+    // surface as "missing lib" / "sandbox failure" instead of an opaque
+    // 30s WS-URL timeout.
     dumpio: true,
     args: [
       '--no-sandbox',
@@ -86,12 +104,13 @@ async function launchBrowser(config) {
       '--disable-software-rasterizer',
       '--no-first-run',
       '--no-default-browser-check',
+      '--no-zygote',
       '--use-fake-ui-for-media-stream',
       '--autoplay-policy=no-user-gesture-required',
       '--enable-usermedia-screen-capturing',
       '--allow-http-screen-capture',
       '--disable-blink-features=AutomationControlled',
-      '--user-data-dir=/tmp/chromium-data',
+      '--remote-debugging-address=0.0.0.0',
       '--window-size=1280,720'
     ],
     defaultViewport: { width: 1280, height: 720 }
