@@ -26,6 +26,43 @@ cd infrastructure/bot-image
 docker build -t entomate-bot:local .
 ```
 
+## Local test (Pass 2a — Google login)
+
+This boots the bot in your local Docker, runs the Google login flow against
+the real Meet Mate account, and saves screenshots of each step to a
+host-mounted directory so you can verify what happened.
+
+```powershell
+# 1. Copy the env template and fill in real values
+cp .env.example .env
+notepad .env   # paste MEET_MATE_EMAIL/PASSWORD/TOTP_SECRET from password manager
+
+# 2. Make a host dir for the bot's screenshots
+mkdir F:\bot-debug
+
+# 3. Run the bot — mounts F:\bot-debug to /tmp/bot-audio inside the container
+docker run --rm --env-file .env -v "F:\bot-debug:/tmp/bot-audio" entomate-bot:local
+```
+
+Watch the container logs (JSON one-liner per event). On success you'll see:
+```
+google_login_start  → google_login_success
+session_end
+```
+
+Then open `F:\bot-debug` — you'll find screenshots named:
+- `google-01-signin-loaded.png`
+- `google-02-email-submitted.png`
+- `google-03-password-submitted.png`
+- `google-04-after-2sv.png`
+- `google-05-logged-in.png`
+
+The last one should show `myaccount.google.com` with the bot signed in.
+
+> **Important:** `.env` is gitignored. Never commit it. The
+> `MEET_MATE_TOTP_SECRET` value is the highest-risk item — treat as a
+> password.
+
 ## Env vars (consumed at runtime)
 
 ### Per-session (set by orchestrator at Machine launch)

@@ -1,14 +1,13 @@
 /**
  * Entomate meeting bot — session entrypoint.
  *
- * Reads session config from env, launches headless Chromium, runs the
- * platform driver for the session's duration, and exits. The container is
- * launched per-meeting by the orchestrator; Fly Machines auto-destroy on
- * exit, so there is no reuse across sessions.
+ * Reads session config from env, launches headless Chromium with the stealth
+ * plugin, dispatches to the platform driver (drivers/<platform>.js), and
+ * exits. Fly Machines auto-destroy on exit, so there is no reuse across
+ * sessions.
  *
- * P1.1 scope: skeleton that boots Chromium, reports status via callback, and
- * exits cleanly. P1.2 replaces `runPlatformDriver` with real Meet/Zoom/Teams
- * join logic + loopback audio capture.
+ * P1.2 Pass 2a (current): drivers/meet.js logs the bot in as the Meet Mate
+ * Google account, then dwells briefly. Pass 2b adds the actual Meet join.
  */
 
 'use strict';
@@ -18,13 +17,22 @@ const puppeteerCore = require('puppeteer-core');
 const { addExtra } = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 
+const { slog } = require('./log');
+const { reportStatus } = require('./callback');
+const { runMeetDriver } = require('./drivers/meet');
+
 // Wrap puppeteer-core with the puppeteer-extra plugin system and enable
-// stealth — defeats the basic automation fingerprints Google Meet checks for
+// stealth — defeats the basic automation fingerprints Google checks for
 // (navigator.webdriver, missing chrome.runtime, suspicious UA, etc.).
 const puppeteer = addExtra(puppeteerCore);
 puppeteer.use(StealthPlugin());
 
 const TERMINAL_STATUSES = new Set(['completed', 'failed', 'stopped', 'timeout']);
+
+const DRIVERS = {
+  meet: runMeetDriver
+  // zoom + teams land in P1.5
+};
 
 function readEnv() {
   const config = {
@@ -43,9 +51,8 @@ function readEnv() {
     chromiumPath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
     headless: process.env.BOT_HEADLESS !== 'false',
 
-    // Meet Mate identity — used by drivers/<platform>.js to authenticate the
-    // headless Chromium session before joining the meeting. P1.2 Pass 2 adds
-    // the actual login flow that consumes these.
+    // Meet Mate identity — consumed by drivers/<platform>.js to authenticate
+    // the headless Chromium session before joining the meeting.
     identity: {
       email: process.env.MEET_MATE_EMAIL || '',
       password: process.env.MEET_MATE_PASSWORD || '',
@@ -61,33 +68,6 @@ function readEnv() {
     process.exit(2);
   }
   return config;
-}
-
-function slog(level, msg, extra = {}) {
-  process.stdout.write(
-    JSON.stringify({ ts: new Date().toISOString(), level, msg, ...extra }) + '\n'
-  );
-}
-
-async function reportStatus(config, status, extra = {}) {
-  if (!config.callbackUrl || !config.callbackToken) return;
-  try {
-    await fetch(config.callbackUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${config.callbackToken}`
-      },
-      body: JSON.stringify({
-        session_id: config.sessionId,
-        status,
-        ts: new Date().toISOString(),
-        ...extra
-      })
-    });
-  } catch (err) {
-    slog('warn', 'callback_failed', { status, error: err.message });
-  }
 }
 
 async function launchBrowser(config) {
@@ -110,40 +90,12 @@ async function launchBrowser(config) {
   });
 }
 
-/**
- * P1.1 placeholder. P1.2 Pass 2 replaces this with a real platform driver
- * dispatched from src/drivers/<platform>.js that:
- *   1. Logs the bot in as the Meet Mate Google account using config.identity
- *      (email + password + TOTP via otplib)
- *   2. Navigates to the meeting URL
- *   3. Sets display name + microphone off + camera off
- *   4. Submits join request, handles waiting room
- *   5. Announces in chat
- *   6. Starts loopback audio capture → streams to Deepgram
- *   7. Monitors meeting-ended signals
- */
-async function runPlatformDriver(browser, config) {
-  const page = await browser.newPage();
-  try {
-    slog('info', 'navigate', {
-      url: config.meetingUrl,
-      platform: config.platform,
-      hasIdentity: Boolean(config.identity.email && config.identity.totpSecret)
-    });
-    await page.goto(config.meetingUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await reportStatus(config, 'in_call', { placeholder: true });
-    slog('info', 'placeholder_dwell', { note: 'P1.2 Pass 2 replaces this with real driver' });
-    await new Promise((resolve) => setTimeout(resolve, 5000));
-  } finally {
-    await page.close().catch(() => {});
-  }
-}
-
 async function runSession(config) {
   slog('info', 'session_start', {
     session_id: config.sessionId,
     platform: config.platform,
-    meeting_id: config.meetingId
+    meeting_id: config.meetingId,
+    has_identity: Boolean(config.identity.email && config.identity.totpSecret)
   });
   await reportStatus(config, 'starting');
 
@@ -151,10 +103,15 @@ async function runSession(config) {
     fs.mkdirSync(config.audioDir, { recursive: true });
   }
 
+  const driver = DRIVERS[config.platform];
+  if (!driver) {
+    throw new Error(`No driver implemented for platform: ${config.platform}`);
+  }
+
   await reportStatus(config, 'joining');
   const browser = await launchBrowser(config);
   try {
-    await runPlatformDriver(browser, config);
+    await driver(browser, config);
   } finally {
     await browser.close().catch(() => {});
   }
