@@ -79,6 +79,6 @@ services:
       - key: RECALL_API_KEY
         sync: false  # set manually (secret) — from Recall.ai dashboard
       - key: RECALL_API_BASE
-        value: https://us-east-1.recall.ai/api/v1
+        value: https://us-west-2.recall.ai/api/v1  # co-located with Render oregon + Supabase us-west-2
       - key: RECALL_WEBHOOK_TOKEN
         sync: false  # generate with: node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"

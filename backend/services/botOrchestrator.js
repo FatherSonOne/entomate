@@ -25,7 +25,7 @@ const crypto = require('crypto');
 const { supabaseAdmin } = require('../config/supabase');
 const log = require('../utils/log');
 
-const RECALL_API_BASE = process.env.RECALL_API_BASE || 'https://us-east-1.recall.ai/api/v1';
+const RECALL_API_BASE = process.env.RECALL_API_BASE || 'https://us-west-2.recall.ai/api/v1';
 const CALLBACK_BASE = process.env.BOT_CALLBACK_BASE_URL || '';
 const DEFAULT_BOT_NAME = 'Meet Mate';
 
