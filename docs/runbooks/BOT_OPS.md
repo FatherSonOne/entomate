@@ -26,7 +26,7 @@ reuse across sessions. Session state lives in `bot_sessions` (Supabase).
 | `FLY_API_TOKEN` | Render backend secret | Fly Machines API auth |
 | `FLY_BOT_APP_NAME` | default `entomate-bot-fleet` | Fly app that owns the bots |
 | `FLY_BOT_IMAGE` | default `registry.fly.io/entomate-bot-fleet:latest` | Bot image reference |
-| `FLY_BOT_REGION` | default `iad` | Fly region |
+| `FLY_BOT_REGION` | default `sjc` | Fly region (San Jose, near Supabase us-west-2) |
 | `BOT_CALLBACK_BASE_URL` | e.g. `https://api.entomate.com` | Base URL the bot POSTs status to |
 
 ## First-time setup

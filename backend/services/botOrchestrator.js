@@ -25,7 +25,7 @@ const db = () => {
 const FLY_API = 'https://api.machines.dev/v1';
 const APP = process.env.FLY_BOT_APP_NAME || 'entomate-bot-fleet';
 const IMAGE = process.env.FLY_BOT_IMAGE || `registry.fly.io/${APP}:latest`;
-const REGION = process.env.FLY_BOT_REGION || 'iad';
+const REGION = process.env.FLY_BOT_REGION || 'sjc';
 const CALLBACK_BASE = process.env.BOT_CALLBACK_BASE_URL || '';
 const DEFAULT_MAX_DURATION_MS = 3 * 60 * 60 * 1000;
 

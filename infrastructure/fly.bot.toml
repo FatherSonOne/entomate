@@ -17,7 +17,7 @@
 # registry.fly.io/entomate-bot-fleet:latest.
 
 app = "entomate-bot-fleet"
-primary_region = "iad"
+primary_region = "sjc"  # San Jose — matches Render oregon + Supabase us-west-2
 
 [build]
   dockerfile = "infrastructure/bot-image/Dockerfile"

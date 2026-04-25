@@ -3,12 +3,12 @@
 
 services:
   - type: web
-    name: entomate-backend
+    name: entomate
     runtime: docker
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
-    region: ohio  # us-east, close to Supabase
-    plan: free    # upgrade to starter ($7/mo) to avoid spin-down
+    region: oregon  # matches Supabase (aws-us-west-2) for low-latency DB access
+    plan: free      # upgrade to starter ($7/mo) to avoid spin-down before GA
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
@@ -39,3 +39,68 @@ services:
         value: "1"
       - key: LOG_LEVEL
         value: info
+
+      # ----- Required in production (server.js:90 throws if unset) -----
+      - key: SESSION_SECRET
+        sync: false  # set manually (secret) — generate with: openssl rand -hex 32
+
+      # ----- Auth (Clerk) -----
+      - key: CLERK_SECRET_KEY
+        sync: false  # set manually (secret)
+      - key: JWT_SECRET
+        sync: false  # set manually (secret)
+
+      # ----- Ecosystem cross-app (Pulse + Logos Vision) -----
+      - key: PULSE_SUPABASE_ANON_KEY
+        sync: false  # set manually
+      - key: LOGOS_VISION_SUPABASE_ANON_KEY
+        sync: false  # set manually
+
+      # ----- Chat / CRM providers -----
+      - key: CHAT_PROVIDER
+        sync: false  # set manually
+      - key: CRM_PROVIDER
+        sync: false  # set manually
+      - key: CRM_API_KEY
+        sync: false  # set manually (secret)
+
+      # ----- Slack -----
+      - key: SLACK_BOT_TOKEN
+        sync: false  # set manually (secret)
+      - key: SLACK_DEFAULT_CHANNEL
+        sync: false  # set manually
+
+      # ----- Bot fleet (P1.1/P1.2) -----
+      # See docs/setup/RENDER_DEPLOY.md and docs/runbooks/BOT_OPS.md.
+      # BOT_CALLBACK_BASE_URL is set AFTER first deploy (to the Render URL).
+      - key: BOT_CALLBACK_BASE_URL
+        sync: false  # set manually after first deploy (https://<svc>.onrender.com)
+      - key: FLY_API_TOKEN
+        sync: false  # set manually (secret) — from Fly.io dashboard
+      - key: FLY_BOT_APP_NAME
+        value: entomate-bot-fleet
+      - key: FLY_BOT_IMAGE
+        value: registry.fly.io/entomate-bot-fleet:latest
+      - key: FLY_BOT_REGION
+        value: sjc  # San Jose — co-located with Render oregon + Supabase us-west-2
+
+      # ----- Meet Mate — bot Google account identity (P1.2) -----
+      # Schema mirrors backend/env.example. Created out-of-band; values live
+      # in 1Password. Backup codes are NOT stored as env — only a pointer to
+      # the password-manager location (MEET_MATE_BACKUP_CODES_REF).
+      - key: MEET_MATE_EMAIL
+        sync: false  # set manually
+      - key: MEET_MATE_PASSWORD
+        sync: false  # set manually (secret)
+      - key: MEET_MATE_TOTP_SECRET
+        sync: false  # set manually (secret) — raw base32 seed, NOT the QR image
+      - key: MEET_MATE_DISPLAY_NAME
+        value: Meet Mate
+      - key: MEET_MATE_RECOVERY_EMAIL
+        sync: false  # admin email for account-recovery alerts
+      - key: MEET_MATE_BACKUP_CODES_REF
+        sync: false  # pointer string, e.g. "1Password: <vault> / Meet Mate / Backup Codes"
+      - key: MEET_MATE_ACCOUNT_TYPE
+        value: workspace  # "workspace" or "personal" — orchestrator branches on rate-limit handling
+      - key: MEET_MATE_WORKSPACE_DOMAIN
+        sync: false  # only set if MEET_MATE_ACCOUNT_TYPE=workspace

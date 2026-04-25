@@ -83,6 +83,13 @@ google-cloud-key*.json
 *credentials*.yaml
 *credentials*.yml
 
+# 2FA / TOTP / backup codes (per-account secret material) — pattern matches
+# any path so accidental drops anywhere in the repo are blocked.
+*[Bb]ackup-[Cc]odes*
+*[Bb]ackup_[Cc]odes*
+*totp*
+*TOTP*
+
 # SSH keys
 id_rsa
 id_rsa.pub
