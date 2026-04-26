@@ -88,7 +88,7 @@ history for reference.
 
 ## Gotchas — read before resuming
 
-1. ~~**Clerk ↔ Supabase auth mismatch (P0).**~~ **RESOLVED 2026-04-25 (next session).**
+1. ~~**Clerk ↔ Supabase auth mismatch (P0).**~~ **RESOLVED 2026-04-26.**
    The original diagnosis was wrong. The frontend has *not* used Clerk for
    some time — `frontend/src/services/authService.js` wraps Supabase Auth,
    and the only remaining Clerk references are in `docs/archive/` and
@@ -96,13 +96,55 @@ history for reference.
    The actual blocker on `/api/admin/bots/launch` was that `authorize(['admin'])`
    reads `user.user_metadata.role`, which nothing in the codebase ever
    populates — so every real Supabase user was rejected as `'member'`.
-   **Fix shipped:** `authorizeOrgRole(roles, resolveOrgId)` in
-   `backend/middleware/auth.js` reads role from `org_members` keyed on the
-   workspace the request is acting on. Bot routes now require `owner` or
-   `admin` of the target org. Note: the same bug still affects every other
-   route using legacy `authorize(['admin'])` (e.g. `settings.js`, `secrets.js`,
-   `agents.js`, `automations.js`). Out of scope for this slice; track
-   separately if those endpoints need to work for real users.
+   **Fix shipped (commit 911581e):** `authorizeOrgRole(roles, resolveOrgId)`
+   in `backend/middleware/auth.js` reads role from `org_members` keyed on
+   the workspace the request is acting on. Bot routes + settings.js
+   workspace/audit routes now require `owner` or `admin` of the target org.
+   E2E verified: 3 read probes pass + a full launch reaches Recall.
+
+## Follow-ups surfaced during the auth-bridge E2E test (2026-04-26)
+
+Track these separately — they're independent of the auth work and don't
+block frontend bot launcher UI development.
+
+1. **Migration `20260425000001_bot_sessions_recall.sql` was not applied to
+   prod when the Recall pivot shipped.** `recall_bot_id`, `recording_url`,
+   and `transcript_url` columns were missing in the live DB until the
+   2026-04-26 E2E session, when it was applied via Supabase MCP. The
+   orchestrator's post-launch UPDATE silently swallowed the error (only
+   `log.warn`, by design — see botOrchestrator.js:153), so launches *appeared*
+   to succeed but left orphaned rows that couldn't be queried for
+   `recall_bot_id` afterwards. Add a deploy step / runbook entry that
+   verifies migrations are applied before a bot test, OR change the
+   post-launch update to throw on error so the failure is loud.
+
+2. **Recall webhooks are not landing in our DB.** Bot reached
+   `joining_call` → `in_waiting_room` (confirmed via `GET /:sessionId/state`
+   which proxies Recall directly), but `bot_sessions.status` never updated
+   from the back-filled `launching` value. Likely causes, in order:
+   (a) Render free-tier cold spin-down between webhook deliveries;
+   (b) `BOT_CALLBACK_BASE_URL` env on Render unset or has typo;
+   (c) `RECALL_WEBHOOK_TOKEN` mismatch between Render env and the value
+   embedded in the launch's `webhook_url`. Diagnose by checking Render
+   request logs for inbound `/api/admin/bots/recall-webhook` hits during
+   the next test, and by comparing the live `RECALL_WEBHOOK_TOKEN` to what
+   was attached to a fresh launch's webhook URL.
+
+3. **`stopBotSession` fails for pre-call bots.** Recall returns 400
+   `cannot_command_unstarted_bot` when calling `/leave_call` on a bot still
+   in `joining_call` / `in_waiting_room`. Need a branch in
+   `botOrchestrator.stopBotSession` that picks the right Recall endpoint
+   based on the bot's current Recall status (likely `DELETE /bot/<id>` or a
+   cancel endpoint — verify against Recall docs).
+
+4. **The "Bot Test Room" referenced in Gotcha #5 does not actually exist
+   in the user's Calendar.** Either drop the line, or set up a real
+   persistent Meet room before the next bot test.
+
+Note: the original footnote saying `secrets.js`, `agents.js`,
+`automations.js` also had broken `authorize(['admin'])` calls was
+overstated — they import the helper but don't use it. Only `bots.js` and
+`settings.js` had live callsites; both have been migrated.
 
 2. **Recall API quirks (already patched, but know them):**
    - Endpoints reject trailing slashes (`/bot` works, `/bot/` returns
@@ -121,9 +163,10 @@ history for reference.
    the in-house bot debugging — irrelevant now since Recall manages its own
    bot fleet, but if anyone reverts, this will bite again.
 
-5. **Bot Test Room:** `https://meet.google.com/agj-onej-fao` — persistent
-   meeting in the user's Calendar. Good for repeated bot testing without
-   spamming real meetings.
+5. ~~**Bot Test Room:** `https://meet.google.com/agj-onej-fao`~~ — this
+   meeting does not actually exist in the user's Calendar (discovered
+   2026-04-26). Set one up before the next bot test or use an ad-hoc
+   Meet link.
 
 ## Suggested next priorities (in rough order)
 
