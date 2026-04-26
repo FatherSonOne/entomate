@@ -104,6 +104,15 @@ async function launchBotSession(p) {
     meeting_url: meetingUrl,
     bot_name: botName || DEFAULT_BOT_NAME,
     webhook_url: webhookUrl(sessionId),
+    // Use Meet's built-in captions for transcription (free with Recall).
+    // P1.4 will swap in Deepgram for higher accuracy + diarization.
+    recording_config: {
+      transcript: {
+        provider: {
+          meeting_captions: {}
+        }
+      }
+    },
     metadata: {
       session_id: sessionId,
       workspace_id: workspaceId,
@@ -114,7 +123,9 @@ async function launchBotSession(p) {
 
   let bot;
   try {
-    bot = await recallFetch('/bot/', {
+    // Recall's API rejects trailing slashes on these endpoints (returns
+    // auth_failed misleadingly on POST /bot/).
+    bot = await recallFetch('/bot', {
       method: 'POST',
       body: JSON.stringify(recallPayload)
     });
@@ -157,7 +168,7 @@ async function stopBotSession(sessionId, reason = 'manual_stop') {
   if (error || !session) throw new Error(`Session not found: ${sessionId}`);
   if (!session.recall_bot_id) throw new Error(`Session ${sessionId} has no recall_bot_id`);
 
-  await recallFetch(`/bot/${session.recall_bot_id}/leave_call/`, { method: 'POST' });
+  await recallFetch(`/bot/${session.recall_bot_id}/leave_call`, { method: 'POST' });
 
   const { error: updErr } = await db()
     .from('bot_sessions')
@@ -191,7 +202,7 @@ async function getRecallBotState(sessionId) {
     .eq('id', sessionId)
     .single();
   if (error || !session?.recall_bot_id) throw new Error(`Session ${sessionId} has no recall_bot_id`);
-  return recallFetch(`/bot/${session.recall_bot_id}/`);
+  return recallFetch(`/bot/${session.recall_bot_id}`);
 }
 
 /**
