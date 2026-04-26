@@ -104,12 +104,18 @@ async function launchBotSession(p) {
     meeting_url: meetingUrl,
     bot_name: botName || DEFAULT_BOT_NAME,
     webhook_url: webhookUrl(sessionId),
-    // Use Meet's built-in captions for transcription (free with Recall).
-    // P1.4 will swap in Deepgram for higher accuracy + diarization.
+    // Deepgram Nova-3 with speaker diarization. BYO Deepgram API key is
+    // configured in the Recall dashboard, not here. Speaker labels arrive
+    // as generic "A", "B", "C" in the transcript JSON we fetch from
+    // transcript_url on bot.done.
     recording_config: {
       transcript: {
         provider: {
-          meeting_captions: {}
+          deepgram_streaming: {
+            model: 'nova-3',
+            language: 'en',
+            diarize: true
+          }
         }
       }
     },

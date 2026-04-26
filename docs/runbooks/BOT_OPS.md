@@ -42,13 +42,20 @@ operators.
    your API key.
 2. **Render env.** Set `RECALL_API_KEY`, `RECALL_WEBHOOK_TOKEN`, and
    `BOT_CALLBACK_BASE_URL` in the Render service Environment tab.
-3. **DB migration.**
+3. **Deepgram credential (transcription).** Sign up at
+   https://console.deepgram.com → API Keys → create a Member-scoped key.
+   In the Recall.ai dashboard → Transcription Providers → add the key as
+   the **default** Deepgram credential (leave Host and Project Id blank
+   for the US endpoint + meeting bots). Bots launch with
+   `deepgram_streaming` + `model: nova-3` + `diarize: true`; Recall reads
+   the key from the dashboard at call time. No backend env var.
+4. **DB migration.**
    ```bash
    supabase db push
    ```
    Applies both the original `20260423000001_bot_sessions.sql` and the
    Recall extension `20260425000001_bot_sessions_recall.sql`.
-4. **Webhook URL** is computed at launch time as
+5. **Webhook URL** is computed at launch time as
    `{BOT_CALLBACK_BASE_URL}/api/admin/bots/recall-webhook?session=<id>&token=<RECALL_WEBHOOK_TOKEN>`.
    Recall stores it per-bot at creation; nothing to register up-front.
 
