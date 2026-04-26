@@ -14,6 +14,8 @@ const OPTIONAL_WARNINGS = [
   { key: 'OPENAI_API_KEY', alt: 'GEMINI_API_KEY', message: 'No AI provider configured (OPENAI_API_KEY or GEMINI_API_KEY)' },
   { key: 'SENTRY_DSN', message: 'Error tracking disabled (no SENTRY_DSN)' },
   { key: 'SLACK_BOT_TOKEN', message: 'Slack integration disabled (no SLACK_BOT_TOKEN)' },
+  { key: 'RECALL_API_KEY', message: 'Recall.ai bot launches will fail (no RECALL_API_KEY)' },
+  { key: 'RECALL_WEBHOOK_SIGNING_SECRET', message: 'Recall webhooks will be rejected at the route — set the Svix whsec_… secret from the Recall dashboard' },
 ];
 
 function validateEnv() {

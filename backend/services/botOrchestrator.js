@@ -13,10 +13,13 @@
  * build-vs-buy tradeoff. To be revisited at M-PR pricing checkpoint.
  *
  * Env vars:
- *   RECALL_API_KEY         — required, from Recall.ai dashboard
- *   RECALL_API_BASE        — default https://us-east-1.recall.ai/api/v1
- *   RECALL_WEBHOOK_TOKEN   — random secret matched in webhook URL query
- *   BOT_CALLBACK_BASE_URL  — public URL of this backend (for webhook)
+ *   RECALL_API_KEY                  — required, from Recall.ai dashboard
+ *   RECALL_API_BASE                 — default https://us-west-2.recall.ai/api/v1
+ *   RECALL_WEBHOOK_SIGNING_SECRET   — Svix `whsec_…` secret, configured per
+ *                                     workspace in the Recall dashboard.
+ *                                     Webhooks are workspace-level, not
+ *                                     per-bot — there is no `webhook_url`
+ *                                     field on Recall's bot create endpoint.
  */
 
 'use strict';
@@ -26,7 +29,6 @@ const { supabaseAdmin } = require('../config/supabase');
 const log = require('../utils/log');
 
 const RECALL_API_BASE = process.env.RECALL_API_BASE || 'https://us-west-2.recall.ai/api/v1';
-const CALLBACK_BASE = process.env.BOT_CALLBACK_BASE_URL || '';
 const DEFAULT_BOT_NAME = 'Meet Mate';
 
 const db = () => {
@@ -55,14 +57,6 @@ async function recallFetch(path, options = {}) {
   if (res.status === 204) return null;
   const ct = res.headers.get('content-type') || '';
   return ct.includes('application/json') ? res.json() : res.text();
-}
-
-function webhookUrl(sessionId) {
-  if (!CALLBACK_BASE) return '';
-  const token = process.env.RECALL_WEBHOOK_TOKEN || '';
-  const params = new URLSearchParams({ session: sessionId });
-  if (token) params.set('token', token);
-  return `${CALLBACK_BASE}/api/admin/bots/recall-webhook?${params.toString()}`;
 }
 
 /**
@@ -103,7 +97,11 @@ async function launchBotSession(p) {
   const recallPayload = {
     meeting_url: meetingUrl,
     bot_name: botName || DEFAULT_BOT_NAME,
-    webhook_url: webhookUrl(sessionId),
+    // Webhooks are configured at the Recall workspace level (dashboard),
+    // not per-bot — Recall's bot create endpoint has no webhook_url field.
+    // Status events arrive via the Svix-signed POST to
+    // /api/admin/bots/recall-webhook and are routed to a session by
+    // metadata.session_id below.
     // Deepgram Nova-3 with speaker diarization. BYO Deepgram API key is
     // configured in the Recall dashboard, not here. Speaker labels arrive
     // as generic "A", "B", "C" in the transcript JSON we fetch from
@@ -162,8 +160,29 @@ async function launchBotSession(p) {
   return { sessionId, recallBotId: bot.id };
 }
 
+// Recall status codes grouped by lifecycle phase. The right "stop" action
+// depends on which phase the bot is in: pre-call bots have to be deleted
+// (Recall returns 400 cannot_command_unstarted_bot on /leave_call), in-call
+// bots get /leave_call, and bots already in a terminal state need no Recall
+// call at all.
+const PRE_CALL_STATUSES = new Set(['ready', 'joining_call', 'in_waiting_room']);
+const IN_CALL_STATUSES = new Set(['in_call_not_recording', 'in_call_recording']);
+const TERMINAL_STATUSES = new Set([
+  'recording_done', 'call_ended', 'done', 'fatal', 'timeout'
+]);
+
+function latestRecallStatusCode(bot) {
+  const changes = Array.isArray(bot?.status_changes) ? bot.status_changes : [];
+  if (!changes.length) return bot?.status?.code || null;
+  return changes[changes.length - 1]?.code || null;
+}
+
 /**
  * Stop a running bot session.
+ *
+ * Branches on the bot's current Recall lifecycle phase to pick the right
+ * cancellation endpoint. See PRE_CALL_STATUSES / IN_CALL_STATUSES /
+ * TERMINAL_STATUSES above for the mapping.
  */
 async function stopBotSession(sessionId, reason = 'manual_stop') {
   const { data: session, error } = await db()
@@ -174,7 +193,34 @@ async function stopBotSession(sessionId, reason = 'manual_stop') {
   if (error || !session) throw new Error(`Session not found: ${sessionId}`);
   if (!session.recall_bot_id) throw new Error(`Session ${sessionId} has no recall_bot_id`);
 
-  await recallFetch(`/bot/${session.recall_bot_id}/leave_call`, { method: 'POST' });
+  let recallStatus = null;
+  try {
+    const bot = await recallFetch(`/bot/${session.recall_bot_id}`);
+    recallStatus = latestRecallStatusCode(bot);
+  } catch (err) {
+    // If Recall doesn't know about the bot anymore, treat as terminal — nothing
+    // to stop. Any other failure should surface; don't blindly try /leave_call.
+    if (/\b404\b/.test(err.message)) {
+      log.warn('Recall bot already gone; marking session stopped', {
+        sessionId, recallBotId: session.recall_bot_id
+      });
+    } else {
+      throw err;
+    }
+  }
+
+  if (recallStatus && PRE_CALL_STATUSES.has(recallStatus)) {
+    await recallFetch(`/bot/${session.recall_bot_id}`, { method: 'DELETE' });
+  } else if (recallStatus && IN_CALL_STATUSES.has(recallStatus)) {
+    await recallFetch(`/bot/${session.recall_bot_id}/leave_call`, { method: 'POST' });
+  } else if (recallStatus && !TERMINAL_STATUSES.has(recallStatus)) {
+    // Unknown status — attempt leave_call as the historical default but log it
+    // so we can extend the map if Recall introduces new codes.
+    log.warn('Unknown Recall status on stop; defaulting to leave_call', {
+      sessionId, recallBotId: session.recall_bot_id, recallStatus
+    });
+    await recallFetch(`/bot/${session.recall_bot_id}/leave_call`, { method: 'POST' });
+  }
 
   const { error: updErr } = await db()
     .from('bot_sessions')
@@ -182,8 +228,10 @@ async function stopBotSession(sessionId, reason = 'manual_stop') {
     .eq('id', sessionId);
   if (updErr) log.warn('bot_sessions post-stop update failed', { sessionId, error: updErr.message });
 
-  log.info('Recall bot stopped', { sessionId, recallBotId: session.recall_bot_id, reason });
-  return { sessionId, recallBotId: session.recall_bot_id };
+  log.info('Recall bot stopped', {
+    sessionId, recallBotId: session.recall_bot_id, recallStatus, reason
+  });
+  return { sessionId, recallBotId: session.recall_bot_id, recallStatus };
 }
 
 async function listActiveSessions(orgId) {
@@ -233,19 +281,64 @@ function mapRecallStatus(code) {
 }
 
 /**
- * Process an inbound Recall webhook event. The token query param is
- * verified by the route layer before this is called.
+ * Resolve which `bot_sessions` row a Recall webhook payload refers to.
+ * Workspace-level webhooks fire for *every* bot in the Recall workspace
+ * (including any future bots from other apps that share the workspace),
+ * so an unknown bot is not an error — we silently no-op on it.
  *
- * @param {string} sessionId — from webhook URL ?session=...
- * @param {Object} payload   — Recall webhook body (event + data)
+ * Lookup order:
+ *   1. payload.data.bot.metadata.session_id  — we wrote this at launch.
+ *   2. payload.data.bot.id matched against bot_sessions.recall_bot_id —
+ *      defensive fallback if metadata is missing (e.g. legacy bots, or
+ *      a payload shape change).
  */
-async function handleRecallWebhook(sessionId, payload) {
-  if (!sessionId) throw new Error('Missing session id');
+async function resolveSessionFromPayload(payload) {
+  const bot = payload?.data?.bot || payload?.data || {};
+  const metaSessionId = bot?.metadata?.session_id;
+  const recallBotId = bot?.id;
 
+  if (metaSessionId) {
+    const { data } = await db()
+      .from('bot_sessions')
+      .select('id')
+      .eq('id', metaSessionId)
+      .maybeSingle();
+    if (data?.id) return data.id;
+  }
+
+  if (recallBotId) {
+    const { data } = await db()
+      .from('bot_sessions')
+      .select('id')
+      .eq('recall_bot_id', recallBotId)
+      .maybeSingle();
+    if (data?.id) return data.id;
+  }
+
+  return null;
+}
+
+/**
+ * Process an inbound Recall webhook event. Signature is verified at the
+ * route layer (Svix HMAC) before this is called. The session is resolved
+ * from the payload, not the URL — workspace-level webhooks have no
+ * per-bot URL params to pivot off.
+ *
+ * @param {Object} payload — Recall webhook body (event + data)
+ */
+async function handleRecallWebhook(payload) {
   const event = payload?.event;
   const data = payload?.data || {};
   const statusCode = data?.status?.code;
   const mapped = mapRecallStatus(statusCode);
+
+  const sessionId = await resolveSessionFromPayload(payload);
+  if (!sessionId) {
+    log.info('Recall webhook for unknown bot — ignoring', {
+      event, statusCode, recallBotId: data?.bot?.id || data?.id || null
+    });
+    return { ok: true, ignored: true };
+  }
 
   log.info('Recall webhook', { sessionId, event, statusCode, mapped });
 
@@ -255,10 +348,32 @@ async function handleRecallWebhook(sessionId, payload) {
     update.ended_at = new Date().toISOString();
   }
 
-  // Recall sends the recording URL on bot.done or bot.recording.done
-  if (event === 'bot.done' || event === 'bot.recording.done') {
-    if (data?.recording?.media_url) update.recording_url = data.recording.media_url;
-    if (data?.transcript?.url) update.transcript_url = data.transcript.url;
+  // Recall doesn't fire a separate bot.recording.done / bot.transcript.done
+  // event (verified against the dashboard event catalog 2026-04-26). On
+  // bot.done we do an authoritative GET /bot/<id> and pull URLs from
+  // recordings[0].media_shortcuts. Best-effort: a transient failure here
+  // shouldn't block the status update — recordings can be backfilled later
+  // via the Recall dashboard or a manual reconcile.
+  if (event === 'bot.done') {
+    const recallBotId = data?.bot?.id || data?.id;
+    if (recallBotId) {
+      try {
+        const fullBot = await recallFetch(`/bot/${recallBotId}`);
+        const rec = Array.isArray(fullBot?.recordings) ? fullBot.recordings[0] : null;
+        const shortcuts = rec?.media_shortcuts || {};
+        const recordingUrl = shortcuts.video_mixed?.data?.download_url
+                          || shortcuts.audio_mixed?.data?.download_url
+                          || rec?.media_url;
+        const transcriptUrl = shortcuts.transcript?.data?.download_url
+                           || rec?.transcript?.url;
+        if (recordingUrl) update.recording_url = recordingUrl;
+        if (transcriptUrl) update.transcript_url = transcriptUrl;
+      } catch (err) {
+        log.warn('Failed to fetch bot for recording URLs', {
+          recallBotId, error: err.message
+        });
+      }
+    }
   }
 
   if (event === 'bot.fatal' && data?.fatal_reason) {
@@ -273,7 +388,7 @@ async function handleRecallWebhook(sessionId, payload) {
     if (updErr) throw updErr;
   }
 
-  return { ok: true };
+  return { ok: true, sessionId };
 }
 
 module.exports = {
@@ -282,5 +397,5 @@ module.exports = {
   listActiveSessions,
   getRecallBotState,
   handleRecallWebhook,
-  _internal: { mapRecallStatus, recallFetch }
+  _internal: { mapRecallStatus, recallFetch, latestRecallStatusCode, resolveSessionFromPayload }
 };

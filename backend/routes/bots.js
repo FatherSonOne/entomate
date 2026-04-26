@@ -89,25 +89,54 @@ router.get('/:sessionId/state', authenticate, authorizeOrgRole(ADMIN_ROLES, orgF
 });
 
 /**
- * POST /api/admin/bots/recall-webhook?session=<id>&token=<secret>
+ * POST /api/admin/bots/recall-webhook
  *
- * Recall posts status events here. Token in query string is matched
- * against RECALL_WEBHOOK_TOKEN env (set on this backend + as part of
- * webhook_url passed to Recall at bot launch).
+ * Recall posts status events here. The endpoint is workspace-wide — Recall
+ * doesn't support per-bot webhook URLs (no `webhook_url` field on the bot
+ * create endpoint). Configure the URL once in the Recall dashboard, paste
+ * the Svix `whsec_…` secret it gives you into RECALL_WEBHOOK_SIGNING_SECRET
+ * on this backend, and every bot in the workspace fires events here.
+ *
+ * Authentication is HMAC-SHA256 via Svix headers (svix-id, svix-timestamp,
+ * svix-signature). The session is resolved from the payload itself, not
+ * from URL query params.
  */
 router.post('/recall-webhook', async (req, res) => {
-  try {
-    const { session, token } = req.query;
-    const expected = process.env.RECALL_WEBHOOK_TOKEN || '';
-    if (!session) {
-      return res.status(400).json({ error: 'Missing session query param' });
-    }
-    if (expected && token !== expected) {
-      log.warn('Recall webhook rejected: bad token', { session });
-      return res.status(401).json({ error: 'Invalid webhook token' });
-    }
+  const secret = process.env.RECALL_WEBHOOK_SIGNING_SECRET || '';
+  if (!secret) {
+    log.error('Recall webhook rejected: RECALL_WEBHOOK_SIGNING_SECRET unset');
+    return res.status(500).json({ error: 'Webhook signing secret not configured' });
+  }
 
-    const result = await orchestrator.handleRecallWebhook(String(session), req.body || {});
+  // svix is loaded lazily so a missing dep doesn't crash the whole router on
+  // boot — only this endpoint will 500 with a clear error.
+  let Webhook;
+  try {
+    ({ Webhook } = require('svix'));
+  } catch (err) {
+    log.error('svix package missing — run `npm install svix`', { error: err.message });
+    return res.status(500).json({ error: 'svix package not installed' });
+  }
+
+  // Signature is computed over the EXACT bytes Recall signed. server.js
+  // stashes the buffer on req.rawBody via the express.json verify callback.
+  const rawBody = req.rawBody;
+  if (!rawBody) {
+    log.error('Recall webhook rejected: req.rawBody missing — verify express.json setup');
+    return res.status(500).json({ error: 'Raw body not captured' });
+  }
+
+  try {
+    const wh = new Webhook(secret);
+    // svix.verify throws on bad signature, missing headers, or stale timestamp.
+    wh.verify(rawBody, req.headers);
+  } catch (err) {
+    log.warn('Recall webhook rejected: signature verification failed', { error: err.message });
+    return res.status(401).json({ error: 'Invalid webhook signature' });
+  }
+
+  try {
+    const result = await orchestrator.handleRecallWebhook(req.body || {});
     res.json(result);
   } catch (err) {
     log.warn('Recall webhook handler failed', { error: err.message });

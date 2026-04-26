@@ -80,8 +80,14 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'X-Request-ID']
 }));
 
-// Body parsing
-app.use(express.json({ limit: '50mb' }));
+// Body parsing. The `verify` callback stashes the raw request buffer on
+// req.rawBody so signature-verifying routes (e.g. Recall webhook HMAC) can
+// run HMAC-SHA256 over the exact bytes Recall signed. Without this, body
+// parsing destroys the byte-for-byte input and verification always fails.
+app.use(express.json({
+  limit: '50mb',
+  verify: (req, _res, buf) => { req.rawBody = buf; }
+}));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Cookie and session (for calendar OAuth)
@@ -369,7 +375,20 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 // ========================================
 
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, () => {
+  // Verify Recall-managed bot path schema before binding the port. In prod a
+  // missing migration exits the process so Render's deploy fails loud; in dev
+  // we just log and continue. See backend/config/verifyBotSchema.js.
+  const { verifyBotSchema } = require('./config/verifyBotSchema');
+
+  (async () => {
+    try {
+      await verifyBotSchema();
+    } catch (err) {
+      logger.error('verifyBotSchema threw unexpectedly', { error: err.message });
+      if (process.env.NODE_ENV === 'production') process.exit(1);
+    }
+
+    app.listen(PORT, () => {
     logger.info(`Entomate Backend running on http://localhost:${PORT}`);
     logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
     logger.info(`Health check: http://localhost:${PORT}/health`);
@@ -404,6 +423,7 @@ if (process.env.NODE_ENV !== 'test') {
       logger.warn('Ecosystem scheduler not initialized:', error.message);
     }
   });
+  })();
 }
 
 module.exports = app;
