@@ -1,9 +1,13 @@
 const express = require('express');
-const { authenticate, authorize } = require('../middleware/auth');
+const { authenticate, authorizeOrgRole } = require('../middleware/auth');
 const { supabaseAdmin } = require('../config/supabase');
 const log = require('../utils/log');
 
 const router = express.Router();
+
+const ADMIN_ROLES = ['owner', 'admin'];
+const orgFromBody = (req) => req.body?.workspaceId || null;
+const orgFromQuery = (req) => req.query?.workspaceId || null;
 
 // ========================================
 // USER SETTINGS
@@ -113,11 +117,12 @@ router.put('/user', authenticate, async (req, res) => {
 // ========================================
 
 /**
- * GET /api/settings/workspace
+ * GET /api/settings/workspace?workspaceId=<org-uuid>
+ * Caller must be owner/admin of the workspace.
  */
-router.get('/workspace', authenticate, authorize(['admin']), async (req, res) => {
+router.get('/workspace', authenticate, authorizeOrgRole(ADMIN_ROLES, orgFromQuery), async (req, res) => {
   try {
-    const workspaceId = req.user.teamId || 'default';
+    const workspaceId = req.orgId;
 
     let { data, error } = await supabaseAdmin
       .from('workspace_settings')
@@ -149,10 +154,12 @@ router.get('/workspace', authenticate, authorize(['admin']), async (req, res) =>
 
 /**
  * PUT /api/settings/workspace
+ * Body: { workspaceId, integrations_json?, security_json?, data_controls_json? }
+ * Caller must be owner/admin of the workspace.
  */
-router.put('/workspace', authenticate, authorize(['admin']), async (req, res) => {
+router.put('/workspace', authenticate, authorizeOrgRole(ADMIN_ROLES, orgFromBody), async (req, res) => {
   try {
-    const workspaceId = req.user.teamId || 'default';
+    const workspaceId = req.orgId;
     const { integrations_json, security_json, data_controls_json } = req.body || {};
 
     const updates = { updated_at: new Date().toISOString() };
@@ -196,11 +203,12 @@ router.put('/workspace', authenticate, authorize(['admin']), async (req, res) =>
 // ========================================
 
 /**
- * GET /api/settings/audit-logs
+ * GET /api/settings/audit-logs?workspaceId=<org-uuid>&limit=<n>
+ * Caller must be owner/admin of the workspace.
  */
-router.get('/audit-logs', authenticate, authorize(['admin']), async (req, res) => {
+router.get('/audit-logs', authenticate, authorizeOrgRole(ADMIN_ROLES, orgFromQuery), async (req, res) => {
   try {
-    const workspaceId = req.user.teamId || 'default';
+    const workspaceId = req.orgId;
     const limit = Math.min(Number(req.query.limit) || 100, 500);
 
     const { data, error } = await supabaseAdmin

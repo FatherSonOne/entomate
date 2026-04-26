@@ -88,15 +88,21 @@ history for reference.
 
 ## Gotchas — read before resuming
 
-1. **Clerk ↔ Supabase auth mismatch (P0 to resolve before any UI work).**
-   The frontend signs users in via Clerk (`CLERK_SECRET_KEY` set in env). The
-   bot admin routes use `backend/middleware/auth.js` which calls
-   `supabase.auth.getUser()`. A Clerk JWT won't validate against Supabase
-   `auth.getUser()`. End-to-end testing of `/api/admin/bots/launch` from the
-   browser is currently blocked.
-   **Fix options:** (a) bridge Clerk → Supabase via a `supabase.auth.signInWithIdToken()`
-   exchange, (b) add a Clerk-aware auth middleware variant, (c) for testing
-   only, add an `ALLOW_SERVICE_KEY_AUTH` env-gated bypass.
+1. ~~**Clerk ↔ Supabase auth mismatch (P0).**~~ **RESOLVED 2026-04-25 (next session).**
+   The original diagnosis was wrong. The frontend has *not* used Clerk for
+   some time — `frontend/src/services/authService.js` wraps Supabase Auth,
+   and the only remaining Clerk references are in `docs/archive/` and
+   `*/env.example`. Tokens validate fine against `supabase.auth.getUser()`.
+   The actual blocker on `/api/admin/bots/launch` was that `authorize(['admin'])`
+   reads `user.user_metadata.role`, which nothing in the codebase ever
+   populates — so every real Supabase user was rejected as `'member'`.
+   **Fix shipped:** `authorizeOrgRole(roles, resolveOrgId)` in
+   `backend/middleware/auth.js` reads role from `org_members` keyed on the
+   workspace the request is acting on. Bot routes now require `owner` or
+   `admin` of the target org. Note: the same bug still affects every other
+   route using legacy `authorize(['admin'])` (e.g. `settings.js`, `secrets.js`,
+   `agents.js`, `automations.js`). Out of scope for this slice; track
+   separately if those endpoints need to work for real users.
 
 2. **Recall API quirks (already patched, but know them):**
    - Endpoints reject trailing slashes (`/bot` works, `/bot/` returns

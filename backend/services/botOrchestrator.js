@@ -180,12 +180,14 @@ async function stopBotSession(sessionId, reason = 'manual_stop') {
   return { sessionId, recallBotId: session.recall_bot_id };
 }
 
-async function listActiveSessions() {
-  const { data, error } = await db()
+async function listActiveSessions(orgId) {
+  let query = db()
     .from('bot_sessions')
     .select('*')
     .not('status', 'in', '(completed,failed,stopped,timeout)')
     .order('created_at', { ascending: false });
+  if (orgId) query = query.eq('org_id', orgId);
+  const { data, error } = await query;
   if (error) throw error;
   return data || [];
 }

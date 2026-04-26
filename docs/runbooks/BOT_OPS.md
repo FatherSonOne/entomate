@@ -52,10 +52,15 @@ operators.
    `{BOT_CALLBACK_BASE_URL}/api/admin/bots/recall-webhook?session=<id>&token=<RECALL_WEBHOOK_TOKEN>`.
    Recall stores it per-bot at creation; nothing to register up-front.
 
-## Admin endpoints (all require admin role)
+## Admin endpoints
+
+All require a Supabase access token in `Authorization: Bearer …` AND that
+the requester be `owner` or `admin` of the workspace (org) the bot belongs
+to. Membership is read from `org_members`; `auth.users.user_metadata.role`
+is ignored.
 
 ```bash
-# Launch
+# Launch — workspaceId in body, role checked against that org
 curl -X POST https://entomate.onrender.com/api/admin/bots/launch \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
@@ -66,19 +71,38 @@ curl -X POST https://entomate.onrender.com/api/admin/bots/launch \
     "platform":    "meet"
   }'
 
-# List active
-curl https://entomate.onrender.com/api/admin/bots \
+# List active — workspaceId required as query param; results scoped to that org
+curl "https://entomate.onrender.com/api/admin/bots?workspaceId=<org-uuid>" \
   -H "Authorization: Bearer $ACCESS_TOKEN"
 
-# Stop (force-leave the meeting)
+# Stop (force-leave the meeting) — org_id resolved from bot_sessions.id
 curl -X DELETE https://entomate.onrender.com/api/admin/bots/<session-id> \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"reason": "stuck in joining state"}'
 
-# Full Recall bot state (status history, recording_url, transcript_url)
+# Full Recall bot state — same authz path as DELETE
 curl https://entomate.onrender.com/api/admin/bots/<session-id>/state \
   -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+### Getting an `$ACCESS_TOKEN` for testing
+
+Sign in via the frontend, then in DevTools console:
+
+```js
+JSON.parse(localStorage.getItem(
+  Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'))
+)).access_token
+```
+
+Or via CLI against Supabase REST:
+
+```bash
+curl -X POST "$SUPABASE_URL/auth/v1/token?grant_type=password" \
+  -H "apikey: $SUPABASE_ANON_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"<you>","password":"<pw>"}' | jq -r .access_token
 ```
 
 ## Manual cleanup (when admin API is unavailable)

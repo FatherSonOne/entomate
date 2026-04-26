@@ -101,7 +101,85 @@ const optionalAuth = async (req, res, next) => {
 };
 
 /**
- * Role-based Authorization
+ * Org-scoped role authorization.
+ *
+ * Source of truth for roles is `org_members`, not `auth.users.user_metadata`
+ * (which is never populated). Use this for any route gated by an org-level
+ * permission. Must run after `authenticate`.
+ *
+ * @param {string[]} allowedRoles  Roles permitted, e.g. ['owner','admin'].
+ *   Valid values: 'owner' | 'admin' | 'manager' | 'member' | 'viewer'.
+ * @param {(req)=>string|Promise<string|null>} resolveOrgId  Returns the
+ *   org_id (workspace id) the request is acting on. May be async (e.g. to
+ *   look up the org from a session/resource id).
+ */
+const authorizeOrgRole = (allowedRoles, resolveOrgId) => {
+  return async (req, res, next) => {
+    try {
+      if (!req.user || !req.user.id || req.user.id === 'anonymous') {
+        return res.status(401).json({
+          error: 'Unauthorized',
+          message: 'Authentication required'
+        });
+      }
+
+      const orgId = await resolveOrgId(req);
+      if (!orgId) {
+        return res.status(400).json({
+          error: 'Bad Request',
+          message: 'Missing workspace/org id'
+        });
+      }
+
+      const { data, error } = await supabase
+        .from('org_members')
+        .select('role')
+        .eq('org_id', orgId)
+        .eq('user_id', req.user.id)
+        .maybeSingle();
+
+      if (error) {
+        log.error('authorizeOrgRole lookup failed:', error.message);
+        return res.status(500).json({
+          error: 'Authorization check failed',
+          message: error.message
+        });
+      }
+
+      if (!data) {
+        return res.status(403).json({
+          error: 'Forbidden',
+          message: 'Not a member of this organization'
+        });
+      }
+
+      if (!allowedRoles.includes(data.role)) {
+        return res.status(403).json({
+          error: 'Forbidden',
+          message: 'Insufficient role for this organization'
+        });
+      }
+
+      req.orgId = orgId;
+      req.orgRole = data.role;
+      next();
+    } catch (err) {
+      log.error('authorizeOrgRole error:', err.message);
+      return res.status(500).json({
+        error: 'Authorization check failed',
+        message: err.message
+      });
+    }
+  };
+};
+
+/**
+ * Role-based Authorization (legacy — reads user_metadata.role).
+ *
+ * Note: `user_metadata.role` is never populated by the app, so this only
+ * accepts users whose metadata has been manually set. Prefer
+ * `authorizeOrgRole` for any new code that gates on org-level permissions.
+ *
  * @param {string[]} allowedRoles - Array of allowed roles
  */
 const authorize = (allowedRoles) => {
@@ -183,6 +261,7 @@ module.exports = {
   authenticate,
   optionalAuth,
   authorize,
+  authorizeOrgRole,
   teamAccess,
   apiKeyAuth
 };
