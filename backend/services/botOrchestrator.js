@@ -262,7 +262,7 @@ async function getRecallBotState(sessionId) {
 }
 
 /**
- * Map Recall's status codes to our bot_sessions.status enum.
+ * Map a Recall status code (no `bot.` prefix) to our bot_sessions.status enum.
  */
 function mapRecallStatus(code) {
   const map = {
@@ -278,6 +278,18 @@ function mapRecallStatus(code) {
     timeout: 'timeout'
   };
   return map[code] || null;
+}
+
+/**
+ * Workspace-level Svix webhooks identify status by event TYPE (e.g.
+ * `bot.in_call_recording`), not by a nested `data.status.code` field —
+ * we verified empirically 2026-04-26 that bot.done payloads land without
+ * any data.status.code at all. Strip the `bot.` prefix and re-use the
+ * mapping above.
+ */
+function mapRecallEvent(event) {
+  if (typeof event !== 'string' || !event.startsWith('bot.')) return null;
+  return mapRecallStatus(event.slice(4));
 }
 
 /**
@@ -329,8 +341,10 @@ async function resolveSessionFromPayload(payload) {
 async function handleRecallWebhook(payload) {
   const event = payload?.event;
   const data = payload?.data || {};
+  // Status comes from the event type for workspace-level Svix webhooks; fall
+  // back to data.status.code for the legacy per-bot payload shape.
   const statusCode = data?.status?.code;
-  const mapped = mapRecallStatus(statusCode);
+  const mapped = mapRecallEvent(event) || mapRecallStatus(statusCode);
 
   const sessionId = await resolveSessionFromPayload(payload);
   if (!sessionId) {
@@ -397,5 +411,5 @@ module.exports = {
   listActiveSessions,
   getRecallBotState,
   handleRecallWebhook,
-  _internal: { mapRecallStatus, recallFetch, latestRecallStatusCode, resolveSessionFromPayload }
+  _internal: { mapRecallStatus, mapRecallEvent, recallFetch, latestRecallStatusCode, resolveSessionFromPayload }
 };
