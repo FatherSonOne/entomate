@@ -4,7 +4,7 @@ import { Logo } from '../components/Logo'
 import BackToTop from '../components/BackToTop'
 
 export default function Terms() {
-  const lastUpdated = 'April 22, 2026'
+  const lastUpdated = 'April 26, 2026'
 
   return (
     <div className="legal-page">
@@ -63,7 +63,7 @@ export default function Terms() {
               </li>
               <li>
                 Notify us promptly at{' '}
-                <a href="mailto:security@entomate.app">security@entomate.app</a>{' '}
+                <a href="mailto:fm1@qntmecos.com">fm1@qntmecos.com</a>{' '}
                 if you believe your account has been compromised.
               </li>
               <li>
@@ -93,16 +93,41 @@ export default function Terms() {
           </section>
 
           <section>
-            <h2>4. Meeting Recording Consent</h2>
+            <h2>4. Meeting Recording Consent and the Meet Mate Bot</h2>
+            <p className="legal-pending-review">
+              <em>
+                Effective {lastUpdated} — pending counsel review.
+              </em>
+            </p>
             <p>
-              Recording conversations is regulated in many jurisdictions.{' '}
+              Entomate operates an AI notetaker called <strong>Meet Mate</strong>{' '}
+              that joins meetings as a visible participant, captures audio and
+              video, and produces a transcript and summary. Recording
+              conversations is regulated in many jurisdictions, including
+              several US states (which require all-party consent) and most EU
+              member states.{' '}
               <strong>
                 You are solely responsible for obtaining any legally required
-                consent from meeting participants before recording.
-              </strong>{' '}
-              Entomate provides recording indicators and controls, but does
-              not obtain consent on your behalf. Misuse of the recording
-              feature may violate law and these Terms.
+                consent from meeting participants before launching Meet Mate.
+              </strong>
+            </p>
+            <p>
+              To make that obligation explicit, the launch flow requires the
+              organizer to affirm that consent has been obtained from all
+              participants. We record who acknowledged this and when. The bot
+              joins under a clearly identifiable display name and posts a chat
+              announcement on join indicating that recording has started, but
+              these surfaces alone do not constitute consent. Misuse of the
+              recording feature — including launching Meet Mate into a meeting
+              where required consent has not been obtained — may violate law
+              and these Terms.
+            </p>
+            <p>
+              Per the Privacy Policy, recordings and transcripts are visible
+              only to the workspace that launched the bot, and are not used to
+              train foundational AI models. Future releases will add a
+              pre-meeting opt-out link for external invitees and per-workspace
+              retention controls.
             </p>
           </section>
 
@@ -316,7 +341,7 @@ export default function Terms() {
             <h2>18. Contact</h2>
             <p>
               Questions? Email{' '}
-              <a href="mailto:legal@entomate.app">legal@entomate.app</a>.
+              <a href="mailto:fm1@qntmecos.com">fm1@qntmecos.com</a>.
             </p>
           </section>
 
@@ -480,6 +505,20 @@ export default function Terms() {
           padding-top: 32px;
           border-top: 1px solid var(--border);
           flex-wrap: wrap;
+        }
+
+        .legal-page .legal-pending-review {
+          padding: 12px 16px;
+          background: rgba(255, 184, 0, 0.06);
+          border: 1px solid rgba(255, 184, 0, 0.25);
+          border-left: 3px solid var(--amber);
+          border-radius: var(--radius-md);
+          margin: 0 0 24px;
+        }
+        .legal-page .legal-pending-review em {
+          color: var(--amber);
+          font-style: normal;
+          font-size: 14px;
         }
 
         @media (max-width: 600px) {

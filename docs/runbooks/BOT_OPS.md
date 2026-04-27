@@ -126,15 +126,20 @@ to. Membership is read from `org_members`; `auth.users.user_metadata.role`
 is ignored.
 
 ```bash
-# Launch — workspaceId in body, role checked against that org
+# Launch — workspaceId in body, role checked against that org.
+# consentAcknowledged: true is REQUIRED (P1.7 organizer-side consent gate).
+# The launching user's auth.users.id + the timestamp are recorded on the
+# bot_sessions row as consent_acknowledged_by / consent_acknowledged_at for
+# audit. Omitting the field returns 400 consent_required.
 curl -X POST https://entomate.onrender.com/api/admin/bots/launch \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "workspaceId": "<org-uuid>",
-    "meetingId":   "<meeting-uuid>",
-    "meetingUrl":  "https://meet.google.com/abc-defg-hij",
-    "platform":    "meet"
+    "workspaceId":         "<org-uuid>",
+    "meetingId":           "<meeting-uuid>",
+    "meetingUrl":          "https://meet.google.com/abc-defg-hij",
+    "platform":            "meet",
+    "consentAcknowledged": true
   }'
 
 # List active — workspaceId required as query param; results scoped to that org

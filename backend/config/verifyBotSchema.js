@@ -28,7 +28,11 @@ const REQUIRED_BOT_SESSION_COLUMNS = [
   'transcript_url',
   'failure_reason',
   'started_at',
-  'ended_at'
+  'ended_at',
+  // P1.7 — organizer-side consent gate. Migration:
+  // supabase/migrations/20260426000001_bot_consent_columns.sql
+  'consent_acknowledged_at',
+  'consent_acknowledged_by'
 ];
 
 async function verifyBotSchema({ exitOnFailure } = {}) {
@@ -56,7 +60,7 @@ async function verifyBotSchema({ exitOnFailure } = {}) {
   log.error('[BOT_SCHEMA] bot_sessions schema check failed — likely missing migration', {
     error: error.message,
     code: error.code,
-    hint: 'Apply supabase/migrations/20260425000001_bot_sessions_recall.sql to this database.',
+    hint: 'Apply pending bot_sessions migrations (20260425000001_bot_sessions_recall.sql, 20260426000001_bot_consent_columns.sql) to this database.',
     fatal: shouldExit
   });
 

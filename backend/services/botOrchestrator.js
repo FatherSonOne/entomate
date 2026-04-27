@@ -31,6 +31,40 @@ const log = require('../utils/log');
 const RECALL_API_BASE = process.env.RECALL_API_BASE || 'https://us-west-2.recall.ai/api/v1';
 const DEFAULT_BOT_NAME = 'Meet Mate';
 
+// Casual, neutral disclosure posted to chat when the bot joins. Per-workspace
+// override lives at tenant_organizations.settings.bot_announcement_message;
+// the {organizer} token resolves to the launching user's first name (falls
+// back to email-username, then drops the substitution).
+const DEFAULT_ANNOUNCEMENT_TEMPLATE =
+  'Hey all — Meet Mate (an AI notetaker) is recording this meeting{organizerSuffix}. ' +
+  'Notes + transcript shared with the meeting host.';
+
+function renderAnnouncement(template, organizerName) {
+  const suffix = organizerName ? ` for ${organizerName}` : '';
+  return template
+    .replace('{organizerSuffix}', suffix)
+    .replace('{organizer}', organizerName || 'the meeting host');
+}
+
+async function resolveAnnouncementMessage(workspaceId, organizerName) {
+  try {
+    const { data } = await db()
+      .from('tenant_organizations')
+      .select('settings')
+      .eq('id', workspaceId)
+      .maybeSingle();
+    const custom = data?.settings?.bot_announcement_message;
+    if (typeof custom === 'string' && custom.trim()) {
+      return renderAnnouncement(custom, organizerName);
+    }
+  } catch (err) {
+    log.warn('Announcement override lookup failed; using default', {
+      workspaceId, error: err.message
+    });
+  }
+  return renderAnnouncement(DEFAULT_ANNOUNCEMENT_TEMPLATE, organizerName);
+}
+
 const db = () => {
   if (!supabaseAdmin) throw new Error('SUPABASE_SERVICE_KEY is not set');
   return supabaseAdmin;
@@ -62,16 +96,30 @@ async function recallFetch(path, options = {}) {
 /**
  * Launch a new bot session.
  *
+ * Caller must have already verified the launching user affirmed consent
+ * from all meeting participants (P1.7). The route layer (routes/bots.js)
+ * enforces consentAcknowledged: true on the request body before invoking
+ * this function; the consent fields below record who/when for audit.
+ *
  * @param {Object} p
  * @param {string} p.workspaceId
  * @param {string} p.meetingId
  * @param {string} p.meetingUrl
  * @param {'meet'|'zoom'|'teams'} p.platform
  * @param {string} [p.botName]
+ * @param {string} [p.consentAcknowledgedBy]      auth.users.id of the
+ *   organizer who clicked the consent checkbox. Required by the route
+ *   layer; treated as optional here so direct callers (e.g. future
+ *   scheduled jobs) can pass null when there is no human in the loop.
+ * @param {string} [p.consentAcknowledgedByName]  Display name used in the
+ *   in-meeting chat announcement. Falls back gracefully if missing.
  * @returns {Promise<{sessionId: string, recallBotId: string}>}
  */
 async function launchBotSession(p) {
-  const { workspaceId, meetingId, meetingUrl, platform, botName } = p || {};
+  const {
+    workspaceId, meetingId, meetingUrl, platform, botName,
+    consentAcknowledgedBy, consentAcknowledgedByName
+  } = p || {};
   if (!workspaceId || !meetingId || !meetingUrl || !platform) {
     throw new Error('launchBotSession: workspaceId, meetingId, meetingUrl, platform are required');
   }
@@ -80,18 +128,27 @@ async function launchBotSession(p) {
   }
 
   const sessionId = crypto.randomUUID();
+  const announcementMessage = await resolveAnnouncementMessage(
+    workspaceId, consentAcknowledgedByName || null
+  );
+
+  const insertRow = {
+    id: sessionId,
+    org_id: workspaceId,
+    meeting_id: meetingId,
+    platform,
+    status: 'pending',
+    meeting_url: meetingUrl,
+    callback_token_hash: 'recall' // legacy column; not used in Recall path
+  };
+  if (consentAcknowledgedBy) {
+    insertRow.consent_acknowledged_at = new Date().toISOString();
+    insertRow.consent_acknowledged_by = consentAcknowledgedBy;
+  }
 
   const { error: insertErr } = await db()
     .from('bot_sessions')
-    .insert({
-      id: sessionId,
-      org_id: workspaceId,
-      meeting_id: meetingId,
-      platform,
-      status: 'pending',
-      meeting_url: meetingUrl,
-      callback_token_hash: 'recall' // legacy column; not used in Recall path
-    });
+    .insert(insertRow);
   if (insertErr) throw new Error(`bot_sessions insert failed: ${insertErr.message}`);
 
   const recallPayload = {
@@ -115,6 +172,17 @@ async function launchBotSession(p) {
             diarize: true
           }
         }
+      }
+    },
+    // P1.7 in-meeting consent announcement. Recall posts this on join.
+    // If Recall rejects the field shape (it has shifted before — the
+    // dashboard catalog should be the source of truth), launch will fail
+    // loud at the Recall API call below and we'll iterate to a runtime
+    // POST /bot/<id>/send_chat_message fallback.
+    chat: {
+      on_bot_join: {
+        send_to: 'everyone',
+        message: announcementMessage
       }
     },
     metadata: {
@@ -411,5 +479,14 @@ module.exports = {
   listActiveSessions,
   getRecallBotState,
   handleRecallWebhook,
-  _internal: { mapRecallStatus, mapRecallEvent, recallFetch, latestRecallStatusCode, resolveSessionFromPayload }
+  _internal: {
+    mapRecallStatus,
+    mapRecallEvent,
+    recallFetch,
+    latestRecallStatusCode,
+    resolveSessionFromPayload,
+    renderAnnouncement,
+    resolveAnnouncementMessage,
+    DEFAULT_ANNOUNCEMENT_TEMPLATE
+  }
 };

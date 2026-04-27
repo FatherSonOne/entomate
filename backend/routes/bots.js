@@ -40,12 +40,30 @@ const orgFromSession = async (req) => {
   return data?.org_id || null;
 };
 
-/** POST /api/admin/bots/launch — launch a new bot session. */
+/**
+ * POST /api/admin/bots/launch — launch a new bot session.
+ *
+ * Body MUST include `consentAcknowledged: true` (strict boolean). This is
+ * the P1.7 organizer-side consent gate: the launching user affirms they
+ * have consent from all meeting participants before the bot is fired.
+ * The acknowledgment (user_id + timestamp) is recorded on the
+ * bot_sessions row for audit. See [docs/runbooks/BOT_OPS.md] for context.
+ */
 router.post('/launch', authenticate, authorizeOrgRole(ADMIN_ROLES, orgFromBody), async (req, res) => {
   try {
-    const { workspaceId, meetingId, meetingUrl, platform, botName } = req.body || {};
+    const { workspaceId, meetingId, meetingUrl, platform, botName, consentAcknowledged } = req.body || {};
+    if (consentAcknowledged !== true) {
+      return res.status(400).json({
+        error: 'consent_required',
+        message: 'consentAcknowledged: true is required. The organizer must affirm participant consent before bot launch. See https://entomate.onrender.com/privacy for the recording disclosure.'
+      });
+    }
+    const organizerName = req.user.firstName
+      || (req.user.email ? req.user.email.split('@')[0] : null);
     const result = await orchestrator.launchBotSession({
-      workspaceId, meetingId, meetingUrl, platform, botName
+      workspaceId, meetingId, meetingUrl, platform, botName,
+      consentAcknowledgedBy: req.user.id,
+      consentAcknowledgedByName: organizerName
     });
     res.status(201).json(result);
   } catch (err) {
