@@ -315,6 +315,10 @@ app.use('/api/assistant', require('./routes/assistant'));
 // Meeting bot fleet (admin) + bot status callbacks
 app.use('/api/admin/bots', require('./routes/bots'));
 
+// Public consent / opt-out endpoints (P1.7 Slice 2). Token-authenticated;
+// no Supabase JWT required. See backend/routes/consent.js.
+app.use('/api/consent', require('./routes/consent'));
+
 
 // ========================================
 // SPA FALLBACK (production only)

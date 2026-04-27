@@ -29,11 +29,32 @@ const REQUIRED_BOT_SESSION_COLUMNS = [
   'failure_reason',
   'started_at',
   'ended_at',
-  // P1.7 — organizer-side consent gate. Migration:
+  // P1.7 Slice 1 — organizer-side consent gate. Migration:
   // supabase/migrations/20260426000001_bot_consent_columns.sql
   'consent_acknowledged_at',
   'consent_acknowledged_by'
 ];
+
+// P1.7 Slice 2 — pre-meeting opt-out email. Migration:
+// supabase/migrations/20260427000001_bot_session_attendees.sql
+const REQUIRED_BOT_SESSION_ATTENDEES_COLUMNS = [
+  'id',
+  'session_id',
+  'org_id',
+  'email',
+  'opt_out_token_hash',
+  'email_status',
+  'opted_out_at',
+  'created_at'
+];
+
+async function probeTable(table, columns) {
+  const { error } = await supabaseAdmin
+    .from(table)
+    .select(columns.join(', '))
+    .limit(0);
+  return error || null;
+}
 
 async function verifyBotSchema({ exitOnFailure } = {}) {
   if (!supabaseAdmin) {
@@ -41,15 +62,22 @@ async function verifyBotSchema({ exitOnFailure } = {}) {
     return false;
   }
 
-  const projection = REQUIRED_BOT_SESSION_COLUMNS.join(', ');
-  const { error } = await supabaseAdmin
-    .from('bot_sessions')
-    .select(projection)
-    .limit(0);
+  const checks = [
+    { table: 'bot_sessions', columns: REQUIRED_BOT_SESSION_COLUMNS },
+    { table: 'bot_session_attendees', columns: REQUIRED_BOT_SESSION_ATTENDEES_COLUMNS }
+  ];
 
-  if (!error) {
-    log.info('[BOT_SCHEMA] bot_sessions schema OK', {
-      columns: REQUIRED_BOT_SESSION_COLUMNS.length
+  const failures = [];
+  for (const { table, columns } of checks) {
+    const err = await probeTable(table, columns);
+    if (err) failures.push({ table, error: err });
+  }
+
+  if (failures.length === 0) {
+    log.info('[BOT_SCHEMA] bot tables schema OK', {
+      tables: checks.length,
+      bot_sessions_columns: REQUIRED_BOT_SESSION_COLUMNS.length,
+      bot_session_attendees_columns: REQUIRED_BOT_SESSION_ATTENDEES_COLUMNS.length
     });
     return true;
   }
@@ -57,12 +85,14 @@ async function verifyBotSchema({ exitOnFailure } = {}) {
   const isProd = process.env.NODE_ENV === 'production';
   const shouldExit = exitOnFailure !== undefined ? exitOnFailure : isProd;
 
-  log.error('[BOT_SCHEMA] bot_sessions schema check failed — likely missing migration', {
-    error: error.message,
-    code: error.code,
-    hint: 'Apply pending bot_sessions migrations (20260425000001_bot_sessions_recall.sql, 20260426000001_bot_consent_columns.sql) to this database.',
-    fatal: shouldExit
-  });
+  for (const f of failures) {
+    log.error(`[BOT_SCHEMA] ${f.table} schema check failed — likely missing migration`, {
+      error: f.error.message,
+      code: f.error.code,
+      hint: 'Apply pending bot migrations (20260425000001_bot_sessions_recall.sql, 20260426000001_bot_consent_columns.sql, 20260427000001_bot_session_attendees.sql) to this database.',
+      fatal: shouldExit
+    });
+  }
 
   if (shouldExit) {
     process.exit(1);
@@ -70,4 +100,8 @@ async function verifyBotSchema({ exitOnFailure } = {}) {
   return false;
 }
 
-module.exports = { verifyBotSchema, REQUIRED_BOT_SESSION_COLUMNS };
+module.exports = {
+  verifyBotSchema,
+  REQUIRED_BOT_SESSION_COLUMNS,
+  REQUIRED_BOT_SESSION_ATTENDEES_COLUMNS
+};

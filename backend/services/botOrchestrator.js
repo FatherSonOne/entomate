@@ -27,6 +27,7 @@
 const crypto = require('crypto');
 const { supabaseAdmin } = require('../config/supabase');
 const log = require('../utils/log');
+const consentEmail = require('./consentEmailService');
 
 const RECALL_API_BASE = process.env.RECALL_API_BASE || 'https://us-west-2.recall.ai/api/v1';
 const DEFAULT_BOT_NAME = 'Meet Mate';
@@ -44,6 +45,45 @@ function renderAnnouncement(template, organizerName) {
   return template
     .replace('{organizerSuffix}', suffix)
     .replace('{organizer}', organizerName || 'the meeting host');
+}
+
+// Opt-out token plumbing (P1.7 Slice 2). The raw token is generated here,
+// embedded in the email link, and never persisted. Only sha256(raw) is
+// stored on bot_session_attendees so a stolen DB dump can't be used to
+// mass-unsubscribe.
+function generateOptOutToken() {
+  const raw = crypto.randomBytes(32).toString('hex');
+  const hash = crypto.createHash('sha256').update(raw).digest('hex');
+  return { raw, hash };
+}
+
+function hashOptOutToken(rawToken) {
+  return crypto.createHash('sha256').update(String(rawToken)).digest('hex');
+}
+
+// Loose RFC 5322-ish email shape check. Not a full parser — just enough
+// to reject obvious typos before we hit Resend.
+function normalizeEmail(e) {
+  if (typeof e !== 'string') return null;
+  const trimmed = e.trim().toLowerCase();
+  if (!trimmed.includes('@') || !trimmed.includes('.')) return null;
+  if (trimmed.length < 5 || trimmed.length > 254) return null;
+  return trimmed;
+}
+
+function normalizeEmailList(emails, organizerEmail) {
+  const orgLower = organizerEmail ? organizerEmail.toLowerCase() : null;
+  const seen = new Set();
+  const out = [];
+  for (const e of Array.isArray(emails) ? emails : []) {
+    const n = normalizeEmail(e);
+    if (!n) continue;
+    if (n === orgLower) continue;     // never email the organizer their own bot launch
+    if (seen.has(n)) continue;
+    seen.add(n);
+    out.push(n);
+  }
+  return out;
 }
 
 async function resolveAnnouncementMessage(workspaceId, organizerName) {
@@ -112,13 +152,26 @@ async function recallFetch(path, options = {}) {
  *   layer; treated as optional here so direct callers (e.g. future
  *   scheduled jobs) can pass null when there is no human in the loop.
  * @param {string} [p.consentAcknowledgedByName]  Display name used in the
- *   in-meeting chat announcement. Falls back gracefully if missing.
- * @returns {Promise<{sessionId: string, recallBotId: string}>}
+ *   in-meeting chat announcement and the opt-out email. Falls back
+ *   gracefully if missing.
+ * @param {string} [p.consentAcknowledgedByEmail] Organizer's email; used
+ *   to filter their own address out of participantEmails and as the
+ *   recipient for the organizer-side opt-out notification email.
+ * @param {string[]} [p.participantEmails]        External attendees who
+ *   should receive a pre-meeting opt-out email. The organizer is
+ *   filtered out automatically; duplicates collapsed; bad shapes
+ *   dropped. Empty/missing array skips the email flow entirely.
+ * @returns {Promise<{
+ *   sessionId: string,
+ *   recallBotId: string,
+ *   attendees: Array<{email: string, status: string, error?: string}>
+ * }>}
  */
 async function launchBotSession(p) {
   const {
     workspaceId, meetingId, meetingUrl, platform, botName,
-    consentAcknowledgedBy, consentAcknowledgedByName
+    consentAcknowledgedBy, consentAcknowledgedByName, consentAcknowledgedByEmail,
+    participantEmails
   } = p || {};
   if (!workspaceId || !meetingId || !meetingUrl || !platform) {
     throw new Error('launchBotSession: workspaceId, meetingId, meetingUrl, platform are required');
@@ -225,7 +278,231 @@ async function launchBotSession(p) {
   if (updErr) log.warn('bot_sessions post-launch update failed', { sessionId, error: updErr.message });
 
   log.info('Recall bot launched', { sessionId, recallBotId: bot.id, platform });
-  return { sessionId, recallBotId: bot.id };
+
+  // P1.7 Slice 2 — fire pre-meeting opt-out emails. Best-effort: a single
+  // bad address or a Resend outage must not fail the launch (the bot is
+  // already in flight at this point). Per-attendee status is persisted on
+  // bot_session_attendees and surfaced in the launch response so the UI
+  // can warn if any sends failed.
+  const cleanEmails = normalizeEmailList(participantEmails, consentAcknowledgedByEmail);
+  let attendees = [];
+  if (cleanEmails.length > 0) {
+    try {
+      attendees = await sendOptOutEmailsForSession({
+        sessionId,
+        workspaceId,
+        organizerName: consentAcknowledgedByName || null,
+        emails: cleanEmails
+      });
+    } catch (err) {
+      log.warn('Opt-out email fan-out threw unexpectedly', {
+        sessionId, error: err.message
+      });
+    }
+  }
+
+  return { sessionId, recallBotId: bot.id, attendees };
+}
+
+/**
+ * Fan out pre-meeting opt-out emails for a launched session. For each
+ * email:
+ *   1. Generate a token + insert a bot_session_attendees row (status pending).
+ *   2. Send via consentEmailService (skipped if RESEND_API_KEY unset).
+ *   3. Update the row to sent/failed/skipped with timestamp + error.
+ *
+ * Returns an array of {email, status, error?} mirroring DB state.
+ */
+async function sendOptOutEmailsForSession({ sessionId, workspaceId, organizerName, emails }) {
+  const rows = emails.map((email) => {
+    const { raw, hash } = generateOptOutToken();
+    return { email, raw, hash };
+  });
+
+  // Insert all attendee rows up front, status='pending'. Done as one batch
+  // so we never end up half-inserted if the request is interrupted mid-loop.
+  const { error: insertErr } = await db()
+    .from('bot_session_attendees')
+    .insert(rows.map((r) => ({
+      session_id: sessionId,
+      org_id: workspaceId,
+      email: r.email,
+      opt_out_token_hash: r.hash,
+      email_status: 'pending'
+    })));
+  if (insertErr) {
+    log.warn('bot_session_attendees insert failed; opt-out emails skipped', {
+      sessionId, error: insertErr.message
+    });
+    return emails.map((email) => ({ email, status: 'failed', error: insertErr.message }));
+  }
+
+  const sends = rows.map(async (r) => {
+    try {
+      const result = await consentEmail.sendAttendeeOptOutEmail({
+        to: r.email,
+        organizerName,
+        rawToken: r.raw
+      });
+      const skipped = result && result.skipped;
+      const messageId = !skipped && result && result.id ? result.id : null;
+      const status = skipped ? 'skipped' : 'sent';
+      await db()
+        .from('bot_session_attendees')
+        .update({
+          email_status: status,
+          email_sent_at: new Date().toISOString(),
+          email_provider_message_id: messageId
+        })
+        .eq('session_id', sessionId)
+        .eq('email', r.email);
+      return { email: r.email, status };
+    } catch (err) {
+      log.warn('Attendee opt-out email send failed', { email: r.email, error: err.message });
+      await db()
+        .from('bot_session_attendees')
+        .update({
+          email_status: 'failed',
+          email_error: String(err.message || err).slice(0, 500)
+        })
+        .eq('session_id', sessionId)
+        .eq('email', r.email);
+      return { email: r.email, status: 'failed', error: err.message };
+    }
+  });
+
+  return Promise.all(sends);
+}
+
+/**
+ * Public opt-out endpoint helper — resolve an attendee row from the raw
+ * token. Returns the minimum context the OptOut landing page needs to
+ * render. Returns null for unknown / malformed tokens (the route turns
+ * this into a 404 — never leak whether the token-shape was valid but
+ * unmatched vs invalid).
+ */
+async function resolveAttendeeFromToken(rawToken) {
+  if (typeof rawToken !== 'string' || rawToken.length < 16) return null;
+  const hash = hashOptOutToken(rawToken);
+
+  const { data: attendee, error } = await db()
+    .from('bot_session_attendees')
+    .select('id, session_id, org_id, email, opted_out_at')
+    .eq('opt_out_token_hash', hash)
+    .maybeSingle();
+  if (error || !attendee) return null;
+
+  // Pull a tiny bit of session context for the page. We deliberately do
+  // NOT expose the meeting URL — anyone with the email link could use
+  // that to crash the meeting. Just the organizer name + meeting time.
+  const { data: session } = await db()
+    .from('bot_sessions')
+    .select('created_at, consent_acknowledged_by, platform')
+    .eq('id', attendee.session_id)
+    .maybeSingle();
+
+  let organizerName = null;
+  if (session?.consent_acknowledged_by && supabaseAdmin) {
+    try {
+      const { data: userInfo } = await supabaseAdmin.auth.admin
+        .getUserById(session.consent_acknowledged_by);
+      const meta = userInfo?.user?.user_metadata || {};
+      organizerName = meta.full_name
+        || meta.name
+        || (userInfo?.user?.email ? userInfo.user.email.split('@')[0] : null);
+    } catch (err) {
+      log.warn('Could not resolve organizer for opt-out page', { error: err.message });
+    }
+  }
+
+  return {
+    attendeeId: attendee.id,
+    sessionId: attendee.session_id,
+    email: attendee.email,
+    alreadyOptedOut: Boolean(attendee.opted_out_at),
+    optedOutAt: attendee.opted_out_at,
+    organizerName,
+    meetingPlatform: session?.platform || null,
+    meetingTime: session?.created_at || null
+  };
+}
+
+/**
+ * Record an opt-out and notify the organizer. Idempotent: re-clicking the
+ * link returns alreadyOptedOut: true without re-sending the notification.
+ *
+ * @param {string} rawToken
+ * @param {Object} ctx
+ * @param {string} [ctx.reason]      Optional free-text reason from the form.
+ * @param {string} [ctx.ip]          Source IP of the click for audit.
+ */
+async function recordAttendeeOptOut(rawToken, ctx = {}) {
+  if (typeof rawToken !== 'string' || rawToken.length < 16) {
+    return { ok: false, error: 'invalid_token' };
+  }
+  const hash = hashOptOutToken(rawToken);
+
+  const { data: attendee, error: lookupErr } = await db()
+    .from('bot_session_attendees')
+    .select('id, session_id, org_id, email, opted_out_at')
+    .eq('opt_out_token_hash', hash)
+    .maybeSingle();
+  if (lookupErr || !attendee) return { ok: false, error: 'not_found' };
+
+  if (attendee.opted_out_at) {
+    return { ok: true, alreadyOptedOut: true };
+  }
+
+  const reason = typeof ctx.reason === 'string' ? ctx.reason.slice(0, 1000) : null;
+  const ip = typeof ctx.ip === 'string' ? ctx.ip : null;
+
+  const { error: updErr } = await db()
+    .from('bot_session_attendees')
+    .update({
+      opted_out_at: new Date().toISOString(),
+      opt_out_reason: reason,
+      opt_out_ip: ip
+    })
+    .eq('id', attendee.id);
+  if (updErr) {
+    log.error('bot_session_attendees opt-out update failed', {
+      attendeeId: attendee.id, error: updErr.message
+    });
+    return { ok: false, error: 'update_failed' };
+  }
+
+  // Best-effort organizer notification. Failures here are logged but not
+  // surfaced — the attendee should always see "you're opted out" regardless.
+  try {
+    const { data: session } = await db()
+      .from('bot_sessions')
+      .select('consent_acknowledged_by')
+      .eq('id', attendee.session_id)
+      .maybeSingle();
+
+    if (session?.consent_acknowledged_by && supabaseAdmin) {
+      const { data: userInfo } = await supabaseAdmin.auth.admin
+        .getUserById(session.consent_acknowledged_by);
+      const organizerEmail = userInfo?.user?.email || null;
+      const meta = userInfo?.user?.user_metadata || {};
+      const organizerName = meta.full_name
+        || meta.name
+        || (organizerEmail ? organizerEmail.split('@')[0] : null);
+
+      if (organizerEmail) {
+        await consentEmail.sendOrganizerOptOutNotification({
+          to: organizerEmail,
+          organizerName,
+          attendeeEmail: attendee.email,
+          reason
+        });
+      }
+    }
+  } catch (err) {
+    log.warn('Organizer notification skipped due to error', { error: err.message });
+  }
+
+  return { ok: true, alreadyOptedOut: false };
 }
 
 // Recall status codes grouped by lifecycle phase. The right "stop" action
@@ -479,6 +756,8 @@ module.exports = {
   listActiveSessions,
   getRecallBotState,
   handleRecallWebhook,
+  resolveAttendeeFromToken,
+  recordAttendeeOptOut,
   _internal: {
     mapRecallStatus,
     mapRecallEvent,
@@ -487,6 +766,11 @@ module.exports = {
     resolveSessionFromPayload,
     renderAnnouncement,
     resolveAnnouncementMessage,
-    DEFAULT_ANNOUNCEMENT_TEMPLATE
+    DEFAULT_ANNOUNCEMENT_TEMPLATE,
+    generateOptOutToken,
+    hashOptOutToken,
+    normalizeEmail,
+    normalizeEmailList,
+    sendOptOutEmailsForSession
   }
 };

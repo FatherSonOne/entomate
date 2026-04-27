@@ -4,7 +4,7 @@ import { Logo } from '../components/Logo'
 import BackToTop from '../components/BackToTop'
 
 export default function PrivacyPolicy() {
-  const lastUpdated = 'April 26, 2026'
+  const lastUpdated = 'April 27, 2026'
 
   return (
     <div className="legal-page">
@@ -294,10 +294,18 @@ export default function PrivacyPolicy() {
 
             <h3>4.5 Opting out</h3>
             <p>
-              Today, if you do not consent to being recorded, ask the meeting
-              host to remove the Meet Mate participant or leave the meeting.
-              Future product iterations will add a pre-meeting opt-out link
-              for external invitees (see <em>Roadmap</em> below).
+              When the organizer launches Meet Mate with a list of external
+              attendees, each attendee receives a pre-meeting email with an
+              opt-out link. Clicking the link records the opt-out and
+              notifies the organizer, who decides whether to continue with
+              the bot, ask the attendee in person, or stop the bot. The
+              legal obligation to honor an opt-out rests with the organizer.
+            </p>
+            <p>
+              You may also opt out by leaving the meeting, asking the
+              organizer to remove Meet Mate, or replying directly to the
+              opt-out email. The opt-out link remains valid for the duration
+              of the meeting.
             </p>
 
             <h3>4.6 Retention</h3>

@@ -51,7 +51,10 @@ const orgFromSession = async (req) => {
  */
 router.post('/launch', authenticate, authorizeOrgRole(ADMIN_ROLES, orgFromBody), async (req, res) => {
   try {
-    const { workspaceId, meetingId, meetingUrl, platform, botName, consentAcknowledged } = req.body || {};
+    const {
+      workspaceId, meetingId, meetingUrl, platform, botName,
+      consentAcknowledged, participantEmails
+    } = req.body || {};
     if (consentAcknowledged !== true) {
       return res.status(400).json({
         error: 'consent_required',
@@ -63,7 +66,9 @@ router.post('/launch', authenticate, authorizeOrgRole(ADMIN_ROLES, orgFromBody),
     const result = await orchestrator.launchBotSession({
       workspaceId, meetingId, meetingUrl, platform, botName,
       consentAcknowledgedBy: req.user.id,
-      consentAcknowledgedByName: organizerName
+      consentAcknowledgedByName: organizerName,
+      consentAcknowledgedByEmail: req.user.email || null,
+      participantEmails: Array.isArray(participantEmails) ? participantEmails : []
     });
     res.status(201).json(result);
   } catch (err) {

@@ -4,7 +4,7 @@ import { Logo } from '../components/Logo'
 import BackToTop from '../components/BackToTop'
 
 export default function Terms() {
-  const lastUpdated = 'April 26, 2026'
+  const lastUpdated = 'April 27, 2026'
 
   return (
     <div className="legal-page">
@@ -125,9 +125,11 @@ export default function Terms() {
             <p>
               Per the Privacy Policy, recordings and transcripts are visible
               only to the workspace that launched the bot, and are not used to
-              train foundational AI models. Future releases will add a
-              pre-meeting opt-out link for external invitees and per-workspace
-              retention controls.
+              train foundational AI models. Where the organizer provides an
+              attendee email list at launch, each external attendee receives
+              a pre-meeting email with an opt-out link; the organizer is
+              notified of any opt-out. Per-workspace retention controls and
+              GDPR right-to-delete flows are coming in a future release.
             </p>
           </section>
 

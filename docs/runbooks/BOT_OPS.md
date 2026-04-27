@@ -34,6 +34,9 @@ operators.
 | `RECALL_API_KEY` | From Recall.ai dashboard. Required. |
 | `RECALL_API_BASE` | Default `https://us-west-2.recall.ai/api/v1` |
 | `RECALL_WEBHOOK_SIGNING_SECRET` | Svix `whsec_…` value generated when you create the workspace webhook in the Recall dashboard. Used to verify HMAC-SHA256 signatures on inbound webhook requests. Required — the route 500s without it. |
+| `RESEND_API_KEY` | From [resend.com](https://resend.com) dashboard. Powers the pre-meeting opt-out email (P1.7 Slice 2). If unset, attendee rows land with `email_status='skipped'` and the bot launch still succeeds — emails simply don't go out. |
+| `RESEND_FROM` | Sender address with display name, e.g. `Meet Mate <notifications@qntmecos.com>`. Defaults to a Resend sandbox sender that won't reach real recipients in prod. |
+| `OPT_OUT_BASE_URL` | Base URL for opt-out links in the email. Default `https://entomate.onrender.com`. The SPA fallback in `server.js` routes `/opt-out/:token` to the React app. |
 
 > **`BOT_CALLBACK_BASE_URL` is no longer used.** Recall doesn't expose a
 > `webhook_url` field on the bot create endpoint; webhooks are configured
@@ -51,13 +54,23 @@ operators.
    for the US endpoint + meeting bots). Bots launch with
    `deepgram_streaming` + `model: nova-3` + `diarize: true`; Recall reads
    the key from the dashboard at call time. No backend env var.
-3. **DB migration.**
+3. **Resend account (opt-out email).** Sign up at https://resend.com →
+   Domains → add `qntmecos.com` (or the chosen sender domain). Add the
+   SPF/DKIM/DMARC DNS records Resend provides — propagation can take
+   up to 24h. Then API Keys → create one and set `RESEND_API_KEY` +
+   `RESEND_FROM` in Render env. **Until DNS verifies, leave
+   `RESEND_API_KEY` unset** — attendee rows will land with
+   `email_status='skipped'` and the launch path keeps working.
+4. **DB migrations.**
    ```bash
    supabase db push
    ```
-   Applies both the original `20260423000001_bot_sessions.sql` and the
-   Recall extension `20260425000001_bot_sessions_recall.sql`.
-4. **Webhook setup** — see next section. This is a one-time dashboard
+   Applies all bot-related migrations:
+   - `20260423000001_bot_sessions.sql` (initial)
+   - `20260425000001_bot_sessions_recall.sql` (Recall pivot)
+   - `20260426000001_bot_consent_columns.sql` (P1.7 Slice 1)
+   - `20260427000001_bot_session_attendees.sql` (P1.7 Slice 2)
+5. **Webhook setup** — see next section. This is a one-time dashboard
    configuration plus a single env var.
 
 ## Webhook setup (workspace-level, signed)
@@ -131,6 +144,12 @@ is ignored.
 # The launching user's auth.users.id + the timestamp are recorded on the
 # bot_sessions row as consent_acknowledged_by / consent_acknowledged_at for
 # audit. Omitting the field returns 400 consent_required.
+#
+# participantEmails (optional, P1.7 Slice 2) is the list of external
+# attendees who should receive a pre-meeting opt-out email. The organizer's
+# own email is filtered out automatically; duplicates are collapsed; bad
+# shapes dropped. Per-attendee status is in the response under `attendees`
+# and persisted on bot_session_attendees.
 curl -X POST https://entomate.onrender.com/api/admin/bots/launch \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
@@ -139,7 +158,8 @@ curl -X POST https://entomate.onrender.com/api/admin/bots/launch \
     "meetingId":           "<meeting-uuid>",
     "meetingUrl":          "https://meet.google.com/abc-defg-hij",
     "platform":            "meet",
-    "consentAcknowledged": true
+    "consentAcknowledged": true,
+    "participantEmails":   ["alice@example.com", "bob@example.com"]
   }'
 
 # List active — workspaceId required as query param; results scoped to that org
@@ -243,6 +263,49 @@ Recall status code → our `bot_sessions.status`:
 `recording_url` and `transcript_url` populate on `bot.done` /
 `bot.recording.done` events.
 
+## Pre-meeting opt-out email (P1.7 Slice 2)
+
+Each launched session can carry a list of `participantEmails`. For each
+clean address, the orchestrator:
+
+1. Generates a 32-byte raw token, stores `sha256(token)` on a
+   `bot_session_attendees` row.
+2. Sends the opt-out email via Resend (sender = `RESEND_FROM`).
+3. Records `email_status` on the row: `sent` / `failed` / `skipped`
+   (latter when `RESEND_API_KEY` is unset).
+
+The opt-out URL points at `${OPT_OUT_BASE_URL}/opt-out/<rawToken>`.
+Recipients land on a public React page that calls
+`GET /api/consent/opt-out/:token` for context and
+`POST /api/consent/opt-out/:token` to record the opt-out. Clicking the
+link is idempotent — re-clicks return `alreadyOptedOut: true` and do
+not re-fire the organizer notification.
+
+When an opt-out is recorded, the orchestrator best-effort sends a
+notification email back to the organizer (resolved via
+`bot_sessions.consent_acknowledged_by` → `auth.users`). The flow is
+notify-only — the bot is **not** automatically stopped; the organizer
+decides whether to continue.
+
+### Querying opt-outs for a workspace
+
+Org members can read their workspace's attendee rows under RLS:
+
+```sql
+select session_id, email, email_status, opted_out_at, opt_out_reason
+from public.bot_session_attendees
+where org_id = '<org-uuid>'
+  and opted_out_at is not null
+order by opted_out_at desc;
+```
+
+### Manually re-firing an opt-out email (e.g. bounce recovery)
+
+Not yet automated. Look up the session in `bot_session_attendees`,
+note the `email`, and re-launch the bot or send a one-off email
+through Resend's dashboard. Bounce-handling is on the slice 2.5
+backlog.
+
 ## Troubleshooting
 
 | Symptom | Likely cause | Action |
@@ -256,3 +319,7 @@ Recall status code → our `bot_sessions.status`:
 | All bots stuck in `launching`, no webhooks ever | No workspace webhook configured in Recall dashboard | Add the endpoint per "Webhook setup" above |
 | Session stuck in `joining`, webhooks landing for other bots | Recall bot couldn't enter meeting | Check Recall dashboard for the bot's status; usually a meeting permission issue |
 | `recording_url` never populated | Meeting never started or bot was kicked | `getRecallBotState` shows the full status history |
+| All attendee emails land with `email_status='skipped'` | `RESEND_API_KEY` unset on Render | Set it (or accept skipped state if Resend isn't ready yet — bot launches still work) |
+| Resend returns 403 / "domain not verified" | DNS records (SPF/DKIM/DMARC) haven't propagated or are missing | Check Resend dashboard → Domains for the verification status; re-add the records at your DNS provider |
+| Opt-out link returns 404 | Token mistyped, expired by cascade-delete (parent `bot_sessions` row gone), or already cancelled | Check `bot_session_attendees.opt_out_token_hash` for the sha256 of the token in the URL |
+| Organizer notification email not received on opt-out | `consent_acknowledged_by` was null at launch (legacy row) or organizer's `auth.users.email` is empty | Check the `bot_sessions` row for `consent_acknowledged_by`; legacy rows pre-Slice-1 won't notify |
