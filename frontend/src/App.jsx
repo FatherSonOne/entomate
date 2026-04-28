@@ -18,6 +18,7 @@ const Goals = React.lazy(() => import('./pages/Goals'))
 const Analytics = React.lazy(() => import('./pages/Analytics'))
 const Search = React.lazy(() => import('./pages/Search'))
 const Settings = React.lazy(() => import('./pages/Settings'))
+const BotLauncher = React.lazy(() => import('./pages/BotLauncher'))
 const ProjectDashboard = React.lazy(() => import('./pages/ProjectDashboard'))
 const Reports = React.lazy(() => import('./pages/Reports'))
 const Calendar = React.lazy(() => import('./pages/Calendar'))
@@ -66,6 +67,7 @@ export default function App() {
             <Route path="calendar" element={<Calendar />} />
             <Route path="search" element={<Search />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="bot-launcher" element={<BotLauncher />} />
             <Route path="guide" element={<UsersGuide />} />
           </Route>
 

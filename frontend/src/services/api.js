@@ -979,6 +979,26 @@ export const settingsApi = {
 }
 
 // ========================================
+// BOTS API (admin only — Recall-managed Meet Mate)
+// ========================================
+export const botsApi = {
+  // Launch a Meet Mate bot. Body must include workspaceId, meetingId,
+  // meetingUrl, platform, consentAcknowledged: true. Optional botName +
+  // participantEmails. See backend/routes/bots.js + BOT_OPS.md.
+  launch: (data) => api.post('/admin/bots/launch', data),
+
+  // List active sessions for a workspace.
+  list: (workspaceId) => api.get('/admin/bots', { params: { workspaceId } }),
+
+  // Stop a bot session. Body: { reason? }.
+  stop: (sessionId, reason) =>
+    api.delete(`/admin/bots/${sessionId}`, { data: { reason: reason || 'manual_stop' } }),
+
+  // Fetch the full Recall bot state (status history, recording URL, etc).
+  getState: (sessionId) => api.get(`/admin/bots/${sessionId}/state`)
+}
+
+// ========================================
 // ASSISTANT API (Context-aware AI)
 // ========================================
 export const assistantApi = {

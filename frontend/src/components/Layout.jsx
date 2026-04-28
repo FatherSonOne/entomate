@@ -24,9 +24,11 @@ import {
   User,
   LogOut,
   Home,
-  BookOpen
+  BookOpen,
+  Radio
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useOrgSafe } from '../contexts/OrgContext'
 import { useKeyboardShortcuts, getModKey } from '../hooks/useKeyboardShortcuts'
 import CommandPalette from './CommandPalette'
 import KeyboardShortcutsHelp from './KeyboardShortcutsHelp'
@@ -42,14 +44,17 @@ import EntoAssistantButton from './EntoAssistant/EntoAssistantButton'
 import EntoAIProactiveChecker from './EntoAssistant/EntoAIProactiveChecker'
 
 // Grouped navigation structure — 4 sections
+// Items with adminOnly: true are filtered out at render time for non-admin
+// users via useOrgSafe().myRole. The backend gates the routes independently.
 const navGroups = [
   {
     label: 'Intelligence',
     items: [
-      { name: 'Dashboard',  href: '/dashboard',        icon: LayoutDashboard, iconKey: 'dashboard' },
-      { name: 'Meetings',   href: '/meetings',          icon: Mic,             iconKey: 'meetings'  },
-      { name: 'Calendar',   href: '/calendar',          icon: Calendar,        iconKey: 'calendar'  },
-      { name: 'Search',     href: '/search',            icon: Search,          iconKey: 'search'    },
+      { name: 'Dashboard',    href: '/dashboard',     icon: LayoutDashboard, iconKey: 'dashboard' },
+      { name: 'Meetings',     href: '/meetings',      icon: Mic,             iconKey: 'meetings'  },
+      { name: 'Bot Launcher', href: '/bot-launcher',  icon: Radio,           iconKey: 'bot-launcher', adminOnly: true },
+      { name: 'Calendar',     href: '/calendar',      icon: Calendar,        iconKey: 'calendar'  },
+      { name: 'Search',       href: '/search',        icon: Search,          iconKey: 'search'    },
     ],
   },
   {
@@ -82,6 +87,7 @@ const navGroups = [
 const breadcrumbMap = {
   '/dashboard':        'Dashboard',
   '/meetings':         'Meetings',
+  '/bot-launcher':     'Bot Launcher',
   '/calendar':         'Calendar',
   '/search':           'Search',
   '/projects':         'Projects',
@@ -117,6 +123,8 @@ export default function Layout() {
   const navigate = useNavigate()
   const { isDark, toggleMode } = useTheme()
   const { user, signOut } = useAuth()
+  const orgCtx = useOrgSafe()
+  const isAdmin = orgCtx?.myRole === 'owner' || orgCtx?.myRole === 'admin'
 
   const handleSignOut = async () => {
     await signOut()
@@ -189,29 +197,33 @@ export default function Layout() {
 
           {/* Grouped Navigation */}
           <nav className="nl-scroll">
-            {navGroups.map((group) => (
-              <div key={group.label}>
-                <div className="nl-section">{group.label}</div>
-                {group.items.map((item) => {
-                  const Icon = item.icon
-                  const active = isActive(item.href)
-                  return (
-                    <NavLink
-                      key={item.name}
-                      to={item.href}
-                      data-icon={item.iconKey}
-                      className={`nl-item ${active ? 'active' : ''}`}
-                      onClick={() => setSidebarOpen(false)}
-                    >
-                      <span className="nl-icon-box">
-                        <Icon className="w-4 h-4" />
-                      </span>
-                      <span>{item.name}</span>
-                    </NavLink>
-                  )
-                })}
-              </div>
-            ))}
+            {navGroups.map((group) => {
+              const visibleItems = group.items.filter((item) => !item.adminOnly || isAdmin)
+              if (visibleItems.length === 0) return null
+              return (
+                <div key={group.label}>
+                  <div className="nl-section">{group.label}</div>
+                  {visibleItems.map((item) => {
+                    const Icon = item.icon
+                    const active = isActive(item.href)
+                    return (
+                      <NavLink
+                        key={item.name}
+                        to={item.href}
+                        data-icon={item.iconKey}
+                        className={`nl-item ${active ? 'active' : ''}`}
+                        onClick={() => setSidebarOpen(false)}
+                      >
+                        <span className="nl-icon-box">
+                          <Icon className="w-4 h-4" />
+                        </span>
+                        <span>{item.name}</span>
+                      </NavLink>
+                    )
+                  })}
+                </div>
+              )
+            })}
           </nav>
 
           {/* Footer: AI + Guide + Settings + User */}
