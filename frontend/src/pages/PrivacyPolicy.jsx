@@ -348,12 +348,28 @@ export default function PrivacyPolicy() {
           <section>
             <h2>6. Data Retention</h2>
             <p>
-              We retain workspace data for as long as your account is active.
-              You may delete meetings, transcripts, tasks, and projects at any
-              time; deletions are propagated from backups on a rolling 30-day
-              schedule. On account deletion, we remove personal data within 90
-              days except where retention is required for legal, tax, or
+              <strong>Workspace data</strong> — we retain meetings,
+              transcripts, tasks, and projects for as long as your account
+              is active. You may delete any of these at any time; deletions
+              are propagated from backups on a rolling 30-day schedule. On
+              account deletion, we remove personal data within 90 days
+              except where retention is required for legal, tax, or
               security reasons.
+            </p>
+            <p>
+              <strong>Meet Mate recordings + transcripts</strong> — workspace
+              owners and admins set a retention window of <strong>30, 90, or
+              365 days</strong> in <em>Settings → Data &amp; Retention</em>{' '}
+              (default 90). After that window, the Recall.ai-hosted
+              recording and transcript are deleted permanently and the URLs
+              are cleared from our database. The meeting record itself
+              (date, organizer, participant list, audit fields) is preserved
+              indefinitely so legal-hold requests and audits remain
+              answerable. Already-deleted recordings cannot be restored.
+            </p>
+            <p>
+              Retention enforcement runs as a daily sweep; changes apply on
+              the next sweep.
             </p>
           </section>
 
@@ -386,7 +402,16 @@ export default function PrivacyPolicy() {
               </li>
             </ul>
             <p>
-              To exercise these rights, contact{' '}
+              To request deletion of your personal data (GDPR Article 17 /
+              right to erasure), use the dedicated form at{' '}
+              <Link to="/data-deletion">/data-deletion</Link>. We action
+              requests within 72 hours; the platform admin may deny under
+              Article 17(3) (e.g. legal retention obligation) with a
+              documented reason.
+            </p>
+            <p>
+              For all other rights — access, correction, export, restriction,
+              consent withdrawal — contact{' '}
               <a href="mailto:fm1@qntmecos.com">fm1@qntmecos.com</a>.
               Workspace admins can fulfil most requests directly from Settings.
             </p>

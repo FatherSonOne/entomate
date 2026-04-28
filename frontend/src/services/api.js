@@ -965,10 +965,13 @@ export const settingsApi = {
   // Update user settings (partial update)
   updateUser: (data) => api.put('/settings/user', data),
 
-  // Get workspace settings (admin only)
-  getWorkspace: () => api.get('/settings/workspace'),
+  // Get workspace settings (admin only). workspaceId is required by the
+  // backend; pass it as a positional arg or via { params } for axios-style.
+  getWorkspace: (workspaceId) => api.get('/settings/workspace', {
+    params: { workspaceId }
+  }),
 
-  // Update workspace settings (admin only)
+  // Update workspace settings (admin only). data must include workspaceId.
   updateWorkspace: (data) => api.put('/settings/workspace', data),
 
   // Get audit logs (admin only)

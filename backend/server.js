@@ -319,6 +319,10 @@ app.use('/api/admin/bots', require('./routes/bots'));
 // no Supabase JWT required. See backend/routes/consent.js.
 app.use('/api/consent', require('./routes/consent'));
 
+// Public GDPR right-to-delete submission + platform-admin fulfillment
+// (P1.7 Slice 3). See backend/routes/dataDeletion.js.
+app.use('/api/consent/data-deletion', require('./routes/dataDeletion'));
+
 
 // ========================================
 // SPA FALLBACK (production only)
@@ -360,6 +364,14 @@ async function gracefulShutdown(signal) {
     const workflowScheduler = require('./services/workflow/WorkflowScheduler');
     workflowScheduler.stopAll();
     logger.info('Workflow scheduler stopped');
+  } catch {
+    // Ignore if not initialized
+  }
+
+  // Stop retention scheduler
+  try {
+    const retentionScheduler = require('./services/retentionScheduler');
+    retentionScheduler.stop();
   } catch {
     // Ignore if not initialized
   }
@@ -425,6 +437,14 @@ if (process.env.NODE_ENV !== 'test') {
       ecosystemScheduler.initialize();
     } catch (error) {
       logger.warn('Ecosystem scheduler not initialized:', error.message);
+    }
+
+    // Initialize retention sweep scheduler (P1.7 Slice 3 — daily 03:00 UTC)
+    try {
+      const retentionScheduler = require('./services/retentionScheduler');
+      retentionScheduler.initialize();
+    } catch (error) {
+      logger.warn('Retention scheduler not initialized:', error.message);
     }
   });
   })();

@@ -227,17 +227,101 @@ async function sendOrganizerOptOutNotification({ to, organizerName, attendeeEmai
   }
 }
 
+function deletionRequestNotificationHtml({ requestId, requesterEmail, reason }) {
+  const safeEmail = escapeHtml(requesterEmail);
+  const safeId = escapeHtml(requestId);
+  const reasonBlock = reason
+    ? `<p style="font-size:15px;line-height:1.6;color:#334155;margin:0 0 16px;">
+         <strong>Reason given:</strong> ${escapeHtml(reason)}
+       </p>`
+    : '';
+  return `<!doctype html>
+<html><body style="margin:0;padding:0;background:#f5f5f7;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <div style="max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff;">
+    <h1 style="font-size:20px;line-height:1.4;color:#0f172a;margin:0 0 16px;">
+      New GDPR data-deletion request
+    </h1>
+    <p style="font-size:15px;line-height:1.6;color:#334155;margin:0 0 16px;">
+      <strong>${safeEmail}</strong> has submitted a right-to-delete request.
+    </p>
+    ${reasonBlock}
+    <p style="font-size:15px;line-height:1.6;color:#334155;margin:0 0 16px;">
+      <strong>Request ID:</strong> <code>${safeId}</code>
+    </p>
+    <p style="font-size:15px;line-height:1.6;color:#334155;margin:0 0 16px;">
+      Action via the admin endpoints (curl with your access token):
+    </p>
+    <pre style="background:#f1f5f9;padding:12px;border-radius:8px;font-size:12px;line-height:1.5;color:#0f172a;overflow:auto;margin:0 0 16px;">POST /api/consent/data-deletion/admin/${safeId}/fulfill
+POST /api/consent/data-deletion/admin/${safeId}/deny  (body: { reason })</pre>
+    <p style="font-size:14px;line-height:1.5;color:#64748b;margin:0 0 16px;">
+      Per GDPR Art. 17, fulfill within 1 month (Entomate target: 72 hours).
+      Denial requires a documented reason from Art. 17(3) — e.g. legal
+      obligation to retain.
+    </p>
+    <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;" />
+    <p style="font-size:12px;line-height:1.5;color:#94a3b8;margin:0;">
+      Entomate · platform admin notification
+    </p>
+  </div>
+</body></html>`;
+}
+
+function deletionRequestNotificationText({ requestId, requesterEmail, reason }) {
+  const lines = [
+    'New GDPR data-deletion request',
+    '',
+    `${requesterEmail} has submitted a right-to-delete request.`
+  ];
+  if (reason) lines.push('', `Reason given: ${reason}`);
+  lines.push(
+    '',
+    `Request ID: ${requestId}`,
+    '',
+    'Action via:',
+    `  POST /api/consent/data-deletion/admin/${requestId}/fulfill`,
+    `  POST /api/consent/data-deletion/admin/${requestId}/deny  (body: { reason })`,
+    '',
+    'Per GDPR Art. 17, fulfill within 1 month (Entomate target: 72 hours). Denial requires a documented reason from Art. 17(3).',
+    '',
+    '—',
+    'Entomate · platform admin notification'
+  );
+  return lines.join('\n');
+}
+
+/**
+ * Notify a platform admin that a new GDPR deletion request has landed.
+ * Best-effort; failures are logged. Submission still succeeds even if
+ * the notification fails — admins can poll the pending list.
+ */
+async function sendDeletionRequestNotification({ to, requestId, requesterEmail, reason }) {
+  try {
+    return await resendSend({
+      to,
+      subject: `GDPR deletion request from ${requesterEmail}`,
+      html: deletionRequestNotificationHtml({ requestId, requesterEmail, reason }),
+      text: deletionRequestNotificationText({ requestId, requesterEmail, reason })
+    });
+  } catch (err) {
+    log.warn('Deletion request notification failed', { to, requestId, error: err.message });
+    return { error: err.message };
+  }
+}
+
 module.exports = {
   isConfigured,
   buildOptOutUrl,
   sendAttendeeOptOutEmail,
   sendOrganizerOptOutNotification,
+  sendDeletionRequestNotification,
   _internal: {
     resendSend,
     attendeeOptOutHtml,
     attendeeOptOutText,
     organizerOptOutNotificationHtml,
     organizerOptOutNotificationText,
+    deletionRequestNotificationHtml,
+    deletionRequestNotificationText,
     escapeHtml
   }
 };

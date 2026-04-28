@@ -32,7 +32,11 @@ const REQUIRED_BOT_SESSION_COLUMNS = [
   // P1.7 Slice 1 — organizer-side consent gate. Migration:
   // supabase/migrations/20260426000001_bot_consent_columns.sql
   'consent_acknowledged_at',
-  'consent_acknowledged_by'
+  'consent_acknowledged_by',
+  // P1.7 Slice 3 — retention enforcement. Migration:
+  // supabase/migrations/20260427000002_retention_and_gdpr.sql
+  'retention_deleted_at',
+  'retention_delete_error'
 ];
 
 // P1.7 Slice 2 — pre-meeting opt-out email. Migration:
@@ -89,7 +93,7 @@ async function verifyBotSchema({ exitOnFailure } = {}) {
     log.error(`[BOT_SCHEMA] ${f.table} schema check failed — likely missing migration`, {
       error: f.error.message,
       code: f.error.code,
-      hint: 'Apply pending bot migrations (20260425000001_bot_sessions_recall.sql, 20260426000001_bot_consent_columns.sql, 20260427000001_bot_session_attendees.sql) to this database.',
+      hint: 'Apply pending bot migrations (20260425000001_bot_sessions_recall.sql, 20260426000001_bot_consent_columns.sql, 20260427000001_bot_session_attendees.sql, 20260427000002_retention_and_gdpr.sql) to this database.',
       fatal: shouldExit
     });
   }

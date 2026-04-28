@@ -30,6 +30,7 @@ const LandingPage = React.lazy(() => import('./pages/LandingPage'))
 const PrivacyPolicy = React.lazy(() => import('./pages/PrivacyPolicy'))
 const Terms = React.lazy(() => import('./pages/Terms'))
 const OptOut = React.lazy(() => import('./pages/OptOut'))
+const DataDeletion = React.lazy(() => import('./pages/DataDeletion'))
 const NotFound = React.lazy(() => import('./pages/NotFound'))
 
 export default function App() {
@@ -42,6 +43,7 @@ export default function App() {
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/opt-out/:token" element={<OptOut />} />
+          <Route path="/data-deletion" element={<DataDeletion />} />
           <Route path="/sign-in" element={<SignIn />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
 

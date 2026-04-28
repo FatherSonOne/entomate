@@ -17,6 +17,7 @@ import AudioSettings from '../components/settings/AudioSettings'
 import NotificationSettings from '../components/settings/NotificationSettings'
 import PermissionsSettings from '../components/settings/PermissionsSettings'
 import BillingSettings from '../components/settings/BillingSettings'
+import DataRetentionSettings from '../components/settings/DataRetentionSettings'
 import { VCButton, VCIconBox, VCBadge } from '../components/vc'
 import DeleteOrgDialog from '../components/settings/DeleteOrgDialog'
 
@@ -26,6 +27,7 @@ const SECTIONS = [
   { id: 'appearance', label: 'Appearance', icon: Palette },
   { id: 'audio',      label: 'Audio & Recording', icon: Mic },
   { id: 'permissions', label: 'Permissions', icon: Shield },
+  { id: 'data-retention', label: 'Data & Retention', icon: Database },
   { id: 'billing',    label: 'Plan & Billing', icon: CreditCard },
   { id: 'notifications', label: 'Notifications', icon: Bell },
   { id: 'integrations', label: 'Integrations', icon: Link2 },
@@ -461,6 +463,14 @@ export default function Settings() {
           <>
             <SectionHeader title="Permissions" subtitle="Manage browser permissions Entomate needs to function" />
             <PermissionsSettings />
+          </>
+        )}
+
+        {/* ═══════ DATA & RETENTION ═══════ */}
+        {activeSection === 'data-retention' && (
+          <>
+            <SectionHeader title="Data & Retention" subtitle="Control how long Meet Mate keeps recordings and transcripts" />
+            <DataRetentionSettings />
           </>
         )}
 

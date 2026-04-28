@@ -263,6 +263,100 @@ Recall status code → our `bot_sessions.status`:
 `recording_url` and `transcript_url` populate on `bot.done` /
 `bot.recording.done` events.
 
+## Retention enforcement (P1.7 Slice 3)
+
+A daily in-process scheduler (`backend/services/retentionScheduler.js`)
+fires `runRetentionSweep` from `retentionService.js` at **03:00 UTC**.
+For each workspace, the sweep:
+
+1. Reads `workspace_settings.data_controls_json.retention_days` (default 90,
+   allowed values {30, 90, 365}).
+2. Finds `bot_sessions` older than that threshold whose
+   `recording_url` or `transcript_url` is still populated and that
+   haven't been swept (`retention_deleted_at IS NULL`).
+3. Calls Recall's `DELETE /bot/<id>` to nuke hosted media. 404 is
+   treated as success (already gone).
+4. NULLs the URL columns on the row, stamps `retention_deleted_at`.
+5. The row itself is preserved for audit.
+
+The sweep is capped at 200 rows per workspace per day to protect against
+a misconfigured retention cliff melting the Recall API; remaining rows
+roll over to the next day.
+
+### Setting per-workspace retention
+
+UI: workspace owner/admin → Settings → Data & Retention → pick 30/90/365.
+
+CLI:
+
+```bash
+curl -X PUT https://entomate.onrender.com/api/settings/workspace \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "workspaceId": "<org-uuid>",
+    "data_controls_json": { "retention_days": 30 }
+  }'
+```
+
+Invalid values return 400 `invalid_settings`.
+
+### Manual retention sweep (out-of-band)
+
+```js
+// In a node REPL on the backend:
+require('./services/retentionService').runRetentionSweep().then(console.log)
+```
+
+There is no admin HTTP endpoint to trigger the sweep — gated behind the
+in-process scheduler so a stuck cron is the only failure mode.
+
+## GDPR right-to-delete (P1.7 Slice 3)
+
+Notify-only fulfillment. Three endpoints under `/api/consent/data-deletion`:
+
+| Method + path | Auth | Purpose |
+|---|---|---|
+| `POST /` | Public | Submit a deletion request |
+| `GET /admin` | Platform admin | List pending requests |
+| `POST /admin/:id/fulfill` | Platform admin | Fan deletion across attendees + sessions |
+| `POST /admin/:id/deny` | Platform admin | Record denial reason (Art. 17(3) basis) |
+
+### Bootstrap a platform admin
+
+There is no UI for managing `platform_admins`. Insert your first row by SQL:
+
+```sql
+insert into public.platform_admins (user_id, notes)
+values ('<your-auth-user-id>', 'bootstrap')
+on conflict (user_id) do nothing;
+```
+
+Resolve your `auth.users.id` from the Supabase dashboard → Authentication
+→ Users.
+
+### Fulfilling a request
+
+```bash
+# List pending requests (yours, by virtue of being a platform admin)
+curl https://entomate.onrender.com/api/consent/data-deletion/admin \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+
+# Fulfill — fans the delete out
+curl -X POST https://entomate.onrender.com/api/consent/data-deletion/admin/<request-id>/fulfill \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+
+# Or deny with a documented Art. 17(3) reason
+curl -X POST https://entomate.onrender.com/api/consent/data-deletion/admin/<request-id>/deny \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"reason":"legal hold under matter X-2026-04"}'
+```
+
+The fulfillment summary (counts of attendees deleted, sessions redacted,
+Recall media deleted) is stored on the `data_deletion_requests` row in
+`fulfillment_summary` and returned in the response.
+
 ## Pre-meeting opt-out email (P1.7 Slice 2)
 
 Each launched session can carry a list of `participantEmails`. For each
@@ -323,3 +417,7 @@ backlog.
 | Resend returns 403 / "domain not verified" | DNS records (SPF/DKIM/DMARC) haven't propagated or are missing | Check Resend dashboard → Domains for the verification status; re-add the records at your DNS provider |
 | Opt-out link returns 404 | Token mistyped, expired by cascade-delete (parent `bot_sessions` row gone), or already cancelled | Check `bot_session_attendees.opt_out_token_hash` for the sha256 of the token in the URL |
 | Organizer notification email not received on opt-out | `consent_acknowledged_by` was null at launch (legacy row) or organizer's `auth.users.email` is empty | Check the `bot_sessions` row for `consent_acknowledged_by`; legacy rows pre-Slice-1 won't notify |
+| Retention sweep never fires | `RetentionScheduler not initialized` in boot logs | Check that `retentionScheduler.initialize()` runs in `server.js`; restart the service |
+| Retention sweep skips rows | `retention_delete_error` populated | Inspect the column for the per-row error. Often a Recall 4xx — fix the Recall key or accept the row as orphaned |
+| GDPR fulfill returns 403 | Caller isn't in `platform_admins` | Insert your `user_id` via SQL (see runbook) |
+| GDPR fulfill `summary.errors` non-empty | Partial deletion — some attendees/sessions failed | Re-run fulfill (idempotent — already-deleted rows are skipped) or inspect the specific errors |

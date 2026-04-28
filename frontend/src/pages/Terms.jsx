@@ -128,8 +128,12 @@ export default function Terms() {
               train foundational AI models. Where the organizer provides an
               attendee email list at launch, each external attendee receives
               a pre-meeting email with an opt-out link; the organizer is
-              notified of any opt-out. Per-workspace retention controls and
-              GDPR right-to-delete flows are coming in a future release.
+              notified of any opt-out. Workspace owners set a recording
+              retention window (30 / 90 / 365 days) in Settings, after which
+              the Recall.ai-hosted media is deleted permanently. Personal-data
+              deletion requests are handled at{' '}
+              <Link to="/data-deletion">/data-deletion</Link> with a 72-hour
+              action target.
             </p>
           </section>
 

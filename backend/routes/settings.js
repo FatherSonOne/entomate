@@ -9,6 +9,27 @@ const ADMIN_ROLES = ['owner', 'admin'];
 const orgFromBody = (req) => req.body?.workspaceId || null;
 const orgFromQuery = (req) => req.query?.workspaceId || null;
 
+// P1.7 Slice 3 — retention setting lives in data_controls_json.retention_days.
+// Allowed values are bounded by the issue #7 acceptance criterion; allow null
+// to mean "use the default" downstream.
+const ALLOWED_RETENTION_DAYS = [30, 90, 365];
+function validateDataControls(blob) {
+  if (blob === undefined || blob === null) return { ok: true };
+  if (typeof blob !== 'object' || Array.isArray(blob)) {
+    return { ok: false, error: 'data_controls_json must be an object' };
+  }
+  if (Object.prototype.hasOwnProperty.call(blob, 'retention_days')) {
+    const v = blob.retention_days;
+    if (v !== null && !ALLOWED_RETENTION_DAYS.includes(Number(v))) {
+      return {
+        ok: false,
+        error: `retention_days must be one of ${ALLOWED_RETENTION_DAYS.join(', ')} (got ${v})`
+      };
+    }
+  }
+  return { ok: true };
+}
+
 // ========================================
 // USER SETTINGS
 // ========================================
@@ -161,6 +182,11 @@ router.put('/workspace', authenticate, authorizeOrgRole(ADMIN_ROLES, orgFromBody
   try {
     const workspaceId = req.orgId;
     const { integrations_json, security_json, data_controls_json } = req.body || {};
+
+    const validation = validateDataControls(data_controls_json);
+    if (!validation.ok) {
+      return res.status(400).json({ error: 'invalid_settings', message: validation.error });
+    }
 
     const updates = { updated_at: new Date().toISOString() };
     if (integrations_json !== undefined) updates.integrations_json = integrations_json;
