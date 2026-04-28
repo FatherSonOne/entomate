@@ -27,7 +27,7 @@ const SECTIONS = [
   { id: 'appearance', label: 'Appearance', icon: Palette },
   { id: 'audio',      label: 'Audio & Recording', icon: Mic },
   { id: 'permissions', label: 'Permissions', icon: Shield },
-  { id: 'data-retention', label: 'Data & Retention', icon: Database },
+  { id: 'data-retention', label: 'Data & Privacy', icon: Database },
   { id: 'billing',    label: 'Plan & Billing', icon: CreditCard },
   { id: 'notifications', label: 'Notifications', icon: Bell },
   { id: 'integrations', label: 'Integrations', icon: Link2 },
@@ -466,10 +466,10 @@ export default function Settings() {
           </>
         )}
 
-        {/* ═══════ DATA & RETENTION ═══════ */}
+        {/* ═══════ DATA & PRIVACY ═══════ */}
         {activeSection === 'data-retention' && (
           <>
-            <SectionHeader title="Data & Retention" subtitle="Control how long Meet Mate keeps recordings and transcripts" />
+            <SectionHeader title="Data & Privacy" subtitle="Recording retention and consent jurisdiction posture" />
             <DataRetentionSettings />
           </>
         )}

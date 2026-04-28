@@ -96,7 +96,9 @@ export default function Terms() {
             <h2>4. Meeting Recording Consent and the Meet Mate Bot</h2>
             <p className="legal-pending-review">
               <em>
-                Effective {lastUpdated} — pending counsel review.
+                Effective {lastUpdated} — pending counsel review. The
+                disclosure language and jurisdiction allocation in this
+                section are being reviewed by counsel.
               </em>
             </p>
             <p>

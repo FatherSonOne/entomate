@@ -219,10 +219,12 @@ export default function PrivacyPolicy() {
             <h2>4. Meeting Recording, Consent, and the Meet Mate Bot</h2>
             <p className="legal-pending-review">
               <em>
-                Effective {lastUpdated} — pending counsel review. This section
-                describes our current recording disclosure practices; specific
-                contractual language and jurisdiction-by-jurisdiction guidance
-                will be tightened after legal review.
+                Effective {lastUpdated} — pending counsel review. This
+                section describes our current recording disclosure
+                practices. Jurisdiction-by-jurisdiction detail is
+                summarized in our internal engineering reference and is
+                being reviewed by counsel; concrete contractual language
+                will be tightened after that review.
               </em>
             </p>
 
@@ -290,6 +292,14 @@ export default function PrivacyPolicy() {
               provide the disclosure surfaces (chat announcement, visible
               participant name, this Policy), but the legal obligation to
               notify and obtain consent from every participant rests with you.
+            </p>
+            <p>
+              Workspace administrators can declare a consent posture in{' '}
+              <em>Settings → Data &amp; Privacy → Consent jurisdiction</em>{' '}
+              (<strong>permissive</strong>, <strong>all-party (US two-party
+              states)</strong>, or <strong>GDPR (EU + UK)</strong>). The
+              setting surfaces a stronger consent prompt at bot launch. It
+              does not override the organizer's legal obligations.
             </p>
 
             <h3>4.5 Opting out</h3>

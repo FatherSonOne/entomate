@@ -311,6 +311,45 @@ require('./services/retentionService').runRetentionSweep().then(console.log)
 There is no admin HTTP endpoint to trigger the sweep — gated behind the
 in-process scheduler so a stuck cron is the only failure mode.
 
+## Jurisdiction policy (P1.7 Slice 4)
+
+Per-workspace consent posture lives at
+`workspace_settings.data_controls_json.consent_jurisdiction`. Allowed
+values:
+
+| Value | Meaning |
+|---|---|
+| `permissive` | Default. One-party-consent assumed. Organizer's launch affirmation suffices. |
+| `two_party` | For meetings where any participant may be in a US two-party-consent state (CA, FL, IL, MD, MA, MT, NV, NH, PA, WA). Surfaces a stronger consent prompt at launch. |
+| `gdpr` | For meetings that may include EU/UK participants. Same prompt as `two_party`; future releases will gate launches without a confirmed attendee list. |
+
+**Slice 4 does not enforce these values beyond UI** — they're a flag a
+future enforcement layer can read. The organizer's legal obligations are
+unchanged.
+
+UI: workspace owner/admin → Settings → Data & Privacy.
+
+CLI:
+
+```bash
+curl -X PUT https://entomate.onrender.com/api/settings/workspace \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "workspaceId": "<org-uuid>",
+    "data_controls_json": { "consent_jurisdiction": "two_party" }
+  }'
+```
+
+Invalid values return 400 `invalid_settings`. The setting is preserved
+across other-key updates because the route does not clobber the JSONB
+blob — the UI does a read-modify-write to keep adjacent keys safe.
+
+The legal reference for these values is
+[`docs/policies/CONSENT_JURISDICTIONS.md`](../policies/CONSENT_JURISDICTIONS.md).
+The counsel review packet is
+[`docs/policies/COUNSEL_REVIEW_PACKET.md`](../policies/COUNSEL_REVIEW_PACKET.md).
+
 ## GDPR right-to-delete (P1.7 Slice 3)
 
 Notify-only fulfillment. Three endpoints under `/api/consent/data-deletion`:

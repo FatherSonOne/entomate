@@ -9,10 +9,14 @@ const ADMIN_ROLES = ['owner', 'admin'];
 const orgFromBody = (req) => req.body?.workspaceId || null;
 const orgFromQuery = (req) => req.query?.workspaceId || null;
 
-// P1.7 Slice 3 — retention setting lives in data_controls_json.retention_days.
-// Allowed values are bounded by the issue #7 acceptance criterion; allow null
-// to mean "use the default" downstream.
+// P1.7 Slices 3+4 — workspace data_controls_json validation.
+//   retention_days: 30 / 90 / 365 (Slice 3)
+//   consent_jurisdiction: 'permissive' / 'two_party' / 'gdpr' (Slice 4)
+// Allow null to mean "use the default" downstream. Anything else in the
+// blob is allowed through unchanged so adjacent settings can ride along.
 const ALLOWED_RETENTION_DAYS = [30, 90, 365];
+const ALLOWED_JURISDICTIONS = ['permissive', 'two_party', 'gdpr'];
+
 function validateDataControls(blob) {
   if (blob === undefined || blob === null) return { ok: true };
   if (typeof blob !== 'object' || Array.isArray(blob)) {
@@ -24,6 +28,15 @@ function validateDataControls(blob) {
       return {
         ok: false,
         error: `retention_days must be one of ${ALLOWED_RETENTION_DAYS.join(', ')} (got ${v})`
+      };
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(blob, 'consent_jurisdiction')) {
+    const v = blob.consent_jurisdiction;
+    if (v !== null && !ALLOWED_JURISDICTIONS.includes(v)) {
+      return {
+        ok: false,
+        error: `consent_jurisdiction must be one of ${ALLOWED_JURISDICTIONS.join(', ')} (got ${v})`
       };
     }
   }
