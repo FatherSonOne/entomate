@@ -269,3 +269,8 @@ router.get('/audit-logs', authenticate, authorizeOrgRole(ADMIN_ROLES, orgFromQue
 });
 
 module.exports = router;
+module.exports._internal = {
+  validateDataControls,
+  ALLOWED_RETENTION_DAYS,
+  ALLOWED_JURISDICTIONS
+};
