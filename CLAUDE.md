@@ -497,3 +497,37 @@ When resuming work:
 2. Review recent git commits
 3. Check docs/ for current week's tasks
 4. Apply appropriate agent workflow
+
+---
+
+## Obsidian Knowledge Vault
+
+This project has a persistent Obsidian knowledge vault at `F:/Obsidian/Entomate/` connected via the `obsidian-vault` MCP server (`@bitbonsai/mcpvault`).
+
+**Folders:**
+- `Architecture/` — System design, data models, Recall/Deepgram pipeline notes
+- `Codebase/` — File-level notes, module maps
+- `Context/` — Project overview, account model, tech stack
+- `Decisions/` — Architecture Decision Records (ADRs)
+- `Mistakes/` — Bugs, root causes, lessons learned
+- `Patterns/` — Reusable patterns
+- `Sessions/` — Session summaries
+
+**Use the vault when:**
+- Recording an ADR after a non-trivial architecture decision (`Decisions/`)
+- Capturing a bug root cause that future sessions could re-hit (`Mistakes/`)
+- Writing session summaries on substantial work (`Sessions/`)
+- Documenting reusable patterns (`Patterns/`)
+
+Tools available: `mcp__obsidian-vault__search_notes`, `read_note`, `write_note`, `patch_note`, `list_directory`, `get_frontmatter`, `update_frontmatter`, `manage_tags`.
+
+---
+
+## graphify
+
+This project has a graphify knowledge graph at `.graphify/`.
+
+Rules:
+- Before answering architecture or codebase questions, read `.graphify/GRAPH_REPORT.md` for god nodes and community structure
+- For cross-module "how does X relate to Y" questions, prefer `graphify query "<question>"`, `graphify path "<A>" "<B>"`, or `graphify explain "<concept>"` over grep
+- After modifying code files in this session, run `graphify update .` to keep the graph current (AST-only, no API cost)

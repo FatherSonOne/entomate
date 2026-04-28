@@ -9,6 +9,17 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/save-session.js",
+            "timeout": 30
+          }
+        ]
+      }
     ]
   },
   "statusLine": {

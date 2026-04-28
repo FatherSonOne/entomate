@@ -1,0 +1,1 @@
+{"nodes":[{"id":"eslint_config","label":"eslint.config.js","file_type":"code","source_file":"F:\\entomate\\eslint.config.js","source_location":"L1"}],"edges":[{"source":"eslint_config","target":"js","relation":"imports_from","confidence":"EXTRACTED","source_file":"F:\\entomate\\eslint.config.js","source_location":"L1","weight":1}]}

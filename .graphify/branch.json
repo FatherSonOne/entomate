@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "branchName": "main",
+  "worktreePath": "F:\\entomate",
+  "upstream": "origin/main",
+  "mergeBase": "b8a2991390c9c0b90b4d75fcd74367b8d4a8d545",
+  "firstSeenHead": "b8a2991390c9c0b90b4d75fcd74367b8d4a8d545",
+  "lastSeenHead": "b8a2991390c9c0b90b4d75fcd74367b8d4a8d545",
+  "lastAnalyzedHead": "b8a2991390c9c0b90b4d75fcd74367b8d4a8d545",
+  "stale": false,
+  "staleReason": null,
+  "staleSince": null,
+  "lifecycleEvent": null,
+  "createdAt": "2026-04-27T18:40:51.115Z",
+  "updatedAt": "2026-04-27T18:40:51.115Z"
+}

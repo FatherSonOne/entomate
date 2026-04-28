@@ -1,0 +1,1 @@
+{"nodes":[{"id":"setup","label":"setup.js","file_type":"code","source_file":"F:\\entomate\\frontend\\src\\__tests__\\setup.js","source_location":"L1"}],"edges":[{"source":"setup","target":"jest_dom","relation":"imports_from","confidence":"EXTRACTED","source_file":"F:\\entomate\\frontend\\src\\__tests__\\setup.js","source_location":"L1","weight":1}]}

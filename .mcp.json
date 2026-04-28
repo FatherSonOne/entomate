@@ -23,6 +23,12 @@
       "command": "npx",
       "args": ["-y", "@anthropic-ai/claude-code-mcp-server-browser"],
       "description": "Browser automation and web interaction"
+    },
+    "obsidian-vault": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@bitbonsai/mcpvault", "F:/Obsidian/Entomate"],
+      "description": "Obsidian vault — persistent knowledge base for project memory, decisions, patterns, and architecture notes"
     }
   }
 }

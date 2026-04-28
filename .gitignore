@@ -31,6 +31,9 @@ frontend/.env.staging
 # Claude Code local settings
 .claude/settings.local.json
 
+# External skills cloned as their own git repos
+.claude/skills/huashu-design/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
