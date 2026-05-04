@@ -157,6 +157,14 @@ async function routeEvent(event: Record<string, unknown>, sourceApp: string) {
     case 'meeting.cancelled':
       return handleMeetingLifecycle(eventType, data, sourceApp)
 
+    // From Pulse: workspace decisions / extracted tasks. Cached as MIP context
+    // so the meeting briefing can surface "the team decided X / has open task Y"
+    // when prepping a related meeting.
+    case 'decision.created':
+      return handlePulseDecisionCreated(data, sourceApp)
+    case 'task.created':
+      return handlePulseTaskCreated(data, sourceApp)
+
     // Health check (supports both event names for cross-app compatibility)
     case 'heartbeat':
     case 'health.ping':
@@ -399,6 +407,122 @@ async function handleMeetingLifecycle(
     lifecycle: lifecycleState,
     cached: !cacheError,
   }
+}
+
+/**
+ * Handle decision.created from Pulse.
+ *
+ * Cache the decision in intelligence_context_cache so the MIP context
+ * assembler can surface "the team decided X" when prepping a related
+ * meeting. Keyed per-workspace so a single user with multiple workspaces
+ * sees only the right decisions.
+ */
+async function handlePulseDecisionCreated(data: Record<string, unknown>, sourceApp: string) {
+  const { decisionId, workspaceId, title, description, decisionType, proposedBy } = data as {
+    decisionId?: string
+    workspaceId?: string
+    title?: string
+    description?: string | null
+    decisionType?: string
+    proposedBy?: string
+  }
+
+  if (!decisionId || !workspaceId) {
+    return { error: 'Missing decisionId or workspaceId', eventType: 'decision.created' }
+  }
+
+  const cachedSnapshot: Record<string, unknown> = {
+    decisionId,
+    workspaceId,
+    title,
+    description: description ?? null,
+    decisionType: decisionType ?? 'general',
+    proposedBy: proposedBy ?? null,
+    _lastEvent: 'decision.created',
+    _lastSeen: new Date().toISOString(),
+  }
+
+  // 30-day TTL — decisions stay relevant for context longer than contacts.
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+
+  const { error: cacheError } = await supabase
+    .from('intelligence_context_cache')
+    .upsert(
+      {
+        entity_type: 'decision',
+        entity_id: decisionId,
+        source_app: sourceApp,
+        context_data: cachedSnapshot,
+        expires_at: expiresAt,
+      },
+      { onConflict: 'entity_type,entity_id,source_app' }
+    )
+
+  if (cacheError) {
+    console.warn('[ecosystem-inbound] decision cache upsert failed:', cacheError.message)
+  }
+
+  return { processed: true, eventType: 'decision.created', decisionId, cached: !cacheError }
+}
+
+/**
+ * Handle task.created from Pulse.
+ *
+ * Cache the task in intelligence_context_cache so the MIP context
+ * assembler can surface "open Pulse tasks for this participant" during
+ * meeting prep. Pulse tasks are NOT mirrored as Entomate action_items —
+ * they're context-only.
+ */
+async function handlePulseTaskCreated(data: Record<string, unknown>, sourceApp: string) {
+  const { taskId, workspaceId, title, description, assigneeId, deadline, priority, originMessageId } = data as {
+    taskId?: string
+    workspaceId?: string
+    title?: string
+    description?: string | null
+    assigneeId?: string | null
+    deadline?: string | null
+    priority?: string
+    originMessageId?: string | null
+  }
+
+  if (!taskId || !workspaceId) {
+    return { error: 'Missing taskId or workspaceId', eventType: 'task.created' }
+  }
+
+  const cachedSnapshot: Record<string, unknown> = {
+    taskId,
+    workspaceId,
+    title,
+    description: description ?? null,
+    assigneeId: assigneeId ?? null,
+    deadline: deadline ?? null,
+    priority: priority ?? 'medium',
+    originMessageId: originMessageId ?? null,
+    _lastEvent: 'task.created',
+    _lastSeen: new Date().toISOString(),
+  }
+
+  // 14-day TTL — tasks decay faster than decisions; expect status churn.
+  const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+
+  const { error: cacheError } = await supabase
+    .from('intelligence_context_cache')
+    .upsert(
+      {
+        entity_type: 'task',
+        entity_id: taskId,
+        source_app: sourceApp,
+        context_data: cachedSnapshot,
+        expires_at: expiresAt,
+      },
+      { onConflict: 'entity_type,entity_id,source_app' }
+    )
+
+  if (cacheError) {
+    console.warn('[ecosystem-inbound] task cache upsert failed:', cacheError.message)
+  }
+
+  return { processed: true, eventType: 'task.created', taskId, cached: !cacheError }
 }
 
 async function handleNotification(data: Record<string, unknown>) {
