@@ -10,7 +10,7 @@ class GeminiService {
 
     if (this.apiKey) {
       this.genAI = new GoogleGenerativeAI(this.apiKey);
-      this.model = this.genAI.getGenerativeModel({ model: 'gemini-2.5-flash-preview-05-20' });
+      this.model = this.genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
       this.embeddingModel = this.genAI.getGenerativeModel({ model: 'text-embedding-004' });
     } else {
       log.warn('GEMINI_API_KEY not set in environment');
