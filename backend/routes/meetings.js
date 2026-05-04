@@ -703,6 +703,26 @@ function firePostProcessing(savedMeeting, summaryData, savedActionItems, ctx = {
             urgency: 'high',
           });
         }
+
+        const workspaceId = process.env.ECOSYSTEM_PULSE_WORKSPACE_ID;
+        if (workspaceId && savedActionItems.length > 0) {
+          await bridge.sendEvent('pulse', {
+            eventType: 'meeting.action_items_extracted',
+            entityType: 'meeting',
+            entityId: savedMeeting.id,
+            data: {
+              workspaceId,
+              meetingTitle: savedMeeting.title,
+              actionItems: savedActionItems.map(item => ({
+                id: item.id,
+                description: item.task_description,
+                assignee: item.assigned_to_name || item.assigned_to_email || null,
+                priority: item.priority,
+                dueDate: item.due_date,
+              })),
+            },
+          });
+        }
       }
 
       if (bridge.isConnected('logos_vision')) {
