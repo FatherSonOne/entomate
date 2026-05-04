@@ -7,10 +7,39 @@ const { authenticate, authorize } = require('../middleware/auth');
 const { asyncHandler } = require('../middleware/errorHandler');
 const { aiLimiter } = require('../middleware/rateLimiter');
 const explanationAnalytics = require('../services/explainability/ExplanationAnalytics');
+const { getEcosystemBridge } = require('../services/ecosystemBridge');
 const log = require('../utils/log');
 const { validate } = require('../middleware/validate');
 const schemas = require('../schemas/agents');
 const agentTemplates = require('../services/agentTemplates');
+
+/**
+ * Forward an agent run result to Pulse so it surfaces a card in the
+ * entomate-alerts bot channel. Fire-and-forget — never block the agent
+ * response on cross-app delivery.
+ */
+async function notifyPulseAgentCompleted(agentName, status, actionDescription) {
+  const workspaceId = process.env.ECOSYSTEM_PULSE_WORKSPACE_ID;
+  if (!workspaceId) return;
+
+  try {
+    const bridge = await getEcosystemBridge();
+    if (!bridge.isConnected('pulse')) return;
+
+    await bridge.sendEvent('pulse', {
+      eventType: 'agent.action_completed',
+      entityType: 'agent_action',
+      data: {
+        workspaceId,
+        agentName: agentName || 'Entomate Agent',
+        status,                         // 'success' | 'failed' | 'partial'
+        actionDescription: actionDescription || 'agent action',
+      },
+    });
+  } catch (err) {
+    log.warn('[agents] notifyPulseAgentCompleted threw:', err.message);
+  }
+}
 
 /**
  * GET /api/agents
@@ -176,6 +205,13 @@ router.post('/:id/execute', authenticate, aiLimiter, validate(schemas.execute), 
     _specific_agent_id: req.params.id
   });
 
+  // Cross-app: notify Pulse on every direct agent execute. Fire-and-forget.
+  notifyPulseAgentCompleted(
+    agentData.name,
+    result?.executed > 0 ? 'success' : 'failed',
+    `Triggered by ${trigger_type}`
+  ).catch(() => {});
+
   res.json({
     success: true,
     data: result,
@@ -198,6 +234,16 @@ router.post('/trigger', authenticate, aiLimiter, validate(schemas.trigger), asyn
   }
 
   const result = await aiAgentService.trigger(trigger_type, data || {});
+
+  // Cross-app: emit one consolidated notification per /trigger call so we
+  // don't spam Pulse with one event per matched agent.
+  if (result?.executed > 0) {
+    notifyPulseAgentCompleted(
+      `${result.executed} agents`,
+      'success',
+      `Trigger ${trigger_type} matched ${result.executed} agents`
+    ).catch(() => {});
+  }
 
   res.json({
     success: true,

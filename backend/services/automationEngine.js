@@ -8,6 +8,7 @@ const crmService = require('./crmService');
 const chatService = require('./chatService');
 const geminiService = require('../config/gemini');
 const agentOrchestrator = require('./agentOrchestrator');
+const { getEcosystemBridge } = require('./ecosystemBridge');
 const log = require('../utils/log');
 
 class AutomationEngine {
@@ -170,6 +171,15 @@ class AutomationEngine {
 
       await this.logExecution(executionLog, startTime);
 
+      // Cross-app: notify Pulse so it surfaces a bot card in the
+      // entomate-automations channel. Fire-and-forget — never block local
+      // execution on cross-app delivery.
+      this.notifyPulseAutomationTriggered(automation, {
+        success: true,
+        actionCount: executionLog.actions_executed.length,
+        triggerData,
+      }).catch(err => log.warn('[AutomationEngine] notifyPulse failed:', err.message));
+
       return {
         automation: automation.name,
         success: true,
@@ -182,11 +192,50 @@ class AutomationEngine {
       executionLog.error_message = error.message;
       await this.logExecution(executionLog, startTime);
 
+      // Notify failed runs too — operators want to see them in #entomate-automations.
+      this.notifyPulseAutomationTriggered(automation, {
+        success: false,
+        actionCount: executionLog.actions_executed.length,
+        triggerData,
+        error: error.message,
+      }).catch(err => log.warn('[AutomationEngine] notifyPulse failed:', err.message));
+
       return {
         automation: automation.name,
         success: false,
         error: error.message
       };
+    }
+  }
+
+  /**
+   * Forward a finished automation run to Pulse via the ecosystem bridge.
+   * Pulse's handleAutomationEvent (in supabase/functions/ecosystem-inbound)
+   * posts a card into the entomate-automations bot channel.
+   */
+  async notifyPulseAutomationTriggered(automation, runResult) {
+    const workspaceId = process.env.ECOSYSTEM_PULSE_WORKSPACE_ID;
+    if (!workspaceId) return;  // Not configured — silent no-op
+
+    try {
+      const bridge = await getEcosystemBridge();
+      if (!bridge.isConnected('pulse')) return;
+
+      await bridge.sendEvent('pulse', {
+        eventType: 'automation.triggered',
+        entityType: 'automation',
+        entityId: automation.id,
+        data: {
+          workspaceId,
+          automationName: automation.name,
+          status: runResult.success ? 'success' : 'failed',
+          triggerDescription: automation.trigger_type || null,
+          actionCount: runResult.actionCount || 0,
+          error: runResult.error || null,
+        },
+      });
+    } catch (err) {
+      log.warn('[AutomationEngine] notifyPulseAutomationTriggered threw:', err.message);
     }
   }
 

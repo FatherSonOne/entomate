@@ -105,9 +105,18 @@ export interface AssembledContext {
   pastMeetings?: PastMeetingContext[];
   recentConversations?: ConversationContext[];
   openTasks?: TaskContext[];
+  recentDecisions?: DecisionContext[];  // Pulse workspace decisions cached by handlePulseDecisionCreated
   assembledAt: string;
   sources: string[];                  // Which sources were actually queried
   tokenEstimate: number;              // Estimated token count for prompt budgeting
+}
+
+export interface DecisionContext {
+  title: string;
+  description?: string;
+  decisionType?: string;             // "general", "technical", "product", "process"
+  decidedAt?: string;                // ISO date when cached
+  sourceApp: 'pulse' | 'entomate' | 'logos_vision';
 }
 
 export interface ParticipantContext {

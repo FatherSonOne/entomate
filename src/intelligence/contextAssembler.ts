@@ -23,6 +23,7 @@ import type {
   PastMeetingContext,
   ConversationContext,
   TaskContext,
+  DecisionContext,
 } from './types';
 
 /** Max token budget for assembled context (~4 chars per token) */
@@ -69,6 +70,7 @@ export async function assembleContext(
   let pastMeetings: PastMeetingContext[] = [];
   let recentConversations: ConversationContext[] = [];
   let openTasks: TaskContext[] = [];
+  let recentDecisions: DecisionContext[] = [];
 
   // Determine if external apps are available
   const lvConfigured = getLVConnectionInfo().isConfigured || getLVConnectionInfo().isSharedInstance;
@@ -177,6 +179,27 @@ export async function assembleContext(
     }
   }
 
+  // Gather Pulse workspace decisions + tasks from intelligence_context_cache.
+  // These are fed by handlePulseDecisionCreated / handlePulseTaskCreated when
+  // Pulse emits decision.created / task.created events. Reading from cache
+  // means no live network call to Pulse — pure local SELECT.
+  // Gated on the same `pulse_history` source flag since it's all "Pulse signal".
+  if (sources.includes('pulse_history')) {
+    try {
+      const pulseCache = await gatherPulseCache(limits.pulseDays);
+      recentDecisions = pulseCache.decisions;
+      // Append cached Pulse tasks to the openTasks list so they flow through
+      // the same trim/render path as Entomate + LV tasks.
+      if (pulseCache.tasks.length > 0) {
+        openTasks = [...openTasks, ...pulseCache.tasks];
+        if (!successfulSources.includes('tasks')) successfulSources.push('tasks');
+      }
+      if (recentDecisions.length > 0) successfulSources.push('pulse_decisions');
+    } catch (err) {
+      console.error('[Intelligence:contextAssembler] pulse cache gather failed:', err);
+    }
+  }
+
   // 4. Build the assembled context
   let context: AssembledContext = {
     participants,
@@ -185,6 +208,7 @@ export async function assembleContext(
     pastMeetings: pastMeetings.length > 0 ? pastMeetings : undefined,
     recentConversations: recentConversations.length > 0 ? recentConversations : undefined,
     openTasks: openTasks.length > 0 ? openTasks : undefined,
+    recentDecisions: recentDecisions.length > 0 ? recentDecisions : undefined,
     assembledAt: new Date().toISOString(),
     sources: successfulSources,
     tokenEstimate: 0,
@@ -637,6 +661,65 @@ async function gatherPulseHistory(
     console.error('[Intelligence:contextAssembler] Pulse query failed:', err);
     return [];
   }
+}
+
+/**
+ * Read Pulse-sourced decisions and tasks from intelligence_context_cache.
+ *
+ * The cache is populated by handlePulseDecisionCreated / handlePulseTaskCreated
+ * in the ecosystem-inbound function whenever a Pulse workspace logs a decision
+ * or extracts a task. We read whatever's still within TTL — no participant
+ * filtering yet (Pulse user IDs don't map to Entomate participant names),
+ * so the assembler surfaces all recent Pulse signal and lets the prompt
+ * builder handle relevance.
+ */
+async function gatherPulseCache(
+  lookbackDays: number
+): Promise<{ decisions: DecisionContext[]; tasks: TaskContext[] }> {
+  const cutoffIso = new Date(Date.now() - lookbackDays * 86400000).toISOString();
+
+  // Pull both kinds in one round trip and split locally.
+  const { data, error } = await supabase
+    .from('intelligence_context_cache')
+    .select('entity_type, entity_id, context_data, created_at')
+    .eq('source_app', 'pulse')
+    .in('entity_type', ['decision', 'task'])
+    .gt('expires_at', new Date().toISOString())
+    .gte('created_at', cutoffIso)
+    .order('created_at', { ascending: false })
+    .limit(20);
+
+  if (error || !data) {
+    if (error) console.warn('[Intelligence:contextAssembler] pulse cache read failed:', error.message);
+    return { decisions: [], tasks: [] };
+  }
+
+  const decisions: DecisionContext[] = [];
+  const tasks: TaskContext[] = [];
+
+  for (const row of data) {
+    const ctx = (row.context_data || {}) as Record<string, unknown>;
+    if (row.entity_type === 'decision') {
+      decisions.push({
+        title: (ctx.title as string) || '(untitled)',
+        description: (ctx.description as string) || undefined,
+        decisionType: (ctx.decisionType as string) || undefined,
+        decidedAt: (ctx._lastSeen as string) || (row.created_at as string),
+        sourceApp: 'pulse',
+      });
+    } else if (row.entity_type === 'task') {
+      tasks.push({
+        title: (ctx.title as string) || '(untitled)',
+        status: 'todo',
+        assignee: (ctx.assigneeId as string) || undefined,
+        dueDate: (ctx.deadline as string) || undefined,
+        priority: ((ctx.priority as string) || 'medium'),
+        relatedTo: 'pulse',
+      });
+    }
+  }
+
+  return { decisions, tasks };
 }
 
 async function gatherTasks(

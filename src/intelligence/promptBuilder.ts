@@ -11,6 +11,8 @@ import type {
   OutputFormatConfig,
   ParticipantContext,
   PastMeetingContext,
+  DecisionContext,
+  TaskContext,
 } from './types';
 
 /** Max chars for the composed system prompt (~4000 tokens at ~4 chars/token) */
@@ -52,6 +54,14 @@ export function buildMeetingPrompt(
     : '';
   prompt = replaceAll(prompt, '{{past_meeting_context}}', pastMeetingText);
 
+  // 3b. Substitute Pulse signal (decisions + tasks from Pulse workspaces).
+  // Templates that don't reference {{pulse_signal}} will fall through to the
+  // auto-append at step 12, so existing profiles benefit without edits.
+  const pulseSignalText = assembledContext
+    ? formatPulseSignal(assembledContext.recentDecisions, assembledContext.openTasks)
+    : '';
+  prompt = replaceAll(prompt, '{{pulse_signal}}', pulseSignalText);
+
   // 4. Substitute focus areas
   const focusAreas = overrides?.focusOverride || profile.focusAreas;
   const focusText = focusAreas.map(f => f.label).join(', ');
@@ -80,12 +90,56 @@ export function buildMeetingPrompt(
     prompt += `\n\nADDITIONAL INSTRUCTIONS: ${overrides.additionalInstructions}`;
   }
 
-  // 11. Trim to token budget
+  // 11. Auto-append Pulse signal if the template doesn't reference {{pulse_signal}}
+  // and the assembled context actually has Pulse signal to share. Existing
+  // built-in profiles benefit without needing template edits.
+  if (
+    pulseSignalText &&
+    !profile.systemPromptTemplate.includes('{{pulse_signal}}')
+  ) {
+    prompt += `\n\n${pulseSignalText}`;
+  }
+
+  // 12. Trim to token budget
   if (prompt.length > MAX_PROMPT_CHARS) {
     prompt = prompt.slice(0, MAX_PROMPT_CHARS - 50) + '\n\n[Context trimmed to fit token budget]';
   }
 
   return prompt.trim();
+}
+
+// ==================== PULSE SIGNAL FORMATTER ====================
+
+function formatPulseSignal(
+  decisions?: DecisionContext[],
+  tasks?: TaskContext[]
+): string {
+  const pulseDecisions = (decisions || []).filter(d => d.sourceApp === 'pulse');
+  const pulseTasks = (tasks || []).filter(t => t.relatedTo === 'pulse');
+
+  if (pulseDecisions.length === 0 && pulseTasks.length === 0) return '';
+
+  const lines: string[] = ['RECENT PULSE WORKSPACE SIGNAL:'];
+
+  if (pulseDecisions.length > 0) {
+    lines.push('\nDecisions logged:');
+    for (const d of pulseDecisions.slice(0, 5)) {
+      const type = d.decisionType ? ` [${d.decisionType}]` : '';
+      const desc = d.description ? ` — ${d.description.slice(0, 120)}` : '';
+      lines.push(`  - ${d.title}${type}${desc}`);
+    }
+  }
+
+  if (pulseTasks.length > 0) {
+    lines.push('\nOpen tasks from Pulse:');
+    for (const t of pulseTasks.slice(0, 5)) {
+      const due = t.dueDate ? ` (due ${t.dueDate})` : '';
+      const prio = t.priority && t.priority !== 'medium' ? ` [${t.priority}]` : '';
+      lines.push(`  - ${t.title}${prio}${due}`);
+    }
+  }
+
+  return lines.join('\n');
 }
 
 // ==================== DEFAULT PROMPT (BACKWARD COMPAT) ====================
