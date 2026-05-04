@@ -114,7 +114,8 @@ async function pollPulseForEvent(sinceIso) {
 }
 
 async function main() {
-  const sinceIso = new Date().toISOString();
+  // 5s buffer for clock skew between this machine and Pulse's Postgres clock.
+  const sinceIso = new Date(Date.now() - 5000).toISOString();
   console.log(`[verify-agent-pulse-emit] Triggering ${TRIGGER_TYPE} on ${ENTOMATE_API_URL}`);
   console.log(`[verify-agent-pulse-emit] Will poll Pulse for events created >= ${sinceIso}`);
 
