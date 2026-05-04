@@ -6,11 +6,15 @@
 
 const cron = require('node-cron');
 const { getEcosystemBridge } = require('./ecosystemBridge');
+const { supabaseAdmin } = require('../config/supabase');
 const log = require('../utils/log');
+
+const RETRY_BACKOFF_MINUTES = [5, 15, 60, 240, 720];
 
 class EcosystemScheduler {
   constructor() {
     this.job = null;
+    this.retryJob = null;
     this.initialized = false;
   }
 
@@ -32,8 +36,79 @@ class EcosystemScheduler {
       timezone: process.env.TIMEZONE || 'America/New_York',
     });
 
+    // Independent cadence for the dead-letter retry tick. Cheap to run
+    // frequently — exits early when nothing is due.
+    const retryCron = process.env.ECOSYSTEM_RETRY_CRON || '*/5 * * * *';
+    this.retryJob = cron.schedule(retryCron, () => this.runRetries(), {
+      timezone: process.env.TIMEZONE || 'America/New_York',
+    });
+
     this.initialized = true;
-    log.info(`[EcosystemScheduler] Auto-sync scheduled: ${cronExpr}`);
+    log.info(`[EcosystemScheduler] Auto-sync scheduled: ${cronExpr}; retry tick: ${retryCron}`);
+  }
+
+  /**
+   * Replay failed outbound events whose next_retry_at is due.
+   * Uses the bridge's existing retryEvent() method so backoff and event
+   * mutation logic stay in one place.
+   */
+  async runRetries() {
+    if (!supabaseAdmin) return;
+
+    try {
+      const { data: candidates, error } = await supabaseAdmin
+        .from('ecosystem_events')
+        .select('id, retry_count, event_type, target_app')
+        .eq('direction', 'outbound')
+        .eq('status', 'failed')
+        .not('next_retry_at', 'is', null)
+        .lte('next_retry_at', new Date().toISOString())
+        .order('next_retry_at', { ascending: true })
+        .limit(50);
+
+      if (error) {
+        log.warn('[EcosystemScheduler] retry candidates query failed:', error.message);
+        return;
+      }
+      if (!candidates || candidates.length === 0) return;
+
+      const bridge = await getEcosystemBridge();
+      let succeeded = 0;
+      let exhausted = 0;
+
+      for (const event of candidates) {
+        const attempt = (event.retry_count || 0) + 1;
+        const maxRetries = parseInt(process.env.ECOSYSTEM_MAX_RETRIES, 10) || 5;
+
+        if (attempt > maxRetries) {
+          await supabaseAdmin
+            .from('ecosystem_events')
+            .update({ status: 'exhausted', next_retry_at: null })
+            .eq('id', event.id);
+          exhausted++;
+          continue;
+        }
+
+        const result = await bridge.retryEvent(event.id);
+        if (result?.success) {
+          succeeded++;
+          continue;
+        }
+
+        // Reschedule with backoff. retryEvent already incremented retry_count,
+        // but did not set next_retry_at on its own re-failure path — push it out.
+        const backoffIdx = Math.min(attempt - 1, RETRY_BACKOFF_MINUTES.length - 1);
+        const nextRetryAt = new Date(Date.now() + RETRY_BACKOFF_MINUTES[backoffIdx] * 60 * 1000).toISOString();
+        await supabaseAdmin
+          .from('ecosystem_events')
+          .update({ next_retry_at: nextRetryAt })
+          .eq('id', event.id);
+      }
+
+      log.info(`[EcosystemScheduler] retry tick: checked=${candidates.length} succeeded=${succeeded} exhausted=${exhausted}`);
+    } catch (err) {
+      log.error('[EcosystemScheduler] retry tick failed:', err.message);
+    }
   }
 
   /**
@@ -90,15 +165,21 @@ class EcosystemScheduler {
     if (this.job) {
       this.job.stop();
       this.job = null;
-      log.info('[EcosystemScheduler] Stopped');
     }
+    if (this.retryJob) {
+      this.retryJob.stop();
+      this.retryJob = null;
+    }
+    log.info('[EcosystemScheduler] Stopped');
   }
 
   getStatus() {
     return {
       initialized: this.initialized,
       running: !!this.job,
+      retryRunning: !!this.retryJob,
       cron: process.env.ECOSYSTEM_SYNC_CRON || '0 */6 * * *',
+      retryCron: process.env.ECOSYSTEM_RETRY_CRON || '*/5 * * * *',
     };
   }
 }
