@@ -159,6 +159,7 @@ class EcosystemBridge {
       };
       if (anonKey) {
         headers['Authorization'] = `Bearer ${anonKey}`;
+        headers['apikey'] = anonKey;
       }
 
       const response = await fetch(cfg.api_url, {
@@ -333,22 +334,27 @@ class EcosystemBridge {
       }
     });
 
-    // 2. Sync each action item as a task
+    // 2. Sync each action item — LV's handler is `action_item.created` and
+    // expects a nested `actionItem` object with snake_case fields matching
+    // its own `tasks` table column names.
     for (const item of actionItems) {
       const taskResult = await this.sendEvent('logos_vision', {
-        eventType: 'task.created',
+        eventType: 'action_item.created',
         entityType: 'action_item',
         entityId: item.id,
         data: {
-          actionItemId: item.id,
-          meetingId: meeting.id,
-          meetingTitle: meeting.title,
-          task: item.task_description,
-          assignedTo: item.assigned_to_name,
-          assignedEmail: item.assigned_to_email,
-          dueDate: item.due_date,
-          priority: item.priority,
-          context: item.context
+          actionItem: {
+            id: item.id,
+            task_description: item.task_description,
+            assigned_to_name: item.assigned_to_name,
+            assigned_to_email: item.assigned_to_email,
+            due_date: item.due_date,
+            priority: item.priority,
+            status: item.status,
+            context: item.context,
+            meeting_id: meeting.id
+          },
+          meetingTitle: meeting.title
         }
       });
 
@@ -394,6 +400,37 @@ class EcosystemBridge {
       entityId: taskId,
       data: { taskId, crmTaskId, completedAt: new Date().toISOString() }
     });
+  }
+
+  /**
+   * Send a pre-meeting briefing to connected apps (LV + Pulse).
+   * Fires when a user finalizes their MIP profile selection on an upcoming meeting.
+   * Broadcasts so both LV (writes activity + notification) and Pulse (posts briefing card)
+   * can prepare context for participants.
+   */
+  async sendMeetingBriefing({ meetingId, meetingTitle, participants = [], briefingData = {}, scheduledTime, workspaceId, entomate_url }) {
+    const event = {
+      eventType: 'meeting.briefing',
+      entityType: 'meeting',
+      entityId: meetingId,
+      data: {
+        meetingId,
+        meetingTitle,
+        participants,
+        briefingData,
+        scheduledTime,
+        workspaceId,
+        entomate_url,
+      },
+    };
+
+    const results = {};
+    for (const targetApp of ['logos_vision', 'pulse']) {
+      if (this.isConnected(targetApp)) {
+        results[targetApp] = await this.sendEvent(targetApp, event);
+      }
+    }
+    return results;
   }
 
   /**

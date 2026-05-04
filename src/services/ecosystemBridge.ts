@@ -86,21 +86,30 @@ class EcosystemBridge {
     const correlationId = event.correlationId || crypto.randomUUID();
 
     try {
-      // Get the service token for this app
+      // Get the service token + gateway key for this app
       const { data: configRow } = await supabase
         .from('ecosystem_config')
-        .select('service_token')
+        .select('service_token, features')
         .eq('app_name', targetApp)
         .single();
 
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'X-Ecosystem-Token': configRow?.service_token || '',
+        'X-Ecosystem-Source': 'entomate',
+        'X-Ecosystem-Event-Id': correlationId,
+      };
+
+      // Supabase edge functions require an anon/publishable key for the API gateway
+      const gatewayKey = (configRow?.features as Record<string, unknown> | undefined)?.gateway_key as string | undefined;
+      if (gatewayKey) {
+        headers['Authorization'] = `Bearer ${gatewayKey}`;
+        headers['apikey'] = gatewayKey;
+      }
+
       const response = await fetch(app.apiUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Ecosystem-Token': configRow?.service_token || '',
-          'X-Ecosystem-Source': 'entomate',
-          'X-Ecosystem-Event-Id': correlationId,
-        },
+        headers,
         body: JSON.stringify({
           eventType: event.eventType,
           source: 'entomate',

@@ -9,6 +9,8 @@ const intelligenceService = require('../services/intelligenceService');
 const log = require('../utils/log');
 const { validate } = require('../middleware/validate');
 const schemas = require('../schemas/intelligence');
+const { supabaseAdmin } = require('../config/supabase');
+const { getEcosystemBridge } = require('../services/ecosystemBridge');
 
 /**
  * GET /api/intelligence/today
@@ -415,6 +417,83 @@ router.get('/relationships/:dealId', async (req, res) => {
       error: 'Failed to fetch relationship insights',
       details: error.message
     });
+  }
+});
+
+/**
+ * POST /api/intelligence/meeting-prep/:meetingId/broadcast-briefing
+ * Fire-and-forget: send a meeting.briefing event to LV + Pulse so they can
+ * surface pre-meeting context to participants. Triggered by the MIP panel
+ * when a user finalizes their profile selection on an upcoming meeting.
+ */
+router.post('/meeting-prep/:meetingId/broadcast-briefing', async (req, res) => {
+  try {
+    const { meetingId } = req.params;
+    if (!supabaseAdmin) {
+      return res.status(503).json({ success: false, error: 'Database not configured' });
+    }
+
+    // Load meeting + intelligence config in parallel.
+    const [meetingRes, configRes] = await Promise.all([
+      supabaseAdmin
+        .from('meetings')
+        .select('id, title, scheduled_at, attendees')
+        .eq('id', meetingId)
+        .single(),
+      supabaseAdmin
+        .from('meeting_intelligence_config')
+        .select('profile_id, assembled_context, status')
+        .eq('meeting_id', meetingId)
+        .single(),
+    ]);
+
+    if (meetingRes.error || !meetingRes.data) {
+      return res.status(404).json({ success: false, error: 'Meeting not found' });
+    }
+
+    const meeting = meetingRes.data;
+    const config = configRes.data;
+
+    // Resolve profile name for the briefing.
+    let suggestedProfile = null;
+    if (config?.profile_id) {
+      const { data: profile } = await supabaseAdmin
+        .from('intelligence_profiles')
+        .select('name')
+        .eq('id', config.profile_id)
+        .single();
+      suggestedProfile = profile?.name || null;
+    }
+
+    // Build a short context summary from assembled context if present.
+    let contextSummary = null;
+    if (config?.assembled_context) {
+      const ctx = config.assembled_context;
+      const counts = [];
+      if (Array.isArray(ctx.contacts)) counts.push(`${ctx.contacts.length} contacts`);
+      if (Array.isArray(ctx.activities)) counts.push(`${ctx.activities.length} recent activities`);
+      if (Array.isArray(ctx.tasks)) counts.push(`${ctx.tasks.length} open tasks`);
+      contextSummary = counts.length ? `Context assembled: ${counts.join(', ')}` : null;
+    }
+
+    const participants = Array.isArray(meeting.attendees)
+      ? meeting.attendees.map(a => (typeof a === 'string' ? { name: a } : a)).filter(p => p && (p.name || p.email))
+      : [];
+
+    const bridge = await getEcosystemBridge();
+    const results = await bridge.sendMeetingBriefing({
+      meetingId: meeting.id,
+      meetingTitle: meeting.title,
+      participants,
+      briefingData: { suggestedProfile, contextSummary },
+      scheduledTime: meeting.scheduled_at || null,
+      workspaceId: req.body?.workspaceId || process.env.ECOSYSTEM_PULSE_WORKSPACE_ID || null,
+    });
+
+    res.json({ success: true, results });
+  } catch (error) {
+    log.error('[Intelligence] Broadcast briefing failed:', { error: error.message || error });
+    res.status(500).json({ success: false, error: 'Failed to broadcast briefing', details: error.message });
   }
 });
 

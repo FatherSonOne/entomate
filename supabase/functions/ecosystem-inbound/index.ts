@@ -125,9 +125,16 @@ async function routeEvent(event: Record<string, unknown>, sourceApp: string) {
     case 'task.completed':
       return handleTaskCompleted(data)
 
-    // From Logos Vision: a contact was updated
+    // From Logos Vision: a CRM task was edited (description, status, due date, etc.)
+    case 'task.updated':
+      return handleTaskUpdated(data)
+
+    // From Logos Vision: a contact was created or updated. Both shapes get
+    // cached to intelligence_context_cache so the MIP context assembler can
+    // use them without another round trip.
+    case 'contact.created':
     case 'contact.updated':
-      return handleContactUpdated(data)
+      return handleContactEvent(eventType, data, sourceApp)
 
     // From Pulse: send a notification within Entomate
     case 'notification.send':
@@ -140,6 +147,15 @@ async function routeEvent(event: Record<string, unknown>, sourceApp: string) {
     // From Pulse: export a meeting recording for AI processing
     case 'meeting.export':
       return handleMeetingExport(data, sourceApp)
+
+    // From Logos Vision: CRM meeting lifecycle. We store minimal state so the
+    // MIP context assembler and the briefing trigger can see what's scheduled
+    // / in-flight / done without hitting LV synchronously.
+    case 'meeting.scheduled':
+    case 'meeting.started':
+    case 'meeting.completed':
+    case 'meeting.cancelled':
+      return handleMeetingLifecycle(eventType, data, sourceApp)
 
     // Health check (supports both event names for cross-app compatibility)
     case 'heartbeat':
@@ -193,16 +209,240 @@ async function handleTaskCompleted(data: Record<string, unknown>) {
   return { processed: true, eventType: 'task.completed' }
 }
 
-async function handleContactUpdated(data: Record<string, unknown>) {
-  // Log contact update for potential future use (meeting prep, etc.)
-  console.log('[ecosystem-inbound] Contact updated:', data.email)
-  return { acknowledged: true, eventType: 'contact.updated' }
+// LV uses 'Done' / 'In Progress' / 'To Do'; Entomate uses 'completed' / 'in_progress' / 'pending'.
+function reverseMapStatus(lvStatus: string): string | null {
+  switch (lvStatus) {
+    case 'Done': return 'completed'
+    case 'In Progress': return 'in_progress'
+    case 'To Do': return 'pending'
+    default: return null
+  }
+}
+
+async function handleTaskUpdated(data: Record<string, unknown>) {
+  const { taskId, entomateActionItemId, changes } = data as {
+    taskId?: string
+    entomateActionItemId?: string
+    changes?: Record<string, unknown>
+  }
+
+  if (!entomateActionItemId && !taskId) {
+    return { error: 'Missing entomateActionItemId or taskId' }
+  }
+  if (!changes || typeof changes !== 'object') {
+    return { error: 'Missing changes object' }
+  }
+
+  // Translate LV task fields → Entomate action_items columns.
+  const update: Record<string, unknown> = { updated_at: new Date().toISOString() }
+  if (typeof changes.description === 'string') update.task_description = changes.description
+  if (typeof changes.due_date === 'string' || changes.due_date === null) update.due_date = changes.due_date
+  if (typeof changes.priority === 'string') update.priority = changes.priority
+  if (typeof changes.status === 'string') {
+    const mapped = reverseMapStatus(changes.status)
+    if (mapped) update.status = mapped
+  }
+
+  // Resolve the local action_item id.
+  let localId = entomateActionItemId || null
+  if (!localId && taskId) {
+    const { data: mapping } = await supabase
+      .from('ecosystem_entity_map')
+      .select('local_entity_id')
+      .eq('remote_app', 'logos_vision')
+      .eq('remote_entity_id', String(taskId))
+      .single()
+    localId = mapping?.local_entity_id || null
+  }
+
+  if (!localId) {
+    return { error: 'No matching action_item found' }
+  }
+
+  const { error } = await supabase.from('action_items').update(update).eq('id', localId)
+  if (error) return { error: error.message }
+
+  return { processed: true, eventType: 'task.updated', actionItemId: localId, fieldsUpdated: Object.keys(update) }
+}
+
+/**
+ * Handle contact.created and contact.updated from Logos Vision.
+ *
+ * Senders use two different payload shapes:
+ *   contact.created:  { contact: { id, name, email, ... } }
+ *   contact.updated:  { contactId, changes: {...} }
+ * We accept either, derive a stable remote id + flat snapshot, then cache to
+ * intelligence_context_cache (keyed by entity_type/entity_id/source_app) and
+ * upsert a row in ecosystem_entity_map so future MIP lookups can resolve it.
+ */
+async function handleContactEvent(
+  eventType: string,
+  data: Record<string, unknown>,
+  sourceApp: string
+) {
+  const nestedContact = (data.contact || {}) as Record<string, unknown>
+  const remoteContactId =
+    (data.contactId as string) ||
+    (nestedContact.id as string) ||
+    null
+
+  if (!remoteContactId) {
+    return { error: 'Missing contactId or contact.id', eventType }
+  }
+
+  // Build a flat snapshot for the cache. For 'updated' we store changes; for
+  // 'created' we store the full contact object. Either way the assembler reads
+  // the latest cached blob, so 'updated' will overwrite the previous snapshot
+  // with a partial — acceptable since changes always come from the source of
+  // truth (LV) and downstream consumers should treat the cache as advisory.
+  const cachedSnapshot: Record<string, unknown> = {
+    ...(eventType === 'contact.created' ? nestedContact : {}),
+    ...((data.changes as Record<string, unknown>) || {}),
+    _lastEvent: eventType,
+    _lastSeen: new Date().toISOString(),
+  }
+
+  // Cache for MIP context assembly. 7-day TTL — context_assembler can refresh.
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+  const { error: cacheError } = await supabase
+    .from('intelligence_context_cache')
+    .upsert(
+      {
+        entity_type: 'contact',
+        entity_id: remoteContactId,
+        source_app: sourceApp,
+        context_data: cachedSnapshot,
+        expires_at: expiresAt,
+      },
+      { onConflict: 'entity_type,entity_id,source_app' }
+    )
+
+  if (cacheError) {
+    console.warn('[ecosystem-inbound] context cache upsert failed:', cacheError.message)
+  }
+
+  // We deliberately do NOT insert into ecosystem_entity_map. That table
+  // requires a real local_entity_id (UUID NOT NULL) — Entomate has no local
+  // contacts table to point at, so a "mirror-only" row would be misleading.
+  // The cache above is the canonical place for cross-app context data.
+
+  return {
+    processed: true,
+    eventType,
+    contactId: remoteContactId,
+    cached: !cacheError,
+  }
+}
+
+/**
+ * Handle CRM meeting lifecycle events from Logos Vision.
+ *
+ * meeting.scheduled / .started / .completed / .cancelled
+ *
+ * We don't synthesize an Entomate meetings row here (that's reserved for
+ * meeting.export which carries the actual recording). Instead we cache the
+ * lifecycle state so the MIP briefing trigger and the context assembler can
+ * see "LV says this meeting starts in 10 minutes" without a synchronous
+ * round trip.
+ */
+async function handleMeetingLifecycle(
+  eventType: string,
+  data: Record<string, unknown>,
+  sourceApp: string
+) {
+  const remoteMeetingId =
+    (data.meetingId as string) ||
+    (data.id as string) ||
+    null
+
+  if (!remoteMeetingId) {
+    return { error: 'Missing meetingId', eventType }
+  }
+
+  const lifecycleState = eventType.replace('meeting.', '') // scheduled | started | completed | cancelled
+
+  const cachedSnapshot: Record<string, unknown> = {
+    ...data,
+    _lifecycle: lifecycleState,
+    _lastEvent: eventType,
+    _lastSeen: new Date().toISOString(),
+  }
+
+  // 24-hour TTL — these are short-lived state markers, not durable records.
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+  const { error: cacheError } = await supabase
+    .from('intelligence_context_cache')
+    .upsert(
+      {
+        entity_type: 'meeting_lifecycle',
+        entity_id: remoteMeetingId,
+        source_app: sourceApp,
+        context_data: cachedSnapshot,
+        expires_at: expiresAt,
+      },
+      { onConflict: 'entity_type,entity_id,source_app' }
+    )
+
+  if (cacheError) {
+    console.warn('[ecosystem-inbound] lifecycle cache upsert failed:', cacheError.message)
+  }
+
+  // We do NOT insert into ecosystem_entity_map here — local_entity_id is UUID
+  // NOT NULL and remoteMeetingId may not be UUID-shaped, plus we have no real
+  // local meetings row yet. meeting.export creates the proper map row once a
+  // recording materializes locally.
+
+  return {
+    processed: true,
+    eventType,
+    meetingId: remoteMeetingId,
+    lifecycle: lifecycleState,
+    cached: !cacheError,
+  }
 }
 
 async function handleNotification(data: Record<string, unknown>) {
-  // Store notification for Entomate UI to display
-  console.log('[ecosystem-inbound] Notification from Pulse:', data.title)
-  return { acknowledged: true, eventType: 'notification.send' }
+  // Persist into the lightweight ecosystem_notifications inbox so the Entomate
+  // UI can poll/render alerts from connected apps without a real-time channel.
+  const { title, body, content, urgency, recipientIds, userIds, metadata } = data as {
+    title?: string
+    body?: string
+    content?: string
+    urgency?: string
+    recipientIds?: string[]
+    userIds?: string[]
+    metadata?: Record<string, unknown>
+  }
+
+  // Either an explicit recipient list, or NULL = broadcast row.
+  const recipients: (string | null)[] =
+    (Array.isArray(recipientIds) ? recipientIds : null) ||
+    (Array.isArray(userIds) ? userIds : null) ||
+    [null]
+
+  const sourceApp = (metadata?.source as string) || 'unknown'
+  const allowedUrgency = ['low', 'normal', 'high', 'urgent']
+  const safeUrgency = urgency && allowedUrgency.includes(urgency) ? urgency : 'normal'
+
+  const rows = recipients.map(userId => ({
+    user_id: userId,
+    source_app: sourceApp,
+    title: title || null,
+    body: body || content || null,
+    urgency: safeUrgency,
+    metadata: metadata || {},
+  }))
+
+  const { error, count } = await supabase
+    .from('ecosystem_notifications')
+    .insert(rows, { count: 'exact' })
+
+  if (error) {
+    console.warn('[ecosystem-inbound] notification insert failed:', error.message)
+    return { acknowledged: true, eventType: 'notification.send', persisted: 0, error: error.message }
+  }
+
+  return { acknowledged: true, eventType: 'notification.send', persisted: count ?? rows.length }
 }
 
 async function handleMeetingFeedback(data: Record<string, unknown>) {
