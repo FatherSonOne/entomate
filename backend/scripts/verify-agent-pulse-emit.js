@@ -11,7 +11,7 @@
  *   3. Reports pass/fail with timing.
  *
  * Required env
- *   ENTOMATE_API_URL              e.g. http://localhost:3001  (no trailing slash)
+ *   ENTOMATE_API_URL              e.g. http://localhost:3000  (no trailing slash)
  *   ENTOMATE_TEST_JWT             A user-scoped JWT for the Entomate API.
  *                                 Run `npm run --prefix backend test:get-jwt`
  *                                 or grab one from your browser's auth header.
