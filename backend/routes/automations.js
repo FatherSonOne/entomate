@@ -614,6 +614,15 @@ router.post('/trigger', apiKeyAuth, validate(schemas.trigger), async (req, res) 
             })
             .eq('id', automation.id);
 
+          // Cross-app emit — this route bypasses automationEngine.execute(), so
+          // we duplicate the hook that lives there (commit b615b0b).
+          automationEngine.notifyPulseAutomationTriggered(automation, {
+            success,
+            actionCount: actionResults.length,
+            triggerData,
+            error: success ? null : actionResults.find(r => r.status === 'failed')?.error,
+          }).catch(err => log.warn('[automations route] notifyPulse failed:', err.message));
+
           results.push({
             automationId: automation.id,
             name: automation.name,
