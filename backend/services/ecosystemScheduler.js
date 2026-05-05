@@ -48,12 +48,50 @@ class EcosystemScheduler {
   }
 
   /**
+   * Pending outbound rows older than the cutoff are presumed orphaned —
+   * the bridge writes status='pending' *before* the HTTP call, so a backend
+   * crash mid-send leaves the row stuck. Flip them to 'failed' so the
+   * alert trigger fires and the normal retry pipeline picks them up.
+   */
+  async sweepStuckPending() {
+    if (!supabaseAdmin) return;
+
+    try {
+      const cutoff = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+      const { data: stuck, error } = await supabaseAdmin
+        .from('ecosystem_events')
+        .update({
+          status: 'failed',
+          error_message: 'stuck in pending state for >10min — backend likely crashed mid-send',
+          next_retry_at: new Date(Date.now() + 60 * 1000).toISOString(),
+        })
+        .eq('direction', 'outbound')
+        .eq('status', 'pending')
+        .lt('created_at', cutoff)
+        .select('id');
+
+      if (error) {
+        log.warn('[EcosystemScheduler] stuck-pending sweep failed:', error.message);
+        return;
+      }
+      if (stuck?.length) {
+        log.info(`[EcosystemScheduler] swept ${stuck.length} stuck-pending row(s) into failed state`);
+      }
+    } catch (err) {
+      log.error('[EcosystemScheduler] stuck-pending sweep threw:', err.message);
+    }
+  }
+
+  /**
    * Replay failed outbound events whose next_retry_at is due.
    * Uses the bridge's existing retryEvent() method so backoff and event
    * mutation logic stay in one place.
    */
   async runRetries() {
     if (!supabaseAdmin) return;
+
+    // First, rescue anything stuck in 'pending' so it enters the retry pipeline.
+    await this.sweepStuckPending();
 
     try {
       const { data: candidates, error } = await supabaseAdmin

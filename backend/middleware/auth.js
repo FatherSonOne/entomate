@@ -236,14 +236,21 @@ const teamAccess = async (req, res, next) => {
 
 /**
  * API Key Authentication
- * For service-to-service communication
+ * For service-to-service communication.
+ *
+ * Fails closed: if `INTERNAL_API_KEY` is unset, the route returns 503 instead
+ * of silently allowing the request through. Set the env var to enable it.
  */
 const apiKeyAuth = (req, res, next) => {
   const apiKey = req.headers['x-api-key'];
   const validApiKey = process.env.INTERNAL_API_KEY;
 
   if (!validApiKey) {
-    return next();
+    log.error('[apiKeyAuth] INTERNAL_API_KEY is not set — service-to-service routes are disabled. Set it in your environment to enable.');
+    return res.status(503).json({
+      error: 'Service Unavailable',
+      message: 'Service-to-service authentication is not configured on this backend'
+    });
   }
 
   if (!apiKey || apiKey !== validApiKey) {

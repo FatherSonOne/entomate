@@ -22,6 +22,24 @@ const SOURCE_APP = 'entomate';
 // Supabase edge functions require an anon key to pass the API gateway.
 // The key is stored in ecosystem_config.features.gateway_key for each app.
 
+// Catches the common shapes we've seen in unconfigured rows: `your-*-project`,
+// `example.com`, `localhost`, etc. Anything that wouldn't actually deliver.
+function isPlaceholderUrl(url) {
+  if (!url || typeof url !== 'string') return true;
+  const lower = url.toLowerCase();
+  return (
+    lower.includes('your-') ||
+    lower.includes('example.com') ||
+    lower.includes('placeholder') ||
+    lower.startsWith('http://localhost') ||
+    lower.startsWith('http://127.')
+  );
+}
+
+function isPlaceholderToken(token) {
+  return !token || typeof token !== 'string' || token.startsWith('PLACEHOLDER');
+}
+
 class EcosystemBridge {
   constructor() {
     this._config = new Map();   // app_name -> config row
@@ -46,6 +64,12 @@ class EcosystemBridge {
       this._config.clear();
       for (const row of (data || [])) {
         this._config.set(row.app_name, row);
+        if (isPlaceholderUrl(row.api_url)) {
+          log.warn(`[EcosystemBridge] ${row.app_name} api_url is a placeholder — events will not be sent until updated`);
+        }
+        if (isPlaceholderToken(row.service_token)) {
+          log.warn(`[EcosystemBridge] ${row.app_name} service_token is a placeholder — events will not be sent until updated`);
+        }
       }
 
       this._initialized = true;
@@ -67,8 +91,12 @@ class EcosystemBridge {
 
   isConnected(appName) {
     const cfg = this._config.get(appName);
-    return !!(cfg && cfg.enabled && cfg.api_url
-      && cfg.service_token && !cfg.service_token.startsWith('PLACEHOLDER'));
+    return !!(
+      cfg &&
+      cfg.enabled &&
+      !isPlaceholderUrl(cfg.api_url) &&
+      !isPlaceholderToken(cfg.service_token)
+    );
   }
 
   getStatus() {

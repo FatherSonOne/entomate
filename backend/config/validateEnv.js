@@ -16,6 +16,7 @@ const OPTIONAL_WARNINGS = [
   { key: 'SLACK_BOT_TOKEN', message: 'Slack integration disabled (no SLACK_BOT_TOKEN)' },
   { key: 'RECALL_API_KEY', message: 'Recall.ai bot launches will fail (no RECALL_API_KEY)' },
   { key: 'RECALL_WEBHOOK_SIGNING_SECRET', message: 'Recall webhooks will be rejected at the route — set the Svix whsec_… secret from the Recall dashboard' },
+  { key: 'INTERNAL_API_KEY', message: 'Service-to-service routes (e.g. POST /api/automations/trigger) will return 503 — set INTERNAL_API_KEY to enable' },
 ];
 
 function validateEnv() {
