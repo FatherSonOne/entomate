@@ -45,7 +45,7 @@ function RingGauge({ value, max, label, icon, color = 'crimson', size = 84 }) {
   return (
     <div className="vc" style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'12px 8px', gap:4, position:'relative' }}>
       <svg width={size} height={size} style={{ transform:'rotate(-90deg)', flexShrink:0 }}>
-        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(248,240,242,.07)" strokeWidth={4.5} />
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="var(--b1)" strokeWidth={4.5} />
         <circle
           cx={size/2} cy={size/2} r={r}
           fill="none"
@@ -187,7 +187,7 @@ function SystemStatus({ systemStatus }) {
         })}
 
         {/* Ecosystem separator */}
-        <div style={{ width:1, height:12, background:'rgba(248,240,242,.12)' }} />
+        <div style={{ width:1, height:12, background:'var(--b1)' }} />
         <span style={{ color:'var(--t1)', fontSize:11, fontWeight:700, letterSpacing:'.08em', textTransform:'uppercase' }}>Ecosystem</span>
 
         {ecosystemApps.map(app => {
@@ -304,11 +304,11 @@ function TeamWorkloadWidget({ workload }) {
                 </div>
               </div>
               {/* Stacked bar */}
-              <div style={{ height:6, borderRadius:3, background:'rgba(248,240,242,.06)', overflow:'hidden', width:barWidth, minWidth:20 }}>
+              <div style={{ height:6, borderRadius:3, background:'var(--b0)', overflow:'hidden', width:barWidth, minWidth:20 }}>
                 <div style={{ display:'flex', height:'100%' }}>
                   <div style={{ width:`${pctDone}%`, background:'var(--m)' }} />
                   <div style={{ width:`${pctInProgress}%`, background:'var(--c)' }} />
-                  <div style={{ width:`${pctPending}%`, background:'rgba(248,240,242,.18)' }} />
+                  <div style={{ width:`${pctPending}%`, background:'var(--t2)' }} />
                 </div>
               </div>
             </div>
@@ -318,7 +318,7 @@ function TeamWorkloadWidget({ workload }) {
         <div style={{ display:'flex', gap:12, fontSize:11, color:'var(--t1)', marginTop:2 }}>
           <span style={{ display:'flex', alignItems:'center', gap:3 }}><div style={{ width:6, height:6, borderRadius:2, background:'var(--m)' }} />Done</span>
           <span style={{ display:'flex', alignItems:'center', gap:3 }}><div style={{ width:6, height:6, borderRadius:2, background:'var(--c)' }} />In Progress</span>
-          <span style={{ display:'flex', alignItems:'center', gap:3 }}><div style={{ width:6, height:6, borderRadius:2, background:'rgba(248,240,242,.18)' }} />Pending</span>
+          <span style={{ display:'flex', alignItems:'center', gap:3 }}><div style={{ width:6, height:6, borderRadius:2, background:'var(--t2)' }} />Pending</span>
         </div>
       </div>
     </div>
@@ -358,7 +358,7 @@ function InsightsTrendsPanel({ insights }) {
 
     return (
       <svg width={size} height={size} style={{ transform:'rotate(-90deg)' }}>
-        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(248,240,242,.06)" strokeWidth={5} />
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="var(--b0)" strokeWidth={5} />
         {slices.filter(s => s.value > 0).map((s, i) => {
           const pct = s.value / total
           const dash = pct * circ
@@ -412,7 +412,7 @@ function InsightsTrendsPanel({ insights }) {
                   <span style={{ fontSize:11, color:'var(--t1)' }}>{b.label}</span>
                   <span style={{ fontSize:11, color:b.color, fontWeight:700, fontFamily:'var(--font-mono)' }}>{b.value}</span>
                 </div>
-                <div style={{ height:4, borderRadius:2, background:'rgba(248,240,242,.06)', overflow:'hidden' }}>
+                <div style={{ height:4, borderRadius:2, background:'var(--b0)', overflow:'hidden' }}>
                   <div style={{ height:'100%', width:'100%', background:b.color, borderRadius:2, transform:`scaleX(${(b.value / maxPriority) || 0})`, transformOrigin:'left', transition:'transform .8s cubic-bezier(0.22,1,0.36,1)' }} />
                 </div>
               </div>
@@ -469,7 +469,7 @@ function AutomationActivityFeed({ count, navigate }) {
       <div style={{ padding:'6px 8px', display:'flex', flexDirection:'column', gap:2 }}>
         {loadingRuns ? (
           Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} style={{ height:32, borderRadius:8, background:'rgba(248,240,242,.04)', animation:'pulse 1.5s ease-in-out infinite' }} />
+            <div key={i} style={{ height:32, borderRadius:8, background:'var(--b0)', animation:'pulse 1.5s ease-in-out infinite' }} />
           ))
         ) : runs.length === 0 ? (
           <p style={{ fontSize:12, color:'var(--t1)', padding:'12px', textAlign:'center' }}>No automations configured</p>
@@ -629,7 +629,7 @@ export default function Dashboard() {
             <div style={{ display:'flex', flexDirection:'column', gap:2, padding:'6px 8px' }}>
               {loading
                 ? Array.from({ length: 4 }).map((_, i) => (
-                    <div key={i} style={{ height:36, borderRadius:8, background:'rgba(248,240,242,.04)', animation:'pulse 1.5s ease-in-out infinite' }} />
+                    <div key={i} style={{ height:36, borderRadius:8, background:'var(--b0)', animation:'pulse 1.5s ease-in-out infinite' }} />
                   ))
                 : recentMeetings.length === 0
                   ? <p style={{ fontSize:12, color:'var(--t1)', padding:'16px', textAlign:'center' }}>No recent meetings</p>
@@ -667,7 +667,7 @@ export default function Dashboard() {
             <div>
               {loading
                 ? Array.from({ length: 5 }).map((_, i) => (
-                    <div key={i} style={{ height:36, margin:'2px 0', background:'rgba(248,240,242,.04)', animation:'pulse 1.5s ease-in-out infinite' }} />
+                    <div key={i} style={{ height:36, margin:'2px 0', background:'var(--b0)', animation:'pulse 1.5s ease-in-out infinite' }} />
                   ))
                 : pendingTasks.length === 0
                   ? <p style={{ fontSize:12, color:'var(--t1)', padding:'16px', textAlign:'center' }}>No open tasks</p>
