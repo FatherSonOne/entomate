@@ -14,6 +14,8 @@ import { VCBadge } from '../components/vc'
 import ErrorState from '../components/vc/ErrorState'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { useAuth } from '../contexts/AuthContext'
+import { useTheme } from '../context/ThemeContext'
+import HeldHero from '../components/HeldHero'
 import { useToast } from '../components/vc/ToastProvider'
 
 /* ═══════════════════════════════════════════════════════════════
@@ -104,6 +106,7 @@ function QuickActionsBar({ navigate, recorderRef }) {
    ═══════════════════════════════════════════════════════════════ */
 function DashboardHero({ stats, loading, navigate, recorderRef }) {
   const { user } = useAuth()
+  const { isHeldLight } = useTheme()
   const hour = new Date().getHours()
   const timeGreet = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
   const firstName = user?.name?.trim().split(' ')[0] || 'there'
@@ -118,15 +121,19 @@ function DashboardHero({ stats, loading, navigate, recorderRef }) {
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-      {/* ── Greeting ── */}
-      <div className="vc" style={{ padding:'20px 22px' }}>
-        <div style={{ fontSize:20, fontWeight:700, fontFamily:'var(--font)', color:'var(--t0)', lineHeight:1.3, letterSpacing:'-.01em' }}>
-          {greeting}
+      {/* ── Greeting — HeldHero (hands + "you hold") under the flag, else legacy card ── */}
+      {isHeldLight ? (
+        <HeldHero />
+      ) : (
+        <div className="vc" style={{ padding:'20px 22px' }}>
+          <div style={{ fontSize:20, fontWeight:700, fontFamily:'var(--font)', color:'var(--t0)', lineHeight:1.3, letterSpacing:'-.01em' }}>
+            {greeting}
+          </div>
+          <div style={{ marginTop:6, fontSize:12, color:'var(--t1)' }}>
+            {new Date().toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' })}
+          </div>
         </div>
-        <div style={{ marginTop:6, fontSize:12, color:'var(--t1)' }}>
-          {new Date().toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' })}
-        </div>
-      </div>
+      )}
 
       {/* ── Metric strip — the single home for the four core counts ── */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:8 }}>
