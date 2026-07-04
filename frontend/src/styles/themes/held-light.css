@@ -194,3 +194,62 @@
 [data-foundation="held-light"] .badge {
   border-radius: 100px;
 }
+
+/* ════════════════════════════════════════════════════════════
+   PHASE 4 — Shell chrome: sidebar + topbar
+   ------------------------------------------------------------
+   The bloom holds the shell. Sidebar goes transparent (content is
+   offset, so only the bloom is behind it — warm in both themes,
+   no blur). Active nav becomes a steady gradient-wash pill; the
+   pulsing, glowing left-bar is calmed to a steady mark. Section
+   icon-box COLOURS stay (wayfinding) but their glow halos drop.
+   ════════════════════════════════════════════════════════════ */
+
+[data-foundation="held-light"] .nl-sidebar {
+  background: transparent;
+  border-right: 1px solid var(--hl-border);
+  box-shadow: none;
+}
+
+/* Calm hover — a warm veil + gentle nudge, no extruded neo shadow. */
+[data-foundation="held-light"] .nl-item:hover {
+  background: var(--accent-primary-dim);
+  border-color: transparent;
+  box-shadow: none;
+  transform: translateX(2px);
+}
+
+/* Active — steady gradient-wash pill, no crimson glow. */
+[data-foundation="held-light"] .nl-item.active {
+  background: linear-gradient(90deg, var(--accent-primary-dim), transparent 92%);
+  border-color: transparent;
+  box-shadow: none;
+}
+[data-foundation="held-light"] .nl-item.active:hover {
+  transform: translateX(3px);
+  box-shadow: none;
+}
+
+/* Left-bar: keep the mark, kill the pulse + glow (defeats the per-accent
+   ::before variants that tie specificity and load later). */
+[data-foundation="held-light"] .nl-item.active::before {
+  animation: none !important;
+  box-shadow: none !important;
+  opacity: 1;
+}
+
+/* Section icon boxes: colour is wayfinding (keep), glow halo is decoration (drop). */
+[data-foundation="held-light"] .nl-item.active .nl-icon-box-crimson,
+[data-foundation="held-light"] .nl-item.active .nl-icon-box-mint,
+[data-foundation="held-light"] .nl-item.active .nl-icon-box-amber,
+[data-foundation="held-light"] .nl-item.active .nl-icon-box-phosphor {
+  box-shadow: none;
+}
+
+/* Topbar — transparent with a hairline seam; search pill softens. */
+[data-foundation="held-light"] .vc-topbar {
+  border-bottom: 1px solid var(--hl-border);
+}
+[data-foundation="held-light"] .vc-topbar-search {
+  border-radius: 10px;
+}
