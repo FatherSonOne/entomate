@@ -28,6 +28,36 @@
      P6 hero                            P8 loaders + polish
    ============================================================ */
 
-/* Phase 0 is intentionally inert: the file is imported and the flag
-   is plumbed, but no rules ship yet, so the app is byte-for-byte
-   unchanged while OFF. Surfaces begin landing in Phase 1. */
+/* ════════════════════════════════════════════════════════════
+   PHASE 1 — Ambient background (static, no motion)
+   Replaces the animated neural canvas with a fixed crimson bloom
+   painted in CSS. No requestAnimationFrame, no <canvas>, no JS.
+   ════════════════════════════════════════════════════════════ */
+
+/* The bloom sits behind the shell (canvas was z-0; main is z-1). */
+[data-foundation="held-light"] .hl-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  /* Warm off-center crimson glow settling toward the void, with a
+     faint mint counter-light low-left. Static — this is the calm. */
+  background:
+    radial-gradient(1000px 620px at 82% -12%, rgba(255, 45, 107, 0.13), transparent 58%),
+    radial-gradient(760px 520px at 6% 4%, rgba(255, 102, 153, 0.06), transparent 55%),
+    radial-gradient(900px 700px at 50% 128%, rgba(0, 245, 212, 0.035), transparent 60%),
+    var(--bg-base, #080808);
+}
+
+/* Light mode — rose bloom on the warm neutral, softer still. */
+[data-foundation="held-light"]:not(.dark) .hl-bg {
+  background:
+    radial-gradient(1000px 620px at 82% -12%, rgba(204, 0, 68, 0.09), transparent 58%),
+    radial-gradient(760px 520px at 6% 4%, rgba(232, 0, 90, 0.045), transparent 55%),
+    var(--bg-base, #FFF8FA);
+}
+
+/* The bloom's base layer is opaque var(--bg-base) covering the viewport
+   at z-0, so the legacy body dot-grid is hidden behind it inside the
+   shell — no need to touch `body` (masking it would clip page content).
+   A faint on-panel texture returns as a whisper in Phase 2 if wanted. */

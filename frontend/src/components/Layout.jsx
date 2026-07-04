@@ -121,7 +121,7 @@ export default function Layout() {
   const [proactiveSuggestion, setProactiveSuggestion] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
-  const { isDark, toggleMode } = useTheme()
+  const { isDark, toggleMode, isHeldLight } = useTheme()
   const { user, signOut } = useAuth()
   const orgCtx = useOrgSafe()
   const isAdmin = orgCtx?.myRole === 'owner' || orgCtx?.myRole === 'admin'
@@ -164,8 +164,11 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen transition-colors duration-300 hover-glow trans-slow">
-      {/* Neural canvas background */}
-      <VCCanvas mode="neural" speed={50} density={95} opacity={0.9} />
+      {/* Ambient background — Held Light: static crimson bloom (CSS, no rAF).
+          Legacy: the animated neural canvas. */}
+      {isHeldLight
+        ? <div className="hl-bg" aria-hidden="true" />
+        : <VCCanvas mode="neural" speed={50} density={95} opacity={0.9} />}
 
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
