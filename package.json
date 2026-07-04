@@ -3,26 +3,10 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "description": "Entomate monorepo root — tooling only. The app lives in backend/ (Node/Express, Render) and frontend/ (React, Vercel), each with its own package.json.",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "build:prod": "NODE_ENV=production vite build",
-    "preview": "vite preview",
-    "typecheck": "tsc --noEmit",
-    "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "lint:fix": "eslint src --ext ts,tsx --fix",
-    "clean": "rm -rf dist node_modules/.vite",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
-    "prepare": "husky"
-  },
-  "dependencies": {
-    "@google/genai": "^1.33.0",
-    "@supabase/supabase-js": "^2.87.3",
-    "cron-parser": "^5.5.0",
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3"
+    "prepare": "husky",
+    "lint": "eslint backend --ext .js"
   },
   "lint-staged": {
     "frontend/src/**/*.{js,jsx}": [
@@ -34,15 +18,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/node": "^22.14.0",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
-    "@vitejs/plugin-react": "^5.0.0",
     "eslint": "^10.1.0",
     "husky": "^9.1.7",
-    "lint-staged": "^16.4.0",
-    "typescript": "~5.8.2",
-    "vite": "^6.2.0",
-    "vitest": "^4.0.16"
+    "lint-staged": "^16.4.0"
   }
 }
