@@ -61,3 +61,66 @@
    at z-0, so the legacy body dot-grid is hidden behind it inside the
    shell — no need to touch `body` (masking it would clip page content).
    A faint on-panel texture returns as a whisper in Phase 2 if wanted. */
+
+/* ════════════════════════════════════════════════════════════
+   PHASE 2 — Core surface (.vc) + Held Light tokens  [the 80%]
+   ------------------------------------------------------------
+   CALM WINS. The ~216 `.vc` consumers inherit an OPAQUE, warm,
+   crimson-tinted panel: hairline border, ONE soft shadow, soft
+   radius. No backdrop-blur (kills the glass default + the perf
+   risk). No decorative crimson glow — glow is a moment, not a
+   surface. Legacy `.vc` (glass) is untouched while the flag is off.
+   ════════════════════════════════════════════════════════════ */
+
+[data-foundation="held-light"] {
+  --hl-radius:      20px;   /* panels */
+  --hl-radius-sm:   14px;   /* tiles, mini-cards, inputs */
+  --hl-radius-btn:  12px;   /* buttons */
+  --hl-panel:        linear-gradient(158deg, rgba(255, 45, 107, 0.055), var(--neo-base, #141414));
+  --hl-panel-flat:   var(--neo-base, #141414);
+  --hl-border:       var(--border-subtle);
+  --hl-border-hover: var(--border-default);
+  --hl-shadow:       0 10px 34px rgba(0, 0, 0, 0.34);
+  --hl-shadow-hover: 0 16px 44px rgba(0, 0, 0, 0.42);
+  --hl-ease:         cubic-bezier(0.16, 1, 0.3, 1);
+}
+[data-foundation="held-light"]:not(.dark) {
+  --hl-panel:        linear-gradient(158deg, rgba(204, 0, 68, 0.04), #FFFFFF);
+  --hl-panel-flat:   #FFFFFF;
+  --hl-shadow:       0 8px 26px rgba(204, 0, 68, 0.06), 0 1px 2px rgba(0, 0, 0, 0.03);
+  --hl-shadow-hover: 0 14px 36px rgba(204, 0, 68, 0.10);
+  --hl-border-hover: rgba(204, 0, 68, 0.16);
+}
+
+[data-foundation="held-light"] .vc {
+  background: var(--hl-panel);
+  border: 1px solid var(--hl-border);
+  border-radius: var(--hl-radius);
+  box-shadow: var(--hl-shadow);
+  -webkit-backdrop-filter: none;   /* off: calm surfaces aren't glass */
+          backdrop-filter: none;
+  transition: transform 0.26s var(--hl-ease),
+              box-shadow 0.26s var(--hl-ease),
+              border-color 0.26s var(--hl-ease);
+}
+
+/* Calm hover: a gentle lift + deeper soft shadow. No crimson halo. */
+[data-foundation="held-light"] .vc:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--hl-shadow-hover);
+  border-color: var(--hl-border-hover);
+}
+
+/* Defeat the global `.hover-glow .vc:hover` crimson halo (it's !important
+   and lives on the Layout root). Held Light stays quiet. */
+[data-foundation="held-light"] .hover-glow .vc:hover {
+  box-shadow: var(--hl-shadow-hover) !important;
+  border-color: var(--hl-border-hover) !important;
+  transform: translateY(-2px);
+}
+
+/* Keep transitions in the product-motion range (~260ms), overriding the
+   global `.trans-slow` 500ms so the calm still feels responsive. */
+[data-foundation="held-light"] .trans-slow .vc {
+  transition-duration: 0.26s !important;
+}
