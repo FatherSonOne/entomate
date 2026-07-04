@@ -18,6 +18,7 @@ const {
   getCategoryMetadata,
   searchTemplates
 } = require('../services/workflow/WorkflowTemplates');
+const { getOrgIdForUser } = require('../utils/orgContext');
 
 // ========================================
 // TEMPLATE BROWSING ENDPOINTS
@@ -260,6 +261,7 @@ router.post('/:id/import', authenticate, apiLimiter, async (req, res) => {
       active: false,
       is_template: false,
       user_id: req.user?.id,
+      org_id: await getOrgIdForUser(req.user?.id),
       version: 1
     };
 
@@ -314,6 +316,7 @@ router.post('/:id/duplicate', authenticate, async (req, res) => {
       active: false,
       is_template: true,
       user_id: req.user?.id,
+      org_id: await getOrgIdForUser(req.user?.id),
       version: 1
     };
 

@@ -5,6 +5,7 @@ const { asyncHandler } = require('../middleware/errorHandler');
 const { isValidUUID } = require('../utils/validators');
 const { validate } = require('../middleware/validate');
 const schemas = require('../schemas/goals');
+const { getOrgIdForUser } = require('../utils/orgContext');
 
 // Helper to check if error is missing table
 function isTableMissing(error) {
@@ -134,6 +135,7 @@ router.post('/', validate(schemas.create), asyncHandler(async (req, res) => {
   // Only set owner_id/team_id if they are valid UUIDs
   const ownerId = req.user?.id && isValidUUID(req.user.id) ? req.user.id : null;
   const teamId = req.user?.teamId && isValidUUID(req.user.teamId) ? req.user.teamId : null;
+  const orgId = await getOrgIdForUser(req.user?.id);
 
   const { data, error } = await supabase
     .from('goals')
@@ -144,6 +146,7 @@ router.post('/', validate(schemas.create), asyncHandler(async (req, res) => {
       parent_goal_id: parent_goal_id && isValidUUID(parent_goal_id) ? parent_goal_id : null,
       owner_id: ownerId,
       team_id: teamId,
+      org_id: orgId,
       quarter: quarter || getCurrentQuarter(),
       start_date: start_date || null,
       target_date: target_date || null,

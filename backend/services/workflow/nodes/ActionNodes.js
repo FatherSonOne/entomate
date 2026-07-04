@@ -553,6 +553,9 @@ class CreateTaskNode extends BaseNode {
 
     log.info(`[CreateTaskNode] Creating task: ${resolvedTitle}`);
 
+    // TODO(S1c/S8): stamp org_id once the workflow engine threads org context
+    // through inputData. This node is part of the half-done workflow-executor
+    // refactor. After org_id is NOT NULL, an un-stamped insert fails closed.
     const { data: task, error } = await supabase
       .from('tasks')
       .insert({
@@ -562,6 +565,7 @@ class CreateTaskNode extends BaseNode {
         due_date: resolvedDueDate,
         assigned_to: resolvedAssignedTo,
         project_id: projectId || inputData.project_id,
+        org_id: inputData.org_id || null,
         status: 'open',
         created_at: new Date().toISOString()
       })

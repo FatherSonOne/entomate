@@ -10,6 +10,7 @@ const { authenticate } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const schemas = require('../schemas/meetings');
 const log = require('../utils/log');
+const { getOrgIdForUser, getOrgIdForMeeting } = require('../utils/orgContext');
 
 const calendarService = require('../services/calendarService');
 
@@ -95,6 +96,7 @@ router.post('/process', authenticate, upload.single('audio'), validate(schemas.p
     const startTime = durationMin > 0
       ? new Date(now.getTime() - durationMin * 60 * 1000).toISOString()
       : now.toISOString();
+    const orgId = await getOrgIdForUser(req.user?.id);
     const meetingData = {
       id: meetingId,
       title: title || `Meeting ${new Date().toLocaleDateString()}`,
@@ -113,6 +115,7 @@ router.post('/process', authenticate, upload.single('audio'), validate(schemas.p
       project_id: projectId || null,
       crm_deal_id: crmDealId || null,
       created_by: req.user?.id || null,
+      org_id: orgId,
       created_at: now.toISOString(),
       updated_at: now.toISOString()
     };
@@ -204,6 +207,7 @@ router.post('/transcript', authenticate, validate(schemas.transcript), async (re
     // Save meeting
     const meetingId = uuidv4();
     const now = new Date();
+    const orgId = await getOrgIdForUser(req.user?.id);
     const meetingData = {
       id: meetingId,
       title: title || `Meeting ${new Date().toLocaleDateString()}`,
@@ -220,6 +224,7 @@ router.post('/transcript', authenticate, validate(schemas.transcript), async (re
       project_id: projectId || null,
       crm_deal_id: crmDealId || null,
       created_by: req.user?.id || null,
+      org_id: orgId,
       created_at: now.toISOString(),
       updated_at: now.toISOString()
     };
@@ -624,11 +629,13 @@ async function runAIPipeline(transcript, title) {
  * @returns {Array} saved action items
  */
 async function saveActionItems(meetingId, actionItems) {
+  const orgId = await getOrgIdForMeeting(meetingId);
   const saved = [];
   for (const item of actionItems) {
     const data = {
       id: uuidv4(),
       meeting_id: meetingId,
+      org_id: orgId,
       task_description: item.task,
       context: item.context,
       assigned_to_name: item.owner,

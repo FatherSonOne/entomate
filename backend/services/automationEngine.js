@@ -10,6 +10,7 @@ const geminiService = require('../config/gemini');
 const agentOrchestrator = require('./agentOrchestrator');
 const { getEcosystemBridge } = require('./ecosystemBridge');
 const log = require('../utils/log');
+const { getOrgIdForMeeting } = require('../utils/orgContext');
 
 class AutomationEngine {
   constructor() {
@@ -299,6 +300,11 @@ class AutomationEngine {
 
   async handleCreateTask(config, data) {
     try {
+      // TODO(S1c/S8): stamp org_id once the automation engine is wired live and
+      // threads org context through triggerData. This handler is currently
+      // dormant (automationEngine.trigger has no callers). After org_id is set
+      // NOT NULL, an un-stamped insert here fails closed (surfacing the gap)
+      // rather than mis-assigning the row — intended fail-safe behavior.
       const { data: task, error } = await supabase
         .from('tasks')
         .insert({
@@ -306,6 +312,7 @@ class AutomationEngine {
           description: this.interpolate(config.description, data),
           project_id: config.project_id || data.project_id,
           assigned_to: config.assigned_to || data.assigned_to,
+          org_id: data.org_id || null,
           priority: config.priority || 'medium',
           status: 'open',
           due_date: config.due_date || this.calculateDueDate(config.due_in_days)
@@ -421,12 +428,14 @@ class AutomationEngine {
 
       const actionItems = await geminiService.extractActionItems(data.transcript);
 
-      // Store action items
+      // Store action items (org derived from the parent meeting — S1c tenancy)
+      const orgId = await getOrgIdForMeeting(data.meeting_id);
       for (const item of actionItems) {
         await supabase
           .from('action_items')
           .insert({
             meeting_id: data.meeting_id,
+            org_id: orgId,
             task_description: item.task,
             assigned_to_name: item.owner,
             assigned_to_email: item.ownerEmail,
@@ -581,11 +590,13 @@ class AutomationEngine {
 
         // Optionally create follow-up tasks automatically
         if (config.autoCreate && supabase) {
+          const orgId = await getOrgIdForMeeting(data.meeting_id);
           for (const followup of followups.filter(f => f.confidence >= 0.7)) {
             await supabase
               .from('action_items')
               .insert({
                 meeting_id: data.meeting_id,
+                org_id: orgId,
                 task_description: followup.suggestedTask,
                 due_date: followup.suggestedDate,
                 priority: followup.priority || 'medium',

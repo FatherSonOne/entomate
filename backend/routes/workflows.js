@@ -13,6 +13,7 @@ const WorkflowExecutor = require('../services/workflow/WorkflowExecutor');
 const NodeRegistry = require('../services/workflow/NodeRegistry');
 const log = require('../utils/log');
 const { validate } = require('../middleware/validate');
+const { getOrgIdForUser } = require('../utils/orgContext');
 const schemas = require('../schemas/workflows');
 
 const workflowExecutor = new WorkflowExecutor();
@@ -201,6 +202,7 @@ router.post('/', authenticate, validate(schemas.create), async (req, res) => {
         active,
         is_template,
         user_id: req.user?.id,
+        org_id: await getOrgIdForUser(req.user?.id),
         version: 1
       })
       .select()

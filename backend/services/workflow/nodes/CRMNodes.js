@@ -511,6 +511,8 @@ class CreateCRMTaskNode extends BaseNode {
 
     if (!result.success) {
       // Fallback to local storage
+      // TODO(S1c/S8): stamp org_id once the workflow engine threads org context.
+      // Dormant CRM-fallback path; after org_id is NOT NULL it fails closed.
       const { data, error } = await supabase
         .from('tasks')
         .insert({
@@ -521,6 +523,7 @@ class CreateCRMTaskNode extends BaseNode {
           assignee: taskData.assigned_to_email,
           deal_id: taskData.deal_id,
           contact_id: taskData.contact_id,
+          org_id: taskData.org_id || null,
           status: 'todo',
           created_at: new Date().toISOString()
         })

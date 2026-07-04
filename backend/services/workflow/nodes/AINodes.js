@@ -335,12 +335,17 @@ class DetectFollowupsNode extends BaseNode {
       // Auto-create follow-up tasks if configured
       if (autoCreate && followups.length > 0) {
         const { supabase } = require('../../../config/supabase');
+        const { getOrgIdForMeeting } = require('../../../utils/orgContext');
 
+        // org derived from the parent meeting (S1c tenancy)
+        const meetingId = inputData.meeting_id || inputData.id;
+        const orgId = await getOrgIdForMeeting(meetingId);
         for (const followup of followups.filter(f => f.confidence >= 0.7)) {
           await supabase
             .from('action_items')
             .insert({
-              meeting_id: inputData.meeting_id || inputData.id,
+              meeting_id: meetingId,
+              org_id: orgId,
               task_description: followup.suggestedTask,
               due_date: followup.suggestedDate,
               priority: followup.priority || 'medium',

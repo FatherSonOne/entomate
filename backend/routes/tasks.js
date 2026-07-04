@@ -5,6 +5,7 @@ const { validate } = require('../middleware/validate');
 const { authenticate } = require('../middleware/auth');
 const schemas = require('../schemas/tasks');
 const log = require('../utils/log');
+const { getOrgIdForUser } = require('../utils/orgContext');
 
 const router = express.Router();
 
@@ -39,6 +40,7 @@ router.post('/', validate(schemas.create), async (req, res) => {
       title,
       description: description || null,
       assigned_to: assignedTo || null,
+      org_id: await getOrgIdForUser(req.user?.id),
       status: 'open',
       priority,
       due_date: dueDate || null,
@@ -390,12 +392,14 @@ router.post('/bulk', validate(schemas.bulkCreate), async (req, res) => {
       return res.status(400).json({ error: 'Tasks array is required' });
     }
 
+    const bulkOrgId = await getOrgIdForUser(req.user?.id);
     const tasksToInsert = tasks.map(task => ({
       id: uuidv4(),
       project_id: projectId || task.projectId || null,
       title: task.title,
       description: task.description || null,
       assigned_to: task.assignedTo || null,
+      org_id: bulkOrgId,
       status: 'open',
       priority: task.priority || 'medium',
       due_date: task.dueDate || null,

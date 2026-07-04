@@ -6,6 +6,7 @@ const { authenticate } = require('../middleware/auth');
 const schemas = require('../schemas/projects');
 const log = require('../utils/log');
 const { aggregateTeamWorkload } = require('../utils/teamWorkload');
+const { getOrgIdForUser } = require('../utils/orgContext');
 
 const router = express.Router();
 
@@ -304,11 +305,13 @@ router.post('/from-deal', validate(schemas.fromDeal), async (req, res) => {
       { title: 'Project handoff', priority: 'low' }
     ];
 
+    const projectOrgId = await getOrgIdForUser(req.user?.id);
     const tasksToInsert = defaultTasks.map((task, index) => ({
       id: uuidv4(),
       project_id: project.id,
       title: task.title,
       description: null,
+      org_id: projectOrgId,
       status: 'open',
       priority: task.priority,
       assigned_to: null,
