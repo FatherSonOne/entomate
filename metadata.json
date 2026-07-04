@@ -1,8 +1,0 @@
-{
-  "description": "AI Meeting Assistant and Automation for use with Logos Vision CRM and Pulse Communication",
-  "requestFramePermissions": [
-    "microphone",
-    "camera"
-  ],
-  "name": "entomate"
-}
