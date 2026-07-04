@@ -2,7 +2,20 @@
 
 **Project:** Entomate - AI-Powered Meeting Intelligence Platform
 **Tech Stack:** Node.js/Express Backend, React Frontend, Supabase Database
-**Last Updated:** 2024-12-21
+**Last Updated:** 2026-07-04
+
+---
+
+## WORKING AGREEMENT (READ FIRST — non-negotiable)
+
+1. **All work stays on `main`. Never create a branch.** Commit directly to `main`.
+2. **Always run `git status` before committing** and before ANY possibly-destructive action
+   (`git reset`, `git checkout -- `, `git clean`, `rm -rf`, overwriting a file you didn't create,
+   force operations). Look at what's staged/modified/untracked first; if it contradicts expectations, stop and surface it.
+3. **Confirm before outward-facing / hard-to-reverse actions** (pushes, deploys, deleting remote resources)
+   unless explicitly told to proceed.
+4. **Hardening roadmap** lives in [docs/app-dev/entomate-APP-PRODUCT.md](docs/app-dev/entomate-APP-PRODUCT.md)
+   and as GitHub issues labeled `roadmap: hardening` (sections S1–S11, milestones H0–H4). Work one section per session.
 
 ---
 
