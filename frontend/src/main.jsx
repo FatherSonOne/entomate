@@ -18,6 +18,10 @@ import './styles/vc-components.css'
 // Import animated icon system
 import './styles/animated-icons.css'
 
+// Held Light foundation — surface treatment behind [data-foundation="held-light"]
+// (scoped rules only; inert until the flag is on)
+import './styles/themes/held-light.css'
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <ErrorBoundary>

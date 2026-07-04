@@ -8,6 +8,28 @@ export const THEME_MODES = {
   system: 'system'
 };
 
+/* ── Held Light foundation flag ──
+   The redesigned surface treatment ("held-light") lives behind an
+   <html data-foundation> attribute so legacy and new CSS coexist and
+   flip atomically. Default is OFF (null) until the Phase 10 flip.
+   Preview it without flipping the global default via the console:
+     localStorage.setItem('entomate-foundation', 'held-light'); // on
+     localStorage.setItem('entomate-foundation', 'off');        // force off
+     localStorage.removeItem('entomate-foundation');            // use default
+   `data-foundation` is deliberately separate from `theme_mode` — do
+   not overload the DB theme setting with it. */
+export const FOUNDATION = 'held-light';
+const FOUNDATION_DEFAULT = null; // Phase 10 flips this to FOUNDATION
+
+function resolveFoundation() {
+  const override = typeof localStorage !== 'undefined'
+    ? localStorage.getItem('entomate-foundation')
+    : null;
+  if (override === 'off') return null;
+  if (override === FOUNDATION) return FOUNDATION;
+  return FOUNDATION_DEFAULT;
+}
+
 export function ThemeProvider({ children }) {
   const [mode, setMode] = useState(() => {
     return localStorage.getItem('entomate-theme-mode') || THEME_MODES.dark;
@@ -15,6 +37,7 @@ export function ThemeProvider({ children }) {
 
   const [resolvedMode, setResolvedMode] = useState('dark');
   const [dbLoaded, setDbLoaded] = useState(false);
+  const [foundation, setFoundation] = useState(resolveFoundation);
 
   // On mount, try to load theme from DB (async, non-blocking).
   // If DB has a value, override localStorage. Otherwise keep localStorage value.
@@ -69,8 +92,23 @@ export function ThemeProvider({ children }) {
       root.classList.remove('dark');
     }
 
+    // Held Light foundation flag (default OFF; see resolveFoundation)
+    if (foundation) {
+      root.setAttribute('data-foundation', foundation);
+    } else {
+      root.removeAttribute('data-foundation');
+    }
+
     localStorage.setItem('entomate-theme-mode', mode);
-  }, [resolvedMode, mode]);
+  }, [resolvedMode, mode, foundation]);
+
+  const toggleFoundation = useCallback(() => {
+    setFoundation((prev) => {
+      const next = prev ? null : FOUNDATION;
+      localStorage.setItem('entomate-foundation', next || 'off');
+      return next;
+    });
+  }, []);
 
   const setThemeMode = useCallback((newMode) => {
     if (Object.values(THEME_MODES).includes(newMode)) {
@@ -88,7 +126,10 @@ export function ThemeProvider({ children }) {
     isDark: resolvedMode === 'dark',
     isLight: resolvedMode === 'light',
     setThemeMode,
-    toggleMode
+    toggleMode,
+    foundation,
+    isHeldLight: foundation === FOUNDATION,
+    toggleFoundation
   };
 
   return (

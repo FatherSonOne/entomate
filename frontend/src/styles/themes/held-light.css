@@ -1,0 +1,33 @@
+/* ============================================================
+   HELD LIGHT — Entomate UI Foundation (surface treatment)
+   ------------------------------------------------------------
+   "Intelligence you hold." Warm, calm, human companion foundation.
+   NOT a new brand — Void Crimson stays primary. This softens the
+   SURFACE: opaque crimson-tinted panels, hairline borders, one
+   soft shadow, glow reserved for moments (active nav, live dot).
+
+   Design decision (2026-07-04): CALM WINS. No backdrop-blur on
+   panels by default, no decorative crimson glow, no gradient text,
+   no gradient button as the default. Those are the marketing voice;
+   the app foundation stays quiet so the work is legible.
+
+   ROLLOUT: every rule is scoped under [data-foundation="held-light"]
+   so legacy dark-glass and Held Light coexist and flip atomically.
+   The attribute is written by ThemeContext (default OFF until the
+   Phase 10 flip; preview with localStorage['entomate-foundation']).
+
+   Signal system is LAW (IDENTITY.md §4):
+     crimson = brand/CTA/active · mint = action/alert
+     amber   = AI / prediction ONLY   ·   phosphor = live / real-time ONLY
+   Never amber or phosphor in chrome.
+
+   Phase map:
+     P0 scaffold (this header, inert)   P1 static bloom + body softening
+     P2 tokens + .vc surface            P3 buttons/badges/inputs
+     P4 sidebar/topbar                  P5 AI signal surfaces
+     P6 hero                            P8 loaders + polish
+   ============================================================ */
+
+/* Phase 0 is intentionally inert: the file is imported and the flag
+   is plumbed, but no rules ship yet, so the app is byte-for-byte
+   unchanged while OFF. Surfaces begin landing in Phase 1. */
