@@ -192,17 +192,17 @@ export default function TodaysIntelligence() {
 
   return (
     <div className="card overflow-hidden">
-      {/* Header with gradient */}
-      <div className="bg-gradient-to-r from-accent-primary via-accent-tertiary to-accent-primary p-6 text-white">
+      {/* AI briefing header — amber signal (AI/prediction), calm wash */}
+      <div className="intel-brief-header p-6" style={{ background: 'linear-gradient(90deg, var(--accent-tertiary-dim), transparent 62%)', borderBottom: '1px solid var(--border-subtle)' }}>
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
-              <GreetingIcon className="w-5 h-5" />
+              <GreetingIcon className="w-5 h-5 text-content-secondary" />
               <span className="text-content-tertiary text-sm">{briefing.formattedDate}</span>
             </div>
-            <h2 className="text-2xl font-bold">{briefing.greeting}!</h2>
+            <h2 className="text-2xl font-bold text-content-primary">{briefing.greeting}!</h2>
             <p className="text-content-tertiary mt-1 flex items-center gap-1">
-              <Zap className="w-4 h-4" />
+              <Zap className="w-4 h-4" style={{ color: 'var(--accent-tertiary)' }} />
               Today's Intelligence Briefing
             </p>
           </div>
@@ -210,7 +210,7 @@ export default function TodaysIntelligence() {
             <button
               onClick={() => loadBriefing(true)}
               disabled={refreshing}
-              className="p-2 hover:bg-surface/10 rounded-lg transition-colors"
+              className="p-2 text-content-secondary hover:bg-accent-primary-dim hover:text-content-primary rounded-lg transition-colors"
               title="Refresh briefing"
               aria-label="Refresh briefing"
             >

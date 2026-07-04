@@ -204,12 +204,12 @@ export default function IntelligenceDashboard() {
   if (loading && !intelligence) {
     return (
       <div className="card">
-        <div className="bg-gradient-to-r from-accent-primary via-accent-tertiary to-accent-primary p-6 text-white">
+        <div className="intel-brief-header p-6" style={{ background: 'linear-gradient(90deg, var(--accent-tertiary-dim), transparent 62%)', borderBottom: '1px solid var(--border-subtle)' }}>
           <div className="flex items-center gap-2 mb-1">
-            <Zap className="w-5 h-5" />
+            <Zap className="w-5 h-5" style={{ color: 'var(--accent-tertiary)' }} />
             <span className="text-content-tertiary text-sm">Loading...</span>
           </div>
-          <h2 className="text-2xl font-bold">Today's Intelligence</h2>
+          <h2 className="text-2xl font-bold text-content-primary">Today's Intelligence</h2>
         </div>
         <div className="p-6 space-y-4">
           <div className="animate-pulse space-y-4">
@@ -226,8 +226,8 @@ export default function IntelligenceDashboard() {
   if (error) {
     return (
       <div className="card">
-        <div className="bg-gradient-to-r from-accent-primary via-accent-tertiary to-accent-primary p-6 text-white">
-          <h2 className="text-2xl font-bold">Today's Intelligence</h2>
+        <div className="intel-brief-header p-6" style={{ background: 'linear-gradient(90deg, var(--accent-tertiary-dim), transparent 62%)', borderBottom: '1px solid var(--border-subtle)' }}>
+          <h2 className="text-2xl font-bold text-content-primary">Today's Intelligence</h2>
         </div>
         <div className="p-6">
           <div className="text-center py-8">
@@ -250,12 +250,12 @@ export default function IntelligenceDashboard() {
 
   return (
     <div className="card overflow-hidden">
-      {/* Header with gradient */}
-      <div className="bg-gradient-to-r from-accent-primary via-accent-tertiary to-accent-primary p-6 text-white">
+      {/* AI briefing header — amber signal (AI/prediction), calm wash */}
+      <div className="intel-brief-header p-6" style={{ background: 'linear-gradient(90deg, var(--accent-tertiary-dim), transparent 62%)', borderBottom: '1px solid var(--border-subtle)' }}>
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
-              <Zap className="w-5 h-5" />
+              <Zap className="w-5 h-5" style={{ color: 'var(--accent-tertiary)' }} />
               <span className="text-content-tertiary text-sm">
                 {new Date().toLocaleDateString('en-US', {
                   weekday: 'long',
@@ -265,7 +265,7 @@ export default function IntelligenceDashboard() {
                 })}
               </span>
             </div>
-            <h2 className="text-2xl font-bold">Today's Intelligence</h2>
+            <h2 className="text-2xl font-bold text-content-primary">Today's Intelligence</h2>
             <p className="text-content-tertiary mt-1 text-sm">
               AI-powered insights for your meetings, deals, and relationships
             </p>
@@ -274,7 +274,7 @@ export default function IntelligenceDashboard() {
             <button
               onClick={() => loadIntelligence(true)}
               disabled={refreshing}
-              className="p-2 hover:bg-surface/10 rounded-lg transition-colors"
+              className="p-2 text-content-secondary hover:bg-accent-primary-dim hover:text-content-primary rounded-lg transition-colors"
               title="Refresh intelligence"
               aria-label="Refresh intelligence"
             >
@@ -282,7 +282,7 @@ export default function IntelligenceDashboard() {
             </button>
             <button
               onClick={() => setShowCustomize(true)}
-              className="p-2 hover:bg-surface/10 rounded-lg transition-colors"
+              className="p-2 text-content-secondary hover:bg-accent-primary-dim hover:text-content-primary rounded-lg transition-colors"
               title="Customize dashboard"
               aria-label="Customize dashboard"
             >
@@ -382,10 +382,11 @@ export default function IntelligenceDashboard() {
           !intelligence.actionItems &&
           !intelligence.relationships?.count) && (
           <div className="text-center py-12">
-            <CheckCircle2 className="w-16 h-16 text-semantic-success mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-content-primary mb-2">All Clear!</h3>
+            {/* Phosphor = live/real-time: Entomate is actively watching, all clear now */}
+            <CheckCircle2 className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--accent-phosphor)', filter: 'drop-shadow(0 0 12px var(--accent-phosphor-dim))' }} />
+            <h3 className="text-lg font-semibold text-content-primary mb-2">All clear.</h3>
             <p className="text-content-secondary">
-              No critical items requiring your attention right now.
+              No critical items need you right now. Entomate is watching in the background.
             </p>
           </div>
         )}
