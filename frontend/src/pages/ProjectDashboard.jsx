@@ -191,7 +191,7 @@ export default function ProjectDashboard() {
       </div>
 
       {/* Tabs */}
-      <div className="border-b" style={{ borderColor: 'rgba(248,240,242,.08)' }}>
+      <div className="border-b" style={{ borderColor: 'var(--b1)' }}>
         <nav className="flex gap-4">
           {[
             { id: 'overview', label: 'Overview', icon: BarChart3 },

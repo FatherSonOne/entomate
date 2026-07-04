@@ -222,7 +222,7 @@ export default function Workflows() {
                 key={workflow.id}
                 onClick={() => navigate(`/workflows/${workflow.id}`)}
                 className="p-4 cursor-pointer transition-colors hover:bg-black/10"
-                style={{ borderBottom: '1px solid rgba(248,240,242,.06)' }}
+                style={{ borderBottom: '1px solid var(--b0)' }}
               >
                 <div className="flex items-start gap-4">
                   {/* Icon */}
@@ -313,7 +313,7 @@ export default function Workflows() {
                             className="fixed inset-0 z-10"
                             onClick={(e) => { e.stopPropagation(); setShowMenu(null); }}
                           />
-                          <div className="absolute right-0 top-full mt-1 w-40 rounded-lg shadow-lg py-1 z-20" style={{ background: 'var(--bg-elevated)', border: '1px solid rgba(248,240,242,.08)' }}>
+                          <div className="absolute right-0 top-full mt-1 w-40 rounded-lg shadow-lg py-1 z-20" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--b1)' }}>
                             <VCButton
                               variant="ghost"
                               size="sm"
@@ -341,7 +341,7 @@ export default function Workflows() {
                               <History className="w-4 h-4" />
                               History
                             </VCButton>
-                            <hr style={{ margin: '4px 0', borderColor: 'rgba(248,240,242,.08)' }} />
+                            <hr style={{ margin: '4px 0', borderColor: 'var(--b1)' }} />
                             <VCButton
                               variant="danger"
                               size="sm"
@@ -370,7 +370,7 @@ export default function Workflows() {
           <div
             onClick={() => handleCreateFromTemplate('template-meeting-processing')}
             className="p-4 rounded-lg cursor-pointer transition-colors group hover:bg-black/20"
-            style={{ border: '1px solid rgba(248,240,242,.08)' }}
+            style={{ border: '1px solid var(--b1)' }}
           >
             <div className="flex items-center gap-3 mb-2">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors" style={{ background: 'rgba(255,45,107,.1)', border: '1px solid rgba(255,45,107,.2)' }}>
@@ -385,7 +385,7 @@ export default function Workflows() {
           <div
             onClick={() => handleCreateFromTemplate('template-webhook-pulse')}
             className="p-4 rounded-lg cursor-pointer transition-colors group hover:bg-black/20"
-            style={{ border: '1px solid rgba(248,240,242,.08)' }}
+            style={{ border: '1px solid var(--b1)' }}
           >
             <div className="flex items-center gap-3 mb-2">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors" style={{ background: 'rgba(0,245,212,.1)', border: '1px solid rgba(0,245,212,.2)' }}>
@@ -400,7 +400,7 @@ export default function Workflows() {
           <div
             onClick={() => handleCreateFromTemplate('template-daily-digest')}
             className="p-4 rounded-lg cursor-pointer transition-colors group hover:bg-black/20"
-            style={{ border: '1px solid rgba(248,240,242,.08)' }}
+            style={{ border: '1px solid var(--b1)' }}
           >
             <div className="flex items-center gap-3 mb-2">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors" style={{ background: 'rgba(255,184,0,.1)', border: '1px solid rgba(255,184,0,.2)' }}>

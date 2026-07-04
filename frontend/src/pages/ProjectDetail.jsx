@@ -405,7 +405,7 @@ export default function ProjectDetail() {
       <div className="vc" style={{ background: 'var(--bg-elevated)' }}>
         <div
           className="p-4 border-b flex items-center justify-between"
-          style={{ borderColor: 'rgba(248,240,242,.08)' }}
+          style={{ borderColor: 'var(--b1)' }}
         >
           <h2 className="font-semibold" style={{ color: 'var(--text-primary)' }}>Tasks</h2>
           <VCButton
@@ -422,7 +422,7 @@ export default function ProjectDetail() {
         {showAddTask && (
           <div
             className="p-4 border-b"
-            style={{ background: 'var(--bg-elevated)', borderColor: 'rgba(248,240,242,.08)' }}
+            style={{ background: 'var(--bg-elevated)', borderColor: 'var(--b1)' }}
           >
             <form onSubmit={handleAddTask} className="space-y-3">
               <div className="flex gap-3">
@@ -606,7 +606,7 @@ export default function ProjectDetail() {
                     <div
                       key={sub.id}
                       className="p-3 pl-14 flex items-center gap-3 border-t"
-                      style={{ borderColor: 'rgba(248,240,242,.04)', background: sub.status === 'done' ? 'var(--bg-elevated)' : 'rgba(248,240,242,.02)' }}
+                      style={{ borderColor: 'var(--b0)', background: sub.status === 'done' ? 'var(--bg-elevated)' : 'var(--b0)' }}
                     >
                       {sub.status === 'done' ? (
                         <button
@@ -655,7 +655,7 @@ export default function ProjectDetail() {
         <div className="vc" style={{ background: 'var(--bg-elevated)' }}>
           <div
             className="p-4 border-b"
-            style={{ borderColor: 'rgba(248,240,242,.08)' }}
+            style={{ borderColor: 'var(--b1)' }}
           >
             <h2 className="font-semibold" style={{ color: 'var(--text-primary)' }}>Related Meetings</h2>
           </div>
@@ -665,7 +665,7 @@ export default function ProjectDetail() {
                 key={meeting.id}
                 to={`/meetings/${meeting.id}`}
                 className="block p-4 transition-colors"
-                style={{ borderBottom: '1px solid rgba(248,240,242,.08)' }}
+                style={{ borderBottom: '1px solid var(--b1)' }}
               >
                 <h4 className="font-medium" style={{ color: 'var(--text-primary)' }}>{meeting.title}</h4>
                 <p className="text-sm mt-0.5" style={{ color: 'var(--text-tertiary)' }}>

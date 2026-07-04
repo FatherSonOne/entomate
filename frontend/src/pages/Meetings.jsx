@@ -300,7 +300,7 @@ export default function Meetings() {
           </div>
         ) : (
           <>
-            <div className="divide-y" style={{ borderColor: 'rgba(248,240,242,.08)' }}>
+            <div className="divide-y" style={{ borderColor: 'var(--b1)' }}>
               {filteredMeetings.map((meeting) => (
                 <div key={meeting.id} className="relative">
                   <Link

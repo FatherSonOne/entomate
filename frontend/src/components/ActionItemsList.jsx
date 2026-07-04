@@ -166,7 +166,7 @@ export default function ActionItemsList({ items = [], onUpdate, meetingId }) {
               className="p-3 rounded-lg border transition-colors"
               style={{
                 background: 'var(--bg-elevated)',
-                borderColor: 'rgba(248,240,242,.08)'
+                borderColor: 'var(--b1)'
               }}
             >
               <div className="flex items-start gap-3">
@@ -175,7 +175,7 @@ export default function ActionItemsList({ items = [], onUpdate, meetingId }) {
                   disabled={toggling[item.id]}
                   className="mt-0.5 flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors"
                   style={{
-                    borderColor: item.status === 'done' ? 'var(--accent-secondary)' : 'rgba(248,240,242,.25)',
+                    borderColor: item.status === 'done' ? 'var(--accent-secondary)' : 'var(--t2)',
                     background: item.status === 'done' ? 'rgba(0,245,212,.15)' : 'transparent'
                   }}
                   title={item.status === 'done' ? 'Mark as open' : 'Mark as done'}

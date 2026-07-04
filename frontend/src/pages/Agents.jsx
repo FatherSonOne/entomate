@@ -484,7 +484,7 @@ export default function Agents() {
                 </div>
               </div>
             ) : (
-              <div className="vc p-8 text-center border-dashed" style={{ background: 'rgba(16,16,16,.3)' }}>
+              <div className="vc p-8 text-center border-dashed" style={{ background: 'var(--bg-base)' }}>
                 <Activity className="h-8 w-8 mx-auto mb-2 opacity-50" style={{ color: 'var(--text-tertiary)' }} />
                 <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Select an agent to view diagnostics and controls.</p>
               </div>
@@ -497,9 +497,9 @@ export default function Agents() {
       {showTemplates && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowTemplates(false)} />
-          <div className="relative rounded-lg shadow-xl w-full max-w-4xl max-h-[85vh] overflow-hidden" style={{ background: 'var(--bg-elevated)', border: '1px solid rgba(248,240,242,.08)' }}>
+          <div className="relative rounded-lg shadow-xl w-full max-w-4xl max-h-[85vh] overflow-hidden" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--b1)' }}>
             {/* Modal Header */}
-            <div className="flex items-center justify-between p-4" style={{ borderBottom: '1px solid rgba(248,240,242,.08)' }}>
+            <div className="flex items-center justify-between p-4" style={{ borderBottom: '1px solid var(--b1)' }}>
               <div>
                 <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Agent Templates</h2>
                 <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Choose a template to deploy an AI agent</p>
@@ -524,7 +524,7 @@ export default function Agents() {
             )}
 
             {/* Category Tabs */}
-            <div className="flex gap-2 p-4 overflow-x-auto" style={{ borderBottom: '1px solid rgba(248,240,242,.08)' }}>
+            <div className="flex gap-2 p-4 overflow-x-auto" style={{ borderBottom: '1px solid var(--b1)' }}>
               {categories.map((category) => (
                 <button
                   key={category}
@@ -532,7 +532,7 @@ export default function Agents() {
                   className="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-colors"
                   style={selectedCategory === category
                     ? { background: 'var(--accent-primary)', color: '#fff' }
-                    : { background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid rgba(248,240,242,.08)' }
+                    : { background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--b1)' }
                   }
                 >
                   {category !== 'All' && <span className="mr-1">{categoryIcons[category] || '📦'}</span>}
@@ -562,7 +562,7 @@ export default function Agents() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2">
                             <h3 className="font-bold" style={{ color: 'var(--text-primary)' }}>{template.name}</h3>
-                            <span className="text-xs px-2 py-0.5 rounded whitespace-nowrap" style={{ background: 'var(--bg-elevated)', color: 'var(--text-tertiary)', border: '1px solid rgba(248,240,242,.08)' }}>
+                            <span className="text-xs px-2 py-0.5 rounded whitespace-nowrap" style={{ background: 'var(--bg-elevated)', color: 'var(--text-tertiary)', border: '1px solid var(--b1)' }}>
                               {template.category}
                             </span>
                           </div>
@@ -628,9 +628,9 @@ export default function Agents() {
       {showCustomizeModal && selectedTemplate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowCustomizeModal(false)} />
-          <div className="relative rounded-lg shadow-xl w-full max-w-3xl max-h-[85vh] overflow-hidden" style={{ background: 'var(--bg-elevated)', border: '1px solid rgba(248,240,242,.08)' }}>
+          <div className="relative rounded-lg shadow-xl w-full max-w-3xl max-h-[85vh] overflow-hidden" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--b1)' }}>
             {/* Modal Header */}
-            <div className="flex items-center justify-between p-4" style={{ borderBottom: '1px solid rgba(248,240,242,.08)' }}>
+            <div className="flex items-center justify-between p-4" style={{ borderBottom: '1px solid var(--b1)' }}>
               <div>
                 <h2 className="text-xl font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                   <Settings size={20} style={{ color: 'var(--accent-primary)' }} />
@@ -675,7 +675,7 @@ export default function Agents() {
                 </label>
                 <div className="space-y-2">
                   {customizations.triggers.map((trigger, idx) => (
-                    <div key={idx} className="flex items-center gap-3 p-3 rounded-md" style={{ background: 'var(--bg-elevated)', border: '1px solid rgba(248,240,242,.08)' }}>
+                    <div key={idx} className="flex items-center gap-3 p-3 rounded-md" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--b1)' }}>
                       <span className="flex-1 text-sm" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{trigger.type}</span>
                       <VCButton
                         variant="ghost"
@@ -719,7 +719,7 @@ export default function Agents() {
                 </label>
                 <div className="space-y-2">
                   {customizations.actions.map((action, idx) => (
-                    <div key={idx} className="flex items-center gap-3 p-3 rounded-md" style={{ background: 'var(--bg-elevated)', border: '1px solid rgba(248,240,242,.08)' }}>
+                    <div key={idx} className="flex items-center gap-3 p-3 rounded-md" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--b1)' }}>
                       <span className="w-6 h-6 rounded-sm flex items-center justify-center text-xs font-bold" style={{ background: 'var(--accent-primary)', color: '#fff' }}>
                         {idx + 1}
                       </span>
@@ -770,7 +770,7 @@ export default function Agents() {
             </div>
 
             {/* Modal Footer */}
-            <div className="flex items-center justify-between p-4" style={{ borderTop: '1px solid rgba(248,240,242,.08)', background: 'rgba(16,16,16,.3)' }}>
+            <div className="flex items-center justify-between p-4" style={{ borderTop: '1px solid var(--b1)', background: 'var(--bg-base)' }}>
               <VCButton variant="secondary" onClick={() => setShowCustomizeModal(false)}>
                 Cancel
               </VCButton>
@@ -798,9 +798,9 @@ export default function Agents() {
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowCreateModal(false)} />
-          <div className="relative rounded-lg shadow-xl w-full max-w-3xl max-h-[85vh] overflow-hidden" style={{ background: 'var(--bg-elevated)', border: '1px solid rgba(248,240,242,.08)' }}>
+          <div className="relative rounded-lg shadow-xl w-full max-w-3xl max-h-[85vh] overflow-hidden" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--b1)' }}>
             {/* Header */}
-            <div className="flex items-center justify-between p-4" style={{ borderBottom: '1px solid rgba(248,240,242,.08)' }}>
+            <div className="flex items-center justify-between p-4" style={{ borderBottom: '1px solid var(--b1)' }}>
               <div>
                 <h2 className="text-xl font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                   <Bot size={20} style={{ color: 'var(--accent-primary)' }} />
@@ -845,7 +845,7 @@ export default function Agents() {
                 </label>
                 <div className="space-y-2">
                   {createForm.triggers.map((trigger, idx) => (
-                    <div key={idx} className="flex items-center gap-3 p-3 rounded-md" style={{ background: 'var(--bg-elevated)', border: '1px solid rgba(248,240,242,.08)' }}>
+                    <div key={idx} className="flex items-center gap-3 p-3 rounded-md" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--b1)' }}>
                       <span className="flex-1 text-sm" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
                         {TRIGGER_TYPES.find(t => t.value === trigger)?.label || trigger}
                       </span>
@@ -884,7 +884,7 @@ export default function Agents() {
                 </label>
                 <div className="space-y-2">
                   {createForm.actions.map((action, idx) => (
-                    <div key={idx} className="flex items-center gap-3 p-3 rounded-md" style={{ background: 'var(--bg-elevated)', border: '1px solid rgba(248,240,242,.08)' }}>
+                    <div key={idx} className="flex items-center gap-3 p-3 rounded-md" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--b1)' }}>
                       <span className="w-6 h-6 rounded-sm flex items-center justify-center text-xs font-bold" style={{ background: 'var(--accent-primary)', color: '#fff' }}>
                         {idx + 1}
                       </span>
@@ -932,7 +932,7 @@ export default function Agents() {
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-between p-4" style={{ borderTop: '1px solid rgba(248,240,242,.08)', background: 'rgba(16,16,16,.3)' }}>
+            <div className="flex items-center justify-between p-4" style={{ borderTop: '1px solid var(--b1)', background: 'var(--bg-base)' }}>
               <VCButton variant="secondary" onClick={() => setShowCreateModal(false)}>
                 Cancel
               </VCButton>
@@ -987,7 +987,7 @@ export default function Agents() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="p-4 rounded-md" style={{ background: 'var(--bg-elevated)', border: '1px solid rgba(248,240,242,.08)' }}>
+            <div className="p-4 rounded-md" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--b1)' }}>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs uppercase" style={{ color: 'var(--text-tertiary)' }}>Total Runs</span>
                 <Activity size={16} style={{ color: 'var(--text-tertiary)' }} />
@@ -995,7 +995,7 @@ export default function Agents() {
               <div className="text-2xl font-bold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{selectedAgent.execution_count || 0}</div>
             </div>
 
-            <div className="p-4 rounded-md" style={{ background: 'var(--bg-elevated)', border: '1px solid rgba(248,240,242,.08)' }}>
+            <div className="p-4 rounded-md" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--b1)' }}>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs uppercase" style={{ color: 'var(--text-tertiary)' }}>Success Rate</span>
                 <TrendingUp size={16} style={{ color: 'var(--accent-secondary)' }} />
@@ -1005,7 +1005,7 @@ export default function Agents() {
               </div>
             </div>
 
-            <div className="p-4 rounded-md" style={{ background: 'var(--bg-elevated)', border: '1px solid rgba(248,240,242,.08)' }}>
+            <div className="p-4 rounded-md" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--b1)' }}>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs uppercase" style={{ color: 'var(--text-tertiary)' }}>Avg Duration</span>
                 <Clock size={16} style={{ color: 'var(--text-tertiary)' }} />
@@ -1013,7 +1013,7 @@ export default function Agents() {
               <div className="text-2xl font-bold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{avgDuration ? `${avgDuration}s` : '—'}</div>
             </div>
 
-            <div className="p-4 rounded-md" style={{ background: 'var(--bg-elevated)', border: '1px solid rgba(248,240,242,.08)' }}>
+            <div className="p-4 rounded-md" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--b1)' }}>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs uppercase" style={{ color: 'var(--text-tertiary)' }}>Status</span>
                 {selectedAgent.enabled
@@ -1046,7 +1046,7 @@ export default function Agents() {
                         )}
                         <div
                           className={`w-full ${day.failed > 0 ? '' : 'rounded-t-sm'} rounded-b-sm`}
-                          style={{ height: `${successRatio * height}px`, background: total > 0 ? 'var(--accent-secondary)' : 'rgba(248,240,242,.08)' }}
+                          style={{ height: `${successRatio * height}px`, background: total > 0 ? 'var(--accent-secondary)' : 'var(--b1)' }}
                         />
                       </div>
                       <span className="text-[9px]" style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>{day.label}</span>

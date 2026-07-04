@@ -38,7 +38,7 @@ function renderAnswerWithCitations(text, citations) {
         if (match) {
           const cite = citations.find(c => c.id === part.slice(1, -1))
           if (cite) {
-            const source = SOURCE_LABELS[cite.sourceType] || { color: 'rgba(248,240,242,0.08)', textColor: 'var(--text-secondary)' }
+            const source = SOURCE_LABELS[cite.sourceType] || { color: 'var(--b1)', textColor: 'var(--text-secondary)' }
             return (
               <Link
                 key={i}
@@ -153,7 +153,7 @@ export default function AskAIPanel() {
   return (
     <div className="vc">
       {/* Header */}
-      <div className="p-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(248,240,242,.08)' }}>
+      <div className="p-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--b1)' }}>
         <h3 className="font-semibold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
           <Sparkles className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
           Ask AI About Your Meetings
@@ -206,7 +206,7 @@ export default function AskAIPanel() {
                   style={
                     msg.role === 'user'
                       ? { background: 'var(--accent-primary)', color: '#fff' }
-                      : { background: 'rgba(248,240,242,0.06)', color: 'var(--text-primary)' }
+                      : { background: 'var(--b0)', color: 'var(--text-primary)' }
                   }
                 >
                   {msg.role === 'assistant' && msg.citations && msg.citations.length > 0
@@ -222,7 +222,7 @@ export default function AskAIPanel() {
 
                   {/* Citations sidebar-style listing */}
                   {msg.citations && msg.citations.length > 0 && (
-                    <div className="mt-3 pt-2" style={{ borderTop: '1px solid rgba(248,240,242,.1)' }}>
+                    <div className="mt-3 pt-2" style={{ borderTop: '1px solid var(--b1)' }}>
                       <p className="text-xs mb-1" style={{ color: 'var(--text-tertiary)' }}>Sources:</p>
                       <div className="flex flex-wrap gap-1">
                         {msg.citations.map((cite, cidx) => {
@@ -243,7 +243,7 @@ export default function AskAIPanel() {
                   )}
 
                   {msg.followUp && msg.followUp.length > 0 && (
-                    <div className="mt-3 pt-2" style={{ borderTop: '1px solid rgba(248,240,242,.1)' }}>
+                    <div className="mt-3 pt-2" style={{ borderTop: '1px solid var(--b1)' }}>
                       <p className="text-xs mb-1" style={{ color: 'var(--text-tertiary)' }}>Follow-up:</p>
                       <div className="flex flex-wrap gap-1">
                         {msg.followUp.map((q, qidx) => (
@@ -251,9 +251,9 @@ export default function AskAIPanel() {
                             key={qidx}
                             onClick={() => setAskQuestion(q)}
                             className="text-xs px-2 py-0.5 rounded transition-colors"
-                            style={{ background: 'rgba(248,240,242,0.06)', color: 'var(--text-secondary)' }}
-                            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(248,240,242,0.1)' }}
-                            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(248,240,242,0.06)' }}
+                            style={{ background: 'var(--b0)', color: 'var(--text-secondary)' }}
+                            onMouseEnter={e => { e.currentTarget.style.background = 'var(--b1)' }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'var(--b0)' }}
                           >
                             {q}
                           </button>
@@ -268,7 +268,7 @@ export default function AskAIPanel() {
             {/* Streaming content */}
             {askingQuestion && streamingContent && (
               <div className="flex justify-start">
-                <div className="max-w-[80%] rounded-lg p-3" style={{ background: 'rgba(248,240,242,0.06)', color: 'var(--text-primary)' }}>
+                <div className="max-w-[80%] rounded-lg p-3" style={{ background: 'var(--b0)', color: 'var(--text-primary)' }}>
                   <p className="whitespace-pre-wrap">
                     {streamingContent}
                     <span className="inline-block w-2 h-4 animate-pulse ml-1" style={{ background: 'var(--accent-primary)' }} />
@@ -280,7 +280,7 @@ export default function AskAIPanel() {
             {/* Loading spinner */}
             {askingQuestion && !streamingContent && (
               <div className="flex justify-start">
-                <div className="rounded-lg p-3 flex items-center gap-2" style={{ background: 'rgba(248,240,242,0.06)' }}>
+                <div className="rounded-lg p-3 flex items-center gap-2" style={{ background: 'var(--b0)' }}>
                   <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--accent-primary)' }} />
                   <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Thinking...</span>
                 </div>
@@ -292,7 +292,7 @@ export default function AskAIPanel() {
       </div>
 
       {/* Input */}
-      <div className="p-4" style={{ borderTop: '1px solid rgba(248,240,242,.08)' }}>
+      <div className="p-4" style={{ borderTop: '1px solid var(--b1)' }}>
         <form onSubmit={handleAskQuestion} className="flex gap-3">
           <input
             type="text"

@@ -59,7 +59,7 @@ const CHART_COLORS = {
   crimson: '#FF2D6B',
   mint: '#00F5D4',
   amber: '#FFB800',
-  muted: 'rgba(248,240,242,0.3)',
+  muted: 'var(--t2)',
 };
 
 export default function Analytics() {
@@ -212,7 +212,7 @@ export default function Analytics() {
       {/* Tabs */}
       <div
         className="flex gap-2 pb-2"
-        style={{ borderBottom: '1px solid rgba(248,240,242,.08)' }}
+        style={{ borderBottom: '1px solid var(--b1)' }}
       >
         {['overview', 'meetings', 'tasks', 'ai', 'team'].map((tab) => (
           <VCButton
@@ -336,7 +336,7 @@ export default function Analytics() {
                 <div className="text-center">
                   <div
                     className="w-16 h-16 rounded-full flex items-center justify-center mb-2"
-                    style={{ background: 'rgba(248,240,242,0.06)' }}
+                    style={{ background: 'var(--b0)' }}
                   >
                     <SentimentNeutral size={28} />
                   </div>
@@ -386,7 +386,7 @@ export default function Analytics() {
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               <div
                 className="text-center p-4 rounded-lg"
-                style={{ background: 'rgba(248,240,242,.06)' }}
+                style={{ background: 'var(--b0)' }}
               >
                 <p
                   style={{
@@ -510,7 +510,7 @@ export default function Analytics() {
               </h3>
               <ResponsiveContainer width="100%" height={200}>
                 <AreaChart data={sentimentTrends} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(248,240,242,0.06)" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--b0)" />
                   <XAxis
                     dataKey="date"
                     tick={{ fontSize: 11, fill: 'var(--text-tertiary)' }}
@@ -525,7 +525,7 @@ export default function Analytics() {
                   <RTooltip
                     contentStyle={{
                       background: 'var(--bg-elevated)',
-                      border: '1px solid rgba(248,240,242,0.1)',
+                      border: '1px solid var(--b1)',
                       borderRadius: 8,
                       color: 'var(--text-primary)',
                       fontSize: 13,
@@ -551,7 +551,7 @@ export default function Analytics() {
               </h3>
               <ResponsiveContainer width="100%" height={240}>
                 <BarChart data={trends.trends} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(248,240,242,0.06)" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--b0)" />
                   <XAxis
                     dataKey="date"
                     tick={{ fontSize: 11, fill: 'var(--text-tertiary)' }}
@@ -571,7 +571,7 @@ export default function Analytics() {
                   <RTooltip
                     contentStyle={{
                       background: 'var(--bg-elevated)',
-                      border: '1px solid rgba(248,240,242,0.1)',
+                      border: '1px solid var(--b1)',
                       borderRadius: 8,
                       color: 'var(--text-primary)',
                       fontSize: 13,
@@ -649,7 +649,7 @@ export default function Analytics() {
                     <RTooltip
                       contentStyle={{
                         background: 'var(--bg-elevated)',
-                        border: '1px solid rgba(248,240,242,0.1)',
+                        border: '1px solid var(--b1)',
                         borderRadius: 8,
                         color: 'var(--text-primary)',
                         fontSize: 13,
@@ -854,7 +854,7 @@ export default function Analytics() {
                 <thead>
                   <tr
                     className="text-left text-sm"
-                    style={{ color: 'var(--text-tertiary)', borderColor: 'rgba(248,240,242,.08)' }}
+                    style={{ color: 'var(--text-tertiary)', borderColor: 'var(--b1)' }}
                   >
                     <th className="pb-3">Team Member</th>
                     <th className="pb-3 text-center">Tasks Created</th>
@@ -868,7 +868,7 @@ export default function Analytics() {
                   {teamPerformance.teamMembers.map((member) => (
                     <tr
                       key={member.userId}
-                      style={{ borderColor: 'rgba(248,240,242,.08)' }}
+                      style={{ borderColor: 'var(--b1)' }}
                       className="border-b last:border-0"
                     >
                       <td className="py-3">
@@ -932,7 +932,7 @@ function MetricCard({ icon: Icon, label, value, total, color }) {
     green:  { bg: 'rgba(0,245,212,0.08)', color: 'var(--accent-secondary)' },
     yellow: { bg: 'rgba(255,184,0,0.08)', color: 'var(--accent-tertiary)' },
     red:    { bg: 'rgba(255,45,107,0.1)', color: 'var(--accent-primary)' },
-    gray:   { bg: 'rgba(248,240,242,0.06)', color: 'var(--text-secondary)' },
+    gray:   { bg: 'var(--b0)', color: 'var(--text-secondary)' },
   };
 
   const scheme = iconColors[color] || iconColors.gray;
@@ -977,7 +977,7 @@ function StatusBar({ label, value, total, color }) {
     blue:   'var(--accent-secondary)',
     yellow: 'var(--accent-tertiary)',
     red:    'var(--accent-primary)',
-    gray:   'rgba(248,240,242,0.3)',
+    gray:   'var(--t2)',
   };
 
   return (
@@ -986,7 +986,7 @@ function StatusBar({ label, value, total, color }) {
         <span style={{ color: 'var(--text-secondary)' }}>{label}</span>
         <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{value}</span>
       </div>
-      <div className="w-full h-2 rounded-full" style={{ background: 'rgba(248,240,242,0.08)' }}>
+      <div className="w-full h-2 rounded-full" style={{ background: 'var(--b1)' }}>
         <div
           className="h-full rounded-full transition-all"
           style={{ width: `${percent}%`, background: barColors[color] || barColors.gray }}

@@ -88,7 +88,7 @@ export default function SearchResults({
 
   return (
     <div className="vc">
-      <div className="p-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(248,240,242,.08)' }}>
+      <div className="p-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--b1)' }}>
         <div>
           <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>
             {loading ? 'Searching...' : `${results.length} result${results.length !== 1 ? 's' : ''} found`}
@@ -131,14 +131,14 @@ export default function SearchResults({
         </div>
       ) : (
         <>
-          <div style={{ borderTop: '1px solid rgba(248,240,242,.04)' }}>
+          <div style={{ borderTop: '1px solid var(--b0)' }}>
             {pageResults.map((result, index) => (
               <Link
                 key={`${result.type}-${result.id}-${index}`}
                 to={getTypeLink(result)}
                 className="block p-4 transition-colors"
-                style={{ borderBottom: '1px solid rgba(248,240,242,.04)' }}
-                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(248,240,242,.04)' }}
+                style={{ borderBottom: '1px solid var(--b0)' }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'var(--b0)' }}
                 onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
               >
                 <div className="flex items-start gap-3">
@@ -174,7 +174,7 @@ export default function SearchResults({
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3" style={{ borderTop: '1px solid rgba(248,240,242,.08)' }}>
+            <div className="flex items-center justify-between px-4 py-3" style={{ borderTop: '1px solid var(--b1)' }}>
               <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
                 Page {page + 1} of {totalPages} ({results.length} results)
               </span>

@@ -48,7 +48,7 @@ export default function BackToTop({ threshold = 400 }) {
           justify-content: center;
           border: 1px solid rgba(255, 45, 107, 0.35);
           border-radius: 999px;
-          background: rgba(16, 16, 16, 0.85);
+          background: var(--bg-elevated);
           color: #FF2D6B;
           backdrop-filter: blur(10px) saturate(160%);
           -webkit-backdrop-filter: blur(10px) saturate(160%);

@@ -328,7 +328,7 @@ export default function Projects() {
 
               <div
                 className="flex items-center justify-between pt-3 border-t"
-                style={{ borderColor: 'rgba(248,240,242,.08)' }}
+                style={{ borderColor: 'var(--b1)' }}
               >
                 <div
                   className="flex items-center gap-3 text-xs"

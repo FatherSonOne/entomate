@@ -501,7 +501,7 @@ export default function Settings() {
             <div className="vc">
               <div
                 className="p-4"
-                style={{ borderBottom: '1px solid var(--b1, rgba(248,240,242,.06))' }}
+                style={{ borderBottom: '1px solid var(--b1, var(--b0))' }}
               >
                 <div className="flex items-center gap-2">
                   <MessageSquare className="w-5 h-5" style={{ color: 'var(--accent-phosphor, #B4F8C8)' }} />
@@ -663,7 +663,7 @@ export default function Settings() {
             <div className="vc">
               <div
                 className="p-4 flex items-center justify-between"
-                style={{ borderBottom: '1px solid var(--b1, rgba(248,240,242,.06))' }}
+                style={{ borderBottom: '1px solid var(--b1, var(--b0))' }}
               >
                 <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Service Health</span>
                 <VCButton variant="secondary" size="sm" onClick={handleTestConnection} disabled={testing}>
@@ -794,7 +794,7 @@ function StatusRow({ icon, iconColor, title, subtitle, status, getStatusIcon, ge
   return (
     <div
       className="p-4"
-      style={!last ? { borderBottom: '1px solid var(--b1, rgba(248,240,242,.06))' } : {}}
+      style={!last ? { borderBottom: '1px solid var(--b1, var(--b0))' } : {}}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">

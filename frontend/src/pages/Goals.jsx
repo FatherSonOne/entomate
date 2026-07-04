@@ -150,7 +150,7 @@ export default function Goals() {
 
     return (
       <div className={`${level > 0 ? 'ml-8 pl-4' : ''}`}
-        style={level > 0 ? { borderLeft: '2px solid rgba(248,240,242,.08)' } : {}}
+        style={level > 0 ? { borderLeft: '2px solid var(--b1)' } : {}}
       >
         <div
           className={`vc p-4 mb-3 cursor-pointer transition-shadow ${
@@ -229,7 +229,7 @@ export default function Goals() {
           </div>
 
           {goal.key_results?.length > 0 && (
-            <div className="mt-4 pt-3 border-t" style={{ borderColor: 'rgba(248,240,242,.08)' }}>
+            <div className="mt-4 pt-3 border-t" style={{ borderColor: 'var(--b1)' }}>
               <div className="space-y-2">
                 {goal.key_results.slice(0, 3).map((kr) => (
                   <div key={kr.id} className="flex items-center justify-between text-sm">
@@ -1010,7 +1010,7 @@ function GoalDetailPanel({ goal, onUpdate, onClose }) {
           ))}
 
           {/* Add Key Result */}
-          <div className="border-2 border-dashed rounded-lg p-3" style={{ borderColor: 'rgba(248,240,242,.08)' }}>
+          <div className="border-2 border-dashed rounded-lg p-3" style={{ borderColor: 'var(--b1)' }}>
             <input
               type="text"
               value={newKRTitle}
@@ -1069,7 +1069,7 @@ function GoalDetailPanel({ goal, onUpdate, onClose }) {
             {taskSearchQuery.length >= 2 && (
               <div
                 className="mt-1 rounded-lg overflow-hidden border"
-                style={{ borderColor: 'rgba(248,240,242,.08)', background: 'var(--bg-elevated)' }}
+                style={{ borderColor: 'var(--b1)', background: 'var(--bg-elevated)' }}
               >
                 {loadingTasks ? (
                   <div className="p-3 text-center text-xs" style={{ color: 'var(--text-tertiary)' }}>Searching...</div>
@@ -1080,7 +1080,7 @@ function GoalDetailPanel({ goal, onUpdate, onClose }) {
                     <button
                       key={task.id}
                       className="w-full text-left p-2.5 text-sm flex items-center justify-between hover:opacity-80 transition-opacity"
-                      style={{ borderBottom: '1px solid rgba(248,240,242,.08)' }}
+                      style={{ borderBottom: '1px solid var(--b1)' }}
                       onClick={() => linkTask(task.id)}
                     >
                       <div className="flex-1 min-w-0">
@@ -1171,7 +1171,7 @@ function GoalDetailPanel({ goal, onUpdate, onClose }) {
                   <div
                     key={entry.id}
                     className="flex items-start gap-2 py-1.5 text-xs"
-                    style={{ borderBottom: '1px solid rgba(248,240,242,.04)' }}
+                    style={{ borderBottom: '1px solid var(--b0)' }}
                   >
                     <div
                       className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0"
@@ -1210,7 +1210,7 @@ function GoalDetailPanel({ goal, onUpdate, onClose }) {
       {/* Metadata */}
       <div
         className="pt-3 border-t text-xs space-y-1"
-        style={{ borderColor: 'rgba(248,240,242,.08)', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}
+        style={{ borderColor: 'var(--b1)', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}
       >
         <p>Quarter: {goal.quarter}</p>
         <p>Type: {goal.goal_type}</p>
@@ -1288,7 +1288,7 @@ function CreateGoalModal({ goals, onClose, onCreated }) {
     >
       <div className="vc rounded-xl shadow-xl max-w-lg w-full mx-4">
         <form onSubmit={handleSubmit}>
-          <div className="p-6 border-b" style={{ borderColor: 'rgba(248,240,242,.08)' }}>
+          <div className="p-6 border-b" style={{ borderColor: 'var(--b1)' }}>
             <h2 className="text-xl font-bold" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}>
               Create Goal
             </h2>
@@ -1382,7 +1382,7 @@ function CreateGoalModal({ goals, onClose, onCreated }) {
             )}
           </div>
 
-          <div className="p-6 border-t flex justify-end gap-3" style={{ borderColor: 'rgba(248,240,242,.08)' }}>
+          <div className="p-6 border-t flex justify-end gap-3" style={{ borderColor: 'var(--b1)' }}>
             <VCButton type="button" variant="secondary" onClick={onClose}>Cancel</VCButton>
             <VCButton type="submit" variant="primary" disabled={saving || !formData.title}>
               {saving ? 'Creating...' : 'Create Goal'}

@@ -35,7 +35,7 @@ export default function SearchAnalytics({ onSearch, searchType }) {
       <button
         onClick={() => setShowAnalytics(!showAnalytics)}
         className="w-full p-4 flex items-center justify-between text-left transition-colors"
-        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(248,240,242,.03)' }}
+        onMouseEnter={e => { e.currentTarget.style.background = 'var(--b0)' }}
         onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
       >
         <div className="flex items-center gap-2">
@@ -46,7 +46,7 @@ export default function SearchAnalytics({ onSearch, searchType }) {
       </button>
 
       {showAnalytics && (
-        <div className="p-4" style={{ borderTop: '1px solid rgba(248,240,242,.08)' }}>
+        <div className="p-4" style={{ borderTop: '1px solid var(--b1)' }}>
           {/* Period selector */}
           <div className="flex items-center justify-between mb-4">
             <div className="flex gap-2">
@@ -63,7 +63,7 @@ export default function SearchAnalytics({ onSearch, searchType }) {
                   style={
                     period === p.value
                       ? { background: 'rgba(255,45,107,0.12)', color: 'var(--accent-primary)' }
-                      : { background: 'rgba(248,240,242,0.05)', color: 'var(--text-secondary)' }
+                      : { background: 'var(--b0)', color: 'var(--text-secondary)' }
                   }
                 >
                   {p.label}
@@ -101,7 +101,7 @@ export default function SearchAnalytics({ onSearch, searchType }) {
               {/* Charts Row */}
               <div className="grid md:grid-cols-2 gap-4">
                 {/* Search Types */}
-                <div className="rounded-lg p-4" style={{ background: 'rgba(248,240,242,0.04)' }}>
+                <div className="rounded-lg p-4" style={{ background: 'var(--b0)' }}>
                   <h4 className="text-sm font-medium mb-3" style={{ color: 'var(--text-secondary)' }}>Searches by Type</h4>
                   {analytics.searchesByType && analytics.searchesByType.length > 0 ? (
                     <div className="space-y-2">
@@ -111,8 +111,8 @@ export default function SearchAnalytics({ onSearch, searchType }) {
                         return (
                           <div key={item.type} className="flex items-center gap-3">
                             <span className="text-sm capitalize w-20" style={{ color: 'var(--text-secondary)' }}>{item.type}</span>
-                            <div className="flex-1 rounded-full h-2" style={{ background: 'rgba(248,240,242,0.08)' }}>
-                              <div className="h-2 rounded-full" style={{ width: `${percentage}%`, background: item.type === 'semantic' ? 'var(--accent-primary)' : 'rgba(248,240,242,0.3)' }} />
+                            <div className="flex-1 rounded-full h-2" style={{ background: 'var(--b1)' }}>
+                              <div className="h-2 rounded-full" style={{ width: `${percentage}%`, background: item.type === 'semantic' ? 'var(--accent-primary)' : 'var(--t2)' }} />
                             </div>
                             <span className="text-sm w-16 text-right" style={{ color: 'var(--text-tertiary)' }}>{item.count} ({percentage}%)</span>
                           </div>
@@ -125,7 +125,7 @@ export default function SearchAnalytics({ onSearch, searchType }) {
                 </div>
 
                 {/* Daily Trend — SVG bar chart */}
-                <div className="rounded-lg p-4" style={{ background: 'rgba(248,240,242,0.04)' }}>
+                <div className="rounded-lg p-4" style={{ background: 'var(--b0)' }}>
                   <h4 className="text-sm font-medium mb-3" style={{ color: 'var(--text-secondary)' }}>Daily Trend</h4>
                   {analytics.dailyTrend && analytics.dailyTrend.length > 0 ? (
                     <DailyTrendChart data={analytics.dailyTrend} />
@@ -137,7 +137,7 @@ export default function SearchAnalytics({ onSearch, searchType }) {
 
               {/* Top Queries & Zero Results */}
               <div className="grid md:grid-cols-2 gap-4">
-                <div className="rounded-lg p-4" style={{ background: 'rgba(248,240,242,0.04)' }}>
+                <div className="rounded-lg p-4" style={{ background: 'var(--b0)' }}>
                   <h4 className="text-sm font-medium mb-3 flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}>
                     <TrendingUp className="w-4 h-4" style={{ color: 'var(--accent-secondary)' }} /> Top Searches
                   </h4>
@@ -154,7 +154,7 @@ export default function SearchAnalytics({ onSearch, searchType }) {
                           >
                             {item.query}
                           </button>
-                          <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(248,240,242,0.06)', color: 'var(--text-secondary)' }}>{item.count}</span>
+                          <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'var(--b0)', color: 'var(--text-secondary)' }}>{item.count}</span>
                         </div>
                       ))}
                     </div>
@@ -163,7 +163,7 @@ export default function SearchAnalytics({ onSearch, searchType }) {
                   )}
                 </div>
 
-                <div className="rounded-lg p-4" style={{ background: 'rgba(248,240,242,0.04)' }}>
+                <div className="rounded-lg p-4" style={{ background: 'var(--b0)' }}>
                   <h4 className="text-sm font-medium mb-3 flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}>
                     <AlertCircle className="w-4 h-4" style={{ color: 'var(--accent-tertiary)' }} /> Zero Results
                   </h4>
@@ -268,8 +268,8 @@ function DailyTrendChart({ data }) {
                     width={28}
                     height={14}
                     rx={3}
-                    fill="rgba(16,16,16,0.95)"
-                    stroke="rgba(248,240,242,0.1)"
+                    fill="var(--bg-elevated)"
+                    stroke="var(--b1)"
                     strokeWidth={0.5}
                   />
                   <text

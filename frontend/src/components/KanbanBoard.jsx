@@ -17,7 +17,7 @@ const COLUMN_VC_COLOR = {
 }
 
 const COLUMN_COUNT_BADGE_COLOR = {
-  open:        'rgba(248,240,242,.08)',
+  open:        'var(--b1)',
   in_progress: 'rgba(255,184,0,.12)',
   review:      'rgba(0,245,212,.12)',
   done:        'rgba(255,45,107,.12)',
@@ -184,7 +184,7 @@ export default function KanbanBoard({ projectId, onTaskUpdate }) {
         const columnTasks = getTasksByStatus(column.id)
         const isOver = dragOverColumn === column.id
         const headerColor = COLUMN_VC_COLOR[column.id] || 'var(--text-tertiary)'
-        const countBg     = COLUMN_COUNT_BADGE_COLOR[column.id] || 'rgba(248,240,242,.08)'
+        const countBg     = COLUMN_COUNT_BADGE_COLOR[column.id] || 'var(--b1)'
         const countColor  = COLUMN_COUNT_TEXT_COLOR[column.id]  || 'var(--text-tertiary)'
 
         return (

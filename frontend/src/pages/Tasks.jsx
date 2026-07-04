@@ -418,7 +418,7 @@ export default function Tasks() {
             </select>
           )}
 
-          <div className="flex border rounded-lg overflow-hidden" style={{ borderColor: 'rgba(248,240,242,.12)' }}>
+          <div className="flex border rounded-lg overflow-hidden" style={{ borderColor: 'var(--b1)' }}>
             <button
               onClick={() => setViewMode('list')}
               className="p-2 transition-colors"
@@ -471,10 +471,10 @@ export default function Tasks() {
               onClick={() => setTagFilter(tagFilter === tag ? null : tag)}
               className="px-2 py-0.5 rounded-full text-xs transition-colors"
               style={{
-                background: tagFilter === tag ? 'var(--accent-primary)' : 'rgba(248,240,242,.08)',
+                background: tagFilter === tag ? 'var(--accent-primary)' : 'var(--b1)',
                 color: tagFilter === tag ? '#fff' : 'var(--text-secondary)',
                 border: '1px solid',
-                borderColor: tagFilter === tag ? 'var(--accent-primary)' : 'rgba(248,240,242,.12)'
+                borderColor: tagFilter === tag ? 'var(--accent-primary)' : 'var(--b1)'
               }}
             >
               {tag}
@@ -533,7 +533,7 @@ export default function Tasks() {
             ) : displayedTasks.length === 0 ? (
               <div
                 className="p-12 text-center border-dashed border-2 m-4 rounded-lg"
-                style={{ borderColor: 'rgba(248,240,242,.08)' }}
+                style={{ borderColor: 'var(--b1)' }}
               >
                 <CheckSquare className="w-16 h-16 mx-auto mb-4 opacity-50" style={{ color: 'var(--text-tertiary)' }} />
                 <h3
@@ -561,7 +561,7 @@ export default function Tasks() {
                 {/* Column header with select-all */}
                 <div
                   className="px-4 py-2 flex items-center gap-4 text-xs border-b"
-                  style={{ color: 'var(--text-tertiary)', borderColor: 'rgba(248,240,242,.08)', fontFamily: 'var(--font-mono)' }}
+                  style={{ color: 'var(--text-tertiary)', borderColor: 'var(--b1)', fontFamily: 'var(--font-mono)' }}
                 >
                   <button
                     onClick={toggleSelectAll}
@@ -588,7 +588,7 @@ export default function Tasks() {
                   <span style={{ width: 64 }} />
                 </div>
 
-                <div className="divide-y" style={{ borderColor: 'rgba(248,240,242,.08)' }}>
+                <div className="divide-y" style={{ borderColor: 'var(--b1)' }}>
                   {displayedTasks.map((task) => (
                     <div
                       key={task.id}
@@ -670,7 +670,7 @@ export default function Tasks() {
                                   key={i}
                                   className="px-1.5 py-0.5 rounded text-xs cursor-pointer"
                                   style={{
-                                    background: tagFilter === tag ? 'var(--accent-primary)' : 'rgba(248,240,242,.08)',
+                                    background: tagFilter === tag ? 'var(--accent-primary)' : 'var(--b1)',
                                     color: tagFilter === tag ? '#fff' : 'var(--text-secondary)'
                                   }}
                                   onClick={(e) => { e.stopPropagation(); setTagFilter(tagFilter === tag ? null : tag) }}

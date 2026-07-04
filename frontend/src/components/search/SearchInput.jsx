@@ -138,11 +138,11 @@ export default function SearchInput({
             <div
               ref={suggestionsRef}
               className="absolute top-full left-0 right-0 mt-1 rounded-lg shadow-lg z-50 overflow-hidden"
-              style={{ background: 'var(--bg-elevated)', border: '1px solid rgba(248,240,242,.1)' }}
+              style={{ background: 'var(--bg-elevated)', border: '1px solid var(--b1)' }}
             >
               {/* Trending */}
               {query.length < 2 && trending && trending.length > 0 && (
-                <div className="p-2" style={{ borderBottom: '1px solid rgba(248,240,242,.06)' }}>
+                <div className="p-2" style={{ borderBottom: '1px solid var(--b0)' }}>
                   <div className="flex items-center gap-1 px-2 py-1 text-xs font-medium uppercase" style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
                     <Flame className="w-3 h-3" style={{ color: 'var(--accent-tertiary)' }} />
                     Trending Searches
@@ -208,16 +208,16 @@ export default function SearchInput({
               {/* Keyboard hint */}
               <div
                 className="px-3 py-2 text-xs flex items-center gap-4"
-                style={{ borderTop: '1px solid rgba(248,240,242,.06)', background: 'rgba(248,240,242,0.03)', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}
+                style={{ borderTop: '1px solid var(--b0)', background: 'var(--b0)', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}
               >
                 <span className="flex items-center gap-1">
-                  <kbd className="px-1 py-0.5 rounded text-xs" style={{ border: '1px solid rgba(248,240,242,.12)', background: 'rgba(248,240,242,0.06)' }}>↑↓</kbd> navigate
+                  <kbd className="px-1 py-0.5 rounded text-xs" style={{ border: '1px solid var(--b1)', background: 'var(--b0)' }}>↑↓</kbd> navigate
                 </span>
                 <span className="flex items-center gap-1">
-                  <kbd className="px-1 py-0.5 rounded text-xs" style={{ border: '1px solid rgba(248,240,242,.12)', background: 'rgba(248,240,242,0.06)' }}>↵</kbd> select
+                  <kbd className="px-1 py-0.5 rounded text-xs" style={{ border: '1px solid var(--b1)', background: 'var(--b0)' }}>↵</kbd> select
                 </span>
                 <span className="flex items-center gap-1">
-                  <kbd className="px-1 py-0.5 rounded text-xs" style={{ border: '1px solid rgba(248,240,242,.12)', background: 'rgba(248,240,242,0.06)' }}>esc</kbd> close
+                  <kbd className="px-1 py-0.5 rounded text-xs" style={{ border: '1px solid var(--b1)', background: 'var(--b0)' }}>esc</kbd> close
                 </span>
               </div>
             </div>
@@ -238,7 +238,7 @@ export default function SearchInput({
               style={
                 isActive
                   ? { background: 'rgba(255,45,107,0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(255,45,107,0.3)' }
-                  : { background: 'rgba(248,240,242,0.04)', color: 'var(--text-tertiary)', border: '1px solid rgba(248,240,242,.1)' }
+                  : { background: 'var(--b0)', color: 'var(--text-tertiary)', border: '1px solid var(--b1)' }
               }
             >
               <Icon className="w-3 h-3" />

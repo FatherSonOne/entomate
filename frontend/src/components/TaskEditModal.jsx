@@ -191,7 +191,7 @@ export default function TaskEditModal({ task, onClose, onSaved }) {
         {/* Header */}
         <div
           className="flex items-center justify-between p-5 border-b"
-          style={{ borderColor: 'rgba(248,240,242,.08)' }}
+          style={{ borderColor: 'var(--b1)' }}
         >
           <h2
             className="text-lg font-bold"
@@ -302,7 +302,7 @@ export default function TaskEditModal({ task, onClose, onSaved }) {
           {/* Subtasks Section */}
           <div
             className="rounded-lg border"
-            style={{ borderColor: 'rgba(248,240,242,.08)' }}
+            style={{ borderColor: 'var(--b1)' }}
           >
             <button
               type="button"
@@ -317,7 +317,7 @@ export default function TaskEditModal({ task, onClose, onSaved }) {
                 {subtasks.length > 0 && (
                   <span
                     className="text-xs px-1.5 py-0.5 rounded"
-                    style={{ background: 'rgba(248,240,242,.08)', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}
+                    style={{ background: 'var(--b1)', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}
                   >
                     {completedSubtasks}/{subtasks.length}
                   </span>
@@ -332,7 +332,7 @@ export default function TaskEditModal({ task, onClose, onSaved }) {
                 {subtasks.length > 0 && (
                   <div
                     className="h-1.5 rounded-full mb-3 overflow-hidden"
-                    style={{ background: 'rgba(248,240,242,.08)' }}
+                    style={{ background: 'var(--b1)' }}
                   >
                     <div
                       className="h-full rounded-full transition-all"
@@ -410,7 +410,7 @@ export default function TaskEditModal({ task, onClose, onSaved }) {
           {eta && !eta.isCompleted && (
             <div
               className="rounded-lg p-4 border"
-              style={{ background: 'rgba(248,240,242,.04)', borderColor: 'rgba(248,240,242,.08)' }}
+              style={{ background: 'var(--b0)', borderColor: 'var(--b1)' }}
             >
               <div className="flex items-center gap-2 mb-2">
                 <TrendingUp size={16} style={{ color: 'var(--accent-primary)' }} />
@@ -450,7 +450,7 @@ export default function TaskEditModal({ task, onClose, onSaved }) {
           {/* Meta info */}
           <div
             className="text-xs pt-3 border-t flex flex-wrap gap-4"
-            style={{ color: 'var(--text-tertiary)', borderColor: 'rgba(248,240,242,.08)', fontFamily: 'var(--font-mono)' }}
+            style={{ color: 'var(--text-tertiary)', borderColor: 'var(--b1)', fontFamily: 'var(--font-mono)' }}
           >
             {task.created_at && <span>Created: {new Date(task.created_at).toLocaleDateString()}</span>}
             {task.completed_at && <span>Completed: {new Date(task.completed_at).toLocaleDateString()}</span>}

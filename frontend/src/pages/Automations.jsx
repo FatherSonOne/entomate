@@ -341,7 +341,7 @@ export default function Automations() {
       {/* Execution History */}
       {showHistory && (
         <div className="vc mb-6 animate-fade-in">
-          <div className="p-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(248,240,242,.08)' }}>
+          <div className="p-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--b1)' }}>
             <h3 className="font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
               <History size={20} />
               Execution History
@@ -356,9 +356,9 @@ export default function Automations() {
             ) : executionLogs.length === 0 ? (
               <div className="p-8 text-center" style={{ color: 'var(--text-tertiary)' }}>No execution history yet</div>
             ) : (
-              <div style={{ borderTop: '1px solid rgba(248,240,242,.08)' }}>
+              <div style={{ borderTop: '1px solid var(--b1)' }}>
                 {executionLogs.map((log, idx) => (
-                  <div key={idx} className="p-3 flex items-center gap-3 transition-colors hover:bg-black/20" style={{ borderBottom: '1px solid rgba(248,240,242,.06)' }}>
+                  <div key={idx} className="p-3 flex items-center gap-3 transition-colors hover:bg-black/20" style={{ borderBottom: '1px solid var(--b0)' }}>
                     {log.success ? (
                       <CheckCircle2 size={18} className="flex-shrink-0" style={{ color: 'var(--accent-secondary)' }} />
                     ) : (
@@ -403,7 +403,7 @@ export default function Automations() {
       {/* Scheduler Status */}
       {schedulerStatus.length > 0 && (
         <div className="vc mb-6 animate-fade-in">
-          <div className="p-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(248,240,242,.08)' }}>
+          <div className="p-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--b1)' }}>
             <h3 className="font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
               <Calendar size={20} style={{ color: 'var(--accent-secondary)' }} />
               Scheduled Automations
@@ -414,7 +414,7 @@ export default function Automations() {
           </div>
           <div>
             {schedulerStatus.map((scheduled) => (
-              <div key={scheduled.id} className="p-3 flex items-center gap-3" style={{ borderBottom: '1px solid rgba(248,240,242,.06)' }}>
+              <div key={scheduled.id} className="p-3 flex items-center gap-3" style={{ borderBottom: '1px solid var(--b0)' }}>
                 <Clock size={18} className="flex-shrink-0" style={{ color: 'var(--accent-secondary)' }} />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{scheduled.name}</p>
@@ -483,7 +483,7 @@ export default function Automations() {
                   <div
                     key={template.id}
                     className="vc p-4 cursor-pointer transition-all group"
-                    style={{ borderColor: 'rgba(248,240,242,.08)' }}
+                    style={{ borderColor: 'var(--b1)' }}
                     onClick={() => handleCreateFromTemplate(template)}
                   >
                     <div className="flex items-start gap-3">
@@ -589,7 +589,7 @@ export default function Automations() {
 
       {/* Automations list */}
       <div className="vc">
-        <div className="p-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(248,240,242,.08)' }}>
+        <div className="p-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--b1)' }}>
           <h2 className="font-bold" style={{ color: 'var(--text-primary)' }}>Active Automations</h2>
           <span className="text-sm" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
             {automations.filter(a => a.enabled).length} active / {automations.length} total
@@ -599,7 +599,7 @@ export default function Automations() {
         {loading ? (
           <Skeleton className="h-24" count={4} />
         ) : automations.length === 0 ? (
-          <div className="p-12 text-center m-4 rounded-lg" style={{ border: '2px dashed rgba(248,240,242,.12)' }}>
+          <div className="p-12 text-center m-4 rounded-lg" style={{ border: '2px dashed var(--b1)' }}>
             <Zap className="w-16 h-16 mx-auto mb-4 opacity-50" style={{ color: 'var(--text-tertiary)' }} />
             <h3 className="text-xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>No automations yet</h3>
             <p className="mb-6" style={{ color: 'var(--text-secondary)' }}>Create your first automation from a template or build a custom workflow</p>
@@ -611,7 +611,7 @@ export default function Automations() {
         ) : (
           <div>
             {automations.map((automation) => (
-              <div key={automation.id} className="p-4 transition-colors hover:bg-black/10 group" style={{ borderBottom: '1px solid rgba(248,240,242,.06)' }}>
+              <div key={automation.id} className="p-4 transition-colors hover:bg-black/10 group" style={{ borderBottom: '1px solid var(--b0)' }}>
                 <div className="flex items-start gap-4">
                   <div className="p-2 rounded-md transition-colors group-hover:scale-110" style={{ background: 'rgba(255,45,107,.1)', color: 'var(--accent-primary)' }}>
                     {getTriggerIcon(automation.trigger_type)}

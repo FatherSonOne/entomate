@@ -246,7 +246,7 @@ export default function AudioSettings({ meetingsJson, onUpdateJson }) {
             style={{
               background: m.auto_sync_meetings_to_calendar
                 ? 'var(--accent-secondary)'
-                : 'rgba(248,240,242,.15)'
+                : 'var(--t2)'
             }}
           >
             <span

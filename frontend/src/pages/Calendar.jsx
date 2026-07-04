@@ -455,7 +455,7 @@ export default function Calendar() {
               Connect Google Calendar
             </VCButton>
           ) : (
-            <div className="text-sm px-3 py-2 rounded-lg" style={{ color: 'var(--text-tertiary)', background: 'var(--bg-elevated)', border: '1px solid rgba(248,240,242,.08)' }}>
+            <div className="text-sm px-3 py-2 rounded-lg" style={{ color: 'var(--text-tertiary)', background: 'var(--bg-elevated)', border: '1px solid var(--b1)' }}>
               Add GOOGLE_CLIENT_ID to enable
             </div>
           )}
@@ -467,7 +467,7 @@ export default function Calendar() {
         <div className="lg:col-span-2">
           <div className="vc">
             {/* Calendar Header */}
-            <div className="p-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(248,240,242,.08)' }}>
+            <div className="p-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--b1)' }}>
               <div className="flex items-center gap-4">
                 <VCButton variant="ghost" size="sm" onClick={() => navigate(-1)} aria-label="Previous">
                   <ChevronLeft className="h-5 w-5" />
@@ -480,7 +480,7 @@ export default function Calendar() {
                 </VCButton>
               </div>
               <div className="flex items-center gap-2">
-                <div className="flex rounded-lg overflow-hidden" style={{ border: '1px solid rgba(248,240,242,.12)' }}>
+                <div className="flex rounded-lg overflow-hidden" style={{ border: '1px solid var(--b1)' }}>
                   {['month', 'week', 'day'].map(mode => (
                     <button
                       key={mode}
@@ -525,8 +525,8 @@ export default function Calendar() {
                         onDoubleClick={() => { setSelectedDate(day); setViewMode('day'); setCurrentDate(day); }}
                         className="min-h-[80px] p-1 text-left rounded-lg border transition-colors"
                         style={{
-                          background: isCurrentMonth ? 'var(--bg-elevated)' : 'rgba(16,16,16,.5)',
-                          borderColor: isToday ? 'var(--accent-primary)' : isSelected ? 'rgba(255,45,107,.5)' : 'rgba(248,240,242,.06)',
+                          background: isCurrentMonth ? 'var(--bg-elevated)' : 'var(--bg-base)',
+                          borderColor: isToday ? 'var(--accent-primary)' : isSelected ? 'rgba(255,45,107,.5)' : 'var(--b0)',
                           boxShadow: isSelected ? '0 0 0 2px rgba(255,45,107,.3)' : 'none'
                         }}
                       >
@@ -580,16 +580,16 @@ export default function Calendar() {
                   })}
                 </div>
                 {/* Time grid */}
-                <div className="max-h-[600px] overflow-y-auto" style={{ borderTop: '1px solid rgba(248,240,242,.08)' }}>
+                <div className="max-h-[600px] overflow-y-auto" style={{ borderTop: '1px solid var(--b1)' }}>
                   {HOURS.filter(h => h >= 6 && h <= 22).map(hour => (
-                    <div key={hour} className="grid gap-0" style={{ gridTemplateColumns: '56px repeat(7, 1fr)', minHeight: 48, borderBottom: '1px solid rgba(248,240,242,.06)' }}>
+                    <div key={hour} className="grid gap-0" style={{ gridTemplateColumns: '56px repeat(7, 1fr)', minHeight: 48, borderBottom: '1px solid var(--b0)' }}>
                       <div className="text-xs text-right pr-2 pt-1" style={{ color: 'var(--text-tertiary)' }}>
                         {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
                       </div>
                       {getWeekDays().map((day, di) => {
                         const dayItems = getAllItemsForDate(day).filter(item => getItemHour(item) === hour)
                         return (
-                          <div key={di} className="relative border-l px-1 py-0.5" style={{ borderColor: 'rgba(248,240,242,.06)' }}>
+                          <div key={di} className="relative border-l px-1 py-0.5" style={{ borderColor: 'var(--b0)' }}>
                             {dayItems.map((item, ii) => {
                               const c = getItemBg(item)
                               return (
@@ -617,11 +617,11 @@ export default function Calendar() {
                   {HOURS.filter(h => h >= 6 && h <= 22).map(hour => {
                     const hourItems = getAllItemsForDate(currentDate).filter(item => getItemHour(item) === hour)
                     return (
-                      <div key={hour} className="flex" style={{ minHeight: 56, borderBottom: '1px solid rgba(248,240,242,.06)' }}>
+                      <div key={hour} className="flex" style={{ minHeight: 56, borderBottom: '1px solid var(--b0)' }}>
                         <div className="w-16 text-xs text-right pr-3 pt-1 flex-shrink-0" style={{ color: 'var(--text-tertiary)' }}>
                           {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
                         </div>
-                        <div className="flex-1 border-l px-2 py-1" style={{ borderColor: 'rgba(248,240,242,.08)' }}>
+                        <div className="flex-1 border-l px-2 py-1" style={{ borderColor: 'var(--b1)' }}>
                           {hourItems.map((item, i) => {
                             const c = getItemBg(item)
                             return (
@@ -698,7 +698,7 @@ export default function Calendar() {
                     <div
                       key={i}
                       className="p-3 rounded-lg border"
-                      style={{ background: 'var(--bg-elevated)', borderColor: 'rgba(248,240,242,.08)' }}
+                      style={{ background: 'var(--bg-elevated)', borderColor: 'var(--b1)' }}
                     >
                       {content}
                     </div>
@@ -727,7 +727,7 @@ export default function Calendar() {
                   <div
                     key={i}
                     className="p-3 rounded-lg"
-                    style={{ background: 'var(--bg-elevated)', border: '1px solid rgba(248,240,242,.08)' }}
+                    style={{ background: 'var(--bg-elevated)', border: '1px solid var(--b1)' }}
                   >
                     <div className="flex items-start gap-2">
                       <span style={{ color: 'var(--accent-primary)' }}>{getItemIcon(item.type)}</span>

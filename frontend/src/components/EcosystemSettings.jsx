@@ -250,7 +250,7 @@ export default function EcosystemSettings() {
       {/* Header */}
       <div
         className="p-4 flex items-center justify-between"
-        style={{ borderBottom: '1px solid var(--b1, rgba(248,240,242,.06))' }}
+        style={{ borderBottom: '1px solid var(--b1, var(--b0))' }}
       >
         <div className="flex items-center gap-2">
           <Globe className="w-5 h-5" style={{ color: 'var(--accent-secondary, #00F5D4)' }} />
@@ -410,7 +410,7 @@ export default function EcosystemSettings() {
       {/* Recent Events */}
       {events.length > 0 && (
         <div
-          style={{ borderTop: '1px solid var(--b1, rgba(248,240,242,.06))' }}
+          style={{ borderTop: '1px solid var(--b1, var(--b0))' }}
         >
           <div className="p-4">
             <h3

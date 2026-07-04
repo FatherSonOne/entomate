@@ -152,10 +152,10 @@ export default function EntoAssistantButton({ onClick, isOpen, hasProactiveSugge
           borderRadius: 4,
           background: isHovered
             ? 'rgba(255,45,107,0.1)'
-            : 'rgba(248,240,242,0.06)',
+            : 'var(--b0)',
           color: isHovered
             ? 'var(--accent-primary, #FF2D6B)'
-            : 'var(--text-muted, rgba(248,240,242,0.25))',
+            : 'var(--text-muted, var(--t2))',
           marginLeft: 'auto',
           fontFamily: 'monospace',
           letterSpacing: '0.02em',

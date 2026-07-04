@@ -195,7 +195,7 @@ export default function Search() {
         <p style={{ color: 'var(--text-secondary)' }}>
           Find anything using semantic search or ask AI questions about your meetings
           <span className="ml-2 text-xs" style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
-            Press <kbd className="px-1 py-0.5 rounded" style={{ border: '1px solid rgba(248,240,242,.12)', background: 'rgba(248,240,242,0.06)' }}>/</kbd> to focus
+            Press <kbd className="px-1 py-0.5 rounded" style={{ border: '1px solid var(--b1)', background: 'var(--b0)' }}>/</kbd> to focus
           </span>
         </p>
       </div>
