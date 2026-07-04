@@ -67,7 +67,7 @@ Slack (notifier + event listener), Google Calendar OAuth, Supabase (anon + servi
 |---|---|---|
 | Backend architecture | 72/100 | Solid foundation; mid-refactor debt (2 transports, 2 RAG stacks, 3 agent systems) |
 | Frontend (canonical) | 64/100 | Feature-complete surface; **zero typechecking on shipped UI**, theme-migration drift, dead twin |
-| **Data layer / multi-tenancy** | **48/100** | **Functional but fragile** — non-reproducible base schema, no row-level org isolation |
+| **Data layer / multi-tenancy** | **48 → 58/100** | S1a closed the anon-key perimeter (RLS on all exposed tables); still: non-reproducible base schema, no `org_id` on core tables, 3 org models |
 | Ecosystem bridge | 55/100 | Right architecture, real retry/DLQ; no idempotency, weak auth, dual-impl drift |
 | Capture pipeline (Recall) | 68/100 | Works E2E through P1.3; webhook-landing + migration-drift + thin tests are the open edges |
 | Consent / GDPR | 80/100 | Genuinely well-built; verify live end-to-end |
@@ -158,8 +158,21 @@ gap is the highest-severity risk for a multi-tenant SaaS heading to market.
 | Date | Section | Outcome |
 |---|---|---|
 | 2026-07-04 | Phase 0–4 orientation | Compiled this spec from 5 parallel layer-maps (backend, frontend, ecosystem, data, vision). No code changed. |
+| 2026-07-04 | **S1a · RLS perimeter lockdown** | **DONE + verified.** Live-DB introspection found the data layer *worse* than estimated: **10 tables with RLS OFF** (incl. `meetings`, `secrets_vault`, `users`) + **18 `USING(true)` policies** = ~25 tables anon-readable via the public key. Tenancy decision: **team-shared per org**. Fix: (1) backend → service-role client ([backend/config/supabase.js](../../backend/config/supabase.js)) so RLS can be ON without breaking reads; (2) migration `20260704000001_rls_perimeter_lockdown` — enable RLS + owner-scope/deny-all across the 25 tables (most already had correct policies shadowed by a `true` one — just dropped the shadow); (3) follow-on `20260704000002_tasks_rls_close_null_project` — closed a live `project_id IS NULL → public` leak (14 tasks). **Verified:** Supabase linter 10→0 ERROR rls-off, 18→1 always-true (remaining is intentional org-bootstrap); anon probe across 25 tables = **0 leaks**; service-role = 25/25 reachable. Isolation is now perimeter-scoped to the *current* owner column. |
 
-**▶ NEXT SESSION: S1 · Data Foundation & Multi-Tenancy** (Frank's pick, 2026-07-04).
+**S1a deferred → fold into S1b (or later):**
+- `goals` SELECT policy has `OR (goal_type='company')` (+ `TO public`) — latent anon leak once any company goal exists; 0 today. Rewrite org-scoped in S1b.
+- Kept policies are mostly `TO public` (rely on `auth.uid()` being NULL for anon); S1b should make them `TO authenticated`.
+- ERROR `security_definer_view` on `vector_collections_overview` (RAG/S7).
+- ~10 org/secret RPCs are `SECURITY DEFINER` + anon-`EXECUTE` (`create_org_for_user`, `hard_delete_org`, `soft_delete_org`, `increment_ai_usage`…) — lock down EXECUTE in S1b/S5.
+- Org helper fns already exist (`user_org_id()`, `get_my_org_ids()`) — reuse for S1b org-scoped RLS.
+- 19 functions have mutable `search_path`; `vector`/`pg_trgm` extensions in `public` — hygiene backlog.
+
+**▶ NEXT SESSION: S1b · Org model + reproducible schema** (tenancy = **team-shared per org**, decided 2026-07-04).
+Introspection confirmed **three** grouping models coexist: `tenant_organizations`/`org_members` (the 2026-04 build: roles, invites, plan tiers, AI metering, one-user-one-org), older `organizations`/`organization_members`, and base-schema `teams`/`team_id` (`goals`/`users`/`secrets_vault`/`search_conversations` scope by `team_id`). S1b: (1) pick `tenant_organizations` as canonical, map `teams`→org, retire `organizations`; (2) add `org_id` + backfill the 1 existing org to core tables; (3) upgrade the S1a owner-scoped RLS to org-scoped (reuse `user_org_id()`/`get_my_org_ids()`); (4) fold the base schema into the migration chain so `supabase db reset` reproduces prod; (5) retire duplicate/"fixed" migration landmines. Conduct: `schema`, `sentinel`.
+
+<!-- superseded pre-brief (S1a executed the introspection + perimeter half): -->
+**▶ (done) S1 opening decision** (Frank's pick, 2026-07-04).
 Opens with the load-bearing decision: **tenancy model** — is Entomate data *team-shared per org* (any org member
 sees the org's meetings/tasks) or *user-owned with org as billing boundary*? That answer determines whether S1
 adds `org_id` + org-scoped RLS everywhere (team model) or keeps `auth.uid()` isolation and only scopes billing/quota

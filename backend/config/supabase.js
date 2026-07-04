@@ -13,14 +13,29 @@ if (!supabaseAnonKey) {
   log.warn('SUPABASE_ANON_KEY not set in environment');
 }
 
-// Public client (uses Row Level Security)
-const supabase = supabaseUrl && supabaseAnonKey
+if (!supabaseServiceKey) {
+  log.warn('SUPABASE_SERVICE_KEY not set — backend will fall back to the anon client (RLS-enforced, no user context)');
+}
+
+// Anon client — RLS-enforced, but the backend attaches no end-user JWT, so
+// auth.uid() is always NULL. Kept for any future per-request-JWT usage.
+const supabaseAnon = supabaseUrl && supabaseAnonKey
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
 
-// Admin client (bypasses Row Level Security - use carefully)
+// Default backend client. The backend is a trusted server-side tier that does
+// its own auth (verifyAuth middleware) + app-layer org/owner filtering, so it
+// runs on the service-role key (bypasses RLS). This lets RLS be ENABLED on the
+// underlying tables as a perimeter against direct anon/PostgREST access without
+// breaking backend reads. Falls back to the anon client only if no service key.
+// (S1a — Data Foundation hardening, 2026-07-04.)
+const supabase = supabaseUrl && supabaseServiceKey
+  ? createClient(supabaseUrl, supabaseServiceKey)
+  : supabaseAnon;
+
+// Admin client (explicit service-role handle; same privileges as `supabase`).
 const supabaseAdmin = supabaseUrl && supabaseServiceKey
   ? createClient(supabaseUrl, supabaseServiceKey)
   : null;
 
-module.exports = { supabase, supabaseAdmin };
+module.exports = { supabase, supabaseAdmin, supabaseAnon };
