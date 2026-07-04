@@ -11,15 +11,15 @@ export const THEME_MODES = {
 /* ── Held Light foundation flag ──
    The redesigned surface treatment ("held-light") lives behind an
    <html data-foundation> attribute so legacy and new CSS coexist and
-   flip atomically. Default is OFF (null) until the Phase 10 flip.
-   Preview it without flipping the global default via the console:
-     localStorage.setItem('entomate-foundation', 'held-light'); // on
+   flip atomically. Default is ON as of the Phase 10 flip (2026-07-04).
+   Force it off without touching this default via the console:
      localStorage.setItem('entomate-foundation', 'off');        // force off
+     localStorage.setItem('entomate-foundation', 'held-light'); // force on
      localStorage.removeItem('entomate-foundation');            // use default
    `data-foundation` is deliberately separate from `theme_mode` — do
    not overload the DB theme setting with it. */
 export const FOUNDATION = 'held-light';
-const FOUNDATION_DEFAULT = null; // Phase 10 flips this to FOUNDATION
+const FOUNDATION_DEFAULT = FOUNDATION; // Phase 10: Held Light is now the default
 
 function resolveFoundation() {
   const override = typeof localStorage !== 'undefined'
