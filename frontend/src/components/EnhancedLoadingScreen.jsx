@@ -1,7 +1,8 @@
 // EnhancedLoadingScreen.jsx
 // Neural Catalyst loading animation — unique to Entomate's AI meeting intelligence brand
 // Features: Orbiting intelligence nodes, pulsing neural connections, progress ring, stage messaging
-// Brand: Electric Crimson #FF2D6B · Catalyst Teal #00D4B4 · Intelligence Violet #9B6DFF
+// Brand: Void Crimson — Electric Crimson #FF2D6B · Neon Mint #00F5D4 · Crimson-bright #FF6699
+// (amber #FFB800 and phosphor #A0FF32 are reserved signals; never used as loader decoration)
 
 import React, { useEffect, useState, useRef } from 'react'
 import { useLoading } from '../contexts/LoadingContext'
@@ -68,8 +69,8 @@ export default function EnhancedLoadingScreen({ autoAnimate = true, inline = fal
             <defs>
               <linearGradient id="en-ring-grad" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#FF2D6B" />
-                <stop offset="50%" stopColor="#00D4B4" />
-                <stop offset="100%" stopColor="#9B6DFF" />
+                <stop offset="50%" stopColor="#00F5D4" />
+                <stop offset="100%" stopColor="#FF6699" />
               </linearGradient>
             </defs>
 
@@ -140,19 +141,19 @@ export default function EnhancedLoadingScreen({ autoAnimate = true, inline = fal
                 <radialGradient id="en-catalyst-glow" cx="50%" cy="50%" r="50%">
                   <stop offset="0%" stopColor="#FF2D6B" stopOpacity="1" />
                   <stop offset="40%" stopColor="#FF2D6B" stopOpacity="0.5" />
-                  <stop offset="100%" stopColor="#9B6DFF" stopOpacity="0" />
+                  <stop offset="100%" stopColor="#FF6699" stopOpacity="0" />
                 </radialGradient>
                 <linearGradient id="en-neural-grad" x1="0%" y1="0%" x2="100%" y2="100%">
                   <stop offset="0%" stopColor="#FF2D6B" stopOpacity="0.7" />
-                  <stop offset="50%" stopColor="#00D4B4" stopOpacity="0.5" />
-                  <stop offset="100%" stopColor="#9B6DFF" stopOpacity="0.3" />
+                  <stop offset="50%" stopColor="#00F5D4" stopOpacity="0.5" />
+                  <stop offset="100%" stopColor="#FF6699" stopOpacity="0.3" />
                 </linearGradient>
               </defs>
 
               {/* Orbital rings — faint structure */}
               <circle cx="60" cy="60" r="48" stroke="#FF2D6B" strokeWidth="0.3" fill="none" opacity="0.12" />
-              <circle cx="60" cy="60" r="36" stroke="#00D4B4" strokeWidth="0.4" fill="none" opacity="0.10" />
-              <circle cx="60" cy="60" r="24" stroke="#9B6DFF" strokeWidth="0.5" fill="none" opacity="0.08" />
+              <circle cx="60" cy="60" r="36" stroke="#00F5D4" strokeWidth="0.4" fill="none" opacity="0.10" />
+              <circle cx="60" cy="60" r="24" stroke="#FF6699" strokeWidth="0.5" fill="none" opacity="0.08" />
 
               {/* Neural connection lines — pulsing */}
               <line className="en-neural-line en-neural-line-1" x1="60" y1="60" x2="60" y2="12" stroke="url(#en-neural-grad)" strokeWidth="0.8" />
@@ -164,29 +165,29 @@ export default function EnhancedLoadingScreen({ autoAnimate = true, inline = fal
 
               {/* Orbiting intelligence nodes */}
               <circle className="en-orbit-node en-orbit-node-1" cx="60" cy="12" r="4" fill="#FF2D6B" />
-              <circle className="en-orbit-node en-orbit-node-2" cx="101" cy="36" r="3.5" fill="#00D4B4" />
-              <circle className="en-orbit-node en-orbit-node-3" cx="101" cy="84" r="3" fill="#9B6DFF" />
+              <circle className="en-orbit-node en-orbit-node-2" cx="101" cy="36" r="3.5" fill="#00F5D4" />
+              <circle className="en-orbit-node en-orbit-node-3" cx="101" cy="84" r="3" fill="#FF6699" />
               <circle className="en-orbit-node en-orbit-node-4" cx="60" cy="108" r="4" fill="#FF2D6B" />
-              <circle className="en-orbit-node en-orbit-node-5" cx="19" cy="84" r="3.5" fill="#00D4B4" />
-              <circle className="en-orbit-node en-orbit-node-6" cx="19" cy="36" r="3" fill="#9B6DFF" />
+              <circle className="en-orbit-node en-orbit-node-5" cx="19" cy="84" r="3.5" fill="#00F5D4" />
+              <circle className="en-orbit-node en-orbit-node-6" cx="19" cy="36" r="3" fill="#FF6699" />
 
               {/* Data pulse particles traveling along connections */}
               <circle className="en-data-pulse en-data-pulse-1" r="1.5" fill="#FF2D6B">
                 <animateMotion dur="2.4s" repeatCount="indefinite" path="M60,60 L60,12" />
               </circle>
-              <circle className="en-data-pulse en-data-pulse-2" r="1.5" fill="#00D4B4">
+              <circle className="en-data-pulse en-data-pulse-2" r="1.5" fill="#00F5D4">
                 <animateMotion dur="2.8s" repeatCount="indefinite" begin="0.4s" path="M60,60 L101,36" />
               </circle>
-              <circle className="en-data-pulse en-data-pulse-3" r="1.5" fill="#9B6DFF">
+              <circle className="en-data-pulse en-data-pulse-3" r="1.5" fill="#FF6699">
                 <animateMotion dur="3.2s" repeatCount="indefinite" begin="0.8s" path="M60,60 L101,84" />
               </circle>
               <circle className="en-data-pulse en-data-pulse-4" r="1.5" fill="#FF2D6B">
                 <animateMotion dur="2.6s" repeatCount="indefinite" begin="1.2s" path="M60,60 L60,108" />
               </circle>
-              <circle className="en-data-pulse en-data-pulse-5" r="1.5" fill="#00D4B4">
+              <circle className="en-data-pulse en-data-pulse-5" r="1.5" fill="#00F5D4">
                 <animateMotion dur="3s" repeatCount="indefinite" begin="1.6s" path="M60,60 L19,84" />
               </circle>
-              <circle className="en-data-pulse en-data-pulse-6" r="1.5" fill="#9B6DFF">
+              <circle className="en-data-pulse en-data-pulse-6" r="1.5" fill="#FF6699">
                 <animateMotion dur="2.2s" repeatCount="indefinite" begin="2s" path="M60,60 L19,36" />
               </circle>
 
@@ -389,7 +390,7 @@ export default function EnhancedLoadingScreen({ autoAnimate = true, inline = fal
           font-weight: 700;
           line-height: 1.2;
           letter-spacing: -0.02em;
-          background: linear-gradient(135deg, #FF2D6B 0%, #00D4B4 50%, #9B6DFF 100%);
+          background: linear-gradient(135deg, #FF2D6B 0%, #00F5D4 50%, #FF6699 100%);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
@@ -427,7 +428,7 @@ export default function EnhancedLoadingScreen({ autoAnimate = true, inline = fal
           width: 6px;
           height: 6px;
           border-radius: 50%;
-          background: linear-gradient(135deg, #FF2D6B, #00D4B4);
+          background: linear-gradient(135deg, #FF2D6B, #00F5D4);
           animation: en-dot-bounce 1.4s ease-in-out infinite;
         }
 
@@ -460,7 +461,7 @@ export default function EnhancedLoadingScreen({ autoAnimate = true, inline = fal
           font-size: 0.65rem;
           font-weight: 700;
           letter-spacing: 0.15em;
-          background: linear-gradient(135deg, #FF2D6B, #00D4B4);
+          background: linear-gradient(135deg, #FF2D6B, #00F5D4);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;

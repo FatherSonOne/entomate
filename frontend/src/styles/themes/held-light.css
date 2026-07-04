@@ -253,3 +253,22 @@
 [data-foundation="held-light"] .vc-topbar-search {
   border-radius: 10px;
 }
+
+/* ════════════════════════════════════════════════════════════
+   PHASE 8 — Polish: accessible focus rings
+   ------------------------------------------------------------
+   Keyboard focus must be unmistakable and on-brand in both
+   themes. A crimson ring with offset, only on :focus-visible so
+   mouse users never see it. (Loader off-palette colours are fixed
+   in the components themselves, not here.)
+   ════════════════════════════════════════════════════════════ */
+[data-foundation="held-light"] .vbtn:focus-visible,
+[data-foundation="held-light"] .btn:focus-visible,
+[data-foundation="held-light"] .chip:focus-visible,
+[data-foundation="held-light"] .vc-topbar-search:focus-visible,
+[data-foundation="held-light"] a.nav:focus-visible,
+[data-foundation="held-light"] [role="button"]:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+  border-radius: var(--hl-radius-btn);
+}

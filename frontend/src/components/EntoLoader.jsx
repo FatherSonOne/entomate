@@ -27,7 +27,7 @@ export default function EntoLoader({
         <defs>
           <linearGradient id={`en-spin-grad-${px}`} x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor={color || '#FF2D6B'} />
-            <stop offset="100%" stopColor={color ? color : '#00D4B4'} />
+            <stop offset="100%" stopColor={color ? color : '#00F5D4'} />
           </linearGradient>
         </defs>
         {/* Track */}
@@ -61,7 +61,7 @@ function DotLoader({ size, color, className }) {
           style={{
             width: dotSize,
             height: dotSize,
-            background: color || (i === 0 ? '#FF2D6B' : i === 1 ? '#00D4B4' : '#9B6DFF'),
+            background: color || (i === 0 ? '#FF2D6B' : i === 1 ? '#00F5D4' : '#FF6699'),
             animationDelay: `${i * 0.16}s`,
           }}
         />
@@ -74,7 +74,7 @@ function PulseLoader({ size, color, className }) {
   return (
     <span className={`en-loader-pulse-wrap ${className}`} style={{ width: size, height: size }} role="status" aria-label="Loading">
       <span className="en-loader-pulse-ring" style={{ borderColor: color || '#FF2D6B' }} />
-      <span className="en-loader-pulse-ring en-loader-pulse-ring-2" style={{ borderColor: color || '#00D4B4' }} />
+      <span className="en-loader-pulse-ring en-loader-pulse-ring-2" style={{ borderColor: color || '#00F5D4' }} />
       <span className="en-loader-pulse-core" style={{ background: color || '#FF2D6B', width: size * 0.3, height: size * 0.3 }} />
     </span>
   )
@@ -85,7 +85,7 @@ function OrbitLoader({ size, color, className }) {
     <span className={`en-loader-orbit-wrap ${className}`} style={{ width: size, height: size }} role="status" aria-label="Loading">
       <span className="en-loader-orbit-track" style={{ borderColor: 'var(--border-subtle, rgba(255,255,255,0.08))' }} />
       <span className="en-loader-orbit-dot" style={{ background: color || '#FF2D6B', filter: `drop-shadow(0 0 4px ${color || '#FF2D6B'})` }} />
-      <span className="en-loader-orbit-dot en-loader-orbit-dot-2" style={{ background: '#00D4B4', filter: 'drop-shadow(0 0 4px #00D4B4)' }} />
+      <span className="en-loader-orbit-dot en-loader-orbit-dot-2" style={{ background: '#00F5D4', filter: 'drop-shadow(0 0 4px #00F5D4)' }} />
     </span>
   )
 }
