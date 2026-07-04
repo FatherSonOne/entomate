@@ -67,7 +67,7 @@ Slack (notifier + event listener), Google Calendar OAuth, Supabase (anon + servi
 |---|---|---|
 | Backend architecture | 72/100 | Solid foundation; mid-refactor debt (2 transports, 2 RAG stacks, 3 agent systems) |
 | Frontend (canonical) | 64/100 | Feature-complete surface; **zero typechecking on shipped UI**, theme-migration drift, dead twin |
-| **Data layer / multi-tenancy** | **48 → 58/100** | S1a closed the anon-key perimeter (RLS on all exposed tables); still: non-reproducible base schema, no `org_id` on core tables, 3 org models |
+| **Data layer / multi-tenancy** | **48 → 58 → 66/100** | S1a closed the anon-key perimeter; S1b added `org_id` + org-scoped RLS to core tables & collapsed to one canonical org model. Still open: non-reproducible base schema, `org_id` still NULLABLE (backend not yet populating it), 3 org RPCs anon-executable |
 | Ecosystem bridge | 55/100 | Right architecture, real retry/DLQ; no idempotency, weak auth, dual-impl drift |
 | Capture pipeline (Recall) | 68/100 | Works E2E through P1.3; webhook-landing + migration-drift + thin tests are the open edges |
 | Consent / GDPR | 80/100 | Genuinely well-built; verify live end-to-end |
@@ -160,25 +160,16 @@ gap is the highest-severity risk for a multi-tenant SaaS heading to market.
 | 2026-07-04 | Phase 0–4 orientation | Compiled this spec from 5 parallel layer-maps (backend, frontend, ecosystem, data, vision). No code changed. |
 | 2026-07-04 | **S1a · RLS perimeter lockdown** | **DONE + verified.** Live-DB introspection found the data layer *worse* than estimated: **10 tables with RLS OFF** (incl. `meetings`, `secrets_vault`, `users`) + **18 `USING(true)` policies** = ~25 tables anon-readable via the public key. Tenancy decision: **team-shared per org**. Fix: (1) backend → service-role client ([backend/config/supabase.js](../../backend/config/supabase.js)) so RLS can be ON without breaking reads; (2) migration `20260704000001_rls_perimeter_lockdown` — enable RLS + owner-scope/deny-all across the 25 tables (most already had correct policies shadowed by a `true` one — just dropped the shadow); (3) follow-on `20260704000002_tasks_rls_close_null_project` — closed a live `project_id IS NULL → public` leak (14 tasks). **Verified:** Supabase linter 10→0 ERROR rls-off, 18→1 always-true (remaining is intentional org-bootstrap); anon probe across 25 tables = **0 leaks**; service-role = 25/25 reachable. Isolation is now perimeter-scoped to the *current* owner column. |
 
-**S1a deferred → fold into S1b (or later):**
-- `goals` SELECT policy has `OR (goal_type='company')` (+ `TO public`) — latent anon leak once any company goal exists; 0 today. Rewrite org-scoped in S1b.
-- Kept policies are mostly `TO public` (rely on `auth.uid()` being NULL for anon); S1b should make them `TO authenticated`.
-- ERROR `security_definer_view` on `vector_collections_overview` (RAG/S7).
-- ~10 org/secret RPCs are `SECURITY DEFINER` + anon-`EXECUTE` (`create_org_for_user`, `hard_delete_org`, `soft_delete_org`, `increment_ai_usage`…) — lock down EXECUTE in S1b/S5.
-- Org helper fns already exist (`user_org_id()`, `get_my_org_ids()`) — reuse for S1b org-scoped RLS.
-- 19 functions have mutable `search_path`; `vector`/`pg_trgm` extensions in `public` — hygiene backlog.
+| 2026-07-04 | **S1b · Org model + org-scoped RLS** | **DONE + verified.** Introspection update: `tenant_organizations` had grown to **3 single-owner orgs** (`Quantum Ecosystems`, `Dev`, `QntmEcos`), `organizations`/`organization_members` **empty**, `teams`=1, **`public.users` empty** (identity lives in `auth.users`+`org_members`). Core data thin & mostly ownerless: 8 meetings (**7 owned by `'system'`**), 13 action_items, 14 tasks (`assigned_to` all null), 5 workflows (`created_by` all null). Migrations `...0003` (add `org_id` + FK→`tenant_organizations` ON DELETE CASCADE + index on meetings/action_items/tasks/workflows/relationships/goals), `...0004` (backfill all → canonical **Quantum Ecosystems**; retire Frank-approved dup orgs `Dev`+`QntmEcos`, cascading 2 owner rows + 3 orphaned April test `bot_sessions`), `...0005` (upgrade S1a owner-scoped policies → **org-scoped** via `get_my_org_ids()`; drop `goals` company-goal `TO public` leak + dead `users.team_id` join; pin `user_org_id()` search_path). `org_id` **left NULLABLE** — backend doesn't populate on INSERT yet, so NOT NULL would break capture. **Verified:** backfill 8/8·13/13·14/14·5/5 all→QE, 0 mis-assigned; 1 org remains, `bot_sessions` 5→2; 3-seat JWT probe — QE member sees all 8 meetings, non-member 0, anon 0; linter 0 new ERROR, `goals` leak cleared. |
 
-**▶ NEXT SESSION: S1b · Org model + reproducible schema** (tenancy = **team-shared per org**, decided 2026-07-04).
-Introspection confirmed **three** grouping models coexist: `tenant_organizations`/`org_members` (the 2026-04 build: roles, invites, plan tiers, AI metering, one-user-one-org), older `organizations`/`organization_members`, and base-schema `teams`/`team_id` (`goals`/`users`/`secrets_vault`/`search_conversations` scope by `team_id`). S1b: (1) pick `tenant_organizations` as canonical, map `teams`→org, retire `organizations`; (2) add `org_id` + backfill the 1 existing org to core tables; (3) upgrade the S1a owner-scoped RLS to org-scoped (reuse `user_org_id()`/`get_my_org_ids()`); (4) fold the base schema into the migration chain so `supabase db reset` reproduces prod; (5) retire duplicate/"fixed" migration landmines. Conduct: `schema`, `sentinel`.
+**S1b deferred → S1c / hygiene backlog:**
+- **`org_id` still NULLABLE + backend doesn't set it on INSERT.** Enforcement step (S1c): backend writes `org_id` on every insert → then `SET NOT NULL`. Until then org-scoped RLS is correct-but-latent (service-role backend serves NULL-org rows).
+- Org-lifecycle RPCs **anon-`EXECUTE`** (`hard_delete_org`, `soft_delete_org`, `create_org_for_user`, `increment_ai_usage`, `restore_org`) — **lead S1c**; `hard_delete_org` callable unauthenticated is the sharp one.
+- `security_definer_view` on `vector_collections_overview` (only remaining linter ERROR; RAG/S7).
+- 19 functions mutable `search_path`; `vector`/`pg_trgm` extensions in `public` — hygiene.
+- Stray type-inconsistent `team_id` columns (uuid/varchar/text on goals/ai_agents/search_conversations/secrets_vault/users) + vestigial `teams` table (1 row, `users` empty) — retire in **S2**.
 
-<!-- superseded pre-brief (S1a executed the introspection + perimeter half): -->
-**▶ (done) S1 opening decision** (Frank's pick, 2026-07-04).
-Opens with the load-bearing decision: **tenancy model** — is Entomate data *team-shared per org* (any org member
-sees the org's meetings/tasks) or *user-owned with org as billing boundary*? That answer determines whether S1
-adds `org_id` + org-scoped RLS everywhere (team model) or keeps `auth.uid()` isolation and only scopes billing/quota
-(user model). Then: (1) capture the true live schema (introspect the remote DB, since base tables were hand-applied);
-(2) author a baseline migration that folds the base schema into the chain so `db reset` reproduces prod; (3) add
-`org_id` + backfill + org-scoped RLS to core tables per the chosen model; (4) retire duplicate/"fixed" migration
-landmines. Conduct: `schema`, `sentinel`. Verify: `supabase db reset` on a branch + RLS probe per table.
+**▶ NEXT SESSION: S2 · Repo cleanup + reproducible schema** (moved here from S1b — it's repo-hygiene, not live-data).
+S2 folds the hand-applied base schema into the migration chain so `supabase db reset` reproduces prod, retires duplicate/"fixed" migration landmines, drops the empty `organizations`/`organization_members` tables + vestigial `teams`/stray `team_id` columns, and clears the dead root scaffold (`index.tsx`, root `src/*.tsx`, `server/`, `server.js.bak`). Verify: `supabase db reset` on a branch + re-run the 3-seat RLS probe. **Or** jump to **S1c** (org_id enforcement: backend populates `org_id` on insert → `NOT NULL`; lock down anon-`EXECUTE` on org RPCs) if you'd rather make tenancy *enforced* before cleaning house.
 
 <!-- Append one row per future session. -->
