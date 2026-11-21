@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { useLoading } from '../contexts/LoadingContext'
 import AnimatedLoadingLogo from './AnimatedLoadingLogo'
+import { Wordmark } from './Logo'
 
 export default function EnhancedLoadingScreen({ autoAnimate = true, inline = false }) {
   const loadingContext = useLoading()
@@ -45,7 +46,7 @@ export default function EnhancedLoadingScreen({ autoAnimate = true, inline = fal
       role="status" aria-live="polite" aria-label={`Loading: ${stageLabel}`}>
       <div className="en-signal-loader-content">
         <AnimatedLoadingLogo />
-        <img className="en-signal-loader-wordmark" src="/brand-lab/assets/logos/entomate-wordmark-white.svg" alt="Entomate" />
+        <div className="en-signal-loader-wordmark"><Wordmark width={178} /></div>
         <div className="en-signal-loader-track" aria-hidden="true">
           <span style={{ width: `${Math.max(0, Math.min(100, progress))}%` }} />
         </div>
@@ -57,7 +58,7 @@ export default function EnhancedLoadingScreen({ autoAnimate = true, inline = fal
         .en-signal-full { position: fixed; inset: 0; z-index: 9999; }
         .en-signal-inline { width: 100%; min-height: min(560px, 100svh); height: 100%; }
         .en-signal-loader-content { width: min(500px, 92vw); text-align: center; padding: 36px 12px; }
-        .en-signal-loader-wordmark { display: block; width: 178px; height: 36px; margin: 0 auto; }
+        .en-signal-loader-wordmark { display: flex; align-items: center; width: 178px; height: 36px; margin: 0 auto; }
         .en-signal-loader-track { width: 220px; height: 2px; background: #312a30; margin: 32px auto 20px; }
         .en-signal-loader-track span { display: block; height: 2px; background: #ff2d6b; transition: width 180ms linear; }
         .en-signal-loader-label { margin: 0 0 12px; font: 12px/1.5 system-ui, sans-serif; color: #b9aeb6; }

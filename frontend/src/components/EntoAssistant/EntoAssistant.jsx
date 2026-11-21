@@ -15,7 +15,7 @@ import {
   streamQuery,
 } from '../../services/entoAssistantService'
 import './EntoAssistant.css'
-import { ApertureMark, Wordmark } from '../Logo'
+import { EntomateMark, Wordmark } from '../Logo'
 
 const STORAGE_KEY = 'ento-ai-history'
 const MAX_MESSAGES = 50
@@ -176,7 +176,7 @@ export default function EntoAssistant({ isOpen, onClose }) {
         <div className="ea-header">
           <div className="ea-header-left">
             <div className="ea-header-icon">
-              <ApertureMark size={24} alt="" />
+              <EntomateMark size={24} alt="" />
             </div>
             <div>
               <div className="ea-header-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Wordmark width={110} /><span>AI</span></div>
@@ -228,7 +228,7 @@ export default function EntoAssistant({ isOpen, onClose }) {
             /* Welcome state */
             <div className="ea-welcome">
               <div className="ea-welcome-icon">
-                <ApertureMark size={40} alt="" />
+                <EntomateMark size={40} alt="" />
               </div>
               <div className="ea-welcome-title">Hi, I'm Entomate AI</div>
               <div className="ea-welcome-desc">

@@ -75,6 +75,7 @@ describe('Entomate brand motion', () => {
     expect(container.querySelector('.en-signal-loader-track span')).toHaveStyle({ width: '63%' })
     expect(container.querySelector('video')).not.toBeInTheDocument()
     expect(container.querySelector('.en-app-loading-logo-art svg image').getAttribute('href'))
-      .toMatch(/^\/brand-lab\/assets\/illustrated\/[a-z-]+\.png$/)
+      .toBe('/brand/relay-orbits-512.webp')
+    expect(container.querySelector('.en-signal-loader-wordmark svg')).toHaveAttribute('aria-label', 'Entomate')
   })
 })

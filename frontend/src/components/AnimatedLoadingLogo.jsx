@@ -1,11 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { nextLoadingLogo } from './loadingLogoRotation'
+import { PRIMARY_LOGO } from './Logo'
 import { LOGO_MOTIONS, renderLogoMotion } from './logoMotion'
 import './AnimatedLoadingLogo.css'
 
-// All loader instances share one direction until the next full app load.
-// Keeping this outside React also prevents Strict Mode from advancing twice.
-const appLoadingLogo = nextLoadingLogo()
+// Use the approved primary identity for every application loading state.
+const appLoadingLogo = PRIMARY_LOGO
 
 export default function AnimatedLoadingLogo() {
   const artRef = useRef(null)
@@ -15,7 +14,7 @@ export default function AnimatedLoadingLogo() {
   const [failed, setFailed] = useState(false)
   const markup = useMemo(() => renderLogoMotion(
     appLoadingLogo,
-    `/brand-lab/assets/illustrated/${appLoadingLogo}.png`,
+    `/brand/${appLoadingLogo}-512.webp`,
     6,
     LOGO_MOTIONS[appLoadingLogo].name,
   ), [])

@@ -1,12 +1,7 @@
 import React, { StrictMode } from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { nextLoadingLogo } from '../components/loadingLogoRotation'
 import AnimatedLoadingLogo from '../components/AnimatedLoadingLogo'
-
-vi.mock('../components/loadingLogoRotation', () => ({
-  nextLoadingLogo: vi.fn().mockReturnValueOnce('bloom').mockReturnValue('aperture'),
-}))
 
 let reduced, onVisibility, onPreference, pause, play, hiddenDescriptor
 const originalPause = Object.getOwnPropertyDescriptor(SVGSVGElement.prototype, 'pauseAnimations')
@@ -31,6 +26,7 @@ beforeEach(() => {
 })
 afterEach(() => {
   cleanup()
+  window.localStorage.removeItem('entomate.loading.previous')
   if (originalPause) Object.defineProperty(SVGSVGElement.prototype, 'pauseAnimations', originalPause)
   else delete SVGSVGElement.prototype.pauseAnimations
   if (originalPlay) Object.defineProperty(SVGSVGElement.prototype, 'unpauseAnimations', originalPlay)
@@ -41,14 +37,16 @@ afterEach(() => {
 })
 
 describe('shared animated application logo', () => {
-  it('keeps one selected logo through Strict Mode, rerenders and loader remounts', () => {
+  it('always uses Relay Orbits through Strict Mode and loader remounts, ignoring old rotation history', () => {
+    window.localStorage.setItem('entomate.loading.previous', 'bloom')
     const first = render(<StrictMode><AnimatedLoadingLogo /></StrictMode>)
-    expect(first.container.querySelector('[data-loading-logo]')).toHaveAttribute('data-loading-logo', 'bloom')
+    expect(first.container.querySelector('[data-loading-logo]')).toHaveAttribute('data-loading-logo', 'relay-orbits')
     first.rerender(<StrictMode><AnimatedLoadingLogo /></StrictMode>)
     first.unmount()
     const second = render(<AnimatedLoadingLogo />)
-    expect(second.container.querySelector('[data-loading-logo]')).toHaveAttribute('data-loading-logo', 'bloom')
-    expect(nextLoadingLogo).toHaveBeenCalledTimes(1)
+    expect(second.container.querySelector('[data-loading-logo]')).toHaveAttribute('data-loading-logo', 'relay-orbits')
+    expect(second.container.querySelector('svg image')).toHaveAttribute('href', '/brand/relay-orbits-512.webp')
+    expect(window.localStorage.getItem('entomate.loading.previous')).toBe('bloom')
   })
 
   it('animates only when visible and pauses offscreen or when the document is hidden', () => {
