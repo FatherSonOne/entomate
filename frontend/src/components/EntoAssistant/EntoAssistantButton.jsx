@@ -4,7 +4,7 @@
  * hover effects, and press/depress tactile feedback
  */
 import React, { useState } from 'react'
-import { ApertureMark } from '../Logo'
+import { EntomateMark } from '../Logo'
 import { getModKey } from '../../hooks/useKeyboardShortcuts'
 
 export default function EntoAssistantButton({ onClick, isOpen, hasProactiveSuggestion }) {
@@ -48,7 +48,7 @@ export default function EntoAssistantButton({ onClick, isOpen, hasProactiveSugge
           transition: 'background 180ms ease, box-shadow 180ms ease',
         }}
       >
-        <ApertureMark size={18} alt="" />
+        <EntomateMark size={18} alt="" />
         {hasProactiveSuggestion && !isOpen && (
           <span
             style={{

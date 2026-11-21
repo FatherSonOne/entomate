@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { guideSections, CATEGORIES, guideVersion, guideUpdated } from '../components/UsersGuide/guideData'
-import { Logo, ApertureMark } from '../components/Logo'
+import { Logo, EntomateMark } from '../components/Logo'
 import BackToTop from '../components/BackToTop'
 import LandingHero from '../components/LandingHero'
 
@@ -1472,7 +1472,7 @@ export default function LandingPage() {
             <div className="orbit-ring orbit-ring-1"></div>
             <div className="orbit-ring orbit-ring-2"></div>
 
-            <div className="orbit-center"><ApertureMark size={56} /></div>
+            <div className="orbit-center"><EntomateMark size={56} /></div>
 
             <div className="integration-chip chip-slack">
               <span className="chip-icon"><IconSlack size={16}/></span> Slack
@@ -1783,7 +1783,7 @@ export default function LandingPage() {
               <span className="footer-trifecto-label">part of</span>
               <div className="trifecto-pip lv" title="Logos Vision">L</div>
               <div className="trifecto-pip pulse" title="Pulse">P</div>
-              <div className="trifecto-pip ent" title="Entomate"><ApertureMark size={24} alt="" /></div>
+              <div className="trifecto-pip ent" title="Entomate"><EntomateMark size={24} alt="" /></div>
             </div>
           </div>
         </div>

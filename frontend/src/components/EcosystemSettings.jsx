@@ -4,7 +4,7 @@ import {
   AlertCircle, Loader2, Activity, Clock, ArrowRight, RotateCcw,
   Key, Copy, Check, Shuffle, ChevronDown
 } from 'lucide-react'
-import { ApertureMark, Wordmark } from './Logo'
+import { EntomateMark, Wordmark } from './Logo'
 import { VCButton, VCBadge, VCInput, VCIconBox } from './vc'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
@@ -262,7 +262,7 @@ export default function EcosystemSettings() {
           >
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0">
-                <ApertureMark size={36} alt="" />
+                <EntomateMark size={36} alt="" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
