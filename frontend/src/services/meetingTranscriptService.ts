@@ -44,6 +44,22 @@ export function toSegments(raw: unknown): TranscriptSegment[] | null {
   return out.length ? out : null
 }
 
+export interface SummaryMoments {
+  keyPoints: Array<number | null>
+  decisions: Array<number | null>
+}
+
+/**
+ * `meetings.summary_moments`: transcript timecodes index-aligned with key_points and
+ * decisions. Anything malformed reads as "no timecode" rather than a wrong one.
+ */
+export function toSummaryMoments(raw: unknown): SummaryMoments {
+  const list = (v: unknown): Array<number | null> =>
+    Array.isArray(v) ? v.map((x) => (typeof x === 'number' && Number.isFinite(x) && x >= 0 ? x : null)) : []
+  const r = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {}
+  return { keyPoints: list(r.keyPoints), decisions: list(r.decisions) }
+}
+
 /** 0:05, 12:40, 1:02:03 — the clock a person reads off a recording. */
 export function formatClock(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000))

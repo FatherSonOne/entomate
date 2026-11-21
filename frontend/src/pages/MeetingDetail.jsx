@@ -12,7 +12,8 @@ import { useToast } from '../components/vc/ToastProvider'
 import EcosystemSyncStatus from '../components/EcosystemSyncStatus'
 import MeetingNotesPanel from '../components/meetings/MeetingNotesPanel'
 import TranscriptPanel from '../components/meetings/TranscriptPanel'
-import { toSegments } from '../services/meetingTranscriptService'
+import TimecodeButton from '../components/meetings/TimecodeButton'
+import { toSegments, toSummaryMoments } from '../services/meetingTranscriptService'
 import MeetingIntelligencePanel from '../components/intelligence/MeetingIntelligencePanel'
 import { getSentimentIcon } from '../utils/meetingHelpers'
 
@@ -22,6 +23,13 @@ export default function MeetingDetail() {
   const [meeting, setMeeting] = useState(null)
   // Timed transcript lines; null for pasted or uploaded meetings, which keep the plain view.
   const transcriptSegments = useMemo(() => toSegments(meeting?.transcript_segments), [meeting?.transcript_segments])
+  const summaryMoments = useMemo(() => toSummaryMoments(meeting?.summary_moments), [meeting?.summary_moments])
+  // Timecodes next to decisions, key points and action items jump the transcript here.
+  const [focusAtMs, setFocusAtMs] = useState(null)
+  const jumpToTranscript = useCallback((atMs) => {
+    setFocusAtMs(atMs)
+    document.getElementById('meeting-transcript')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [])
   const [loading, setLoading] = useState(true)
   const [question, setQuestion] = useState('')
   const [askingQuestion, setAskingQuestion] = useState(false)
@@ -181,8 +189,9 @@ export default function MeetingDetail() {
     const points = editKeyPoints.split('\n').map(p => p.trim()).filter(Boolean)
     try {
       setSaving(true)
-      await meetingsApi.update(id, { key_points: points })
-      setMeeting(prev => ({ ...prev, key_points: points }))
+      const updated = await meetingsApi.update(id, { key_points: points })
+      // The server recomputes transcript timecodes for edited key points.
+      setMeeting(prev => ({ ...prev, key_points: points, summary_moments: updated?.summary_moments ?? null }))
       setEditingKeyPoints(false)
       toast.success('Saved', 'Key points updated')
     } catch (err) {
@@ -410,7 +419,12 @@ export default function MeetingDetail() {
                 <VCTimeline
                   events={meeting.key_points.map((point, index) => ({
                     title: point,
-                    time: `Point ${index + 1}`,
+                    time: transcriptSegments && summaryMoments.keyPoints[index] != null ? (
+                      <span>
+                        Point {index + 1} ·{' '}
+                        <TimecodeButton atMs={summaryMoments.keyPoints[index]} onJump={jumpToTranscript} label={point} />
+                      </span>
+                    ) : `Point ${index + 1}`,
                     color: index % 3 === 0 ? 'crimson' : index % 3 === 1 ? 'mint' : 'amber',
                   }))}
                 />
@@ -428,8 +442,11 @@ export default function MeetingDetail() {
                 Decisions Made
               </h2>
               <VCTimeline
-                events={meeting.decisions.map((decision) => ({
+                events={meeting.decisions.map((decision, index) => ({
                   title: decision,
+                  time: transcriptSegments && summaryMoments.decisions[index] != null ? (
+                    <TimecodeButton atMs={summaryMoments.decisions[index]} onJump={jumpToTranscript} label={decision} />
+                  ) : undefined,
                   color: 'mint',
                 }))}
               />
@@ -457,7 +474,7 @@ export default function MeetingDetail() {
           )}
 
           {/* Transcript */}
-          <div className="vc p-5">
+          <div id="meeting-transcript" className="vc p-5 scroll-mt-4">
             <h2
               className="font-semibold mb-3 flex items-center gap-2"
               style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
@@ -470,6 +487,7 @@ export default function MeetingDetail() {
               <TranscriptPanel
                 meetingId={meeting.id}
                 segments={transcriptSegments}
+                focusAtMs={focusAtMs}
                 onRenamed={({ segments, transcript }) =>
                   setMeeting(prev => ({ ...prev, transcript_segments: segments, transcript }))
                 }
@@ -505,6 +523,7 @@ export default function MeetingDetail() {
               items={meeting.actionItems || []}
               meetingId={id}
               onUpdate={loadMeeting}
+              onJumpToTranscript={transcriptSegments ? jumpToTranscript : undefined}
             />
           </div>
 

@@ -15,6 +15,7 @@ const { getOrgIdForUser, getOrgIdForMeeting } = require('../utils/orgContext');
 const calendarService = require('../services/calendarService');
 const meetingNotes = require('../services/meetingNotesService');
 const meetingEvents = require('../services/meetingEvents');
+const transcriptMoments = require('../services/transcriptMoments');
 
 const router = express.Router();
 
@@ -441,6 +442,24 @@ router.put('/:id', authenticate, validate(schemas.update), async (req, res) => {
     }
     filteredUpdates.updated_at = new Date().toISOString();
 
+    // Edited key points or decisions get fresh timecodes, so a link never points at the
+    // moment of an item that was rewritten or removed.
+    if (filteredUpdates.key_points !== undefined || filteredUpdates.decisions !== undefined) {
+      const { data: current } = await supabase
+        .from('meetings')
+        .select('key_points, decisions, transcript_segments')
+        .eq('id', id)
+        .eq('org_id', orgId)
+        .maybeSingle();
+      if (Array.isArray(current?.transcript_segments) && current.transcript_segments.length > 0) {
+        filteredUpdates.summary_moments = transcriptMoments.summaryMoments(
+          current.transcript_segments,
+          filteredUpdates.key_points ?? current.key_points,
+          filteredUpdates.decisions ?? current.decisions
+        );
+      }
+    }
+
     const { data: meeting, error } = await supabase
       .from('meetings')
       .update(filteredUpdates)
@@ -804,6 +823,10 @@ async function saveActionItems(meetingId, actionItems) {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
+    // Set by transcriptMoments for meetings with timed transcript lines.
+    if (Number.isInteger(item.transcriptAtMs) && item.transcriptAtMs >= 0) {
+      data.transcript_at_ms = item.transcriptAtMs;
+    }
 
     if (supabase) {
       const { data: row, error } = await supabase
@@ -1009,7 +1032,9 @@ router.post('/:id/reprocess', authenticate, async (req, res) => {
     }
 
     // Run AI pipeline
-    const { summaryData, actionItems, embedding } = await runAIPipeline(transcript, meeting.title);
+    const { summaryData, actionItems: rawActionItems, embedding } = await runAIPipeline(transcript, meeting.title);
+    const segments = Array.isArray(meeting.transcript_segments) ? meeting.transcript_segments : null;
+    const actionItems = transcriptMoments.withActionItemMoments(segments, rawActionItems);
 
     // Update meeting record
     const updateData = {
@@ -1023,6 +1048,9 @@ router.post('/:id/reprocess', authenticate, async (req, res) => {
       duration_minutes: meeting.duration_minutes || parseDuration(summaryData.estimatedDuration),
       updated_at: new Date().toISOString(),
     };
+    if (segments) {
+      updateData.summary_moments = transcriptMoments.summaryMoments(segments, updateData.key_points, updateData.decisions);
+    }
     if (embedding) {
       updateData.transcript_embedding = embedding;
     }

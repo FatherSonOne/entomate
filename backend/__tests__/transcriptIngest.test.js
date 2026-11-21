@@ -212,11 +212,27 @@ describe('ingestBotTranscript', () => {
     expect(meeting.transcript_segments).toHaveLength(3);
     expect(meeting.summary).toBe('We agreed to ship.');
     expect(meeting.duration_minutes).toBe(3);
+    expect(meeting.summary_moments).toEqual({ keyPoints: [null], decisions: [] });
     expect(mockDb.action_items).toHaveLength(1);
     expect(mockDb.action_items[0].org_id).toBe(ORG_A);
 
     await flush(); await flush();
     expect(meetingEvents.handleMeetingProcessed).toHaveBeenCalledTimes(1);
+  });
+
+  test('decisions and action items are linked to the transcript line they came from', async () => {
+    const words = (t, at) => t.split(' ').map((w, i) => ({ text: w, start_timestamp: { relative: at + i * 0.3 }, end_timestamp: { relative: at + i * 0.3 + 0.2 } }));
+    mockFetchJson([
+      { participant: { id: 1, name: 'Ann' }, words: words('Thanks everyone for joining today', 1) },
+      { participant: { id: 2, name: 'Bo' }, words: words('We will move the product launch to March fifteenth', 40) },
+      { participant: { id: 3, name: 'Cy' }, words: words('I will send the vendor quote to finance by Friday', 80) },
+    ]);
+    ai.generateSummary.mockResolvedValueOnce({ summary: 's', keyPoints: [], decisions: ['Product launch moved to March'], topics: [] });
+    ai.extractActionItems.mockResolvedValueOnce([{ task: 'Send vendor quote to finance', context: 'by Friday', owner: 'Cy' }]);
+    await ingest.ingestBotTranscript(SESSION, { transcriptUrl: 'https://recall.example/t.json' });
+    const meeting = mockDb.meetings.find((m) => m.id === BOT_MEETING);
+    expect(meeting.summary_moments).toEqual({ keyPoints: [], decisions: [40000] });
+    expect(mockDb.action_items[0].transcript_at_ms).toBe(80000);
   });
 
   test('a repeated bot.done does nothing the second time', async () => {
@@ -324,6 +340,15 @@ describe('meeting routes are org-scoped', () => {
     const res = await request(app).patch('/api/meetings/action-items/ai-1').set(as(OUTSIDER)).send({ status: 'done' });
     expect(res.status).toBe(404);
     expect(mockDb.action_items[0].status).toBe('open');
+  });
+
+  test('editing decisions recomputes their timecodes', async () => {
+    const m = mockDb.meetings.find((x) => x.id === MEETING_A);
+    m.transcript_segments = [{ atMs: 0, speaker: 'A', text: 'hello' }, { atMs: 9000, speaker: 'B', text: 'We will move the product launch to March' }];
+    m.summary_moments = { keyPoints: [], decisions: [123] };
+    const res = await request(app).put(`/api/meetings/${MEETING_A}`).set(as(MEMBER)).send({ decisions: ['Launch moves to March for the product'] });
+    expect(res.status).toBe(200);
+    expect(m.summary_moments).toEqual({ keyPoints: [], decisions: [9000] });
   });
 
   test('renaming a speaker rewrites the timed lines and the flat text', async () => {
