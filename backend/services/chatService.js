@@ -327,23 +327,47 @@ class ChatService {
   /**
    * Format a meeting recap for chat
    */
-  formatMeetingRecap(meeting, actionItems = []) {
+  formatMeetingRecap(meeting, actionItems = [], teamNotes = []) {
     switch (this.provider) {
       case 'slack':
-        return this.formatSlackRecap(meeting, actionItems);
+        return this.formatSlackRecap(meeting, actionItems, teamNotes);
       case 'teams':
-        return this.formatTeamsRecap(meeting, actionItems);
+        return this.formatTeamsRecap(meeting, actionItems, teamNotes);
       case 'discord':
-        return this.formatDiscordRecap(meeting, actionItems);
+        return this.formatDiscordRecap(meeting, actionItems, teamNotes);
       default:
-        return this.formatPlainRecap(meeting, actionItems);
+        return this.formatPlainRecap(meeting, actionItems, teamNotes);
     }
+  }
+
+  /**
+   * Team notes as bullet lines. Notes are user-written, so mention syntax is
+   * neutralised: Slack's <!channel>/<@U..> (escape < > &) and Discord/Teams
+   * @everyone/@here (zero-width joiner after the @). Capped at 5 notes, 500 chars each.
+   * @param {Array<{ authorName: string|null, body: string }>} teamNotes
+   * @param {'slack'|'plain'} style
+   */
+  formatTeamNoteLines(teamNotes, style = 'plain') {
+    return (teamNotes || []).slice(0, 5).map(note => {
+      let body = String(note.body || '').replace(/\s+/g, ' ').trim();
+      if (body.length > 500) body = `${body.slice(0, 497)}...`;
+      let author = note.authorName ? String(note.authorName) : '';
+      if (style === 'slack') {
+        const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        body = esc(body);
+        author = esc(author);
+      }
+      const unping = (t) => t.replace(/@(everyone|here|channel)/gi, '@\u200D$1');
+      body = unping(body);
+      author = unping(author);
+      return `• ${body}${author ? ` (${author})` : ''}`;
+    });
   }
 
   /**
    * Slack Block Kit formatted recap
    */
-  formatSlackRecap(meeting, actionItems) {
+  formatSlackRecap(meeting, actionItems, teamNotes = []) {
     const sentimentEmoji = {
       'Positive': '😊',
       'Neutral': '😐',
@@ -414,6 +438,18 @@ class ChatService {
       });
     }
 
+    // Team notes (never private ones; the caller passes team notes only)
+    if (teamNotes.length > 0) {
+      blocks.push({ type: 'divider' });
+      blocks.push({
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `*Team Notes:*\n${this.formatTeamNoteLines(teamNotes, 'slack').join('\n')}`
+        }
+      });
+    }
+
     // Footer
     blocks.push({
       type: 'context',
@@ -432,7 +468,7 @@ class ChatService {
   /**
    * Teams Adaptive Card formatted recap
    */
-  formatTeamsRecap(meeting, actionItems) {
+  formatTeamsRecap(meeting, actionItems, teamNotes = []) {
     const sentimentEmoji = {
       'Positive': '😊',
       'Neutral': '😐',
@@ -468,6 +504,13 @@ class ChatService {
       });
     }
 
+    if (teamNotes.length > 0) {
+      sections.push({
+        title: 'Team Notes',
+        text: this.formatTeamNoteLines(teamNotes).join('\n\n')
+      });
+    }
+
     return {
       title: `Meeting Recap: ${meeting.title}`,
       color: '0076D7',
@@ -478,7 +521,7 @@ class ChatService {
   /**
    * Discord embed formatted recap
    */
-  formatDiscordRecap(meeting, actionItems) {
+  formatDiscordRecap(meeting, actionItems, teamNotes = []) {
     const sentimentEmoji = {
       'Positive': '😊',
       'Neutral': '😐',
@@ -516,6 +559,15 @@ class ChatService {
       });
     }
 
+    if (teamNotes.length > 0) {
+      // Discord caps a field value at 1,024 characters.
+      fields.push({
+        name: '📝 Team Notes',
+        value: this.formatTeamNoteLines(teamNotes).join('\n').slice(0, 1024),
+        inline: false
+      });
+    }
+
     const embeds = [{
       title: `${sentimentEmoji} Meeting Recap: ${meeting.title}`,
       description: meeting.summary || 'No summary available',
@@ -535,7 +587,7 @@ class ChatService {
   /**
    * Plain text formatted recap
    */
-  formatPlainRecap(meeting, actionItems) {
+  formatPlainRecap(meeting, actionItems, teamNotes = []) {
     const sentimentEmoji = {
       'Positive': '😊',
       'Neutral': '😐',
@@ -570,6 +622,10 @@ class ChatService {
         if (item.due_date) message += ` (due ${item.due_date})`;
         message += '\n';
       });
+    }
+
+    if (teamNotes.length > 0) {
+      message += `\n**Team Notes:**\n${this.formatTeamNoteLines(teamNotes).join('\n')}\n`;
     }
 
     return { text: message };

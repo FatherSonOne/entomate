@@ -4,6 +4,7 @@ const { supabase } = require('../config/supabase');
 const ai = require('../config/ai');
 const crmService = require('../services/crmService');
 const chatService = require('../services/chatService');
+const meetingNotes = require('../services/meetingNotesService');
 const logosVisionService = require('../services/logosVisionService');
 const { authenticate } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
@@ -280,11 +281,24 @@ router.post('/chat/post-recap', authenticate, validate(schemas.postRecap), async
       return res.status(503).json({ error: 'Database not configured' });
     }
 
+    // The recap carries team notes, so it must be org-scoped: a user outside the
+    // meeting's org gets the same 404 as for a missing meeting.
+    let orgId;
+    try {
+      orgId = await meetingNotes.assertMeetingAccess(req.user?.id, meetingId);
+    } catch (accessError) {
+      if (accessError instanceof meetingNotes.NotesError) {
+        return res.status(accessError.status).json({ error: accessError.message });
+      }
+      throw accessError;
+    }
+
     // Get meeting with action items
     const { data: meeting, error: meetingError } = await supabase
       .from('meetings')
       .select('*')
       .eq('id', meetingId)
+      .eq('org_id', orgId)
       .single();
 
     if (meetingError) {
@@ -296,6 +310,9 @@ router.post('/chat/post-recap', authenticate, validate(schemas.postRecap), async
       .select('*')
       .eq('meeting_id', meetingId);
 
+    // Team notes only; private notes are never posted.
+    const teamNotes = await meetingNotes.getTeamNotesForMeeting(orgId, meetingId);
+
     // Format message using chatService
     let formattedMessage;
     let messageText;
@@ -305,7 +322,7 @@ router.post('/chat/post-recap', authenticate, validate(schemas.postRecap), async
       messageText = customMessage;
     } else {
       // Use chatService to format the recap with rich formatting
-      formattedMessage = chatService.formatMeetingRecap(meeting, actionItems || []);
+      formattedMessage = chatService.formatMeetingRecap(meeting, actionItems || [], teamNotes);
       messageText = formattedMessage.text || formattedMessage.content || '';
 
       // Pass blocks/embeds for rich formatting
