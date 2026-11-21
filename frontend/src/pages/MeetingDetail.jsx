@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
   ArrowLeft, Clock, Users, FileText, CheckSquare, MessageSquare,
-  Send, Loader2, RefreshCw, Share2, X, Pencil, Check, CalendarPlus
+  Send, Loader2, RefreshCw, Share2, X, Pencil, Check, CalendarPlus, StickyNote
 } from 'lucide-react'
 import { meetingsApi, integrationsApi, calendarApi } from '../services/api'
 import ActionItemsList from '../components/ActionItemsList'
@@ -10,6 +10,7 @@ import ChatChannelSelector from '../components/ChatChannelSelector'
 import { VCButton, VCBadge, VCTimeline } from '../components/vc'
 import { useToast } from '../components/vc/ToastProvider'
 import EcosystemSyncStatus from '../components/EcosystemSyncStatus'
+import MeetingNotesPanel from '../components/meetings/MeetingNotesPanel'
 import MeetingIntelligencePanel from '../components/intelligence/MeetingIntelligencePanel'
 import { getSentimentIcon } from '../utils/meetingHelpers'
 
@@ -491,6 +492,18 @@ export default function MeetingDetail() {
               onUpdate={loadMeeting}
             />
           </div>
+
+          {/* My Notes (private by default, team on request) */}
+          <section className="vc p-5" aria-labelledby="meeting-notes-heading">
+            <h2
+              id="meeting-notes-heading"
+              className="font-semibold mb-3 flex items-center gap-2 font-display text-content-primary"
+            >
+              <StickyNote className="w-5 h-5" aria-hidden="true" />
+              Notes
+            </h2>
+            <MeetingNotesPanel meetingId={id} />
+          </section>
 
           {/* Ecosystem Sync Status */}
           <EcosystemSyncStatus meetingId={id} />

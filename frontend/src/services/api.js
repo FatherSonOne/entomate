@@ -248,6 +248,13 @@ export const meetingsApi = {
   // Get formatted recap
   getRecap: (id) => api.get(`/meetings/${id}/recap`),
 
+  // Meeting notes (private by default; team on request). Typed wrapper:
+  // services/meetingNotesService.ts
+  listNotes: (meetingId) => api.get(`/meetings/${meetingId}/notes`),
+  createNote: (meetingId, data) => api.post(`/meetings/${meetingId}/notes`, data),
+  updateNote: (meetingId, noteId, data) => api.patch(`/meetings/${meetingId}/notes/${noteId}`, data),
+  deleteNote: (meetingId, noteId) => api.delete(`/meetings/${meetingId}/notes/${noteId}`),
+
   // Update action item status
   updateActionItem: (id, data) => api.patch(`/meetings/action-items/${id}`, data),
 

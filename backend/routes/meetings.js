@@ -13,6 +13,7 @@ const log = require('../utils/log');
 const { getOrgIdForUser, getOrgIdForMeeting } = require('../utils/orgContext');
 
 const calendarService = require('../services/calendarService');
+const meetingNotes = require('../services/meetingNotesService');
 const meetingEvents = require('../services/meetingEvents');
 
 const router = express.Router();
@@ -559,11 +560,24 @@ router.get('/:id/recap', authenticate, async (req, res) => {
       return res.status(503).json({ error: 'Database not configured' });
     }
 
+    // The recap now carries team notes, so it must be org-scoped: a user outside the
+    // meeting's org gets the same 404 as for a missing meeting.
+    let orgId;
+    try {
+      orgId = await meetingNotes.assertMeetingAccess(req.user?.id, id);
+    } catch (accessError) {
+      if (accessError instanceof meetingNotes.NotesError) {
+        return res.status(accessError.status).json({ error: accessError.message });
+      }
+      throw accessError;
+    }
+
     // Get meeting with action items
     const { data: meeting, error: meetingError } = await supabase
       .from('meetings')
       .select('*')
       .eq('id', id)
+      .eq('org_id', orgId)
       .single();
 
     if (meetingError) {
@@ -574,6 +588,8 @@ router.get('/:id/recap', authenticate, async (req, res) => {
       .from('action_items')
       .select('*')
       .eq('meeting_id', id);
+
+    const teamNotes = await meetingNotes.getTeamNotesForMeeting(orgId, id);
 
     // Format recap
     let recap;
@@ -586,6 +602,12 @@ router.get('/:id/recap', authenticate, async (req, res) => {
     } else {
       // Fallback formatting
       recap = formatRecapFallback(meeting, actionItems || []);
+    }
+
+    // Team notes are appended after formatting, never handed to the AI to rewrite.
+    if (teamNotes.length > 0 && typeof recap === 'string') {
+      const lines = teamNotes.map(n => `• ${n.body}${n.authorName ? ` (${n.authorName})` : ''}`);
+      recap += `\n\n*Team Notes:*\n${lines.join('\n')}`;
     }
 
     res.json({

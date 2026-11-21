@@ -231,6 +231,8 @@ app.get('/api/health', async (req, res) => {
 // ========================================
 
 // Meetings
+// Notes first: its own router, scoped to one meeting (private-or-team rule in the service).
+app.use('/api/meetings/:meetingId/notes', require('./routes/meetingNotes'));
 app.use('/api/meetings', require('./routes/meetings'));
 
 // Projects
