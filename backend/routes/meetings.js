@@ -512,6 +512,11 @@ router.delete('/:id', authenticate, async (req, res) => {
       return res.status(404).json({ error: 'Meeting not found' });
     }
 
+    // A browser recording may still have audio saved (unfinished or failed).
+    require('../services/meetingRecorder')
+      .purgeRecordingAudio(orgId, id)
+      .catch((purgeError) => log.warn('Meeting deleted but its recording audio was not', { meetingId: id, error: purgeError.message }));
+
     res.json({ success: true, message: 'Meeting deleted' });
 
   } catch (error) {

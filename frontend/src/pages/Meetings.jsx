@@ -4,7 +4,7 @@ import {
   Plus, Search, Clock, Users, MessageSquare, Trash2, AlertTriangle,
   RefreshCw, Loader2, CheckSquare, Square, Download, X
 } from 'lucide-react'
-import MeetingRecorder from '../components/MeetingRecorder'
+import MeetingRecorder from '../components/meetings/MeetingRecorder'
 import { meetingsApi, settingsApi } from '../services/api'
 import { VCButton, VCBadge } from '../components/vc'
 import { useConfirm } from '../components/vc/ConfirmDialog'
@@ -80,8 +80,7 @@ export default function Meetings() {
     }
   }
 
-  const handleMeetingProcessed = (result) => {
-    setShowRecorder(false)
+  const handleMeetingProcessed = () => {
     loadMeetings()
   }
 
@@ -235,7 +234,8 @@ export default function Meetings() {
 
       {/* Recorder panel */}
       {showRecorder && (
-        <MeetingRecorder onMeetingProcessed={handleMeetingProcessed} audioInputDeviceId={audioInputDeviceId} />
+        // The panel stays open after recording: it offers the video download and a link to the meeting.
+        <MeetingRecorder onRecorded={handleMeetingProcessed} audioInputDeviceId={audioInputDeviceId} />
       )}
 
       {/* Search and filters */}

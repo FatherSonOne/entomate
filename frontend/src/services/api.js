@@ -217,6 +217,25 @@ api.interceptors.response.use(
 export const checkHealth = () => api.get('/health')
 
 // ========================================
+// RECORDINGS API (in-browser recorder, no bot)
+// ========================================
+export const recordingsApi = {
+  start: (data) => api.post('/recordings', data),
+  // One piece of audio as the raw body; the server stores it by number, so a repeat is safe.
+  uploadPiece: (meetingId, seq, durationMs, blob, contentType) =>
+    api.put(`/recordings/${meetingId}/pieces/${seq}`, blob, {
+      params: { durationMs },
+      headers: { 'Content-Type': contentType },
+      timeout: 60000,
+    }),
+  finish: (meetingId, pieces) => api.post(`/recordings/${meetingId}/finish`, { pieces }),
+  // The recording tab closed before Stop: transcribe the audio that reached the server.
+  salvage: (meetingId) => api.post(`/recordings/${meetingId}/finish`, { salvage: true }),
+  retry: (meetingId) => api.post(`/recordings/${meetingId}/retry`),
+  discard: (meetingId) => api.delete(`/recordings/${meetingId}`),
+}
+
+// ========================================
 // MEETINGS API
 // ========================================
 export const meetingsApi = {
