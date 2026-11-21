@@ -1,0 +1,104 @@
+[
+  {
+    "id": "relay",
+    "source": "codex-clipboard-0a386bd3-8248-429e-bb13-d5220dd3ce1d.gif",
+    "prompt": "Use case: logo-brand. Create ONE premium illustrated logo emblem for Entomate, using the attached reference as the actual visual foundation. Preserve the reference\u2019s luminous crimson, mint and ivory wireframe rings, crystalline micro-circuits and fine energy filaments. Resolve its four-glyph strip into one strong central circular catalyst emblem, drawing especially on the third open ring, with controlled satellite connections. Rich detailed 3D scientific wireframe artwork with a clean recognizable silhouette; not a generic flat vector icon. Isolate the complete emblem centered on a genuinely transparent background, generous clear space, no black rectangle, no scenery. No words, no lettering; the Entomate wordmark will be paired separately. Keep the object intricate but deliberate and visually cohesive.",
+    "method": "built-in image_gen"
+  },
+  {
+    "id": "constellation",
+    "source": "codex-clipboard-3ad9f6ff-64e9-49b6-bc33-d6af1a2b49f1.png",
+    "prompt": "Use case: logo-brand. Create ONE premium illustrated Entomate logo symbol based directly on the attached visual reference. Preserve the large luminous central circular intelligence core and three smaller orbiting ring cores in the same asymmetric constellation. Keep the copper-ivory fine concentric circuitry and mint architectural traces, but consolidate the busy background into an isolated, deliberate emblem. Keep intricate scientific wireframe detail, glass-like ribbons and fine luminous filaments; a composed high-end logo artwork, not a flat geometric substitute. Isolate the complete mark centered with generous margins. Background must be transparent outside and through the open spaces of the object, with no colored backdrop or rectangle and no broad background glow. No words or lettering; the Entomate wordmark is added separately.",
+    "method": "built-in image_gen"
+  },
+  {
+    "id": "aperture",
+    "source": "codex-clipboard-3e51ebcb-9c27-4a2e-9fb4-04cb14145898.png",
+    "prompt": "Use case: logo-brand. Create ONE premium illustrated Entomate logo symbol based directly on the attached visual reference. Preserve the distinctive huge bright crescent open on the left, densely layered orange-ivory concentric ribbons, fine mint inlay, and smaller offset orbital core on the left. Make it a self-contained circular Entomate catalyst emblem. Preserve the asymmetry rather than turning it into a generic symmetric ring. Keep intricate scientific wireframe detail, glass-like ribbons and fine luminous filaments; a composed high-end logo artwork, not a flat geometric substitute. Isolate the complete mark centered with generous margins. Background must be transparent outside and through the open spaces of the object, with no colored backdrop or rectangle and no broad background glow. No words or lettering; the Entomate wordmark is added separately.",
+    "method": "built-in image_gen"
+  },
+  {
+    "id": "orbit",
+    "source": "codex-clipboard-5cfa6e8a-c75d-4f75-a8a1-dc2a42139f8f.png",
+    "prompt": "Use case: logo-brand. Create ONE premium illustrated Entomate logo symbol based directly on the attached visual reference. Preserve the actual layered translucent cyan and crimson ribbon loops, large open upper-right loop, smaller upper-left loop, dense lower circular core and connected golden circuit lattice. Refine these into a single recognizable, fluid, sculptural intelligence emblem with the source\u2019s characteristic silhouette. Keep intricate scientific wireframe detail, glass-like ribbons and fine luminous filaments; a composed high-end logo artwork, not a flat geometric substitute. Isolate the complete mark centered with generous margins. Background must be transparent outside and through the open spaces of the object, with no colored backdrop or rectangle and no broad background glow. No words or lettering; the Entomate wordmark is added separately.",
+    "method": "built-in image_gen"
+  },
+  {
+    "id": "bloom",
+    "source": "codex-clipboard-94003b11-e2c2-4076-8c7e-849fbd542652.png",
+    "prompt": "Use case: logo-brand. Create ONE premium illustrated Entomate logo symbol based directly on the attached visual reference. Preserve the four translucent pillowy lobes, central dark opening and crimson inner ribbon, delicate cyan glass strands, copper highlights and intricate circuit lattice. Make an elegant four-lobed cellular catalyst emblem with the same dimensional and luminous character. Keep intricate scientific wireframe detail, glass-like ribbons and fine luminous filaments; a composed high-end logo artwork, not a flat geometric substitute. Isolate the complete mark centered with generous margins. Background must be transparent outside and through the open spaces of the object, with no colored backdrop or rectangle and no broad background glow. No words or lettering; the Entomate wordmark is added separately.",
+    "method": "built-in image_gen"
+  },
+  {
+    "id": "circuit-spire",
+    "source": "Abstract_compact_technology_mark_inspired_by_Entomates_routin_c987ecdf-8380-40c0-b95b-a4be874ae2f3_0.png",
+    "prompt": "Use case: logo-brand. Create ONE illustrated logo emblem for Entomate based directly on this reference image. Preserve the compact vertical branching copper-and-mint circuit tree with its illuminated red routing spine, symmetric horizontal traces, and orbital micro-nodes. Make a deliberate self-contained vertical emblem. Retain the source\u2019s actual visual character and intricate dimensional materials; refine balance, silhouette and clarity rather than substituting a generic geometric icon. Center the complete mark with generous margins on a genuinely transparent background, including transparent open spaces. Keep glow tight to the actual object, no broad backdrop, no black rectangle, no words or lettering. The lowercase Entomate wordmark is added separately.",
+    "method": "built-in image_gen"
+  },
+  {
+    "id": "circuit-e",
+    "source": "Abstract_compact_technology_mark_inspired_by_Entomates_routin_c987ecdf-8380-40c0-b95b-a4be874ae2f3_1.png",
+    "prompt": "Use case: logo-brand. Create ONE illustrated logo emblem for Entomate based directly on this reference image. Preserve and refine the three substantial red horizontal bars, the left routing circuit branches and round metallic nodes into a dimensional capital E intelligence logo. Keep the clear three-bar silhouette with crisp engineered edges. Retain the source\u2019s actual visual character and intricate dimensional materials; refine balance, silhouette and clarity rather than substituting a generic geometric icon. Center the complete mark with generous margins on a genuinely transparent background, including transparent open spaces. Keep glow tight to the actual object, no broad backdrop, no black rectangle, no words or lettering. The lowercase Entomate wordmark is added separately.",
+    "method": "built-in image_gen"
+  },
+  {
+    "id": "catalyst-core",
+    "source": "Abstract_compact_technology_mark_inspired_by_Entomates_routin_c987ecdf-8380-40c0-b95b-a4be874ae2f3_2.png",
+    "prompt": "Use case: logo-brand. Create ONE illustrated logo emblem for Entomate based directly on this reference image. Preserve the crimson concentric orbital core, layered horizontal data traces and suspended wireframe satellite nodes. Make a strong compact circular intelligence emblem. Retain the source\u2019s actual visual character and intricate dimensional materials; refine balance, silhouette and clarity rather than substituting a generic geometric icon. Center the complete mark with generous margins on a genuinely transparent background, including transparent open spaces. Keep glow tight to the actual object, no broad backdrop, no black rectangle, no words or lettering. The lowercase Entomate wordmark is added separately.",
+    "method": "built-in image_gen"
+  },
+  {
+    "id": "routed-signal",
+    "source": "Abstract_compact_technology_mark_inspired_by_Entomates_routin_c987ecdf-8380-40c0-b95b-a4be874ae2f3_3.png",
+    "prompt": "Use case: logo-brand. Create ONE illustrated logo emblem for Entomate based directly on this reference image. Preserve the three horizontal light bars, large right ring terminals, left circuitry and one offset signal node. Compose these as a distinctive three-path routing logo, luminous red and warm ivory. Retain the source\u2019s actual visual character and intricate dimensional materials; refine balance, silhouette and clarity rather than substituting a generic geometric icon. Center the complete mark with generous margins on a genuinely transparent background, including transparent open spaces. Keep glow tight to the actual object, no broad backdrop, no black rectangle, no words or lettering. The lowercase Entomate wordmark is added separately.",
+    "method": "built-in image_gen"
+  },
+  {
+    "id": "ignition",
+    "source": "A_coordinated_set_of_four_abstract_Entomate_intelligence_glyp_fcc7c7f6-2396-46c8-926a-cc1cac73d381_1.png",
+    "prompt": "Use case: logo-brand. Create ONE illustrated logo emblem for Entomate based directly on this reference image. The reference contains four glyphs. Create ONE coherent emblem based on its distinctive spiky crimson-and-mint ignition core, intersecting vertical circuit axis and circular halo. Do not reproduce a row of four objects. Retain the source\u2019s actual visual character and intricate dimensional materials; refine balance, silhouette and clarity rather than substituting a generic geometric icon. Center the complete mark with generous margins on a genuinely transparent background, including transparent open spaces. Keep glow tight to the actual object, no broad backdrop, no black rectangle, no words or lettering. The lowercase Entomate wordmark is added separately.",
+    "method": "built-in image_gen"
+  },
+  {
+    "id": "relay-orbits",
+    "source": "A_coordinated_set_of_four_abstract_Entomate_intelligence_glyp_fcc7c7f6-2396-46c8-926a-cc1cac73d381_2.png",
+    "prompt": "Use case: logo-brand. Create ONE illustrated logo emblem for Entomate based directly on this reference image. The reference contains four ring glyphs. Create ONE compact emblem combining the strongest layered crescent ring, luminous inner halo and horizontal energy axis. Preserve the translucent red glass and precision wires. Retain the source\u2019s actual visual character and intricate dimensional materials; refine balance, silhouette and clarity rather than substituting a generic geometric icon. Center the complete mark with generous margins on a genuinely transparent background, including transparent open spaces. Keep glow tight to the actual object, no broad backdrop, no black rectangle, no words or lettering. The lowercase Entomate wordmark is added separately.",
+    "method": "built-in image_gen"
+  },
+  {
+    "id": "signal-cascade",
+    "source": "A_coordinated_set_of_four_abstract_Entomate_intelligence_glyp_fcc7c7f6-2396-46c8-926a-cc1cac73d381_3.png",
+    "prompt": "Use case: logo-brand. Create ONE illustrated logo emblem for Entomate based directly on this reference image. The reference contains four circular glyphs. Create ONE coherent central emblem with its warm crimson concentric ignition rings, fine technical etchings and a smaller orbiting node. Retain the warm light and dark open center. Retain the source\u2019s actual visual character and intricate dimensional materials; refine balance, silhouette and clarity rather than substituting a generic geometric icon. Center the complete mark with generous margins on a genuinely transparent background, including transparent open spaces. Keep glow tight to the actual object, no broad backdrop, no black rectangle, no words or lettering. The lowercase Entomate wordmark is added separately.",
+    "method": "built-in image_gen"
+  },
+  {
+    "id": "orbital-network",
+    "source": "Four_coordinated_intelligence_signals_operating_as_one_system_f4c5d4ac-d09d-4245-9ad4-359944b1ec65_1.png",
+    "prompt": "Use case: logo-brand. Create ONE illustrated logo emblem for Entomate based directly on this reference image. Preserve the large central dimensional ring connected to several smaller orbiting ring cores, silky cyan and rose wireframe connections and open dark spaces. Refine it into an intricate, connected intelligence emblem. Retain the source\u2019s actual visual character and intricate dimensional materials; refine balance, silhouette and clarity rather than substituting a generic geometric icon. Center the complete mark with generous margins on a genuinely transparent background, including transparent open spaces. Keep glow tight to the actual object, no broad backdrop, no black rectangle, no words or lettering. The lowercase Entomate wordmark is added separately.",
+    "method": "built-in image_gen"
+  },
+  {
+    "id": "trinity",
+    "source": "Four_coordinated_intelligence_signals_operating_as_one_system_f4c5d4ac-d09d-4245-9ad4-359944b1ec65_2.png",
+    "prompt": "Use case: logo-brand. Create ONE illustrated logo emblem for Entomate based directly on this reference image. Preserve the three distinct translucent orbital lobes in a triangular arrangement, warm copper upper loops and cool ivory lower orbit ribbons. Make an elegant three-part connected intelligence emblem. Retain the source\u2019s actual visual character and intricate dimensional materials; refine balance, silhouette and clarity rather than substituting a generic geometric icon. Center the complete mark with generous margins on a genuinely transparent background, including transparent open spaces. Keep glow tight to the actual object, no broad backdrop, no black rectangle, no words or lettering. The lowercase Entomate wordmark is added separately.",
+    "method": "built-in image_gen"
+  },
+  {
+    "id": "flow-field",
+    "source": "Four_coordinated_intelligence_signals_operating_as_one_system_f4c5d4ac-d09d-4245-9ad4-359944b1ec65_3.png",
+    "prompt": "Use case: logo-brand. Create ONE illustrated logo emblem for Entomate based directly on this reference image. Preserve the twisting amber upper flow and two lower mint-and-ivory circular vortices, connected as one three-part ribbon system. Make an isolated self-contained sculptural logo emblem. Retain the source\u2019s actual visual character and intricate dimensional materials; refine balance, silhouette and clarity rather than substituting a generic geometric icon. Center the complete mark with generous margins on a genuinely transparent background, including transparent open spaces. Keep glow tight to the actual object, no broad backdrop, no black rectangle, no words or lettering. The lowercase Entomate wordmark is added separately.",
+    "method": "built-in image_gen"
+  },
+  {
+    "id": "neural-core",
+    "source": "Isolated_abstract_Entomate_intelligence_object_on_a_true-blac_60e9baa4-c81b-42a6-8849-5d134a83a557_0.png",
+    "prompt": "Use case: logo-brand. Create ONE illustrated logo emblem for Entomate based directly on this reference image. Preserve the compact asymmetric multi-loop cyan-and-crimson wireframe object with its intricate golden central circuit lattice. Consolidate its silhouette into a premium sculptural logo without losing fine circuitry. Retain the source\u2019s actual visual character and intricate dimensional materials; refine balance, silhouette and clarity rather than substituting a generic geometric icon. Center the complete mark with generous margins on a genuinely transparent background, including transparent open spaces. Keep glow tight to the actual object, no broad backdrop, no black rectangle, no words or lettering. The lowercase Entomate wordmark is added separately.",
+    "method": "built-in image_gen"
+  },
+  {
+    "id": "ribbon-catalyst",
+    "source": "Isolated_abstract_Entomate_intelligence_object_on_a_true-blac_60e9baa4-c81b-42a6-8849-5d134a83a557_3.png",
+    "prompt": "Use case: logo-brand. Create ONE illustrated logo emblem for Entomate based directly on this reference image. Preserve the rounded open torus made from translucent cyan and rose glass ribbons and black crystalline facets, with a clear central void. Make a polished self-contained intelligence emblem. Retain the source\u2019s actual visual character and intricate dimensional materials; refine balance, silhouette and clarity rather than substituting a generic geometric icon. Center the complete mark with generous margins on a genuinely transparent background, including transparent open spaces. Keep glow tight to the actual object, no broad backdrop, no black rectangle, no words or lettering. The lowercase Entomate wordmark is added separately.",
+    "method": "built-in image_gen"
+  }
+]

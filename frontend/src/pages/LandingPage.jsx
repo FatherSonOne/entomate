@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { guideSections, CATEGORIES, guideVersion, guideUpdated } from '../components/UsersGuide/guideData'
-import { Logo, CircuitEMark } from '../components/Logo'
+import { Logo, ApertureMark } from '../components/Logo'
 import BackToTop from '../components/BackToTop'
+import LandingHero from '../components/LandingHero'
 
 /* ════════════════════════════════════════════════════════
    ANIMATED SVG ICONS — replace every emoji on the page
@@ -624,7 +625,6 @@ export default function LandingPage() {
   const { isSignedIn, loading: isLoading } = useAuth()
   const isLoaded = !isLoading
   const landingRef = useRef(null)
-  const heroCanvasRef = useRef(null)
 
   // Load Google Fonts
   useEffect(() => {
@@ -648,304 +648,6 @@ export default function LandingPage() {
       document.head.removeChild(link)
       document.head.removeChild(preconnect1)
       document.head.removeChild(preconnect2)
-    }
-  }, [])
-
-  // ── Hero neural-network canvas animation ─────────────────────────────────────
-  useEffect(() => {
-    const canvas = heroCanvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-
-    let isVisible = true
-    const visObs = new IntersectionObserver(([entry]) => { isVisible = entry.isIntersecting }, { threshold: 0 })
-    visObs.observe(canvas)
-
-    const CRIMSON = '#FF2D6B'
-    const MINT    = '#00F5D4'
-    const AMBER   = '#FFB800'
-    const COLORS  = [CRIMSON, MINT, AMBER]
-    const GLOW    = 1.0
-    const CONNECT_DIST_FRAC = 0.30  // fraction of canvas width — bigger = more connections
-    const N_NODES = 50
-    const N_HUBS  = 10
-
-    let W = 0, H = 0, rafId = 0, time = 0
-
-    // ── Node types ──
-    // Hubs: large, slow, named — represent key automation concepts
-    // Regular: small, drift around, form the mesh
-    const nodes = []
-    const pings = []   // data pulses traveling between nodes
-    const ripples = [] // expanding rings when a ping arrives
-
-    function makeNode(isHub, idx) {
-      const color = COLORS[idx % 3]
-      const pad = 40  // keep nodes away from edges
-      return {
-        x:  pad + Math.random() * (W - pad * 2),
-        y:  pad + Math.random() * (H - pad * 2),
-        vx: (Math.random() - 0.5) * (isHub ? 0.25 : 0.55),
-        vy: (Math.random() - 0.5) * (isHub ? 0.25 : 0.55),
-        r:  isHub ? 5 + Math.random() * 4 : 2 + Math.random() * 3,
-        color,
-        alpha: isHub ? 1.0 : 0.45 + Math.random() * 0.35,
-        isHub,
-        pulsePhase: Math.random() * Math.PI * 2,
-      }
-    }
-
-    function buildNodes() {
-      nodes.length = 0
-      pings.length = 0
-      ripples.length = 0
-      for (let i = 0; i < N_HUBS; i++) nodes.push(makeNode(true, i))
-      for (let i = 0; i < N_NODES - N_HUBS; i++) nodes.push(makeNode(false, i))
-    }
-
-    // ── Spawn a data ping between two connected nodes ──
-    function spawnPing(fromIdx, toIdx) {
-      const from = nodes[fromIdx]
-      const to = nodes[toIdx]
-      if (!from || !to) return
-      // Use the source node's color, or blend
-      pings.push({
-        fromIdx, toIdx,
-        progress: 0,           // 0 → 1
-        speed: 0.006 + Math.random() * 0.010,
-        size: 3 + Math.random() * 3,
-        color: from.color,
-        trail: [],             // recent positions for comet tail
-      })
-    }
-
-    // ── Spawn a ripple at a position ──
-    function spawnRipple(x, y, color) {
-      ripples.push({ x, y, r: 0, maxR: 30 + Math.random() * 25, alpha: 0.75, color })
-    }
-
-    const resize = () => {
-      const dpr = window.devicePixelRatio || 1
-      W = canvas.offsetWidth
-      H = canvas.offsetHeight
-      if (W === 0 || H === 0) return  // not laid out yet
-      canvas.width  = W * dpr
-      canvas.height = H * dpr
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-      buildNodes()  // always rebuild with correct dimensions
-    }
-
-    // ── Find active connections (edges) each frame ──
-    function getEdges() {
-      const edges = []
-      const maxDist = W * CONNECT_DIST_FRAC
-      for (let i = 0; i < nodes.length; i++) {
-        for (let j = i + 1; j < nodes.length; j++) {
-          const dx = nodes[i].x - nodes[j].x
-          const dy = nodes[i].y - nodes[j].y
-          const dist = Math.sqrt(dx * dx + dy * dy)
-          if (dist < maxDist) {
-            edges.push({ i, j, dist, strength: 1 - dist / maxDist })
-          }
-        }
-      }
-      return edges
-    }
-
-    // ── Ping spawning timer ──
-    let pingTimer = 0
-    const PING_INTERVAL = 12 // frames between new pings — frequent for lively feel
-
-    // ── Main loop ──
-    const loop = () => {
-      rafId = requestAnimationFrame(loop)
-      if (!isVisible) return
-      ctx.clearRect(0, 0, W, H)
-      time += 0.016
-
-      // ── Drift nodes — bounce off edges ──
-      nodes.forEach(n => {
-        n.x += n.vx
-        n.y += n.vy
-        if (n.x < n.r)     { n.x = n.r;     n.vx = Math.abs(n.vx) }
-        if (n.x > W - n.r) { n.x = W - n.r; n.vx = -Math.abs(n.vx) }
-        if (n.y < n.r)     { n.y = n.r;     n.vy = Math.abs(n.vy) }
-        if (n.y > H - n.r) { n.y = H - n.r; n.vy = -Math.abs(n.vy) }
-      })
-
-      const edges = getEdges()
-
-      // ── Draw connection lines ──
-      edges.forEach(e => {
-        const a = nodes[e.i], b = nodes[e.j]
-        const hasHub = a.isHub || b.isHub
-        const bothHub = a.isHub && b.isHub
-        const alpha = e.strength * (bothHub ? 0.45 : hasHub ? 0.28 : 0.15)
-        ctx.beginPath()
-        ctx.moveTo(a.x, a.y)
-        ctx.lineTo(b.x, b.y)
-        ctx.strokeStyle = a.color
-        ctx.lineWidth = bothHub ? 1.2 : hasHub ? 0.8 : 0.5
-        ctx.globalAlpha = alpha
-        // Glow on hub connections
-        if (hasHub) {
-          ctx.shadowColor = a.color
-          ctx.shadowBlur = 6
-        }
-        ctx.stroke()
-        ctx.shadowBlur = 0
-      })
-
-      // ── Spawn pings along random edges ──
-      pingTimer++
-      if (pingTimer >= PING_INTERVAL && edges.length > 0) {
-        pingTimer = 0
-        // Pick a random edge, prefer hub connections
-        const hubEdges = edges.filter(e => nodes[e.i].isHub || nodes[e.j].isHub)
-        const pool = hubEdges.length > 3 ? hubEdges : edges
-        const edge = pool[Math.floor(Math.random() * pool.length)]
-        // Random direction
-        if (Math.random() > 0.5) {
-          spawnPing(edge.i, edge.j)
-        } else {
-          spawnPing(edge.j, edge.i)
-        }
-      }
-
-      // ── Update & draw pings ──
-      for (let p = pings.length - 1; p >= 0; p--) {
-        const ping = pings[p]
-        ping.progress += ping.speed
-
-        if (ping.progress >= 1) {
-          // Ping arrived — spawn ripple at destination
-          const dest = nodes[ping.toIdx]
-          if (dest) spawnRipple(dest.x, dest.y, ping.color)
-          pings.splice(p, 1)
-          continue
-        }
-
-        const from = nodes[ping.fromIdx]
-        const to = nodes[ping.toIdx]
-        if (!from || !to) { pings.splice(p, 1); continue }
-
-        const px = from.x + (to.x - from.x) * ping.progress
-        const py = from.y + (to.y - from.y) * ping.progress
-
-        // Store trail position
-        ping.trail.push({ x: px, y: py })
-        if (ping.trail.length > 8) ping.trail.shift()
-
-        // Draw comet trail
-        ping.trail.forEach((pt, ti) => {
-          const trailAlpha = (ti / ping.trail.length) * 0.5
-          ctx.beginPath()
-          ctx.arc(pt.x, pt.y, ping.size * (0.3 + 0.7 * ti / ping.trail.length), 0, Math.PI * 2)
-          ctx.fillStyle = ping.color
-          ctx.globalAlpha = trailAlpha * GLOW
-          ctx.fill()
-        })
-
-        // Draw ping head
-        ctx.beginPath()
-        ctx.arc(px, py, ping.size, 0, Math.PI * 2)
-        ctx.fillStyle = ping.color
-        ctx.globalAlpha = 0.9
-        ctx.shadowColor = ping.color
-        ctx.shadowBlur = 14 * GLOW
-        ctx.fill()
-        ctx.shadowBlur = 0
-      }
-
-      // ── Update & draw ripples ──
-      for (let r = ripples.length - 1; r >= 0; r--) {
-        const rip = ripples[r]
-        rip.r += 0.8
-        rip.alpha -= 0.012
-        if (rip.alpha <= 0 || rip.r > rip.maxR) { ripples.splice(r, 1); continue }
-
-        ctx.beginPath()
-        ctx.arc(rip.x, rip.y, rip.r, 0, Math.PI * 2)
-        ctx.strokeStyle = rip.color
-        ctx.lineWidth = 2
-        ctx.globalAlpha = rip.alpha
-        ctx.shadowColor = rip.color
-        ctx.shadowBlur = 8
-        ctx.stroke()
-        ctx.shadowBlur = 0
-      }
-
-      // ── Draw nodes ──
-      nodes.forEach((n) => {
-        const pulse = 0.65 + 0.35 * Math.sin(time * 1.5 + n.pulsePhase)
-        const r = n.r * (0.9 + 0.1 * pulse)
-
-        // Outer glow halo
-        if (n.isHub) {
-          ctx.beginPath()
-          ctx.arc(n.x, n.y, r * 5, 0, Math.PI * 2)
-          const grad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r * 5)
-          grad.addColorStop(0, n.color + '35')
-          grad.addColorStop(0.5, n.color + '12')
-          grad.addColorStop(1, n.color + '00')
-          ctx.fillStyle = grad
-          ctx.globalAlpha = pulse
-          ctx.fill()
-        } else {
-          // Small glow for regular nodes too
-          ctx.beginPath()
-          ctx.arc(n.x, n.y, r * 3, 0, Math.PI * 2)
-          const grad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r * 3)
-          grad.addColorStop(0, n.color + '18')
-          grad.addColorStop(1, n.color + '00')
-          ctx.fillStyle = grad
-          ctx.globalAlpha = pulse * 0.6
-          ctx.fill()
-        }
-
-        // Core dot
-        ctx.beginPath()
-        ctx.arc(n.x, n.y, r, 0, Math.PI * 2)
-        ctx.fillStyle = n.color
-        ctx.globalAlpha = n.alpha * pulse
-        ctx.shadowColor = n.color
-        ctx.shadowBlur = n.isHub ? 18 : 8
-        ctx.fill()
-        ctx.shadowBlur = 0
-
-        // White hot-center on hubs
-        if (n.isHub) {
-          ctx.beginPath()
-          ctx.arc(n.x, n.y, r * 0.4, 0, Math.PI * 2)
-          ctx.fillStyle = '#ffffff'
-          ctx.globalAlpha = 0.45 * pulse
-          ctx.fill()
-        }
-      })
-
-      // ── Central ambient glow ──
-      const cx = W * 0.50, cy = H * 0.45
-      const gr = ctx.createRadialGradient(cx, cy, 0, cx, cy, W * 0.48)
-      gr.addColorStop(0,   `rgba(255,45,107,${(0.10 * GLOW).toFixed(2)})`)
-      gr.addColorStop(0.35, `rgba(255,184,0,${(0.05 * GLOW).toFixed(2)})`)
-      gr.addColorStop(0.65, `rgba(0,245,212,${(0.03 * GLOW).toFixed(2)})`)
-      gr.addColorStop(1,   'rgba(0,0,0,0)')
-      ctx.beginPath()
-      ctx.arc(cx, cy, W * 0.48, 0, Math.PI * 2)
-      ctx.fillStyle = gr
-      ctx.globalAlpha = 1
-      ctx.fill()
-    }
-
-    resize()
-    window.addEventListener('resize', resize)
-    loop()
-
-    return () => {
-      cancelAnimationFrame(rafId)
-      window.removeEventListener('resize', resize)
-      visObs.disconnect()
     }
   }, [])
 
@@ -1063,12 +765,7 @@ export default function LandingPage() {
 
       {/* ── HERO ── */}
       <section className="hero">
-        {/* Canvas — automation circuit graphic, right 65%, full height */}
-        <canvas
-          ref={heroCanvasRef}
-          className="hero-circuit-canvas"
-          aria-hidden="true"
-        />
+        <LandingHero />
 
         {/* Grid overlay — radial mask focuses on the canvas region */}
         <div className="hero-grid"></div>
@@ -1363,10 +1060,7 @@ export default function LandingPage() {
 
             {/* Entomate - ACTIVE */}
             <div className="trifecto-card active">
-              <div className="trifecto-icon entomate">
-                <CircuitEMark size={28} />
-              </div>
-              <div className="trifecto-product-name">Entomate</div>
+              <div className="trifecto-product-name"><Logo size="md" /></div>
               <div className="trifecto-product-role active">The Hands — You Are Here</div>
               <p>
                 Visual workflow automation, 4 specialized AI agents, and 7+ integrations
@@ -2089,7 +1783,7 @@ export default function LandingPage() {
               <span className="footer-trifecto-label">part of</span>
               <div className="trifecto-pip lv" title="Logos Vision">L</div>
               <div className="trifecto-pip pulse" title="Pulse">P</div>
-              <div className="trifecto-pip ent" title="Entomate">E</div>
+              <div className="trifecto-pip ent" title="Entomate"><ApertureMark size={24} alt="" /></div>
             </div>
           </div>
         </div>
@@ -2363,16 +2057,21 @@ export default function LandingPage() {
           background: var(--void, #080808);
         }
 
-        /* Canvas — automation circuit graphic, right 65%, full height */
-        .landing-page .hero-circuit-canvas {
+        /* Original brand footage with a still-image fallback. */
+        .landing-page .hero-brand-film {
           position: absolute;
           top: 0;
           right: 0;
-          width: 65%;
+          width: 75%;
           height: 100%;
-          pointer-events: none;
           z-index: 1;
         }
+        .landing-page .hero-brand-film .brand-motion-poster,
+        .landing-page .hero-brand-film .brand-motion-video { object-fit: contain; object-position: 70% center; }
+        .landing-page .hero-brand-film { background: transparent; }
+        .landing-page .hero-brand-film .brand-motion-poster,
+        .landing-page .hero-brand-film .brand-motion-video { mask-image: linear-gradient(90deg, transparent, black 35%); }
+        .landing-page .hero-brand-film .brand-motion-control { bottom: 24px; }
 
         /* Grid overlay — radial mask focuses on the canvas region */
         .landing-page .hero-grid {
@@ -2435,7 +2134,7 @@ export default function LandingPage() {
           position: relative;
           z-index: 10;
           padding: max(120px, 10vh) 64px 64px;
-          max-width: 52%;
+          max-width: 62%;
           width: 100%;
         }
 
@@ -2472,7 +2171,7 @@ export default function LandingPage() {
         }
 
         .landing-page .hero h1 {
-          font-size: clamp(48px, 6vw, 80px);
+          font-size: clamp(48px, 5.5vw, 76px);
           font-weight: 800;
           letter-spacing: -0.03em;
           line-height: 1.18;
@@ -4183,7 +3882,9 @@ export default function LandingPage() {
           .landing-page .pillars-grid { grid-template-columns: 1fr 1fr; }
           .landing-page .trifecto-grid { grid-template-columns: 1fr; }
           .landing-page .trifecto-neural { max-width: 320px; margin-bottom: 40px; }
-          .landing-page .hero-circuit-canvas { width: 100%; opacity: 0.3; }
+          .landing-page .hero-brand-film { width: 100%; }
+          .landing-page .hero-brand-film .brand-motion-poster,
+          .landing-page .hero-brand-film .brand-motion-video { opacity: 0.3; object-fit: cover; }
           .landing-page .hero-fade { background: linear-gradient(180deg, var(--void, #080808) 10%, rgba(8,8,8,0.60) 40%, transparent 70%); }
           .landing-page .hero-content { max-width: 100%; padding: 10vh 32px 48px; }
           .landing-page .hero-wf-nodes { display: none; }
@@ -4206,6 +3907,10 @@ export default function LandingPage() {
           .landing-page .chip-gcal, .landing-page .chip-cron, .landing-page .chip-email { display: none; }
           .landing-page .adaptive-grid { grid-template-columns: 1fr; }
           .landing-page .power-grid { grid-template-columns: 1fr; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .landing-page .animate-blur-reveal { animation: none; opacity: 1; filter: none; transform: none; }
+          .landing-page .hero-badge-dot { animation: none; }
         }
       `}</style>
     </div>

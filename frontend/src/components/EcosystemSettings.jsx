@@ -4,35 +4,12 @@ import {
   AlertCircle, Loader2, Activity, Clock, ArrowRight, RotateCcw,
   Key, Copy, Check, Shuffle, ChevronDown
 } from 'lucide-react'
+import { ApertureMark, Wordmark } from './Logo'
 import { VCButton, VCBadge, VCInput, VCIconBox } from './vc'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
 // ── App Logos (from each app's favicon.svg) ──
-
-function EntomateLogo({ size = 24 }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" width={size} height={size}>
-      <defs>
-        <linearGradient id="ent-bg" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#1a0810"/>
-          <stop offset="100%" stopColor="#0d0408"/>
-        </linearGradient>
-      </defs>
-      <rect width="64" height="64" rx="14" fill="url(#ent-bg)"/>
-      <rect x="1" y="1" width="62" height="62" rx="13" stroke="#FF2D6B" strokeWidth="1.5" strokeOpacity="0.5" fill="none"/>
-      <rect x="22" y="14" width="26" height="6" rx="1.5" fill="#FF2D6B"/>
-      <rect x="22" y="29" width="20" height="6" rx="1.5" fill="#FF2D6B" opacity="0.85"/>
-      <rect x="22" y="44" width="26" height="6" rx="1.5" fill="#FF2D6B"/>
-      <path d="M22 17 L14 17 L10 13" stroke="#FF2D6B" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
-      <circle cx="10" cy="13" r="2" fill="#FF2D6B" opacity="0.9"/>
-      <path d="M22 32 L12 32 L8 28" stroke="#FF2D6B" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
-      <circle cx="8" cy="28" r="2" fill="#FF2D6B" opacity="0.9"/>
-      <path d="M22 47 L14 47 L10 51" stroke="#FF2D6B" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
-      <circle cx="10" cy="51" r="2" fill="#FF2D6B" opacity="0.9"/>
-    </svg>
-  )
-}
 
 function PulseLogo({ size = 24 }) {
   return (
@@ -285,7 +262,7 @@ export default function EcosystemSettings() {
           >
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0">
-                <EntomateLogo size={36} />
+                <ApertureMark size={36} alt="" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
@@ -293,7 +270,7 @@ export default function EcosystemSettings() {
                     className="text-sm font-medium"
                     style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}
                   >
-                    Entomate
+                    <Wordmark width={115} />
                   </span>
                   <span
                     className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full"
