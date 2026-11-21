@@ -13,6 +13,38 @@ const { supabase, supabaseAdmin } = require('../../config/supabase');
 const NodeRegistry = require('./NodeRegistry');
 const log = require('../../utils/log');
 
+/**
+ * Steps that send, write or call out. In a test run (mode 'test') these are
+ * skipped and return a preview instead, so a test never sends a message,
+ * writes a record or calls an outside URL. Read-only steps (logic, data,
+ * AI prompts, CRM lookups) still run so the test shows real results.
+ */
+const SIDE_EFFECT_NODES = {
+  action: ['http_request', 'execute_workflow', 'send_slack', 'send_pulse', 'send_email', 'create_task', 'sync_crm'],
+  rag: ['vector_store', 'document_loader'],
+  crm: ['create_deal', 'update_deal', 'create_contact', 'update_contact', 'create_crm_task', 'log_activity', 'assign_owner']
+};
+
+function isSideEffectNode(node) {
+  if (!node) return false;
+  if (node.type === 'ai' && node.subtype === 'ai_agent') return node.config?.autoApply === true;
+  return (SIDE_EFFECT_NODES[node.type] || []).includes(node.subtype);
+}
+
+/** Output for a skipped step: passes its input through, tagged so the trace shows what was skipped. */
+function dryRunOutput(node, inputData) {
+  const base = inputData && typeof inputData === 'object' && !Array.isArray(inputData) ? inputData : { input: inputData };
+  return {
+    ...base,
+    _dryRun: {
+      skipped: true,
+      nodeId: node.id,
+      step: `${node.type}/${node.subtype}`,
+      reason: 'Test run: this step sends, writes or calls out, so it was not performed.'
+    }
+  };
+}
+
 class WorkflowExecutor {
   constructor() {
     this.nodeRegistry = new NodeRegistry();
@@ -172,6 +204,19 @@ class WorkflowExecutor {
           await this.executeConnectedNodes(node, 'main', context, pinnedData);
           return pinnedData;
         }
+      }
+
+      // Test runs never perform side effects
+      if (mode === 'test' && isSideEffectNode(node)) {
+        const preview = dryRunOutput(node, inputData);
+        log.info(`[WorkflowExecutor] Test run: skipped side-effect node ${node.id} (${node.subtype})`);
+        nodeExecution.output = preview;
+        nodeExecution.status = 'skipped';
+        nodeExecution.dryRun = true;
+        nodeExecution.finishedAt = new Date().toISOString();
+        context.nodeOutputs.set(node.id, { output: 'main', data: preview });
+        await this.executeConnectedNodes(node, 'main', context, preview);
+        return preview;
       }
 
       // Get the node handler
@@ -488,3 +533,5 @@ class WorkflowExecutor {
 }
 
 module.exports = WorkflowExecutor;
+module.exports.isSideEffectNode = isSideEffectNode;
+module.exports.SIDE_EFFECT_NODES = SIDE_EFFECT_NODES;

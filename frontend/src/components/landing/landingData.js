@@ -77,7 +77,7 @@ export const MODULES = [
     features: [
       ['Conditional branching and expressions', 'ship'],
       ['Schedule, webhook and manual triggers', 'ship'],
-      ['Test runs with pinned sample data', 'ship'],
+      ['Dry-run tests that never send, write or call out', 'ship'],
       ['Execution trace and debug logs', 'ship'],
       ['Version history with restore', 'ship'],
       ['Encrypted secrets vault', 'ship'],
