@@ -382,7 +382,11 @@ class SendPulseNode extends BaseNode {
 
       const response = await fetch(`${apiBaseUrl}/api/ecosystem/pulse`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        // /api/ecosystem requires auth; server-to-server calls use INTERNAL_API_KEY.
+        headers: {
+          'Content-Type': 'application/json',
+          ...(process.env.INTERNAL_API_KEY ? { 'X-API-Key': process.env.INTERNAL_API_KEY } : {})
+        },
         body: JSON.stringify({
           channel: channelPurpose,
           message: resolvedMessage,

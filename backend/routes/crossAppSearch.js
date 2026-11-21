@@ -11,6 +11,11 @@ const router = express.Router();
 const crossAppSearch = require('../services/crossAppSearch');
 const logger = require('../services/logger');
 const { apiLimiter } = require('../middleware/rateLimiter');
+const { authenticate } = require('../middleware/auth');
+
+// Cross-app search reads contacts and meetings from every app, so it needs a
+// signed-in user (audit finding 1).
+router.use(authenticate);
 
 /**
  * GET /api/cross-search

@@ -16,7 +16,7 @@ setInterval(() => {
       requestCounts.delete(key);
     }
   }
-}, 60000);
+}, 60000).unref(); // don't keep the process (or Jest) alive just for cleanup
 
 /**
  * Rate Limiter Factory

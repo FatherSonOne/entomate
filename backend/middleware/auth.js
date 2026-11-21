@@ -13,6 +13,12 @@ const supabase = createClient(
  */
 const authenticate = async (req, res, next) => {
   try {
+    // optionalAuth (global) already verified this request's token; don't make
+    // a second round trip to Supabase (audit finding 13).
+    if (req.authVerified && req.user?.id && req.user.id !== 'anonymous') {
+      return next();
+    }
+
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -87,6 +93,7 @@ const optionalAuth = async (req, res, next) => {
         teamId: user.user_metadata?.team_id || 'default',
         avatar_url: user.user_metadata?.avatar_url || user.user_metadata?.picture || null
       };
+      req.authVerified = true;
     } catch (error) {
       // Token invalid or expired, treat as anonymous
       log.debug('Optional auth failed:', error.message);

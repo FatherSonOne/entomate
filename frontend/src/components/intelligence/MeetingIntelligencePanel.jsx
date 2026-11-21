@@ -7,6 +7,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Brain, ChevronDown, ChevronUp, RefreshCw, X, Check, Sliders, Loader2 } from 'lucide-react'
 import { supabase } from '../../services/supabaseClient'
+import { authFetch } from '../../services/authFetch'
 import { ProfileIcon } from '../icons/AnimatedIcons'
 
 // ==================== SUGGESTION ENGINE (inline) ====================
@@ -204,7 +205,7 @@ export default function MeetingIntelligencePanel({
       // Broadcast a pre-meeting briefing to LV + Pulse so participants get
       // context. Fire-and-forget — failures here must not block save UX.
       const apiBase = import.meta.env.VITE_API_URL || ''
-      fetch(`${apiBase}/api/intelligence/meeting-prep/${meetingId}/broadcast-briefing`, {
+      authFetch(`${apiBase}/api/intelligence/meeting-prep/${meetingId}/broadcast-briefing`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),

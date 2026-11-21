@@ -3,6 +3,7 @@ import {
   Globe, CheckCircle2, XCircle, Loader2, RotateCcw, Clock
 } from 'lucide-react'
 import { VCBadge } from './vc'
+import { authFetch } from '../services/authFetch'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -23,7 +24,7 @@ export default function EcosystemSyncStatus({ meetingId }) {
   const loadSyncStatus = async () => {
     try {
       setLoading(true)
-      const res = await fetch(`${API_BASE}/api/ecosystem/sync-status/${meetingId}`)
+      const res = await authFetch(`${API_BASE}/api/ecosystem/sync-status/${meetingId}`)
       const data = await res.json()
       setSyncStatus(data)
     } catch (err) {
@@ -37,7 +38,7 @@ export default function EcosystemSyncStatus({ meetingId }) {
   const handleRetry = async (eventId) => {
     try {
       setRetrying(eventId)
-      await fetch(`${API_BASE}/api/ecosystem/retry/${eventId}`, { method: 'POST' })
+      await authFetch(`${API_BASE}/api/ecosystem/retry/${eventId}`, { method: 'POST' })
       await loadSyncStatus()
     } catch (err) {
       console.error('Retry failed:', err)

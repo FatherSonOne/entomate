@@ -3,12 +3,16 @@ const { v4: uuidv4 } = require('uuid');
 const { supabaseAdmin: supabase } = require('../config/supabase');
 const automationScheduler = require('../services/automationScheduler');
 const automationEngine = require('../services/automationEngine');
-const { authenticate, authorize, optionalAuth, apiKeyAuth } = require('../middleware/auth');
+const { authenticate, apiKeyAuth } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const schemas = require('../schemas/automations');
 const log = require('../utils/log');
 
 const router = express.Router();
+
+// Every route needs a signed-in user except POST /trigger, which is
+// service-to-service and uses apiKeyAuth (audit finding 1).
+router.use((req, res, next) => (req.path === '/trigger' ? next() : authenticate(req, res, next)));
 
 // Initialize scheduler on module load
 automationScheduler.initialize().catch(err => {

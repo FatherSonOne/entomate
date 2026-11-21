@@ -7,7 +7,7 @@ const express = require('express');
 const { supabase } = require('../config/supabase');
 const ai = require('../config/ai');
 const log = require('../utils/log');
-const { optionalAuth } = require('../middleware/auth');
+const { authenticate } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -256,7 +256,7 @@ const SECTION_LABELS = {
  *
  * Body: { question, section, conversationId? }
  */
-router.post('/query', optionalAuth, async (req, res) => {
+router.post('/query', authenticate, async (req, res) => {
   try {
     const { question, section = 'dashboard', conversationId } = req.body;
 

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { EntomateMark, Wordmark } from './Logo'
 import { VCButton, VCBadge, VCInput, VCIconBox } from './vc'
+import { authFetch } from '../services/authFetch'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -71,9 +72,9 @@ export default function EcosystemSettings() {
     try {
       setLoading(true)
       const [statusRes, configRes, eventsRes] = await Promise.all([
-        fetch(`${API_BASE}/api/ecosystem/status`).then(r => r.json()).catch(() => null),
-        fetch(`${API_BASE}/api/ecosystem/config`).then(r => r.json()).catch(() => ({ configs: [] })),
-        fetch(`${API_BASE}/api/ecosystem/events?limit=10`).then(r => r.json()).catch(() => ({ events: [] }))
+        authFetch(`${API_BASE}/api/ecosystem/status`).then(r => r.json()).catch(() => null),
+        authFetch(`${API_BASE}/api/ecosystem/config`).then(r => r.json()).catch(() => ({ configs: [] })),
+        authFetch(`${API_BASE}/api/ecosystem/events?limit=10`).then(r => r.json()).catch(() => ({ events: [] }))
       ])
       setStatus(statusRes)
       setConfigs(configRes.configs || [])
@@ -134,7 +135,7 @@ export default function EcosystemSettings() {
       setSaving(true)
       const displayName = showForm === 'pulse' ? 'Pulse' : 'Logos Vision'
 
-      const res = await fetch(`${API_BASE}/api/ecosystem/config`, {
+      const res = await authFetch(`${API_BASE}/api/ecosystem/config`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -165,7 +166,7 @@ export default function EcosystemSettings() {
 
   const handleDisconnect = async (appName) => {
     try {
-      await fetch(`${API_BASE}/api/ecosystem/config/${appName}`, { method: 'DELETE' })
+      await authFetch(`${API_BASE}/api/ecosystem/config/${appName}`, { method: 'DELETE' })
       await loadEcosystemData()
     } catch (err) {
       console.error('Failed to disconnect:', err)
@@ -178,7 +179,7 @@ export default function EcosystemSettings() {
     try {
       setTesting(appName)
       setTestResult(null)
-      const resp = await fetch(`${API_BASE}/api/ecosystem/test/${appName}`, { method: 'POST' })
+      const resp = await authFetch(`${API_BASE}/api/ecosystem/test/${appName}`, { method: 'POST' })
       if (!resp.ok) {
         setTestResult({ app: appName, success: false, error: `Server returned ${resp.status}` })
         return
@@ -196,7 +197,7 @@ export default function EcosystemSettings() {
 
   const handleRetry = async (eventId) => {
     try {
-      await fetch(`${API_BASE}/api/ecosystem/retry/${eventId}`, { method: 'POST' })
+      await authFetch(`${API_BASE}/api/ecosystem/retry/${eventId}`, { method: 'POST' })
       await loadEcosystemData()
     } catch (err) {
       console.error('Retry failed:', err)

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ThumbsUp, ThumbsDown, Send } from 'lucide-react';
+import { authFetch } from '../../services/authFetch';
 
 /**
  * ExplanationFeedback - Collects user feedback on explanation quality
@@ -21,7 +22,7 @@ export default function ExplanationFeedback({ executionId, onFeedbackSubmitted }
 
     try {
       // Store feedback in database
-      const response = await fetch(`/api/agents/executions/${executionId}/feedback`, {
+      const response = await authFetch(`/api/agents/executions/${executionId}/feedback`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

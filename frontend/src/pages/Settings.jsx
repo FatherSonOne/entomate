@@ -7,6 +7,7 @@ import {
   Trash2, Archive
 } from 'lucide-react'
 import { integrationsApi, checkHealth, settingsApi } from '../services/api'
+import { authFetch } from '../services/authFetch'
 import { useOrg } from '../contexts/OrgContext'
 import { TENANT_PLAN_LABELS, PLAN_BADGE_COLORS, TENANT_PLAN_LIMITS } from '../constants/plans'
 import { useTheme, THEME_MODES } from '../context/ThemeContext'
@@ -126,7 +127,7 @@ export default function Settings() {
       const [healthData, integrationStatus, ecosystemStatus] = await Promise.all([
         checkHealth().catch(() => null),
         integrationsApi.getStatus().catch(() => ({ integrations: {} })),
-        fetch(`${API_BASE}/api/ecosystem/status`).then(r => r.json()).catch(() => null)
+        authFetch(`${API_BASE}/api/ecosystem/status`).then(r => r.json()).catch(() => null)
       ])
       setStatus({
         health: healthData,
@@ -150,7 +151,7 @@ export default function Settings() {
     try {
       setTestingCRM(true)
       setCrmTestResult(null)
-      const result = await fetch('/api/integrations/crm/test', { method: 'POST' }).then(r => r.json())
+      const result = await authFetch('/api/integrations/crm/test', { method: 'POST' }).then(r => r.json())
       setCrmTestResult(result)
     } catch (error) {
       setCrmTestResult({ connected: false, message: error.message })

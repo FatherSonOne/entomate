@@ -10,6 +10,10 @@ const log = require('../utils/log');
 const { validate } = require('../middleware/validate');
 const schemas = require('../schemas/intelligence');
 const { supabaseAdmin } = require('../config/supabase');
+const { authenticate } = require('../middleware/auth');
+
+// Every intelligence route needs a signed-in user (audit finding 1).
+router.use(authenticate);
 const { getEcosystemBridge } = require('../services/ecosystemBridge');
 
 /**

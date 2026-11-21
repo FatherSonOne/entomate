@@ -10,8 +10,22 @@ const { v4: uuidv4 } = require('uuid');
 const { supabaseAdmin } = require('../config/supabase');
 const { getEcosystemBridge } = require('../services/ecosystemBridge');
 const log = require('../utils/log');
+const { authenticate, apiKeyAuth } = require('../middleware/auth');
+const { authorizePlatformAdmin } = require('../middleware/authorizePlatformAdmin');
 
 const router = express.Router();
+
+// Audit finding 2: the ecosystem config is global (shared by every tenant),
+// so changing it, reading events or posting through the bridge is limited
+// to platform admins. Server-to-server callers (e.g. the Send Pulse workflow
+// node) authenticate with X-API-Key = INTERNAL_API_KEY instead.
+router.use((req, res, next) => (
+  req.headers['x-api-key'] ? apiKeyAuth(req, res, next) : authenticate(req, res, next)
+));
+const adminOnly = (req, res, next) => (
+  req.isServiceRequest ? next() : authorizePlatformAdmin(req, res, next)
+);
+
 
 // ── Status ──
 
@@ -38,7 +52,7 @@ router.get('/status', async (req, res) => {
  * POST /api/ecosystem/config
  * Save or update ecosystem config for an app
  */
-router.post('/config', async (req, res) => {
+router.post('/config', adminOnly, async (req, res) => {
   try {
     const { appName, displayName, apiUrl, serviceToken, inboundToken, enabled, features } = req.body;
 
@@ -94,7 +108,7 @@ router.post('/config', async (req, res) => {
  * GET /api/ecosystem/config
  * Get all ecosystem configs (tokens masked)
  */
-router.get('/config', async (req, res) => {
+router.get('/config', adminOnly, async (req, res) => {
   try {
     if (!supabaseAdmin) {
       return res.json({ success: true, configs: [] });
@@ -125,7 +139,7 @@ router.get('/config', async (req, res) => {
  * DELETE /api/ecosystem/config/:appName
  * Disconnect an app
  */
-router.delete('/config/:appName', async (req, res) => {
+router.delete('/config/:appName', adminOnly, async (req, res) => {
   try {
     const { appName } = req.params;
 
@@ -157,7 +171,7 @@ router.delete('/config/:appName', async (req, res) => {
  * POST /api/ecosystem/test/:appName
  * Test connection to a specific app
  */
-router.post('/test/:appName', async (req, res) => {
+router.post('/test/:appName', adminOnly, async (req, res) => {
   try {
     const { appName } = req.params;
     const bridge = await getEcosystemBridge();
@@ -181,7 +195,7 @@ router.post('/test/:appName', async (req, res) => {
  * GET /api/ecosystem/events
  * Recent sync events for the UI
  */
-router.get('/events', async (req, res) => {
+router.get('/events', adminOnly, async (req, res) => {
   try {
     const { limit = 20, direction, status } = req.query;
     const bridge = await getEcosystemBridge();
@@ -203,7 +217,7 @@ router.get('/events', async (req, res) => {
  * POST /api/ecosystem/retry/:eventId
  * Retry a failed event
  */
-router.post('/retry/:eventId', async (req, res) => {
+router.post('/retry/:eventId', adminOnly, async (req, res) => {
   try {
     const { eventId } = req.params;
     const bridge = await getEcosystemBridge();
@@ -223,7 +237,7 @@ router.post('/retry/:eventId', async (req, res) => {
  * Convenience endpoint for posting to Pulse via the bridge
  * Used by agent actions and other services
  */
-router.post('/pulse', async (req, res) => {
+router.post('/pulse', adminOnly, async (req, res) => {
   try {
     const { channel, message, title, urgency, metadata } = req.body;
 
@@ -299,7 +313,7 @@ router.get('/sync-status/:meetingId', async (req, res) => {
  * Request a list of available Pulse recordings via the ecosystem bridge.
  * Pulse will post the list to the #entomate-meetings bot channel.
  */
-router.post('/pull-recordings', async (req, res) => {
+router.post('/pull-recordings', adminOnly, async (req, res) => {
   try {
     const bridge = await getEcosystemBridge();
 
@@ -336,7 +350,7 @@ router.post('/pull-recordings', async (req, res) => {
  *
  * NOTE: Requires Pulse-side meeting.export_request handler (see Pulse execution prompt).
  */
-router.post('/import-recording', async (req, res) => {
+router.post('/import-recording', adminOnly, async (req, res) => {
   try {
     const bridge = await getEcosystemBridge();
 

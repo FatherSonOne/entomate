@@ -6,6 +6,10 @@ const { isValidUUID } = require('../utils/validators');
 const { validate } = require('../middleware/validate');
 const schemas = require('../schemas/goals');
 const { getOrgIdForUser } = require('../utils/orgContext');
+const { authenticate } = require('../middleware/auth');
+
+// Every goals route needs a signed-in user (audit finding 1).
+router.use(authenticate);
 
 // Helper to check if error is missing table
 function isTableMissing(error) {

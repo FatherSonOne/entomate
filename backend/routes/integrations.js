@@ -6,12 +6,16 @@ const crmService = require('../services/crmService');
 const chatService = require('../services/chatService');
 const meetingNotes = require('../services/meetingNotesService');
 const logosVisionService = require('../services/logosVisionService');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, apiKeyAuth } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const schemas = require('../schemas/integrations');
 const log = require('../utils/log');
 
 const router = express.Router();
+
+// Every route needs a signed-in user except the CRM webhook, which is called
+// by a server and uses apiKeyAuth (X-API-Key = INTERNAL_API_KEY). Audit finding 1.
+router.use((req, res, next) => (req.path === '/webhooks/crm' ? next() : authenticate(req, res, next)));
 
 // ========================================
 // CRM INTEGRATION ENDPOINTS
@@ -562,7 +566,7 @@ router.get('/chat/status', async (req, res) => {
  * POST /api/integrations/webhooks/crm
  * Receive webhooks from CRM
  */
-router.post('/webhooks/crm', async (req, res) => {
+router.post('/webhooks/crm', apiKeyAuth, async (req, res) => {
   try {
     const { event, data } = req.body;
 
@@ -600,38 +604,6 @@ router.post('/webhooks/crm', async (req, res) => {
   }
 });
 
-/**
- * POST /api/integrations/webhooks/chat
- * Receive webhooks from chat (e.g., slash commands)
- */
-router.post('/webhooks/chat', async (req, res) => {
-  try {
-    const { command, text, userId, channelId } = req.body;
-
-    log.info(`Received chat webhook: ${command}`);
-
-    // Handle slash commands
-    switch (command) {
-      case '/entomate-recap':
-        // Send recent meeting recap
-        break;
-
-      case '/entomate-tasks':
-        // List open tasks
-        break;
-
-      case '/entomate-ask':
-        // Answer question about meetings
-        break;
-    }
-
-    res.json({ received: true, command });
-
-  } catch (error) {
-    log.error('Error processing chat webhook:', { error: error.message || error });
-    res.status(500).json({ error: error.message });
-  }
-});
 
 // ========================================
 // STATUS AND LOGS
