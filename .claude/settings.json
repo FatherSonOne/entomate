@@ -1,4 +1,13 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(git push origin main)",
+      "Bash(git push origin HEAD:main)",
+      "Bash(git push -u origin main)",
+      "Bash(gh pr merge:*)",
+      "mcp__github__merge_pull_request"
+    ]
+  },
   "hooks": {
     "SessionStart": [
       {
