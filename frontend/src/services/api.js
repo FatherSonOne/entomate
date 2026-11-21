@@ -255,6 +255,9 @@ export const meetingsApi = {
   updateNote: (meetingId, noteId, data) => api.patch(`/meetings/${meetingId}/notes/${noteId}`, data),
   deleteNote: (meetingId, noteId) => api.delete(`/meetings/${meetingId}/notes/${noteId}`),
 
+  // Rename a speaker across the transcript. Typed wrapper: services/meetingTranscriptService.ts
+  renameSpeaker: (meetingId, from, to) => api.patch(`/meetings/${meetingId}/speakers`, { from, to }),
+
   // Update action item status
   updateActionItem: (id, data) => api.patch(`/meetings/action-items/${id}`, data),
 

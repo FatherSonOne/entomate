@@ -747,7 +747,46 @@ async function handleRecallWebhook(payload) {
     if (updErr) throw updErr;
   }
 
+  // Turn the transcript into a meeting while its pre-signed URL is fresh. Fire-and-forget:
+  // the AI pipeline takes far longer than Recall's webhook timeout, and a slow or failed
+  // ingest must not make Recall retry the status update. A missed ingest can be re-run
+  // with POST /api/admin/bots/:sessionId/ingest, which fetches a fresh URL.
+  if (event === 'bot.done' && update.transcript_url) {
+    transcriptIngest()
+      .ingestBotTranscript(sessionId, { transcriptUrl: update.transcript_url })
+      .catch((err) => log.error('Transcript ingest failed', { sessionId, error: err.message }));
+  }
+
   return { ok: true, sessionId };
+}
+
+/** Lazy: transcriptIngest requires the meetings route, which must not load at require time here. */
+function transcriptIngest() {
+  return require('./transcriptIngest');
+}
+
+/**
+ * Re-run transcript ingestion for a finished session (admin retry). Asks Recall for the
+ * bot again, because the stored transcript_url is pre-signed and may have expired.
+ *
+ * @param {string} sessionId
+ */
+async function ingestSessionTranscript(sessionId) {
+  const { data: session, error } = await db()
+    .from('bot_sessions')
+    .select('id, recall_bot_id, retention_deleted_at')
+    .eq('id', sessionId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!session) return { status: 'not_found' };
+  if (session.retention_deleted_at) return { status: 'retention_deleted' };
+  if (!session.recall_bot_id) return { status: 'no_bot' };
+
+  const fullBot = await recallFetch(`/bot/${session.recall_bot_id}`);
+  const rec = Array.isArray(fullBot?.recordings) ? fullBot.recordings[0] : null;
+  const transcriptUrl = rec?.media_shortcuts?.transcript?.data?.download_url || rec?.transcript?.url;
+  if (!transcriptUrl) return { status: 'no_transcript' };
+  return transcriptIngest().ingestBotTranscript(sessionId, { transcriptUrl });
 }
 
 module.exports = {
@@ -756,6 +795,7 @@ module.exports = {
   listActiveSessions,
   getRecallBotState,
   handleRecallWebhook,
+  ingestSessionTranscript,
   resolveAttendeeFromToken,
   recordAttendeeOptOut,
   _internal: {

@@ -29,6 +29,39 @@ function getCalendarTokens(req) {
   return null;
 }
 
+/**
+ * Org-scope a meeting route. The backend runs on the service-role key, so RLS does not
+ * protect these reads: without this check any signed-in user could read, edit or delete
+ * another workspace's meeting by id. Answers 404 (not 403) for a meeting outside the
+ * caller's orgs, so ids cannot be probed. Returns the meeting's org id, or null after
+ * sending the error response.
+ */
+async function meetingOrgOrRespond(req, res, meetingId) {
+  try {
+    return await meetingNotes.assertMeetingAccess(req.user?.id, meetingId);
+  } catch (accessError) {
+    if (accessError instanceof meetingNotes.NotesError) {
+      const message = accessError.status === 401 ? 'Unauthorized' : accessError.message;
+      res.status(accessError.status).json({ error: message });
+      return null;
+    }
+    throw accessError;
+  }
+}
+
+/** Every org the user belongs to (a user can be in more than one). */
+async function orgIdsForUser(userId) {
+  if (!userId || userId === 'anonymous') return [];
+  const { data, error } = await supabase
+    .from('org_members')
+    .select('org_id')
+    .eq('user_id', userId);
+  if (error) throw error;
+  return [...new Set((data || []).map((r) => r.org_id).filter(Boolean))];
+}
+
+const MAX_SPEAKER_NAME = 120;
+
 // Configure multer for memory storage
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -293,9 +326,15 @@ router.get('/', authenticate, validate(schemas.list), async (req, res) => {
       return res.json({ meetings: [], count: 0, hasMore: false });
     }
 
+    const orgIds = await orgIdsForUser(req.user?.id);
+    if (orgIds.length === 0) {
+      return res.json({ meetings: [], count: 0, hasMore: false });
+    }
+
     let query = supabase
       .from('meetings')
       .select('*', { count: 'exact' })
+      .in('org_id', orgIds)
       .order('created_at', { ascending: false });
 
     if (projectId) {
@@ -345,10 +384,14 @@ router.get('/:id', authenticate, async (req, res) => {
       return res.status(404).json({ error: 'Database not configured' });
     }
 
+    const orgId = await meetingOrgOrRespond(req, res, id);
+    if (!orgId) return;
+
     const { data: meeting, error: meetingError } = await supabase
       .from('meetings')
       .select('*')
       .eq('id', id)
+      .eq('org_id', orgId)
       .single();
 
     if (meetingError) {
@@ -385,6 +428,9 @@ router.put('/:id', authenticate, validate(schemas.update), async (req, res) => {
       return res.status(503).json({ error: 'Database not configured' });
     }
 
+    const orgId = await meetingOrgOrRespond(req, res, id);
+    if (!orgId) return;
+
     // Only allow certain fields to be updated
     const allowedFields = ['title', 'summary', 'key_points', 'decisions', 'project_id', 'crm_deal_id'];
     const filteredUpdates = {};
@@ -399,6 +445,7 @@ router.put('/:id', authenticate, validate(schemas.update), async (req, res) => {
       .from('meetings')
       .update(filteredUpdates)
       .eq('id', id)
+      .eq('org_id', orgId)
       .select()
       .single();
 
@@ -426,6 +473,9 @@ router.delete('/:id', authenticate, async (req, res) => {
       return res.status(503).json({ error: 'Database not configured' });
     }
 
+    const orgId = await meetingOrgOrRespond(req, res, id);
+    if (!orgId) return;
+
     // Delete action items first (cascade should handle this, but being explicit)
     await supabase
       .from('action_items')
@@ -436,7 +486,8 @@ router.delete('/:id', authenticate, async (req, res) => {
     const { error } = await supabase
       .from('meetings')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('org_id', orgId);
 
     if (error) {
       return res.status(404).json({ error: 'Meeting not found' });
@@ -467,6 +518,17 @@ router.patch('/action-items/:id', authenticate, async (req, res) => {
     if (!status || !allowedStatuses.includes(status)) {
       return res.status(400).json({ error: 'Status must be "open" or "done"' });
     }
+
+    const { data: existingItem } = await supabase
+      .from('action_items')
+      .select('meeting_id')
+      .eq('id', id)
+      .maybeSingle();
+    if (!existingItem?.meeting_id) {
+      return res.status(404).json({ error: 'Action item not found' });
+    }
+    const itemOrgId = await meetingOrgOrRespond(req, res, existingItem.meeting_id);
+    if (!itemOrgId) return;
 
     const { data: item, error } = await supabase
       .from('action_items')
@@ -506,10 +568,14 @@ router.post('/:id/ask', authenticate, validate(schemas.ask), async (req, res) =>
     // Get meeting
     let meeting;
     if (supabase) {
+      const orgId = await meetingOrgOrRespond(req, res, id);
+      if (!orgId) return;
+
       const { data, error } = await supabase
         .from('meetings')
         .select('*')
         .eq('id', id)
+        .eq('org_id', orgId)
         .single();
 
       if (error) {
@@ -545,6 +611,74 @@ ${meeting.transcript}
   } catch (error) {
     log.error('Error answering question:', { error: error.message || error });
     res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * PATCH /api/meetings/:id/speakers
+ * Rename a speaker everywhere in a meeting's transcript: { from, to }.
+ * Diarization and platform names are often "Speaker 2" or a dial-in number, so this is
+ * how a teammate fixes the labels once. Any member of the meeting's org may do it, the
+ * same people who can read the transcript. Both the timed lines and the flat text change,
+ * so search, Ask and recaps see the new name.
+ */
+router.patch('/:id/speakers', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const from = typeof req.body?.from === 'string' ? req.body.from.trim() : '';
+    const to = typeof req.body?.to === 'string' ? req.body.to.trim() : '';
+
+    if (!from || !to) {
+      return res.status(400).json({ error: 'Both the current and the new speaker name are required' });
+    }
+    if (to.length > MAX_SPEAKER_NAME) {
+      return res.status(400).json({ error: `A speaker name can be at most ${MAX_SPEAKER_NAME} characters` });
+    }
+    if (/[\r\n:]/.test(to)) {
+      // A colon or line break would corrupt the "Speaker: words" text the AI reads.
+      return res.status(400).json({ error: 'A speaker name cannot contain a colon or a line break' });
+    }
+    if (!supabase) {
+      return res.status(503).json({ error: 'Database not configured' });
+    }
+
+    const orgId = await meetingOrgOrRespond(req, res, id);
+    if (!orgId) return;
+
+    const { data: meeting, error } = await supabase
+      .from('meetings')
+      .select('id, transcript, transcript_segments')
+      .eq('id', id)
+      .eq('org_id', orgId)
+      .single();
+    if (error || !meeting) {
+      return res.status(404).json({ error: 'Meeting not found' });
+    }
+
+    const segments = Array.isArray(meeting.transcript_segments) ? meeting.transcript_segments : null;
+    if (!segments || !segments.some((s) => s?.speaker === from)) {
+      return res.status(404).json({ error: 'That speaker is not in this transcript' });
+    }
+
+    const renamed = segments.map((s) => (s?.speaker === from ? { ...s, speaker: to } : s));
+    const { buildTranscriptText } = require('../services/transcriptIngest');
+    const { data: updated, error: updateError } = await supabase
+      .from('meetings')
+      .update({
+        transcript_segments: renamed,
+        transcript: buildTranscriptText(renamed),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .eq('org_id', orgId)
+      .select('id, transcript, transcript_segments')
+      .single();
+    if (updateError || !updated) throw updateError || new Error('Speaker rename failed');
+
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    log.error('Error renaming speaker:', { error: error.message || error });
+    res.status(500).json({ success: false, error: 'Internal server error' });
   }
 });
 
@@ -831,10 +965,14 @@ router.post('/:id/reprocess', authenticate, async (req, res) => {
       return res.status(503).json({ error: 'Database not configured' });
     }
 
+    const orgId = await meetingOrgOrRespond(req, res, id);
+    if (!orgId) return;
+
     const { data: meeting, error } = await supabase
       .from('meetings')
       .select('*')
       .eq('id', id)
+      .eq('org_id', orgId)
       .single();
 
     if (error || !meeting) {
@@ -971,3 +1109,6 @@ function formatRecapFallback(meeting, actionItems) {
 }
 
 module.exports = router;
+
+// Shared with services/transcriptIngest.js, which turns finished bot sessions into meetings.
+module.exports._pipeline = { runAIPipeline, saveActionItems, firePostProcessing };

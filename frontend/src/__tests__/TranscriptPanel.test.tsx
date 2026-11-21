@@ -1,0 +1,117 @@
+import React from 'react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { vi, describe, test, expect, beforeEach } from 'vitest'
+
+const api = vi.hoisted(() => ({ renameSpeaker: vi.fn() }))
+const cacheMock = vi.hoisted(() => ({ invalidate: vi.fn() }))
+vi.mock('../services/api', () => ({ meetingsApi: api }))
+vi.mock('../services/apiCache', () => ({ default: cacheMock }))
+
+import TranscriptPanel from '../components/meetings/TranscriptPanel'
+import { formatClock, toSegments, matchingLines, type TranscriptSegment } from '../services/meetingTranscriptService'
+
+const MEETING = 'meeting-1'
+const SEGMENTS: TranscriptSegment[] = [
+  { atMs: 500, speaker: 'Speaker 200', text: 'Hi there' },
+  { atMs: 65_000, speaker: 'Ann Lee', text: 'Budget is approved' },
+  { atMs: 3_725_000, speaker: 'Speaker 200', text: 'Great, the budget works' },
+]
+
+beforeEach(() => vi.clearAllMocks())
+
+describe('meetingTranscriptService', () => {
+  test('formatClock reads like a recording clock', () => {
+    expect(formatClock(500)).toBe('0:00')
+    expect(formatClock(65_000)).toBe('1:05')
+    expect(formatClock(3_725_000)).toBe('1:02:05')
+  })
+
+  test('toSegments drops malformed rows and returns null for nothing', () => {
+    expect(toSegments(null)).toBeNull()
+    expect(toSegments([])).toBeNull()
+    expect(toSegments([{ atMs: 'x', text: 'ok' }, { text: '' }, 5])).toEqual([{ atMs: 0, speaker: 'Speaker', text: 'ok' }])
+  })
+
+  test('matchingLines is case-insensitive over text and speaker', () => {
+    expect(matchingLines(SEGMENTS, 'BUDGET')).toEqual([1, 2])
+    expect(matchingLines(SEGMENTS, 'ann')).toEqual([1])
+    expect(matchingLines(SEGMENTS, '  ')).toEqual([])
+  })
+})
+
+describe('TranscriptPanel', () => {
+  test('shows every line with its time and speaker, and the speakers with line counts', () => {
+    render(<TranscriptPanel meetingId={MEETING} segments={SEGMENTS} />)
+    const lines = screen.getAllByTestId('transcript-line')
+    expect(lines).toHaveLength(3)
+    expect(lines[1]).toHaveTextContent('1:05')
+    expect(lines[1]).toHaveTextContent('Ann Lee')
+    expect(screen.getByRole('button', { name: 'Rename Speaker 200' })).toHaveTextContent('2')
+  })
+
+  test('search counts matches and steps through them', () => {
+    render(<TranscriptPanel meetingId={MEETING} segments={SEGMENTS} />)
+    fireEvent.change(screen.getByLabelText('Search transcript'), { target: { value: 'budget' } })
+    expect(screen.getByText('1 of 2')).toBeInTheDocument()
+    expect(screen.getAllByTestId('transcript-line')[1]).toHaveAttribute('aria-current', 'true')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next match' }))
+    expect(screen.getByText('2 of 2')).toBeInTheDocument()
+    expect(screen.getAllByTestId('transcript-line')[2]).toHaveAttribute('aria-current', 'true')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next match' }))
+    expect(screen.getByText('1 of 2')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Search transcript'), { target: { value: 'zebra' } })
+    expect(screen.getByText('No matches')).toBeInTheDocument()
+  })
+
+  test('renaming a speaker updates every line and tells the page', async () => {
+    api.renameSpeaker.mockResolvedValue({
+      success: true,
+      data: {
+        transcript: 'Bo: Hi there\nAnn Lee: Budget is approved\nBo: Great, the budget works',
+        transcript_segments: SEGMENTS.map((s) => (s.speaker === 'Speaker 200' ? { ...s, speaker: 'Bo' } : s)),
+      },
+    })
+    const onRenamed = vi.fn()
+    render(<TranscriptPanel meetingId={MEETING} segments={SEGMENTS} onRenamed={onRenamed} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rename Speaker 200' }))
+    const input = screen.getByLabelText('New name for Speaker 200')
+    fireEvent.change(input, { target: { value: 'Bo' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save name' }))
+
+    await waitFor(() => expect(api.renameSpeaker).toHaveBeenCalledWith(MEETING, 'Speaker 200', 'Bo'))
+    expect(await screen.findByRole('button', { name: 'Rename Bo' })).toBeInTheDocument()
+    expect(within(screen.getAllByTestId('transcript-line')[2]!).getByText('Bo')).toBeInTheDocument()
+    expect(cacheMock.invalidate).toHaveBeenCalledWith(`/meetings/${MEETING}`)
+    expect(onRenamed).toHaveBeenCalledWith(expect.objectContaining({ transcript: expect.stringContaining('Bo: Hi there') }))
+  })
+
+  test('a timecode jumps to the line being spoken at that moment', () => {
+    const { rerender } = render(<TranscriptPanel meetingId={MEETING} segments={SEGMENTS} focusAtMs={70_000} />)
+    expect(screen.getAllByTestId('transcript-line')[1]).toHaveAttribute('aria-current', 'true')
+    rerender(<TranscriptPanel meetingId={MEETING} segments={SEGMENTS} focusAtMs={4_000_000} />)
+    expect(screen.getAllByTestId('transcript-line')[2]).toHaveAttribute('aria-current', 'true')
+  })
+
+  test('a colon is refused before anything is sent', () => {
+    render(<TranscriptPanel meetingId={MEETING} segments={SEGMENTS} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Rename Ann Lee' }))
+    fireEvent.change(screen.getByLabelText('New name for Ann Lee'), { target: { value: 'Ann: CEO' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save name' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('colon')
+    expect(api.renameSpeaker).not.toHaveBeenCalled()
+  })
+
+  test("a failed rename keeps the old name and says why", async () => {
+    api.renameSpeaker.mockRejectedValue(Object.assign(new Error('That speaker is not in this transcript'), { status: 404 }))
+    render(<TranscriptPanel meetingId={MEETING} segments={SEGMENTS} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Rename Ann Lee' }))
+    fireEvent.change(screen.getByLabelText('New name for Ann Lee'), { target: { value: 'Annie' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save name' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('could not be renamed')
+    expect(screen.getAllByTestId('transcript-line')[1]).toHaveTextContent('Ann Lee')
+  })
+})
