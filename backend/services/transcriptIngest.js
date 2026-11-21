@@ -24,6 +24,7 @@
 const { supabaseAdmin } = require('../config/supabase');
 const ai = require('../config/ai');
 const log = require('../utils/log');
+const transcriptMoments = require('./transcriptMoments');
 
 const MAX_TRANSCRIPT_BYTES = 25 * 1024 * 1024;
 const FETCH_TIMEOUT_MS = 30 * 1000;
@@ -213,14 +214,20 @@ async function ingestBotTranscript(sessionId, { transcriptUrl } = {}) {
     }
   }
 
+  // Link each summary item and action item to the line it came from.
+  actionItems = transcriptMoments.withActionItemMoments(segments, actionItems);
+  const keyPoints = summaryData.keyPoints || [];
+  const decisions = summaryData.decisions || [];
+
   const now = new Date().toISOString();
   const meetingData = {
     title,
     transcript,
     transcript_segments: segments,
     summary: summaryData.summary || null,
-    key_points: summaryData.keyPoints || [],
-    decisions: summaryData.decisions || [],
+    key_points: keyPoints,
+    decisions,
+    summary_moments: transcriptMoments.summaryMoments(segments, keyPoints, decisions),
     topics: summaryData.topics || [],
     sentiment_label: summaryData.sentiment || null,
     sentiment_score: summaryData.sentimentScore ?? null,

@@ -1,8 +1,13 @@
 import React, { useState } from 'react'
 import { RefreshCw, Loader2, CheckCircle, XCircle, Clock, CalendarPlus } from 'lucide-react'
 import { integrationsApi, meetingsApi, calendarApi } from '../services/api'
+import TimecodeButton from './meetings/TimecodeButton'
 
-export default function ActionItemsList({ items = [], onUpdate, meetingId }) {
+/**
+ * @param {(atMs: number) => void} [onJumpToTranscript]  When given, items with a
+ *   transcript_at_ms show a timecode that jumps the transcript to where it was said.
+ */
+export default function ActionItemsList({ items = [], onUpdate, meetingId, onJumpToTranscript }) {
   const [syncing, setSyncing] = useState({})
   const [toggling, setToggling] = useState({})
   const [calSyncing, setCalSyncing] = useState({})
@@ -205,6 +210,13 @@ export default function ActionItemsList({ items = [], onUpdate, meetingId }) {
                         <span>Due:</span>
                         {new Date(item.due_date).toLocaleDateString()}
                       </span>
+                    )}
+                    {onJumpToTranscript && (
+                      <TimecodeButton
+                        atMs={item.transcript_at_ms}
+                        onJump={onJumpToTranscript}
+                        label={item.task_description}
+                      />
                     )}
                   </div>
                   {item.last_sync_error && item.crm_sync_status === 'failed' && (
