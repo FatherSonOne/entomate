@@ -14,6 +14,7 @@ const { getOrgIdForUser, getOrgIdForMeeting } = require('../utils/orgContext');
 
 const calendarService = require('../services/calendarService');
 const meetingNotes = require('../services/meetingNotesService');
+const meetingEvents = require('../services/meetingEvents');
 
 const router = express.Router();
 
@@ -807,6 +808,9 @@ function firePostProcessing(savedMeeting, summaryData, savedActionItems, ctx = {
     } catch (calendarError) {
       log.warn('Calendar auto-sync failed (non-blocking):', calendarError.message);
     }
+
+    // Agents + meeting/action-item workflow triggers (never throws)
+    await meetingEvents.handleMeetingProcessed(savedMeeting, savedActionItems);
   })().catch(err => {
     log.error('Post-processing unexpected error:', err.message || err);
   });

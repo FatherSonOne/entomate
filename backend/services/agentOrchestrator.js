@@ -128,6 +128,7 @@ class AgentOrchestrator {
       const result = {
         agent: agentName,
         suggestion,
+        triggerEventId: context.triggerEventId || null,
         executionTime: Date.now() - startTime,
         success: true
       };
@@ -370,7 +371,7 @@ class AgentOrchestrator {
         .insert({
           agent_id: agentDbId,
           status: result.skipped ? 'skipped' : (result.success ? 'success' : 'failed'),
-          trigger_event_id: null,
+          trigger_event_id: result.triggerEventId || null,
           input: { agent: result.agent, context: 'orchestrator' },
           output: result.suggestion ? { suggestion: result.suggestion } : null,
           error: result.error || null,
