@@ -13,6 +13,8 @@ import EcosystemSyncStatus from '../components/EcosystemSyncStatus'
 import MeetingNotesPanel from '../components/meetings/MeetingNotesPanel'
 import TranscriptPanel from '../components/meetings/TranscriptPanel'
 import TimecodeButton from '../components/meetings/TimecodeButton'
+import RecordingStatus from '../components/meetings/RecordingStatus'
+import cache from '../services/apiCache'
 import { toSegments, toSummaryMoments } from '../services/meetingTranscriptService'
 import MeetingIntelligencePanel from '../components/intelligence/MeetingIntelligencePanel'
 import { getSentimentIcon } from '../utils/meetingHelpers'
@@ -65,6 +67,17 @@ export default function MeetingDetail() {
   useEffect(() => {
     loadMeeting()
   }, [loadMeeting])
+
+  // A browser recording being transcribed: re-read quietly (no spinner, no cache).
+  const refreshMeeting = useCallback(async () => {
+    try {
+      cache.invalidate(`/meetings/${id}`)
+      const data = await meetingsApi.get(id)
+      setMeeting(data)
+    } catch (error) {
+      console.error('Failed to refresh meeting:', error)
+    }
+  }, [id])
 
   const handleAskQuestion = async (e) => {
     e.preventDefault()
@@ -332,6 +345,8 @@ export default function MeetingDetail() {
           </VCButton>
         </div>
       </div>
+
+      <RecordingStatus meetingId={meeting.id} recordingJob={meeting.recording_job} onRefresh={refreshMeeting} />
 
       {/* Meeting Intelligence Panel */}
       <MeetingIntelligencePanel

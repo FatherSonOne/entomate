@@ -5,7 +5,7 @@ import {
   Plus, Sparkles, AlertTriangle, Users, BarChart3,
   ChevronDown, ChevronUp, Keyboard,
 } from 'lucide-react'
-import MeetingRecorder from '../components/MeetingRecorder'
+import MeetingRecorder from '../components/meetings/MeetingRecorder'
 import IntelligenceDashboard from '../components/intelligence/IntelligenceDashboard'
 import { LearningInsightsWidget } from '../components/intelligence'
 import SentimentTrendMini from '../components/intelligence/SentimentTrendMini'
@@ -612,7 +612,7 @@ export default function Dashboard() {
 
         {/* Meeting Recorder */}
         <div className="lg:col-span-1 space-y-4" ref={recorderRef}>
-          <MeetingRecorder onMeetingProcessed={loadData} />
+          <MeetingRecorder onRecorded={loadData} />
           <AutomationActivityFeed count={stats.automations} navigate={navigate} />
         </div>
 
