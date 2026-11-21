@@ -3,7 +3,7 @@
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 .tabs{flex-wrap:wrap}.tabs .button{white-space:nowrap}header nav{flex-wrap:wrap}header nav .button{font-size:12px}
 #completePackReady[hidden]{display:none}#fullPack:disabled{opacity:.65;cursor:progress}
-</style></head><body><header><a class="brand" href="index.html#logos"><span id="brandWord" style="border:0;padding:0"></span><span>SIGNAL STUDIO</span></a><nav class="tabs" aria-label="Systems"><a class="button active" href="index.html#logos">01 / Logo system</a><a class="button" href="motion.html#motion">02 / Motion system</a><a class="button" href="loaders.html">03 / Logo loaders</a></nav><span class="meta">ILLUSTRATED IDENTITY / NOV 2026</span></header><section class="intro"><div><div class="eyebrow">Built from your original imagery</div><h1>Art becomes <i>identity.</i></h1></div><p>Seventeen illustrated directions drawn directly from your uploads and the preview collection. The original forms, refined into a logo system.</p></section><main><aside><div class="label">01 — REFERENCE DIRECTIONS</div><div class="filters"><button data-filter="all" class="active">All 17</button><button data-filter="Uploaded references">Your uploads</button><button data-filter="Preview references">Preview folder</button></div><div class="options" id="options"></div><div class="group"><label for="layout">Composition</label><select id="layout"><option value="horizontal">Horizontal lockup</option><option value="stacked">Stacked lockup</option><option value="mark">Illustrated symbol</option><option value="wordmark">Wordmark only</option></select><label for="wordColor">Wordmark color</label><select id="wordColor"><option value="#F8F0F2">Chalk</option><option value="#FF2D6B">Crimson</option><option value="#151316">Ink</option></select><label for="scale">Preview scale <output id="scaleValue">100%</output></label><input id="scale" type="range" min="60" max="120" value="100"></div><div class="group"><div class="label">QUICK COMPOSITIONS</div><div class="pills"><button data-preset="signature">Signature</button><button data-preset="emblem">Emblem</button><button data-preset="paper">On paper</button><button data-preset="stacked">Stacked</button></div></div><div class="group"><button class="button primary" id="fullPack" type="button">↓ Complete logo system</button><p style="font-size:10px">17 symbols · 102 lockups · 3 wordmarks<br>Every composition in transparent PNG &amp; self-contained SVG.</p><p id="completePackStatus" role="status" style="font:10px/1.7 monospace;color:var(--muted)">244 artwork files. Building the full pack may take a moment.</p><a class="button" id="completePackReady" hidden download>↓ Save complete ZIP</a></div></aside><section class="workspace"><div class="stage-top"><span class="caption" id="caption"></span><div class="pills"><button data-bg="void" class="active">Void</button><button data-bg="paper">Paper</button><button data-bg="checker">Alpha</button></div></div><div class="stage" id="stage"><div class="preview" id="preview"></div><span class="stage-note">ILLUSTRATED PNG SYMBOL / OUTLINED VECTOR WORDMARK</span></div><div class="detail"><div><div class="eyebrow" id="sourceTag"></div><h2 id="name"></h2><p id="detail"></p><div class="exports"><button class="primary" id="exportPng">↓ Lockup PNG</button><button id="exportSvg">↓ Lockup SVG</button><a class="button" id="master" download>↓ Original PNG</a><a class="button" id="animateLogo" href="loaders.html">Loading preview ↗</a></div><p style="font-size:10px;margin-top:12px">SVG lockups embed the illustrated PNG with vector lettering.</p></div><details class="reference" open><summary>ORIGINAL REFERENCE ↗</summary><img id="reference" alt="Original visual reference"></details></div><div class="sample-grid"><div class="sample" id="darkSample"></div><div class="sample light" id="lightSample"></div><div class="sample" id="markSample"></div></div><div class="direction"><div><div class="label" style="margin:0">YOUR DIRECTION</div><p id="prompt"></p></div><button id="copyPrompt">Copy direction ↗</button></div></section></main><section class="gallery-wrap"><div class="gallery-header"><h2>The complete collection.</h2><p>Five uploaded references. Twelve additional directions.</p></div><div class="gallery" id="gallery"></div></section><footer><span>ENTOMATE / MEETING INTELLIGENCE PLATFORM</span><span>ORIGINAL FORMS. CONNECTED INTELLIGENCE.</span></footer><div class="toast" id="toast" role="status" hidden></div><script>
+</style></head><body><header><a class="brand" href="index.html#logos"><span id="brandWord" style="border:0;padding:0"></span><span>SIGNAL STUDIO</span></a><nav class="tabs" aria-label="Systems"><a class="button active" href="index.html#logos">01 / Logo system</a><a class="button" href="motion.html#motion">02 / Motion system</a><a class="button" href="loaders.html">03 / Logo loaders</a></nav><span class="meta">ILLUSTRATED IDENTITY / NOV 2026</span></header><section class="intro"><div><div class="eyebrow">Built from your original imagery</div><h1>Art becomes <i>identity.</i></h1></div><p>Seventeen illustrated directions drawn directly from your uploads and the preview collection. The original forms, refined into a logo system.</p></section><main><aside><div class="label">01 — REFERENCE DIRECTIONS</div><div class="filters"><button data-filter="all" class="active">All 17</button><button data-filter="Uploaded references">Your uploads</button><button data-filter="Preview references">Preview folder</button></div><div class="options" id="options"></div><div class="group"><label for="layout">Composition</label><select id="layout"><option value="horizontal">Horizontal lockup</option><option value="stacked">Stacked lockup</option><option value="mark">Illustrated symbol</option><option value="wordmark">Wordmark only</option></select><label for="wordColor">Wordmark color</label><select id="wordColor"><option value="#F8F0F2">Chalk</option><option value="#FF2D6B">Crimson</option><option value="#151316">Ink</option></select><label for="scale">Preview scale <output id="scaleValue">100%</output></label><input id="scale" type="range" min="60" max="120" value="100"></div><div class="group"><div class="label">QUICK COMPOSITIONS</div><div class="pills"><button data-preset="signature">Signature</button><button data-preset="emblem">Emblem</button><button data-preset="paper">On paper</button><button data-preset="stacked">Stacked</button></div></div><div class="group"><button class="button primary" id="fullPack" type="button">↓ Complete logo system</button><p style="font-size:10px">17 logo directions · light + dark + crimson<br>Every combination in transparent PNG &amp; self-contained SVG, with clear space.</p><p id="completePackStatus" role="status" style="font:10px/1.7 monospace;color:var(--muted)">278 artwork files. Building the full pack may take a moment.</p><a class="button" id="completePackReady" hidden download>↓ Save complete ZIP</a></div></aside><section class="workspace"><div class="stage-top"><span class="caption" id="caption"></span><div class="pills"><button data-bg="void" class="active">Void</button><button data-bg="paper">Paper</button><button data-bg="checker">Alpha</button></div></div><div class="stage" id="stage"><div class="preview" id="preview"></div><span class="stage-note">ILLUSTRATED PNG SYMBOL / OUTLINED VECTOR WORDMARK</span></div><div class="detail"><div><div class="eyebrow" id="sourceTag"></div><h2 id="name"></h2><p id="detail"></p><div class="exports"><button class="primary" id="exportPng">↓ Lockup PNG</button><button id="exportSvg">↓ Lockup SVG</button><a class="button" id="master" download>↓ Original PNG</a><a class="button" id="animateLogo" href="loaders.html">Loading preview ↗</a></div><p style="font-size:10px;margin-top:12px">SVG lockups embed the illustrated PNG with vector lettering.</p></div><details class="reference" open><summary>ORIGINAL REFERENCE ↗</summary><img id="reference" alt="Original visual reference"></details></div><div class="sample-grid"><div class="sample" id="darkSample"></div><div class="sample light" id="lightSample"></div><div class="sample" id="markSample"></div></div><div class="direction"><div><div class="label" style="margin:0">YOUR DIRECTION</div><p id="prompt"></p></div><button id="copyPrompt">Copy direction ↗</button></div></section></main><section class="gallery-wrap"><div class="gallery-header"><h2>The complete collection.</h2><p>Five uploaded references. Twelve additional directions.</p></div><div class="gallery" id="gallery"></div></section><footer><span>ENTOMATE / MEETING INTELLIGENCE PLATFORM</span><span>ORIGINAL FORMS. CONNECTED INTELLIGENCE.</span></footer><div class="toast" id="toast" role="status" hidden></div><script>
 if(location.hash==='#motion')location.replace('motion.html#motion');
 const DATA=[{"id": "relay", "name": "Relay", "group": "Uploaded references", "reference": "relay.gif", "number": "01", "detail": "An illustrated Entomate emblem developed directly from your uploaded artwork, preserving its characteristic form, luminous materials and fine circuit detail."}, {"id": "constellation", "name": "Constellation", "group": "Uploaded references", "reference": "constellation.png", "number": "02", "detail": "An illustrated Entomate emblem developed directly from your uploaded artwork, preserving its characteristic form, luminous materials and fine circuit detail."}, {"id": "aperture", "name": "Aperture", "group": "Uploaded references", "reference": "aperture.png", "number": "03", "detail": "An illustrated Entomate emblem developed directly from your uploaded artwork, preserving its characteristic form, luminous materials and fine circuit detail."}, {"id": "orbit", "name": "Orbit", "group": "Uploaded references", "reference": "orbit.png", "number": "04", "detail": "An illustrated Entomate emblem developed directly from your uploaded artwork, preserving its characteristic form, luminous materials and fine circuit detail."}, {"id": "bloom", "name": "Bloom", "group": "Uploaded references", "reference": "bloom.png", "number": "05", "detail": "An illustrated Entomate emblem developed directly from your uploaded artwork, preserving its characteristic form, luminous materials and fine circuit detail."}, {"id": "circuit-spire", "name": "Circuit Spire", "group": "Preview references", "reference": "circuit-spire.png", "number": "06", "detail": "Preserve the compact vertical branching copper-and-mint circuit tree with its illuminated red routing spine, symmetric horizontal traces, and orbital micro-nodes. Make a deliberate self-contained vertical emblem."}, {"id": "circuit-e", "name": "Circuit E", "group": "Preview references", "reference": "circuit-e.png", "number": "07", "detail": "Preserve and refine the three substantial red horizontal bars, the left routing circuit branches and round metallic nodes into a dimensional capital E intelligence logo. Keep the clear three-bar silhouette with crisp engineered edges."}, {"id": "catalyst-core", "name": "Catalyst Core", "group": "Preview references", "reference": "catalyst-core.png", "number": "08", "detail": "Preserve the crimson concentric orbital core, layered horizontal data traces and suspended wireframe satellite nodes. Make a strong compact circular intelligence emblem."}, {"id": "routed-signal", "name": "Routed Signal", "group": "Preview references", "reference": "routed-signal.png", "number": "09", "detail": "Preserve the three horizontal light bars, large right ring terminals, left circuitry and one offset signal node. Compose these as a distinctive three-path routing logo, luminous red and warm ivory."}, {"id": "ignition", "name": "Ignition", "group": "Preview references", "reference": "ignition.png", "number": "10", "detail": "The reference contains four glyphs. Create ONE coherent emblem based on its distinctive spiky crimson-and-mint ignition core, intersecting vertical circuit axis and circular halo. Do not reproduce a row of four objects."}, {"id": "relay-orbits", "name": "Relay Orbits", "group": "Preview references", "reference": "relay-orbits.png", "number": "11", "detail": "The reference contains four ring glyphs. Create ONE compact emblem combining the strongest layered crescent ring, luminous inner halo and horizontal energy axis. Preserve the translucent red glass and precision wires."}, {"id": "signal-cascade", "name": "Signal Cascade", "group": "Preview references", "reference": "signal-cascade.png", "number": "12", "detail": "The reference contains four circular glyphs. Create ONE coherent central emblem with its warm crimson concentric ignition rings, fine technical etchings and a smaller orbiting node. Retain the warm light and dark open center."}, {"id": "orbital-network", "name": "Orbital Network", "group": "Preview references", "reference": "orbital-network.png", "number": "13", "detail": "Preserve the large central dimensional ring connected to several smaller orbiting ring cores, silky cyan and rose wireframe connections and open dark spaces. Refine it into an intricate, connected intelligence emblem."}, {"id": "trinity", "name": "Trinity", "group": "Preview references", "reference": "trinity.png", "number": "14", "detail": "Preserve the three distinct translucent orbital lobes in a triangular arrangement, warm copper upper loops and cool ivory lower orbit ribbons. Make an elegant three-part connected intelligence emblem."}, {"id": "flow-field", "name": "Flow Field", "group": "Preview references", "reference": "flow-field.png", "number": "15", "detail": "Preserve the twisting amber upper flow and two lower mint-and-ivory circular vortices, connected as one three-part ribbon system. Make an isolated self-contained sculptural logo emblem."}, {"id": "neural-core", "name": "Neural Core", "group": "Preview references", "reference": "neural-core.png", "number": "16", "detail": "Preserve the compact asymmetric multi-loop cyan-and-crimson wireframe object with its intricate golden central circuit lattice. Consolidate its silhouette into a premium sculptural logo without losing fine circuitry."}, {"id": "ribbon-catalyst", "name": "Ribbon Catalyst", "group": "Preview references", "reference": "ribbon-catalyst.png", "number": "17", "detail": "Preserve the rounded open torus made from translucent cyan and rose glass ribbons and black crystalline facets, with a clear central void. Make a polished self-contained intelligence emblem."}],WORD="<g fill=\"none\" stroke=\"WORDCOLOR\" stroke-width=\"8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path transform=\"translate(0 0)\" d=\"M42 45H5C5 18 44 18 44 44M5 45C5 73 31 75 43 62\"/><path transform=\"translate(59 0)\" d=\"M5 70V28M5 42C5 22 42 22 42 43V70\"/><path transform=\"translate(117 0)\" d=\"M22 9V56Q22 73 40 69M5 29H40\"/><path transform=\"translate(165 0)\" d=\"M25 27C-2 27-2 70 25 70C52 70 52 27 25 27Z\"/><path transform=\"translate(226 0)\" d=\"M5 70V28M5 43C5 22 34 23 34 43V70M34 43C34 22 64 23 64 43V70\"/><path transform=\"translate(307 0)\" d=\"M43 70V29M43 49C43 20 4 20 4 49C4 77 43 78 43 49\"/><path transform=\"translate(365 0)\" d=\"M22 9V56Q22 73 40 69M5 29H40\"/><path transform=\"translate(413 0)\" d=\"M42 45H5C5 18 44 18 44 44M5 45C5 73 31 75 43 62\"/></g>",ASSET='./assets';
 const $=id=>document.getElementById(id),state={id:'relay-orbits',layout:'horizontal',wordColor:'#F8F0F2',scale:100,bg:'void',filter:'all'};
@@ -22,9 +22,9 @@ $('copyPrompt').onclick=async()=>{try{await navigator.clipboard.writeText($('pro
 
 /* COMPLETE_LOGO_EXPORT_START */
 const COMPLETE_LOGO_COLORS = [
-  { id: 'chalk', name: 'Chalk', hex: '#F8F0F2' },
-  { id: 'crimson', name: 'Crimson', hex: '#FF2D6B' },
-  { id: 'ink', name: 'Ink', hex: '#151316' },
+  { id: 'chalk', name: 'Chalk', hex: '#F8F0F2', theme: 'on-dark' },
+  { id: 'crimson', name: 'Crimson', hex: '#FF2D6B', theme: 'accent-crimson' },
+  { id: 'ink', name: 'Ink', hex: '#151316', theme: 'on-light' },
 ]
 const COMPLETE_LOGO_DIMENSIONS = {
   mark: { width: 1300, height: 1300 },
@@ -128,61 +128,72 @@ $('fullPack').onclick = async () => {
   const button = $('fullPack'), status = $('completePackStatus'), ready = $('completePackReady')
   if (completeLogoPackUrl) { ready.click(); return }
   button.disabled = true; button.setAttribute('aria-busy', 'true'); ready.hidden = true
-  const zip = new CompleteLogoZip(), entries = [], total = DATA.length * 7 + 3
+  const zip = new CompleteLogoZip(), entries = [], total = DATA.length * 8 + 3
   let completed = 0
-  const root = 'Entomate-Complete-Logo-System/'
+  const root = 'Entomate-All-17-Logos-Light-Dark/'
   try {
     async function addComposition(id, name, layout, color, imageUri) {
       status.textContent = 'Building ' + (completed + 1) + ' / ' + total + ' — ' + name + ', ' + layout + (color ? ', ' + color.name : '') + '…'
       button.textContent = 'Exporting ' + Math.round(completed / total * 100) + '%…'
       const tone = color ? color.hex : '#F8F0F2'
       let svg = compose(id, layout, tone, imageUri)
+      const viewBox = svg.match(/viewBox="([^"]+)"/)
+      const [x, y, width, height] = viewBox[1].split(' ').map(Number)
+      const margin = Math.ceil(Math.min(width, height) * 0.08)
+      svg = svg.replace(viewBox[0], `viewBox="${x - margin} ${y - margin} ${width + 2 * margin} ${height + 2 * margin}"`)
       const label = layout === 'wordmark' ? 'Entomate wordmark ' + color.name : 'Entomate ' + name + ' ' + layout
       svg = svg.replace(/aria-label="[^"]*"/, 'aria-label="' + label + '"')
-      const stem = layout === 'wordmark' ? 'wordmarks/entomate-wordmark-' + color.id
-        : 'logos/' + id + '/' + (layout === 'mark' ? 'symbol/entomate-' + id + '-symbol'
-          : layout + '/entomate-' + id + '-' + layout + '-' + color.id)
-      const dimensions = COMPLETE_LOGO_DIMENSIONS[layout]
+      const theme = color.theme
+      const stem = layout === 'wordmark' ? theme + '/wordmarks/entomate-wordmark-' + theme
+        : theme + '/' + id + '/entomate-' + id + '-' + (layout === 'mark' ? 'symbol' : layout) + '-' + theme
+      const originalDimensions = COMPLETE_LOGO_DIMENSIONS[layout]
+      const padding = Math.round(margin * originalDimensions.width / width)
+      const dimensions = { width: originalDimensions.width + padding * 2, height: originalDimensions.height + padding * 2 }
       await zip.add(root + stem + '.svg', svg)
       await zip.add(root + stem + '.png', await completeLogoPng(svg, dimensions))
       entries.push({ logo: layout === 'wordmark' ? null : id, name, layout,
-        wordmarkColor: color ? color.name : null, color: color ? color.hex : null,
-        pngWidth: dimensions.width, pngHeight: dimensions.height, svg: stem + '.svg', png: stem + '.png' })
+        theme, wordmarkColor: layout === 'mark' ? null : color.name, color: layout === 'mark' ? null : color.hex,
+        clearSpaceSvgUnits: margin, pngWidth: dimensions.width, pngHeight: dimensions.height, svg: stem + '.svg', png: stem + '.png' })
       completed++
       // Let progress paint between compositions without changing the selected preview.
       await new Promise(resolve => setTimeout(resolve, 0))
     }
     for (const direction of DATA) {
       const imageUri = await completeLogoImage(direction.id)
-      await addComposition(direction.id, direction.name, 'mark', null, imageUri)
+      for (const color of COMPLETE_LOGO_COLORS.filter(color => color.id !== 'crimson')) {
+        await addComposition(direction.id, direction.name, 'mark', color, imageUri)
+      }
       for (const layout of ['horizontal', 'stacked']) {
         for (const color of COMPLETE_LOGO_COLORS) await addComposition(direction.id, direction.name, layout, color, imageUri)
       }
     }
     for (const color of COMPLETE_LOGO_COLORS) await addComposition(DATA[0].id, 'Entomate', 'wordmark', color, '')
     const manifest = {
-      system: 'Entomate complete illustrated logo system', generatedAt: new Date().toISOString(),
+      system: 'Entomate all 17 illustrated logos — light and dark', primary: 'relay-orbits', generatedAt: new Date().toISOString(),
       directions: DATA.length, compositions: entries.length, assetFiles: entries.length * 2,
       formats: ['PNG', 'SVG'], colors: COMPLETE_LOGO_COLORS, entries,
+      clearSpace: '8% of the original shorter canvas dimension added transparently to every edge.',
     }
     await zip.add(root + 'manifest.json', JSON.stringify(manifest, null, 2))
     await zip.add(root + 'README.txt', [
-      'ENTOMATE — COMPLETE ILLUSTRATED LOGO SYSTEM', '',
-      '17 standalone symbols; 102 horizontal/stacked lockups; 3 standalone wordmarks.',
-      '122 compositions in PNG and SVG: 244 artwork files.', '',
-      'Each logo has a symbol-only composition plus horizontal and stacked lockups with Chalk, Crimson and Ink wordmarks.',
-      'Standalone wordmarks appear once per color because they are shared across all 17 directions.',
+      'ENTOMATE — ALL 17 LOGOS / LIGHT + DARK', '',
+      '139 compositions in PNG and SVG: 278 artwork files. Primary direction: Relay Orbits.', '',
+      'on-dark/: complete symbol, horizontal, stacked and shared Chalk wordmark set (104 files).',
+      'on-light/: complete symbol, horizontal, stacked and shared Ink wordmark set (104 files).',
+      'accent-crimson/: horizontal/stacked lockups and shared Crimson wordmark (70 files).',
+      'Each theme contains its own symbol files. Wordmarks appear once per theme because all 17 directions share them.',
       'The illustrated artwork keeps its original colors. Wordmarks use outlined vector paths.',
-      'PNGs have transparent backgrounds. SVGs embed the original illustrated PNG and require no linked files or fonts.',
+      'Light/dark means the intended background. Every file is transparent, with added clear space; do not crop the padding.',
+      'SVGs embed the original illustrated PNG and require no linked files or fonts.',
       'The illustrated emblems are raster artwork, not vector tracings.', '',
-      'PNG sizes: symbols/stacked 1300×1300; horizontal 2160×800; wordmarks 1880×336.',
+      'PNG sizes with clear space: symbols/stacked 1508×1508; horizontal 2288×928; wordmarks 1936×392.',
       'manifest.json lists every composition, color, filename and PNG size.', '',
       'Playground: https://entomate.logosvision.org/brand-lab/index.html#logos',
     ].join('\n'))
     status.textContent = 'Finishing the complete ZIP…'
     const archive = zip.finish()
     completeLogoPackUrl = URL.createObjectURL(archive)
-    ready.href = completeLogoPackUrl; ready.download = 'entomate-complete-logo-system.zip'; ready.hidden = false
+    ready.href = completeLogoPackUrl; ready.download = 'entomate-all-17-logos-light-dark.zip'; ready.hidden = false
     status.textContent = 'Ready: ' + entries.length * 2 + ' artwork files · ' + (archive.size / 1048576).toFixed(1) + ' MB.'
     ready.click()
     toast('Complete logo system exported')
@@ -194,5 +205,6 @@ $('fullPack').onclick = async () => {
   }
 }
 /* COMPLETE_LOGO_EXPORT_END */
+
 
 </script></body></html>
