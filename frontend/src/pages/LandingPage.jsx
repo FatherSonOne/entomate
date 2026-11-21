@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { guideSections, CATEGORIES, guideVersion, guideUpdated } from '../components/UsersGuide/guideData'
 import { Logo, CircuitEMark } from '../components/Logo'
 import BackToTop from '../components/BackToTop'
-import BrandMotion from '../components/BrandMotion'
+import LandingHero from '../components/LandingHero'
 
 /* ════════════════════════════════════════════════════════
    ANIMATED SVG ICONS — replace every emoji on the page
@@ -765,7 +765,7 @@ export default function LandingPage() {
 
       {/* ── HERO ── */}
       <section className="hero">
-        <BrandMotion clip="hands" className="hero-brand-film" />
+        <LandingHero />
 
         {/* Grid overlay — radial mask focuses on the canvas region */}
         <div className="hero-grid"></div>

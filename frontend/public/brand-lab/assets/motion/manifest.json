@@ -4,7 +4,8 @@
     "title": "Intelligence, held",
     "role": "Hero",
     "source": "Entomate_brand_hero_two_abstract_architectural_wireframe_hand_965fa74d-394e-4d8c-bff6-6cdf0667d017_0.mp4",
-    "bytes": 1039340
+    "bytes": 2027190,
+    "playback": "forward-reverse"
   },
   {
     "id": "intelligence",
@@ -18,21 +19,24 @@
     "title": "Decision to execution",
     "role": "Workflow",
     "source": "Dark_modular_automation_landscape_for_an_Entomate_website_sec_c1c7fc54-be3c-438e-bfff-db308ef9a9bf_0.mp4",
-    "bytes": 1134818
+    "bytes": 2211786,
+    "playback": "forward-reverse"
   },
   {
     "id": "bridge",
     "title": "Connected intelligence",
     "role": "Ecosystem",
     "source": "Entomate_ecosystem_bridge_section_background_three_distant_mo_3cc6a331-cbe3-454c-9728-d0ec6bd3f177_0.mp4",
-    "bytes": 3112367
+    "bytes": 6061360,
+    "playback": "forward-reverse"
   },
   {
     "id": "signal",
     "title": "Signal field",
     "role": "Section background",
     "source": "Subtle_low-contrast_section_background_for_Entomate_meeting_i_085ccde7-5f30-43c1-9f56-b8b3aa993ef7_0.mp4",
-    "bytes": 1346752
+    "bytes": 2605702,
+    "playback": "forward-reverse"
   },
   {
     "id": "glyphs",
@@ -46,7 +50,8 @@
     "title": "Explainable intelligence",
     "role": "AI",
     "source": "Abstract_factor-analysis_field_for_Entomate_explainable_AI_on_39ac63d0-469c-48ee-a63f-dc3c14364564_0.mp4",
-    "bytes": 540888
+    "bytes": 890429,
+    "playback": "forward-reverse"
   },
   {
     "id": "portal",
