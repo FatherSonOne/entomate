@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { useLoading } from '../contexts/LoadingContext'
-import BrandMotion from './BrandMotion'
+import AnimatedLoadingLogo from './AnimatedLoadingLogo'
 
 export default function EnhancedLoadingScreen({ autoAnimate = true, inline = false }) {
   const loadingContext = useLoading()
@@ -44,7 +44,7 @@ export default function EnhancedLoadingScreen({ autoAnimate = true, inline = fal
     <div className={`en-signal-loader ${inline ? 'en-signal-inline' : 'en-signal-full'}`}
       role="status" aria-live="polite" aria-label={`Loading: ${stageLabel}`}>
       <div className="en-signal-loader-content">
-        <BrandMotion clip="glyphs" className="en-signal-loader-film" />
+        <AnimatedLoadingLogo />
         <img className="en-signal-loader-wordmark" src="/brand-lab/assets/logos/entomate-wordmark-white.svg" alt="Entomate" />
         <div className="en-signal-loader-track" aria-hidden="true">
           <span style={{ width: `${Math.max(0, Math.min(100, progress))}%` }} />
@@ -57,9 +57,6 @@ export default function EnhancedLoadingScreen({ autoAnimate = true, inline = fal
         .en-signal-full { position: fixed; inset: 0; z-index: 9999; }
         .en-signal-inline { width: 100%; min-height: min(560px, 100svh); height: 100%; }
         .en-signal-loader-content { width: min(500px, 92vw); text-align: center; padding: 36px 12px; }
-        .en-signal-loader-film { width: 100%; height: 150px; margin-bottom: 24px; }
-        .en-signal-loader-film .brand-motion-poster, .en-signal-loader-film .brand-motion-video { object-fit: contain; }
-        .en-signal-loader-film .brand-motion-control { right: 0; bottom: 0; padding: 4px 8px; font-size: 9px; }
         .en-signal-loader-wordmark { display: block; width: 178px; height: 36px; margin: 0 auto; }
         .en-signal-loader-track { width: 220px; height: 2px; background: #312a30; margin: 32px auto 20px; }
         .en-signal-loader-track span { display: block; height: 2px; background: #ff2d6b; transition: width 180ms linear; }
