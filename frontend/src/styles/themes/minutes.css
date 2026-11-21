@@ -1,0 +1,167 @@
+/* ============================================================
+   MINUTES — Entomate app design layer (direction C, 2026-11-21)
+   ------------------------------------------------------------
+   Swiss information design on top of the foundation:
+   2px corners, hairline rules instead of cards-with-shadows,
+   numbered structure, Syne poster titles, monospace numerals.
+   Same Void Crimson palette (main.css tokens). Signal law holds:
+     crimson = brand/CTA/active · amber = AI only
+     phosphor = live only        · mint = action
+   Rendered as 8px squares + a word; never amber/phosphor in chrome.
+
+   ROLLOUT: every rule is scoped under html[data-style="minutes"],
+   written by ThemeContext. Off by default; preview from
+   Settings → Appearance. Specificity (0,2,1)+ beats the
+   [data-foundation="held-light"] rules it replaces, so both
+   layers can stay loaded.
+
+   Phase map:  P1 surfaces + primitives (this file)
+               P2 shell (rail, bottom sheet, title rule)
+               P3 Today · P4 Meetings · P5 sweep, then default on
+   ============================================================ */
+
+html[data-style="minutes"] {
+  --mn-radius: 2px;
+  --mn-rule: var(--text-primary);
+  --mn-hair: var(--border-subtle);
+  --mn-hair-strong: var(--border-default);
+  --mn-display: 'Syne', 'Inter', system-ui, sans-serif;
+  --mn-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+/* ── Background: flat paper, no bloom ── */
+html[data-style="minutes"] .hl-bg,
+html[data-style="minutes"] .vc-canvas { display: none; }
+html[data-style="minutes"] body {
+  background: var(--bg-base);
+  background-image: none;
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+/* ── Core surface: a ruled panel, not a floating card ── */
+html[data-style="minutes"] .vc {
+  background: var(--bg-surface);
+  border: 1px solid var(--mn-hair);
+  border-radius: var(--mn-radius);
+  box-shadow: none;
+  transform: none;
+  -webkit-backdrop-filter: none;
+          backdrop-filter: none;
+  transition: border-color 0.2s ease;
+}
+html[data-style="minutes"] .vc:hover,
+html[data-style="minutes"] .hover-glow .vc:hover {
+  transform: none !important;
+  box-shadow: none !important;
+  border-color: var(--mn-hair-strong) !important;
+}
+
+/* ── Corners and depth across Tailwind utilities ──
+   Pills stay round (rounded-full: avatars, switches, dots);
+   everything else squares off. Floating layers (xl/2xl shadows on
+   menus and modals) keep their separation. */
+html[data-style="minutes"] main .rounded,
+html[data-style="minutes"] main .rounded-sm,
+html[data-style="minutes"] main .rounded-md,
+html[data-style="minutes"] main .rounded-lg,
+html[data-style="minutes"] main .rounded-xl,
+html[data-style="minutes"] main .rounded-2xl,
+html[data-style="minutes"] main .rounded-3xl { border-radius: var(--mn-radius); }
+html[data-style="minutes"] main .shadow,
+html[data-style="minutes"] main .shadow-sm,
+html[data-style="minutes"] main .shadow-md,
+html[data-style="minutes"] main .shadow-lg { box-shadow: none; }
+
+/* ── Primitives ── */
+html[data-style="minutes"] .btn,
+html[data-style="minutes"] .vbtn,
+html[data-style="minutes"] .vc-btn {
+  border-radius: var(--mn-radius);
+  box-shadow: none;
+  transform: none;
+}
+html[data-style="minutes"] .btn-primary,
+html[data-style="minutes"] .vbtn-primary,
+html[data-style="minutes"] .vc-btn-primary {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: #fff;
+  box-shadow: none;
+}
+html[data-style="minutes"] .btn-primary:hover,
+html[data-style="minutes"] .vbtn-primary:hover,
+html[data-style="minutes"] .vc-btn-primary:hover {
+  background: var(--accent-primary-light, var(--accent-primary));
+  box-shadow: none;
+  transform: none;
+}
+html[data-style="minutes"] .input,
+html[data-style="minutes"] .vinput,
+html[data-style="minutes"] .vselect,
+html[data-style="minutes"] main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+html[data-style="minutes"] main select,
+html[data-style="minutes"] main textarea { border-radius: var(--mn-radius); }
+html[data-style="minutes"] .badge,
+html[data-style="minutes"] .vbadge {
+  border-radius: var(--mn-radius);
+  font-family: var(--mn-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+html[data-style="minutes"] :focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+
+/* ── Type: poster titles, tabular numerals ── */
+html[data-style="minutes"] main h1 {
+  font-family: var(--mn-display);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 0.95;
+}
+html[data-style="minutes"] h2,
+html[data-style="minutes"] h3,
+html[data-style="minutes"] h4,
+html[data-style="minutes"] h5,
+html[data-style="minutes"] h6 {
+  font-family: 'Inter', system-ui, sans-serif;
+  letter-spacing: -0.015em;
+}
+html[data-style="minutes"] main { font-variant-numeric: tabular-nums; }
+html[data-style="minutes"] main code,
+html[data-style="minutes"] main kbd,
+html[data-style="minutes"] main time { font-family: var(--mn-mono); }
+
+/* ── Shell, interim (P2 replaces this with the numbered rail) ── */
+html[data-style="minutes"] .nl-sidebar {
+  background: var(--bg-base);
+  border-right: 1px solid var(--mn-hair);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+          backdrop-filter: none;
+}
+html[data-style="minutes"] .nl-item { border-radius: var(--mn-radius); }
+html[data-style="minutes"] .nl-item.active,
+html[data-style="minutes"] .nl-item.active:hover {
+  background: color-mix(in srgb, var(--accent-primary) 8%, transparent);
+  box-shadow: inset 2px 0 0 var(--accent-primary);
+  color: var(--text-primary);
+}
+html[data-style="minutes"] .nl-item.active::before { display: none; }
+html[data-style="minutes"] .nl-section {
+  font-family: var(--mn-mono);
+  letter-spacing: 0.2em;
+}
+/* The topbar sets background and border inline; !important is needed
+   until P2 moves those into CSS. */
+html[data-style="minutes"] .vc-topbar {
+  background: var(--bg-base) !important;
+  border-bottom: 2px solid var(--mn-rule) !important;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+          backdrop-filter: none;
+}
+html[data-style="minutes"] .vc-topbar-search { border-radius: var(--mn-radius); }
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-style="minutes"] * { transition-duration: 0.01ms !important; }
+}

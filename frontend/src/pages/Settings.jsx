@@ -67,7 +67,7 @@ export default function Settings() {
   const [deleteDialogMode, setDeleteDialogMode] = useState(null) // 'soft' | 'hard' | null
   const [deleteLoading, setDeleteLoading] = useState(false)
 
-  const { mode, setThemeMode } = useTheme()
+  const { mode, setThemeMode, isMinutes, toggleDesignStyle } = useTheme()
 
   // Load user settings from DB — merge over defaults so nothing is ever null
   useEffect(() => {
@@ -440,6 +440,26 @@ export default function Settings() {
                         marginTop: 2
                       }}
                     />
+                  </button>
+                </div>
+              </div>
+
+              {/* Minutes design preview (direction C) */}
+              <div className="px-5 pb-5">
+                <div className="flex items-center justify-between gap-4 p-3 rounded-lg bg-surface-elevated border border-line-subtle">
+                  <div>
+                    <span id="minutes-preview-label" className="text-sm font-medium block text-content-primary">Preview the Minutes design</span>
+                    <span className="text-xs text-content-tertiary">The new Swiss look, still being rolled out. Only changes this browser.</span>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={isMinutes}
+                    aria-labelledby="minutes-preview-label"
+                    onClick={toggleDesignStyle}
+                    className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full border-0 transition-colors ${isMinutes ? 'bg-accent-primary' : 'bg-surface-muted'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${isMinutes ? 'translate-x-4' : 'translate-x-0.5'}`} />
                   </button>
                 </div>
               </div>

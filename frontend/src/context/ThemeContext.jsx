@@ -30,6 +30,20 @@ function resolveFoundation() {
   return FOUNDATION_DEFAULT;
 }
 
+/* ── Minutes design layer (direction C, 2026-11-21) ──
+   Swiss "Minutes" styling layered on top of the foundation via
+   <html data-style="minutes">. Off by default while it is built out;
+   preview it from Settings → Appearance, or the console:
+     localStorage.setItem('entomate-style', 'minutes');  // on
+     localStorage.removeItem('entomate-style');         // off */
+export const DESIGN_STYLE = 'minutes';
+const STYLE_KEY = 'entomate-style';
+
+function resolveDesignStyle() {
+  if (typeof localStorage === 'undefined') return null;
+  return localStorage.getItem(STYLE_KEY) === DESIGN_STYLE ? DESIGN_STYLE : null;
+}
+
 export function ThemeProvider({ children }) {
   const [mode, setMode] = useState(() => {
     return localStorage.getItem('entomate-theme-mode') || THEME_MODES.dark;
@@ -38,6 +52,7 @@ export function ThemeProvider({ children }) {
   const [resolvedMode, setResolvedMode] = useState('dark');
   const [dbLoaded, setDbLoaded] = useState(false);
   const [foundation, setFoundation] = useState(resolveFoundation);
+  const [designStyle, setDesignStyle] = useState(resolveDesignStyle);
 
   // On mount, try to load theme from DB (async, non-blocking).
   // If DB has a value, override localStorage. Otherwise keep localStorage value.
@@ -99,8 +114,23 @@ export function ThemeProvider({ children }) {
       root.removeAttribute('data-foundation');
     }
 
+    if (designStyle) {
+      root.setAttribute('data-style', designStyle);
+    } else {
+      root.removeAttribute('data-style');
+    }
+
     localStorage.setItem('entomate-theme-mode', mode);
-  }, [resolvedMode, mode, foundation]);
+  }, [resolvedMode, mode, foundation, designStyle]);
+
+  const toggleDesignStyle = useCallback(() => {
+    setDesignStyle((prev) => {
+      const next = prev ? null : DESIGN_STYLE;
+      if (next) localStorage.setItem(STYLE_KEY, next);
+      else localStorage.removeItem(STYLE_KEY);
+      return next;
+    });
+  }, []);
 
   const toggleFoundation = useCallback(() => {
     setFoundation((prev) => {
@@ -129,7 +159,10 @@ export function ThemeProvider({ children }) {
     toggleMode,
     foundation,
     isHeldLight: foundation === FOUNDATION,
-    toggleFoundation
+    toggleFoundation,
+    designStyle,
+    isMinutes: designStyle === DESIGN_STYLE,
+    toggleDesignStyle
   };
 
   return (
