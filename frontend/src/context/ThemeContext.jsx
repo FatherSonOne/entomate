@@ -30,18 +30,28 @@ function resolveFoundation() {
   return FOUNDATION_DEFAULT;
 }
 
-/* ── Minutes design layer (direction C, 2026-11-21) ──
-   Swiss "Minutes" styling layered on top of the foundation via
-   <html data-style="minutes">. Off by default while it is built out;
-   preview it from Settings → Appearance, or the console:
-     localStorage.setItem('entomate-style', 'minutes');  // on
-     localStorage.removeItem('entomate-style');         // off */
-export const DESIGN_STYLE = 'minutes';
+/* ── Design styles (2026-11-21) ──
+   Each style is a CSS layer on top of the foundation, scoped under
+   <html data-style="...">. Orbital is the default. "classic" writes no
+   attribute and shows the Held Light foundation on its own. The choice
+   is per browser (localStorage), like the theme mode fallback.
+     localStorage.setItem('entomate-style', 'folio');  // pick one
+     localStorage.removeItem('entomate-style');       // back to default */
+export const DESIGN_STYLES = [
+  { id: 'orbital', label: 'Orbital', blurb: 'Dark instrument from the Relay Orbits mark. Teal and crimson, rounded panels.' },
+  { id: 'folio', label: 'Folio', blurb: 'Warm editorial paper. Serif headings, quiet margins.' },
+  { id: 'bench', label: 'Bench', blurb: 'Tactile hardware. Raised modules, keys and status lights.' },
+  { id: 'minutes', label: 'Minutes', blurb: 'Swiss information design. Hairline rules and square corners.' },
+  { id: 'classic', label: 'Classic', blurb: 'The previous Held Light look, with soft crimson panels.' },
+];
+export const DEFAULT_DESIGN_STYLE = 'orbital';
 const STYLE_KEY = 'entomate-style';
+const STYLE_IDS = DESIGN_STYLES.map((s) => s.id);
 
 function resolveDesignStyle() {
-  if (typeof localStorage === 'undefined') return null;
-  return localStorage.getItem(STYLE_KEY) === DESIGN_STYLE ? DESIGN_STYLE : null;
+  if (typeof localStorage === 'undefined') return DEFAULT_DESIGN_STYLE;
+  const saved = localStorage.getItem(STYLE_KEY);
+  return STYLE_IDS.includes(saved) ? saved : DEFAULT_DESIGN_STYLE;
 }
 
 export function ThemeProvider({ children }) {
@@ -114,7 +124,7 @@ export function ThemeProvider({ children }) {
       root.removeAttribute('data-foundation');
     }
 
-    if (designStyle) {
+    if (designStyle && designStyle !== 'classic') {
       root.setAttribute('data-style', designStyle);
     } else {
       root.removeAttribute('data-style');
@@ -123,13 +133,10 @@ export function ThemeProvider({ children }) {
     localStorage.setItem('entomate-theme-mode', mode);
   }, [resolvedMode, mode, foundation, designStyle]);
 
-  const toggleDesignStyle = useCallback(() => {
-    setDesignStyle((prev) => {
-      const next = prev ? null : DESIGN_STYLE;
-      if (next) localStorage.setItem(STYLE_KEY, next);
-      else localStorage.removeItem(STYLE_KEY);
-      return next;
-    });
+  const chooseDesignStyle = useCallback((id) => {
+    if (!STYLE_IDS.includes(id)) return;
+    localStorage.setItem(STYLE_KEY, id);
+    setDesignStyle(id);
   }, []);
 
   const toggleFoundation = useCallback(() => {
@@ -161,8 +168,8 @@ export function ThemeProvider({ children }) {
     isHeldLight: foundation === FOUNDATION,
     toggleFoundation,
     designStyle,
-    isMinutes: designStyle === DESIGN_STYLE,
-    toggleDesignStyle
+    designStyles: DESIGN_STYLES,
+    setDesignStyle: chooseDesignStyle
   };
 
   return (

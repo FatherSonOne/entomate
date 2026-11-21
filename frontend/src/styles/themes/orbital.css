@@ -1,0 +1,201 @@
+/* ============================================================
+   ORBITAL — Entomate design style D (default, 2026-11-21)
+   ------------------------------------------------------------
+   A dark scientific instrument drawn from the Relay Orbits mark:
+   teal hairlines and crimson signal on a deep teal-black, rounded
+   panels, pill buttons, monospace readouts, faint orbit rings
+   behind the shell. Light mode is a cool mineral white.
+   Signal law holds: crimson = brand/CTA/active, amber = AI only,
+   phosphor = live only, mint/teal = action.
+
+   ROLLOUT: every rule is scoped under html[data-style="orbital"][data-brand],
+   written by ThemeContext (default style). Tokens are set on a body
+   without the public landing page, so the landing keeps its look.
+   Layer order in main.jsx: void-crimson → held-light → this file.
+   ============================================================ */
+
+/* ── Tokens: dark (default) ── */
+html[data-style="orbital"][data-brand].dark body:not(:has(.lc-page)) {
+  --font: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+  --font-display: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+  --font-heading: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+  --or-teal: #2EC4B6;
+  --or-teal-dim: rgba(46, 196, 182, 0.12);
+  --or-ring: rgba(46, 196, 182, 0.07);
+
+  --bg-base: #060A0B;
+  --bg-surface: #0B1214;
+  --bg-elevated: rgba(11, 18, 20, 0.88);
+  --bg-muted: #111B1D;
+  --bg-subtle: #0B1214;
+  --text-primary: #E8F1EF;
+  --text-secondary: #92A6A2;
+  --text-tertiary: #5E726F;
+  --text-muted: #3B4A48;
+  --border-subtle: rgba(120, 220, 205, 0.10);
+  --border-default: rgba(120, 220, 205, 0.16);
+  --border-strong: rgba(120, 220, 205, 0.32);
+  --accent-secondary: #2EC4B6;
+  --accent-secondary-light: #5FE0D3;
+  --accent-secondary-dim: rgba(46, 196, 182, 0.12);
+  --neo-base: #0B1214;
+  --neo-l: #13201F;
+  --neo-d: #050808;
+  --grid-color: transparent;
+
+  --bg0: #060A0B; --bg1: #0B1214; --bg2: #111B1D; --bg3: #172426;
+  --t0: #E8F1EF; --t1: #92A6A2; --t2: #5E726F;
+  --b0: rgba(120, 220, 205, 0.06); --b1: rgba(120, 220, 205, 0.10); --b2: rgba(120, 220, 205, 0.16);
+  --m: #2EC4B6; --md: rgba(46, 196, 182, 0.12); --mg: rgba(46, 196, 182, 0.30);
+
+  --hl-panel: linear-gradient(180deg, rgba(46, 196, 182, 0.035), rgba(46, 196, 182, 0) 46%), #0B1214;
+  --hl-panel-flat: #0B1214;
+  --hl-border: rgba(120, 220, 205, 0.11);
+  --hl-border-hover: rgba(46, 196, 182, 0.32);
+  --hl-shadow: 0 1px 0 rgba(255, 255, 255, 0.02) inset;
+  --hl-shadow-hover: 0 0 0 1px rgba(46, 196, 182, 0.10), 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+
+/* ── Tokens: light ── */
+html[data-style="orbital"][data-brand]:not(.dark) body:not(:has(.lc-page)) {
+  --font: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+  --font-display: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+  --font-heading: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+  --or-teal: #0F8C80;
+  --or-teal-dim: rgba(15, 140, 128, 0.10);
+  --or-ring: rgba(15, 140, 128, 0.08);
+
+  --bg-base: #F2F6F5;
+  --bg-surface: #FFFFFF;
+  --bg-elevated: rgba(255, 255, 255, 0.9);
+  --bg-muted: #E5EDEB;
+  --bg-subtle: #F7FAF9;
+  --text-primary: #0A1517;
+  --text-secondary: #3E514E;
+  --text-tertiary: #6A7D7A;
+  --text-muted: #A2B1AE;
+  --border-subtle: rgba(10, 50, 46, 0.08);
+  --border-default: rgba(10, 50, 46, 0.13);
+  --border-strong: rgba(10, 50, 46, 0.24);
+  --accent-secondary: #0F8C80;
+  --accent-secondary-light: #14A898;
+  --accent-secondary-dim: rgba(15, 140, 128, 0.10);
+  --neo-base: #FFFFFF;
+  --grid-color: transparent;
+
+  --bg0: #F2F6F5; --bg1: #FFFFFF; --bg2: #F7FAF9; --bg3: #E5EDEB;
+  --t0: #0A1517; --t1: #3E514E; --t2: #6A7D7A;
+  --b0: rgba(10, 50, 46, 0.05); --b1: rgba(10, 50, 46, 0.09); --b2: rgba(10, 50, 46, 0.16);
+  --m: #0F8C80; --md: rgba(15, 140, 128, 0.10); --mg: rgba(15, 140, 128, 0.22);
+
+  --hl-panel: #FFFFFF;
+  --hl-panel-flat: #FFFFFF;
+  --hl-border: rgba(10, 50, 46, 0.09);
+  --hl-border-hover: rgba(15, 140, 128, 0.30);
+  --hl-shadow: 0 1px 2px rgba(10, 40, 38, 0.04);
+  --hl-shadow-hover: 0 10px 28px rgba(10, 40, 38, 0.08);
+}
+
+/* ── Background: orbit rings around the top-right, crimson core ── */
+html[data-style="orbital"][data-brand] .hl-bg {
+  background:
+    radial-gradient(circle at 88% -6%, rgba(255, 45, 107, 0.10), transparent 22%),
+    repeating-radial-gradient(circle at 88% -6%, transparent 0 139px, var(--or-ring) 139px 140px),
+    radial-gradient(1100px 700px at 88% -6%, rgba(46, 196, 182, 0.06), transparent 60%),
+    var(--bg-base);
+  -webkit-mask-image: radial-gradient(1500px 1100px at 88% -6%, #000 35%, transparent 80%);
+          mask-image: radial-gradient(1500px 1100px at 88% -6%, #000 35%, transparent 80%);
+}
+html[data-style="orbital"][data-brand] body { background-image: none; }
+
+/* ── Type: Space Grotesk throughout, mono readouts ── */
+html[data-style="orbital"][data-brand] .app-shell,
+html[data-style="orbital"][data-brand] [role="dialog"] {
+  font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+}
+html[data-style="orbital"][data-brand] .app-shell :is(h1, h2, h3, h4, h5, h6) {
+  font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+  letter-spacing: -0.02em;
+}
+html[data-style="orbital"][data-brand] .app-shell main h1 { font-weight: 600; }
+html[data-style="orbital"][data-brand] .app-shell main { font-variant-numeric: tabular-nums; }
+html[data-style="orbital"][data-brand] .app-shell main :is(code, kbd, time) { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+/* ── Panels: rounded, hairline, no lift ── */
+html[data-style="orbital"][data-brand] .vc {
+  border-radius: 18px;
+  transform: none;
+}
+html[data-style="orbital"][data-brand] .vc:hover,
+html[data-style="orbital"][data-brand] .hover-glow .vc:hover { transform: none !important; }
+
+/* ── Primitives: pill buttons, mono badges ── */
+html[data-style="orbital"][data-brand] .btn,
+html[data-style="orbital"][data-brand] .vbtn,
+html[data-style="orbital"][data-brand] .vc-btn { border-radius: 999px; }
+html[data-style="orbital"][data-brand] .btn-primary,
+html[data-style="orbital"][data-brand] .vbtn-primary,
+html[data-style="orbital"][data-brand] .vc-btn-primary {
+  box-shadow: 0 0 0 1px rgba(255, 45, 107, 0.25), 0 6px 18px -8px var(--accent-primary-glow);
+}
+html[data-style="orbital"][data-brand] .btn-primary:hover,
+html[data-style="orbital"][data-brand] .vbtn-primary:hover { transform: none; }
+html[data-style="orbital"][data-brand] .btn-secondary,
+html[data-style="orbital"][data-brand] .vbtn-secondary {
+  border-color: var(--border-default);
+  color: var(--text-primary);
+}
+html[data-style="orbital"][data-brand] .btn-secondary:hover,
+html[data-style="orbital"][data-brand] .vbtn-secondary:hover {
+  background: var(--or-teal-dim);
+  border-color: var(--or-teal);
+}
+html[data-style="orbital"][data-brand] :is(.vinput, .vselect, .input) { border-radius: 12px; }
+html[data-style="orbital"][data-brand] :is(.vinput, .vselect, .input):focus {
+  border-color: var(--or-teal);
+  box-shadow: 0 0 0 3px var(--or-teal-dim);
+}
+html[data-style="orbital"][data-brand] :is(.badge, .vbadge) {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+html[data-style="orbital"][data-brand] :focus-visible { outline: 2px solid var(--or-teal); outline-offset: 2px; }
+
+/* ── Shell: transparent rail, teal orbit marker on the active item ── */
+html[data-style="orbital"][data-brand] .nl-sidebar {
+  background: color-mix(in srgb, var(--bg-base) 72%, transparent);
+  border-right: 1px solid var(--hl-border);
+}
+html[data-style="orbital"][data-brand] .nl-item { border-radius: 12px; }
+html[data-style="orbital"][data-brand] .nl-item:hover { background: var(--or-teal-dim); transform: none; }
+html[data-style="orbital"][data-brand] .nl-item.active,
+html[data-style="orbital"][data-brand] .nl-item.active:hover {
+  background: var(--or-teal-dim);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--or-teal) 28%, transparent);
+  color: var(--text-primary);
+  transform: none;
+}
+html[data-style="orbital"][data-brand] .nl-item.active::before {
+  top: 30%;
+  height: 40%;
+  border-radius: 3px;
+  box-shadow: 0 0 8px var(--accent-primary-glow) !important;
+}
+html[data-style="orbital"][data-brand] .nl-section {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  letter-spacing: 0.16em;
+}
+/* The topbar sets background and border inline. */
+html[data-style="orbital"][data-brand] .vc-topbar {
+  background: color-mix(in srgb, var(--bg-base) 78%, transparent) !important;
+  border-bottom: 1px solid var(--hl-border) !important;
+  -webkit-backdrop-filter: blur(12px);
+          backdrop-filter: blur(12px);
+}
+html[data-style="orbital"][data-brand] .vc-topbar-search { border-radius: 999px; }
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-style="orbital"][data-brand] * { transition-duration: 0.01ms !important; }
+}

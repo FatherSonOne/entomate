@@ -1,0 +1,202 @@
+/* ============================================================
+   BENCH — Entomate design style F (2026-11-21)
+   ------------------------------------------------------------
+   Tactile hardware. A grey case with raised modules, keys that
+   press down, LED status lights and IBM Plex Mono labels. Dark
+   mode is a black anodised case. Signal law holds and reads as
+   LEDs: crimson = brand/active, amber = AI, phosphor = live,
+   mint = action.
+
+   Scoped under html[data-style="bench"][data-brand]; tokens skip the public
+   landing page. Layer order: void-crimson → held-light → this.
+   ============================================================ */
+
+html[data-style="bench"][data-brand]:not(.dark) body:not(:has(.lc-page)) {
+  --font: 'Instrument Sans', 'Inter', system-ui, sans-serif;
+  --font-display: 'Instrument Sans', 'Inter', system-ui, sans-serif;
+  --font-heading: 'Instrument Sans', 'Inter', system-ui, sans-serif;
+  --font-body: 'Instrument Sans', 'Inter', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --be-hi: rgba(255, 255, 255, 0.75);
+  --be-lo: rgba(0, 0, 0, 0.10);
+  --be-key: linear-gradient(180deg, #F6F6F2, #E4E3DE);
+
+  --bg-base: #D9D8D2;
+  --bg-surface: #E8E7E2;
+  --bg-elevated: rgba(236, 235, 230, 0.96);
+  --bg-muted: #D0CFC8;
+  --bg-subtle: #E1E0DA;
+  --text-primary: #1A1A18;
+  --text-secondary: #4A4A45;
+  --text-tertiary: #74746D;
+  --text-muted: #A3A39C;
+  --border-subtle: rgba(0, 0, 0, 0.08);
+  --border-default: rgba(0, 0, 0, 0.13);
+  --border-strong: rgba(0, 0, 0, 0.24);
+  --accent-primary: #E0004D;
+  --accent-primary-light: #F21862;
+  --accent-primary-dim: rgba(224, 0, 77, 0.09);
+  --accent-primary-glow: rgba(224, 0, 77, 0.30);
+  --accent-secondary: #0E9F8C;
+  --accent-secondary-dim: rgba(14, 159, 140, 0.10);
+  --neo-base: #E8E7E2;
+  --grid-color: transparent;
+
+  --c: #E0004D; --cb: #F21862; --cd: rgba(224, 0, 77, 0.09); --cg: rgba(224, 0, 77, 0.30);
+  --bg0: #D9D8D2; --bg1: #E8E7E2; --bg2: #ECEBE6; --bg3: #D0CFC8;
+  --t0: #1A1A18; --t1: #4A4A45; --t2: #74746D;
+  --b0: rgba(0, 0, 0, 0.05); --b1: rgba(0, 0, 0, 0.09); --b2: rgba(0, 0, 0, 0.14);
+
+  --hl-panel: linear-gradient(180deg, #EEEDE9, #E5E4DF);
+  --hl-panel-flat: #E8E7E2;
+  --hl-border: rgba(0, 0, 0, 0.06);
+  --hl-border-hover: rgba(0, 0, 0, 0.10);
+  --hl-shadow: inset 0 1px 0 var(--be-hi), 0 1px 0 rgba(0, 0, 0, 0.05), 0 8px 18px -12px rgba(0, 0, 0, 0.35);
+  --hl-shadow-hover: var(--hl-shadow);
+}
+
+html[data-style="bench"][data-brand].dark body:not(:has(.lc-page)) {
+  --font: 'Instrument Sans', 'Inter', system-ui, sans-serif;
+  --font-display: 'Instrument Sans', 'Inter', system-ui, sans-serif;
+  --font-heading: 'Instrument Sans', 'Inter', system-ui, sans-serif;
+  --font-body: 'Instrument Sans', 'Inter', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --be-hi: rgba(255, 255, 255, 0.05);
+  --be-lo: rgba(0, 0, 0, 0.5);
+  --be-key: linear-gradient(180deg, #2A2A2A, #1F1F1F);
+
+  --bg-base: #111111;
+  --bg-surface: #1B1B1B;
+  --bg-elevated: rgba(30, 30, 30, 0.96);
+  --bg-muted: #252525;
+  --bg-subtle: #171717;
+  --text-primary: #EDEDE8;
+  --text-secondary: #A2A29C;
+  --text-tertiary: #6F6F6A;
+  --text-muted: #4A4A46;
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.10);
+  --border-strong: rgba(255, 255, 255, 0.20);
+  --neo-base: #1B1B1B;
+  --grid-color: transparent;
+
+  --bg0: #111111; --bg1: #1B1B1B; --bg2: #212121; --bg3: #252525;
+  --t0: #EDEDE8; --t1: #A2A29C; --t2: #6F6F6A;
+  --b0: rgba(255, 255, 255, 0.04); --b1: rgba(255, 255, 255, 0.07); --b2: rgba(255, 255, 255, 0.11);
+
+  --hl-panel: linear-gradient(180deg, #1F1F1F, #191919);
+  --hl-panel-flat: #1B1B1B;
+  --hl-border: rgba(255, 255, 255, 0.05);
+  --hl-border-hover: rgba(255, 255, 255, 0.09);
+  --hl-shadow: inset 0 1px 0 var(--be-hi), 0 10px 22px -14px rgba(0, 0, 0, 0.9);
+  --hl-shadow-hover: var(--hl-shadow);
+}
+
+/* ── Background: the bare case ── */
+html[data-style="bench"][data-brand] .hl-bg { background: var(--bg-base); }
+html[data-style="bench"][data-brand] body { background-image: none; }
+
+/* ── Type: Instrument Sans, Plex Mono labels ── */
+html[data-style="bench"][data-brand] .app-shell,
+html[data-style="bench"][data-brand] [role="dialog"] {
+  font-family: 'Instrument Sans', 'Inter', system-ui, sans-serif;
+}
+html[data-style="bench"][data-brand] .app-shell :is(h1, h2, h3, h4, h5, h6) {
+  font-family: 'Instrument Sans', 'Inter', system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+html[data-style="bench"][data-brand] .app-shell main { font-variant-numeric: tabular-nums; }
+html[data-style="bench"][data-brand] .app-shell main :is(code, kbd, time) { font-family: 'IBM Plex Mono', ui-monospace, monospace; }
+
+/* ── Modules: raised, bevelled, no lift ── */
+html[data-style="bench"][data-brand] .vc { border-radius: 16px; transform: none; }
+html[data-style="bench"][data-brand] .vc:hover,
+html[data-style="bench"][data-brand] .hover-glow .vc:hover { transform: none !important; }
+
+/* ── Keys ── */
+html[data-style="bench"][data-brand] .btn,
+html[data-style="bench"][data-brand] .vbtn,
+html[data-style="bench"][data-brand] .vc-btn {
+  border-radius: 10px;
+  background: var(--be-key);
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
+  box-shadow: inset 0 1px 0 var(--be-hi), 0 2px 0 var(--be-lo);
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+html[data-style="bench"][data-brand] :is(.btn, .vbtn, .vc-btn):hover { transform: none; filter: brightness(1.03); }
+html[data-style="bench"][data-brand] :is(.btn, .vbtn, .vc-btn):active {
+  transform: translateY(2px);
+  box-shadow: inset 0 1px 0 var(--be-hi), 0 0 0 var(--be-lo);
+}
+html[data-style="bench"][data-brand] .btn-primary,
+html[data-style="bench"][data-brand] .vbtn-primary,
+html[data-style="bench"][data-brand] .vc-btn-primary {
+  background: linear-gradient(180deg, var(--accent-primary-light), var(--accent-primary));
+  border-color: color-mix(in srgb, var(--accent-primary) 70%, #000);
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 0 color-mix(in srgb, var(--accent-primary) 55%, #000);
+}
+html[data-style="bench"][data-brand] .btn-primary:hover,
+html[data-style="bench"][data-brand] .vbtn-primary:hover {
+  background: linear-gradient(180deg, var(--accent-primary-light), var(--accent-primary));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 0 color-mix(in srgb, var(--accent-primary) 55%, #000);
+}
+html[data-style="bench"][data-brand] :is(.vinput, .vselect, .input) {
+  border-radius: 10px;
+  box-shadow: inset 0 1px 2px var(--be-lo);
+}
+html[data-style="bench"][data-brand] :is(.badge, .vbadge) {
+  border-radius: 6px;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+html[data-style="bench"][data-brand] :focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+
+/* ── Shell: the rail is a module of keys with an LED on the active one ── */
+html[data-style="bench"][data-brand] .nl-sidebar {
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border-subtle);
+  box-shadow: inset -1px 0 0 var(--be-hi);
+}
+html[data-style="bench"][data-brand] .nl-item { border-radius: 10px; border: 1px solid transparent; }
+html[data-style="bench"][data-brand] .nl-item:hover { background: var(--bg-muted); transform: none; }
+html[data-style="bench"][data-brand] .nl-item.active,
+html[data-style="bench"][data-brand] .nl-item.active:hover {
+  background: var(--be-key);
+  border-color: var(--border-subtle);
+  box-shadow: inset 0 1px 0 var(--be-hi), 0 2px 0 var(--be-lo);
+  color: var(--text-primary);
+  transform: none;
+}
+html[data-style="bench"][data-brand] .nl-item.active::before {
+  left: auto !important;
+  right: 12px;
+  top: calc(50% - 3.5px) !important;
+  width: 7px !important;
+  height: 7px !important;
+  border-radius: 50% !important;
+  background: var(--accent-primary) !important;
+  box-shadow: 0 0 6px var(--accent-primary-glow), 0 0 0 2px var(--accent-primary-dim) !important;
+}
+html[data-style="bench"][data-brand] .nl-section {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  letter-spacing: 0.12em;
+}
+html[data-style="bench"][data-brand] .vc-topbar {
+  background: var(--bg-base) !important;
+  border-bottom: 1px solid var(--border-subtle) !important;
+  -webkit-backdrop-filter: none;
+          backdrop-filter: none;
+}
+html[data-style="bench"][data-brand] .vc-topbar-search {
+  border-radius: 10px;
+  box-shadow: inset 0 1px 2px var(--be-lo);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-style="bench"][data-brand] * { transition-duration: 0.01ms !important; }
+}

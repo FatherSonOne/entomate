@@ -22,8 +22,13 @@ import './styles/animated-icons.css'
 // (scoped rules only; inert until the flag is on)
 import './styles/themes/held-light.css'
 
-// Minutes design layer (direction C) — scoped to html[data-style="minutes"], off by default
+// Design styles — each scoped to html[data-style="..."], picked in
+// Settings → Appearance. Orbital is the default (see ThemeContext).
+import './styles/themes/orbital.css'
+import './styles/themes/folio.css'
+import './styles/themes/bench.css'
 import './styles/themes/minutes.css'
+import './styles/design-style-picker.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

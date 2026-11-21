@@ -163,7 +163,7 @@ export default function Layout() {
   })
 
   return (
-    <div className="min-h-screen transition-colors duration-300 hover-glow trans-slow">
+    <div className="app-shell min-h-screen transition-colors duration-300 hover-glow trans-slow">
       {/* Ambient background — Held Light: static crimson bloom (CSS, no rAF).
           Legacy: the animated neural canvas. */}
       {isHeldLight

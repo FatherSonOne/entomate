@@ -1,0 +1,189 @@
+/* ============================================================
+   FOLIO — Entomate design style E (2026-11-21)
+   ------------------------------------------------------------
+   Warm editorial paper. Newsreader serif headings over Inter
+   body text, cream sheets with a soft paper shadow, quiet ruled
+   sidebar, crimson ink for brand and CTA. Dark mode is a lamp-lit
+   brown-black. Signal law holds (amber = AI, phosphor = live).
+
+   Scoped under html[data-style="folio"][data-brand]; tokens skip the public
+   landing page. Layer order: void-crimson → held-light → this.
+   ============================================================ */
+
+html[data-style="folio"][data-brand]:not(.dark) body:not(:has(.lc-page)) {
+  --font: 'Inter', system-ui, sans-serif;
+  --font-display: 'Inter', system-ui, sans-serif;
+  --font-heading: 'Newsreader', Georgia, serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --fo-sheet-shadow: 0 1px 0 rgba(60, 40, 20, 0.04), 0 14px 34px -22px rgba(60, 40, 20, 0.30);
+  --fo-rail: #EEE8DC;
+
+  --bg-base: #F4EFE6;
+  --bg-surface: #FBF8F2;
+  --bg-elevated: rgba(251, 248, 242, 0.94);
+  --bg-muted: #ECE5D8;
+  --bg-subtle: #F7F3EC;
+  --text-primary: #1F1A15;
+  --text-secondary: #51473C;
+  --text-tertiary: #7D7264;
+  --text-muted: #B1A696;
+  --border-subtle: rgba(60, 40, 20, 0.09);
+  --border-default: rgba(60, 40, 20, 0.15);
+  --border-strong: rgba(60, 40, 20, 0.28);
+  --accent-primary: #B3123E;
+  --accent-primary-light: #CC1F4D;
+  --accent-primary-dim: rgba(179, 18, 62, 0.08);
+  --accent-primary-glow: rgba(179, 18, 62, 0.18);
+  --accent-secondary: #2F7A6A;
+  --accent-secondary-light: #3A9480;
+  --accent-secondary-dim: rgba(47, 122, 106, 0.10);
+  --neo-base: #FBF8F2;
+  --grid-color: transparent;
+
+  --c: #B3123E; --cb: #CC1F4D; --cd: rgba(179, 18, 62, 0.08); --cg: rgba(179, 18, 62, 0.18);
+  --m: #2F7A6A; --md: rgba(47, 122, 106, 0.10);
+  --bg0: #F4EFE6; --bg1: #FBF8F2; --bg2: #F7F3EC; --bg3: #ECE5D8;
+  --t0: #1F1A15; --t1: #51473C; --t2: #7D7264;
+  --b0: rgba(60, 40, 20, 0.05); --b1: rgba(60, 40, 20, 0.09); --b2: rgba(60, 40, 20, 0.15);
+
+  --hl-panel: #FBF8F2;
+  --hl-panel-flat: #FBF8F2;
+  --hl-border: rgba(60, 40, 20, 0.09);
+  --hl-border-hover: rgba(60, 40, 20, 0.18);
+  --hl-shadow: var(--fo-sheet-shadow);
+  --hl-shadow-hover: 0 1px 0 rgba(60, 40, 20, 0.05), 0 18px 40px -22px rgba(60, 40, 20, 0.38);
+}
+
+html[data-style="folio"][data-brand].dark body:not(:has(.lc-page)) {
+  --font: 'Inter', system-ui, sans-serif;
+  --font-display: 'Inter', system-ui, sans-serif;
+  --font-heading: 'Newsreader', Georgia, serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --fo-sheet-shadow: 0 1px 0 rgba(0, 0, 0, 0.3), 0 16px 36px -22px rgba(0, 0, 0, 0.7);
+  --fo-rail: #1B1714;
+
+  --bg-base: #171411;
+  --bg-surface: #201C18;
+  --bg-elevated: rgba(32, 28, 24, 0.94);
+  --bg-muted: #2B2520;
+  --bg-subtle: #1D1915;
+  --text-primary: #EEE6D8;
+  --text-secondary: #B6AA96;
+  --text-tertiary: #857A69;
+  --text-muted: #5A5146;
+  --border-subtle: rgba(238, 230, 216, 0.08);
+  --border-default: rgba(238, 230, 216, 0.14);
+  --border-strong: rgba(238, 230, 216, 0.26);
+  --accent-primary: #F0567C;
+  --accent-primary-light: #F57A97;
+  --accent-primary-dim: rgba(240, 86, 124, 0.12);
+  --accent-primary-glow: rgba(240, 86, 124, 0.24);
+  --accent-secondary: #5FBFA8;
+  --accent-secondary-light: #7DD1BD;
+  --accent-secondary-dim: rgba(95, 191, 168, 0.12);
+  --neo-base: #201C18;
+  --grid-color: transparent;
+
+  --c: #F0567C; --cb: #F57A97; --cd: rgba(240, 86, 124, 0.12); --cg: rgba(240, 86, 124, 0.24);
+  --m: #5FBFA8; --md: rgba(95, 191, 168, 0.12);
+  --bg0: #171411; --bg1: #201C18; --bg2: #26211C; --bg3: #2B2520;
+  --t0: #EEE6D8; --t1: #B6AA96; --t2: #857A69;
+  --b0: rgba(238, 230, 216, 0.05); --b1: rgba(238, 230, 216, 0.08); --b2: rgba(238, 230, 216, 0.14);
+
+  --hl-panel: #201C18;
+  --hl-panel-flat: #201C18;
+  --hl-border: rgba(238, 230, 216, 0.08);
+  --hl-border-hover: rgba(238, 230, 216, 0.16);
+  --hl-shadow: var(--fo-sheet-shadow);
+  --hl-shadow-hover: var(--fo-sheet-shadow);
+}
+
+/* ── Background: flat paper ── */
+html[data-style="folio"][data-brand] .hl-bg { background: var(--bg-base); }
+html[data-style="folio"][data-brand] body { background-image: none; }
+
+/* ── Type: serif headings, Inter body ── */
+html[data-style="folio"][data-brand] .app-shell,
+html[data-style="folio"][data-brand] [role="dialog"] {
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+html[data-style="folio"][data-brand] .app-shell :is(h1, h2, h3),
+html[data-style="folio"][data-brand] [role="dialog"] :is(h1, h2, h3) {
+  /* !important: several headings set font-family inline. */
+  font-family: 'Newsreader', 'Georgia', serif !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.01em;
+}
+html[data-style="folio"][data-brand] .app-shell main h1 { font-size: max(1.9rem, 1em); line-height: 1.08; }
+html[data-style="folio"][data-brand] .app-shell :is(h4, h5, h6) {
+  font-family: 'Inter', system-ui, sans-serif;
+  letter-spacing: 0;
+}
+html[data-style="folio"][data-brand] .app-shell main :is(blockquote, em) { font-family: 'Newsreader', 'Georgia', serif; }
+
+/* Dashboard greeting reads as a headline. */
+html[data-style="folio"][data-brand] .held-hero > div:nth-child(-n+2) {
+  font-family: 'Newsreader', 'Georgia', serif !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.015em !important;
+}
+html[data-style="folio"][data-brand] .held-hero > div:first-child { font-size: 34px !important; }
+html[data-style="folio"][data-brand] .held-hero > div:nth-child(2) span { font-style: italic; }
+
+/* ── Sheets: soft corners, paper shadow, no lift ── */
+html[data-style="folio"][data-brand] .vc { border-radius: 8px; transform: none; }
+html[data-style="folio"][data-brand] .vc:hover,
+html[data-style="folio"][data-brand] .hover-glow .vc:hover { transform: none !important; }
+html[data-style="folio"][data-brand] .app-shell main :is(.rounded-xl, .rounded-2xl, .rounded-3xl) { border-radius: 10px; }
+
+/* ── Primitives ── */
+html[data-style="folio"][data-brand] .btn,
+html[data-style="folio"][data-brand] .vbtn,
+html[data-style="folio"][data-brand] .vc-btn { border-radius: 999px; font-weight: 600; }
+html[data-style="folio"][data-brand] .btn-primary:hover,
+html[data-style="folio"][data-brand] .vbtn-primary:hover { transform: none; }
+html[data-style="folio"][data-brand] .btn-secondary,
+html[data-style="folio"][data-brand] .vbtn-secondary {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+html[data-style="folio"][data-brand] .btn-secondary:hover,
+html[data-style="folio"][data-brand] .vbtn-secondary:hover { background: var(--bg-muted); }
+html[data-style="folio"][data-brand] :is(.vinput, .vselect, .input) { border-radius: 8px; background: var(--bg-surface); }
+html[data-style="folio"][data-brand] :is(.badge, .vbadge) {
+  border-radius: 999px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+html[data-style="folio"][data-brand] :focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+
+/* ── Shell: ruled paper rail, ink-underlined active item ── */
+html[data-style="folio"][data-brand] .nl-sidebar {
+  background: var(--fo-rail);
+  border-right: 1px solid var(--border-subtle);
+}
+html[data-style="folio"][data-brand] .nl-item { border-radius: 8px; }
+html[data-style="folio"][data-brand] .nl-item:hover { background: var(--bg-muted); transform: none; }
+html[data-style="folio"][data-brand] .nl-item.active,
+html[data-style="folio"][data-brand] .nl-item.active:hover {
+  background: var(--bg-surface);
+  box-shadow: 0 1px 2px rgba(60, 40, 20, 0.08);
+  color: var(--text-primary);
+  transform: none;
+}
+html[data-style="folio"][data-brand] .nl-item.active::before { display: none; }
+html[data-style="folio"][data-brand] .nl-section {
+  font-family: 'Inter', system-ui, sans-serif;
+  letter-spacing: 0.14em;
+}
+html[data-style="folio"][data-brand] .vc-topbar {
+  background: var(--bg-base) !important;
+  border-bottom: 1px solid var(--border-subtle) !important;
+  -webkit-backdrop-filter: none;
+          backdrop-filter: none;
+}
+html[data-style="folio"][data-brand] .vc-topbar-search { border-radius: 999px; }
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-style="folio"][data-brand] * { transition-duration: 0.01ms !important; }
+}

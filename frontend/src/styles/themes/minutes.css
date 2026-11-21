@@ -60,17 +60,17 @@ html[data-style="minutes"] .hover-glow .vc:hover {
    Pills stay round (rounded-full: avatars, switches, dots);
    everything else squares off. Floating layers (xl/2xl shadows on
    menus and modals) keep their separation. */
-html[data-style="minutes"] main .rounded,
-html[data-style="minutes"] main .rounded-sm,
-html[data-style="minutes"] main .rounded-md,
-html[data-style="minutes"] main .rounded-lg,
-html[data-style="minutes"] main .rounded-xl,
-html[data-style="minutes"] main .rounded-2xl,
-html[data-style="minutes"] main .rounded-3xl { border-radius: var(--mn-radius); }
-html[data-style="minutes"] main .shadow,
-html[data-style="minutes"] main .shadow-sm,
-html[data-style="minutes"] main .shadow-md,
-html[data-style="minutes"] main .shadow-lg { box-shadow: none; }
+html[data-style="minutes"] .app-shell main .rounded,
+html[data-style="minutes"] .app-shell main .rounded-sm,
+html[data-style="minutes"] .app-shell main .rounded-md,
+html[data-style="minutes"] .app-shell main .rounded-lg,
+html[data-style="minutes"] .app-shell main .rounded-xl,
+html[data-style="minutes"] .app-shell main .rounded-2xl,
+html[data-style="minutes"] .app-shell main .rounded-3xl { border-radius: var(--mn-radius); }
+html[data-style="minutes"] .app-shell main .shadow,
+html[data-style="minutes"] .app-shell main .shadow-sm,
+html[data-style="minutes"] .app-shell main .shadow-md,
+html[data-style="minutes"] .app-shell main .shadow-lg { box-shadow: none; }
 
 /* ── Primitives ── */
 html[data-style="minutes"] .btn,
@@ -98,9 +98,9 @@ html[data-style="minutes"] .vc-btn-primary:hover {
 html[data-style="minutes"] .input,
 html[data-style="minutes"] .vinput,
 html[data-style="minutes"] .vselect,
-html[data-style="minutes"] main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
-html[data-style="minutes"] main select,
-html[data-style="minutes"] main textarea { border-radius: var(--mn-radius); }
+html[data-style="minutes"] .app-shell main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+html[data-style="minutes"] .app-shell main select,
+html[data-style="minutes"] .app-shell main textarea { border-radius: var(--mn-radius); }
 html[data-style="minutes"] .badge,
 html[data-style="minutes"] .vbadge {
   border-radius: var(--mn-radius);
@@ -112,24 +112,24 @@ html[data-style="minutes"] .vbadge {
 html[data-style="minutes"] :focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
 
 /* ── Type: poster titles, tabular numerals ── */
-html[data-style="minutes"] main h1 {
+html[data-style="minutes"] .app-shell main h1 {
   font-family: var(--mn-display);
   font-weight: 800;
   letter-spacing: -0.03em;
   line-height: 0.95;
 }
-html[data-style="minutes"] h2,
-html[data-style="minutes"] h3,
-html[data-style="minutes"] h4,
-html[data-style="minutes"] h5,
-html[data-style="minutes"] h6 {
+html[data-style="minutes"] .app-shell h2,
+html[data-style="minutes"] .app-shell h3,
+html[data-style="minutes"] .app-shell h4,
+html[data-style="minutes"] .app-shell h5,
+html[data-style="minutes"] .app-shell h6 {
   font-family: 'Inter', system-ui, sans-serif;
   letter-spacing: -0.015em;
 }
-html[data-style="minutes"] main { font-variant-numeric: tabular-nums; }
-html[data-style="minutes"] main code,
-html[data-style="minutes"] main kbd,
-html[data-style="minutes"] main time { font-family: var(--mn-mono); }
+html[data-style="minutes"] .app-shell main { font-variant-numeric: tabular-nums; }
+html[data-style="minutes"] .app-shell main code,
+html[data-style="minutes"] .app-shell main kbd,
+html[data-style="minutes"] .app-shell main time { font-family: var(--mn-mono); }
 
 /* ── Shell, interim (P2 replaces this with the numbered rail) ── */
 html[data-style="minutes"] .nl-sidebar {

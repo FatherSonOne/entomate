@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en" class="dark" data-style="orbital">
   <head>
     <meta charset="UTF-8" />
     <link rel="shortcut icon" href="/favicon.ico?v=relay-orbits-20261121" />
@@ -17,6 +17,15 @@
   </head>
   <body>
     <div id="root"></div>
+    <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Instrument+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400&display=swap" rel="stylesheet">
+    <script>
+      // Apply the saved design style before first paint (ThemeContext keeps it in sync).
+      try {
+        var s = localStorage.getItem('entomate-style');
+        if (s === 'classic') document.documentElement.removeAttribute('data-style');
+        else if (s === 'folio' || s === 'bench' || s === 'minutes') document.documentElement.setAttribute('data-style', s);
+      } catch (e) {}
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

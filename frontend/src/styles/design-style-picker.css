@@ -1,0 +1,31 @@
+/* ── Design style picker swatches (Settings → Appearance) ──
+   Fixed miniatures of each style, independent of the active one. */
+.design-style-swatch {
+  display: block;
+  height: 64px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  position: relative;
+  overflow: hidden;
+}
+.design-style-swatch::before,
+.design-style-swatch::after { content: ''; position: absolute; }
+.design-style-swatch--orbital {
+  background:
+    radial-gradient(circle at 85% 0%, rgba(255, 45, 107, 0.45) 0 6px, transparent 7px),
+    repeating-radial-gradient(circle at 85% 0%, transparent 0 13px, rgba(46, 196, 182, 0.35) 13px 14px),
+    #060A0B;
+}
+.design-style-swatch--orbital::before { left: 10px; bottom: 10px; width: 46%; height: 18px; border-radius: 9px; border: 1px solid rgba(46, 196, 182, 0.4); }
+.design-style-swatch--orbital::after { right: 10px; bottom: 12px; width: 36px; height: 14px; border-radius: 7px; background: #FF2D6B; }
+.design-style-swatch--folio { background: #F4EFE6; }
+.design-style-swatch--folio::before { left: 12px; top: 12px; right: 30%; height: 10px; background: #1F1A15; border-radius: 2px; box-shadow: 0 16px 0 -2px #B1A696, 0 28px 0 -2px #B1A696; }
+.design-style-swatch--folio::after { right: 10px; top: 10px; bottom: 10px; width: 22%; background: #FBF8F2; border-left: 2px solid #9B6800; }
+.design-style-swatch--bench { background: #D9D8D2; }
+.design-style-swatch--bench::before { left: 10px; top: 10px; bottom: 10px; width: 55%; border-radius: 8px; background: linear-gradient(180deg, #2A2A2A, #161616); box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
+.design-style-swatch--bench::after { right: 18px; top: 50%; width: 22px; height: 22px; margin-top: -11px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #FF6A95, #E0004D); box-shadow: 0 2px 0 #8a0030; }
+.design-style-swatch--minutes { background: #FFF8FA; }
+.design-style-swatch--minutes::before { left: 10px; right: 10px; top: 14px; height: 2px; background: #08080A; box-shadow: 0 14px 0 -0.5px rgba(8,8,10,.15), 0 26px 0 -0.5px rgba(8,8,10,.15), 0 38px 0 -0.5px rgba(8,8,10,.15); }
+.design-style-swatch--minutes::after { left: 10px; top: 24px; width: 8px; height: 8px; background: #CC0044; }
+.design-style-swatch--classic { background: radial-gradient(120px 60px at 85% 0%, rgba(255, 45, 107, 0.35), transparent 70%), #101010; }
+.design-style-swatch--classic::before { left: 10px; bottom: 10px; width: 60%; height: 22px; border-radius: 10px; background: #181818; border: 1px solid rgba(248,240,242,.1); }

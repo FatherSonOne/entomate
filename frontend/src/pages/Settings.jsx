@@ -68,7 +68,7 @@ export default function Settings() {
   const [deleteDialogMode, setDeleteDialogMode] = useState(null) // 'soft' | 'hard' | null
   const [deleteLoading, setDeleteLoading] = useState(false)
 
-  const { mode, setThemeMode, isMinutes, toggleDesignStyle } = useTheme()
+  const { mode, setThemeMode, designStyle, designStyles, setDesignStyle } = useTheme()
 
   // Load user settings from DB — merge over defaults so nothing is ever null
   useEffect(() => {
@@ -445,23 +445,31 @@ export default function Settings() {
                 </div>
               </div>
 
-              {/* Minutes design preview (direction C) */}
+              {/* Design style picker (2026-11-21) */}
               <div className="px-5 pb-5">
-                <div className="flex items-center justify-between gap-4 p-3 rounded-lg bg-surface-elevated border border-line-subtle">
-                  <div>
-                    <span id="minutes-preview-label" className="text-sm font-medium block text-content-primary">Preview the Minutes design</span>
-                    <span className="text-xs text-content-tertiary">The new Swiss look, still being rolled out. Only changes this browser.</span>
-                  </div>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={isMinutes}
-                    aria-labelledby="minutes-preview-label"
-                    onClick={toggleDesignStyle}
-                    className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full border-0 transition-colors ${isMinutes ? 'bg-accent-primary' : 'bg-surface-muted'}`}
-                  >
-                    <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${isMinutes ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                  </button>
+                <span id="design-style-label" className="text-sm font-medium block mb-1 text-content-primary">Design style</span>
+                <span className="text-xs block mb-3 text-content-tertiary">Changes the whole app's look in this browser. Light and dark mode still apply.</span>
+                <div role="radiogroup" aria-labelledby="design-style-label" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {designStyles.map((style) => {
+                    const selected = designStyle === style.id
+                    return (
+                      <button
+                        key={style.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        onClick={() => setDesignStyle(style.id)}
+                        className={`design-style-option text-left p-3 rounded-lg border transition-colors ${selected ? 'border-accent-primary bg-accent-primary-dim' : 'border-line-subtle bg-surface-elevated hover:border-line'}`}
+                      >
+                        <span className={`design-style-swatch design-style-swatch--${style.id}`} aria-hidden="true" />
+                        <span className="flex items-center justify-between gap-2 mt-3">
+                          <span className="text-sm font-semibold text-content-primary">{style.label}</span>
+                          {selected && <span className="text-xs font-medium text-accent-primary">In use</span>}
+                        </span>
+                        <span className="text-xs block mt-1 text-content-tertiary">{style.blurb}</span>
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
             </div>
