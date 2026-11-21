@@ -402,8 +402,9 @@ class NodeRegistry {
     });
 
     this.register('action', 'code', {
-      name: 'Code',
-      description: 'Execute custom JavaScript code',
+      name: 'Code (disabled)',
+      description: 'Disabled: custom JavaScript cannot run safely on the server',
+      disabled: true,
       icon: 'code',
       category: 'action',
       inputs: ['main'],

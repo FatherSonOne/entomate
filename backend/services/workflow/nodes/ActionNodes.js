@@ -701,77 +701,18 @@ class SetVariableNode extends BaseNode {
 }
 
 /**
- * Code Node - Execute custom JavaScript
+ * Code Node - DISABLED.
+ *
+ * It used to run user-typed JavaScript with `new AsyncFunction` inside the
+ * server process. That code could read process.env (every server secret)
+ * and load child_process, so any signed-in user could take over the server.
+ * There is no safe sandbox in plain Node, so the node now refuses to run.
+ * If custom code is needed again, run it in an isolate (e.g. isolated-vm)
+ * with no access to `process` or `require`.
  */
 class CodeNode extends BaseNode {
-  static async execute(config, inputData, context) {
-    const { code, language = 'javascript' } = config;
-
-    if (language !== 'javascript') {
-      throw new Error(`Unsupported language: ${language}`);
-    }
-
-    log.info('[CodeNode] Executing custom code');
-
-    try {
-      // Create a sandboxed execution environment
-      const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
-
-      // Allowed globals
-      const sandbox = {
-        console: {
-          log: (...args) => log.info('[CodeNode]', ...args),
-          warn: (...args) => log.warn('[CodeNode]', ...args),
-          error: (...args) => log.error('[CodeNode]', ...args)
-        },
-        JSON,
-        Date,
-        Math,
-        Array,
-        Object,
-        String,
-        Number,
-        Boolean,
-        RegExp,
-        Error,
-        Promise,
-        setTimeout: (fn, ms) => setTimeout(fn, Math.min(ms, 10000)), // Max 10s
-        $input: inputData,
-        $context: {
-          nodeId: context.nodeId,
-          workflowId: context.workflowId,
-          executionId: context.executionId
-        }
-      };
-
-      // Wrap code in async function that returns $output
-      const wrappedCode = `
-        const $input = this.$input;
-        const $context = this.$context;
-        let $output = {};
-
-        ${code}
-
-        return $output;
-      `;
-
-      const fn = new AsyncFunction(wrappedCode);
-      const result = await fn.call(sandbox);
-
-      log.info('[CodeNode] Code executed successfully');
-
-      return {
-        output: 'main',
-        data: {
-          ...inputData,
-          ...result
-        }
-      };
-
-    } catch (error) {
-      log.error('[CodeNode] Execution error:', { error: error.message || error });
-      throw new Error(`Code execution failed: ${error.message}`);
-    }
+  static async execute() {
+    throw new Error('The Code node is disabled: custom JavaScript cannot run safely on the server. Use Set Variable, Transform or Condition nodes instead.');
   }
 }
 

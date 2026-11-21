@@ -4,6 +4,8 @@
  * Provides common utilities and interface definition
  */
 
+const log = require('../../../utils/log');
+
 class BaseNode {
   /**
    * Execute the node
@@ -59,6 +61,7 @@ class BaseNode {
 
     return path.split('.').reduce((curr, key) => {
       if (curr === undefined || curr === null) return undefined;
+      if (FORBIDDEN_KEYS.has(key)) return undefined;
       return curr[key];
     }, obj);
   }
@@ -68,6 +71,11 @@ class BaseNode {
    */
   static setNestedValue(obj, path, value) {
     const keys = path.split('.');
+    // Block prototype pollution: `__proto__.x` would change every object in
+    // the server process.
+    if (keys.some(k => FORBIDDEN_KEYS.has(k))) {
+      throw new Error(`Invalid path: ${path}`);
+    }
     const lastKey = keys.pop();
     let current = obj;
 
@@ -239,31 +247,179 @@ class BaseNode {
   }
 
   /**
-   * Parse expression and return result
-   * Supports basic JavaScript expressions in a safe context
+   * Evaluate a small expression such as `$item.price * 2` or
+   * `$item.status == "open" && $item.count > 0`.
+   *
+   * This is a tiny interpreter, not JavaScript: it only knows numbers,
+   * strings, true/false/null, `$path` lookups, arithmetic, comparisons,
+   * `&& || !` and parentheses. User text is never compiled or run as code
+   * (the old version used `new Function`, which gave workflows full server
+   * access). On any parse error the original string is returned, as before.
    */
   static evaluateExpression(expression, data) {
-    // Simple expression evaluation for safe operations
     try {
-      // Replace variable references with actual values
-      const resolved = expression.replace(/\$([a-zA-Z_][a-zA-Z0-9_.]*)/g, (match, path) => {
-        const value = this.getNestedValue(data, path);
-        return JSON.stringify(value);
-      });
-
-      // Only allow safe operations
-      if (/[;{}]/.test(resolved)) {
-        throw new Error('Invalid expression: contains forbidden characters');
-      }
-
-      // Use Function constructor for evaluation (safer than eval)
-      // eslint-disable-next-line no-new-func
-      const fn = new Function('data', `return ${resolved}`);
-      return fn(data);
+      if (typeof expression !== 'string') return expression;
+      const tokens = tokenizeExpression(expression);
+      const parser = new ExpressionParser(tokens, (path) => this.getNestedValue(data, path));
+      const result = parser.parseExpression();
+      if (parser.pos !== tokens.length) throw new Error('Unexpected token');
+      return result;
     } catch (error) {
       log.warn('Expression evaluation failed:', error.message);
       return expression;
     }
+  }
+}
+
+
+// ----------------------------------------------------------------------------
+// Safe expression interpreter used by BaseNode.evaluateExpression
+// ----------------------------------------------------------------------------
+
+const MAX_EXPRESSION_LENGTH = 500;
+const FORBIDDEN_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
+
+function tokenizeExpression(src) {
+  if (src.length > MAX_EXPRESSION_LENGTH) throw new Error('Expression too long');
+  const tokens = [];
+  let i = 0;
+  while (i < src.length) {
+    const ch = src[i];
+    if (/\s/.test(ch)) { i++; continue; }
+
+    if (/[0-9]/.test(ch) || (ch === '.' && /[0-9]/.test(src[i + 1] || ''))) {
+      const m = /^[0-9]*\.?[0-9]+(?:[eE][+-]?[0-9]+)?/.exec(src.slice(i));
+      tokens.push({ type: 'value', value: Number(m[0]) });
+      i += m[0].length;
+      continue;
+    }
+
+    if (ch === '"' || ch === "'") {
+      let j = i + 1;
+      let str = '';
+      while (j < src.length && src[j] !== ch) {
+        if (src[j] === '\\' && j + 1 < src.length) { str += src[j + 1]; j += 2; continue; }
+        str += src[j++];
+      }
+      if (j >= src.length) throw new Error('Unterminated string');
+      tokens.push({ type: 'value', value: str });
+      i = j + 1;
+      continue;
+    }
+
+    if (ch === '$') {
+      const m = /^\$([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z0-9_]+)*)/.exec(src.slice(i));
+      if (!m) throw new Error('Invalid variable');
+      tokens.push({ type: 'var', path: m[1] });
+      i += m[0].length;
+      continue;
+    }
+
+    const word = /^[a-zA-Z_]+/.exec(src.slice(i));
+    if (word) {
+      const literals = { true: true, false: false, null: null };
+      if (!(word[0] in literals)) throw new Error(`Unknown word: ${word[0]}`);
+      tokens.push({ type: 'value', value: literals[word[0]] });
+      i += word[0].length;
+      continue;
+    }
+
+    const op = /^(===|!==|==|!=|<=|>=|&&|\|\||[-+*/%<>!()])/.exec(src.slice(i));
+    if (!op) throw new Error(`Unexpected character: ${ch}`);
+    tokens.push({ type: 'op', value: op[0] });
+    i += op[0].length;
+  }
+  return tokens;
+}
+
+class ExpressionParser {
+  constructor(tokens, lookup) {
+    this.tokens = tokens;
+    this.lookup = lookup;
+    this.pos = 0;
+  }
+
+  peekOp(...ops) {
+    const t = this.tokens[this.pos];
+    return t && t.type === 'op' && ops.includes(t.value) ? t.value : null;
+  }
+
+  binary(next, ops, apply) {
+    let left = next();
+    let op;
+    while ((op = this.peekOp(...ops))) {
+      this.pos++;
+      left = apply(op, left, next());
+    }
+    return left;
+  }
+
+  parseExpression() {
+    return this.binary(() => this.parseAnd(), ['||'], (_, a, b) => a || b);
+  }
+
+  parseAnd() {
+    return this.binary(() => this.parseEquality(), ['&&'], (_, a, b) => a && b);
+  }
+
+  parseEquality() {
+    return this.binary(() => this.parseComparison(), ['===', '!==', '==', '!='], (op, a, b) => {
+      // == and != compare strictly so "1" == 1 can't surprise anyone.
+      const equal = a === b;
+      return op === '===' || op === '==' ? equal : !equal;
+    });
+  }
+
+  parseComparison() {
+    return this.binary(() => this.parseAdditive(), ['<', '<=', '>', '>='], (op, a, b) => {
+      if (op === '<') return a < b;
+      if (op === '<=') return a <= b;
+      if (op === '>') return a > b;
+      return a >= b;
+    });
+  }
+
+  parseAdditive() {
+    return this.binary(() => this.parseMultiplicative(), ['+', '-'], (op, a, b) => (
+      op === '+' ? a + b : a - b
+    ));
+  }
+
+  parseMultiplicative() {
+    return this.binary(() => this.parseUnary(), ['*', '/', '%'], (op, a, b) => {
+      if (op === '*') return a * b;
+      if (op === '/') return a / b;
+      return a % b;
+    });
+  }
+
+  parseUnary() {
+    const op = this.peekOp('!', '-');
+    if (op) {
+      this.pos++;
+      const v = this.parseUnary();
+      return op === '!' ? !v : -v;
+    }
+    return this.parsePrimary();
+  }
+
+  parsePrimary() {
+    const t = this.tokens[this.pos];
+    if (!t) throw new Error('Unexpected end of expression');
+    if (t.type === 'op' && t.value === '(') {
+      this.pos++;
+      const v = this.parseExpression();
+      if (!this.peekOp(')')) throw new Error('Missing )');
+      this.pos++;
+      return v;
+    }
+    if (t.type === 'value') { this.pos++; return t.value; }
+    if (t.type === 'var') {
+      this.pos++;
+      if (t.path.split('.').some(k => FORBIDDEN_KEYS.has(k))) throw new Error('Forbidden path');
+      return this.lookup(t.path);
+    }
+    throw new Error(`Unexpected token: ${t.value}`);
   }
 }
 

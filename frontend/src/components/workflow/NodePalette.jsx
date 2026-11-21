@@ -10,7 +10,7 @@ import {
   Webhook, Clock, FileText, AlertCircle, Play,
   GitBranch, ArrowRightLeft, Merge, Repeat, Filter,
   Timer, StopCircle, Layers,
-  Globe, Workflow, MessageSquare, Mail, ListTodo, Users, Code,
+  Globe, Workflow, MessageSquare, Mail, ListTodo, Users,
   Bot, Sparkles, FileSearch, Tags, MessageCircle, FileType,
   Shuffle, Split, Variable, Calendar, FileJson, Lock
 } from 'lucide-react'
@@ -62,8 +62,8 @@ const nodeCategories = [
       { type: 'create_task', label: 'Create Task', description: 'Create a task', icon: ListTodo },
       { type: 'sync_crm', label: 'Sync CRM', description: 'Sync with CRM', icon: Users },
       { type: 'respond_webhook', label: 'Respond Webhook', description: 'Send webhook response', icon: Webhook },
-      { type: 'set_variable', label: 'Set Variable', description: 'Set workflow variable', icon: Variable },
-      { type: 'code', label: 'Code', description: 'Run JavaScript code', icon: Code }
+      { type: 'set_variable', label: 'Set Variable', description: 'Set workflow variable', icon: Variable }
+      // Code node removed: running user JavaScript on the server is unsafe (see ActionNodes.CodeNode).
     ]
   },
   {
