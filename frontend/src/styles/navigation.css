@@ -138,6 +138,12 @@
   user-select: none;
 }
 
+/* A label used on its own (not inside .nl-section-toggle) needs its own
+   inset, lined up with the nav item icons. */
+.nl-scroll > div > .nl-section {
+  padding: 12px 20px 4px;
+}
+
 /* Collapse chevron */
 .nl-section-chevron {
   width: 10px;
