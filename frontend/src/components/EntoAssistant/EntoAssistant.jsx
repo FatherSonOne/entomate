@@ -15,25 +15,7 @@ import {
   streamQuery,
 } from '../../services/entoAssistantService'
 import './EntoAssistant.css'
-
-// ── Circuit E Logo Mark (inline SVG) ──
-function EntoLogo({ size = 20 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <rect x="22" y="14" width="26" height="6" rx="1.5" fill="#FF2D6B" />
-      <rect x="22" y="29" width="20" height="6" rx="1.5" fill="#FF2D6B" opacity="0.85" />
-      <rect x="22" y="44" width="26" height="6" rx="1.5" fill="#FF2D6B" />
-      <path d="M22 17 L14 17 L10 13" stroke="#FF2D6B" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-      <circle cx="10" cy="13" r="2" fill="#FF2D6B" opacity="0.9" />
-      <path d="M22 32 L12 32 L8 28" stroke="#FF2D6B" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-      <circle cx="8" cy="28" r="2" fill="#FF2D6B" opacity="0.9" />
-      <path d="M22 47 L14 47 L10 51" stroke="#FF2D6B" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-      <circle cx="10" cy="51" r="2" fill="#FF2D6B" opacity="0.9" />
-      <path d="M22 14 L18 10" stroke="#FF2D6B" strokeWidth="1.2" strokeLinecap="round" fill="none" opacity="0.6" />
-      <circle cx="18" cy="10" r="1.5" fill="#FF2D6B" opacity="0.6" />
-    </svg>
-  )
-}
+import { ApertureMark, Wordmark } from '../Logo'
 
 const STORAGE_KEY = 'ento-ai-history'
 const MAX_MESSAGES = 50
@@ -194,10 +176,10 @@ export default function EntoAssistant({ isOpen, onClose }) {
         <div className="ea-header">
           <div className="ea-header-left">
             <div className="ea-header-icon">
-              <EntoLogo size={20} />
+              <ApertureMark size={24} alt="" />
             </div>
             <div>
-              <div className="ea-header-title">Entomate AI</div>
+              <div className="ea-header-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Wordmark width={110} /><span>AI</span></div>
               <div className="ea-header-subtitle">Ask me anything about your data</div>
             </div>
           </div>
@@ -246,7 +228,7 @@ export default function EntoAssistant({ isOpen, onClose }) {
             /* Welcome state */
             <div className="ea-welcome">
               <div className="ea-welcome-icon">
-                <EntoLogo size={24} />
+                <ApertureMark size={40} alt="" />
               </div>
               <div className="ea-welcome-title">Hi, I'm Entomate AI</div>
               <div className="ea-welcome-desc">

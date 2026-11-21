@@ -1,153 +1,32 @@
 import React from 'react'
+import './Logo.css'
 
-/**
- * Entomate Logo — Two-tier system
- *
- * variant="mark"  → Circuit E lettermark (navbar, favicon, compact spaces)
- * variant="hero"  → Animated wireframe hands (hero sections, brand identity)
- */
+// The approved Aperture identity, paired with the studio's custom vector wordmark.
+const SIZES = { sm: { mark: 32, word: 116 }, md: { mark: 40, word: 148 }, lg: { mark: 56, word: 188 }, xl: { mark: 120, word: 280 } }
+const LETTERS = [{"d":"M42 45H5C5 18 44 18 44 44M5 45C5 73 31 75 43 62","transform":"translate(0 0)"},{"d":"M5 70V28M5 42C5 22 42 22 42 43V70","transform":"translate(59 0)"},{"d":"M22 9V56Q22 73 40 69M5 29H40","transform":"translate(117 0)"},{"d":"M25 27C-2 27-2 70 25 70C52 70 52 27 25 27Z","transform":"translate(165 0)"},{"d":"M5 70V28M5 43C5 22 34 23 34 43V70M34 43C34 22 64 23 64 43V70","transform":"translate(226 0)"},{"d":"M43 70V29M43 49C43 20 4 20 4 49C4 77 43 78 43 49","transform":"translate(307 0)"},{"d":"M22 9V56Q22 73 40 69M5 29H40","transform":"translate(365 0)"},{"d":"M42 45H5C5 18 44 18 44 44M5 45C5 73 31 75 43 62","transform":"translate(413 0)"}]
 
-const SIZES = {
-  sm: { svg: 28,  textSize: '0.9rem'  },
-  md: { svg: 36,  textSize: '1.1rem'  },
-  lg: { svg: 56,  textSize: '1.4rem'  },
-  xl: { svg: 120, textSize: '2.4rem'  },
+export function ApertureMark({ size = 36, alt = 'Entomate', style, className = '' }) {
+  return <img className={`en-aperture-mark ${className}`} src="/brand/aperture-128.webp"
+    srcSet="/brand/aperture-128.webp 128w, /brand/aperture-256.webp 256w, /brand/aperture-512.webp 512w"
+    sizes={`${size}px`} width={size} height={size} alt={alt} aria-hidden={alt === '' ? true : undefined}
+    decoding="async" style={style} />
 }
 
-// ── Circuit E Lettermark (navbar/compact) ──
-function CircuitEMark({ size }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Entomate">
-      {/* Three E bars */}
-      <rect x="22" y="14" width="26" height="6" rx="1.5" fill="#FF2D6B" />
-      <rect x="22" y="29" width="20" height="6" rx="1.5" fill="#FF2D6B" opacity="0.85" />
-      <rect x="22" y="44" width="26" height="6" rx="1.5" fill="#FF2D6B" />
-
-      {/* Circuit traces (left side) */}
-      <path d="M22 17 L14 17 L10 13" stroke="#FF2D6B" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-      <circle cx="10" cy="13" r="2" fill="#FF2D6B" opacity="0.9" />
-
-      <path d="M22 32 L12 32 L8 28" stroke="#FF2D6B" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-      <circle cx="8" cy="28" r="2" fill="#FF2D6B" opacity="0.9" />
-
-      <path d="M22 47 L14 47 L10 51" stroke="#FF2D6B" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-      <circle cx="10" cy="51" r="2" fill="#FF2D6B" opacity="0.9" />
-
-      {/* Extra node on top bar */}
-      <path d="M22 14 L18 10" stroke="#FF2D6B" strokeWidth="1.2" strokeLinecap="round" fill="none" opacity="0.6" />
-      <circle cx="18" cy="10" r="1.5" fill="#FF2D6B" opacity="0.6" />
-    </svg>
-  )
+export function Wordmark({ width = 148 }) {
+  return <svg className="en-brand-wordmark" width={width} height={width * 84 / 470} viewBox="0 0 470 84"
+    role="img" aria-label="Entomate" xmlns="http://www.w3.org/2000/svg">
+    <g fill="none" stroke="currentColor" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round">
+      {LETTERS.map((path, index) => <path key={index} {...path} />)}
+    </g>
+  </svg>
 }
 
-// ── Animated Hands (hero/brand) ──
-function HandsHero({ size }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 100 100"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      style={{ flexShrink: 0, animation: 'vc-logo-breathe 2.8s ease-in-out infinite' }}
-      aria-label="Entomate Logo"
-    >
-      <defs>
-        <filter id="amber-glow" x="-40%" y="-40%" width="180%" height="180%">
-          <feGaussianBlur stdDeviation="2.5" result="blur" />
-          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
-        <filter id="crimson-glow" x="-30%" y="-30%" width="160%" height="160%">
-          <feGaussianBlur stdDeviation="1.5" result="blur" />
-          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
-        <linearGradient id="hand-grad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#FF2D6B" stopOpacity="1" />
-          <stop offset="100%" stopColor="#FF2D6B" stopOpacity="0.5" />
-        </linearGradient>
-        <linearGradient id="hand-r-g" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#00F5D4" stopOpacity="1" />
-          <stop offset="100%" stopColor="#00F5D4" stopOpacity="0.5" />
-        </linearGradient>
-      </defs>
-
-      {/* Left hand — crimson */}
-      <path d="M18 72 L26 52 L36 50 L40 68 Z" stroke="url(#hand-grad)" strokeWidth="1.2" fill="rgba(255,45,107,0.05)" strokeLinejoin="round" filter="url(#crimson-glow)" />
-      <path d="M18 72 L22 82 L38 80 L40 68" stroke="#FF2D6B" strokeWidth="1" fill="rgba(255,45,107,0.04)" strokeLinecap="round" />
-      <path d="M26 52 L20 44 L17 38" stroke="#FF2D6B" strokeWidth="1.1" fill="none" strokeLinecap="round" />
-      <path d="M28 51 L26 38 L25 28" stroke="#FF2D6B" strokeWidth="1.1" fill="none" strokeLinecap="round" />
-      <path d="M32 50 L31 35 L30 24" stroke="#FF2D6B" strokeWidth="1.3" fill="none" strokeLinecap="round" />
-      <path d="M35 51 L36 37 L36 28" stroke="#FF2D6B" strokeWidth="1.1" fill="none" strokeLinecap="round" />
-      <path d="M38 53 L40 40 L40 33" stroke="#FF2D6B" strokeWidth="1" fill="none" strokeLinecap="round" />
-      <line x1="26" y1="52" x2="32" y2="60" stroke="#FF2D6B" strokeWidth="0.6" opacity="0.4" />
-      <line x1="32" y1="60" x2="40" y2="68" stroke="#FF2D6B" strokeWidth="0.6" opacity="0.4" />
-
-      {/* Right hand — mint */}
-      <path d="M82 72 L74 52 L64 50 L60 68 Z" stroke="url(#hand-r-g)" strokeWidth="1.2" fill="rgba(0,245,212,0.05)" strokeLinejoin="round" />
-      <path d="M82 72 L78 82 L62 80 L60 68" stroke="#00F5D4" strokeWidth="1" fill="rgba(0,245,212,0.04)" strokeLinecap="round" />
-      <path d="M74 52 L80 44 L83 38" stroke="#00F5D4" strokeWidth="1.1" fill="none" strokeLinecap="round" />
-      <path d="M72 51 L74 38 L75 28" stroke="#00F5D4" strokeWidth="1.1" fill="none" strokeLinecap="round" />
-      <path d="M68 50 L69 35 L70 24" stroke="#00F5D4" strokeWidth="1.3" fill="none" strokeLinecap="round" />
-      <path d="M65 51 L64 37 L64 28" stroke="#00F5D4" strokeWidth="1.1" fill="none" strokeLinecap="round" />
-      <path d="M62 53 L60 40 L60 33" stroke="#00F5D4" strokeWidth="1" fill="none" strokeLinecap="round" />
-      <line x1="74" y1="52" x2="68" y2="60" stroke="#00F5D4" strokeWidth="0.6" opacity="0.4" />
-      <line x1="68" y1="60" x2="60" y2="68" stroke="#00F5D4" strokeWidth="0.6" opacity="0.4" />
-
-      {/* Amber circuit node */}
-      <circle cx="50" cy="18" r="7" fill="rgba(255,184,0,0.15)" stroke="#FFB800" strokeWidth="0.8" opacity="0.6" filter="url(#amber-glow)" />
-      <circle cx="50" cy="18" r="4.5" fill="rgba(255,184,0,0.25)" stroke="#FFB800" strokeWidth="1.4" filter="url(#amber-glow)" />
-      <circle cx="50" cy="18" r="2" fill="#FFB800" />
-      <line x1="50" y1="13.5" x2="50" y2="9" stroke="#FFB800" strokeWidth="1" strokeLinecap="round" />
-      <line x1="50" y1="9" x2="45" y2="9" stroke="#FFB800" strokeWidth="0.8" strokeLinecap="round" />
-      <line x1="50" y1="9" x2="55" y2="9" stroke="#FFB800" strokeWidth="0.8" strokeLinecap="round" />
-      <circle cx="45" cy="9" r="1.2" fill="#FFB800" opacity="0.8" />
-      <circle cx="55" cy="9" r="1.2" fill="#FFB800" opacity="0.8" />
-      <path d="M30 24 Q38 20 46 18" stroke="#FF2D6B" strokeWidth="0.7" strokeDasharray="2.5 2" opacity="0.6" fill="none" />
-      <path d="M70 24 Q62 20 54 18" stroke="#00F5D4" strokeWidth="0.7" strokeDasharray="2.5 2" opacity="0.6" fill="none" />
-
-      {/* E letterform bars */}
-      <rect x="38" y="84" width="24" height="3" rx="1.5" fill="#FF2D6B" opacity="0.95" />
-      <rect x="40" y="90" width="18" height="2.5" rx="1.25" fill="#FF2D6B" opacity="0.7" />
-      <rect x="38" y="96" width="24" height="3" rx="1.5" fill="#FF2D6B" opacity="0.95" />
-    </svg>
-  )
+export const Logo = ({ size = 'md', withText = true, className = '' }) => {
+  const dimensions = SIZES[size] || SIZES.md
+  return <span className={`en-brand-logo ${className}`} role="img" aria-label="Entomate">
+    <ApertureMark size={dimensions.mark} alt="" />
+    {withText && <span aria-hidden="true"><Wordmark width={dimensions.word} /></span>}
+  </span>
 }
 
-// ── Gradient wordmark text ──
-function Wordmark({ fontSize }) {
-  return (
-    <span style={{
-      fontFamily: "'Syne', system-ui, sans-serif",
-      fontWeight: 700,
-      fontSize,
-      letterSpacing: '0.04em',
-      lineHeight: 1.35,
-      background: 'linear-gradient(90deg, #FF2D6B 0%, #FF6699 55%, #FFB800 100%)',
-      WebkitBackgroundClip: 'text',
-      WebkitTextFillColor: 'transparent',
-      backgroundClip: 'text',
-    }}>
-      entomate
-    </span>
-  )
-}
-
-/**
- * Main Logo export
- * @param {string} variant - "mark" (circuit E) or "hero" (animated hands)
- * @param {string} size - "sm" | "md" | "lg" | "xl"
- * @param {boolean} withText - Show wordmark text
- */
-export const Logo = ({ variant = 'mark', size = 'md', withText = true, className = '' }) => {
-  const s = SIZES[size] || SIZES.md
-
-  return (
-    <div className={className} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      {variant === 'hero' ? <HandsHero size={s.svg} /> : <CircuitEMark size={s.svg} />}
-      {withText && <Wordmark fontSize={s.textSize} />}
-    </div>
-  )
-}
-
-export { CircuitEMark, HandsHero, Wordmark }
 export default Logo

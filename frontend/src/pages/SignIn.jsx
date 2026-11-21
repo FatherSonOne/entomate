@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { Navigate } from 'react-router-dom'
+import Logo from '../components/Logo'
 
 export default function SignInPage() {
   const { signInWithOAuth, signIn, signUp, isSignedIn, loading } = useAuth()
@@ -63,25 +64,7 @@ export default function SignInPage() {
         <div className="entomate-signin-aurora entomate-signin-aurora-2" />
 
         <div className="entomate-signin-brand-content">
-          {/* Logo mark */}
-          <div className="entomate-signin-logomark">
-            <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" width="48" height="48">
-              <polyline points="6,30 6,20 9,16 11,14 11,11 12,14 13,11 14,14 15,10 16,14 17,11 17,15"
-                fill="none" stroke="#dc2626" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              <polygon points="6,30 6,20 10,22 12,26 10,30" fill="#dc2626" opacity="0.2"/>
-              <polyline points="30,30 30,20 27,16 25,14 25,11 24,14 23,11 22,14 21,10 20,14 19,11 19,15"
-                fill="none" stroke="#dc2626" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              <polygon points="30,30 30,20 26,22 24,26 26,30" fill="#dc2626" opacity="0.2"/>
-              <rect x="14" y="15.5" width="8" height="1.5" rx="0.75" fill="#dc2626"/>
-              <rect x="13" y="18" width="10" height="1.5" rx="0.75" fill="#dc2626" opacity="0.7"/>
-              <circle cx="18" cy="13" r="2.5" fill="#FFB800" opacity="0.9">
-                <animate attributeName="opacity" values="0.9;0.4;0.9" dur="2.2s" repeatCount="indefinite"/>
-                <animate attributeName="r" values="2.5;3;2.5" dur="2.2s" repeatCount="indefinite"/>
-              </circle>
-            </svg>
-          </div>
-
-          <p className="entomate-signin-brand-name">entomate</p>
+          <div style={{ marginBottom: 28 }}><Logo size="lg" /></div>
           <h2 className="entomate-signin-tagline">
             Your workflows,<br />fully automated.
           </h2>
@@ -124,6 +107,7 @@ export default function SignInPage() {
             ← Back to home
           </a>
 
+          <Logo size="md" className="entomate-signin-auth-logo" />
           <div className="entomate-signin-card">
             <div className="entomate-signin-card-header">
               <h2 className="entomate-signin-card-title">Welcome Back</h2>
@@ -343,23 +327,6 @@ export default function SignInPage() {
           flex: 1;
           display: flex; flex-direction: column;
           padding: 48px 40px 32px;
-        }
-
-        .entomate-signin-logomark {
-          width: 56px; height: 56px;
-          background: rgba(220,38,38,0.08);
-          border: 1px solid rgba(220,38,38,0.2);
-          border-radius: 14px;
-          display: flex; align-items: center; justify-content: center;
-          margin-bottom: 24px;
-        }
-
-        .entomate-signin-brand-name {
-          font-family: 'Syne', 'Space Grotesk', sans-serif;
-          font-size: 13px; font-weight: 700;
-          letter-spacing: 0.2em; text-transform: uppercase;
-          color: #dc2626;
-          margin: 0 0 20px;
         }
 
         .entomate-signin-tagline {

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { guideSections, CATEGORIES, guideVersion, guideUpdated } from '../components/UsersGuide/guideData'
-import { Logo, CircuitEMark } from '../components/Logo'
+import { Logo, ApertureMark } from '../components/Logo'
 import BackToTop from '../components/BackToTop'
 import LandingHero from '../components/LandingHero'
 
@@ -1060,10 +1060,7 @@ export default function LandingPage() {
 
             {/* Entomate - ACTIVE */}
             <div className="trifecto-card active">
-              <div className="trifecto-icon entomate">
-                <CircuitEMark size={28} />
-              </div>
-              <div className="trifecto-product-name">Entomate</div>
+              <div className="trifecto-product-name"><Logo size="md" /></div>
               <div className="trifecto-product-role active">The Hands — You Are Here</div>
               <p>
                 Visual workflow automation, 4 specialized AI agents, and 7+ integrations
@@ -1786,7 +1783,7 @@ export default function LandingPage() {
               <span className="footer-trifecto-label">part of</span>
               <div className="trifecto-pip lv" title="Logos Vision">L</div>
               <div className="trifecto-pip pulse" title="Pulse">P</div>
-              <div className="trifecto-pip ent" title="Entomate">E</div>
+              <div className="trifecto-pip ent" title="Entomate"><ApertureMark size={24} alt="" /></div>
             </div>
           </div>
         </div>
