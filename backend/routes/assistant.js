@@ -8,21 +8,25 @@ const { supabase } = require('../config/supabase');
 const ai = require('../config/ai');
 const log = require('../utils/log');
 const { authenticate } = require('../middleware/auth');
+const { getOrgIdsForUser } = require('../utils/orgContext');
 
 const router = express.Router();
 
 // ── Section data loaders ───────────────────────────────
-// Each loader fetches the data relevant to a specific app section
+// Each loader fetches the data relevant to a specific app section.
+// The backend uses the service-role key, so every query must be limited to the
+// caller: org-owned tables by org_id, the rest (no org_id column yet) by owner.
+// Audit finding 3.
 
 const sectionLoaders = {
-  async dashboard(userId) {
+  async dashboard({ orgIds, userId }) {
     const [tasks, meetings, projects] = await Promise.allSettled([
       supabase.from('tasks').select('id, title, description, status, priority, due_date, assigned_to, project_id')
-        .order('due_date', { ascending: true }).limit(20),
+        .in('org_id', orgIds).order('due_date', { ascending: true }).limit(20),
       supabase.from('meetings').select('id, title, summary, created_at, sentiment_label')
-        .order('created_at', { ascending: false }).limit(10),
+        .in('org_id', orgIds).order('created_at', { ascending: false }).limit(10),
       supabase.from('projects').select('id, name, status, start_date, end_date, budget, budget_spent')
-        .eq('status', 'active').limit(10),
+        .eq('owner_id', userId).eq('status', 'active').limit(10),
     ]);
     return {
       tasks: tasks.status === 'fulfilled' ? tasks.value?.data || [] : [],
@@ -31,74 +35,82 @@ const sectionLoaders = {
     };
   },
 
-  async meetings() {
+  async meetings({ orgIds }) {
     const { data } = await supabase.from('meetings')
       .select('id, title, summary, key_points, decisions, created_at, sentiment_label, transcript')
+      .in('org_id', orgIds)
       .order('created_at', { ascending: false }).limit(15);
     // Truncate transcripts to save tokens
     return { meetings: (data || []).map(m => ({ ...m, transcript: m.transcript?.substring(0, 500) })) };
   },
 
-  async calendar() {
+  async calendar({ userId }) {
     try {
       const { data } = await supabase.from('calendar_events')
         .select('id, title, start_time, end_time, location, description')
+        .eq('user_id', userId)
         .gte('start_time', new Date().toISOString())
         .order('start_time', { ascending: true }).limit(20);
       return { events: data || [] };
     } catch { return { events: [] }; }
   },
 
-  async projects() {
+  async projects({ userId }) {
     const { data } = await supabase.from('projects')
       .select('id, name, description, status, start_date, end_date, budget, budget_spent, created_at')
+      .eq('owner_id', userId)
       .order('created_at', { ascending: false }).limit(15);
     return { projects: data || [] };
   },
 
-  async tasks() {
+  async tasks({ orgIds }) {
     const { data } = await supabase.from('tasks')
       .select('id, title, description, status, priority, due_date, assigned_to, project_id, created_at')
+      .in('org_id', orgIds)
       .order('due_date', { ascending: true }).limit(25);
     return { tasks: data || [] };
   },
 
-  async goals() {
+  async goals({ orgIds }) {
     try {
       const { data } = await supabase.from('goals')
         .select('id, title, description, status, progress, target_value, current_value, due_date')
+        .in('org_id', orgIds)
         .order('due_date', { ascending: true }).limit(15);
       return { goals: data || [] };
     } catch { return { goals: [] }; }
   },
 
-  async workflows() {
+  async workflows({ orgIds }) {
     const { data } = await supabase.from('workflows')
       .select('id, name, description, status, enabled, last_run_at, created_at')
+      .in('org_id', orgIds)
       .order('created_at', { ascending: false }).limit(15);
     return { workflows: data || [] };
   },
 
-  async automations() {
+  async automations({ userId }) {
     const { data } = await supabase.from('automations')
       .select('id, name, description, enabled, trigger_type, last_run_at, created_at')
+      .eq('created_by', userId)
       .order('created_at', { ascending: false }).limit(15);
     return { automations: data || [] };
   },
 
-  async agents() {
+  async agents({ userId }) {
     const { data } = await supabase.from('agents')
       .select('id, name, type, description, enabled, last_execution_at, created_at')
+      .eq('created_by', userId)
       .order('created_at', { ascending: false }).limit(15);
     return { agents: data || [] };
   },
 
-  async analytics() {
+  async analytics({ orgIds, userId }) {
     // Aggregate metrics
     const [tasks, meetings, projects] = await Promise.allSettled([
-      supabase.from('tasks').select('status', { count: 'exact' }),
-      supabase.from('meetings').select('id', { count: 'exact' }),
-      supabase.from('projects').select('status', { count: 'exact' }),
+      supabase.from('tasks').select('status', { count: 'exact' }).in('org_id', orgIds),
+      supabase.from('meetings').select('id', { count: 'exact' }).in('org_id', orgIds),
+      supabase.from('projects').select('status', { count: 'exact' }).eq('owner_id', userId),
     ]);
     return {
       metrics: {
@@ -115,7 +127,8 @@ async function loadSectionData(section, userId) {
   const loader = sectionLoaders[section];
   if (!loader) return {};
   try {
-    return await loader(userId);
+    const orgIds = await getOrgIdsForUser(userId);
+    return await loader({ orgIds, userId });
   } catch (err) {
     log.warn(`[Assistant] Failed to load ${section} data:`, err.message);
     return {};

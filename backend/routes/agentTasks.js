@@ -6,11 +6,13 @@
 const express = require('express');
 const { supabase } = require('../config/supabase');
 const { authenticate } = require('../middleware/auth');
+const { attachOrgIds } = require('../utils/orgContext');
 const log = require('../utils/log');
 
 const router = express.Router();
 
 router.use(authenticate);
+router.use(attachOrgIds); // every tasks query below is limited to req.orgIds (audit finding 3)
 
 // ========================================
 // DEFAULT ETA DAYS BY PRIORITY
@@ -32,6 +34,7 @@ router.get('/overdue', async (req, res) => {
     const { data: tasks, error } = await supabase
       .from('tasks')
       .select('id, title, description, priority, status, due_date, assigned_to, project_id, created_at')
+      .in('org_id', req.orgIds)
       .lt('due_date', cutoffDate.toISOString().split('T')[0])
       .neq('status', 'done')
       .order('due_date', { ascending: true })
@@ -71,6 +74,7 @@ router.get('/:id/eta', async (req, res) => {
     const { data: task, error: taskError } = await supabase
       .from('tasks')
       .select('*')
+      .in('org_id', req.orgIds)
       .eq('id', id)
       .single();
 
@@ -96,6 +100,7 @@ router.get('/:id/eta', async (req, res) => {
     const { data: completedTasks } = await supabase
       .from('tasks')
       .select('created_at, updated_at, completed_at')
+      .in('org_id', req.orgIds)
       .eq('priority', task.priority)
       .eq('status', 'done')
       .limit(50);
@@ -126,6 +131,7 @@ router.get('/:id/eta', async (req, res) => {
       const { count } = await supabase
         .from('tasks')
         .select('*', { count: 'exact', head: true })
+        .in('org_id', req.orgIds)
         .eq('assigned_to', task.assigned_to)
         .in('status', ['open', 'in_progress']);
 
@@ -208,6 +214,7 @@ router.post('/:id/auto-assign', async (req, res) => {
     const { data: task, error: taskError } = await supabase
       .from('tasks')
       .select('*')
+      .in('org_id', req.orgIds)
       .eq('id', id)
       .single();
 
@@ -223,10 +230,23 @@ router.post('/:id/auto-assign', async (req, res) => {
       });
     }
 
+    // Candidates are members of the task's own org only (users has no org_id,
+    // so go through org_members). Before this, auto-assign picked from every
+    // tenant's users.
+    const { data: members, error: membersError } = await supabase
+      .from('org_members')
+      .select('user_id')
+      .eq('org_id', task.org_id);
+    const memberIds = (members || []).map(m => m.user_id);
+    if (membersError || memberIds.length === 0) {
+      return res.json({ success: false, reason: 'No active team members found' });
+    }
+
     // Get active team members with their workload
     const { data: users, error: usersError } = await supabase
       .from('users')
       .select('id, name, email, role')
+      .in('id', memberIds)
       .eq('active', true);
 
     if (usersError || !users || users.length === 0) {
@@ -244,6 +264,7 @@ router.post('/:id/auto-assign', async (req, res) => {
       const { count } = await supabase
         .from('tasks')
         .select('*', { count: 'exact', head: true })
+        .in('org_id', req.orgIds)
         .eq('assigned_to', user.id)
         .in('status', ['open', 'in_progress']);
 
@@ -264,6 +285,7 @@ router.post('/:id/auto-assign', async (req, res) => {
         assigned_to: assignee.id,
         updated_at: new Date().toISOString()
       })
+      .in('org_id', req.orgIds)
       .eq('id', id);
 
     if (updateError) throw updateError;

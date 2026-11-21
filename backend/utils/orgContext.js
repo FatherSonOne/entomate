@@ -75,9 +75,41 @@ async function getOrgIdForMeeting(meetingId) {
   return data?.org_id || null;
 }
 
+/**
+ * Every org the user belongs to (a user can be in more than one).
+ * @param {string|null|undefined} userId
+ * @returns {Promise<string[]>} org ids; [] for anonymous/system users.
+ */
+async function getOrgIdsForUser(userId) {
+  if (!userId || userId === 'anonymous' || userId === 'system' || !supabase) return [];
+  const { data, error } = await supabase
+    .from('org_members')
+    .select('org_id')
+    .eq('user_id', userId);
+  if (error) throw new Error(`org membership lookup failed: ${error.message}`);
+  return [...new Set((data || []).map((r) => r.org_id).filter(Boolean))];
+}
+
+/**
+ * Express middleware: sets req.orgIds to the caller's orgs so routes can add
+ * `.in('org_id', req.orgIds)` to every read, update and delete. The backend
+ * runs on the service-role key, so this filter is the only thing keeping one
+ * tenant out of another's rows (audit finding 3). Must run after authenticate.
+ * A user with no org gets [], which matches no rows.
+ */
+async function attachOrgIds(req, res, next) {
+  try {
+    req.orgIds = await getOrgIdsForUser(req.user?.id);
+    next();
+  } catch (err) {
+    log.error('[orgContext] attachOrgIds failed:', err.message);
+    res.status(500).json({ error: 'Could not resolve your workspace' });
+  }
+}
+
 /** Clear the cache (tests / after a membership change). */
 function _clearCache() {
   _cache.clear();
 }
 
-module.exports = { getOrgIdForUser, getOrgIdForMeeting, _clearCache };
+module.exports = { getOrgIdForUser, getOrgIdsForUser, getOrgIdForMeeting, attachOrgIds, _clearCache };

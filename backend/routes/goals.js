@@ -5,11 +5,13 @@ const { asyncHandler } = require('../middleware/errorHandler');
 const { isValidUUID } = require('../utils/validators');
 const { validate } = require('../middleware/validate');
 const schemas = require('../schemas/goals');
-const { getOrgIdForUser } = require('../utils/orgContext');
+const { getOrgIdForUser, attachOrgIds } = require('../utils/orgContext');
 const { authenticate } = require('../middleware/auth');
 
-// Every goals route needs a signed-in user (audit finding 1).
+// Every goals route needs a signed-in user (audit finding 1), and every
+// query is limited to the caller's orgs (audit finding 3).
 router.use(authenticate);
+router.use(attachOrgIds);
 
 // Helper to check if error is missing table
 function isTableMissing(error) {
@@ -31,7 +33,7 @@ const EMPTY_GOALS_RESPONSE = {
 router.get('/', validate(schemas.list), asyncHandler(async (req, res) => {
   const { type, status, quarter, owner_id, team_id } = req.query;
 
-  let query = supabase.from('goals').select('*');
+  let query = supabase.from('goals').select('*').in('org_id', req.orgIds);
 
   if (type) query = query.eq('goal_type', type);
   if (status) query = query.eq('status', status);
@@ -61,7 +63,7 @@ router.get('/', validate(schemas.list), asyncHandler(async (req, res) => {
 router.get('/hierarchy', asyncHandler(async (req, res) => {
   const { quarter } = req.query;
 
-  let query = supabase.from('goals').select('*');
+  let query = supabase.from('goals').select('*').in('org_id', req.orgIds);
   if (quarter) query = query.eq('quarter', quarter);
 
   const { data: goals, error } = await query.order('goal_type');
@@ -177,7 +179,7 @@ router.post('/', validate(schemas.create), asyncHandler(async (req, res) => {
 router.get('/stats/summary', asyncHandler(async (req, res) => {
   const { quarter } = req.query;
 
-  let query = supabase.from('goals').select('*');
+  let query = supabase.from('goals').select('*').in('org_id', req.orgIds);
 
   // Only filter by quarter if specified
   if (quarter) {
@@ -245,8 +247,9 @@ router.get('/:id', asyncHandler(async (req, res) => {
   const { data: goal, error } = await supabase
     .from('goals')
     .select('*')
+    .in('org_id', req.orgIds)
     .eq('id', id)
-    .single();
+    .maybeSingle();
 
   if (error) throw error;
 
@@ -258,6 +261,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
   const { data: children } = await supabase
     .from('goals')
     .select('*')
+    .in('org_id', req.orgIds)
     .eq('parent_goal_id', id);
 
   // Get related tasks
@@ -266,6 +270,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
     const { data: tasks } = await supabase
       .from('tasks')
       .select('*')
+      .in('org_id', req.orgIds)
       .in('id', goal.related_tasks);
     relatedTasks = tasks || [];
   }
@@ -298,6 +303,7 @@ router.put('/:id', validate(schemas.update), asyncHandler(async (req, res) => {
   const { data, error } = await supabase
     .from('goals')
     .update(updates)
+    .in('org_id', req.orgIds)
     .eq('id', id)
     .select()
     .single();
@@ -325,6 +331,7 @@ router.delete('/:id', asyncHandler(async (req, res) => {
   const { error } = await supabase
     .from('goals')
     .delete()
+    .in('org_id', req.orgIds)
     .eq('id', id);
 
   if (error) throw error;
@@ -354,6 +361,7 @@ router.post('/:id/key-results', validate(schemas.createKeyResult), asyncHandler(
   const { data: goal, error: fetchError } = await supabase
     .from('goals')
     .select('key_results')
+    .in('org_id', req.orgIds)
     .eq('id', id)
     .single();
 
@@ -378,6 +386,7 @@ router.post('/:id/key-results', validate(schemas.createKeyResult), asyncHandler(
       key_results: keyResults,
       updated_at: new Date().toISOString()
     })
+    .in('org_id', req.orgIds)
     .eq('id', id)
     .select()
     .single();
@@ -403,6 +412,7 @@ router.put('/:id/key-results/:krId', validate(schemas.updateKeyResult), asyncHan
   const { data: goal, error: fetchError } = await supabase
     .from('goals')
     .select('key_results')
+    .in('org_id', req.orgIds)
     .eq('id', id)
     .single();
 
@@ -436,6 +446,7 @@ router.put('/:id/key-results/:krId', validate(schemas.updateKeyResult), asyncHan
       progress: Math.round(avgProgress * 100) / 100,
       updated_at: new Date().toISOString()
     })
+    .in('org_id', req.orgIds)
     .eq('id', id)
     .select()
     .single();
@@ -467,6 +478,7 @@ router.post('/:id/link-task', validate(schemas.linkTask), asyncHandler(async (re
   const { data: goal, error: fetchError } = await supabase
     .from('goals')
     .select('related_tasks')
+    .in('org_id', req.orgIds)
     .eq('id', id)
     .single();
 
@@ -483,6 +495,7 @@ router.post('/:id/link-task', validate(schemas.linkTask), asyncHandler(async (re
       related_tasks: relatedTasks,
       updated_at: new Date().toISOString()
     })
+    .in('org_id', req.orgIds)
     .eq('id', id)
     .select()
     .single();
@@ -510,6 +523,7 @@ router.delete('/:id/link-task/:taskId', asyncHandler(async (req, res) => {
   const { data: goal, error: fetchError } = await supabase
     .from('goals')
     .select('related_tasks')
+    .in('org_id', req.orgIds)
     .eq('id', id)
     .single();
 
@@ -520,6 +534,7 @@ router.delete('/:id/link-task/:taskId', asyncHandler(async (req, res) => {
   const { data, error } = await supabase
     .from('goals')
     .update({ related_tasks: relatedTasks, updated_at: new Date().toISOString() })
+    .in('org_id', req.orgIds)
     .eq('id', id)
     .select()
     .single();
@@ -538,6 +553,17 @@ router.get('/:id/history', asyncHandler(async (req, res) => {
 
   if (!isValidUUID(id)) {
     return res.status(400).json({ success: false, error: 'Invalid goal ID' });
+  }
+
+  // goal_progress_history has no org_id; check the goal is in the caller's org.
+  const { data: ownGoal } = await supabase
+    .from('goals')
+    .select('id')
+    .in('org_id', req.orgIds)
+    .eq('id', id)
+    .maybeSingle();
+  if (!ownGoal) {
+    return res.status(404).json({ success: false, error: 'Goal not found' });
   }
 
   const { data, error } = await supabase
@@ -571,6 +597,7 @@ router.post('/:id/history', asyncHandler(async (req, res) => {
   const { data: goal, error: fetchError } = await supabase
     .from('goals')
     .select('progress, status, key_results')
+    .in('org_id', req.orgIds)
     .eq('id', id)
     .single();
 

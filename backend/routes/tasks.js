@@ -5,12 +5,13 @@ const { validate } = require('../middleware/validate');
 const { authenticate } = require('../middleware/auth');
 const schemas = require('../schemas/tasks');
 const log = require('../utils/log');
-const { getOrgIdForUser } = require('../utils/orgContext');
+const { getOrgIdForUser, attachOrgIds } = require('../utils/orgContext');
 
 const router = express.Router();
 
 // Require authentication for all task routes
 router.use(authenticate);
+router.use(attachOrgIds); // every query below is limited to req.orgIds (audit finding 3)
 
 /**
  * POST /api/tasks
@@ -106,6 +107,7 @@ router.get('/', validate(schemas.list), async (req, res) => {
     let query = supabase
       .from('tasks')
       .select('*', { count: 'exact' })
+      .in('org_id', req.orgIds)
       .order(safeSortBy, { ascending: safeSortDir });
 
     if (projectId) {
@@ -166,6 +168,7 @@ router.get('/:id', async (req, res) => {
     const { data: task, error } = await supabase
       .from('tasks')
       .select('*')
+      .in('org_id', req.orgIds)
       .eq('id', id)
       .single();
 
@@ -177,6 +180,7 @@ router.get('/:id', async (req, res) => {
     const { data: subtasks } = await supabase
       .from('tasks')
       .select('*')
+      .in('org_id', req.orgIds)
       .eq('parent_task_id', id);
 
     res.json({
@@ -223,6 +227,7 @@ router.put('/:id', validate(schemas.update), async (req, res) => {
     const { data: task, error } = await supabase
       .from('tasks')
       .update(filteredUpdates)
+      .in('org_id', req.orgIds)
       .eq('id', id)
       .select()
       .single();
@@ -255,12 +260,14 @@ router.delete('/:id', async (req, res) => {
     await supabase
       .from('tasks')
       .delete()
+      .in('org_id', req.orgIds)
       .eq('parent_task_id', id);
 
     // Delete task
     const { error } = await supabase
       .from('tasks')
       .delete()
+      .in('org_id', req.orgIds)
       .eq('id', id);
 
     if (error) {
@@ -294,6 +301,7 @@ router.post('/:id/complete', async (req, res) => {
         completed_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
+      .in('org_id', req.orgIds)
       .eq('id', id)
       .select()
       .single();
@@ -329,6 +337,7 @@ router.post('/:id/reopen', async (req, res) => {
         completed_at: null,
         updated_at: new Date().toISOString()
       })
+      .in('org_id', req.orgIds)
       .eq('id', id)
       .select()
       .single();
@@ -364,6 +373,7 @@ router.put('/:id/assign', validate(schemas.assign), async (req, res) => {
         assigned_to: assignedTo,
         updated_at: new Date().toISOString()
       })
+      .in('org_id', req.orgIds)
       .eq('id', id)
       .select()
       .single();
@@ -464,6 +474,7 @@ router.put('/bulk/status', validate(schemas.bulkStatus), async (req, res) => {
     const { data: tasks, error } = await supabase
       .from('tasks')
       .update(updates)
+      .in('org_id', req.orgIds)
       .in('id', taskIds)
       .select();
 
