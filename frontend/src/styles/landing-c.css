@@ -1,0 +1,699 @@
+/* ============================================================
+   Entomate landing page · Direction C "Minutes" (2026-11-21)
+   Swiss structure (numbered sections, 2px ink rules, hairlines,
+   2px corners) + the qntmecos.com "Signal Spine" pattern
+   (cinematic hero, pinned module journey with a step rail, close).
+   Void Crimson palette. Signal law: crimson = brand/CTA,
+   amber = AI, phosphor = live, mint = action; 8px squares + a word.
+   Everything is scoped under .lc-page so app styles are untouched.
+   ============================================================ */
+
+.lc-page {
+  --bg: #080808; --paper: #141414; --ink: #F8F0F2; --ink2: #C4B6BC; --muted: #968890;
+  --hair: rgba(248, 240, 242, .12); --hair2: rgba(248, 240, 242, .06);
+  --accent: #FF2D6B; --accent-ink: #FF6699; --band: #CC0044;
+  --ai: #FFB800; --live: #A0FF32; --mint: #00F5D4;
+  /* aliases used by the guide section */
+  --crimson: var(--accent); --amber: var(--ai);
+  --surface: var(--paper); --elevated: color-mix(in srgb, var(--paper) 80%, var(--ink) 4%);
+  --border: var(--hair); --border-glow: color-mix(in srgb, var(--accent) 40%, transparent);
+  --text-primary: var(--ink); --text-secondary: var(--ink2); --text-muted: var(--muted);
+  --font-body: Inter, system-ui, sans-serif; --font-display: Syne, Inter, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --radius-sm: 2px; --radius-md: 2px; --radius-xl: 2px;
+
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+.lc-page.is-light {
+  --bg: #FFF8FA; --paper: #FFFFFF; --ink: #08080A; --ink2: #4A3840; --muted: #76646C;
+  --hair: rgba(8, 8, 10, .12); --hair2: rgba(8, 8, 10, .05);
+  --accent: #CC0044; --accent-ink: #A30036; --band: #CC0044;
+  --ai: #9B6800; --live: #5A9B00; --mint: #008C7A;
+}
+.lc-page *, .lc-page *::before, .lc-page *::after { box-sizing: border-box; }
+.lc-page h1, .lc-page h2, .lc-page h3, .lc-page h4, .lc-page p, .lc-page ul, .lc-page ol { margin: 0; padding: 0; }
+.lc-page a { color: inherit; text-decoration: none; }
+.lc-page button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+.lc-page a:focus-visible, .lc-page button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+.lc-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.lc-eyebrow { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .22em; color: var(--muted); }
+.lc-btn {
+  height: 44px; padding: 0 18px; border: 1px solid currentColor; border-radius: 2px;
+  display: inline-flex; align-items: center; gap: 10px; font-weight: 600; font-size: 14px; white-space: nowrap;
+}
+.lc-btn.is-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.lc-sq { display: inline-block; width: 8px; height: 8px; flex: none; }
+.lc-sq--ai { background: var(--ai); }
+.lc-sq--live { background: var(--live); }
+.lc-sq--brand { background: var(--accent); }
+.lc-wrap { padding-left: clamp(20px, 5vw, 72px); padding-right: clamp(20px, 5vw, 72px); }
+.lc-pad { padding-top: 110px; padding-bottom: 110px; }
+.lc-skip { position: absolute; left: -9999px; top: 8px; z-index: 300; background: var(--accent); color: #fff; padding: 8px 14px; }
+.lc-skip:focus { left: 8px; }
+
+/* Media zones stay dark in both themes: the footage is dark. */
+.lc-media {
+  --ink: #F8F0F2; --ink2: #D6CACF; --muted: #A89BA1; --hair: rgba(248, 240, 242, .16);
+  --accent: #FF2D6B; --ai: #FFB800; --live: #A0FF32; --mint: #00F5D4;
+  color: var(--ink); background: #080808; position: relative; overflow: hidden;
+}
+.lc-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+
+/* ── Nav ── */
+.lc-nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100; height: 64px;
+  display: flex; align-items: center; gap: 28px;
+  border-bottom: 1px solid transparent; transition: background .3s, border-color .3s;
+}
+.lc-nav.is-solid { background: color-mix(in srgb, var(--bg) 92%, transparent); border-color: var(--hair); backdrop-filter: blur(8px); }
+.lc-nav:not(.is-solid) { --ink: #F8F0F2; --ink2: #D6CACF; --muted: #A89BA1; --accent: #FF2D6B; }
+.lc-brand { display: flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: -.02em; font-size: 17px; color: var(--ink); }
+.lc-brand .en-brand-logo { color: var(--ink); }
+.lc-nav-links { display: flex; gap: 26px; font-size: 13.5px; color: var(--ink2); margin-left: 18px; }
+.lc-nav-links a:hover { color: var(--ink); }
+.lc-nav-links .lc-n { font-family: var(--font-mono); font-size: 10px; color: var(--muted); margin-right: 6px; }
+.lc-nav-r { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+.lc-nav-r .lc-signin { font-weight: 600; font-size: 13.5px; color: var(--ink2); }
+.lc-nav-r .lc-btn { height: 36px; font-size: 13px; }
+.lc-page .lc-theme { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .14em; color: var(--muted); min-height: 36px; padding: 0 4px; }
+.lc-page .lc-theme:hover { color: var(--ink); }
+
+/* ── 01 Hero ── */
+.lc-hero { min-height: 100vh; display: flex; flex-direction: column; justify-content: flex-end; padding-top: 120px; padding-bottom: 56px; }
+.lc-hero .lc-scrim {
+  position: absolute; inset: 0;
+  background:
+    linear-gradient(100deg, rgba(8,8,8,.94) 0%, rgba(8,8,8,.72) 34%, rgba(8,8,8,.08) 66%),
+    linear-gradient(0deg, rgba(8,8,8,.85) 0%, rgba(8,8,8,0) 38%);
+}
+.lc-hero .lc-in { position: relative; z-index: 2; }
+.lc-hero .lc-rule { display: flex; gap: 24px; border-bottom: 2px solid var(--ink); padding-bottom: 12px; margin-bottom: 28px; max-width: 760px; }
+.lc-hero h1 { font-family: var(--font-display); font-weight: 800; font-size: clamp(46px, 6.6vw, 104px); line-height: .9; letter-spacing: -.035em; max-width: 12ch; }
+.lc-hero h1 em, .lc-close h2 em { font-style: normal; color: var(--accent); }
+.lc-hero .lc-lede { max-width: 52ch; font-size: clamp(16px, 1.5vw, 19px); color: var(--ink2); margin-top: 28px; }
+.lc-ctas { display: flex; gap: 12px; margin-top: 30px; flex-wrap: wrap; }
+.lc-hero .lc-status { margin-top: 22px; font-size: 12px; color: var(--muted); display: flex; gap: 18px; flex-wrap: wrap; }
+.lc-hero .lc-cue { position: absolute; right: clamp(20px, 5vw, 72px); bottom: 56px; z-index: 2; text-align: right; color: var(--muted); font-size: 11px; }
+.lc-hero .lc-cue b { display: block; font-family: var(--font-mono); color: var(--ink); font-weight: 500; }
+
+/* ── Band ── */
+.lc-band { background: var(--band); color: #fff; display: grid; grid-template-columns: repeat(4, 1fr); list-style: none; }
+.lc-band li { padding: 26px clamp(20px, 2.4vw, 36px); border-right: 1px solid rgba(255,255,255,.22); }
+.lc-band li:last-child { border-right: 0; }
+.lc-band .lc-v { font-size: 44px; font-weight: 800; letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums; }
+.lc-band .lc-l { font-size: 13px; margin-top: 8px; opacity: .92; }
+.lc-band .lc-note { display: block; opacity: .8; font-size: 12px; }
+
+/* ── Swiss section head ── */
+.lc-sh { display: grid; grid-template-columns: repeat(12, 1fr); gap: 24px; border-top: 2px solid var(--ink); padding-top: 14px; margin-bottom: 44px; }
+.lc-sh .lc-n { grid-column: span 2; font-family: var(--font-mono); font-size: 12px; color: var(--accent); }
+.lc-sh h2 { grid-column: span 6; font-family: var(--font-display); font-weight: 800; font-size: clamp(34px, 4.2vw, 60px); line-height: .95; letter-spacing: -.03em; }
+.lc-sh p { grid-column: span 4; color: var(--ink2); font-size: 15px; }
+
+/* ── 02 Module journey (pinned) ── */
+.lc-journey { position: relative; overflow: visible; }
+.lc-journey .lc-pin { position: sticky; top: 0; height: 100vh; overflow: hidden; }
+.lc-layer { position: absolute; inset: 0; opacity: 0; transition: opacity .7s cubic-bezier(.16,1,.3,1); }
+.lc-layer.is-on { opacity: 1; }
+.lc-shade { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(8,8,8,.92) 0%, rgba(8,8,8,.55) 42%, rgba(8,8,8,.2) 70%, rgba(8,8,8,.6) 100%); }
+.lc-jgrid { position: absolute; inset: 64px clamp(20px, 5vw, 72px) 40px; display: grid; grid-template-columns: 260px 1fr; gap: clamp(24px, 4vw, 64px); align-items: center; }
+.lc-rail { align-self: center; border-top: 2px solid var(--ink); }
+.lc-rail .lc-eyebrow { display: block; padding: 12px 0 8px; }
+.lc-rail button { display: grid; grid-template-columns: 34px 1fr; width: 100%; text-align: left; padding: 11px 0; border-bottom: 1px solid var(--hair); color: var(--muted); align-items: baseline; min-height: 44px; transition: color .2s; }
+.lc-rail button .lc-n { font-family: var(--font-mono); font-size: 11px; }
+.lc-rail button[aria-selected="true"] { color: var(--ink); font-weight: 700; }
+.lc-rail button[aria-selected="true"] .lc-n { color: var(--accent); }
+.lc-prog { height: 2px; background: var(--hair); margin-top: 16px; position: relative; }
+.lc-prog i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); width: 100%; transform-origin: left; transform: scaleX(0); }
+.lc-sheets { position: relative; min-height: 520px; display: grid; align-items: center; }
+.lc-sheet {
+  grid-area: 1 / 1; max-width: 640px; background: rgba(8,8,8,.78); border: 1px solid var(--hair); border-top: 2px solid var(--ink);
+  padding: 30px 34px 28px; backdrop-filter: blur(6px);
+  opacity: 0; transform: translateY(18px); pointer-events: none;
+  transition: opacity .45s cubic-bezier(.16,1,.3,1), transform .45s cubic-bezier(.16,1,.3,1);
+}
+.lc-sheet.is-on { opacity: 1; transform: none; pointer-events: auto; }
+.lc-sheet .lc-k { display: flex; align-items: center; gap: 10px; font-family: var(--font-mono); font-size: 11.5px; text-transform: uppercase; letter-spacing: .16em; }
+.lc-k--ai { color: var(--ai); } .lc-k--live { color: var(--live); } .lc-k--brand { color: var(--accent); }
+.lc-sheet h3 { display: flex; align-items: baseline; gap: 14px; margin-top: 14px; font-family: var(--font-display); font-weight: 800; font-size: clamp(32px, 3.6vw, 48px); line-height: 1; letter-spacing: -.025em; }
+.lc-sheet h3 .lc-n { font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: 0; }
+.lc-sheet .lc-tag { color: var(--ink2); margin-top: 12px; max-width: 46ch; }
+.lc-sheet ul { list-style: none; margin-top: 20px; border-top: 1px solid var(--hair); }
+.lc-sheet li { display: grid; grid-template-columns: 44px 1fr auto; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--hair); font-size: 14px; align-items: baseline; }
+.lc-sheet li .lc-n { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+.lc-st { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
+.lc-st.ship { color: var(--ink2); } .lc-st.plan { color: var(--muted); }
+.lc-sheet .lc-src { margin-top: 14px; font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+.lc-thumb { display: none; margin: 0 0 18px; aspect-ratio: 16 / 9; width: 100%; object-fit: cover; }
+.lc-legend { position: absolute; right: clamp(20px, 5vw, 72px); bottom: 22px; z-index: 3; font-size: 11px; color: var(--muted); display: flex; gap: 16px; }
+
+/* static fallback: phone and reduced motion */
+.lc-journey.is-static .lc-pin { position: relative; height: auto; overflow: visible; }
+.lc-journey.is-static .lc-layer, .lc-journey.is-static .lc-shade,
+.lc-journey.is-static .lc-rail, .lc-journey.is-static .lc-legend { display: none; }
+.lc-journey.is-static .lc-jgrid { position: static; display: block; padding: 40px clamp(20px, 5vw, 72px) 0; }
+.lc-journey.is-static .lc-sheets { display: block; min-height: 0; }
+.lc-journey.is-static .lc-sheet { opacity: 1; transform: none; pointer-events: auto; max-width: none; background: none; border: 0; border-top: 2px solid var(--ink); padding: 0 0 40px; backdrop-filter: none; }
+.lc-journey.is-static .lc-thumb { display: block; margin-left: calc(-1 * clamp(20px, 5vw, 72px)); margin-right: calc(-1 * clamp(20px, 5vw, 72px)); width: calc(100% + 2 * clamp(20px, 5vw, 72px)); max-width: none; }
+
+/* ── 03 Shows its work ── */
+.lc-minutes { display: grid; grid-template-columns: repeat(12, 1fr); gap: 24px; }
+.lc-minutes .lc-doc { grid-column: span 7; }
+.lc-minutes .lc-side { grid-column: 9 / span 4; }
+.lc-dh { display: flex; align-items: baseline; gap: 14px; border-bottom: 1px solid var(--ink); padding: 26px 0 8px; }
+.lc-side .lc-dh { padding-top: 0; }
+.lc-dh .lc-n { font-family: var(--font-mono); font-size: 12px; font-weight: 600; }
+.lc-dh h3 { font-size: 20px; letter-spacing: -.01em; }
+.lc-li { display: grid; grid-template-columns: 44px 1fr; gap: 4px 10px; padding: 13px 0; border-bottom: 1px solid var(--hair); }
+.lc-li .lc-n { font-family: var(--font-mono); font-size: 11px; color: var(--muted); padding-top: 3px; }
+.lc-li .lc-m { grid-column: 2; display: flex; gap: 14px; flex-wrap: wrap; align-items: center; font-size: 12px; color: var(--muted); }
+.lc-li .lc-m .lc-sq { margin-right: 8px; }
+.lc-tr { display: grid; grid-template-columns: 60px 1fr; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--hair2); font-size: 14px; }
+.lc-tr .lc-tc { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); }
+.lc-side .lc-foot { margin-top: 16px; color: var(--muted); font-size: 13px; }
+
+/* ── 04 Agents ── */
+.lc-agents-img { height: 300px; }
+.lc-agents-img .lc-scrim { position: absolute; inset: 0; background: linear-gradient(0deg, rgba(8,8,8,.9), rgba(8,8,8,.1) 60%); }
+.lc-agents-img .lc-cap { position: absolute; left: clamp(20px, 5vw, 72px); bottom: 22px; z-index: 2; color: #D6CACF; }
+.lc-agents-body { padding-top: 64px; }
+.lc-agents { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 2px solid var(--ink); list-style: none; }
+.lc-agents li { padding: 18px 22px 26px 0; border-right: 1px solid var(--hair); }
+.lc-agents li + li { padding-left: 22px; }
+.lc-agents li:last-child { border-right: 0; }
+.lc-agents .lc-n { font-family: var(--font-mono); font-size: 11px; color: var(--ai); }
+.lc-agents h3 { font-size: 22px; letter-spacing: -.015em; margin: 26px 0 8px; }
+.lc-agents p { color: var(--ink2); font-size: 14px; }
+
+/* ── 05 Close ── */
+.lc-close { min-height: 86vh; display: grid; place-items: center; text-align: center; }
+.lc-close .lc-scrim { position: absolute; inset: 0; background: radial-gradient(60% 70% at 50% 50%, rgba(8,8,8,.9), rgba(8,8,8,.55) 55%, rgba(8,8,8,.2)); }
+.lc-close .lc-in { position: relative; z-index: 2; padding: 0 20px; }
+.lc-close .lc-eyebrow { color: #FF6699; }
+.lc-close h2 { font-family: var(--font-display); font-weight: 800; font-size: clamp(40px, 6vw, 92px); line-height: .95; letter-spacing: -.035em; max-width: 16ch; margin: 18px auto 0; }
+.lc-close .lc-ctas { justify-content: center; margin-top: 34px; }
+.lc-close .lc-where { margin-top: 20px; font-size: 12px; color: #A89BA1; }
+
+/* ── 06 Guide ── */
+.lc-guide .guide-master-toggle, .lc-guide .guide-body { --font-display: var(--font-body); }
+.lc-guide .guide-cta { text-align: center; margin-top: 32px; }
+.lc-page .guide-note-sq { display: inline-block; width: 8px; height: 8px; background: var(--ai); flex: none; margin-top: 6px; }
+
+/* ── Footer ── */
+.lc-footer { border-top: 1px solid var(--hair); padding-top: 36px; padding-bottom: 48px; }
+.lc-footer .lc-g { display: grid; grid-template-columns: 2fr repeat(3, 1fr); gap: 24px; }
+.lc-footer h4 { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .16em; color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--hair); padding-bottom: 8px; margin-bottom: 8px; }
+.lc-footer a { display: block; padding: 4px 0; color: var(--ink2); font-size: 14px; }
+.lc-footer a:hover { color: var(--ink); }
+.lc-footer .lc-about { color: var(--muted); font-size: 13px; margin-top: 10px; max-width: 34ch; }
+.lc-footer .lc-fine { margin-top: 36px; font-size: 12px; color: var(--muted); display: flex; gap: 20px; flex-wrap: wrap; }
+
+/* ── Phone ── */
+@media (max-width: 760px) {
+  .lc-nav { height: 56px; gap: 12px; }
+  .lc-nav-links, .lc-nav-r .lc-signin { display: none; }
+  .lc-hero { padding-bottom: 36px; padding-top: 96px; }
+  .lc-hero .lc-scrim { background: linear-gradient(0deg, rgba(8,8,8,.96) 0%, rgba(8,8,8,.75) 45%, rgba(8,8,8,.2) 80%); }
+  .lc-hero .lc-bg { object-position: 72% center; }
+  .lc-hero .lc-rule { flex-direction: column; gap: 4px; }
+  .lc-hero .lc-cue { display: none; }
+  .lc-hero .lc-ctas .lc-btn { flex: 1; justify-content: center; }
+  .lc-band { grid-template-columns: 1fr 1fr; }
+  .lc-band li:nth-child(2) { border-right: 0; }
+  .lc-band li:nth-child(-n+2) { border-bottom: 1px solid rgba(255,255,255,.22); }
+  .lc-band .lc-v { font-size: 32px; }
+  .lc-pad { padding-top: 64px; padding-bottom: 64px; }
+  .lc-sh { grid-template-columns: 1fr; gap: 10px; margin-bottom: 28px; }
+  .lc-sh > * { grid-column: auto; }
+  .lc-sh .lc-n, .lc-sh h2, .lc-sh p { grid-column: auto; }
+  .lc-minutes { grid-template-columns: 1fr; }
+  .lc-minutes .lc-doc, .lc-minutes .lc-side { grid-column: auto; }
+  .lc-agents-img { height: 180px; }
+  .lc-agents { grid-template-columns: 1fr; }
+  .lc-agents li, .lc-agents li + li { border-right: 0; border-bottom: 1px solid var(--hair); padding-left: 0; }
+  .lc-agents h3 { margin-top: 10px; }
+  .lc-footer .lc-g { grid-template-columns: 1fr 1fr; }
+  .lc-footer .lc-g > div:first-child { grid-column: 1 / -1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lc-layer, .lc-sheet, .lc-nav { transition: none; }
+}
+
+/* ============================================================
+   User guide (moved from the old landing page, re-scoped to .lc-page;
+   radii and colours come from the aliases at the top of this file)
+   ============================================================ */
+
+/* Master toggle button */
+.lc-page .guide-master-toggle {
+  max-width: 900px;
+  margin: 0 auto 24px;
+}
+
+.lc-page .guide-toggle-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  cursor: pointer;
+  transition: all 200ms ease;
+  font-family: var(--font-body);
+  text-align: left;
+}
+
+.lc-page .guide-toggle-btn:hover {
+  border-color: var(--border-glow);
+  background: var(--elevated);
+}
+
+.lc-page .guide-toggle-btn.is-open {
+  border-color: rgba(255, 45, 107, 0.30);
+  background: var(--elevated);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+}
+
+.lc-page .guide-toggle-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 45, 107, 0.10);
+  border: 1px solid rgba(255, 45, 107, 0.20);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.lc-page .guide-toggle-text {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  flex: 1;
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+.lc-page .guide-toggle-meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+.lc-page .guide-expand-controls {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--elevated);
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  border-color: rgba(255, 45, 107, 0.30);
+}
+
+.lc-page .guide-ctrl-btn {
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.lc-page .guide-ctrl-btn:hover {
+  color: var(--crimson);
+  border-color: rgba(255, 45, 107, 0.3);
+}
+
+/* Chevron */
+.lc-page .guide-chevron {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-muted);
+  transition: transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.lc-page .guide-chevron.is-open {
+  transform: rotate(90deg);
+  color: var(--crimson);
+}
+
+/* Guide body */
+.lc-page .guide-body {
+  max-width: 900px;
+  margin: 0 auto;
+  background: var(--surface);
+  border: 1px solid rgba(255, 45, 107, 0.30);
+  border-top: none;
+  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+  overflow: hidden;
+  animation: guide-slide-in 300ms ease;
+}
+
+@keyframes guide-slide-in {
+  from { opacity: 0; max-height: 0; }
+  to   { opacity: 1; max-height: 5000px; }
+}
+
+/* Category */
+.lc-page .guide-category {
+  border-bottom: 1px solid var(--border);
+}
+
+.lc-page .guide-category:last-child {
+  border-bottom: none;
+}
+
+.lc-page .guide-cat-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 24px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-body);
+  transition: background 150ms ease;
+}
+
+.lc-page .guide-cat-header:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.lc-page .guide-cat-header.is-open {
+  background: rgba(255, 45, 107, 0.04);
+}
+
+.lc-page .guide-cat-label {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  flex: 1;
+  text-align: left;
+}
+
+.lc-page .guide-cat-count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--crimson);
+  padding: 2px 8px;
+  background: rgba(255, 45, 107, 0.08);
+  border-radius: 100px;
+}
+
+/* Category body */
+.lc-page .guide-cat-body {
+  padding: 0 12px 12px;
+  animation: guide-slide-in 200ms ease;
+}
+
+/* Section entry */
+.lc-page .guide-entry {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  margin-bottom: 6px;
+  overflow: hidden;
+  transition: border-color 200ms ease;
+}
+
+.lc-page .guide-entry:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.lc-page .guide-entry-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-body);
+  transition: background 150ms ease;
+}
+
+.lc-page .guide-entry-header:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.lc-page .guide-entry-header.is-open {
+  background: rgba(255, 45, 107, 0.04);
+  border-bottom: 1px solid var(--border);
+}
+
+.lc-page .guide-entry-icon {
+  font-size: 18px;
+  width: 28px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.lc-page .guide-entry-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+  text-align: left;
+}
+
+.lc-page .guide-badge {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 2px 8px;
+  border-radius: 100px;
+}
+
+.lc-page .guide-badge--new {
+  background: rgba(0, 245, 212, 0.12);
+  color: var(--mint);
+  border: 1px solid rgba(0, 245, 212, 0.25);
+}
+
+.lc-page .guide-badge--updated {
+  background: rgba(255, 184, 0, 0.12);
+  color: var(--amber);
+  border: 1px solid rgba(255, 184, 0, 0.25);
+}
+
+/* Entry body */
+.lc-page .guide-entry-body {
+  padding: 16px 20px;
+  animation: guide-slide-in 200ms ease;
+}
+
+.lc-page .guide-entry-summary {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  margin-bottom: 20px;
+  padding-left: 38px;
+}
+
+.lc-page .guide-steps-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--crimson);
+  margin-bottom: 10px;
+  padding-left: 38px;
+}
+
+.lc-page .guide-step-list {
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-left: 38px;
+}
+
+.lc-page .guide-step-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.lc-page .guide-step-num {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(255, 45, 107, 0.10);
+  border: 1px solid rgba(255, 45, 107, 0.20);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--crimson);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.lc-page .guide-step-list--sm { padding-left: 0; }
+
+.lc-page .guide-step-item--sm { font-size: 12px; }
+
+.lc-page .guide-step-num--sm {
+  width: 18px;
+  height: 18px;
+  font-size: 9px;
+}
+
+/* Subsection <details> */
+.lc-page .guide-sub-detail {
+  margin-left: 38px;
+  margin-bottom: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  transition: border-color 150ms ease;
+}
+
+.lc-page .guide-sub-detail:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.lc-page .guide-sub-detail[open] {
+  border-color: rgba(255, 45, 107, 0.20);
+}
+
+.lc-page .guide-sub-detail--uc {
+  border-color: rgba(139, 92, 246, 0.15);
+}
+
+.lc-page .guide-sub-detail--uc[open] {
+  border-color: rgba(139, 92, 246, 0.30);
+}
+
+.lc-page .guide-sub-summary {
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 150ms ease;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lc-page .guide-sub-summary::-webkit-details-marker { display: none; }
+
+.lc-page .guide-sub-summary::before {
+  content: '\\25B8';
+  color: var(--crimson);
+  font-size: 11px;
+  transition: transform 200ms ease;
+}
+
+.lc-page .guide-sub-detail[open] > .guide-sub-summary::before {
+  transform: rotate(90deg);
+}
+
+.lc-page .guide-sub-summary:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.lc-page .guide-sub-body {
+  padding: 12px 14px 14px;
+  border-top: 1px solid var(--border);
+}
+
+.lc-page .guide-sub-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 10px;
+}
+
+.lc-page .guide-note {
+  font-size: 12px;
+  color: var(--amber);
+  padding: 8px 12px;
+  background: rgba(255, 184, 0, 0.06);
+  border: 1px solid rgba(255, 184, 0, 0.15);
+  border-radius: var(--radius-sm);
+  margin-top: 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  line-height: 1.5;
+}
+
+/* Tips */
+.lc-page .guide-tips {
+  padding-left: 38px;
+  margin-bottom: 16px;
+}
+
+.lc-page .guide-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  padding: 4px 0;
+}
+
+.lc-page .guide-tip-arrow {
+  color: var(--mint);
+  font-family: var(--font-mono);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* Subsections container */
+.lc-page .guide-subsections {
+  margin-bottom: 16px;
+}
+
+.lc-page .guide-subsections .guide-steps-label {
+  margin-bottom: 8px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .lc-page .guide-toggle-meta { display: none; }
+  .lc-page .guide-entry-body { padding: 12px; }
+  .lc-page .guide-entry-summary,
+  .lc-page .guide-steps-label,
+  .lc-page .guide-step-list,
+  .lc-page .guide-tips { padding-left: 0; }
+  .lc-page .guide-sub-detail { margin-left: 0; }
+}
+
+
+.lc-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
