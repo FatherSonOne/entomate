@@ -22,6 +22,9 @@ const { supabaseAdmin } = require('../config/supabase');
 const log = require('../utils/log');
 const orchestrator = require('./botOrchestrator');
 
+/** Lazy: transcriptIngest pulls in the meetings route. */
+const transcriptIngest = () => require('./transcriptIngest');
+
 const ALLOWED_RETENTION_DAYS = [30, 90, 365];
 const DEFAULT_RETENTION_DAYS = 90;
 // Cap how many rows a single sweep will touch. A misconfigured retention
@@ -112,6 +115,8 @@ async function sweepWorkspace(workspaceId, retentionDays) {
   for (const row of rows || []) {
     try {
       const result = await deleteRecallMedia(row.recall_bot_id);
+      // The transcript was also copied into the meeting on ingestion; it expires too.
+      await transcriptIngest().purgeSessionTranscript(row.id);
       const { error: updErr } = await db()
         .from('bot_sessions')
         .update({

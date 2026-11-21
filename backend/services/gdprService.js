@@ -189,6 +189,7 @@ async function fulfillDeletionRequest(requestId, fulfilledByUserId) {
       if (!s.recording_url && !s.transcript_url) continue;
       try {
         const result = await deleteRecallMedia(s.recall_bot_id);
+        await require('./transcriptIngest').purgeSessionTranscript(s.id);
         await db()
           .from('bot_sessions')
           .update({

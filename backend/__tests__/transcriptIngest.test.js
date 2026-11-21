@@ -67,8 +67,14 @@ function mockMakeQuery(table) {
     eq(col, val) { filters.push((r) => r[col] === val); return q; },
     in(col, vals) { filters.push((r) => vals.includes(r[col])); return q; },
     is(col, val) { filters.push((r) => (r[col] ?? null) === val); return q; },
+    like(col, pattern) {
+      const re = new RegExp(`^${pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/%/g, '.*').replace(/_/g, '.')}$`);
+      filters.push((r) => re.test(String(r[col] ?? '')));
+      return q;
+    },
     or() { return q; },
     gte() { return q; },
+    lt(col, val) { filters.push((r) => r[col] < val); return q; },
     lte() { return q; },
     order() { return q; },
     limit() { return q; },
@@ -173,6 +179,8 @@ beforeEach(() => {
   ];
   mockDb.org_members = [{ org_id: ORG_A, user_id: MEMBER }, { org_id: ORG_B, user_id: OUTSIDER }];
   mockDb.action_items = [];
+  mockDb.bot_session_attendees = [];
+  mockDb.embeddings = [];
 });
 
 describe('parseRecallTranscript', () => {
@@ -284,6 +292,83 @@ describe('ingestBotTranscript', () => {
     await expect(ingest.ingestBotTranscript(SESSION, { transcriptUrl: 'http://recall.example/t.json' }))
       .rejects.toThrow('https');
     expect(global.fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('privacy', () => {
+  test("an opted-out attendee's words never reach the AI, the transcript or the attendee list", async () => {
+    mockDb.bot_session_attendees = [
+      { session_id: SESSION, email: 'ann@example.com', opted_out_at: '2026-11-21T14:00:00Z' },
+      { session_id: SESSION, email: 'bo@example.com', opted_out_at: null },
+    ];
+    mockFetchJson(RECALL_TRANSCRIPT); // Ann (Ann@Example.com) speaks twice
+    await ingest.ingestBotTranscript(SESSION, { transcriptUrl: 'https://recall.example/t.json' });
+
+    const meeting = mockDb.meetings.find((m) => m.id === BOT_MEETING);
+    expect(meeting.transcript).not.toMatch(/Hello team|ship/);
+    expect(meeting.transcript).toContain(ingest._internal.REMOVED_TEXT);
+    expect(meeting.attendees.map((a) => a.name)).toEqual(['Speaker 200']);
+    const aiInput = ai.generateSummary.mock.calls[0][0];
+    expect(aiInput).not.toMatch(/Hello team|ship/);
+  });
+
+  test('back-to-back removed lines collapse into one placeholder', () => {
+    const raw = [
+      { participant: { id: 1, email: 'x@e.com' }, words: [{ text: 'a', start_timestamp: { relative: 1 } }] },
+      { participant: { id: 1, email: 'x@e.com' }, words: [{ text: 'b', start_timestamp: { relative: 2 } }] },
+      { participant: { id: 2, email: 'y@e.com', name: 'Y' }, words: [{ text: 'c', start_timestamp: { relative: 3 } }] },
+    ];
+    const out = ingest._internal.redactOptedOut(raw, new Set(['x@e.com']));
+    expect(out.removed).toBe(2);
+    expect(ingest.parseRecallTranscript(out.entries).map((s) => s.text)).toEqual([ingest._internal.REMOVED_TEXT, 'c']);
+  });
+
+  test('without participant emails nothing can be matched, and that is reported', () => {
+    const out = ingest._internal.redactOptedOut([{ participant: { id: 1, name: 'Ann' }, words: [] }], new Set(['ann@example.com']));
+    expect(out).toMatchObject({ removed: 0, unmatched: true });
+  });
+
+  test('retention purge removes the transcript, timed lines, timecodes and search chunks, and keeps the meeting', async () => {
+    mockFetchJson(RECALL_TRANSCRIPT);
+    await ingest.ingestBotTranscript(SESSION, { transcriptUrl: 'https://recall.example/t.json' });
+    mockDb.embeddings = [
+      { source_id: BOT_MEETING, source_type: 'meeting', content_type: 'transcript_chunk_0' },
+      { source_id: BOT_MEETING, source_type: 'meeting', content_type: 'summary' },
+      { source_id: MEETING_A, source_type: 'meeting', content_type: 'transcript_chunk_0' },
+    ];
+    mockDb.action_items.forEach((i) => { i.transcript_at_ms = 1000; });
+
+    expect(await ingest.purgeSessionTranscript(SESSION)).toEqual({ purged: true, meetingId: BOT_MEETING });
+    const meeting = mockDb.meetings.find((m) => m.id === BOT_MEETING);
+    expect(meeting.transcript).toBeNull();
+    expect(meeting.transcript_segments).toBeNull();
+    expect(meeting.summary_moments).toBeNull();
+    expect(meeting.summary).toBe('We agreed to ship.');
+    expect(mockDb.action_items.every((i) => i.transcript_at_ms === null)).toBe(true);
+    expect(mockDb.embeddings.map((e) => `${e.source_id}:${e.content_type}`)).toEqual([
+      `${BOT_MEETING}:summary`,
+      `${MEETING_A}:transcript_chunk_0`,
+    ]);
+  });
+
+  test('the daily retention sweep reaches the meeting transcript too', async () => {
+    process.env.RECALL_API_KEY = process.env.RECALL_API_KEY || 'test-key';
+    mockFetchJson(RECALL_TRANSCRIPT);
+    await ingest.ingestBotTranscript(SESSION, { transcriptUrl: 'https://recall.example/t.json' });
+    Object.assign(mockDb.bot_sessions[0], { created_at: '2020-01-01T00:00:00Z', transcript_url: 'https://x', retention_deleted_at: null });
+    global.fetch = jest.fn(async () => ({ ok: true, status: 204, headers: { get: () => null }, text: async () => '' }));
+
+    const { sweepWorkspace } = require('../services/retentionService');
+    const out = await sweepWorkspace(ORG_A, 30);
+    expect(out).toMatchObject({ deleted: 1, failed: 0 });
+    expect(mockDb.meetings.find((m) => m.id === BOT_MEETING).transcript).toBeNull();
+    expect(mockDb.bot_sessions[0].transcript_url).toBeNull();
+  });
+
+  test('purge never touches a meeting in another org', async () => {
+    mockDb.bot_sessions[0].meeting_id = MEETING_B;
+    expect(await ingest.purgeSessionTranscript(SESSION)).toEqual({ purged: false });
+    expect(mockDb.meetings.find((m) => m.id === MEETING_B).transcript).toBe('secret');
   });
 });
 

@@ -99,7 +99,7 @@ function attendeesFromTranscript(raw) {
   const seen = new Map();
   for (const entry of raw) {
     const p = entry?.participant;
-    if (!p) continue;
+    if (!p || entry.__removed) continue;
     const key = p.id ?? p.name;
     if (key === undefined || key === null || seen.has(key)) continue;
     const name = speakerFor(p);
@@ -123,6 +123,69 @@ function meetingTitle(session) {
     ? ''
     : when.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
   return date ? `${label} meeting, ${date}` : `${label} meeting`;
+}
+
+const REMOVED_SPEAKER = 'Removed';
+const REMOVED_TEXT = "[Removed at this participant's request]";
+
+/**
+ * Opt-outs (bot_session_attendees.opted_out_at) are honoured BEFORE anything else reads
+ * the transcript: an opted-out attendee's words never reach the AI, the saved text, the
+ * search index or the attendee list. Matching is by email (then by that participant's
+ * Recall id), which Recall supplies only when participant identification is on; when it
+ * is off the transcript cannot be matched, and that is logged rather than guessed at by
+ * display name.
+ *
+ * Each run of removed entries becomes one placeholder line, so the transcript stays
+ * honest about a gap instead of silently closing it.
+ *
+ * @returns {{ entries: unknown[], removed: number, unmatched: boolean }}
+ */
+function redactOptedOut(raw, optedOutEmails) {
+  if (!Array.isArray(raw) || optedOutEmails.size === 0) return { entries: raw, removed: 0, unmatched: false };
+  const emailOf = (entry) =>
+    typeof entry?.participant?.email === 'string' ? entry.participant.email.trim().toLowerCase() : '';
+  // A participant identified once by email is removed everywhere, even on entries
+  // where Recall left the email off.
+  const optedOutIds = new Set();
+  for (const entry of raw) {
+    const id = entry?.participant?.id;
+    if (id !== undefined && id !== null && optedOutEmails.has(emailOf(entry))) optedOutIds.add(id);
+  }
+  let removed = 0;
+  let sawEmail = false;
+  const entries = [];
+  for (const entry of raw) {
+    const email = emailOf(entry);
+    if (email) sawEmail = true;
+    if ((email && optedOutEmails.has(email)) || optedOutIds.has(entry?.participant?.id)) {
+      removed += 1;
+      const prev = entries[entries.length - 1];
+      if (prev?.participant?.name === REMOVED_SPEAKER && prev.__removed) continue;
+      const firstWord = Array.isArray(entry.words) ? entry.words[0] : null;
+      entries.push({
+        __removed: true,
+        participant: { id: 'removed', name: REMOVED_SPEAKER },
+        words: [{ text: REMOVED_TEXT, start_timestamp: firstWord?.start_timestamp, end_timestamp: firstWord?.start_timestamp }],
+      });
+      continue;
+    }
+    entries.push(entry);
+  }
+  return { entries, removed, unmatched: !sawEmail };
+}
+
+async function optedOutEmailsFor(sessionId) {
+  const { data, error } = await db()
+    .from('bot_session_attendees')
+    .select('email, opted_out_at')
+    .eq('session_id', sessionId);
+  if (error) throw error;
+  return new Set(
+    (data || [])
+      .filter((r) => r.opted_out_at && typeof r.email === 'string')
+      .map((r) => r.email.trim().toLowerCase())
+  );
 }
 
 /**
@@ -191,7 +254,16 @@ async function ingestBotTranscript(sessionId, { transcriptUrl } = {}) {
     return { status: 'already_ingested', meetingId: existing.id };
   }
 
-  const raw = await downloadTranscript(transcriptUrl);
+  const downloaded = await downloadTranscript(transcriptUrl);
+  const optedOut = await optedOutEmailsFor(sessionId);
+  const { entries: raw, removed, unmatched } = redactOptedOut(downloaded, optedOut);
+  if (optedOut.size > 0 && unmatched) {
+    log.warn('Transcript ingest: attendees opted out but Recall sent no participant emails; nothing could be removed', {
+      sessionId, optedOut: optedOut.size,
+    });
+  } else if (removed > 0) {
+    log.info('Transcript ingest: removed opted-out attendees', { sessionId, entries: removed });
+  }
   const segments = parseRecallTranscript(raw);
   if (segments.length === 0) {
     log.info('Transcript ingest: no speech in transcript', { sessionId });
@@ -276,10 +348,67 @@ async function ingestBotTranscript(sessionId, { transcriptUrl } = {}) {
   return { status: 'ingested', meetingId: saved.id, segments: segments.length };
 }
 
+/**
+ * Retention / deletion: remove the transcript a finished bot session left in its meeting.
+ * The workspace retention setting promises the recording AND transcript are deleted after
+ * N days, and ingestion copied the transcript into `meetings`, so the sweep must reach it:
+ * the flat text, the timed lines, the timecodes derived from them, the transcript
+ * embedding, and the transcript chunks in the search index. The meeting itself (summary,
+ * decisions, action items) stays, as the settings page says.
+ *
+ * Idempotent. Throws on a database error so the caller records it and retries.
+ *
+ * @param {string} sessionId
+ * @returns {Promise<{ purged: boolean, meetingId?: string }>}
+ */
+async function purgeSessionTranscript(sessionId) {
+  const { data: session, error: sessionErr } = await db()
+    .from('bot_sessions')
+    .select('id, org_id, meeting_id')
+    .eq('id', sessionId)
+    .maybeSingle();
+  if (sessionErr) throw sessionErr;
+  if (!session?.meeting_id || !session.org_id) return { purged: false };
+
+  const { data: meeting, error: meetingErr } = await db()
+    .from('meetings')
+    .update({
+      transcript: null,
+      transcript_segments: null,
+      summary_moments: null,
+      transcript_embedding: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', session.meeting_id)
+    .eq('org_id', session.org_id)
+    .select('id')
+    .maybeSingle();
+  if (meetingErr) throw meetingErr;
+  if (!meeting) return { purged: false };
+
+  const { error: itemsErr } = await db()
+    .from('action_items')
+    .update({ transcript_at_ms: null })
+    .eq('meeting_id', meeting.id);
+  if (itemsErr) throw itemsErr;
+
+  const { error: embErr } = await db()
+    .from('embeddings')
+    .delete()
+    .eq('source_id', meeting.id)
+    .eq('source_type', 'meeting')
+    .like('content_type', 'transcript_chunk_%');
+  // 42P01: no embeddings table in this environment, so nothing to delete.
+  if (embErr && embErr.code !== '42P01') throw embErr;
+
+  return { purged: true, meetingId: meeting.id };
+}
+
 module.exports = {
   ingestBotTranscript,
+  purgeSessionTranscript,
   parseRecallTranscript,
   buildTranscriptText,
   attendeesFromTranscript,
-  _internal: { downloadTranscript, meetingTitle, durationMinutes, speakerFor, MAX_TRANSCRIPT_BYTES },
+  _internal: { redactOptedOut, REMOVED_TEXT, downloadTranscript, meetingTitle, durationMinutes, speakerFor, MAX_TRANSCRIPT_BYTES },
 };
