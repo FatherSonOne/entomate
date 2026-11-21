@@ -1472,7 +1472,7 @@ export default function LandingPage() {
             <div className="orbit-ring orbit-ring-1"></div>
             <div className="orbit-ring orbit-ring-2"></div>
 
-            <div className="orbit-center">E</div>
+            <div className="orbit-center"><ApertureMark size={56} /></div>
 
             <div className="integration-chip chip-slack">
               <span className="chip-icon"><IconSlack size={16}/></span> Slack
