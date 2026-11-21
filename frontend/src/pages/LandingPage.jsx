@@ -9,7 +9,7 @@ import { Logo } from '../components/Logo'
 import ModuleJourney from '../components/landing/ModuleJourney'
 import LandingGuide from '../components/landing/LandingGuide'
 import useReducedMotion from '../components/landing/useReducedMotion'
-import { AGENTS, BAND, ECOSYSTEM_LINKS, MEDIA, NAV_LINKS } from '../components/landing/landingData'
+import { AGENTS, BAND, CAPTURE, ECOSYSTEM_LINKS, MEDIA, NAV_LINKS } from '../components/landing/landingData'
 import '../styles/landing-c.css'
 
 // Hero film rotates once per page load (workflow, hands, bridge, signal, factors).
@@ -119,18 +119,18 @@ export default function LandingPage() {
           <div className="lc-sh">
             <span className="lc-n">03</span>
             <h2 id="lc-work-h">Every meeting, minuted.</h2>
-            <p>Every meeting leaves behind a clear record: transcript, decisions, owners and deadlines. Ask it anything later.</p>
+            <p>Every meeting leaves behind a clear record: transcript, decisions, the owners named in the room and deadlines. Ask it anything later.</p>
           </div>
           <div className="lc-minutes">
             <div className="lc-doc">
               <div className="lc-eyebrow">Sample minutes · Q4 roadmap review · 10:00–10:46</div>
               <div className="lc-dh"><span className="lc-n">2</span><h3>Decisions</h3></div>
-              <div className="lc-li"><span className="lc-n">2.1</span><div>Ship transcript ingestion before the notes editor</div><div className="lc-m"><span>Priya S.</span></div></div>
-              <div className="lc-li"><span className="lc-n">2.2</span><div>Move the Pulse handoff to January</div><div className="lc-m"><span>Frankie</span></div></div>
+              <div className="lc-li"><span className="lc-n">2.1</span><div>Ship transcript ingestion before the notes editor</div><div className="lc-m"><span className="lc-mono">at 12:20</span></div></div>
+              <div className="lc-li"><span className="lc-n">2.2</span><div>Move the Pulse handoff to January</div><div className="lc-m"><span className="lc-mono">at 23:40</span></div></div>
               <div className="lc-dh"><span className="lc-n">3</span><h3>Actions</h3></div>
               <div className="lc-li">
                 <span className="lc-n">3.1</span><div>Write the ingestion spec</div>
-                <div className="lc-m"><span>Priya S.</span><span className="lc-mono">Mon 24 Nov</span><span><span className="lc-sq lc-sq--ai" aria-hidden="true" />Owner recommended by the Assignment agent</span></div>
+                <div className="lc-m"><span>Priya S.</span><span className="lc-mono">Mon 24 Nov</span><span><span className="lc-sq lc-sq--ai" aria-hidden="true" />Priority set by the Priority agent</span></div>
               </div>
               <div className="lc-li">
                 <span className="lc-n">3.2</span><div>Draft the January Pulse handoff plan</div>
@@ -158,7 +158,7 @@ export default function LandingPage() {
             <div className="lc-sh">
               <span className="lc-n">04</span>
               <h2 id="lc-agents-h">Four agents recommend the next step.</h2>
-              <p>Every agent recommendation comes with its reasoning and a confidence score, and you can accept or override it.</p>
+              <p>Each recommendation carries a reason and a confidence score. Anything the agents change after a meeting is yours to edit.</p>
             </div>
             <ul className="lc-agents">
               {AGENTS.map((a) => (
@@ -168,14 +168,28 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* 05 Close · portal loop */}
+        {/* 05 Capture · Meet Mate notetaker */}
+        <section className="lc-pad lc-wrap" id="capture" aria-labelledby="lc-capture-h">
+          <div className="lc-sh">
+            <span className="lc-n">05</span>
+            <h2 id="lc-capture-h">A notetaker that asks first.</h2>
+            <p>Send Meet Mate into a video call and the meeting becomes minutes: a transcript, then the summary, decisions and action items. Workspace admins launch it during early access.</p>
+          </div>
+          <ul className="lc-agents lc-agents--live">
+            {CAPTURE.map((c) => (
+              <li key={c.n}><span className="lc-n">{c.n}</span><h3>{c.head}</h3><p>{c.body}</p></li>
+            ))}
+          </ul>
+        </section>
+
+        {/* 06 Close · portal loop */}
         <section className="lc-close lc-media" id="start" aria-labelledby="lc-close-h">
           <video ref={closeVideo} className="lc-bg" autoPlay={!reducedMotion} muted loop playsInline preload="metadata" poster={MEDIA('portal').poster} aria-hidden="true">
             <source src={MEDIA('portal').video} type="video/mp4" />
           </video>
           <div className="lc-scrim" aria-hidden="true" />
           <div className="lc-in">
-            <div className="lc-eyebrow">05 · Start free</div>
+            <div className="lc-eyebrow">06 · Start free</div>
             <h2 id="lc-close-h">Ready to turn meetings <em>into motion?</em></h2>
             <div className="lc-ctas">
               <Link className="lc-btn is-primary" to="/sign-in">Start free <span aria-hidden="true">→</span></Link>
@@ -185,7 +199,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* 06 User guide */}
+        {/* 07 User guide */}
         <LandingGuide />
       </main>
 
@@ -197,7 +211,7 @@ export default function LandingPage() {
           </div>
           <div>
             <h4>Product</h4>
-            <a href="#modules">Modules</a><a href="#agents">Agents</a><a href="#work">Minutes</a><a href="#guide">User guide</a>
+            <a href="#modules">Modules</a><a href="#agents">Agents</a><a href="#work">Minutes</a><a href="#capture">Notetaker</a><a href="#guide">User guide</a>
           </div>
           <div>
             <h4>Ecosystem</h4>

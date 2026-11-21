@@ -4,7 +4,7 @@ import { guideSections, CATEGORIES, guideVersion, guideUpdated } from '../UsersG
 import AnimatedIcon from '../icons/AnimatedIcons'
 
 /**
- * Public User Guide section of the landing page (section 06).
+ * Public User Guide section of the landing page (section 07).
  * Moved out of the old LandingPage.jsx unchanged in behaviour: a master toggle,
  * collapsible categories and entries, steps, sub-features, tips and use cases,
  * all driven by UsersGuide/guideData.
@@ -35,7 +35,7 @@ export default function LandingGuide() {
   return (
     <section className="lc-pad lc-wrap lc-guide" id="guide" aria-labelledby="lc-guide-h">
       <div className="lc-sh">
-        <span className="lc-n">06</span>
+        <span className="lc-n">07</span>
         <h2 id="lc-guide-h">The user guide, in the open.</h2>
         <p>{guideSections.length} sections covering every feature in Entomate. Browse it here, or sign in for the full interactive guide.</p>
       </div>

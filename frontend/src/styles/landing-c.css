@@ -197,6 +197,7 @@
 .lc-agents li + li { padding-left: 22px; }
 .lc-agents li:last-child { border-right: 0; }
 .lc-agents .lc-n { font-family: var(--font-mono); font-size: 11px; color: var(--ai); }
+.lc-agents--live .lc-n { color: var(--live); } /* capture rows: live signal, not AI */
 .lc-agents h3 { font-size: 22px; letter-spacing: -.015em; margin: 26px 0 8px; }
 .lc-agents p { color: var(--ink2); font-size: 14px; }
 

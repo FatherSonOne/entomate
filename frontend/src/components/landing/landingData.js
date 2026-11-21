@@ -17,7 +17,8 @@ export const NAV_LINKS = [
   { href: '#modules', n: '02', label: 'Modules' },
   { href: '#work', n: '03', label: 'Shows its work' },
   { href: '#agents', n: '04', label: 'Agents' },
-  { href: '#guide', n: '06', label: 'Guide' },
+  { href: '#capture', n: '05', label: 'Notetaker' },
+  { href: '#guide', n: '07', label: 'Guide' },
 ]
 
 export const BAND = [
@@ -39,8 +40,10 @@ export const MODULES = [
       ['Sentiment for each meeting', 'ship'],
       ['Ask questions of any meeting', 'ship'],
       ['Full-text and semantic search', 'ship'],
+      ['Meet Mate notetaker for your video calls', 'ship'],
+      ['Decisions and action items linked to the moment in the transcript', 'ship'],
     ],
-    src: 'routes/meetings.js · routes/search.js',
+    src: 'routes/meetings.js · routes/search.js · services/transcriptIngest.js',
   },
   {
     name: 'Assistant', sig: 'ai', kicker: 'AI · Ento Assistant', media: 'intelligence',
@@ -57,11 +60,11 @@ export const MODULES = [
   {
     name: 'Agents', sig: 'ai', kicker: 'AI · Action items', media: 'glyphs',
     head: 'From talk to owned tasks',
-    tag: 'After every processed meeting, the agents prioritize and schedule each action item, and recommend who should own it.',
+    tag: 'After every processed meeting, the agents set the priority and fill in a due date for each action item.',
     features: [
       ['4 specialized agents with explanations', 'ship'],
       ['Due dates and priority set after every meeting', 'ship'],
-      ['AI-recommended owner', 'ship'],
+      ['Owner recommended automatically', 'plan'],
       ['Promised follow-ups detected', 'ship'],
       ['Send action items to your CRM in one click', 'ship'],
     ],
@@ -84,7 +87,7 @@ export const MODULES = [
   {
     name: 'Explainable', sig: 'ai', kicker: 'AI · Shows its work', media: 'factors',
     head: 'Every decision explained',
-    tag: 'Every agent decision includes an explanation and a confidence score.',
+    tag: 'Agents attach a reason and a confidence score to every recommendation.',
     features: [
       ['Factor analysis with confidence', 'ship'],
       ['Learns your preferences from every override', 'ship'],
@@ -115,10 +118,18 @@ export const STATUS = {
 }
 
 export const AGENTS = [
-  { n: '4.1 · Assignment', head: 'Finds the owner', body: 'Recommends an owner by skills and current workload.' },
+  { n: '4.1 · Assignment', head: 'Finds the owner', body: 'Recommends an owner by skills and current workload when you run it.' },
   { n: '4.2 · Priority', head: 'Ranks the work', body: 'Weighs meeting sentiment, urgency language and due dates.' },
   { n: '4.3 · Deadline', head: 'Sets a date', body: 'Suggests realistic due dates from task complexity and priority.' },
   { n: '4.4 · Follow-up', head: 'Catches promises', body: 'Detects promised follow-ups in the conversation.' },
+]
+
+/** Section 05: the Meet Mate notetaker. Each line is checked against botOrchestrator.js, consent.js, transcriptIngest.js, transcriptMoments.js and dataDeletion.js. */
+export const CAPTURE = [
+  { n: '5.1 · Visible', head: 'Joins by name', body: 'Meet Mate joins as a named participant and announces itself in the meeting chat.' },
+  { n: '5.2 · Asks first', head: 'One-click opt-out', body: 'Attendees get an email before the meeting and can opt out in one click. The organizer is told.' },
+  { n: '5.3 · Linked', head: 'Back to the moment', body: 'The transcript keeps speaker names, and every decision and action item links to the moment it was said.' },
+  { n: '5.4 · Yours', head: 'Ask to delete', body: 'Anyone can request that their data be deleted.' },
 ]
 
 export const ECOSYSTEM_LINKS = [
