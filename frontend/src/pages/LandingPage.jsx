@@ -3,12 +3,18 @@ import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import BackToTop from '../components/BackToTop'
+import BrandMotion from '../components/BrandMotion'
+import { nextHeroClip } from '../components/heroRotation'
 import { Logo } from '../components/Logo'
 import ModuleJourney from '../components/landing/ModuleJourney'
 import LandingGuide from '../components/landing/LandingGuide'
 import useReducedMotion from '../components/landing/useReducedMotion'
 import { AGENTS, BAND, ECOSYSTEM_LINKS, MEDIA, NAV_LINKS } from '../components/landing/landingData'
 import '../styles/landing-c.css'
+
+// Hero film rotates once per page load (workflow, hands, bridge, signal, factors).
+// Module scope so it is picked once, including under React Strict Mode.
+const heroClip = nextHeroClip()
 
 /**
  * Public landing page, direction C "Minutes" (2026-11-21).
@@ -21,7 +27,6 @@ export default function LandingPage() {
   const { isLight, toggleMode } = useTheme()
   const reducedMotion = useReducedMotion()
   const [navSolid, setNavSolid] = useState(false)
-  const heroVideo = useRef(null)
   const closeVideo = useRef(null)
 
   // Nav turns solid after the hero, except while the pinned journey fills the screen.
@@ -43,13 +48,12 @@ export default function LandingPage() {
     }
   }, [])
 
-  // Background loops autoplay unless the user asked for reduced motion.
+  // The closing loop autoplays unless the user asked for reduced motion.
   useEffect(() => {
-    ;[heroVideo.current, closeVideo.current].forEach((video) => {
-      if (!video) return
-      if (reducedMotion) video.pause()
-      else video.play().catch(() => {})
-    })
+    const video = closeVideo.current
+    if (!video) return
+    if (reducedMotion) video.pause()
+    else video.play().catch(() => {})
   }, [reducedMotion])
 
   if (!isLoading && isSignedIn) {
@@ -79,9 +83,7 @@ export default function LandingPage() {
       <main id="lc-main">
         {/* 01 Hero · hands loop */}
         <section className="lc-hero lc-media lc-wrap" aria-labelledby="lc-h1">
-          <video ref={heroVideo} className="lc-bg" autoPlay={!reducedMotion} muted loop playsInline poster={MEDIA('hands').poster} aria-hidden="true">
-            <source src={MEDIA('hands').video} type="video/mp4" />
-          </video>
+          <BrandMotion clip={heroClip} className="lc-hero-film" />
           <div className="lc-scrim" aria-hidden="true" />
           <div className="lc-in">
             <div className="lc-rule lc-eyebrow"><span>01 · The Hands of the Trifecto</span><span>Meeting intelligence that executes</span></div>

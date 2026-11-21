@@ -94,13 +94,21 @@
     linear-gradient(0deg, rgba(8,8,8,.85) 0%, rgba(8,8,8,0) 38%);
 }
 .lc-hero .lc-in { position: relative; z-index: 2; }
+.lc-hero-film { position: absolute; inset: 0; }
+.lc-hero .lc-scrim { z-index: 1; }
+.lc-page .lc-hero-film .brand-motion-control {
+  right: clamp(20px, 5vw, 72px); bottom: 24px; z-index: 3; border-radius: 2px; border-color: rgba(248,240,242,.28);
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: .06em; min-height: 36px;
+}
+.lc-page .lc-hero-film .brand-motion-control:hover { border-color: var(--accent); }
+.lc-page .lc-hero-film .brand-motion-control:focus-visible { outline-color: var(--accent); }
 .lc-hero .lc-rule { display: flex; gap: 24px; border-bottom: 2px solid var(--ink); padding-bottom: 12px; margin-bottom: 28px; max-width: 760px; }
 .lc-hero h1 { font-family: var(--font-display); font-weight: 800; font-size: clamp(46px, 6.6vw, 104px); line-height: .9; letter-spacing: -.035em; max-width: 12ch; }
 .lc-hero h1 em, .lc-close h2 em { font-style: normal; color: var(--accent); }
 .lc-hero .lc-lede { max-width: 52ch; font-size: clamp(16px, 1.5vw, 19px); color: var(--ink2); margin-top: 28px; }
 .lc-ctas { display: flex; gap: 12px; margin-top: 30px; flex-wrap: wrap; }
 .lc-hero .lc-status { margin-top: 22px; font-size: 12px; color: var(--muted); display: flex; gap: 18px; flex-wrap: wrap; }
-.lc-hero .lc-cue { position: absolute; right: clamp(20px, 5vw, 72px); bottom: 56px; z-index: 2; text-align: right; color: var(--muted); font-size: 11px; }
+.lc-hero .lc-cue { position: absolute; right: clamp(20px, 5vw, 72px); bottom: 84px; z-index: 2; text-align: right; color: var(--muted); font-size: 11px; }
 .lc-hero .lc-cue b { display: block; font-family: var(--font-mono); color: var(--ink); font-weight: 500; }
 
 /* ── Band ── */
@@ -221,7 +229,8 @@
   .lc-nav-links, .lc-nav-r .lc-signin { display: none; }
   .lc-hero { padding-bottom: 36px; padding-top: 96px; }
   .lc-hero .lc-scrim { background: linear-gradient(0deg, rgba(8,8,8,.96) 0%, rgba(8,8,8,.75) 45%, rgba(8,8,8,.2) 80%); }
-  .lc-hero .lc-bg { object-position: 72% center; }
+  .lc-hero-film .brand-motion-poster, .lc-hero-film .brand-motion-video { object-position: 72% center; }
+  .lc-page .lc-hero-film .brand-motion-control { top: 68px; bottom: auto; }
   .lc-hero .lc-rule { flex-direction: column; gap: 4px; }
   .lc-hero .lc-cue { display: none; }
   .lc-hero .lc-ctas .lc-btn { flex: 1; justify-content: center; }
