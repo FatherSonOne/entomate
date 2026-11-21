@@ -5,7 +5,9 @@
       "Bash(git push origin HEAD:main)",
       "Bash(git push -u origin main)",
       "Bash(gh pr merge:*)",
-      "mcp__github__merge_pull_request"
+      "mcp__github__merge_pull_request",
+      "mcp__Supabase__apply_migration",
+      "mcp__Supabase__execute_sql"
     ]
   },
   "hooks": {
