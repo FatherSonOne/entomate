@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
   ArrowLeft, Clock, Users, FileText, CheckSquare, MessageSquare,
@@ -11,6 +11,8 @@ import { VCButton, VCBadge, VCTimeline } from '../components/vc'
 import { useToast } from '../components/vc/ToastProvider'
 import EcosystemSyncStatus from '../components/EcosystemSyncStatus'
 import MeetingNotesPanel from '../components/meetings/MeetingNotesPanel'
+import TranscriptPanel from '../components/meetings/TranscriptPanel'
+import { toSegments } from '../services/meetingTranscriptService'
 import MeetingIntelligencePanel from '../components/intelligence/MeetingIntelligencePanel'
 import { getSentimentIcon } from '../utils/meetingHelpers'
 
@@ -18,6 +20,8 @@ export default function MeetingDetail() {
   const { id } = useParams()
   const toast = useToast()
   const [meeting, setMeeting] = useState(null)
+  // Timed transcript lines; null for pasted or uploaded meetings, which keep the plain view.
+  const transcriptSegments = useMemo(() => toSegments(meeting?.transcript_segments), [meeting?.transcript_segments])
   const [loading, setLoading] = useState(true)
   const [question, setQuestion] = useState('')
   const [askingQuestion, setAskingQuestion] = useState(false)
@@ -461,17 +465,28 @@ export default function MeetingDetail() {
               <FileText className="w-5 h-5" />
               Full Transcript
             </h2>
-            <div
-              className="rounded-lg p-4 max-h-96 overflow-y-auto scrollbar-thin"
-              style={{ background: 'var(--bg-elevated)' }}
-            >
-              <pre
-                className="whitespace-pre-wrap text-sm"
-                style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}
+            {transcriptSegments ? (
+              // Timed lines (Recall bot meetings): search and speaker rename.
+              <TranscriptPanel
+                meetingId={meeting.id}
+                segments={transcriptSegments}
+                onRenamed={({ segments, transcript }) =>
+                  setMeeting(prev => ({ ...prev, transcript_segments: segments, transcript }))
+                }
+              />
+            ) : (
+              <div
+                className="rounded-lg p-4 max-h-96 overflow-y-auto scrollbar-thin"
+                style={{ background: 'var(--bg-elevated)' }}
               >
-                {meeting.transcript || 'No transcript available'}
-              </pre>
-            </div>
+                <pre
+                  className="whitespace-pre-wrap text-sm"
+                  style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}
+                >
+                  {meeting.transcript || 'No transcript available'}
+                </pre>
+              </div>
+            )}
           </div>
         </div>
 

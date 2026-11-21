@@ -112,6 +112,22 @@ router.get('/:sessionId/state', authenticate, authorizeOrgRole(ADMIN_ROLES, orgF
 });
 
 /**
+ * POST /api/admin/bots/:sessionId/ingest — turn a finished session's transcript into a
+ * meeting. Normally bot.done does this on its own; this is the retry for a missed or
+ * failed ingest. Idempotent: a session already ingested answers `already_ingested`.
+ */
+router.post('/:sessionId/ingest', authenticate, authorizeOrgRole(ADMIN_ROLES, orgFromSession), async (req, res) => {
+  try {
+    const result = await orchestrator.ingestSessionTranscript(req.params.sessionId);
+    const status = result.status === 'not_found' ? 404 : 200;
+    res.status(status).json(result);
+  } catch (err) {
+    log.error('Bot transcript ingest failed', { sessionId: req.params.sessionId, error: err.message });
+    res.status(502).json({ error: 'Transcript ingest failed', message: err.message });
+  }
+});
+
+/**
  * POST /api/admin/bots/recall-webhook
  *
  * Recall posts status events here. The endpoint is workspace-wide — Recall
