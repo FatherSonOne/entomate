@@ -14,7 +14,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { botsApi } from '../../services/api'
-import { Key, Signal, TitleRule } from '../bench'
+import { Breadcrumbs, Key, Signal, TitleRule } from '../bench'
 import { BotPipelineDisplay } from './BotDisplays'
 import TimecodeButton from '../meetings/TimecodeButton'
 import BotLive from './BotLive'
@@ -160,13 +160,12 @@ export function BotMeetingPending({ meetingId, onReady, notFound }) {
   const sig = phaseSignal(view.phase)
   const meta = (
     <>
-      <Link to="/meetings" className="bs-crumb-link"><b>Meetings</b></Link>
-      {' / '}<Signal tone={sig.tone}>{sig.word}</Signal>
+      <Signal tone={sig.tone}>{sig.word}</Signal>
     </>
   )
   return (
     <div className="bs-mtg bs-mtg-detail">
-      <TitleRule title={runTitle(view)} meta={meta} />
+      <TitleRule title={runTitle(view)} crumbs={<Breadcrumbs current={runTitle(view)} />} meta={meta} />
       <div className="bs-cell">
         {isActive(view.phase) || view.phase === 'scheduled'
           ? <BotLive view={view} canControl={canControl} onStop={stop} stopping={stopping} />

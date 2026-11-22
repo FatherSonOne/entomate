@@ -6,6 +6,7 @@ import { Key } from '../Key'
 import { Led } from '../Signal'
 import { cx } from '../cx'
 import { logoAsset, useLogoSystem } from '../../../services/logoSystem'
+import { RippleCircles } from '../../ui/ripple-circles'
 
 /* ============================================================
    Bench Swiss shell: patch-panel rail (desktop), slim toolbar on
@@ -298,8 +299,11 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
         <nav className="bs-patch" aria-label="Modules">
           <PatchPanel groups={groups} isActive={isActive} />
         </nav>
-        <button type="button" className="bs-recbox" onClick={onRecord}>
-          <span className="bs-rec" aria-hidden="true" />
+        <button type="button" className="bs-recbox group" onClick={onRecord}>
+          <span className="relative isolate inline-flex" aria-hidden="true">
+            <RippleCircles className="-inset-[9px] -z-10 opacity-0 transition-opacity duration-300 [&_*]:[animation-play-state:paused] group-hover:opacity-100 group-hover:[&_*]:[animation-play-state:running] group-focus-visible:opacity-100 group-focus-visible:[&_*]:[animation-play-state:running]" />
+            <span className="bs-rec" />
+          </span>
           <span>
             <b>Record</b>
             <span className="bs-lbl">{modKey}M to start</span>

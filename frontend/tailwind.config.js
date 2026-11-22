@@ -142,8 +142,17 @@ export default {
         'icon-rotate': 'iconRotate 200ms cubic-bezier(0.4, 0, 0.2, 1)',
         'icon-bounce': 'iconBounce 400ms ease-in-out',
         'bar-grow': 'barGrow 600ms cubic-bezier(0.16, 1, 0.3, 1)',
+        // RippleCircles (components/ui/ripple-circles.tsx)
+        'ripple': 'ripple 2s ease-in-out infinite',
       },
       keyframes: {
+        // Rings breathe out and back. Scale is capped at 1.15 (the stock
+        // 1.3 overruns the sidebar Record module); no drop shadow, it
+        // vanishes on the dark display anyway.
+        ripple: {
+          '0%, 100%': { transform: 'scale(1)' },
+          '50%': { transform: 'scale(1.15)' },
+        },
         glow: {
           '0%': { boxShadow: '0 0 5px var(--highlight-color), 0 0 10px var(--highlight-color)' },
           '100%': { boxShadow: '0 0 10px var(--highlight-color), 0 0 20px var(--highlight-color), 0 0 30px var(--highlight-color)' },

@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { dashboardApi, meetingsApi, projectsApi, tasksApi } from '../services/api'
 import {
   Cell, DateStamp, Display, Drawer, GroupHead, Grid, Key, Readout, Section, Signal, Switch, Tabs, TextArea, TextInput,
-  TitleRule, PHONE_QUERY, useMediaQuery,
+  TitleRule, Breadcrumbs, PHONE_QUERY, useMediaQuery,
 } from '../components/bench'
 import { useConfirm } from '../components/vc/ConfirmDialog'
 import { useToast } from '../components/vc/ToastProvider'
@@ -302,7 +302,7 @@ export default function ProjectDetail(): React.ReactElement {
 
   const meta = (
     <span>
-      <Link to="/projects" className="bs-proj-crumb">Projects</Link> / {STATUS_WORD[status]} · {project.end_date ? `ends ${dayShort(project.end_date)}` : 'no end date'}
+      {STATUS_WORD[status]} · {project.end_date ? `ends ${dayShort(project.end_date)}` : 'no end date'}
       {project.deal_value != null && <> · ${Number(project.deal_value).toLocaleString()}</>}
       {tags.length > 0 && <> · {tags.join(', ')}</>}
     </span>
@@ -408,7 +408,7 @@ export default function ProjectDetail(): React.ReactElement {
 
   return (
     <div className="bs-proj">
-      <TitleRule title={projectName(project)} meta={meta} actions={actions} />
+      <TitleRule title={projectName(project)} crumbs={<Breadcrumbs current={projectName(project)} />} meta={meta} actions={actions} />
 
       <Grid>
         <Cell span={8}>
