@@ -38,6 +38,9 @@
 }
 .lc-page *, .lc-page *::before, .lc-page *::after { box-sizing: border-box; }
 .lc-page h1, .lc-page h2, .lc-page h3, .lc-page h4, .lc-page p, .lc-page ul, .lc-page ol { margin: 0; padding: 0; }
+/* main.css colours every h1–h6 with the app theme's ink (near-black in light mode).
+   Landing headings follow the section's own --ink instead, so media zones stay light. */
+.lc-page h1, .lc-page h2, .lc-page h3, .lc-page h4 { color: inherit; }
 .lc-page a { color: inherit; text-decoration: none; }
 .lc-page button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
 .lc-page a:focus-visible, .lc-page button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
@@ -84,14 +87,16 @@
 .lc-nav-r .lc-btn { height: 36px; font-size: 13px; }
 .lc-page .lc-theme { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .14em; color: var(--muted); min-height: 36px; padding: 0 4px; }
 .lc-page .lc-theme:hover { color: var(--ink); }
+.lc-nav:not(.is-solid) .lc-theme { color: var(--ink2); }
 
 /* ── 01 Hero ── */
 .lc-hero { min-height: 100vh; display: flex; flex-direction: column; justify-content: flex-end; padding-top: 120px; padding-bottom: 56px; }
 .lc-hero .lc-scrim {
   position: absolute; inset: 0;
   background:
-    linear-gradient(100deg, rgba(8,8,8,.94) 0%, rgba(8,8,8,.72) 34%, rgba(8,8,8,.08) 66%),
-    linear-gradient(0deg, rgba(8,8,8,.85) 0%, rgba(8,8,8,0) 38%);
+    linear-gradient(180deg, rgba(8,8,8,.88) 0, rgba(8,8,8,.6) 64px, rgba(8,8,8,0) 150px),
+    linear-gradient(100deg, rgba(8,8,8,.94) 0%, rgba(8,8,8,.86) 45%, rgba(8,8,8,.72) 70%, rgba(8,8,8,.3) 86%, rgba(8,8,8,.1) 96%),
+    linear-gradient(0deg, rgba(8,8,8,.88) 0%, rgba(8,8,8,0) 42%);
 }
 .lc-hero .lc-in { position: relative; z-index: 2; }
 .lc-hero-film { position: absolute; inset: 0; }
@@ -102,6 +107,7 @@
 }
 .lc-page .lc-hero-film .brand-motion-control:hover { border-color: var(--accent); }
 .lc-page .lc-hero-film .brand-motion-control:focus-visible { outline-color: var(--accent); }
+.lc-hero .lc-eyebrow { color: var(--ink2); }
 .lc-hero .lc-rule { display: flex; gap: 24px; border-bottom: 2px solid var(--ink); padding-bottom: 12px; margin-bottom: 28px; max-width: 760px; }
 .lc-hero h1 { font-family: var(--font-display); font-weight: 800; font-size: clamp(46px, 6.6vw, 104px); line-height: .9; letter-spacing: -.035em; max-width: 12ch; }
 .lc-hero h1 em, .lc-close h2 em { font-style: normal; color: var(--accent); }
@@ -229,9 +235,19 @@
   .lc-nav { height: 56px; gap: 12px; }
   .lc-nav-links, .lc-nav-r .lc-signin { display: none; }
   .lc-hero { padding-bottom: 36px; padding-top: 96px; }
-  .lc-hero .lc-scrim { background: linear-gradient(0deg, rgba(8,8,8,.96) 0%, rgba(8,8,8,.75) 45%, rgba(8,8,8,.2) 80%); }
+  .lc-hero .lc-scrim {
+    background:
+      linear-gradient(180deg, rgba(8,8,8,.9) 0, rgba(8,8,8,.6) 56px, rgba(8,8,8,0) 120px),
+      /* px stops: the hero copy is bottom-anchored and ~600px tall on a phone */
+      linear-gradient(0deg, rgba(8,8,8,.97) 0, rgba(8,8,8,.9) 420px, rgba(8,8,8,.84) 620px, rgba(8,8,8,.2) 760px);
+  }
+  .lc-nav-r { gap: 8px; }
+  .lc-page .lc-theme { padding: 0 6px; }
   .lc-hero-film .brand-motion-poster, .lc-hero-film .brand-motion-video { object-position: 72% center; }
-  .lc-page .lc-hero-film .brand-motion-control { top: 68px; bottom: auto; }
+  /* Phone: the film control moves out of the nav's path and shrinks to its glyph. */
+  .lc-page .lc-hero-film .brand-motion-control { bottom: 36px; width: 44px; height: 44px; padding: 0; display: grid; place-items: center; }
+  .lc-page .lc-hero-film .brand-motion-control .brand-motion-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .lc-hero .lc-status { padding-right: 56px; }
   .lc-hero .lc-rule { flex-direction: column; gap: 4px; }
   .lc-hero .lc-cue { display: none; }
   .lc-hero .lc-ctas .lc-btn { flex: 1; justify-content: center; }

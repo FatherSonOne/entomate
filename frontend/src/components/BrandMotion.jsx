@@ -49,7 +49,8 @@ export default function BrandMotion({ clip = 'hands', className = '', controls =
       {controls && !failed && (
         <button type="button" className="brand-motion-control" onClick={() => setPlaying(value => !value)}
           aria-label={playing ? 'Pause background animation' : 'Play background animation'}>
-          {playing ? 'Ⅱ Pause motion' : '▷ Play motion'}
+          <span aria-hidden="true">{playing ? 'Ⅱ' : '▷'}</span>{' '}
+          <span className="brand-motion-label">{playing ? 'Pause motion' : 'Play motion'}</span>
         </button>
       )}
     </div>
