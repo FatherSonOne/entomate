@@ -518,6 +518,8 @@ export default function MeetingDetail() {
         )}
       </section>
       <CarryForward data={carryForward} title="From earlier meetings" />
+      {/* Transcript and sync stay in view while the minutes scroll (desktop). */}
+      <div className="bs-mtg-follow">
       <section id="meeting-transcript" className="bs-mtg-transcript" aria-labelledby="meeting-transcript-heading">
         <Section
           id="meeting-transcript-heading"
@@ -554,6 +556,7 @@ export default function MeetingDetail() {
       </section>
       <div className="bs-mtg-sync">
         <EcosystemSyncStatus meetingId={id} />
+      </div>
       </div>
     </div>
   )
