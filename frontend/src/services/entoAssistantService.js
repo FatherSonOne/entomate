@@ -340,7 +340,7 @@ export function getSectionSummary(section, data) {
 export async function streamQuery(userQuery, context, callbacks) {
   try {
     await entoAiApi.queryStream(
-      { question: userQuery, section: context.section, conversationId: context.conversationId },
+      { question: userQuery, section: context.section, threadId: context.threadId },
       callbacks
     )
     return

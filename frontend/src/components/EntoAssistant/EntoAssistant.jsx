@@ -23,12 +23,10 @@ import { usePanelResize } from './usePanelResize'
 import { setVoiceState, pulseVoice, onVoiceRequest } from './voiceSignal'
 import { useMicLevel } from './useMicLevel'
 import { AgentPipeline, ToolsUsed, applyToolEvent } from './AgentPipeline'
+import { entoAiApi } from '../../services/api'
 import './EntoAI.css'
 import './EntoAI.tokens.css'
 
-const STORAGE_KEY = 'ento-ai-history'
-const PARKED_KEY = 'ento-ai-parked'
-const MAX_MESSAGES = 50
 /**
  * A conversation left this long, or started on another page, is set aside when the panel
  * opens so the panel starts clean for the page you are on. It can be brought back from the
@@ -45,21 +43,6 @@ const MIC_ERRORS = {
   'audio-capture': 'No microphone found. Connect one, then try again.',
 }
 
-function loadHistory(key = STORAGE_KEY) {
-  try {
-    const raw = sessionStorage.getItem(key)
-    const parsed = raw ? JSON.parse(raw) : []
-    return Array.isArray(parsed) ? parsed : []
-  } catch { return [] }
-}
-
-function saveHistory(messages, key = STORAGE_KEY) {
-  try {
-    if (messages.length) sessionStorage.setItem(key, JSON.stringify(messages.slice(-MAX_MESSAGES)))
-    else sessionStorage.removeItem(key)
-  } catch { /* quota */ }
-}
-
 /** True when a saved conversation does not belong on the page the panel is opening over. */
 function isStale(messages, section) {
   if (!messages.length) return false
@@ -73,9 +56,13 @@ export default function EntoAssistant({ isOpen, onClose }) {
   const { user } = useAuth()
   const { context, section, sectionSummary, sectionLabel, isLoading: contextLoading, isReady: contextReady } = useAssistantContext(isOpen)
 
-  const [messages, setMessages] = useState(() => loadHistory())
-  // A conversation set aside on open (see STALE_AFTER_MS), offered back from the starting state.
-  const [parked, setParked] = useState(() => loadHistory(PARKED_KEY))
+  // EAI-03: the thread lives in ento_ai_threads (the backend appends each exchange), so it
+  // is read once on the first open and survives a reload and a second device.
+  const [messages, setMessages] = useState([])
+  const [threadId, setThreadId] = useState(null)
+  const [threadLoaded, setThreadLoaded] = useState(false)
+  // A thread set aside on open (see STALE_AFTER_MS), offered back from the starting state.
+  const [parked, setParked] = useState(null)
   const [inputValue, setInputValue] = useState('')
   const [isQuerying, setIsQuerying] = useState(false)
   const [streamingContent, setStreamingContent] = useState('')
@@ -83,6 +70,7 @@ export default function EntoAssistant({ isOpen, onClose }) {
   const [toolSteps, setToolSteps] = useState([])
   const [answering, setAnswering] = useState(false)
   const [error, setError] = useState(null)
+  // Used only by the /api/assistant/query fallback, which keeps its own conversations table.
   const [conversationId, setConversationId] = useState(null)
   const [isListening, setIsListening] = useState(false)
 
@@ -97,24 +85,50 @@ export default function EntoAssistant({ isOpen, onClose }) {
     onPointerDown: onResizePointerDown, onKeyDown: onResizeKeyDown, onDoubleClick: onResizeDoubleClick,
   } = usePanelResize(panelRef, canResize)
 
-  // Persist messages
-  useEffect(() => { saveHistory(messages) }, [messages])
-  useEffect(() => { saveHistory(parked, PARKED_KEY) }, [parked])
-
   // Opening the panel over another page, or long after the last answer, starts clean.
   // Read through refs so this runs on open only, not on every message.
   const messagesRef = useRef(messages)
   messagesRef.current = messages
+  const threadIdRef = useRef(threadId)
+  threadIdRef.current = threadId
   useEffect(() => {
     if (!isOpen) return
+    if (!threadLoaded) {
+      // First open: the newest saved thread, set aside by the same rule if it is stale.
+      let cancelled = false
+      entoAiApi.latestThread()
+        .then((thread) => {
+          if (cancelled) return
+          setThreadLoaded(true)
+          // A question asked while the read was in flight starts its own thread.
+          if (!thread || messagesRef.current.length) return
+          const saved = Array.isArray(thread.messages) ? thread.messages : []
+          if (!saved.length) return
+          if (isStale(saved, section)) {
+            setParked({ id: thread.id, messages: saved })
+          } else {
+            setMessages(saved)
+            setThreadId(thread.id)
+          }
+        })
+        .catch((err) => {
+          if (cancelled) return
+          // A failed read is not "no thread": nothing is overwritten, and the next question
+          // starts a new thread. Say so in the console only; the panel still works.
+          console.warn('[EntoAI] Could not load the last conversation:', err?.message)
+          setThreadLoaded(true)
+        })
+      return () => { cancelled = true }
+    }
     const current = messagesRef.current
     if (!isStale(current, section)) return
     abortRef.current?.abort()
     setIsQuerying(false)
     setStreamingContent('')
     setToolSteps([])
-    setParked(current)
+    setParked({ id: threadIdRef.current, messages: current })
     setMessages([])
+    setThreadId(null)
     setConversationId(null)
   }, [isOpen]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -257,7 +271,7 @@ export default function EntoAssistant({ isOpen, onClose }) {
     const userMsg = { role: 'user', content: query, ts: Date.now(), section }
     setMessages(prev => [...prev, userMsg])
     // A new conversation replaces the one set aside.
-    setParked([])
+    setParked(null)
 
     // Abort previous
     abortRef.current?.abort()
@@ -278,16 +292,20 @@ export default function EntoAssistant({ isOpen, onClose }) {
         {
           ...context,
           userName: user?.name || user?.email || 'User',
+          threadId,
           conversationId,
         },
         {
           signal: controller.signal,
           onToolEvent: (event) => setToolSteps(prev => applyToolEvent(prev, event)),
           onAnswering: () => setAnswering(true),
+          // The text so far was a preamble to a tool call: the tool steps replace it.
+          onChunkReset: () => { setStreamingContent(''); setAnswering(false) },
           onChunk: (chunk) => { pulseVoice(); setStreamingContent(prev => prev + chunk) },
           onCitations: (citations) => { streamedCitations = citations },
           onFollowUp: (suggestions) => { streamedFollowUp = suggestions },
           onComplete: (result) => {
+            if (result.threadId) setThreadId(result.threadId)
             if (result.conversationId) setConversationId(result.conversationId)
             setMessages(prev => [...prev, {
               role: 'assistant',
@@ -318,7 +336,7 @@ export default function EntoAssistant({ isOpen, onClose }) {
       setStreamingContent('')
       setToolSteps([])
     }
-  }, [inputValue, isQuerying, context, section, user, conversationId])
+  }, [inputValue, isQuerying, context, section, user, threadId, conversationId])
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -330,17 +348,20 @@ export default function EntoAssistant({ isOpen, onClose }) {
   const handleNewChat = () => {
     abortRef.current?.abort()
     setMessages([])
+    setThreadId(null)
     setConversationId(null)
     setStreamingContent('')
     setToolSteps([])
     setIsQuerying(false)
     setError(null)
-    setParked([])
+    setParked(null)
   }
 
   const handleResume = () => {
-    setMessages(parked)
-    setParked([])
+    if (!parked) return
+    setMessages(parked.messages)
+    setThreadId(parked.id)
+    setParked(null)
   }
 
   // Until this page's data arrives the questions are not shown, so they never flip from
@@ -414,7 +435,7 @@ export default function EntoAssistant({ isOpen, onClose }) {
             </div>
           )}
 
-          {!hasMessages && !isQuerying ? (
+          {!hasMessages && !isQuerying && !threadLoaded ? null : !hasMessages && !isQuerying ? (
             /* Starting state: one line, three questions, the composer. */
             <div className="la-welcome la-welcome-brief">
               <div className="la-welcome-icon la-welcome-hero">
@@ -438,7 +459,7 @@ export default function EntoAssistant({ isOpen, onClose }) {
                   ))}
                 </div>
               </div>
-              {parked.length > 0 && (
+              {parked?.messages.length > 0 && (
                 <button type="button" className="la-welcome-help" onClick={handleResume}>
                   Back to your last chat
                 </button>

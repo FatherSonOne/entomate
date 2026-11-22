@@ -84,3 +84,36 @@ describe('streamQuery fallback', () => {
     expect(onError.mock.calls[0]![0].message).toMatch(/Wait a minute/)
   })
 })
+
+describe('EAI-03', () => {
+  test('chunk_reset reaches the panel between the preamble and the tool steps', async () => {
+    const all = ev({ type: 'start' }) + ev({ type: 'answering' }) + ev({ type: 'chunk', content: 'Let me check.' })
+      + ev({ type: 'chunk_reset' }) + ev({ type: 'tool_start', turn: 1, tools: ['list_tasks'] })
+      + ev({ type: 'complete', answer: 'x', tools: [] })
+    vi.stubGlobal('fetch', vi.fn(async () => sseResponse([all])))
+    const seen: string[] = []
+    await entoAiApi.queryStream({ question: 'q' }, {
+      onChunk: (c: string) => seen.push(`chunk:${c}`),
+      onChunkReset: () => seen.push('reset'),
+      onToolEvent: (e: { type: string }) => seen.push(e.type),
+      onComplete: () => seen.push('complete'),
+    })
+    expect(seen).toEqual(['chunk:Let me check.', 'reset', 'tool_start', 'complete'])
+  })
+
+  test('latestThread returns the thread, read with the bearer token and no cache', async () => {
+    const thread = { id: 't1', title: 'q', messages: [{ role: 'user', content: 'q' }], updated_at: 'now' }
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => new Response(JSON.stringify({ thread }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(entoAiApi.latestThread()).resolves.toEqual(thread)
+    expect(fetchMock.mock.calls[0]![0]).toMatch(/\/api\/ento-ai\/threads\/latest$/)
+    expect(fetchMock.mock.calls[0]![1]).toMatchObject({ headers: { Authorization: 'Bearer tok' } })
+  })
+
+  test('latestThread: no thread is null, and a failed read throws instead of reading as none', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ thread: null }), { status: 200 })))
+    await expect(entoAiApi.latestThread()).resolves.toBeNull()
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 502 })))
+    await expect(entoAiApi.latestThread()).rejects.toThrow(/502/)
+  })
+})

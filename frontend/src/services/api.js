@@ -1061,7 +1061,7 @@ export const assistantApi = {
  */
 export const entoAiApi = {
   queryStream: async (data, callbacks = {}) => {
-    const { signal, onStart, onToolEvent, onAnswering, onChunk, onFollowUp, onComplete, onError } = callbacks
+    const { signal, onStart, onToolEvent, onAnswering, onChunk, onChunkReset, onFollowUp, onComplete, onError } = callbacks
     const streamUrl = API_BASE_URL ? `${API_BASE_URL}/api/ento-ai/query` : '/api/ento-ai/query'
     const { data: { session } } = await supabase.auth.getSession()
     const response = await fetch(streamUrl, {
@@ -1087,6 +1087,7 @@ export const entoAiApi = {
         case 'tool_start': case 'tool_end': onToolEvent?.(event); break
         case 'answering': onAnswering?.(); break
         case 'chunk': onChunk?.(event.content); break
+        case 'chunk_reset': onChunkReset?.(); break
         case 'followUp': onFollowUp?.(event.suggestions); break
         case 'complete': finished = true; onComplete?.(event); break
         case 'error': finished = true; onError?.(new Error(event.message)); break
@@ -1113,6 +1114,20 @@ export const entoAiApi = {
     }
     if (!started) throw new Error('Entomate AI stream ended before it started')
     if (!finished) onError?.(new Error('The answer was cut off. Please try again.'))
+  },
+
+  // EAI-03: the caller's newest thread ({ id, title, messages, updated_at }) or null.
+  // Plain fetch, not the axios instance: its GET cache would hand back the thread as it
+  // was at the last read, and its retries would hold the panel on a failed read.
+  latestThread: async () => {
+    const url = API_BASE_URL ? `${API_BASE_URL}/api/ento-ai/threads/latest` : '/api/ento-ai/threads/latest'
+    const { data: { session } } = await supabase.auth.getSession()
+    const response = await fetch(url, {
+      headers: { 'Authorization': session?.access_token ? `Bearer ${session.access_token}` : '' },
+    })
+    if (!response.ok) throw new Error(`Entomate AI thread read failed: ${response.status}`)
+    const body = await response.json()
+    return body?.thread || null
   },
 }
 

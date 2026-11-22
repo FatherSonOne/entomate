@@ -7,6 +7,10 @@
  *     the org fence (.in('org_id', orgIds)); the service client reads nothing.
  *   - The loop runs tool rounds, emits tool_start / tool_end, then answers.
  *   - A bad record id never reaches the database.
+ *   - EAI-03: text streams as the model writes it; a preamble before a tool
+ *     call is taken back (chunk_reset); raw streamed parts (thought
+ *     signatures) go back to the model; the thread is read and appended
+ *     under the user client, and GET /threads/latest reopens it.
  *
  * The real authenticate middleware runs; getUser and Gemini are faked.
  */
@@ -26,13 +30,17 @@ jest.mock('@supabase/supabase-js', () => ({
   }),
 }));
 
-// Chainable PostgREST stand-in that records every query (table + calls).
+// Chainable PostgREST stand-in that records every query (table + calls) and rpc.
 function mockClient(log, results = {}) {
   return {
+    rpc: async (fn, args) => {
+      log.push({ rpc: fn, args });
+      return results[`rpc:${fn}`] || { data: 'thread-1', error: null };
+    },
     from(table) {
       const entry = { table, calls: [] };
       log.push(entry);
-      const result = results[table] || { data: table === 'conversations' ? { id: 'conv-1' } : [], count: 0, error: null };
+      const result = results[table] || { data: [], count: 0, error: null };
       const builder = new Proxy({}, {
         get: (_, prop) => {
           if (prop === 'then') return (resolve, reject) => Promise.resolve(result).then(resolve, reject);
@@ -53,20 +61,17 @@ jest.mock('../config/supabase', () => ({
   createUserClient: jest.fn(() => mockClient(mockUserQueries, mockResults)),
 }));
 
-// Scripted Gemini: each generateContent returns the next scripted response.
-// mockSent holds a copy of the turn list each call was given.
+// Scripted Gemini: each generateContentStream streams the next scripted step.
+// A step is { text } (one chunk), { chunks: [parts...] } (raw parts, one chunk each),
+// or { calls } (function calls in one chunk). mockSent holds a copy of the turn
+// list each call was given.
 const mockScript = [];
 const mockSent = [];
 const mockModelParams = [];
-function mockResponse(step) {
-  const parts = step.calls ? step.calls.map((c) => ({ functionCall: c })) : [{ text: step.text || '' }];
-  return {
-    response: {
-      candidates: [{ content: { role: 'model', parts } }],
-      functionCalls: () => (step.calls ? step.calls : undefined),
-      text: () => step.text || '',
-    },
-  };
+function mockChunks(step) {
+  if (step.chunks) return step.chunks.map((part) => [part]);
+  if (step.calls) return [step.calls.map((c) => ({ functionCall: c }))];
+  return [[{ text: step.text || '' }]];
 }
 jest.mock('../config/gemini', () => ({
   isConfigured: jest.fn(() => true),
@@ -74,17 +79,22 @@ jest.mock('../config/gemini', () => ({
     getGenerativeModel: (params) => {
       mockModelParams.push(params);
       return {
-        generateContent: async ({ contents }) => {
+        generateContentStream: async ({ contents }) => {
           mockSent.push(JSON.parse(JSON.stringify(contents)));
           const step = mockScript.shift() || { text: 'fallback answer' };
-          return mockResponse(step);
+          async function* stream() {
+            for (const parts of mockChunks(step)) yield { candidates: [{ content: { role: 'model', parts } }] };
+          }
+          // The SDK's aggregate promise; the route must not depend on it.
+          return { stream: stream(), response: Promise.reject(new Error('aggregate not used')) };
         },
       };
     },
   },
 }));
-jest.mock('../services/askService', () => ({ ownedConversationId: jest.fn(async () => null) }));
-jest.mock('../utils/orgContext', () => ({ getOrgIdsForUser: jest.fn(async () => ['org-a']) }));
+// aiLimiter (10/min per IP) has its own test; this file sends more questions than that.
+jest.mock('../middleware/rateLimiter', () => ({ aiLimiter: (req, res, next) => next() }));
+jest.mock('../utils/orgContext',() => ({ getOrgIdsForUser: jest.fn(async () => ['org-a']) }));
 jest.mock('../utils/log', () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() }));
 jest.mock('../services/calendarService', () => ({ isConfigured: () => false, getEvents: jest.fn() }));
 
@@ -153,7 +163,7 @@ test('one tool round: events in order, tools on the user client with the org fen
   expect(ev.map((e) => e.type)).toEqual(['start', 'tool_start', 'tool_end', 'answering', 'chunk', 'followUp', 'complete']);
   expect(ev[1]).toEqual({ type: 'tool_start', turn: 1, tools: ['list_tasks', 'list_projects'] });
   expect(ev[2].tools).toEqual([{ name: 'list_tasks', ok: true, count: 1 }, { name: 'list_projects', ok: true, count: 0 }]);
-  expect(ev.at(-1)).toMatchObject({ type: 'complete', answer: 'You have **1** open task: **Ship it**.', conversationId: 'conv-1' });
+  expect(ev.at(-1)).toMatchObject({ type: 'complete', answer: 'You have **1** open task: **Ship it**.', threadId: 'thread-1' });
 
   // The model turn went back unchanged, then the results in a USER turn carrying the call id
   // (current models refuse role "function").
@@ -168,7 +178,7 @@ test('one tool round: events in order, tools on the user client with the org fen
   // Declared tools reached the model; nothing was read with the service client.
   expect(mockModelParams[0].tools[0].functionDeclarations.map((d) => d.name)).toEqual(Object.keys(TOOLS));
   expect(mockServiceQueries).toEqual([]);
-  for (const q of mockUserQueries.filter((x) => !x.table.startsWith('conversation'))) {
+  for (const q of mockUserQueries.filter((x) => x.table)) {
     expect(q.calls).toContainEqual(['in', ['org_id', ['org-a']]]);
   }
 });
@@ -196,7 +206,7 @@ test('rounds are capped at 5, then the model is asked for the answer', async () 
 test('a model error after start ends the stream with an error event', async () => {
   mockScript.push({ calls: [{ name: 'list_tasks', args: {} }] });
   const original = gemini.genAI.getGenerativeModel;
-  gemini.genAI.getGenerativeModel = () => ({ generateContent: async () => { throw new Error('404 model'); } });
+  gemini.genAI.getGenerativeModel = () => ({ generateContentStream: async () => { throw new Error('404 model'); } });
   try {
     const res = await request(app).post('/api/ento-ai/query')
       .set('Authorization', 'Bearer good-token').send({ question: 'x' });
@@ -205,6 +215,121 @@ test('a model error after start ends the stream with an error event', async () =
   } finally {
     gemini.genAI.getGenerativeModel = original;
   }
+});
+
+describe('streaming (EAI-03)', () => {
+  test('text goes out chunk by chunk as the model writes it', async () => {
+    mockScript.push({ chunks: [{ text: 'You have ' }, { text: '**3** ' }, { text: 'meetings.' }] });
+    const res = await request(app).post('/api/ento-ai/query')
+      .set('Authorization', 'Bearer good-token').send({ question: 'meetings?' });
+    const ev = events(res.text);
+    expect(ev.map((e) => e.type)).toEqual(['start', 'answering', 'chunk', 'chunk', 'chunk', 'complete']);
+    expect(ev.filter((e) => e.type === 'chunk').map((e) => e.content)).toEqual(['You have ', '**3** ', 'meetings.']);
+    expect(ev.at(-1).answer).toBe('You have **3** meetings.');
+  });
+
+  test('a preamble before a tool call is taken back; raw parts go back to the model', async () => {
+    mockScript.push(
+      { chunks: [{ text: 'Let me check. ' }, { functionCall: { name: 'list_tasks', args: {}, id: 'c1' }, thoughtSignature: 'sig-1' }] },
+      { chunks: [{ text: 'Working on it', thought: true }, { text: 'No open tasks.' }] },
+    );
+    const res = await request(app).post('/api/ento-ai/query')
+      .set('Authorization', 'Bearer good-token').send({ question: 'open tasks?' });
+    const ev = events(res.text);
+    expect(ev.map((e) => e.type)).toEqual(['start', 'answering', 'chunk', 'chunk_reset', 'tool_start', 'tool_end', 'answering', 'chunk', 'complete']);
+    // A thought part is never shown as the answer.
+    expect(ev.filter((e) => e.type === 'chunk').map((e) => e.content)).toEqual(['Let me check. ', 'No open tasks.']);
+    expect(ev.at(-1).answer).toBe('No open tasks.');
+    // The model turn went back with every streamed part, thought signature included
+    // (the SDK aggregate would have dropped it).
+    expect(mockSent[1][1]).toEqual({
+      role: 'model',
+      parts: [{ text: 'Let me check. ' }, { functionCall: { name: 'list_tasks', args: {}, id: 'c1' }, thoughtSignature: 'sig-1' }],
+    });
+  });
+
+  test('an empty answer after the retry is still sent as text', async () => {
+    mockScript.push({ text: '' }, { text: '   ' });
+    const res = await request(app).post('/api/ento-ai/query')
+      .set('Authorization', 'Bearer good-token').send({ question: 'x' });
+    const ev = events(res.text);
+    expect(ev.filter((e) => e.type === 'chunk').map((e) => e.content).join('')).toMatch(/could not put an answer together/);
+    expect(ev.at(-1).type).toBe('complete');
+  });
+});
+
+describe('threads (EAI-03)', () => {
+  const THREAD = '99999999-2222-4333-8444-555555555555';
+
+  test('a thread id reads that thread on the user client and feeds its turns as history', async () => {
+    mockResults.ento_ai_threads = {
+      data: { id: THREAD, messages: [
+        { role: 'assistant', content: 'stray opener' },
+        { role: 'user', content: 'list my tasks', section: 'tasks', ts: 1 },
+        { role: 'assistant', content: 'You have **Ship it**.', tools: [], ts: 2 },
+      ] },
+      error: null,
+    };
+    mockScript.push({ text: 'It is due Friday.' });
+    const res = await request(app).post('/api/ento-ai/query')
+      .set('Authorization', 'Bearer good-token').send({ question: 'when is it due?', section: 'tasks', threadId: THREAD });
+    expect(events(res.text).at(-1)).toMatchObject({ type: 'complete', threadId: 'thread-1' });
+
+    const read = mockUserQueries.find((q) => q.table === 'ento_ai_threads');
+    expect(read.calls).toContainEqual(['eq', ['id', THREAD]]);
+    // History starts with a user turn: the leading assistant message is dropped.
+    expect(mockSent[0].map((c) => [c.role, c.parts[0].text])).toEqual([
+      ['user', 'list my tasks'], ['model', 'You have **Ship it**.'], ['user', 'when is it due?'],
+    ]);
+    const save = mockUserQueries.find((q) => q.rpc);
+    expect(save.rpc).toBe('ento_ai_append_thread');
+    expect(save.args).toMatchObject({ p_thread_id: THREAD, p_org_id: 'org-a', p_title: 'when is it due?' });
+    expect(save.args.p_messages).toEqual([
+      { role: 'user', content: 'when is it due?', ts: expect.any(Number), section: 'tasks' },
+      { role: 'assistant', content: 'It is due Friday.', tools: [], followUp: [], ts: expect.any(Number), section: 'tasks' },
+    ]);
+    expect(mockServiceQueries).toEqual([]);
+  });
+
+  test('a thread id that is not a uuid is never read and starts a new thread', async () => {
+    mockScript.push({ text: 'Hi.' });
+    await request(app).post('/api/ento-ai/query')
+      .set('Authorization', 'Bearer good-token').send({ question: 'hi', threadId: "x' or 1=1" });
+    expect(mockUserQueries.find((q) => q.table === 'ento_ai_threads')).toBeUndefined();
+    expect(mockUserQueries.find((q) => q.rpc).args.p_thread_id).toBeNull();
+  });
+
+  test('a failed save still completes the answer and keeps the requested thread id', async () => {
+    mockResults['rpc:ento_ai_append_thread'] = { data: null, error: { message: 'permission denied' } };
+    mockScript.push({ text: 'Done.' });
+    const res = await request(app).post('/api/ento-ai/query')
+      .set('Authorization', 'Bearer good-token').send({ question: 'q', threadId: THREAD });
+    expect(events(res.text).at(-1)).toMatchObject({ type: 'complete', answer: 'Done.', threadId: THREAD });
+  });
+
+  test('GET /threads/latest: anonymous → 401', async () => {
+    const res = await request(app).get('/api/ento-ai/threads/latest');
+    expect(res.status).toBe(401);
+    expect(createUserClient).not.toHaveBeenCalled();
+  });
+
+  test('GET /threads/latest reads the newest thread on the user client with the org fence', async () => {
+    mockResults.ento_ai_threads = { data: { id: THREAD, title: 't', messages: [], updated_at: 'now' }, error: null };
+    const res = await request(app).get('/api/ento-ai/threads/latest').set('Authorization', 'Bearer good-token');
+    expect(res.status).toBe(200);
+    expect(res.body.thread).toMatchObject({ id: THREAD });
+    expect(createUserClient).toHaveBeenCalledWith('good-token');
+    expect(mockUserQueries[0].calls).toEqual(expect.arrayContaining([
+      ['in', ['org_id', ['org-a']]], ['order', ['updated_at', { ascending: false }]], ['limit', [1]],
+    ]));
+    expect(mockServiceQueries).toEqual([]);
+  });
+
+  test('GET /threads/latest: a failed read is a 502, never "no thread"', async () => {
+    mockResults.ento_ai_threads = { data: null, error: { message: 'relation does not exist' } };
+    const res = await request(app).get('/api/ento-ai/threads/latest').set('Authorization', 'Bearer good-token');
+    expect(res.status).toBe(502);
+  });
 });
 
 describe('tools', () => {
