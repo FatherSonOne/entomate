@@ -516,6 +516,12 @@ async function getPlayback({ orgId, meetingId }) {
     }
     log.warn('Recording: playback copy could not be signed, using the pieces', { meetingId, error: error?.message });
   }
+  // A bot meeting without a saved copy plays from Recall's own (fresh) link.
+  if (job.source === 'bot' && job.botSessionId) {
+    const url = await require('./botRecording').freshRecordingLink(job.botSessionId).catch(() => null);
+    if (url) return { mimeType: 'video/mp4', durationMs: job.durationMs || 0, url };
+    throw new RecorderError(404, 'The bot recording is no longer available.');
+  }
   const pieces = (await listPieces(orgId, meetingId)).filter((p) => p.seq < (job.pieces || MAX_PIECES));
   if (!pieces.length || pieces[0].seq !== 0) throw new RecorderError(404, 'There is no recording to play.');
   const { data, error } = await supabase.storage

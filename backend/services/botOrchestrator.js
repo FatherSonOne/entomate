@@ -780,10 +780,21 @@ async function handleRecallWebhook(payload) {
   if (event === 'bot.done' && update.transcript_url) {
     transcriptIngest()
       .ingestBotTranscript(sessionId, { transcriptUrl: update.transcript_url })
+      .then((r) => afterIngest(sessionId, r))
       .catch((err) => log.error('Transcript ingest failed', { sessionId, error: err.message }));
   }
 
   return { ok: true, sessionId };
+}
+
+/** Once the meeting exists, keep its audio for playback (services/botRecording.js). */
+function afterIngest(sessionId, result) {
+  if (result?.meetingId && ['ingested', 'already_ingested'].includes(result.status)) {
+    require('./botRecording')
+      .copyBotRecording(sessionId)
+      .catch((err) => log.warn('Bot recording copy failed', { sessionId, error: err.message }));
+  }
+  return result;
 }
 
 /** Lazy: transcriptIngest requires the meetings route, which must not load at require time here. */
@@ -812,7 +823,7 @@ async function ingestSessionTranscript(sessionId) {
   const rec = Array.isArray(fullBot?.recordings) ? fullBot.recordings[0] : null;
   const transcriptUrl = rec?.media_shortcuts?.transcript?.data?.download_url || rec?.transcript?.url;
   if (!transcriptUrl) return { status: 'no_transcript' };
-  return transcriptIngest().ingestBotTranscript(sessionId, { transcriptUrl });
+  return afterIngest(sessionId, await transcriptIngest().ingestBotTranscript(sessionId, { transcriptUrl }));
 }
 
 module.exports = {
