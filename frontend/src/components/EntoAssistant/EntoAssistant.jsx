@@ -9,7 +9,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { X, AlertCircle, ArrowRight, MessageSquarePlus, User as UserIcon } from 'lucide-react'
+import { X, AlertCircle, User as UserIcon } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import { useAuth } from '../../contexts/AuthContext'
 import useAssistantContext from './useAssistantContext'
@@ -24,7 +24,8 @@ import ContextCard from './ContextCard'
 import { WelcomeOrb, orbStateFor, useSettledOrbState, AI_ORB_LABELS } from './AiOrb'
 import { EntoOrb, EntoOrbGlyph } from './EntoOrb'
 import { usePanelResize } from './usePanelResize'
-import { setVoiceState, pulseVoice } from './voiceSignal'
+import { setVoiceState, pulseVoice, onVoiceRequest } from './voiceSignal'
+import { useMicLevel } from './useMicLevel'
 import './EntoAI.css'
 import './EntoAI.tokens.css'
 
@@ -32,6 +33,13 @@ const STORAGE_KEY = 'ento-ai-history'
 const MAX_MESSAGES = 50
 /** usePanelResize is desktop-only: below this the CSS media queries own the width. */
 const RESIZE_QUERY = '(min-width: 1281px)'
+
+// A refused or missing microphone ends dictation with no word; say why (from Logos AI).
+const MIC_ERRORS = {
+  'not-allowed': 'The microphone is blocked. Allow it in your browser’s site settings, then try again.',
+  'service-not-allowed': 'The microphone is blocked. Allow it in your browser’s site settings, then try again.',
+  'audio-capture': 'No microphone found. Connect one, then try again.',
+}
 
 function loadHistory() {
   try {
@@ -57,6 +65,7 @@ export default function EntoAssistant({ isOpen, onClose }) {
   const [streamingContent, setStreamingContent] = useState('')
   const [error, setError] = useState(null)
   const [conversationId, setConversationId] = useState(null)
+  const [isListening, setIsListening] = useState(false)
 
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
@@ -97,8 +106,107 @@ export default function EntoAssistant({ isOpen, onClose }) {
     return () => window.removeEventListener('keydown', handler)
   }, [isOpen, onClose])
 
-  // The orb and the launcher's dot field read voiceSignal: thinking until text arrives, then speaking.
-  const voiceState = !isQuerying ? 'idle' : streamingContent ? 'speaking' : 'thinking'
+  // --- Voice input (Web Speech API), ported from Logos AI ---
+  const recognitionRef = useRef(null)
+
+  const handleVoiceInput = useCallback(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SpeechRecognition) {
+      setError('Voice input is not supported in this browser. Try Chrome or Edge.')
+      return
+    }
+
+    // Clearing the ref is the "user is done" signal: onend restarts only the current recognizer.
+    if (isListening) {
+      const current = recognitionRef.current
+      recognitionRef.current = null
+      current?.stop()
+      setIsListening(false)
+      return
+    }
+
+    const recognition = new SpeechRecognition()
+    recognition.continuous = true
+    recognition.interimResults = false
+    recognition.lang = 'en-US'
+
+    // Some Chrome builds fire onresult again for every growing phrase, so keep the draft from
+    // before dictation and REPLACE the dictated part each time (results are kept by index).
+    let draft = null
+    let phrases = []
+    recognition.onresult = (event) => {
+      for (let i = event.resultIndex ?? 0; i < event.results.length; i++) {
+        phrases[i] = event.results[i][0].transcript.trim()
+      }
+      const transcript = phrases.filter(Boolean).join(' ')
+      setInputValue(prev => {
+        if (draft === null) draft = prev
+        return draft ? `${draft} ${transcript}` : transcript
+      })
+    }
+
+    recognition.onerror = (event) => {
+      // A pause raises 'no-speech'; only a lost or refused microphone ends dictation.
+      const message = MIC_ERRORS[event?.error]
+      if (message) {
+        if (recognitionRef.current === recognition) recognitionRef.current = null
+        setIsListening(false)
+        setError(message)
+      }
+    }
+
+    // Chrome ends even a continuous session after a few seconds of silence. Keep listening
+    // until the user presses stop: start a new session on top of what is already typed.
+    recognition.onend = () => {
+      if (recognitionRef.current === recognition) {
+        draft = null
+        phrases = []
+        try {
+          recognition.start()
+          return
+        } catch { /* fall through: the recognizer refused to restart */ }
+        recognitionRef.current = null
+      }
+      setIsListening(false)
+    }
+
+    recognitionRef.current = recognition
+    recognition.start()
+    setIsListening(true)
+    // A fresh try clears an older microphone message; other errors stay.
+    setError(prev => (prev && Object.values(MIC_ERRORS).includes(prev) ? null : prev))
+  }, [isListening])
+
+  // Closing the panel ends dictation (the panel stays mounted after its first open).
+  // abort(), not stop(): nothing said after closing is transcribed.
+  useEffect(() => {
+    if (!isOpen) return
+    return () => {
+      const current = recognitionRef.current
+      recognitionRef.current = null
+      current?.abort()
+      setIsListening(false)
+    }
+  }, [isOpen])
+
+  // Sending ends dictation too, so speech after the send cannot re-type the sent draft.
+  useEffect(() => {
+    if (!isQuerying || !recognitionRef.current) return
+    const current = recognitionRef.current
+    recognitionRef.current = null
+    current.abort()
+    setIsListening(false)
+  }, [isQuerying])
+
+  // The Web Speech API never exposes audio, so a parallel capture feeds the mic level to voiceSignal.
+  useMicLevel(isListening)
+
+  // The launcher's mic asks the panel to listen as soon as it opens.
+  useEffect(() => onVoiceRequest(handleVoiceInput), [handleVoiceInput])
+
+  // The orb and the launcher's dot field read voiceSignal: listening wins, then thinking until
+  // text arrives, then speaking.
+  const voiceState = isListening ? 'listening' : !isQuerying ? 'idle' : streamingContent ? 'speaking' : 'thinking'
   useEffect(() => { setVoiceState(voiceState) }, [voiceState])
 
   const handleSend = useCallback(async (text) => {
@@ -190,7 +298,7 @@ export default function EntoAssistant({ isOpen, onClose }) {
   const hasMessages = messages.length > 0
 
   const orbState = useSettledOrbState(orbStateFor({
-    isListening: false,
+    isListening,
     isLoading: isQuerying,
     isTyping: Boolean(inputValue.trim()),
     error,
@@ -244,8 +352,7 @@ export default function EntoAssistant({ isOpen, onClose }) {
           </div>
           <div className="la-header-right">
             {hasMessages && (
-              <button type="button" className="la-header-action-btn" onClick={handleNewChat} title="New chat">
-                <MessageSquarePlus size={14} />
+              <button type="button" className="la-header-action-btn la-header-history-btn" onClick={handleNewChat} title="New chat">
                 <span className="la-header-action-label">New chat</span>
               </button>
             )}
@@ -350,7 +457,6 @@ export default function EntoAssistant({ isOpen, onClose }) {
                     {suggestedActions.map((action, i) => (
                       <button key={i} type="button" className="la-suggested-btn" onClick={() => handleNavigate(action.to)}>
                         {action.label}
-                        <ArrowRight size={12} style={{ marginLeft: 3, opacity: 0.6 }} />
                       </button>
                     ))}
                   </div>
@@ -373,7 +479,8 @@ export default function EntoAssistant({ isOpen, onClose }) {
           onKeyDown={handleKeyDown}
           placeholder="Ask anything about your data..."
           disabled={isQuerying}
-          isListening={false}
+          isListening={isListening}
+          onVoiceInput={handleVoiceInput}
           onSend={() => handleSend()}
           orbState={orbState}
         />

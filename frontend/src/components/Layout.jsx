@@ -33,6 +33,7 @@ import '../styles/navigation.css'
 import VCCanvas from './vc/VCCanvas'
 import Logo from './Logo'
 import EntoAssistantSkeleton from './EntoAssistant/EntoAssistantSkeleton'
+import { requestVoiceOnOpen } from './EntoAssistant/voiceSignal'
 import EntoAssistantButton from './EntoAssistant/EntoAssistantButton'
 import EntoAIProactiveChecker from './EntoAssistant/EntoAIProactiveChecker'
 import { BenchShell } from './bench/shell/BenchShell'
@@ -188,6 +189,8 @@ export default function Layout() {
   }, [isBenchSwiss, onGuide, guideHasNew, dismissGuideNew])
 
   const toggleAssistant = () => { setAssistantOpen(prev => !prev); setProactiveSuggestion(false) }
+  // The launcher's mic: open the panel if needed and ask it to start (or stop) listening.
+  const voiceAssistant = () => { requestVoiceOnOpen(); if (!assistantOpen) toggleAssistant() }
 
   // Overlays shared by both shells
   const overlays = (
@@ -224,7 +227,7 @@ export default function Layout() {
       { label: 'Tools', items: [
         { name: 'Search', href: '/search' },
         ...(isAdmin ? [{ name: 'Bot', href: '/bot' }] : []),
-        { name: 'Ask Entomate', onSelect: toggleAssistant, note: proactiveSuggestion ? 'NEW' : undefined, noteIsNew: proactiveSuggestion },
+        { name: 'Ask Entomate', onSelect: toggleAssistant, note: proactiveSuggestion ? 'NEW' : undefined, noteIsNew: proactiveSuggestion, railHidden: true },
         { name: 'User Guide', href: '/guide', note: guideHasNew ? 'NEW' : undefined, noteIsNew: guideHasNew },
       ] },
     ]
@@ -260,6 +263,14 @@ export default function Layout() {
           onSignOut={handleSignOut}
           modKey={getModKey()}
           dock={benchDock}
+          assistant={
+            <EntoAssistantButton
+              onClick={toggleAssistant}
+              onVoice={voiceAssistant}
+              isOpen={assistantOpen}
+              proactiveCount={proactiveSuggestion ? 1 : 0}
+            />
+          }
         >
           <Faceplate>
             {/* Pages reach shell overlays through the outlet context (Today's Ask Entomate key). */}
@@ -344,8 +355,9 @@ export default function Layout() {
           <div className="nl-footer">
             <EntoAssistantButton
               onClick={() => { setAssistantOpen(prev => !prev); setProactiveSuggestion(false) }}
+              onVoice={voiceAssistant}
               isOpen={assistantOpen}
-              hasProactiveSuggestion={proactiveSuggestion}
+              proactiveCount={proactiveSuggestion ? 1 : 0}
             />
 
             <NavLink

@@ -21,8 +21,7 @@ interface ComposerProps {
   placeholder: string;
   disabled: boolean;
   isListening: boolean;
-  /** Omit when there is no voice input (Entomate until EAI-06): the button is then always send. */
-  onVoiceInput?: () => void;
+  onVoiceInput: () => void;
   onSend: () => void;
   orbState: AiOrbState;
 }
@@ -46,11 +45,11 @@ const Composer: React.FC<ComposerProps> = ({
     el.style.height = `${Math.min(el.scrollHeight, MAX_INPUT_PX)}px`;
   }, [value, inputRef]);
 
-  const mode = isListening ? 'stop' : value.trim() || !onVoiceInput ? 'send' : 'mic';
+  const mode = isListening ? 'stop' : value.trim() ? 'send' : 'mic';
   const action = {
-    stop: { label: 'Stop listening', className: 'la-voice-btn la-voice-btn-active', icon: <Square size={12} fill="currentColor" />, run: onVoiceInput ?? (() => {}) },
+    stop: { label: 'Stop listening', className: 'la-voice-btn la-voice-btn-active', icon: <Square size={12} fill="currentColor" />, run: onVoiceInput },
     send: { label: 'Send message', className: 'la-send-btn', icon: <ArrowUp size={17} />, run: onSend },
-    mic: { label: 'Voice input', className: 'la-voice-btn', icon: <Mic size={16} />, run: onVoiceInput ?? (() => {}) },
+    mic: { label: 'Voice input', className: 'la-voice-btn', icon: <Mic size={16} />, run: onVoiceInput },
   }[mode];
 
   return (
@@ -73,7 +72,7 @@ const Composer: React.FC<ComposerProps> = ({
           className={`${action.className} la-action-morph`}
           data-mode={mode}
           onClick={action.run}
-          disabled={disabled || (mode === 'send' && !value.trim())}
+          disabled={disabled}
           title={action.label}
           aria-label={action.label}
         >
