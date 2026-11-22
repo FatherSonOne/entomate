@@ -1344,6 +1344,15 @@ html.bs-scroll-lock, html.bs-scroll-lock body { overflow: hidden; }
 .bs-action-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin-top: 4px; font-size: 12.5px; color: var(--bs-ink2); }
 .bs-action-meta .bs-mono { font-size: 11.5px; }
 .bs-action-keys { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+/* Agent "why" (AgentNotes): amber LED + mono, the agent's reason and confidence */
+.bs-agentnotes:empty { display: none; }
+.bs-agentnotes details { margin-top: 6px; font-size: 12.5px; }
+.bs-agentnotes summary { gap: 7px; font: 500 10.5px var(--bs-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--bs-ink2); }
+.bs-agentnotes summary > span:first-child { width: 8px; height: 8px; border-radius: 50%; background: var(--bs-ai); box-shadow: 0 0 6px var(--bs-ai); }
+.bs-agentnotes dl { margin-top: 8px; padding-left: 14px; border-left: 2px solid var(--bs-ai); }
+.bs-agentnotes dt { color: var(--bs-ink); }
+.bs-agentnotes dt .font-mono { font-family: var(--bs-mono); color: var(--bs-ai); }
+.bs-agentnotes dd { color: var(--bs-ink2); margin: 2px 0 6px; }
 
 @media (prefers-reduced-motion: reduce) {
   .bs-tabs [role="tab"]::after, .bs-tape-head { transition-duration: 1ms !important; }

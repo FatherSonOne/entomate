@@ -87,7 +87,7 @@ export const MODULES = [
   {
     name: 'Explainable', sig: 'ai', kicker: 'AI · Shows its work', media: 'factors',
     head: 'Every decision explained',
-    tag: 'Agents attach a reason and a confidence score to every recommendation.',
+    tag: 'Agents attach a reason and a confidence score to every recommendation, shown right under the action item.',
     features: [
       ['Factor analysis with confidence', 'ship'],
       ['Learns your preferences from every override', 'ship'],
@@ -120,7 +120,7 @@ export const STATUS = {
 export const AGENTS = [
   { n: '4.1 · Assignment', head: 'Finds the owner', body: 'Picks an owner from your own team by skills and current workload.' },
   { n: '4.2 · Priority', head: 'Ranks the work', body: 'Weighs meeting sentiment, urgency language and due dates.' },
-  { n: '4.3 · Deadline', head: 'Sets a date', body: 'Suggests realistic due dates from task complexity and priority.' },
+  { n: '4.3 · Deadline', head: 'Sets a date', body: 'Suggests realistic due dates from complexity, priority and the owner\'s open work.' },
   { n: '4.4 · Follow-up', head: 'Catches promises', body: 'Detects promised follow-ups in the conversation.' },
 ]
 

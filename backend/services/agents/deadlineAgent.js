@@ -6,6 +6,7 @@
 
 const BaseAgent = require('./baseAgent');
 const ai = require('../../config/ai');
+const { supabase } = require('../../config/supabase');
 const LearningEngine = require('../learning/LearningEngine');
 
 class DeadlineAgent extends BaseAgent {
@@ -24,8 +25,11 @@ class DeadlineAgent extends BaseAgent {
     this.log('Analyzing deadline context');
 
     const meetingDate = context.meetingDate || context.meeting_date || context.created_at || new Date();
+    const owner = context.assignedTo || context.assigned_to_name || null;
 
     return {
+      owner,
+      ownerOpenItems: await this.getOwnerWorkload(owner, context.orgId, context.actionItemId),
       taskDescription: context.task || context.task_description,
       priority: context.priority || 'medium',
       meetingDate: new Date(meetingDate),
@@ -33,6 +37,51 @@ class DeadlineAgent extends BaseAgent {
       actionItems: context.actionItems || [],
       existingDeadline: context.dueDate || context.due_date
     };
+  }
+
+  /**
+   * Count the owner's other open items in the same org.
+   * Returns null when there is no owner, no org or no database, so the
+   * deadline falls back to priority and complexity alone.
+   */
+  async getOwnerWorkload(owner, orgId, excludeItemId) {
+    if (!owner || !orgId || !supabase) return null;
+    try {
+      let query = supabase
+        .from('action_items')
+        .select('id', { count: 'exact', head: true })
+        .eq('org_id', orgId)
+        .eq('assigned_to_name', owner)
+        .in('status', ['open', 'in_progress']);
+      if (excludeItemId) query = query.neq('id', excludeItemId);
+      const { count, error } = await query;
+      if (error) throw error;
+      return count || 0;
+    } catch (error) {
+      this.log('Could not fetch owner workload', { error: error.message });
+      return null;
+    }
+  }
+
+  /**
+   * More open work means more time: 0-2 open items add nothing,
+   * 3-5 add a quarter, 6-9 add half, 10+ double the window.
+   */
+  workloadMultiplier(openItems) {
+    if (typeof openItems !== 'number') return 1;
+    if (openItems >= 10) return 2;
+    if (openItems >= 6) return 1.5;
+    if (openItems >= 3) return 1.25;
+    return 1;
+  }
+
+  /** Human reason for the heuristic deadline. */
+  describeBasis(analysis) {
+    const parts = [`${analysis.priority} priority`, `${analysis.complexity} complexity`];
+    if (typeof analysis.ownerOpenItems === 'number') {
+      parts.push(`${analysis.owner} has ${analysis.ownerOpenItems} other open item${analysis.ownerOpenItems === 1 ? '' : 's'}`);
+    }
+    return `Based on ${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
   }
 
   /**
@@ -58,7 +107,7 @@ class DeadlineAgent extends BaseAgent {
   /**
    * Calculate deadline based on priority and complexity
    */
-  calculateDeadline(meetingDate, priority, complexity) {
+  calculateDeadline(meetingDate, priority, complexity, workloadFactor = 1) {
     const baseDate = new Date(meetingDate);
 
     // Base days by priority
@@ -76,7 +125,9 @@ class DeadlineAgent extends BaseAgent {
     };
 
     const daysToAdd = Math.ceil(
-      priorityDays[priority] * complexityMultiplier[complexity]
+      (priorityDays[priority] || priorityDays.medium) *
+      (complexityMultiplier[complexity] || 1) *
+      workloadFactor
     );
 
     // Add days (skip weekends for business days)
@@ -117,16 +168,18 @@ class DeadlineAgent extends BaseAgent {
       const heuristicDeadline = this.calculateDeadline(
         analysis.meetingDate,
         analysis.priority,
-        analysis.complexity
+        analysis.complexity,
+        this.workloadMultiplier(analysis.ownerOpenItems)
       );
 
       // Use AI for more intelligent estimation if available
       if (!ai.isConfigured()) {
         return {
           recommended: heuristicDeadline.toISOString().split('T')[0],
-          reason: `Based on ${analysis.priority} priority and ${analysis.complexity} complexity`,
+          reason: this.describeBasis(analysis),
           confidence: 0.7,
           complexity: analysis.complexity,
+          ownerOpenItems: analysis.ownerOpenItems,
           businessDays: this.getBusinessDaysBetween(analysis.meetingDate, heuristicDeadline)
         };
       }
@@ -137,12 +190,16 @@ Task: ${analysis.taskDescription}
 Priority: ${analysis.priority}
 Meeting date: ${analysis.meetingDate.toISOString().split('T')[0]}
 Estimated complexity: ${analysis.complexity}
+${typeof analysis.ownerOpenItems === 'number'
+  ? `Owner: ${analysis.owner}, who already has ${analysis.ownerOpenItems} other open item(s)`
+  : 'Owner: not known yet'}
 
 Consider:
 1. Task complexity and effort needed
 2. Priority level
-3. Realistic timelines (don't be too aggressive)
-4. Buffer for unexpected delays
+3. The owner's current workload (more open items means more time)
+4. Realistic timelines (don't be too aggressive)
+5. Buffer for unexpected delays
 
 Today is ${new Date().toISOString().split('T')[0]}.
 
@@ -163,14 +220,16 @@ Return ONLY this JSON:
         this.log('AI deadline suggestion', { deadline: suggestion.recommended });
         suggestion = {
           ...suggestion,
-          complexity: analysis.complexity
+          complexity: analysis.complexity,
+          ownerOpenItems: analysis.ownerOpenItems
         };
       } else {
         suggestion = {
           recommended: heuristicDeadline.toISOString().split('T')[0],
-          reason: `Default deadline based on ${analysis.priority} priority`,
+          reason: this.describeBasis(analysis),
           confidence: 0.6,
-          complexity: analysis.complexity
+          complexity: analysis.complexity,
+          ownerOpenItems: analysis.ownerOpenItems
         };
       }
 

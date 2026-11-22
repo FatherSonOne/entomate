@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { RefreshCw, Loader2, CalendarPlus } from 'lucide-react'
 import { integrationsApi, meetingsApi, calendarApi } from '../services/api'
 import TimecodeButton from './meetings/TimecodeButton'
+import AgentNotes from './meetings/AgentNotes'
 import { Key, Signal } from './bench'
 
 /**
@@ -178,6 +179,7 @@ export default function ActionItemsList({ items = [], onUpdate, meetingId, onJum
                     {item.last_sync_error && item.crm_sync_status === 'failed' && (
                       <div className="bs-why"><span className="bs-led brand" aria-hidden="true" />{item.last_sync_error}</div>
                     )}
+                    <div className="bs-agentnotes"><AgentNotes notes={item.agent_notes} /></div>
                   </div>
                   <div className="bs-action-keys">
                     {onJumpToTranscript && (

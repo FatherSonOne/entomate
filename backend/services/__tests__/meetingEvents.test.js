@@ -7,10 +7,10 @@
 
 jest.mock('../../utils/log', () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn() }));
 
-const { MeetingEvents, decideUpdates, hasTrigger, hasCodeNode } = require('../meetingEvents');
+const { MeetingEvents, decideUpdates, buildAgentNotes, hasTrigger, hasCodeNode } = require('../meetingEvents');
 
 // Minimal chainable supabase stub: from().update().eq().eq() and from().select().eq().eq()
-function makeDb({ workflows = [], updateError = null } = {}) {
+function makeDb({ workflows = [], updateError = null, failOn = null } = {}) {
   const calls = { updates: [], selects: [] };
   const db = {
     calls,
@@ -21,7 +21,10 @@ function makeDb({ workflows = [], updateError = null } = {}) {
           calls.updates.push(entry);
           const q = {
             eq(col, val) { entry.filters[col] = val; return q; },
-            then(resolve) { resolve({ error: updateError }); }
+            then(resolve) {
+              if (failOn && failOn in values) return resolve({ error: { message: `column "${failOn}" does not exist` } });
+              resolve({ error: updateError });
+            }
           };
           return q;
         },
@@ -84,6 +87,29 @@ describe('decideUpdates', () => {
   });
 });
 
+describe('buildAgentNotes', () => {
+  const now = new Date('2026-11-22T12:00:00Z');
+
+  it('records each recommendation, its reason, confidence and whether it was applied', () => {
+    const notes = buildAgentNotes({
+      priority: { recommended: 'HIGH', reason: 'Mentions a launch blocker', confidence: 0.876 },
+      deadline: { recommended: '2026-12-05T00:00:00Z', reason: 'Based on high priority and low complexity', confidence: 0.7 },
+      assignment: { recommended: 'Jon B.', reason: 'Lowest workload', confidence: 0.6, recommendedMember: { name: 'Jon B.' } }
+    }, { priority: 'high', due_date: '2026-12-05' }, now);
+    expect(notes).toEqual({
+      reviewed_at: '2026-11-22T12:00:00.000Z',
+      priority: { recommended: 'high', reason: 'Mentions a launch blocker', confidence: 0.88, applied: true },
+      deadline: { recommended: '2026-12-05', reason: 'Based on high priority and low complexity', confidence: 0.7, applied: true },
+      assignment: { recommended: 'Jon B.', reason: 'Lowest workload', confidence: 0.6, applied: false }
+    });
+  });
+
+  it('skips echoed deadlines and returns null when there is nothing to say', () => {
+    expect(buildAgentNotes({ deadline: { recommended: '2026-12-01', isExisting: true } }, {}, now)).toBeNull();
+    expect(buildAgentNotes({}, {}, now)).toBeNull();
+  });
+});
+
 describe('hasTrigger / hasCodeNode', () => {
   it('detects trigger subtypes and code nodes', () => {
     const wf = { nodes: [trigger('meeting_processed'), { type: 'action', subtype: 'code' }] };
@@ -114,9 +140,24 @@ describe('handleMeetingProcessed', () => {
     const result = await events.handleMeetingProcessed(meeting, items);
 
     expect(orchestrator.processMeetingWithAgents).toHaveBeenCalledWith(meeting, items);
-    expect(db.calls.updates).toHaveLength(1);
+    // a1 gets its changes plus notes; a2 only notes (nothing applied)
+    expect(db.calls.updates).toHaveLength(2);
     expect(db.calls.updates[0].values).toMatchObject({ priority: 'high', due_date: '2026-12-05' });
+    expect(db.calls.updates[0].values.agent_notes.priority).toMatchObject({ recommended: 'high', applied: true });
     expect(db.calls.updates[0].filters).toEqual({ id: 'a1', org_id: 'org-a' });
+    expect(db.calls.updates[1].values).not.toHaveProperty('priority');
+    expect(db.calls.updates[1].values.agent_notes.priority).toMatchObject({ recommended: 'low', applied: false });
+    expect(db.calls.updates[1].values.agent_notes).not.toHaveProperty('deadline');
+    expect(result.agents).toEqual({ reviewed: 2, updated: 1 });
+  });
+
+  it('still applies changes before the agent_notes column exists', async () => {
+    const { orchestrator, executor } = setup();
+    const db = makeDb({ failOn: 'agent_notes' });
+    const events = new MeetingEvents({ db, orchestrator, executor });
+    const result = await events.handleMeetingProcessed(meeting, items);
+    const retried = db.calls.updates.find(u => !('agent_notes' in u.values));
+    expect(retried.values).toMatchObject({ priority: 'high', due_date: '2026-12-05' });
     expect(result.agents).toEqual({ reviewed: 2, updated: 1 });
   });
 
