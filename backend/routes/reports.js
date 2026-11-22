@@ -8,6 +8,7 @@ const router = express.Router();
 const { supabase } = require('../config/supabase');
 const { authenticate } = require('../middleware/auth');
 const reportService = require('../services/reportService');
+const { buildProjectReport } = require('../services/projectReport');
 const log = require('../utils/log');
 const { attachOrgIds } = require('../utils/orgContext');
 
@@ -88,62 +89,43 @@ router.get('/project/:id/pdf', async (req, res) => {
       return res.status(503).json({ error: 'Database not configured' });
     }
 
-    // Get project stats (scoped to current user)
-    const { data: project, error: projectError } = await supabase
-      .from('project_statistics')
-      .select('*')
+    const { data: project } = await supabase
+      .from('projects')
+      .select('id, name')
+      .in('org_id', req.orgIds)
       .eq('id', id)
-      .eq('owner_id', req.user.id)
-      .single();
+      .maybeSingle();
 
-    if (projectError && projectError.code !== 'PGRST116') {
-      // Try fetching from meetings directly
-      const { data: meeting } = await supabase
-        .from('meetings')
-        .select('*')
-        .in('org_id', req.orgIds)
-        .eq('id', id)
-        .eq('created_by', req.user.id)
-        .single();
-
-      if (!meeting) {
-        return res.status(404).json({ error: 'Project not found' });
-      }
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' });
     }
 
-    // Get action items
-    const { data: actionItems } = await supabase
-      .from('action_items')
-      .select('*')
-      .in('org_id', req.orgIds)
-      .eq('meeting_id', id)
-      .order('status');
+    const [{ data: tasks }, { data: meetings }] = await Promise.all([
+      supabase
+        .from('tasks')
+        .select('title, description, status, assigned_to, due_date')
+        .in('org_id', req.orgIds)
+        .eq('project_id', id),
+      supabase
+        .from('meetings')
+        .select('id')
+        .in('org_id', req.orgIds)
+        .eq('project_id', id),
+    ]);
 
-    // Get team workload for this project
-    const workloadMap = new Map();
-    (actionItems || []).forEach(item => {
-      if (!item.assigned_to_name) return;
-      if (!workloadMap.has(item.assigned_to_name)) {
-        workloadMap.set(item.assigned_to_name, {
-          team_member: item.assigned_to_name,
-          total_assigned: 0,
-          completed_items: 0
-        });
-      }
-      const member = workloadMap.get(item.assigned_to_name);
-      member.total_assigned++;
-      if (item.status === 'done' || item.status === 'complete') {
-        member.completed_items++;
-      }
-    });
-    const teamWorkload = Array.from(workloadMap.values());
+    const meetingIds = (meetings || []).map((m) => m.id);
+    let actionItems = [];
+    if (meetingIds.length) {
+      const { data } = await supabase
+        .from('action_items')
+        .select('task_description, status, assigned_to_name, due_date')
+        .in('org_id', req.orgIds)
+        .in('meeting_id', meetingIds);
+      actionItems = data || [];
+    }
 
-    // Generate PDF
-    const pdfBuffer = await reportService.generateProjectReportPDF(
-      project || { title: 'Project Report', id },
-      actionItems || [],
-      teamWorkload
-    );
+    const report = buildProjectReport({ project, tasks: tasks || [], actionItems });
+    const pdfBuffer = await reportService.generateProjectReportPDF(report.project, report.items, report.teamWorkload);
 
     const filename = `project-report-${id}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');

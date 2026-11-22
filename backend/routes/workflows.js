@@ -847,6 +847,10 @@ router.post('/:id/nodes/:nodeId/pin', authenticate, validate(schemas.pin), async
     const { id, nodeId } = req.params;
     const { data: pinnedData } = req.body;
 
+    if (!(await workflowInOrg(id, req.orgIds))) {
+      return res.status(404).json({ success: false, error: 'Workflow not found' });
+    }
+
     const { data, error } = await supabase
       .from('node_pinned_data')
       .upsert({
@@ -855,7 +859,7 @@ router.post('/:id/nodes/:nodeId/pin', authenticate, validate(schemas.pin), async
         pinned_data: pinnedData,
         pinned_by: req.user?.id,
         pinned_at: new Date().toISOString()
-      })
+      }, { onConflict: 'workflow_id,node_id' })
       .select()
       .single();
 
@@ -879,6 +883,10 @@ router.post('/:id/nodes/:nodeId/pin', authenticate, validate(schemas.pin), async
 router.delete('/:id/nodes/:nodeId/pin', authenticate, async (req, res) => {
   try {
     const { id, nodeId } = req.params;
+
+    if (!(await workflowInOrg(id, req.orgIds))) {
+      return res.status(404).json({ success: false, error: 'Workflow not found' });
+    }
 
     const { error } = await supabase
       .from('node_pinned_data')
@@ -920,6 +928,17 @@ function isTriggerNode(node) {
  * The payload a meeting_processed / action_item_created trigger receives,
  * built from the org's newest meeting. Used by "Test on last meeting".
  */
+/** True when the workflow belongs to one of the caller's orgs. */
+async function workflowInOrg(workflowId, orgIds) {
+  const { data } = await supabase
+    .from('workflows')
+    .select('id')
+    .in('org_id', orgIds)
+    .eq('id', workflowId)
+    .maybeSingle();
+  return Boolean(data);
+}
+
 async function lastMeetingPayload(orgIds, workflow) {
   const { data: meeting, error } = await supabase
     .from('meetings')
