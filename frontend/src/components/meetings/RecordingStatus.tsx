@@ -15,6 +15,8 @@ import {
   salvageRecording,
   toRecordingJob,
 } from '../../services/meetingRecorderService'
+import { DebriefLoader } from '../bot/DebriefLoader'
+import { recordingSource } from '../../services/recordingProgress'
 
 export interface RecordingStatusProps {
   meetingId: string
@@ -24,12 +26,15 @@ export interface RecordingStatusProps {
   onRefresh: () => void
   /** The meeting already has a summary (so an old summary failure no longer matters). */
   hasSummary?: boolean
+  /** For the writing loader's title line and its placeholder speakers. */
+  title?: string | null
+  attendees?: unknown
 }
 
 export const POLL_MS = 5000
 
 
-export function RecordingStatus({ meetingId, recordingJob, onRefresh, hasSummary = false }: RecordingStatusProps): React.ReactElement | null {
+export function RecordingStatus({ meetingId, recordingJob, onRefresh, hasSummary = false, title, attendees }: RecordingStatusProps): React.ReactElement | null {
   const job = toRecordingJob(recordingJob)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -58,10 +63,19 @@ export function RecordingStatus({ meetingId, recordingJob, onRefresh, hasSummary
     }
   }
 
+  // While the minutes are written: the same loader as a bot's debrief (steps, stopwatch, typed lines).
+  if (writing) {
+    return (
+      <div data-testid="recording-status" className="bs-recstat-loader">
+        <DebriefLoader source={recordingSource(job, title, attendees)} />
+      </div>
+    )
+  }
+
   const icon = busy ? <Loader2 className="animate-spin" aria-hidden="true" /> : <RotateCcw aria-hidden="true" />
 
   return (
-    <div role="status" data-testid="recording-status" className="bs-recstat" data-tone={writing ? 'live' : 'brand'}>
+    <div role="status" data-testid="recording-status" className="bs-recstat" data-tone="brand">
       {summaryMissing ? (
         <>
           <Signal tone="brand">No summary</Signal>
@@ -69,12 +83,6 @@ export function RecordingStatus({ meetingId, recordingJob, onRefresh, hasSummary
           <Key disabled={busy} onClick={() => void act(rewriteSummary)} icon={icon}>
             Write the summary
           </Key>
-        </>
-      ) : writing ? (
-        <>
-          <Signal tone="live">Writing</Signal>
-          <p className="bs-recstat-text">Writing the transcript, speakers, summary and action items. This page updates by itself.</p>
-          <Loader2 className="bs-recstat-spin animate-spin" aria-hidden="true" />
         </>
       ) : job.status === 'recording' ? (
         <>

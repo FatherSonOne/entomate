@@ -21,6 +21,10 @@ export interface DebriefInfo {
   steps: ReadonlyArray<Pick<BotStep, 'key' | 'state'>>
   /** When this screen first saw each step become the current one, epoch ms. */
   seenAt: Partial<Record<StepKey, number>>
+  /** Transcript time as a share of the call's length (default 0.03, Recall's read-back). */
+  transcriptRate?: number
+  /** When the current step began, epoch ms, if the server says (better than seenAt after a reload). */
+  stepStartedAt?: number | null
 }
 
 export interface DebriefState {
@@ -38,10 +42,10 @@ export interface DebriefState {
 }
 
 // Rough times for each step. Tune these once real calls have been timed.
-const EST: Record<StepKey, (durationMs: number) => number> = {
+const EST: Record<StepKey, (durationMs: number, rate: number) => number> = {
   left: () => 0,
   // Recall finishes the recording, then the transcript is read back and saved.
-  transcript: (d) => Math.max(40_000, d * 0.03),
+  transcript: (d, rate) => Math.max(40_000, d * rate),
   summary: () => 45_000,
   actions: () => 8_000,
   audio: () => 10_000,
@@ -71,7 +75,7 @@ export function currentStep(steps: DebriefInfo['steps']): number {
 /** Where the minutes are, for drawing. `now` is this device's clock. */
 export function estimate(info: DebriefInfo, now: number): DebriefState {
   const { steps } = info
-  const est = steps.map((s) => EST[s.key]?.(info.durationMs) ?? 0)
+  const est = steps.map((s) => EST[s.key]?.(info.durationMs, info.transcriptRate ?? 0.03) ?? 0)
   const total = est.reduce((a, b) => a + b, 0) || 1
   const allDone = steps.length > 0 && steps.every((s) => s.state === 'done')
   const step = currentStep(steps)
@@ -83,7 +87,7 @@ export function estimate(info: DebriefInfo, now: number): DebriefState {
   const key = steps[step]?.key ?? 'transcript'
   const stepEst = est[step] ?? 0
   // The transcript starts when the bot leaves; later steps start when this screen saw them start.
-  const since = Math.max(ended, info.seenAt[key] ?? (key === 'transcript' ? ended : now))
+  const since = Math.max(ended, info.stepStartedAt ?? info.seenAt[key] ?? (key === 'transcript' ? ended : now))
   const inStepMs = Math.max(0, now - since)
   const frac = stepEst ? clamp(inStepMs / stepEst, 0, 0.9) : 1
   const before = est.slice(0, step).reduce((a, b) => a + b, 0)

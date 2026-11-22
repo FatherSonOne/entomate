@@ -225,6 +225,19 @@ async function setJob(meeting, patch) {
   return job;
 }
 
+/**
+ * Where a transcription run has got to (transcript, speakers, summary, saving),
+ * for the meeting page's writing loader. Best effort: a failed write here never
+ * stops the run.
+ */
+async function markStage(meeting, stage) {
+  try {
+    await setJob(meeting, { stage, stageAt: new Date().toISOString() });
+  } catch (err) {
+    log.warn('Recording: could not save the stage', { meetingId: meeting.id, stage, error: err.message });
+  }
+}
+
 function isStale(job, now = Date.now()) {
   const at = Date.parse(job?.updatedAt || job?.finishedAt || '');
   return !Number.isFinite(at) || now - at > STALE_JOB_MS;
@@ -324,7 +337,7 @@ async function finishRecording({ meetingId, pieces, salvage = false, now = Date.
   }
 
   const durationMs = saved.filter((p) => p.seq < pieces).reduce((sum, p) => sum + p.durationMs, 0);
-  await setJob(meeting, { status: 'transcribing', pieces, durationMs, finishedAt: new Date().toISOString(), error: null });
+  await setJob(meeting, { status: 'transcribing', pieces, durationMs, finishedAt: new Date().toISOString(), error: null, stage: null, stageAt: null });
   runInBackground(meetingId);
   return { status: 'transcribing' };
 }
@@ -336,7 +349,7 @@ async function retryTranscription({ meetingId }) {
   if (!job) throw new RecorderError(409, 'This meeting was not recorded here.');
   const retryable = job.status === 'failed' || (job.status === 'transcribing' && !running.has(meetingId) && isStale(job));
   if (!retryable) throw new RecorderError(409, job.status === 'transcribing' ? 'The transcript is still being written.' : 'There is nothing to retry.');
-  await setJob(meeting, { status: 'transcribing', error: null });
+  await setJob(meeting, { status: 'transcribing', error: null, stage: null, stageAt: null });
   runInBackground(meetingId);
   return { status: 'transcribing' };
 }
@@ -395,6 +408,7 @@ async function transcribeMeeting(meetingId) {
     }
 
     const audio = Buffer.concat(parts);
+    await markStage(meeting, 'transcript');
     const text = await geminiRecording.transcribeRecording(audio, job.mimeType || 'audio/webm');
     let segments = parseTimestampedTranscript(text);
     let transcript = segments.length ? buildTranscriptText(segments) : String(text || '').trim();
@@ -409,6 +423,7 @@ async function transcribeMeeting(meetingId) {
     // Strong evidence renames; weaker guesses wait on the meeting page as suggestions.
     let speakerSuggestions = [];
     if (segments.length) {
+      await markStage(meeting, 'speakers');
       try {
         const candidates = await speakerNames.loadCandidates(meeting);
         const { apply, suggestions } = await speakerNames.suggestNames(segments, candidates);
@@ -428,6 +443,7 @@ async function transcribeMeeting(meetingId) {
     let embedding = null;
     // Saved on the job so a missing summary can be diagnosed from the database.
     let summaryError = null;
+    await markStage(meeting, 'summary');
     if (!ai.isConfigured()) {
       summaryError = 'AI provider not configured';
     } else {
@@ -444,6 +460,7 @@ async function transcribeMeeting(meetingId) {
     const decisions = summaryData.decisions || [];
     const speakers = [...new Set(segments.map((s) => s.speaker))];
 
+    await markStage(meeting, 'saving');
     const now = new Date().toISOString();
     const durationMs = job.durationMs || 0;
     const startMs = Date.parse(meeting.start_time || job.startedAt || now);
@@ -462,7 +479,7 @@ async function transcribeMeeting(meetingId) {
       attendees: Array.isArray(meeting.attendees) && meeting.attendees.length ? meeting.attendees : speakers,
       duration_minutes: durationMs ? Math.max(1, Math.round(durationMs / 60000)) : null,
       end_time: Number.isFinite(startMs) && durationMs ? new Date(startMs + durationMs).toISOString() : now,
-      recording_job: { ...job, status: 'done', error: null, summaryError, speakerSuggestions, audioKept: true, playbackFile: playback, speakers: speakers.length, lines: segments.length, updatedAt: now },
+      recording_job: { ...job, status: 'done', stage: null, stageAt: null, error: null, summaryError, speakerSuggestions, audioKept: true, playbackFile: playback, speakers: speakers.length, lines: segments.length, updatedAt: now },
       updated_at: now,
     };
     if (embedding) update.transcript_embedding = embedding;

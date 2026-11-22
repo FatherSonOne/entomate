@@ -282,7 +282,7 @@ describe('recorder routes', () => {
     expect(mime).toBe('audio/webm');
 
     const row = meeting(id);
-    expect(row.recording_job).toMatchObject({ status: 'done', speakers: 2, lines: 4 });
+    expect(row.recording_job).toMatchObject({ status: 'done', speakers: 2, lines: 4, stage: null });
     expect(row.transcript_segments).toHaveLength(4);
     expect(row.transcript.split('\n')[0]).toBe('Speaker 1: Morning everyone, let us settle the launch date.');
     expect(row.summary).toBe('The team set the launch date.');

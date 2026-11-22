@@ -49,7 +49,12 @@ describe('meetingRecorderService', () => {
     expect(toRecordingJob({ status: 'weird' })).toBeNull()
     expect(toRecordingJob({ status: 'failed', mode: 'tab', error: 'No speech', updatedAt: 'x' })).toEqual({
       status: 'failed', mode: 'tab', error: 'No speech', updatedAt: 'x', speakers: null, summaryError: null,
+      stage: null, stageAt: null, finishedAt: null, durationMs: 0,
     })
+    expect(toRecordingJob({ status: 'transcribing', stage: 'summary', stageAt: 'y', finishedAt: 'z', durationMs: 90000 })).toMatchObject({
+      stage: 'summary', stageAt: 'y', finishedAt: 'z', durationMs: 90000,
+    })
+    expect(toRecordingJob({ status: 'transcribing', stage: 'bogus' })?.stage).toBeNull()
   })
 
   test('canRetry: failed, or transcribing for too long', () => {
@@ -258,7 +263,8 @@ describe('RecordingStatus', () => {
     vi.useFakeTimers()
     const onRefresh = vi.fn()
     render(<RecordingStatus meetingId="m" recordingJob={{ status: 'transcribing', updatedAt: new Date().toISOString() }} onRefresh={onRefresh} />)
-    expect(screen.getByRole('status')).toHaveTextContent(/Writing the transcript/)
+    expect(screen.getByRole('progressbar', { name: 'Minutes progress' })).toBeInTheDocument()
+    expect(screen.getByText('Recording stopped · writing the minutes')).toBeInTheDocument()
     act(() => vi.advanceTimersByTime(10_000))
     expect(onRefresh).toHaveBeenCalledTimes(2)
     vi.useRealTimers()

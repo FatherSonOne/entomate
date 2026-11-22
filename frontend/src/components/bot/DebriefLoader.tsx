@@ -15,15 +15,52 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Display, Led } from '../bench'
 import { botsApi } from '../../services/api'
-import type { BotSessionView, CaptionLine } from '../../services/botView'
+import type { BotSessionView, BotStep, CaptionLine } from '../../services/botView'
 import { runTitle } from '../../services/botView'
 import {
   estimate, glide, initials, loaderClock, minutesLeft, stepWhere,
   type DebriefInfo, type StepKey,
 } from '../../services/debriefProgress'
 
+/** What the loader draws. Bot calls and browser recordings each build one. */
+export interface DebriefSource {
+  /** Meeting name under the state line. */
+  title: string
+  /** When writing began (the bot left, or Stop was pressed), ISO. */
+  endedAt: string | null
+  durationMs: number
+  steps: BotStep[]
+  /** Mono state line ("The bot left · writing the minutes"). */
+  headline: string
+  /** Under the stopwatch ("since it left"). */
+  sinceLabel: string
+  /** Bot session whose live captions name the speakers; leave out for a browser recording. */
+  sessionId?: string
+  /** Speaker names known up front (the meeting's attendees). */
+  speakers?: string[]
+  /** Transcript time as a share of the recording's length (see debriefProgress). */
+  transcriptRate?: number
+  /** When the current step began, ISO, if the server reports it. */
+  stepStartedAt?: string | null
+}
+
+export function botSource(view: BotSessionView): DebriefSource {
+  return {
+    title: runTitle(view),
+    endedAt: view.endedAt,
+    durationMs: view.debrief?.durationMs || 0,
+    steps: view.debrief?.steps || [],
+    headline: 'The bot left · writing the minutes',
+    sinceLabel: 'since it left',
+    sessionId: view.sessionId,
+  }
+}
+
 export interface DebriefLoaderProps {
-  view: BotSessionView
+  /** A bot call's debrief. */
+  view?: BotSessionView
+  /** Or any other source (a browser recording). Wins over view. */
+  source?: DebriefSource
   /** A plain ruled strip instead of a display (the meeting page already has its one display). */
   plain?: boolean
 }
@@ -34,9 +71,10 @@ const reducedMotion = (): boolean =>
   typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 /** Speaker names from the call's live captions, for the typed lines' initials. Empty when there were none. */
-function useCallSpeakers(sessionId: string): string[] {
+function useCallSpeakers(sessionId: string | undefined): string[] {
   const [names, setNames] = useState<string[]>([])
   useEffect(() => {
+    if (!sessionId) return undefined
     let off = false
     Promise.resolve(botsApi.captions(sessionId, 0) as unknown)
       .then((raw) => {
@@ -118,12 +156,18 @@ function lifeCanvas(canvas: HTMLCanvasElement) {
   return { resize, draw }
 }
 
-export function DebriefLoader({ view, plain = false }: DebriefLoaderProps): React.ReactElement {
+const EMPTY_SOURCE: DebriefSource = {
+  title: 'Meeting', endedAt: null, durationMs: 0, steps: [], headline: 'Writing the minutes', sinceLabel: 'so far',
+}
+
+export function DebriefLoader({ view, source, plain = false }: DebriefLoaderProps): React.ReactElement {
+  const src = source ?? (view ? botSource(view) : EMPTY_SOURCE)
   const rootRef = useRef<HTMLDivElement>(null)
-  const speakers = useCallSpeakers(view.sessionId)
-  const viewRef = useRef(view)
+  const callSpeakers = useCallSpeakers(src.sessionId)
+  const speakers = callSpeakers.length ? callSpeakers : (src.speakers || [])
+  const srcRef = useRef(src)
   const speakersRef = useRef(speakers)
-  viewRef.current = view
+  srcRef.current = src
   speakersRef.current = speakers
 
   useEffect(() => {
@@ -148,7 +192,7 @@ export function DebriefLoader({ view, plain = false }: DebriefLoaderProps): Reac
       if (!list) return
       const who = names()
       const w = (lineNo * 7 + Math.floor(Math.random() * 3)) % who.length
-      const dur = viewRef.current.debrief?.durationMs || 0
+      const dur = srcRef.current.durationMs || 0
       // Times in the call only go forward, and start over at the top when they pass its end.
       let next = lastAt + 4000 + Math.random() * 11000
       if (dur && next > dur) next = Math.random() * 20000
@@ -176,13 +220,16 @@ export function DebriefLoader({ view, plain = false }: DebriefLoaderProps): Reac
     }
 
     function render(now: number) {
-      const v = viewRef.current
-      const steps = v.debrief?.steps || []
+      const v = srcRef.current
+      const steps = v.steps
+      const started = v.stepStartedAt ? Date.parse(v.stepStartedAt) : NaN
       const info: DebriefInfo = {
         endedAt: v.endedAt ? Date.parse(v.endedAt) : null,
-        durationMs: v.debrief?.durationMs || 0,
+        durationMs: v.durationMs || 0,
         steps,
         seenAt,
+        transcriptRate: v.transcriptRate,
+        stepStartedAt: Number.isFinite(started) ? started : null,
       }
       const cur = steps.find((s) => s.state !== 'done')
       if (cur && seenAt[cur.key] == null) seenAt[cur.key] = now
@@ -217,7 +264,7 @@ export function DebriefLoader({ view, plain = false }: DebriefLoaderProps): Reac
         const small = li.querySelector('small')
         if (!small || !s) return
         small.textContent = s.state === 'done'
-          ? (s.key === 'left' && info.durationMs ? `${loaderClock(info.durationMs)} call` : s.value)
+          ? (s.key === 'left' && info.durationMs ? `${loaderClock(info.durationMs)} ${v.sessionId ? 'call' : 'recorded'}` : s.value)
           : isNow ? loaderClock(state.inStepMs) : ''
       })
 
@@ -260,9 +307,9 @@ export function DebriefLoader({ view, plain = false }: DebriefLoaderProps): Reac
     return stop
   }, [])
 
-  const steps = view.debrief?.steps || []
-  const dur = view.debrief?.durationMs || 0
-  const sub = [runTitle(view), dur ? `${loaderClock(dur)} call` : ''].filter(Boolean).join(' · ')
+  const steps = src.steps
+  const dur = src.durationMs || 0
+  const sub = [src.title, dur ? `${loaderClock(dur)} ${src.sessionId ? 'call' : 'recorded'}` : ''].filter(Boolean).join(' · ')
   const Box = plain ? 'div' : Display
   return (
     <Box className={`bs-dl${plain ? ' is-plain' : ''}`}>
@@ -273,12 +320,12 @@ export function DebriefLoader({ view, plain = false }: DebriefLoaderProps): Reac
             {Array.from({ length: 8 }, (_, i) => <i key={i} />)}
           </span>
           <div className="bs-dl-title">
-            <span className="bs-lbl bs-dl-state"><Led tone="ai" /> The bot left · writing the minutes</span>
+            <span className="bs-lbl bs-dl-state"><Led tone="ai" /> {src.headline}</span>
             <strong>{sub}</strong>
           </div>
           <div className="bs-dl-watch" aria-hidden="true">
             <b data-dl-watch>0:00</b>
-            <small className="bs-lbl">since it left</small>
+            <small className="bs-lbl">{src.sinceLabel}</small>
           </div>
         </div>
         <div className="bs-dl-page" aria-hidden="true">

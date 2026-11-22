@@ -13,7 +13,7 @@ import CarryForward from '../components/meetings/CarryForward'
 import RecordingStatus from '../components/meetings/RecordingStatus'
 import RecordingPlayer from '../components/meetings/RecordingPlayer'
 import CrmSendDrawer from '../components/meetings/CrmSendDrawer'
-import { canPlay } from '../services/meetingRecorderService'
+import { canPlay, toRecordingJob } from '../services/meetingRecorderService'
 import cache from '../services/apiCache'
 import { clipToNotes } from '../services/searchNotesService'
 import { formatClock, toSegments, toSummaryMoments } from '../services/meetingTranscriptService'
@@ -52,6 +52,8 @@ export default function MeetingDetail() {
   const playerRef = useRef(null)
   const [playingAtMs, setPlayingAtMs] = useState(null)
   const playable = canPlay(meeting?.recording_job)
+  // A browser recording whose minutes are still being written: empty sections say so instead of "none".
+  const minutesPending = toRecordingJob(meeting?.recording_job)?.status === 'transcribing'
   const jumpToTranscript = useCallback((atMs) => {
     setFocusAtMs(atMs)
     if (playerRef.current?.isReady()) playerRef.current.playFrom(atMs)
@@ -565,7 +567,7 @@ export default function MeetingDetail() {
       )}
 
       <div className="bs-mtg-status-row">
-        <RecordingStatus meetingId={meeting.id} recordingJob={meeting.recording_job} onRefresh={refreshMeeting} hasSummary={!!meeting.summary} />
+        <RecordingStatus meetingId={meeting.id} recordingJob={meeting.recording_job} onRefresh={refreshMeeting} hasSummary={!!meeting.summary} title={meeting.title} attendees={meeting.attendees} />
       </div>
 
       {showTape && (
@@ -628,7 +630,7 @@ export default function MeetingDetail() {
                 <Section
                   title="Summary"
                   level={3}
-                  aside={!editingSummary && <Key size="sm" onClick={startEditSummary}>Edit</Key>}
+                  aside={!editingSummary && !minutesPending && <Key size="sm" onClick={startEditSummary}>Edit</Key>}
                 />
                 {editingSummary ? (
                   <div className="bs-mtg-edit">
@@ -644,7 +646,7 @@ export default function MeetingDetail() {
                 ) : meeting.summary ? (
                   <p className="bs-para">{meeting.summary}</p>
                 ) : (
-                  <p className="bs-para bs-mut">No summary yet.</p>
+                  <p className="bs-para bs-mut">{minutesPending ? 'Being written. It appears here when it lands.' : 'No summary yet.'}</p>
                 )}
                 {rewriting && <p className="bs-mtg-none"><Signal tone="ai">Rewriting the summary</Signal></p>}
               </div>
@@ -667,7 +669,7 @@ export default function MeetingDetail() {
                   aside={decisions.length > 0 ? `${decisions.length}${decisionMarks.length ? ' · on the tape' : ''}` : undefined}
                 />
                 {decisions.length === 0 ? (
-                  <p className="bs-mtg-none">No decisions were recorded.</p>
+                  <p className="bs-mtg-none">{minutesPending ? 'Being written.' : 'No decisions were recorded.'}</p>
                 ) : (
                   <ul className="bs-rows">
                     {decisions.map((decision, index) => {
@@ -688,7 +690,7 @@ export default function MeetingDetail() {
               <section id="meeting-actions" className="bs-mtg-block" aria-labelledby="meeting-actions-heading">
                 <Section id="meeting-actions-heading" title="Action items" level={3} aside={actionItems.length ? String(actionItems.length) : undefined} />
                 {actionItems.length === 0 ? (
-                  <p className="bs-mtg-none">No action items were recorded.</p>
+                  <p className="bs-mtg-none">{minutesPending ? 'Being written.' : 'No action items were recorded.'}</p>
                 ) : (
                   <ActionItemsList
                     items={actionItems}

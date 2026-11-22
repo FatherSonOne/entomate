@@ -29,7 +29,18 @@ export interface RecordingJob {
   speakers: number | null
   /** The transcript was saved but the summary step failed, with this reason. */
   summaryError: string | null
+  /** While transcribing: how far the server has got. Null before the run starts. */
+  stage: RecordingStage | null
+  /** When the current stage began, ISO. */
+  stageAt: string | null
+  /** When Stop was pressed and transcribing began, ISO. */
+  finishedAt: string | null
+  /** Length of the recording, ms. */
+  durationMs: number
 }
+
+export type RecordingStage = 'transcript' | 'speakers' | 'summary' | 'saving'
+const STAGES: RecordingStage[] = ['transcript', 'speakers', 'summary', 'saving']
 
 const STATUSES: RecordingStatus[] = ['recording', 'transcribing', 'done', 'failed']
 const MODES: RecorderMode[] = ['mic', 'camera', 'tab']
@@ -47,6 +58,10 @@ export function toRecordingJob(raw: unknown): RecordingJob | null {
     updatedAt: typeof r.updatedAt === 'string' ? r.updatedAt : null,
     speakers: typeof r.speakers === 'number' ? r.speakers : null,
     summaryError: typeof r.summaryError === 'string' && r.summaryError ? r.summaryError : null,
+    stage: STAGES.find((x) => x === r.stage) ?? null,
+    stageAt: typeof r.stageAt === 'string' ? r.stageAt : null,
+    finishedAt: typeof r.finishedAt === 'string' ? r.finishedAt : null,
+    durationMs: typeof r.durationMs === 'number' && r.durationMs > 0 ? r.durationMs : 0,
   }
 }
 
