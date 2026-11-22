@@ -346,7 +346,7 @@ export default function MeetingDetail() {
         </div>
       </div>
 
-      <RecordingStatus meetingId={meeting.id} recordingJob={meeting.recording_job} onRefresh={refreshMeeting} />
+      <RecordingStatus meetingId={meeting.id} recordingJob={meeting.recording_job} onRefresh={refreshMeeting} hasSummary={!!meeting.summary} />
 
       {/* Meeting Intelligence Panel */}
       <MeetingIntelligencePanel

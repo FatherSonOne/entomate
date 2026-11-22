@@ -10,6 +10,7 @@ import { AlertTriangle, Loader2, RotateCcw } from 'lucide-react'
 import {
   canRetry,
   retryRecording,
+  rewriteSummary,
   salvageRecording,
   toRecordingJob,
 } from '../../services/meetingRecorderService'
@@ -20,6 +21,8 @@ export interface RecordingStatusProps {
   recordingJob: unknown
   /** Reload the meeting (fresh, not cached). */
   onRefresh: () => void
+  /** The meeting already has a summary (so an old summary failure no longer matters). */
+  hasSummary?: boolean
 }
 
 export const POLL_MS = 5000
@@ -28,7 +31,7 @@ const BUTTON =
   'inline-flex min-h-9 items-center gap-2 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-content-primary ' +
   'hover:border-line-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary disabled:opacity-50'
 
-export function RecordingStatus({ meetingId, recordingJob, onRefresh }: RecordingStatusProps): React.ReactElement | null {
+export function RecordingStatus({ meetingId, recordingJob, onRefresh, hasSummary = false }: RecordingStatusProps): React.ReactElement | null {
   const job = toRecordingJob(recordingJob)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -41,7 +44,8 @@ export function RecordingStatus({ meetingId, recordingJob, onRefresh }: Recordin
     return () => window.clearInterval(timer)
   }, [writing, onRefresh])
 
-  if (!job || job.status === 'done') return null
+  const summaryMissing = job?.status === 'done' && !!job.summaryError && !hasSummary
+  if (!job || (job.status === 'done' && !summaryMissing)) return null
 
   const act = async (fn: (id: string) => Promise<void>): Promise<void> => {
     setBusy(true)
@@ -58,7 +62,18 @@ export function RecordingStatus({ meetingId, recordingJob, onRefresh }: Recordin
 
   return (
     <div role="status" data-testid="recording-status" className="rounded-xl border border-line bg-surface-elevated p-4 text-sm">
-      {writing ? (
+      {summaryMissing ? (
+        <div className="space-y-2">
+          <p className="flex items-start gap-2 text-content-primary">
+            <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-semantic-error" aria-hidden="true" />
+            The transcript is saved, but the summary, decisions and action items could not be written.
+          </p>
+          <button type="button" className={BUTTON} disabled={busy} onClick={() => void act(rewriteSummary)}>
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <RotateCcw className="h-4 w-4" aria-hidden="true" />}
+            Write the summary
+          </button>
+        </div>
+      ) : writing ? (
         <p className="flex items-center gap-2 text-content-primary">
           <Loader2 className="h-4 w-4 animate-spin text-accent-primary" aria-hidden="true" />
           Writing the transcript, speakers, summary and action items. This page updates by itself.

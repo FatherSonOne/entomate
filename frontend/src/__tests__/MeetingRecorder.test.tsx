@@ -12,7 +12,8 @@ const api = vi.hoisted(() => ({
   discard: vi.fn(),
 }))
 const cacheMock = vi.hoisted(() => ({ invalidate: vi.fn() }))
-vi.mock('../services/api', () => ({ recordingsApi: api, meetingsApi: {} }))
+const meetings = vi.hoisted(() => ({ reprocess: vi.fn() }))
+vi.mock('../services/api', () => ({ recordingsApi: api, meetingsApi: meetings }))
 vi.mock('../services/apiCache', () => ({ default: cacheMock }))
 
 import MeetingRecorder from '../components/meetings/MeetingRecorder'
@@ -47,7 +48,7 @@ describe('meetingRecorderService', () => {
     expect(toRecordingJob(null)).toBeNull()
     expect(toRecordingJob({ status: 'weird' })).toBeNull()
     expect(toRecordingJob({ status: 'failed', mode: 'tab', error: 'No speech', updatedAt: 'x' })).toEqual({
-      status: 'failed', mode: 'tab', error: 'No speech', updatedAt: 'x', speakers: null,
+      status: 'failed', mode: 'tab', error: 'No speech', updatedAt: 'x', speakers: null, summaryError: null,
     })
   })
 
@@ -271,6 +272,18 @@ describe('RecordingStatus', () => {
     fireEvent.click(screen.getByRole('button', { name: /try again/i }))
     await waitFor(() => expect(onRefresh).toHaveBeenCalled())
     expect(api.retry).toHaveBeenCalledWith('m')
+  })
+
+  test('a missing summary can be written again from the transcript', async () => {
+    meetings.reprocess.mockResolvedValue({ success: true })
+    const onRefresh = vi.fn()
+    const job = { status: 'done', summaryError: 'Summary generation failed: bad JSON' }
+    const { rerender, container } = render(<RecordingStatus meetingId="m" recordingJob={job} onRefresh={onRefresh} />)
+    fireEvent.click(screen.getByRole('button', { name: /write the summary/i }))
+    await waitFor(() => expect(meetings.reprocess).toHaveBeenCalledWith('m'))
+    await waitFor(() => expect(onRefresh).toHaveBeenCalled())
+    rerender(<RecordingStatus meetingId="m" recordingJob={job} onRefresh={onRefresh} hasSummary />)
+    expect(container).toBeEmptyDOMElement()
   })
 
   test('an unstopped recording offers to transcribe the saved audio', async () => {
