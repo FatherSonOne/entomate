@@ -6,6 +6,8 @@ export default defineConfig({
   define: {
     // Sentry release: the commit Vercel is building (empty locally)
     __APP_RELEASE__: JSON.stringify(process.env.VERCEL_GIT_COMMIT_SHA || ''),
+    // Sentry environment; empty locally, which keeps Sentry off
+    __APP_ENV__: JSON.stringify(process.env.VERCEL_ENV || ''),
   },
   server: {
     port: 5175,

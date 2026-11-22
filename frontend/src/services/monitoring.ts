@@ -1,6 +1,6 @@
 /**
- * Error tracking (2026-11-22). Sends errors to Sentry when VITE_SENTRY_DSN is
- * set at build time; without it every call here is a no-op. The SDK loads in
+ * Error tracking (2026-11-22). Sends errors to Sentry from Vercel builds
+ * (production and preview); in local builds every call here is a no-op. The SDK loads in
  * its own chunk after the app starts, so it never slows the first paint.
  * Calls made before it loads are queued.
  *
@@ -13,8 +13,20 @@ import { isChunkError } from './chunkReload'
 type SentryModule = typeof import('@sentry/react')
 
 declare const __APP_RELEASE__: string
+/** "production" or "preview" on Vercel builds, empty locally. */
+declare const __APP_ENV__: string
 
-const DSN = import.meta.env.VITE_SENTRY_DSN as string | undefined
+/**
+ * Sentry project quantum-ecosystems/entomate. A browser DSN is public by
+ * design (it only allows sending events), so it lives here rather than in
+ * Vercel. On only for Vercel builds; VITE_SENTRY_DSN overrides it.
+ */
+// Vite defines these at build time; tests run without them
+const APP_ENV = typeof __APP_ENV__ === 'undefined' ? '' : __APP_ENV__
+const APP_RELEASE = typeof __APP_RELEASE__ === 'undefined' ? '' : __APP_RELEASE__
+
+const ENTOMATE_DSN = 'https://48ef372b286d59b48c0c85bf676a9a6b@o4511901529997312.ingest.us.sentry.io/4512476450652160'
+const DSN = (import.meta.env.VITE_SENTRY_DSN as string | undefined) || (APP_ENV ? ENTOMATE_DSN : undefined)
 
 let sentry: SentryModule | null = null
 let queue: Array<(s: SentryModule) => void> = []
@@ -31,8 +43,8 @@ export function initMonitoring(): void {
     .then((s) => {
       s.init({
         dsn: DSN,
-        environment: (import.meta.env.VITE_APP_ENV as string | undefined) ?? import.meta.env.MODE,
-        release: __APP_RELEASE__ || undefined,
+        environment: APP_ENV || import.meta.env.MODE,
+        release: APP_RELEASE || undefined,
         sendDefaultPii: false,
         tracesSampleRate: 0,
         // A stale page file after a deploy is handled by a reload, not a bug
