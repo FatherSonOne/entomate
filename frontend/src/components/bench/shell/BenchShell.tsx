@@ -1,10 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Moon, Search, Settings, Sun } from 'lucide-react'
+import { AudioLines, House, LayoutGrid, ListChecks, Moon, Search, Settings, Sun } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { Drawer } from '../Drawer'
 import { Key } from '../Key'
 import { Led } from '../Signal'
 import { cx } from '../cx'
+import { drawIcon } from '../iconDraw'
+import { prefersReducedMotion } from '../motion'
 import { logoAsset, useLogoSystem } from '../../../services/logoSystem'
 import { RippleCircles } from '../../ui/ripple-circles'
 
@@ -62,7 +65,7 @@ export interface BenchShellProps {
   onSignOut: () => void
   /** "⌘" or "Ctrl". */
   modKey: string
-  /** Dock routes: Today, Meetings, Tasks. */
+  /** Dock routes: Today, Meetings, Tasks. Icons are keyed by href. */
   dock: ReadonlyArray<{ name: string; href: string }>
   /** The AI launcher, docked in the rail above Record (desktop). */
   assistant?: React.ReactNode
@@ -262,6 +265,15 @@ function ProfileMenu({ user, items, onSignOut, onSettings, modKey }: {
   )
 }
 
+/* ── Phone dock icons, keyed by route ── */
+
+const DOCK_ICONS: Readonly<Record<string, LucideIcon>> = {
+  '/dashboard': House,
+  // Not Mic: the Record key sits right beside it.
+  '/meetings': AudioLines,
+  '/tasks': ListChecks,
+}
+
 /* ── The shell ── */
 
 export function BenchShell(props: BenchShellProps): React.ReactElement {
@@ -275,12 +287,33 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
   const now = useClock()
   const online = useOnline()
 
+  // When a dock tab becomes active by any route (back button, a link in the
+  // page), its icon draws in once. Taps already draw through the shared
+  // pointer listener; the running guard keeps the two from doubling up.
+  const dockRef = useRef<HTMLElement>(null)
+  const activeDock = dock.find((d) => isActive(d.href))?.href ?? null
+  const seenDock = useRef<string | null | undefined>(undefined)
+  useEffect(() => {
+    const first = seenDock.current === undefined
+    seenDock.current = activeDock
+    if (first || !activeDock || prefersReducedMotion()) return
+    const svg = dockRef.current?.querySelector<SVGSVGElement>('.bs-dock-item[aria-current="page"] svg')
+    if (svg) drawIcon(svg)
+  }, [activeDock])
+
+  const dockLabel = (name: string, active: boolean): React.ReactElement => (
+    <span className="bs-dock-lbl">
+      <Led tone={active ? 'brand' : 'off'} />
+      {name}
+    </span>
+  )
   const dockItem = (d: { name: string; href: string }): React.ReactElement => {
     const active = isActive(d.href)
+    const Icon = DOCK_ICONS[d.href]
     return (
       <Link key={d.href} to={d.href} className="bs-dock-item" aria-current={active ? 'page' : undefined}>
-        <Led tone={active ? 'brand' : 'off'} />
-        {d.name}
+        {Icon ? <Icon aria-hidden="true" strokeWidth={1.6} /> : null}
+        {dockLabel(d.name, active)}
       </Link>
     )
   }
@@ -350,7 +383,7 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
       </div>
 
       {/* Phone dock */}
-      <nav className="bs-dock" aria-label="Quick navigation">
+      <nav className="bs-dock" aria-label="Quick navigation" ref={dockRef}>
         {d0 && dockItem(d0)}
         {d1 && dockItem(d1)}
         <button type="button" className="bs-dock-rec" onClick={onRecord} aria-label="Record a meeting">
@@ -358,8 +391,8 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
         </button>
         {d2 && dockItem(d2)}
         <button type="button" className="bs-dock-item" onClick={() => setNavOpen(true)} aria-haspopup="dialog" aria-expanded={navOpen}>
-          <Led tone="off" />
-          More
+          <LayoutGrid aria-hidden="true" strokeWidth={1.6} />
+          {dockLabel('More', navOpen)}
         </button>
       </nav>
 
