@@ -52,6 +52,7 @@ export function renderLogoMotion(id, href, duration = 6, title = id) {
     `<image id="${uid}-art" href="${href}" x="0" y="0" width="1000" height="1000" preserveAspectRatio="xMidYMid meet"/>`,
     `<filter id="${uid}-hot" x="-10%" y="-10%" width="120%" height="120%"><feComponentTransfer><feFuncR type="linear" slope="2.4"/><feFuncG type="linear" slope="2.4"/><feFuncB type="linear" slope="2.4"/></feComponentTransfer><feGaussianBlur stdDeviation="2"/></filter>`,
     `<filter id="${uid}-trail" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="4"/></filter>`,
+    `<filter id="${uid}-core" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="7"/></filter>`,
     `<filter id="${uid}-smear" x="-20%" y="-5%" width="140%" height="110%"><feGaussianBlur stdDeviation="14 1"/></filter>`,
   ]
   const cuts = []
@@ -145,6 +146,27 @@ export function renderLogoMotion(id, href, duration = 6, title = id) {
     scale: once([[0, 1], [win[0], 1], [win[1], to, 'out'], [1, to]]),
     fade: once([[0, 0], [win[0], peak], [win[1], 0, 'out'], [1, 0]]),
   })
+
+  /**
+   * A living centre: the still middle of a mark gets a soft, slowly turning
+   * blur that breathes, and its own image ripples outward from it, so the
+   * eye never rests on the artwork's flat, low-detail core. Soft-edged, so
+   * no circle outline shows; drawn over everything else.
+   */
+  function centre(cx, cy, r, dir = 1, phase = 0) {
+    const sid = `${uid}-s${n++}`
+    defs.push(`<radialGradient id="${sid}-g" cx="${cx}" cy="${cy}" r="${r}" gradientUnits="userSpaceOnUse"><stop offset=".45" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>`
+      + `<mask id="${sid}" maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height="1000"><circle cx="${cx}" cy="${cy}" r="${r}" fill="url(#${sid}-g)"/></mask>`
+      + `<clipPath id="${sid}-c"><circle cx="${cx}" cy="${cy}" r="${r * 1.1}"/></clipPath>`)
+    const region = `<g clip-path="url(#${sid}-c)">${art}</g>`
+    const spin = tf('rotate', [[0, 0], [1, 360 * dir, 'lin']], (v) => `${v} ${cx} ${cy}`, phase, 0)
+    const breathe = `<g class="motion-layer" opacity=".4">${attr('opacity', [[0, 0.35], [0.5, 0.85, 'io'], [1, 0.35, 'io']], phase)}`
+      + `<g mask="url(#${sid})"><g>${spin}<g filter="url(#${uid}-core)">${region}</g></g></g></g>`
+    const ripple = (p) => `<g class="motion-layer" opacity="0">${attr('opacity', [[0, 0.55], [1, 0, 'out']], phase + p)}`
+      + `<g transform="translate(${cx} ${cy})"><g>${tf('scale', [[0, 0.92], [1, 1.5, 'out']], (v) => v, phase + p, 0)}<g transform="translate(${-cx} ${-cy})">`
+      + `<g mask="url(#${sid})"><g filter="url(#${uid}-trail)">${region}</g></g></g></g></g></g>`
+    return breathe + ripple(0) + ripple(0.5)
+  }
 
   let moving = ''
   const AXIS_H = (y, h = 30) => rect(0, y - h / 2, 1000, h)
@@ -280,6 +302,22 @@ export function renderLogoMotion(id, href, duration = 6, title = id) {
       + part({ shape: circle(500, 500, 132), cx: 500, cy: 500, rot: [[0, 0], [0.4, -8, 'in'], [0.58, 130, 'out'], [1, 120, 'io']],
         hot: [[0, 0], [0.5, 0], [0.56, 0.9, 'out'], [0.8, 0, 'io'], [1, 0]] })
   }
+
+  // Marks with a still middle: give it a living centre (cx, cy, r, turn direction)
+  const CENTRES = {
+    'relay-orbits': [[527, 494, 96, -1]],
+    'orbital-network': [[500, 500, 70, 1]],
+    constellation: [[500, 500, 130, -1]],
+    'catalyst-core': [[500, 500, 150, 1]],
+    ignition: [[500, 500, 100, 1]],
+    aperture: [[340, 496, 110, -1]],
+    bloom: [[500, 500, 150, 1]],
+    'flow-field': [[362, 352, 70, 1], [632, 360, 70, -1], [650, 650, 70, 1], [362, 642, 70, -1]],
+    'neural-core': [[482, 482, 175, 1]],
+    'signal-cascade': [[500, 500, 125, -1]],
+    orbit: [[500, 500, 150, 1]],
+  }
+  moving += (CENTRES[id] || []).map(([x, y, r, d], i) => centre(x, y, r, d, i * 0.17)).join('')
 
   const mask = cuts.length
     ? `<mask id="${uid}-cut" maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height="1000"><rect width="1000" height="1000" fill="#fff"/><g fill="#000">${cuts.join('')}</g></mask>`
