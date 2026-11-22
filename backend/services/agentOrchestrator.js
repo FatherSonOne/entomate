@@ -257,18 +257,32 @@ class AgentOrchestrator {
         meetingDate: meeting.created_at,
         sentiment: meeting.sentiment_label,
         priority: item.priority,
+        dueDate: item.due_date || null,
+        assignedTo: item.assigned_to_name || null,
         actionItemId: item.id,
         triggerEventId: `meeting:${meeting.id}:item:${item.id}`,
         orgId: meeting.org_id || null, // Assignment Agent picks from this org's members only
         team: []
       };
 
-      // Priority, deadline and assignment don't depend on each other.
-      // Assignment only runs for unassigned items in a known org.
-      const agents = ['priority', 'deadline'];
-      if (context.orgId && !item.assigned_to_name && !item.assigned_to_email) agents.push('assignment');
+      // Assignment runs first, only for unassigned items in a known org, so
+      // the Deadline agent can weigh the likely owner's workload. A suggested
+      // owner counts only if it would be applied (same bar as meetingEvents).
+      const aggregated = {};
+      if (context.orgId && !item.assigned_to_name && !item.assigned_to_email) {
+        const assignment = await this.runAgent('assignment', context);
+        if (assignment.success && assignment.suggestion) {
+          aggregated.assignment = assignment.suggestion;
+          const member = assignment.suggestion.recommendedMember;
+          if (member?.name && (assignment.suggestion.confidence ?? 0) >= 0.7) {
+            context.assignedTo = member.name;
+          }
+        }
+      }
 
-      const suggestions = await this.orchestrateParallel(agents, context);
+      // Priority and deadline don't depend on each other.
+      const parallel = await this.orchestrateParallel(['priority', 'deadline'], context);
+      const suggestions = { aggregated: { ...aggregated, ...parallel.aggregated } };
 
       results.actionItems.push({
         id: item.id,

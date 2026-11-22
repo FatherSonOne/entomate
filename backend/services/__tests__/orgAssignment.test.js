@@ -16,6 +16,7 @@ function makeDb() {
       const q = {
         select() { return q; },
         eq(col, val) { filters.push(r => r[col] === val); calls.push([table, 'eq', col, val]); return q; },
+        neq(col, val) { filters.push(r => r[col] !== val); return q; },
         in(col, vals) { filters.push(r => vals.includes(r[col])); calls.push([table, 'in', col, vals]); return q; },
         then(resolve) {
           const rows = (tables[table] || []).filter(r => filters.every(f => f(r)));
@@ -147,5 +148,58 @@ describe('real agents, end to end through the orchestrator', () => {
 
     const noOrg = await orchestrator.processMeetingWithAgents({ ...meeting, org_id: null }, [items[0]]);
     expect(noOrg.actionItems[0].suggestions.assignment).toBeUndefined();
+  });
+});
+
+describe('deadline agent weighs the owner workload', () => {
+  const deadlineAgent = require('../agents/deadlineAgent');
+  const base = { task: 'Draft the plan', priority: 'medium', meetingDate: '2026-11-23T10:00:00Z', orgId: 'org-a' };
+
+  it('scales the window by open items', () => {
+    expect([0, 2, 3, 6, 10].map(n => deadlineAgent.workloadMultiplier(n))).toEqual([1, 1, 1.25, 1.5, 2]);
+    expect(deadlineAgent.workloadMultiplier(null)).toBe(1);
+  });
+
+  it('gives a busy owner more time, counting only their open items in the org', async () => {
+    tables.action_items = [
+      ...Array.from({ length: 6 }, (_, i) => ({ id: `b${i}`, org_id: 'org-a', assigned_to_name: 'Priya S.', status: 'open' })),
+      { id: 'x1', org_id: 'org-b', assigned_to_name: 'Jon B.', status: 'open' },
+      { id: 'x2', org_id: 'org-a', assigned_to_name: 'Jon B.', status: 'done' }
+    ];
+    const busy = await deadlineAgent.suggest({ ...base, assignedTo: 'Priya S.' });
+    const free = await deadlineAgent.suggest({ ...base, assignedTo: 'Jon B.' });
+    const unknown = await deadlineAgent.suggest({ ...base });
+
+    expect(busy.ownerOpenItems).toBe(6);
+    expect(free.ownerOpenItems).toBe(0);
+    expect(unknown.ownerOpenItems).toBeNull();
+    // medium (7) x medium (1): 7 business days; busy owner x1.5 -> 11
+    expect(free.recommended).toBe(unknown.recommended);
+    expect(busy.recommended > free.recommended).toBe(true);
+    expect(busy.reason).toMatch(/Priya S\. has 6 other open items/);
+  });
+
+  it('does not count the item itself', async () => {
+    tables.action_items = [{ id: 'self', org_id: 'org-a', assigned_to_name: 'Jon B.', status: 'open' }];
+    const s = await deadlineAgent.suggest({ ...base, assignedTo: 'Jon B.', actionItemId: 'self' });
+    expect(s.ownerOpenItems).toBe(0);
+  });
+
+  it('uses the suggested owner for unassigned meeting items', async () => {
+    const orchestrator = require('../agentOrchestrator');
+    tables.action_items = Array.from({ length: 10 }, (_, i) => ({ id: `p${i}`, org_id: 'org-a', assigned_to_name: 'Priya S.', status: 'open' }));
+    const meeting = { id: 'm2', org_id: 'org-a', title: 'Plan', created_at: '2026-11-23T10:00:00Z' };
+    const result = await orchestrator.processMeetingWithAgents(meeting, [{ id: 'n1', task_description: 'Review the draft', priority: 'medium' }]);
+    const s = result.actionItems[0].suggestions;
+    // Two members, no AI: a 0.6 guess is below the bar, so it is not used
+    expect(s.assignment.recommendedMember.name).toBe('Jon B.');
+    expect(s.assignment.confidence).toBe(0.6);
+    expect(s.deadline.ownerOpenItems).toBeNull();
+
+    // One member: a sure pick, so their workload counts
+    tables.org_members = [{ org_id: 'org-a', user_id: 'u1' }];
+    const solo = await orchestrator.processMeetingWithAgents(meeting, [{ id: 'n2', task_description: 'Review the draft', priority: 'medium' }]);
+    expect(solo.actionItems[0].suggestions.deadline.ownerOpenItems).toBe(10);
+    expect(solo.actionItems[0].suggestions.deadline.reason).toMatch(/Priya S\. has 10 other open items/);
   });
 });
