@@ -18,6 +18,7 @@ import { Breadcrumbs, Key, Signal, TitleRule } from '../bench'
 import { BotPipelineDisplay } from './BotDisplays'
 import TimecodeButton from '../meetings/TimecodeButton'
 import BotLive from './BotLive'
+import DebriefLoader from './DebriefLoader'
 import { formatElapsed, isActive, markSeen, phaseSignal, runTitle } from '../../services/botView'
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -77,7 +78,9 @@ export function BotDebrief({ meetingId, forced, onOpenTab, onMinutesReady, onJum
   const audio = d.steps.find((s) => s.key === 'audio')
   return (
     <section className="bs-bot-debrief" aria-label="Bot debrief">
-      <BotPipelineDisplay view={view} onDismiss={dismiss} plain />
+      {view.phase === 'processing'
+        ? <DebriefLoader view={view} plain />
+        : <BotPipelineDisplay view={view} onDismiss={dismiss} plain />}
       <dl className="bs-bot-figs">
         <div><dt className="bs-lbl">Duration</dt><dd>{formatElapsed(d.durationMs)}</dd></div>
         <div><dt className="bs-lbl">Speakers</dt><dd>{d.speakers}</dd></div>
@@ -170,7 +173,7 @@ export function BotMeetingPending({ meetingId, onReady, notFound }) {
         {isActive(view.phase) || view.phase === 'scheduled'
           ? <BotLive view={view} canControl={canControl} onStop={stop} stopping={stopping} />
           : view.phase === 'processing'
-            ? <BotPipelineDisplay view={view} />
+            ? <DebriefLoader view={view} />
             : (
               <div className="bs-bot-ended">
                 <p className="bs-h3">{view.phase === 'failed' ? view.failure : 'The bot left without anything to write up.'}</p>
@@ -184,7 +187,7 @@ export function BotMeetingPending({ meetingId, onReady, notFound }) {
             )}
         {stopError && <p className="bs-bot-note bs-bot-err" role="alert">{stopError}</p>}
       </div>
-      {(isActive(view.phase) || view.phase === 'processing') && (
+      {isActive(view.phase) && (
         <div className="bs-cell bs-bot-pending">
           <p className="bs-h3">Minutes write themselves when the call ends.</p>
           <p className="bs-bot-note">The transcript, summary, decisions and action items arrive about a minute after the bot leaves. This page turns into the meeting on its own.</p>
