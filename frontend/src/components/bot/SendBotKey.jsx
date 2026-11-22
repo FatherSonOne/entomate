@@ -9,13 +9,13 @@ import { useNavigate } from 'react-router-dom'
 import { Drawer, Key, useMediaQuery, PHONE_QUERY } from '../bench'
 import SendBotForm from './SendBotForm'
 
-export default function SendBotKey({ size, onDisplay, children = 'Send a bot' }) {
+export default function SendBotKey({ size, onDisplay, variant, children = 'Send a bot' }) {
   const navigate = useNavigate()
   const isPhone = useMediaQuery(PHONE_QUERY)
   const [open, setOpen] = useState(false)
   return (
     <>
-      <Key size={size} onDisplay={onDisplay} onClick={() => (isPhone ? setOpen(true) : navigate('/bot'))}>{children}</Key>
+      <Key size={size} variant={variant} onDisplay={onDisplay} onClick={() => (isPhone ? setOpen(true) : navigate('/bot'))}>{children}</Key>
       {isPhone && (
         <Drawer open={open} onClose={() => setOpen(false)} label="Send the bot" hideEscHint>
           <SendBotForm onLaunched={({ meetingId }) => { setOpen(false); navigate(`/meetings/${meetingId}`) }} />

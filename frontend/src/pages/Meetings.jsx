@@ -2,15 +2,16 @@ import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Search, Loader2 } from 'lucide-react'
 import MeetingRecorder from '../components/meetings/MeetingRecorder'
+import MeetingPreview from '../components/meetings/MeetingPreview'
+import { useAuth } from '../contexts/AuthContext'
 import { meetingsApi, settingsApi } from '../services/api'
 import { useToast } from '../components/vc/ToastProvider'
 import {
-  TitleRule, Section, Key, Switch, Signal, Tape, RuledTable, DateStamp, TextInput,
+  TitleRule, Section, Key, Switch, Signal, RuledTable, DateStamp, TextInput, Menu,
 } from '../components/bench'
-import { toSegments } from '../services/meetingTranscriptService'
 import {
-  asList, attendeeLine, decisionMarkers, formatLength, groupByTime, matchesFilter,
-  meetingDate, meetingLengthMs, meetingStatus, speechDensity,
+  actionCounts, attendeeLine, firstDecision, formatLength, groupByTime, matchesFilter,
+  meetingDate, meetingLengthMs, meetingStatus, plural,
 } from '../services/meetingView'
 import SendBotKey from '../components/bot/SendBotKey'
 
@@ -24,7 +25,7 @@ const FILTERS = [
   { value: 'all', label: 'All' },
   { value: 'live', label: 'Live' },
   { value: 'ready', label: 'Ready' },
-  { value: 'attention', label: 'Attention' },
+  { value: 'attention', label: 'Needs you' },
 ]
 
 const isThisWeek = (d) => {
@@ -37,6 +38,9 @@ const isThisWeek = (d) => {
 export default function Meetings() {
   const toast = useToast()
   const navigate = useNavigate()
+  const { user } = useAuth()
+  // The meeting whose preview has slid out beside the list.
+  const [previewId, setPreviewId] = useState(null)
   const [searchParams, setSearchParams] = useSearchParams()
   const [meetings, setMeetings] = useState([])
   const [total, setTotal] = useState(0)
@@ -192,6 +196,11 @@ export default function Meetings() {
     setSelectedIds(allSelected ? new Set() : new Set(visible.map(m => m.id)))
   }
 
+  const startSelectionMode = () => {
+    setPreviewId(null)
+    setSelectionMode(true)
+  }
+
   const exitSelectionMode = () => {
     setSelectionMode(false)
     setSelectedIds(new Set())
@@ -234,7 +243,8 @@ export default function Meetings() {
   // Title meta: totals from the server, this week's figures from the loaded rows.
   const week = meetings.filter(m => isThisWeek(meetingDate(m)))
   const weekMs = week.reduce((n, m) => n + meetingLengthMs(m), 0)
-  const weekDecisions = week.reduce((n, m) => n + asList(m.decisions).length, 0)
+
+  const previewRow = previewId ? meetings.find(m => m.id === previewId) || null : null
 
   const columns = [
     ...(selectionMode ? [{
@@ -259,10 +269,13 @@ export default function Meetings() {
     },
     {
       key: 'meeting',
-      header: 'Meeting',
+      header: 'Meeting · first decision',
       render: (m) => {
         const people = attendeeLine(m)
         const time = meetingDate(m).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+        const dec = firstDecision(m)
+        const { mine } = actionCounts(m)
+        const status = meetingStatus(m)
         return (
           <div className="bs-mtg-name">
             <Link to={`/meetings/${m.id}`} className="bs-h3 bs-mtg-link">{m.title || 'Untitled meeting'}</Link>
@@ -270,28 +283,32 @@ export default function Meetings() {
               <span className="bs-mono">{time}</span>
               {people && <> · {people}</>}
             </div>
+            {dec ? (
+              <p className="bs-mtg-dec">
+                <span className="bs-tick" aria-hidden="true" />
+                <span>{dec.text}{dec.more > 0 && <span className="bs-mtg-dec-more"> +{dec.more} more</span>}</span>
+              </p>
+            ) : status.key === 'ready' || status.key === 'posted' ? (
+              <p className="bs-mtg-dec bs-mut">No decisions recorded.</p>
+            ) : null}
+            {mine > 0 && <p className="bs-mtg-mine bs-ph-only">{mine} on you</p>}
           </div>
         )
       },
     },
     {
-      key: 'tape',
-      header: 'Tape · decisions',
+      key: 'actions',
+      header: 'Actions',
       secondary: true,
-      className: 'bs-mtg-tape',
+      className: 'bs-mtg-acts',
       render: (m) => {
-        // Only meetings with timed lines have a tape: the meter is real speech, the ticks real moments.
-        const segments = toSegments(m.transcript_segments)
-        const length = meetingLengthMs(m, segments)
-        if (!segments || !length) return <span className="bs-mut">—</span>
-        const marks = decisionMarkers(m)
+        const { total, open, mine } = actionCounts(m)
+        if (!total) return <span className="bs-mut">—</span>
         return (
-          <Tape
-            durationMs={length}
-            density={speechDensity(segments, length, 56)}
-            decisions={marks}
-            label={`${marks.length} decisions on a ${formatLength(length)} tape`}
-          />
+          <>
+            <span>{open ? `${open} open` : plural(total, 'action')}</span>
+            {mine > 0 && <span className="bs-mtg-acts-mine">{mine} on you</span>}
+          </>
         )
       },
     },
@@ -304,14 +321,6 @@ export default function Meetings() {
       render: (m) => formatLength(meetingLengthMs(m)),
     },
     {
-      key: 'dec',
-      header: 'Dec.',
-      secondary: true,
-      align: 'right',
-      className: 'bs-num',
-      render: (m) => asList(m.decisions).length || <span className="bs-mut">—</span>,
-    },
-    {
       key: 'status',
       header: 'Status',
       className: 'bs-mtg-status',
@@ -321,12 +330,18 @@ export default function Meetings() {
       },
     },
     ...(!selectionMode ? [{
-      key: 'del',
-      header: <span className="bs-sr">Delete</span>,
-      secondary: true,
-      className: 'bs-mtg-del',
+      key: 'more',
+      header: <span className="bs-sr">More</span>,
+      className: 'bs-mtg-more-col',
       render: (m) => (
-        <Key size="sm" onClick={() => handleDelete(m)} aria-label={`Delete ${m.title}`}>Delete</Key>
+        <Menu
+          label={`More for ${m.title || 'this meeting'}`}
+          entries={[
+            { key: 'open', label: 'Open meeting', onSelect: () => navigate(`/meetings/${m.id}`) },
+            { key: 'share', label: 'Share recap', onSelect: () => navigate(`/meetings/${m.id}?share=1`) },
+            { key: 'del', label: 'Delete', hint: 'Undo for 8s', danger: true, onSelect: () => { if (previewId === m.id) setPreviewId(null); handleDelete(m) } },
+          ]}
+        />
       ),
     }] : []),
   ]
@@ -344,11 +359,11 @@ export default function Meetings() {
     <>
       <Switch label="Filter meetings" options={FILTERS} value={filter} onChange={setFilter} />
       <div className="bs-title-keys">
-        {meetings.length > 0 && <Key onClick={() => setSelectionMode(true)}>Select</Key>}
-        <SendBotKey />
-        {/* While the recorder is open its Start key is the view's one primary key. */}
-        <Key variant={showRecorder ? 'plain' : 'primary'} onClick={() => setShowRecorder(v => !v)} aria-expanded={showRecorder}>
-          {showRecorder ? 'Close recorder' : 'New meeting'}
+        {meetings.length > 0 && <Key onClick={startSelectionMode}>Select</Key>}
+        {/* Sending the bot is the main way in; while the recorder is open its Start key is the one primary key. */}
+        <SendBotKey variant={showRecorder ? 'plain' : 'primary'} />
+        <Key onClick={() => setShowRecorder(v => !v)} aria-expanded={showRecorder}>
+          {showRecorder ? 'Close recorder' : 'Record'}
         </Key>
       </div>
     </>
@@ -358,7 +373,7 @@ export default function Meetings() {
     <div className="bs-mtg">
       <TitleRule
         title="Meetings"
-        meta={<><b>{total} meetings</b> · {week.length} this week · {formatLength(weekMs)} recorded · {weekDecisions} decisions</>}
+        meta={<><b>{total} meetings</b> · {week.length} this week · {formatLength(weekMs)} recorded</>}
         actions={actions}
       />
 
@@ -419,7 +434,8 @@ export default function Meetings() {
               columns={columns}
               groups={groups.map(g => ({ key: g.key, label: g.label, count: g.rows.length, rows: g.rows }))}
               rowKey={(m) => m.id}
-              onRowClick={(m) => (selectionMode ? toggleSelect(m.id) : navigate(`/meetings/${m.id}`))}
+              selectedKey={selectionMode ? null : previewId}
+              onRowClick={(m) => (selectionMode ? toggleSelect(m.id) : setPreviewId(m.id))}
             />
             <div className="bs-mtg-more">
               <span className="bs-lbl">{meetings.length} of {total} loaded</span>
@@ -433,6 +449,7 @@ export default function Meetings() {
           </>
         )}
       </div>
+      <MeetingPreview meeting={previewRow} onClose={() => setPreviewId(null)} myEmail={user?.email} />
     </div>
   )
 }

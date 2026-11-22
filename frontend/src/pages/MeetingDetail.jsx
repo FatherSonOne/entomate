@@ -20,8 +20,8 @@ import { formatClock, toSegments, toSummaryMoments } from '../services/meetingTr
 import MeetingIntelligencePanel from '../components/intelligence/MeetingIntelligencePanel'
 import { BotDebrief, BotMeetingPending } from '../components/bot/BotDebrief'
 import {
-  TitleRule, Breadcrumbs, Section, Key, Signal, Tag, Display, Tape, Grid, Cell, Tabs, TabPanel, Drawer,
-  TextInput, TextArea,
+  TitleRule, Breadcrumbs, Section, Key, Signal, Display, Tape, Grid, Cell, Tabs, TabPanel, Drawer,
+  TextInput, TextArea, Menu, useMediaQuery, PHONE_QUERY,
 } from '../components/bench'
 import { asList, meetingDate, meetingLengthMs, formatLength, speechDensity } from '../services/meetingView'
 
@@ -55,11 +55,8 @@ export default function MeetingDetail() {
   const jumpToTranscript = useCallback((atMs) => {
     setFocusAtMs(atMs)
     if (playerRef.current?.isReady()) playerRef.current.playFrom(atMs)
-    // The transcript sits beside the content on desktop; on phone it is below, so bring it up.
-    const el = document.getElementById('meeting-transcript')
-    if (el && el.getBoundingClientRect().top > window.innerHeight * 0.6) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }
+    // The transcript sits beside the content on desktop; on phone it is its own tab.
+    if (window.matchMedia(PHONE_QUERY).matches) setTab('transcript')
   }, [])
   // A ▶ timecode or tape mark the user pressed: also loads the recording if needed, then plays from there.
   const playMoment = useCallback((atMs) => {
@@ -67,6 +64,8 @@ export default function MeetingDetail() {
     jumpToTranscript(atMs)
   }, [playable, jumpToTranscript])
   const [tab, setTab] = useState('minutes')
+  const isPhone = useMediaQuery(PHONE_QUERY)
+  const [showIntel, setShowIntel] = useState(false)
   const [loading, setLoading] = useState(true)
   const [question, setQuestion] = useState('')
   const [askingQuestion, setAskingQuestion] = useState(false)
@@ -116,7 +115,7 @@ export default function MeetingDetail() {
   }, [id, attendeeKey])
 
   // ?t=<ms> (from Today's decision timecodes) jumps the transcript once the meeting has loaded.
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const startAtMs = Number(searchParams.get('t'))
   const jumpedRef = useRef(false)
   useEffect(() => {
@@ -124,6 +123,15 @@ export default function MeetingDetail() {
     jumpedRef.current = true
     requestAnimationFrame(() => jumpToTranscript(startAtMs))
   }, [transcriptSegments, startAtMs, jumpToTranscript])
+
+  // ?share=1 (list preview, row menu) opens Share recap once the meeting is here.
+  useEffect(() => {
+    if (!meeting || searchParams.get('share') !== '1') return
+    setShowShareModal(true)
+    const next = new URLSearchParams(searchParams)
+    next.delete('share')
+    setSearchParams(next, { replace: true })
+  }, [meeting, searchParams, setSearchParams])
 
   // Browser tab title: "02 Meetings · <title> · Entomate" while the page is open.
   useEffect(() => {
@@ -181,11 +189,12 @@ export default function MeetingDetail() {
       .catch(() => setTemplates([]))
   }, [])
   useEffect(() => { setTemplatePick(meeting?.summary_template || '') }, [meeting?.summary_template])
-  const handleRewriteSummary = async () => {
-    if (!templatePick) return
+  const handleRewriteSummary = async (template = templatePick) => {
+    if (!template) return
+    setTemplatePick(template)
     setRewriting(true)
     try {
-      await meetingsApi.regenerateSummary(id, templatePick)
+      await meetingsApi.regenerateSummary(id, template)
       cache.invalidate(`/meetings/${id}`)
       setMeeting(await meetingsApi.get(id))
       toast.success('Rewritten', 'The summary was rewritten for this meeting type')
@@ -375,7 +384,7 @@ export default function MeetingDetail() {
   if (loading) {
     return (
       <div className="bs-mtg-empty" aria-busy="true">
-        <Signal tone="brand">Loading meeting</Signal>
+        <Signal tone="off">Loading meeting</Signal>
       </div>
     )
   }
@@ -403,6 +412,7 @@ export default function MeetingDetail() {
       {date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}
       {lengthMs > 0 && <> · {formatLength(lengthMs)}</>}
       {people.length > 0 && <> · {people.length} {people.length === 1 ? 'person' : 'people'}</>}
+      {meeting.sentiment_label && <> · {meeting.sentiment_label}</>}
     </>
   )
 
@@ -434,31 +444,124 @@ export default function MeetingDetail() {
     </>
   ) : (
     <>
-      <Key onClick={startEditTitle}>Rename</Key>
-      <Key onClick={handleAddToCalendar} disabled={calendarSyncing}>
-        {calendarSyncing && <Loader2 className="animate-spin" aria-hidden="true" />}Add to calendar
-      </Key>
-      <Key onClick={openShareModal}>
+      <Menu
+        label="More actions"
+        entries={[
+          { key: 'rename', label: 'Rename', onSelect: startEditTitle },
+          { key: 'cal', label: calendarSyncing ? 'Adding to calendar' : 'Add to calendar', disabled: calendarSyncing, onSelect: handleAddToCalendar },
+          ...(meeting.transcript && templates.length > 0 ? [
+            { kind: 'label', key: 'rw', label: rewriting ? 'Rewriting the summary' : 'Rewrite the summary as' },
+            ...templates.map((t) => ({
+              key: `t-${t.id}`,
+              label: t.label,
+              hint: t.id === (meeting.summary_template || '') ? 'Current' : undefined,
+              disabled: rewriting,
+              onSelect: () => handleRewriteSummary(t.id),
+            })),
+          ] : []),
+          { kind: 'label', key: 'more', label: 'Setup' },
+          { key: 'intel', label: 'Intelligence profile', onSelect: () => setShowIntel(true) },
+        ]}
+      />
+      <Key onClick={handleSyncToCRM}>Send to CRM</Key>
+      <Key variant="primary" onClick={openShareModal}>
         Share recap{meeting.chat_posted && <span className="bs-k">Posted</span>}
       </Key>
-      <Key variant="primary" onClick={handleSyncToCRM}>Send actions to CRM</Key>
     </>
   )
 
+  // Actions sit in Minutes beside the decisions; Ask and earlier meetings sit with the transcript.
+  // On phone the transcript column becomes its own tab.
   const tabs = [
     { value: 'minutes', label: 'Minutes' },
-    { value: 'actions', label: 'Actions', count: actionItems.length },
+    ...(isPhone ? [{ value: 'transcript', label: 'Transcript' }] : []),
     { value: 'notes', label: 'Notes' },
-    { value: 'ask', label: 'Ask' },
-    { value: 'intel', label: 'Context' },
   ]
+  const activeTab = !isPhone && tab === 'transcript' ? 'minutes' : tab
+  // The bot debrief links "action items" here: they now live in Minutes.
+  const openTab = (value) => {
+    setTab(value === 'actions' ? 'minutes' : value)
+    if (value === 'actions') requestAnimationFrame(() => document.getElementById('meeting-actions')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  }
+
+  // The context column (a tab on phone): ask, earlier commitments, the transcript, ecosystem sync.
+  const context = (
+    <div className="bs-mtg-context">
+      <section className="bs-mtg-askbox" aria-labelledby="meeting-ask-heading">
+        <h3 id="meeting-ask-heading" className="bs-sr">Ask this meeting</h3>
+        <form onSubmit={handleAskQuestion} className="bs-mtg-ask">
+          <label htmlFor="meeting-ask-input" className="bs-sr">Question</label>
+          <TextInput
+            id="meeting-ask-input"
+            placeholder="Ask this meeting…"
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            disabled={askingQuestion}
+          />
+          <Key type="submit" disabled={askingQuestion || !question.trim()}>
+            {askingQuestion ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Send aria-hidden="true" />}
+            Ask
+          </Key>
+        </form>
+        {answer && (
+          <div className="bs-mtg-answer" aria-live="polite">
+            {answer.question && <div className="bs-lbl">Q · {answer.question}</div>}
+            <p className="bs-para">{answer.answer}</p>
+            {typeof answer.confidence === 'number' && (
+              <div className="bs-why">
+                <Signal tone="ai">Answer · {Math.round(answer.confidence * 100)}% confident</Signal>
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+      <CarryForward data={carryForward} title="From earlier meetings" />
+      <section id="meeting-transcript" className="bs-mtg-transcript" aria-labelledby="meeting-transcript-heading">
+        <Section
+          id="meeting-transcript-heading"
+          title="Transcript"
+          level={3}
+          aside={transcriptSegments
+            ? <Signal tone={focusAtMs != null ? 'brand' : 'off'}>{focusAtMs != null ? `At ${formatClock(focusAtMs)}` : `${transcriptSegments.length} lines`}</Signal>
+            : meeting.transcript ? <Signal tone="off">Plain text</Signal> : undefined}
+        />
+        {transcriptSegments ? (
+          // Timed lines: search and speaker rename.
+          <div className="bs-transcript">
+            <TranscriptPanel
+              meetingId={meeting.id}
+              segments={transcriptSegments}
+              focusAtMs={focusAtMs}
+              playingAtMs={playable ? playingAtMs : null}
+              onPlayFrom={playable ? (atMs) => playerRef.current?.playFrom(atMs) : undefined}
+              onClip={(line) => clipToSearchNotes({ kind: 'transcript', body: line.speaker ? `${line.speaker}: ${line.text}` : line.text, atMs: line.atMs })}
+              suggestions={meeting.recording_job?.speakerSuggestions}
+              onRenamed={({ segments, transcript }) => {
+                setMeeting(prev => ({ ...prev, transcript_segments: segments, transcript }))
+                // The rename also moves attendees and action item owners on the server.
+                cache.invalidate(`/meetings/${id}`)
+                meetingsApi.get(id).then((fresh) => { if (fresh) setMeeting(fresh) }).catch(() => {})
+              }}
+            />
+          </div>
+        ) : (
+          <div className="bs-transcript-plain">
+            <pre>{meeting.transcript || 'No transcript yet.'}</pre>
+          </div>
+        )}
+      </section>
+      <div className="bs-mtg-sync">
+        <EcosystemSyncStatus meetingId={id} />
+      </div>
+    </div>
+  )
 
   return (
     <div className="bs-mtg bs-mtg-detail">
       <TitleRule title={title} crumbs={<Breadcrumbs current={meeting.title || 'Untitled meeting'} />} meta={meta} actions={actions} />
 
       {(searchParams.get('debrief') || meeting.recording_job?.source === 'bot') && (
-        <BotDebrief meetingId={meeting.id} forced={Boolean(searchParams.get('debrief'))} onOpenTab={setTab} onMinutesReady={refreshMeeting} onJump={playMoment} plays={playable} />
+        <BotDebrief meetingId={meeting.id} forced={Boolean(searchParams.get('debrief'))} onOpenTab={openTab} onMinutesReady={refreshMeeting} onJump={playMoment} plays={playable} />
       )}
 
       <div className="bs-mtg-status-row">
@@ -508,8 +611,8 @@ export default function MeetingDetail() {
               )}
             </div>
             <div className="bs-transport-keys">
-              <Key size="sm" onDisplay onClick={() => stepMoment(-1)} disabled={!moments.length} aria-label="Previous moment">◀◀</Key>
-              <Key size="sm" onDisplay onClick={() => stepMoment(1)} disabled={!moments.length} aria-label="Next moment">▶▶</Key>
+              <Key size="sm" onDisplay onClick={() => stepMoment(-1)} disabled={!moments.length} aria-label="Previous moment">◀◀ Prev</Key>
+              <Key size="sm" onDisplay onClick={() => stepMoment(1)} disabled={!moments.length} aria-label="Next moment">Next ▶▶</Key>
             </div>
           </Display>
         </div>
@@ -517,9 +620,9 @@ export default function MeetingDetail() {
 
       <Grid>
         <Cell span={8}>
-          <Tabs label="Meeting sections" idBase={TABS_ID} items={tabs} value={tab} onChange={setTab} />
+          <Tabs label="Meeting sections" idBase={TABS_ID} items={tabs} value={activeTab} onChange={setTab} />
 
-          {tab === 'minutes' && (
+          {activeTab === 'minutes' && (
             <TabPanel idBase={TABS_ID} value="minutes">
               <div className="bs-mtg-block">
                 <Section
@@ -543,27 +646,7 @@ export default function MeetingDetail() {
                 ) : (
                   <p className="bs-para bs-mut">No summary yet.</p>
                 )}
-                {meeting.transcript && templates.length > 0 && !editingSummary && (
-                  <div className="bs-mtg-style">
-                    <label htmlFor="meeting-summary-style" className="bs-lbl">Meeting type</label>
-                    <select
-                      id="meeting-summary-style"
-                      className="bs-input"
-                      value={templatePick}
-                      onChange={(e) => setTemplatePick(e.target.value)}
-                      disabled={rewriting}
-                    >
-                      {!templatePick && <option value="">Not set</option>}
-                      {templates.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
-                    </select>
-                    {templatePick && templatePick !== (meeting.summary_template || '') && (
-                      <Key size="sm" onClick={handleRewriteSummary} disabled={rewriting}>
-                        {rewriting && <Loader2 className="animate-spin" aria-hidden="true" />}
-                        {rewriting ? 'Rewriting' : 'Rewrite summary'}
-                      </Key>
-                    )}
-                  </div>
-                )}
+                {rewriting && <p className="bs-mtg-none"><Signal tone="ai">Rewriting the summary</Signal></p>}
               </div>
 
               {summarySections.map((section) => (
@@ -602,6 +685,22 @@ export default function MeetingDetail() {
                 )}
               </div>
 
+              <section id="meeting-actions" className="bs-mtg-block" aria-labelledby="meeting-actions-heading">
+                <Section id="meeting-actions-heading" title="Action items" level={3} aside={actionItems.length ? String(actionItems.length) : undefined} />
+                {actionItems.length === 0 ? (
+                  <p className="bs-mtg-none">No action items were recorded.</p>
+                ) : (
+                  <ActionItemsList
+                    items={actionItems}
+                    meetingId={id}
+                    onUpdate={refreshMeeting}
+                    onJumpToTranscript={transcriptSegments ? playMoment : undefined}
+                    timecodesPlay={playable}
+                    focusAtMs={focusAtMs}
+                  />
+                )}
+              </section>
+
               {(keyPoints.length > 0 || editingKeyPoints) && (
                 <div className="bs-mtg-block">
                   <Section
@@ -637,32 +736,16 @@ export default function MeetingDetail() {
                 </div>
               )}
 
-              {meeting.sentiment_label && (
-                <p className="bs-mtg-foot">
-                  <span className="bs-lbl">Tone</span>
-                  <Tag>{meeting.sentiment_label}{typeof meeting.sentiment_score === 'number' ? ` · ${meeting.sentiment_score.toFixed(2)}` : ''}</Tag>
-                </p>
-              )}
             </TabPanel>
           )}
 
-          {tab === 'actions' && (
-            <TabPanel idBase={TABS_ID} value="actions">
-              <div className="bs-mtg-block">
-                <ActionItemsList
-                  items={actionItems}
-                  meetingId={id}
-                  onUpdate={loadMeeting}
-                  onJumpToTranscript={transcriptSegments ? playMoment : undefined}
-                  timecodesPlay={playable}
-                  focusAtMs={focusAtMs}
-                />
-              </div>
-              <CarryForward data={carryForward} title="From earlier meetings" />
+          {activeTab === 'transcript' && (
+            <TabPanel idBase={TABS_ID} value="transcript">
+              {context}
             </TabPanel>
           )}
 
-          {tab === 'notes' && (
+          {activeTab === 'notes' && (
             <TabPanel idBase={TABS_ID} value="notes">
               <section className="bs-mtg-block" aria-labelledby="meeting-notes-heading">
                 <Section id="meeting-notes-heading" title="Notes" level={3} aside="Private unless you share with the team" />
@@ -673,90 +756,10 @@ export default function MeetingDetail() {
             </TabPanel>
           )}
 
-          {tab === 'ask' && (
-            <TabPanel idBase={TABS_ID} value="ask">
-              <div className="bs-mtg-block">
-                <Section title="Ask about this meeting" level={3} aside="Answers come from the transcript" />
-                <form onSubmit={handleAskQuestion} className="bs-mtg-ask">
-                  <label htmlFor="meeting-ask-input" className="bs-sr">Question</label>
-                  <TextInput
-                    id="meeting-ask-input"
-                    placeholder="Who owns the spec? What did we decide about pricing?"
-                    value={question}
-                    onChange={(e) => setQuestion(e.target.value)}
-                    disabled={askingQuestion}
-                  />
-                  <Key type="submit" disabled={askingQuestion || !question.trim()}>
-                    {askingQuestion ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Send aria-hidden="true" />}
-                    Ask
-                  </Key>
-                </form>
-                {answer && (
-                  <div className="bs-mtg-answer" aria-live="polite">
-                    {answer.question && <div className="bs-lbl">Q · {answer.question}</div>}
-                    <p className="bs-para">{answer.answer}</p>
-                    {typeof answer.confidence === 'number' && (
-                      <div className="bs-why">
-                        <Signal tone="ai">Answer · {Math.round(answer.confidence * 100)}% confident</Signal>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </TabPanel>
-          )}
-
-          {tab === 'intel' && (
-            <TabPanel idBase={TABS_ID} value="intel">
-              <div className="bs-mtg-block bs-skin bs-mtg-intel">
-                <MeetingIntelligencePanel
-                  meetingId={meeting.id}
-                  meetingTitle={meeting.title}
-                  meetingDescription={meeting.description}
-                  meetingTags={meeting.tags}
-                  meetingParticipants={meeting.attendees || meeting.participants}
-                />
-                <EcosystemSyncStatus meetingId={id} />
-              </div>
-            </TabPanel>
-          )}
         </Cell>
 
         <Cell span={4} rule>
-          <section id="meeting-transcript" className="bs-mtg-transcript" aria-labelledby="meeting-transcript-heading">
-            <Section
-              id="meeting-transcript-heading"
-              title="Transcript"
-              level={3}
-              aside={transcriptSegments
-                ? <Signal tone={focusAtMs != null ? 'brand' : 'off'}>{focusAtMs != null ? `At ${formatClock(focusAtMs)}` : `${transcriptSegments.length} lines`}</Signal>
-                : meeting.transcript ? <Signal tone="off">Plain text</Signal> : undefined}
-            />
-            {transcriptSegments ? (
-              // Timed lines: search and speaker rename.
-              <div className="bs-transcript">
-                <TranscriptPanel
-                  meetingId={meeting.id}
-                  segments={transcriptSegments}
-                  focusAtMs={focusAtMs}
-                  playingAtMs={playable ? playingAtMs : null}
-                  onPlayFrom={playable ? (atMs) => playerRef.current?.playFrom(atMs) : undefined}
-                  onClip={(line) => clipToSearchNotes({ kind: 'transcript', body: line.speaker ? `${line.speaker}: ${line.text}` : line.text, atMs: line.atMs })}
-                  suggestions={meeting.recording_job?.speakerSuggestions}
-                  onRenamed={({ segments, transcript }) => {
-                    setMeeting(prev => ({ ...prev, transcript_segments: segments, transcript }))
-                    // The rename also moves attendees and action item owners on the server.
-                    cache.invalidate(`/meetings/${id}`)
-                    meetingsApi.get(id).then((fresh) => { if (fresh) setMeeting(fresh) }).catch(() => {})
-                  }}
-                />
-              </div>
-            ) : (
-              <div className="bs-transcript-plain">
-                <pre>{meeting.transcript || 'No transcript yet.'}</pre>
-              </div>
-            )}
-          </section>
+          {!isPhone && context}
         </Cell>
       </Grid>
 
@@ -766,6 +769,19 @@ export default function MeetingDetail() {
         items={meeting.actionItems || []}
         onSent={refreshMeeting}
       />
+
+      {/* Intelligence profile: set-up for the agents, folded out of the old Context tab */}
+      <Drawer open={showIntel} onClose={() => setShowIntel(false)} label="Intelligence profile" className="bs-drawer-wide">
+        <div className="bs-mtg-block bs-skin bs-mtg-intel">
+          <MeetingIntelligencePanel
+            meetingId={meeting.id}
+            meetingTitle={meeting.title}
+            meetingDescription={meeting.description}
+            meetingTags={meeting.tags}
+            meetingParticipants={meeting.attendees || meeting.participants}
+          />
+        </div>
+      </Drawer>
 
       {/* Share recap: a drawer on desktop, a sheet on phone */}
       <Drawer

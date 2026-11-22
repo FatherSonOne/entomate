@@ -23,6 +23,14 @@ export interface MeetingRow {
   transcript_segments?: unknown
   recording_job?: unknown
   chat_posted?: boolean | null
+  /** From GET /api/meetings: open action items and how many are on the caller. */
+  action_counts?: unknown
+}
+
+export interface ActionCounts {
+  total: number
+  open: number
+  mine: number
 }
 
 export type MeetingStatusKey = 'recording' | 'writing' | 'attention' | 'posted' | 'ready' | 'empty'
@@ -179,3 +187,24 @@ export function speechDensity(segments: ReadonlyArray<TranscriptSegment> | null,
   const max = Math.max(...out)
   return max > 0 ? out.map((v) => v / max) : out
 }
+
+/** The list's follow-through figures for a row; zeros when the API sent none. */
+export function actionCounts(m: MeetingRow): ActionCounts {
+  const raw = m.action_counts
+  if (!raw || typeof raw !== 'object') return { total: 0, open: 0, mine: 0 }
+  const r = raw as Record<string, unknown>
+  const n = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.floor(v) : 0)
+  return { total: n(r.total), open: n(r.open), mine: n(r.mine) }
+}
+
+/** The first decision and how many more there are: the line under a list row's title. */
+export function firstDecision(m: MeetingRow): { text: string; more: number } | null {
+  const list = asList(m.decisions)
+  return list.length ? { text: list[0]!, more: list.length - 1 } : null
+}
+
+/** "1 action", "3 actions". */
+export function plural(n: number, one: string, many = `${one}s`): string {
+  return `${n} ${n === 1 ? one : many}`
+}
+

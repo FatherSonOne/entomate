@@ -379,8 +379,29 @@ router.get('/', authenticate, validate(schemas.list), async (req, res) => {
 
     if (error) throw error;
 
+    // Per-row follow-through for the list: open action items, and how many are on the caller.
+    const rows = meetings || [];
+    if (rows.length > 0) {
+      const { data: items } = await supabase
+        .from('action_items')
+        .select('meeting_id, status, assigned_to_email')
+        .in('org_id', orgIds)
+        .in('meeting_id', rows.map((m) => m.id));
+      const me = (req.user?.email || '').toLowerCase();
+      const counts = {};
+      for (const it of items || []) {
+        const c = counts[it.meeting_id] || (counts[it.meeting_id] = { total: 0, open: 0, mine: 0 });
+        c.total++;
+        if (it.status !== 'done') {
+          c.open++;
+          if (me && (it.assigned_to_email || '').toLowerCase() === me) c.mine++;
+        }
+      }
+      for (const m of rows) m.action_counts = counts[m.id] || { total: 0, open: 0, mine: 0 };
+    }
+
     res.json({
-      meetings: meetings || [],
+      meetings: rows,
       count: count || 0,
       hasMore: (meetings?.length || 0) === parseInt(limit)
     });

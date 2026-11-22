@@ -1239,6 +1239,62 @@ html[data-motion="reduce"] :is(.bs-key, .bs-av) { transition-duration: 1ms !impo
 .bs-mtg-link:hover { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
 .bs-mtg-sub { margin-top: 2px; font-size: 12.5px; color: var(--bs-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bs-mtg-sub .bs-mono { font-size: 11.5px; }
+/* List row: the first decision under the title, follow-through in its own column (2026-11-22, A) */
+.bs-mtg-dec { display: flex; gap: 9px; align-items: baseline; margin-top: 6px; font-size: 13px; line-height: 1.4; color: var(--bs-ink2); overflow-wrap: anywhere; }
+.bs-mtg-dec .bs-tick { align-self: auto; flex: none; height: 12px; margin: 0; transform: translateY(1px); }
+.bs-mtg-dec-more { font: 500 11px var(--bs-mono); color: var(--bs-muted); white-space: nowrap; }
+.bs-mtg-mine { margin-top: 5px; font: 500 11px var(--bs-mono); letter-spacing: 0.04em; color: var(--bs-brand); }
+.bs-mtg .bs-tbl td.bs-mtg-acts { width: 112px; font: 500 12px var(--bs-mono); }
+.bs-mtg .bs-tbl td.bs-mtg-acts > span { display: block; }
+.bs-mtg-acts-mine { margin-top: 3px; color: var(--bs-brand); }
+.bs-mtg .bs-tbl td.bs-mtg-more-col { width: 1%; padding-right: 0; }
+.bs-mtg .bs-tbl td { vertical-align: top; }
+.bs-mtg .bs-tbl td.bs-mtg-status, .bs-mtg .bs-tbl td.bs-num, .bs-mtg .bs-tbl td.bs-mtg-acts { padding-top: 14px; }
+
+/* Menu: the ⋯ key and its short list of secondary actions */
+.bs-menu { position: relative; display: inline-flex; }
+.bs-menu-trigger { min-width: 34px; justify-content: center; padding: 0 10px; letter-spacing: 0.08em; }
+.bs-mtg .bs-tbl .bs-menu-trigger { height: 28px; min-width: 30px; padding: 0 8px; }
+.bs-menu-list {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 60; min-width: 220px; max-width: calc(100vw - 24px);
+  list-style: none; margin: 0; padding: 6px; border-radius: 12px; background: var(--bs-plate);
+  box-shadow: inset 0 0 0 1px var(--bs-rule), 0 20px 40px -14px rgba(0, 0, 0, 0.45);
+  transform-origin: top right; animation: bs-menu-in 260ms var(--bs-spring);
+}
+.bs-menu-list[data-align="start"] { right: auto; left: 0; transform-origin: top left; }
+@keyframes bs-menu-in { from { opacity: 0; transform: scale(0.95) translateY(-4px); } to { opacity: 1; transform: none; } }
+.bs-menu-label { padding: 10px 10px 4px; }
+.bs-menu-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px; width: 100%;
+  padding: 9px 10px; border: 0; border-radius: 7px; background: none; cursor: pointer; text-align: left;
+  font-size: 13.5px; font-weight: 500; color: var(--bs-ink);
+}
+.bs-menu-item:hover, .bs-menu-item:focus-visible { background: var(--bs-sunk); outline: none; }
+.bs-menu-item:disabled { color: var(--bs-muted); cursor: default; background: none; }
+.bs-menu-item[data-danger] { color: var(--bs-brand); }
+.bs-menu-hint { font: 500 10.5px var(--bs-mono); letter-spacing: 0.04em; color: var(--bs-muted); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .bs-menu-list { animation: none; } }
+html[data-motion="reduce"] .bs-menu-list { animation: none; }
+
+/* Meeting page context column (a tab on phone): ask, earlier meetings, transcript, sync */
+.bs-mtg-context { display: flex; flex-direction: column; gap: 26px; }
+.bs-mtg-context > * { min-width: 0; }
+.bs-mtg-askbox .bs-mtg-answer { margin-top: 12px; }
+.bs-mtg-sync { padding-top: 14px; border-top: 1px solid var(--bs-rule); }
+.bs-mtg-sync:empty { display: none; }
+@media (min-width: 768px) { .bs-drawer.bs-drawer-wide { width: min(560px, calc(100vw - 36px)); } }
+@media (max-width: 767.98px) { .bs-mtg-context { padding-top: 18px; } }
+
+/* Meeting preview: slides out beside the list */
+.bs-mtg-pv { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding-top: 14px; }
+.bs-mtg-pv > .bs-h2 { margin-top: 2px; overflow-wrap: anywhere; }
+.bs-mtg-pv-people { font: 500 11.5px var(--bs-mono); color: var(--bs-muted); }
+.bs-mtg-pv-sum { margin-top: 8px; font-size: 14px; line-height: 1.55; color: var(--bs-ink2); }
+.bs-mtg-pv .bs-mtg-block { align-self: stretch; padding-top: 18px; }
+.bs-mtg-pv .bs-row-dec .bs-row-text { font-size: 13.5px; }
+.bs-mtg-pv-act .bs-row-text { display: flex; flex-direction: column; gap: 3px; font-size: 13.5px; }
+.bs-mtg-pv-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; font: 500 11px var(--bs-mono); color: var(--bs-muted); }
+.bs-mtg-pv-meta [data-mine] { color: var(--bs-brand); }
 .bs-mtg-more { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 18px; }
 .bs-mtg-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 40px 0 12px; }
 .bs-mtg-empty .bs-h3 { max-width: 46ch; }

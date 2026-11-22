@@ -17,3 +17,21 @@ describe('meetingLengthMs', () => {
     expect(meetingLengthMs({ id: 'm', created_at: '2026-11-22' } as never)).toBe(0)
   })
 })
+
+import { actionCounts, firstDecision, plural } from '../services/meetingView'
+
+describe('list row helpers', () => {
+  it('reads action counts defensively', () => {
+    expect(actionCounts({ id: 'm', created_at: 'x', action_counts: { total: 3, open: 2, mine: 1 } } as never)).toEqual({ total: 3, open: 2, mine: 1 })
+    expect(actionCounts({ id: 'm', created_at: 'x', action_counts: { total: 'x', open: -1 } } as never)).toEqual({ total: 0, open: 0, mine: 0 })
+    expect(actionCounts({ id: 'm', created_at: 'x' } as never)).toEqual({ total: 0, open: 0, mine: 0 })
+  })
+  it('gives the first decision and the count after it', () => {
+    expect(firstDecision({ id: 'm', created_at: 'x', decisions: ['A', '', 'B'] } as never)).toEqual({ text: 'A', more: 1 })
+    expect(firstDecision({ id: 'm', created_at: 'x', decisions: [] } as never)).toBeNull()
+  })
+  it('pluralises', () => {
+    expect(plural(1, 'action')).toBe('1 action')
+    expect(plural(2, 'action')).toBe('2 actions')
+  })
+})

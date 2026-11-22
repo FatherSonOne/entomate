@@ -98,7 +98,7 @@ export function BotDebrief({ meetingId, forced, onOpenTab, onMinutesReady, onJum
           <span className="bs-lbl">Tasks</span>
           <span>
             {d.actionItems > 0
-              ? <><button type="button" className="bs-linkbtn" onClick={() => onOpenTab?.('actions')}>{d.actionItems} action {d.actionItems === 1 ? 'item' : 'items'}</button> on the Actions tab and in <Link to="/tasks">Tasks</Link></>
+              ? <><button type="button" className="bs-linkbtn" onClick={() => onOpenTab?.('actions')}>{d.actionItems} action {d.actionItems === 1 ? 'item' : 'items'}</button> in the minutes and in <Link to="/tasks">Tasks</Link></>
               : 'No action items in this call'}
           </span>
         </li>
