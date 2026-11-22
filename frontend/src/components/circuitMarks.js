@@ -1,15 +1,15 @@
 // Vector redraws of the four circuit marks (Circuit E, Circuit Spire,
-// Catalyst Core, Routed Signal), 2026-11-22. Three finishes share one geometry
-// and one choreography: engraved (hairline + hatching), machined (matte
-// graphite solids) and drafted (ink lines over construction lines). Crimson is
-// kept for the one thing that is live at any moment; nothing glows.
+// Catalyst Core, Routed Signal), 2026-11-22. Four finishes share one geometry
+// and one choreography. Neon (shipped) keeps the original marks' lit red
+// tubes and glossy metal, drawn clean; engraved, machined and drafted are
+// calmer alternates. One colour (CRIMSON in the palette) marks what is live.
 //
 // renderCircuitMark(id, finish, duration) returns an SVG string in the same
 // 1000-unit box as the illustrated marks. The still mark (.mark-static) shows
 // when paused or with reduced motion; the animated copy is .motion-layer.
 
 export const CIRCUIT_MARK_IDS = ['circuit-e', 'circuit-spire', 'catalyst-core', 'routed-signal']
-export const CIRCUIT_FINISHES = ['engraved', 'machined', 'drafted']
+export const CIRCUIT_FINISHES = ['neon', 'engraved', 'machined', 'drafted']
 
 const EASE = { io: '.65 0 .35 1', out: '.16 1 .3 1', in: '.7 0 .84 0', lin: '0 0 1 1' }
 /* Engraved and Machined are neutral with a crimson live point. Drafted carries
@@ -17,6 +17,8 @@ const EASE = { io: '.65 0 .35 1', out: '.16 1 .3 1', in: '.7 0 .84 0', lin: '0 0
    oxblood construction, cream cores, amber for what is live. */
 const PALETTES = {
   neutral: { BG: '#060606', INK: '#E9E9E4', MUT: '#6E6E69', CRIMSON: '#FF2D6B', COPPER: '#E9E9E4', DEEP: '#060606', CREAM: '#E9E9E4' },
+  // Neon: the original marks' lit-tube look, rebuilt clean. Red tubes with a hot core and a soft halo, glossy red metal, copper rims, teal pads on the spire, gold for what is live.
+  neon: { BG: '#060606', INK: '#FF3B24', MUT: '#7A0E08', CRIMSON: '#FFD36B', COPPER: '#F08A50', DEEP: '#2A0403', CREAM: '#FF9A78' },
   drafted: { BG: '#060606', INK: '#E8573C', MUT: '#6E2B21', CRIMSON: '#FFB347', COPPER: '#D98C5F', DEEP: '#2B0B07', CREAM: '#F6D8B7' },
 }
 
@@ -53,6 +55,21 @@ export function renderCircuitMark(id, finish = 'engraved', duration = 6, title =
     `<linearGradient id="${uid}-metal" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4C4C50"/><stop offset=".45" stop-color="#2C2C2F"/><stop offset="1" stop-color="#1B1B1D"/></linearGradient>`,
     `<radialGradient id="${uid}-cap" cx=".4" cy=".35" r=".7"><stop offset="0" stop-color="#55555A"/><stop offset="1" stop-color="#1C1C1E"/></radialGradient>`,
   )
+  if (finish === 'neon') defs.push(
+    `<linearGradient id="${uid}-red" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FF7A55"/><stop offset=".16" stop-color="#F0301C"/><stop offset=".55" stop-color="#A8130B"/><stop offset="1" stop-color="#4A0504"/></linearGradient>`,
+    `<linearGradient id="${uid}-redv" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#4A0504"/><stop offset=".4" stop-color="#C21A0F"/><stop offset=".62" stop-color="#FF5A3A"/><stop offset="1" stop-color="#6A0705"/></linearGradient>`,
+    `<radialGradient id="${uid}-orb" cx=".36" cy=".3" r=".75"><stop offset="0" stop-color="#FFC4AA"/><stop offset=".22" stop-color="#FF4A2C"/><stop offset=".6" stop-color="#9E0F08"/><stop offset="1" stop-color="#2A0302"/></radialGradient>`,
+  )
+  const HALO = '#FF1E0A'
+  const HOT = '#FFE2D4'
+  const TEAL = '#46E0CC'
+  /** A lit tube: soft halo, coloured body, hot core. `extra`/`inner` go on every layer so draw-on animations stay in step. */
+  const tube = (d, w, extra = '', inner = '', color = INK) => [
+    `<path data-halo="1" d="${d}" fill="none" stroke="${HALO}" stroke-opacity=".2" stroke-width="${w * 3.4}" stroke-linecap="round" stroke-linejoin="round"${extra}>${inner}</path>`,
+    `<path d="${d}" fill="none" stroke="${color}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"${extra}>${inner}</path>`,
+    `<path data-halo="1" d="${d}" fill="none" stroke="${HOT}" stroke-opacity=".8" stroke-width="${w * 0.32}" stroke-linecap="round" stroke-linejoin="round"${extra}>${inner}</path>`,
+  ].join('')
+  const ringTube = (cx, cy, r, w, dash = '', color = INK) => tube(`M${cx - r} ${cy}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0`, w, dash ? ` stroke-dasharray="${dash}"` : '', '', color)
   const F = {
     engraved: {
       body: (x, y, w, h, r = 6) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${r}" fill="url(#${uid}-hatch)" stroke="${INK}" stroke-width="2.5"/>`,
@@ -82,6 +99,21 @@ export function renderCircuitMark(id, finish = 'engraved', duration = 6, title =
       band: (cx, cy, r, w) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#2A2A2D" stroke-width="${w}"/><circle cx="${cx}" cy="${cy}" r="${r + w / 2 - 2}" fill="none" stroke="#6A6A6E" stroke-width="2" opacity=".7"/>`,
       guide: () => '',
     },
+    neon: {
+      body: (x, y, w, h, r = 6) => (w > h
+        ? `<rect data-halo="1" x="${x - 4}" y="${y - 4}" width="${w + 8}" height="${h + 8}" rx="${r + 4}" fill="none" stroke="${HALO}" stroke-opacity=".22" stroke-width="10"/><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${r}" fill="url(#${uid}-red)" stroke="#FF6A48" stroke-width="2"/><rect x="${x + 10}" y="${y + 7}" width="${Math.max(0, w - 20)}" height="3" rx="1.5" fill="${HOT}" opacity=".75"/><rect x="${x + 10}" y="${y + h - 12}" width="${Math.max(0, w - 20)}" height="1.5" fill="#FF6A48" opacity=".5"/>`
+        : `<rect data-halo="1" x="${x - 4}" y="${y - 4}" width="${w + 8}" height="${h + 8}" rx="${r + 4}" fill="none" stroke="${HALO}" stroke-opacity=".22" stroke-width="10"/><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${r}" fill="url(#${uid}-redv)" stroke="#FF6A48" stroke-width="2"/><rect x="${x + w * 0.56}" y="${y + r}" width="3" height="${Math.max(0, h - 2 * r)}" fill="${HOT}" opacity=".6"/>`),
+      trace: (d, extra = '', inner = '') => tube(d, 5, extra, inner),
+      heavy: (d, extra = '', inner = '') => tube(d, 9, extra, inner, id === 'circuit-spire' ? COPPER : INK),
+      node: (cx, cy, r, core) => `<circle data-halo="1" cx="${cx}" cy="${cy}" r="${r + 6}" fill="none" stroke="${HALO}" stroke-opacity=".25" stroke-width="14"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="url(#${uid}-orb)" stroke="${COPPER}" stroke-width="${Math.max(2.5, r * 0.09)}"/><circle cx="${cx}" cy="${cy}" r="${r * 0.62}" fill="none" stroke="#FF6A48" stroke-opacity=".55" stroke-width="1.5"/>${core}<ellipse cx="${cx - r * 0.3}" cy="${cy - r * 0.36}" rx="${r * 0.22}" ry="${r * 0.12}" transform="rotate(-30 ${cx - r * 0.3} ${cy - r * 0.36})" fill="#FFF1EA" opacity=".7"/>`,
+      coreFill: CREAM,
+      pad: (cx, cy, r = 8) => `<circle data-halo="1" cx="${cx}" cy="${cy}" r="${r + 5}" fill="${id === 'circuit-spire' ? TEAL : HALO}" opacity=".18"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="${BG}" stroke="${id === 'circuit-spire' ? TEAL : COPPER}" stroke-width="3"/>`,
+      ring: (cx, cy, r, kind) => kind === 'dash' ? ringTube(cx, cy, r, 4, '38 18', '#E2281A')
+        : kind === 'fine' ? `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${MUT}" stroke-width="2"/>`
+          : ringTube(cx, cy, r, 7),
+      band: (cx, cy, r, w) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${DEEP}" stroke-width="${w}"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#7A0E08" stroke-width="${w * 0.3}" stroke-dasharray="3 9"/>` + ringTube(cx, cy, r + w / 2, 4) + ringTube(cx, cy, r - w / 2, 3, '', COPPER),
+      guide: () => '',
+    },
     drafted: {
       body: (x, y, w, h, r = 6) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${r}" fill="${DEEP}" stroke="${INK}" stroke-width="2.5"/><line x1="${x + 14}" y1="${y + h / 2}" x2="${x + w - 14}" y2="${y + h / 2}" stroke="${COPPER}" stroke-width="1.6" stroke-dasharray="10 8"/>`,
       trace: (d, extra = '', inner = '') => `<path d="${d}" fill="none" stroke="${INK}" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"${extra}>${inner}</path>`,
@@ -106,10 +138,16 @@ export function renderCircuitMark(id, finish = 'engraved', duration = 6, title =
     return F.node(cx, cy, r, fill)
   }
   /** A path that draws itself over [s, s+d] and erases over [e, e+d2]. */
-  const drawn = (d, s, dur, e, edur, heavy = false, reverseErase = false) => {
-    const f = once([[0, 1], [s, 1], [s + dur, 0, 'out'], [e, 0], [e + edur, reverseErase ? -1 : 1, 'in'], [1, reverseErase ? -1 : 1]])
+  const drawn = (d, s, dur, e, edur, heavy = false, reverseErase = false, ease = 'out') => {
+    const f = once([[0, 1], [s, 1], [s + dur, 0, ease], [e, 0], [e + edur, reverseErase ? -1 : 1, 'in'], [1, reverseErase ? -1 : 1]])
     return (heavy ? F.heavy : F.trace)(d, ' pathLength="1" stroke-dasharray="1 1" stroke-dashoffset="1"', a('stroke-dashoffset', f))
   }
+  /** A ring of light that leaves a point at share t and fades as it grows. */
+  const flash = (cx, cy, r0, r1, t, len = 0.12, w = 6) => `<circle cx="${cx}" cy="${cy}" r="${r0}" fill="none" stroke="${CRIMSON}" stroke-width="${w}" opacity="0">${a('r', once([[0, r0], [t, r0], [t + len, r1, 'out'], [1, r1]]))}${a('opacity', once([[0, 0], [t, 0], [t + 0.005, 0.85, 'lin'], [t + len, 0, 'out'], [1, 0]]))}</circle>`
+  /** A neon strike: the tube stutters as it catches, then holds. */
+  const strike = (t, inner) => fade(once([[0, 1], [t, 1], [t + 0.008, 0.3, 'lin'], [t + 0.018, 1, 'lin'], [t + 0.026, 0.55, 'lin'], [t + 0.04, 1, 'lin'], [1, 1]]), inner)
+  /** The live point: a hot orb with a halo. */
+  const orb = (r, extra = '') => `<g${extra}><circle r="${r * 2.4}" fill="${CRIMSON}" opacity=".18"/><circle r="${r * 1.5}" fill="${CRIMSON}" opacity=".35"/><circle r="${r}" fill="${CRIMSON}"/><circle r="${r * 0.45}" fill="#FFF6E0"/></g>`
   const popAt = (cx, cy, s, e, inner) => scaleAt(cx, cy, once([[0, 0.001], [s, 0.001], [s + 0.05, 1.14, 'out'], [s + 0.1, 1, 'io'], [e, 1], [e + 0.07, 0.001, 'in'], [1, 0.001]]), inner)
 
   let still = ''
@@ -129,10 +167,11 @@ export function renderCircuitMark(id, finish = 'engraved', duration = 6, title =
       const s = 0.06 + i * 0.1
       const out = 0.8 + i * 0.03
       const slide = once([[0, '-60 0'], [s, '-60 0'], [s + 0.11, '10 0', 'out'], [s + 0.17, '0 0', 'io'], [out, '0 0'], [out + 0.1, '-60 0', 'in'], [1, '-60 0']])
-      return revealX(234, y - 6, w + 60, 100, once([[0, 0], [s, 0], [s + 0.11, 1, 'out'], [out, 1], [out + 0.1, 0, 'in'], [1, 0]]), moveBy(slide, F.body(262, y, w, 88, 4)))
+      return strike(s + 0.11, revealX(234, y - 6, w + 60, 100, once([[0, 0], [s, 0], [s + 0.11, 1, 'out'], [out, 1], [out + 0.1, 0, 'in'], [1, 0]]), moveBy(slide, F.body(262, y, w, 88, 4))))
     }).join('')
       + spine + drawn(traceD, 0.36, 0.12, 0.8, 0.08) + popAt(560, 385, 0.46, 0.8, F.pad(560, 385))
-      + nodes.map((y, i) => node(200, y, 58, [0.04 + i * 0.1, 0.16 + i * 0.1])).join('') + node(200, 345, 24, [0.36, 0.5])
+      + nodes.map((y, i) => node(200, y, 58, [0.04 + i * 0.1, 0.16 + i * 0.1]) + flash(200, y, 58, 120, 0.05 + i * 0.1, 0.1, 4)).join('') + node(200, 345, 24, [0.36, 0.5])
+      + flash(560, 385, 8, 60, 0.5, 0.1, 3)
   } else if (id === 'circuit-spire') {
     // A routing trunk builds upward from its root; branches sprout as the edge passes them, then it drains.
     const trunk = 'M500 940V760L470 730V560L530 500V320L500 290V70'
@@ -146,8 +185,15 @@ export function renderCircuitMark(id, finish = 'engraved', duration = 6, title =
     both(F.guide('M500 30V970M300 940H700'), F.guide('M500 30V970M300 940H700'))
     still += F.heavy(trunk) + br.map((b) => { const { d, end } = branch(b); return F.trace(d) + F.pad(end[0], end[1], 7) }).join('')
       + parts.map(([x, y, r]) => node(x, y, r)).join('') + F.pad(500, 940, 11) + F.pad(500, 70, 9)
-    const edge = (y) => 0.04 + 0.41 * (940 - y) / 870
-    moving += drawn(trunk, 0.04, 0.41, 0.82, 0.12, true, true)
+    const trunkLen = 180 + 42.4 + 170 + 84.9 + 180 + 42.4 + 220
+    const along = (y) => { // share of the trunk's length below height y
+      const segs = [[940, 760, 180], [760, 730, 42.4], [730, 560, 170], [560, 500, 84.9], [500, 320, 180], [320, 290, 42.4], [290, 70, 220]]
+      let run = 0
+      for (const [y0, y1, len] of segs) { if (y <= y1) { run += len; continue } return (run + len * (y0 - y) / (y0 - y1)) / trunkLen }
+      return 1
+    }
+    const edge = (y) => 0.04 + 0.41 * along(y)
+    moving += drawn(trunk, 0.04, 0.41, 0.82, 0.12, true, true, 'lin')
       + br.map((b) => {
         const { d, end } = branch(b)
         const s = edge(b[0])
@@ -157,7 +203,8 @@ export function renderCircuitMark(id, finish = 'engraved', duration = 6, title =
       + popAt(500, 940, 0.02, 0.86, F.pad(500, 940, 11)) + popAt(500, 70, 0.44, 0.84, F.pad(500, 70, 9))
       // the live edge: a crimson head that rides the trunk as it builds
       + fade(once([[0, 0], [0.04, 1], [0.44, 1], [0.48, 0, 'out'], [1, 0]]),
-        `<circle r="9" fill="${CRIMSON}"><animateMotion path="${trunk}" keyPoints="0;0;1;1" keyTimes="0;.04;.45;1" calcMode="spline" keySplines="0 0 1 1;.65 0 .35 1;0 0 1 1" ${loop}/></circle>`)
+        `<g>${orb(10)}<animateMotion path="${trunk}" keyPoints="0;0;1;1" keyTimes="0;.04;.45;1" calcMode="linear" ${loop}/></g>`)
+      + flash(500, 70, 9, 150, 0.45, 0.14, 5) + flash(500, 70, 9, 90, 0.47, 0.1, 3)
   } else if (id === 'catalyst-core') {
     // Rings spin apart and lock back into line with the fixed keys; the core fires on each lock.
     const keys = 'M140 440H330M670 440H860M140 560H330M670 560H860'
@@ -172,6 +219,7 @@ export function renderCircuitMark(id, finish = 'engraved', duration = 6, title =
     const coreNode = (cx, cy, r) => F.node(cx, cy, r, `<circle cx="${cx}" cy="${cy}" r="${r * 0.34}" fill="${F.coreFill}">${a('fill', once([[0, F.coreFill], [lit[0][0], F.coreFill], [lit[0][0] + 0.02, CRIMSON, 'out'], [lit[0][1], CRIMSON], [lit[0][1] + 0.05, F.coreFill, 'io'], [lit[1][0], F.coreFill], [lit[1][0] + 0.02, CRIMSON, 'out'], [lit[1][1], CRIMSON], [1, F.coreFill, 'io']]))}</circle>`)
     moving += F.trace(keys) + rotateAt(500, 500, lockF(1), outer) + rotateAt(500, 500, lockF(-0.5), inner) + F.trace(legs)
       + coreNode(395, 650, 40) + coreNode(605, 650, 40)
+      + flash(500, 500, 95, 440, 0.42, 0.16, 8) + flash(500, 500, 95, 440, 0.92, 0.08, 8)
       + scaleAt(500, 500, once([[0, 1], [0.38, 0.94, 'in'], [0.43, 1.06, 'out'], [0.5, 1, 'io'], [0.88, 0.94, 'in'], [0.93, 1.06, 'out'], [1, 1, 'io']]), coreNode(500, 500, 95))
   } else if (id === 'routed-signal') {
     // Routes draw out to their terminals, which pop on arrival; the charge rolls in and settles.
@@ -181,15 +229,16 @@ export function renderCircuitMark(id, finish = 'engraved', duration = 6, title =
     both(F.guide('M120 160V860M60 480H940'), F.guide('M120 160V860M60 480H940'))
     const term = (cx, cy) => node(cx, cy, 62)
     still += F.heavy(bus) + routes.map(([y, x2, cx]) => F.trace(`M120 ${y}H${x2}`) + term(cx, y)).join('') + F.trace(hook)
-      + `<circle cx="500" cy="480" r="20" fill="${F.coreFill}"/>`
+      + orb(16, ' transform="translate(500 480)"')
     moving += drawn(bus, 0.11, 0.16, 0.84, 0.1, true)
       + routes.map(([y, x2, cx, s]) => drawn(`M120 ${y}H${x2}`, s, 0.14, 0.84, 0.1)
-        + popAt(cx, y, s + 0.13, 0.86, F.node(cx, y, 62, `<circle cx="${cx}" cy="${y}" r="${62 * 0.34}" fill="${F.coreFill}">${a('fill', once([[0, F.coreFill], [s + 0.13, CRIMSON], [s + 0.24, F.coreFill, 'io'], [1, F.coreFill]]))}</circle>`))).join('')
+        + flash(cx, y, 62, 130, s + 0.13, 0.1, 4) + popAt(cx, y, s + 0.13, 0.86, F.node(cx, y, 62, `<circle cx="${cx}" cy="${y}" r="${62 * 0.34}" fill="${F.coreFill}">${a('fill', once([[0, F.coreFill], [s + 0.13, CRIMSON], [s + 0.24, F.coreFill, 'io'], [1, F.coreFill]]))}</circle>`))).join('')
       + drawn(hook, 0.4, 0.08, 0.84, 0.08)
       + fade(once([[0, 0], [0.26, 0], [0.28, 1, 'out'], [0.86, 1], [0.94, 0, 'io'], [1, 0]]),
         moveBy(once([[0, '-380 0'], [0.26, '-380 0'], [0.39, '16 0', 'out'], [0.45, '0 0', 'io'], [1, '0 0']]),
           scaleAt(500, 480, once([[0, 1], [0.26, '1.5 .75'], [0.39, '.85 1.15', 'out'], [0.45, 1, 'io'], [1, 1]]),
-            `<circle cx="500" cy="480" r="20" fill="${CRIMSON}">${a('fill', once([[0, CRIMSON], [0.5, CRIMSON], [0.6, F.coreFill, 'io'], [1, F.coreFill]]))}</circle>`)))
+            orb(16, ' transform="translate(500 480)"'))))
+      + flash(500, 480, 16, 110, 0.4, 0.12, 4)
   }
 
   const css = '.mark-static{display:none}.motion-still .mark-static{display:inline}.motion-still .motion-layer{display:none}'
@@ -203,4 +252,4 @@ export function renderCircuitStill(id, finish = 'engraved') {
 }
 
 /** The finish the app ships. */
-export const CIRCUIT_FINISH = 'drafted'
+export const CIRCUIT_FINISH = 'neon'
