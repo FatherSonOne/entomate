@@ -1,8 +1,9 @@
 /**
  * Transcript panel: timed, per-speaker lines with search and speaker rename.
  * Ported from Logos Vision `NotetakerPlaybackPanel.tsx` (search moments, speaker lanes)
- * and the "Check speakers" step, without media playback: Recall's recording link is
- * pre-signed and expires, so there is nothing reliable to play yet.
+ * and the "Check speakers" step. Media playback is optional: a meeting recorded in the
+ * browser passes `playingAtMs` and `onPlayFrom` (from `RecordingPlayer`), which marks the
+ * line being spoken and turns each line's time into a "Play from" button.
  *
  * Search marks every match and steps through them; the current one scrolls into view.
  * Renaming a speaker changes every line they spoke, on the server, so search, Ask and
@@ -30,6 +31,10 @@ export interface TranscriptPanelProps {
    * action-item timecodes elsewhere on the page; a new value scrolls and marks the line.
    */
   focusAtMs?: number | null
+  /** Where playback is (ms from the start): marks that line and keeps it in view. */
+  playingAtMs?: number | null
+  /** Given when there is audio to play: each line's time plays from that moment. */
+  onPlayFrom?: (atMs: number) => void
 }
 
 /** Index of the line being spoken at `atMs`: the last one that started at or before it. */
@@ -74,7 +79,7 @@ function Highlighted({ text, query }: { text: string; query: string }): React.Re
   )
 }
 
-export function TranscriptPanel({ meetingId, segments, onRenamed, focusAtMs }: TranscriptPanelProps): React.ReactElement {
+export function TranscriptPanel({ meetingId, segments, onRenamed, focusAtMs, playingAtMs, onPlayFrom }: TranscriptPanelProps): React.ReactElement {
   const [lines, setLines] = useState<TranscriptSegment[]>(segments)
   const [query, setQuery] = useState('')
   const [current, setCurrent] = useState(0)
@@ -83,6 +88,7 @@ export function TranscriptPanel({ meetingId, segments, onRenamed, focusAtMs }: T
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const lineRefs = useRef<Array<HTMLLIElement | null>>([])
+  const listRef = useRef<HTMLOListElement | null>(null)
 
   useEffect(() => setLines(segments), [segments])
 
@@ -92,6 +98,21 @@ export function TranscriptPanel({ meetingId, segments, onRenamed, focusAtMs }: T
     typeof focusAtMs === 'number' && Number.isFinite(focusAtMs) && lines.length ? lineAt(lines, focusAtMs) : undefined
   // A search in progress wins; otherwise the line a timecode jumped to is the active one.
   const activeLine = hits.length ? hits[Math.min(current, hits.length - 1)] : query.trim() ? undefined : focusLine
+
+  const playingLine =
+    typeof playingAtMs === 'number' && Number.isFinite(playingAtMs) && lines.length ? lineAt(lines, playingAtMs) : undefined
+
+  // Follow playback inside the list only (never scroll the page), and not during a search.
+  // Runs on a new playing line only: a user scrolling the list is not pulled back each second.
+  useEffect(() => {
+    const list = listRef.current
+    const line = playingLine === undefined ? null : lineRefs.current[playingLine]
+    if (!list || !line || query.trim()) return
+    const top = line.offsetTop
+    if (top < list.scrollTop || top + line.offsetHeight > list.scrollTop + list.clientHeight) {
+      list.scrollTop = Math.max(0, top - list.clientHeight / 3)
+    }
+  }, [playingLine])
 
   // A new query starts at its first match.
   useEffect(() => setCurrent(0), [query])
@@ -230,7 +251,7 @@ export function TranscriptPanel({ meetingId, segments, onRenamed, focusAtMs }: T
         )}
       </div>
 
-      <ol className="max-h-96 space-y-2 overflow-y-auto rounded-lg bg-surface-elevated p-3 scrollbar-thin" aria-label="Transcript">
+      <ol ref={listRef} className="relative max-h-96 space-y-2 overflow-y-auto rounded-lg bg-surface-elevated p-3 scrollbar-thin" aria-label="Transcript">
         {lines.map((line, i) => (
           <li
             key={`${line.atMs}-${i}`}
@@ -240,11 +261,24 @@ export function TranscriptPanel({ meetingId, segments, onRenamed, focusAtMs }: T
             data-testid="transcript-line"
             data-at-ms={line.atMs}
             aria-current={i === activeLine ? 'true' : undefined}
+            data-playing={i === playingLine ? 'true' : undefined}
             className={`grid grid-cols-[3.5rem_1fr] gap-x-3 rounded px-1.5 py-1 text-sm ${
               i === activeLine ? 'ring-2 ring-accent-primary' : ''
-            }`}
+            } ${i === playingLine ? 'bg-accent-primary-dim' : ''}`}
           >
-            <span className="pt-px text-xs tabular-nums text-content-secondary">{formatClock(line.atMs)}</span>
+            {onPlayFrom ? (
+              <button
+                type="button"
+                onClick={() => onPlayFrom(line.atMs)}
+                aria-label={`Play from ${formatClock(line.atMs)}`}
+                title="Play from here"
+                className="self-start rounded pt-px text-left text-xs tabular-nums text-content-secondary underline decoration-line underline-offset-2 hover:text-content-primary hover:decoration-accent-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary"
+              >
+                {formatClock(line.atMs)}
+              </button>
+            ) : (
+              <span className="pt-px text-xs tabular-nums text-content-secondary">{formatClock(line.atMs)}</span>
+            )}
             <p className="text-content-secondary">
               <span className="font-medium text-content-primary">
                 <Highlighted text={line.speaker} query={query} />

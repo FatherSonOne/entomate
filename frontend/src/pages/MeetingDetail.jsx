@@ -10,6 +10,8 @@ import MeetingNotesPanel from '../components/meetings/MeetingNotesPanel'
 import TranscriptPanel from '../components/meetings/TranscriptPanel'
 import TimecodeButton from '../components/meetings/TimecodeButton'
 import RecordingStatus from '../components/meetings/RecordingStatus'
+import RecordingPlayer from '../components/meetings/RecordingPlayer'
+import { canPlay } from '../services/meetingRecorderService'
 import cache from '../services/apiCache'
 import { formatClock, toSegments, toSummaryMoments } from '../services/meetingTranscriptService'
 import MeetingIntelligencePanel from '../components/intelligence/MeetingIntelligencePanel'
@@ -30,8 +32,13 @@ export default function MeetingDetail() {
   const summaryMoments = useMemo(() => toSummaryMoments(meeting?.summary_moments), [meeting?.summary_moments])
   // Timecodes next to decisions, key points and action items jump the transcript here.
   const [focusAtMs, setFocusAtMs] = useState(null)
+  // A browser recording's audio, played under the tape; timecodes move it once it is loaded.
+  const playerRef = useRef(null)
+  const [playingAtMs, setPlayingAtMs] = useState(null)
+  const playable = canPlay(meeting?.recording_job)
   const jumpToTranscript = useCallback((atMs) => {
     setFocusAtMs(atMs)
+    if (playerRef.current?.isReady()) playerRef.current.playFrom(atMs)
     // The transcript sits beside the content on desktop; on phone it is below, so bring it up.
     const el = document.getElementById('meeting-transcript')
     if (el && el.getBoundingClientRect().top > window.innerHeight * 0.6) {
@@ -276,6 +283,8 @@ export default function MeetingDetail() {
     jumpToTranscript(next ?? (dir > 0 ? moments[0] : moments[moments.length - 1]))
   }
   const showTape = Boolean(transcriptSegments && lengthMs > 0)
+  // While the recording plays, the tape follows it; otherwise it shows the last jump.
+  const tapeAtMs = playable && playingAtMs != null ? playingAtMs : focusAtMs
 
   if (loading) {
     return (
@@ -378,7 +387,7 @@ export default function MeetingDetail() {
                   Tape · <span className="bs-transport-key d" aria-hidden="true" /> decision · <span className="bs-transport-key a" aria-hidden="true" /> action item
                 </span>
                 <span className="bs-transport-clock" aria-live="polite">
-                  <b>{formatClock(focusAtMs ?? 0)}</b> / {formatClock(lengthMs)}
+                  <b>{formatClock(tapeAtMs ?? 0)}</b> / {formatClock(lengthMs)}
                 </span>
               </div>
               <Tape
@@ -386,13 +395,22 @@ export default function MeetingDetail() {
                 density={density}
                 decisions={decisionMarks}
                 actions={actionMarks}
-                progress={focusAtMs != null ? focusAtMs / lengthMs : 0}
-                playhead={focusAtMs != null}
+                progress={tapeAtMs != null ? Math.min(1, tapeAtMs / lengthMs) : 0}
+                playhead={tapeAtMs != null}
                 onSeek={jumpToTranscript}
                 label={`Meeting tape: ${decisionMarks.length} decisions and ${actionMarks.length} action items. Choose one to jump the transcript.`}
               />
               {/* Player slot: the synced video/audio player goes here, under the tape. */}
-              {meeting.audio_file_url && (
+              {playable ? (
+                <div className="bs-transport-media" data-slot="player">
+                  <RecordingPlayer
+                    ref={playerRef}
+                    meetingId={meeting.id}
+                    durationMs={meeting.recording_job?.durationMs}
+                    onTime={setPlayingAtMs}
+                  />
+                </div>
+              ) : meeting.audio_file_url && (
                 <div className="bs-transport-media" data-slot="player">
                   <audio controls preload="none" src={meeting.audio_file_url}>
                     Your browser does not support the audio element.
@@ -597,6 +615,8 @@ export default function MeetingDetail() {
                   meetingId={meeting.id}
                   segments={transcriptSegments}
                   focusAtMs={focusAtMs}
+                  playingAtMs={playable ? playingAtMs : null}
+                  onPlayFrom={playable ? (atMs) => playerRef.current?.playFrom(atMs) : undefined}
                   onRenamed={({ segments, transcript }) =>
                     setMeeting(prev => ({ ...prev, transcript_segments: segments, transcript }))
                   }

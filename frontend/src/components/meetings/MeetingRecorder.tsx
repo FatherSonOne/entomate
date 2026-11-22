@@ -16,6 +16,7 @@ import React, { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, Camera, Download, Loader2, Mic, MonitorUp, Square, Trash2 } from 'lucide-react'
 import { formatClock } from '../../services/meetingTranscriptService'
+import LiveCaptions, { speechRecognitionCtor } from './LiveCaptions'
 import {
   PIECE_MS,
   PieceUploader,
@@ -126,6 +127,8 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded }: MeetingRecor
   const [title, setTitle] = useState('')
   const [attendees, setAttendees] = useState('')
   const [consent, setConsent] = useState(false)
+  // Live captions are opt-in: the browser's speech service (Google, in Chrome) hears the audio.
+  const [captions, setCaptions] = useState(false)
   const [phase, setPhase] = useState<Phase>('setup')
   const [error, setError] = useState<string | null>(null)
   const [elapsedMs, setElapsedMs] = useState(0)
@@ -143,6 +146,7 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded }: MeetingRecor
   const meetingRef = useRef<string | null>(null)
 
   const tabSupported = tabCaptureSupported(typeof navigator === 'undefined' ? undefined : navigator)
+  const captionsSupported = speechRecognitionCtor() !== null
 
   const releaseDevices = useCallback((): void => {
     const c = capture.current
@@ -420,6 +424,18 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded }: MeetingRecor
                 Choose the tab with the call and turn on &quot;Also share tab audio&quot;. Chrome and Edge share tab sound; other browsers may share video only.
               </p>
             )}
+            {captionsSupported && (
+              <>
+                <label className="flex items-center gap-2 text-sm text-content-primary">
+                  <input type="checkbox" checked={captions} onChange={(e) => setCaptions(e.target.checked)} className="h-4 w-4 accent-accent-primary" />
+                  Show live captions while recording
+                </label>
+                <p className="text-xs text-content-secondary">
+                  A rough preview without speakers, from your browser&apos;s speech service (Chrome sends the audio to Google). Captions are not saved;
+                  the transcript with speakers is written after you stop.
+                </p>
+              </>
+            )}
           </fieldset>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -470,6 +486,13 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded }: MeetingRecor
               </div>
               {c && phase === 'recording' && (
                 <LevelMeter context={c.audioContext} stream={c.audioRecorder.stream} />
+              )}
+              {c && phase === 'recording' && captions && (
+                <LiveCaptions
+                  track={c.audioRecorder.stream.getAudioTracks()[0] ?? null}
+                  startedAt={startedAt.current}
+                  onClose={() => setCaptions(false)}
+                />
               )}
               <p className="text-xs text-content-secondary" aria-live="polite">
                 {upload.failed

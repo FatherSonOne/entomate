@@ -1303,6 +1303,10 @@ html.bs-scroll-lock, html.bs-scroll-lock body { overflow: hidden; }
   background: color-mix(in srgb, var(--bs-brand) 8%, transparent);
 }
 .bs-transcript [data-testid="transcript-line"][aria-current="true"] > span:first-child { padding-left: 11px; color: var(--bs-brand); }
+/* A recording that can play: each line's time is a "Play from" button; the playing line is tinted. */
+.bs-transcript [data-testid="transcript-line"] > button:first-child { font-family: var(--bs-mono); font-size: 11px; color: var(--bs-muted); padding-left: 2px; }
+.bs-transcript [data-testid="transcript-line"][aria-current="true"] > button:first-child { padding-left: 11px; color: var(--bs-brand); }
+.bs-transcript [data-testid="transcript-line"][data-playing="true"] { background: color-mix(in srgb, var(--bs-brand) 5%, transparent); }
 .bs-transcript mark { background: color-mix(in srgb, var(--bs-brand) 14%, transparent); color: var(--bs-ink); }
 
 /* Legacy components inside the plate (recorder, notes, channel picker) */

@@ -233,6 +233,8 @@ export const recordingsApi = {
   salvage: (meetingId) => api.post(`/recordings/${meetingId}/finish`, { salvage: true }),
   retry: (meetingId) => api.post(`/recordings/${meetingId}/retry`),
   discard: (meetingId) => api.delete(`/recordings/${meetingId}`),
+  // Signed links to the saved audio, in order; they expire, so never read this from the cache.
+  playback: (meetingId) => api.get(`/recordings/${meetingId}/playback`),
 }
 
 // ========================================

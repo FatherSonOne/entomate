@@ -7,6 +7,7 @@
  *                                             ({ salvage: true }: the tab closed; use what was saved)
  *   POST   /api/recordings/:id/retry          transcribe again after a failure
  *   DELETE /api/recordings/:id                discard an unfinished recording
+ *   GET    /api/recordings/:id/playback       signed links to the saved audio pieces, in order
  *
  * Progress is read from the meeting itself (`recording_job` on GET /api/meetings/:id).
  */
@@ -89,6 +90,17 @@ router.post('/:id/retry', authenticate, async (req, res) => {
     res.status(202).json({ success: true, ...result });
   } catch (err) {
     sendError(res, err, 'retry');
+  }
+});
+
+router.get('/:id/playback', authenticate, async (req, res) => {
+  try {
+    const orgId = await meetingNotes.assertMeetingAccess(req.user?.id, req.params.id);
+    // Signed links expire; a cached copy would hand out dead ones.
+    res.set('Cache-Control', 'no-store');
+    res.json({ success: true, ...(await recorder.getPlayback({ orgId, meetingId: req.params.id })) });
+  } catch (err) {
+    sendError(res, err, 'playback');
   }
 });
 
