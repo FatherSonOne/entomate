@@ -119,7 +119,8 @@
 /* Picked card: the live motion sits where the still was, at the same size */
 .lp-card-disp .en-app-loading-logo { width: 58%; height: auto; margin: 0; aspect-ratio: 1; }
 .lp-card-disp .en-app-loading-logo-art { width: 100%; height: 100%; }
-.lp-card-meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-width: 0; }
+.lp-card-meta { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 4px 8px; min-width: 0; }
+.lp-card-meta .bs-h3 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 
 @media (max-width: 640px) {
   .lp-bar { gap: 12px; }
