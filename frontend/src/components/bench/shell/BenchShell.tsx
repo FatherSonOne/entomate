@@ -289,7 +289,7 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
       {/* Rail: the patch panel (desktop) */}
       <aside className="bs-rail" aria-label="Main navigation">
         <Link to="/dashboard" className="bs-brand" aria-label="Entomate, go to Today">
-          <img src={brandMark} alt="" width={28} height={28} />
+          <img src={brandMark} alt="" width={28} height={28} data-brand-mark="" />
           entomate
           <span className="bs-ver" aria-hidden="true">EN-01</span>
         </Link>
@@ -315,7 +315,7 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
       <div className="bs-main">
         <div className="bs-tbar">
           <Link to="/dashboard" className="bs-tbar-brand" aria-label="Entomate, go to Today">
-            <img src={brandMark} alt="" width={22} height={22} />
+            <img src={brandMark} alt="" width={22} height={22} data-brand-mark="" />
             entomate
           </Link>
           <div className="bs-tbar-stat bs-lbl">

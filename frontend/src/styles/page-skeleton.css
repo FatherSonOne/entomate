@@ -1,0 +1,42 @@
+/* Page skeleton (2026-11-22): the Bench Swiss page shape while a page loads. */
+.en-skel { padding: 4px 0 24px; min-width: 0; }
+.en-skel-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; }
+.en-skel-bar {
+  display: block;
+  height: 12px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--bs-rule) 0%, var(--bs-rule2) 40%, var(--bs-rule) 80%);
+  background-size: 300% 100%;
+  animation: en-skel-sweep 1.4s ease-in-out infinite;
+}
+.en-skel-title { width: min(320px, 60%); height: 44px; border-radius: 8px; }
+.en-skel-meta { width: 140px; height: 10px; flex: none; }
+.en-skel-keys { display: flex; gap: 10px; margin: 18px 0 16px; }
+.en-skel-key { width: 112px; height: 34px; border-radius: 8px; }
+.en-skel-rule { height: 2px; background: var(--bs-ink); opacity: .85; }
+.en-skel-rows { list-style: none; margin: 0; padding: 0; }
+.en-skel-rows li {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 24px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--bs-rule2);
+}
+.en-skel-main { width: 62%; }
+.en-skel-rows li:nth-child(2) .en-skel-main { width: 48%; }
+.en-skel-rows li:nth-child(3) .en-skel-main { width: 70%; }
+.en-skel-rows li:nth-child(4) .en-skel-main { width: 54%; }
+.en-skel-rows li:nth-child(5) .en-skel-main { width: 40%; }
+.en-skel-rows li:nth-child(6) .en-skel-main { width: 66%; }
+.en-skel-date { width: 56px; height: 22px; }
+.en-skel-side { width: 96px; justify-self: end; }
+.en-skel-rows li:nth-child(even) .en-skel-side { width: 72px; }
+@keyframes en-skel-sweep { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
+@media (prefers-reduced-motion: reduce) { .en-skel-bar { animation: none; } }
+@media (max-width: 640px) {
+  .en-skel-title { height: 32px; }
+  .en-skel-meta { display: none; }
+  .en-skel-rows li { grid-template-columns: 44px minmax(0, 1fr); gap: 14px; }
+  .en-skel-side { display: none; }
+}

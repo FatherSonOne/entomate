@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import React, { Suspense, useState, useEffect } from 'react'
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
+import PageSkeleton from './PageSkeleton'
 import {
   LayoutDashboard,
   Mic,
@@ -254,7 +255,9 @@ export default function Layout() {
         >
           <Faceplate>
             {/* Pages reach shell overlays through the outlet context (Today's Ask Entomate key). */}
-            <Outlet context={{ openAssistant: () => { setAssistantOpen(true); setProactiveSuggestion(false) } }} />
+            <Suspense fallback={<PageSkeleton />}>
+              <Outlet context={{ openAssistant: () => { setAssistantOpen(true); setProactiveSuggestion(false) } }} />
+            </Suspense>
           </Faceplate>
         </BenchShell>
         {overlays}
@@ -489,7 +492,9 @@ export default function Layout() {
 
         {/* Page content */}
         <main className="p-4 lg:p-6" style={{ position: 'relative', zIndex: 1 }}>
-          <Outlet />
+          <Suspense fallback={<PageSkeleton />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
 

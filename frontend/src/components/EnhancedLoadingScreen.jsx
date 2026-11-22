@@ -1,8 +1,9 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useRef } from 'react'
 import { useLoading } from '../contexts/LoadingContext'
 import AnimatedLoadingLogo from './AnimatedLoadingLogo'
 import { Wordmark } from './Logo'
 import { isLogoId, logoById, useLogoSystem } from '../services/logoSystem'
+import { loaderMounted, loaderUnmounted } from '../services/loaderHandoff'
 import './EnhancedLoadingScreen.css'
 
 /*
@@ -31,6 +32,15 @@ export default function EnhancedLoadingScreen({ autoAnimate = true, stage = 'ses
   const loadingContext = useLoading()
   const picked = useLogoSystem()
   const logo = isLogoId(logoId) ? logoById(logoId) : picked
+
+  // Real loaders (not the picker preview) hand off to the app when the last one goes
+  const logoRef = useRef(logo.id)
+  logoRef.current = logo.id
+  useEffect(() => {
+    if (onClose) return undefined
+    loaderMounted()
+    return () => loaderUnmounted(logoRef.current)
+  }, [onClose])
 
   useEffect(() => {
     if (!onClose) return undefined

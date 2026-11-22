@@ -4,6 +4,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import OrgSetupGate from './components/teams/OrgSetupGate'
 import Layout from './components/Layout'
 import PageLoader from './components/PageLoader'
+import LoaderHandoff from './components/LoaderHandoff'
 import NavTrailRecorder from './components/NavTrailRecorder'
 
 // Lazy-loaded pages (code splitting)
@@ -34,6 +35,7 @@ export default function App() {
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <NavTrailRecorder />
+      <LoaderHandoff />
       <Suspense fallback={<PageLoader />}>
         <Routes>
           {/* Public routes */}
