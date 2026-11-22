@@ -31,7 +31,7 @@ const OptOut = React.lazy(() => import('./pages/OptOut'))
 const DataDeletion = React.lazy(() => import('./pages/DataDeletion'))
 const NotFound = React.lazy(() => import('./pages/NotFound'))
 
-export default // The Calendar page was retired (surface audit 2026-11-22): Today shows the schedule and
+// The Calendar page was retired (surface audit 2026-11-22): Today shows the schedule and
 // Settings › Recording holds the Google connection. Old links and OAuth returns to
 // /calendar land on Today with their query intact.
 function CalendarMoved() {
@@ -39,7 +39,7 @@ function CalendarMoved() {
   return <Navigate to={{ pathname: '/dashboard', search: location.search }} replace />
 }
 
-function App() {
+export default function App() {
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <NavTrailRecorder />
