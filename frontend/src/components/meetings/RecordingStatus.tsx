@@ -6,7 +6,8 @@
  */
 
 import React, { useEffect, useState } from 'react'
-import { AlertTriangle, Loader2, RotateCcw } from 'lucide-react'
+import { Loader2, RotateCcw } from 'lucide-react'
+import { Key, Signal } from '../bench'
 import {
   canRetry,
   retryRecording,
@@ -27,9 +28,6 @@ export interface RecordingStatusProps {
 
 export const POLL_MS = 5000
 
-const BUTTON =
-  'inline-flex min-h-9 items-center gap-2 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-content-primary ' +
-  'hover:border-line-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary disabled:opacity-50'
 
 export function RecordingStatus({ meetingId, recordingJob, onRefresh, hasSummary = false }: RecordingStatusProps): React.ReactElement | null {
   const job = toRecordingJob(recordingJob)
@@ -60,53 +58,52 @@ export function RecordingStatus({ meetingId, recordingJob, onRefresh, hasSummary
     }
   }
 
+  const icon = busy ? <Loader2 className="animate-spin" aria-hidden="true" /> : <RotateCcw aria-hidden="true" />
+
   return (
-    <div role="status" data-testid="recording-status" className="rounded-xl border border-line bg-surface-elevated p-4 text-sm">
+    <div role="status" data-testid="recording-status" className="bs-recstat" data-tone={writing ? 'live' : 'brand'}>
       {summaryMissing ? (
-        <div className="space-y-2">
-          <p className="flex items-start gap-2 text-content-primary">
-            <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-semantic-error" aria-hidden="true" />
-            The transcript is saved, but the summary, decisions and action items could not be written.
-          </p>
-          <button type="button" className={BUTTON} disabled={busy} onClick={() => void act(rewriteSummary)}>
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <RotateCcw className="h-4 w-4" aria-hidden="true" />}
+        <>
+          <Signal tone="brand">No summary</Signal>
+          <p className="bs-recstat-text">The transcript is saved, but the summary, decisions and action items could not be written.</p>
+          <Key disabled={busy} onClick={() => void act(rewriteSummary)} icon={icon}>
             Write the summary
-          </button>
-        </div>
+          </Key>
+        </>
       ) : writing ? (
-        <p className="flex items-center gap-2 text-content-primary">
-          <Loader2 className="h-4 w-4 animate-spin text-accent-primary" aria-hidden="true" />
-          Writing the transcript, speakers, summary and action items. This page updates by itself.
-        </p>
+        <>
+          <Signal tone="live">Writing</Signal>
+          <p className="bs-recstat-text">Writing the transcript, speakers, summary and action items. This page updates by itself.</p>
+          <Loader2 className="bs-recstat-spin animate-spin" aria-hidden="true" />
+        </>
       ) : job.status === 'recording' ? (
-        <div className="space-y-2">
-          <p className="text-content-primary">
+        <>
+          <Signal tone="brand">Not stopped</Signal>
+          <p className="bs-recstat-text">
             This recording was not stopped, so it has no transcript yet. If the recording tab was closed, the audio saved up to
             then can still be transcribed.
           </p>
-          <button type="button" className={BUTTON} disabled={busy} onClick={() => void act(salvageRecording)}>
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <RotateCcw className="h-4 w-4" aria-hidden="true" />}
+          <Key disabled={busy} onClick={() => void act(salvageRecording)} icon={icon}>
             Transcribe the saved audio
-          </button>
-        </div>
+          </Key>
+        </>
       ) : (
-        <div className="space-y-2">
-          <p className="flex items-start gap-2 text-content-primary">
-            <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-semantic-error" aria-hidden="true" />
+        <>
+          <Signal tone="brand">{job.status === 'failed' ? 'Failed' : 'Stopped'}</Signal>
+          <p className="bs-recstat-text">
             {job.status === 'failed'
               ? job.error || 'The transcript could not be written.'
               : 'Writing the transcript stopped before it finished.'}
           </p>
           {retryable && (
-            <button type="button" className={BUTTON} disabled={busy} onClick={() => void act(retryRecording)}>
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <RotateCcw className="h-4 w-4" aria-hidden="true" />}
+            <Key disabled={busy} onClick={() => void act(retryRecording)} icon={icon}>
               Try again
-            </button>
+            </Key>
           )}
-        </div>
+        </>
       )}
       {error && (
-        <p role="alert" className="mt-2 text-xs text-semantic-error">
+        <p role="alert" className="bs-recstat-err">
           {error}
         </p>
       )}

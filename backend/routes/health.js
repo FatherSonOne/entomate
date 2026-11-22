@@ -49,6 +49,16 @@ async function checkDatabase() {
   }
 }
 
+// Recall capture: bots can launch with RECALL_API_KEY, but every status
+// webhook is rejected without RECALL_WEBHOOK_SIGNING_SECRET (audit finding 5).
+function checkRecall() {
+  if (!process.env.RECALL_API_KEY) return { status: 'not_configured', latency: 0 };
+  if (!process.env.RECALL_WEBHOOK_SIGNING_SECRET) {
+    return { status: 'error', latency: 0, error: 'RECALL_WEBHOOK_SIGNING_SECRET unset: every Recall webhook is rejected' };
+  }
+  return { status: 'healthy', latency: 0 };
+}
+
 // Check AI service
 async function checkAI() {
   const start = Date.now();
@@ -184,7 +194,8 @@ router.get('/status', async (req, res) => {
     checkChat()
   ]);
 
-  const services = { database, ai, crm, chat };
+  const recall = checkRecall();
+  const services = { database, ai, crm, chat, recall };
 
   // Determine overall health
   const criticalServices = [database];
@@ -197,8 +208,12 @@ router.get('/status', async (req, res) => {
     (sum, s) => sum + (s.latency || 0), 0
   );
 
+  // Recall misconfiguration marks the status degraded without failing the
+  // HTTP check, so it shows up without taking the API offline.
+  const captureBroken = recall.status === 'error';
+
   const status = {
-    status: isHealthy ? 'healthy' : 'degraded',
+    status: isHealthy && !captureBroken ? 'healthy' : 'degraded',
     version: process.env.npm_package_version || '1.0.0',
     environment: process.env.NODE_ENV || 'development',
     uptime: Math.floor((Date.now() - startTime) / 1000),

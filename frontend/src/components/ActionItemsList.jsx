@@ -1,13 +1,20 @@
 import React, { useState } from 'react'
-import { RefreshCw, Loader2, CheckCircle, XCircle, Clock, CalendarPlus } from 'lucide-react'
+import { RefreshCw, Loader2, CalendarPlus } from 'lucide-react'
 import { integrationsApi, meetingsApi, calendarApi } from '../services/api'
 import TimecodeButton from './meetings/TimecodeButton'
+import AgentNotes from './meetings/AgentNotes'
+import { Key, Signal } from './bench'
 
 /**
+ * Action items of a meeting (Bench Swiss): grouped by priority under group heads,
+ * a checkbox to close each one, its CRM state as an LED + word, and keys to jump
+ * to where it was said, add it to the calendar or send it to the CRM.
+ *
  * @param {(atMs: number) => void} [onJumpToTranscript]  When given, items with a
  *   transcript_at_ms show a timecode that jumps the transcript to where it was said.
+ * @param {number|null} [focusAtMs]  The transcript moment in view; its timecode shows pressed.
  */
-export default function ActionItemsList({ items = [], onUpdate, meetingId, onJumpToTranscript }) {
+export default function ActionItemsList({ items = [], onUpdate, meetingId, onJumpToTranscript, focusAtMs = null }) {
   const [syncing, setSyncing] = useState({})
   const [toggling, setToggling] = useState({})
   const [calSyncing, setCalSyncing] = useState({})
@@ -90,222 +97,118 @@ export default function ActionItemsList({ items = [], onUpdate, meetingId, onJum
     }
   }
 
-  const getPriorityDotStyle = (priority) => {
-    switch (priority) {
-      case 'high': return { background: 'var(--accent-primary)' }
-      case 'medium': return { background: 'var(--accent-tertiary)' }
-      case 'low': return { background: 'var(--accent-secondary)' }
-      default: return { background: 'var(--text-tertiary)' }
-    }
-  }
-
-  const getSyncStatusBadge = (status) => {
-    switch (status) {
-      case 'synced':
-        return (
-          <span
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-            style={{ background: 'rgba(0,245,212,.12)', color: 'var(--accent-secondary)' }}
-          >
-            <CheckCircle className="w-3 h-3" />
-            Synced
-          </span>
-        )
-      case 'failed':
-        return (
-          <span
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-            style={{ background: 'rgba(255,45,107,.12)', color: 'var(--accent-primary)' }}
-          >
-            <XCircle className="w-3 h-3" />
-            Failed
-          </span>
-        )
-      default:
-        return (
-          <span
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-            style={{ background: 'rgba(255,184,0,.12)', color: 'var(--accent-tertiary)' }}
-          >
-            <Clock className="w-3 h-3" />
-            Pending
-          </span>
-        )
-    }
-  }
-
   const hasPending = items.some(i => i.crm_sync_status === 'pending' || i.crm_sync_status === 'failed')
   const syncedCount = items.filter(i => i.crm_sync_status === 'synced').length
   const pendingCount = items.filter(i => i.crm_sync_status === 'pending').length
   const failedCount = items.filter(i => i.crm_sync_status === 'failed').length
+  const anySyncing = Object.values(syncing).some(Boolean)
 
   if (!items || items.length === 0) {
-    return (
-      <div className="text-sm py-4 text-center" style={{ color: 'var(--text-tertiary)' }}>
-        No action items extracted
-      </div>
-    )
+    return <p className="bs-mtg-none">No action items were found in this meeting.</p>
   }
 
-  // Group by priority
-  const highPriority = items.filter(i => i.priority === 'high')
-  const mediumPriority = items.filter(i => i.priority === 'medium')
-  const lowPriority = items.filter(i => i.priority === 'low')
+  const groups = [
+    { key: 'high', label: 'High', tone: 'brand', rows: items.filter(i => i.priority === 'high') },
+    { key: 'medium', label: 'Medium', tone: 'off', rows: items.filter(i => i.priority === 'medium') },
+    { key: 'low', label: 'Low', tone: 'off', rows: items.filter(i => i.priority !== 'high' && i.priority !== 'medium') },
+  ].filter(g => g.rows.length > 0)
 
-  const renderItems = (priorityItems, priorityLabel, priority) => {
-    if (priorityItems.length === 0) return null
+  const crmSignal = (status) => {
+    if (status === 'synced') return <Signal tone="mint">In CRM</Signal>
+    if (status === 'failed') return <Signal tone="brand">CRM failed</Signal>
+    return <Signal tone="off">Not sent</Signal>
+  }
 
-    return (
-      <div className="mb-4">
-        <h4
-          className="text-xs font-semibold uppercase mb-2 flex items-center gap-2"
-          style={{ color: 'var(--text-tertiary)' }}
-        >
-          <span className="w-2 h-2 rounded-full" style={getPriorityDotStyle(priority)} />
-          {priorityLabel} ({priorityItems.length})
-        </h4>
-        <div className="space-y-2">
-          {priorityItems.map((item) => (
-            <div
-              key={item.id}
-              className="p-3 rounded-lg border transition-colors"
-              style={{
-                background: 'var(--bg-elevated)',
-                borderColor: 'var(--b1)'
-              }}
-            >
-              <div className="flex items-start gap-3">
-                <button
-                  onClick={() => toggleStatus(item.id, item.status)}
-                  disabled={toggling[item.id]}
-                  className="mt-0.5 flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors"
-                  style={{
-                    borderColor: item.status === 'done' ? 'var(--accent-secondary)' : 'var(--t2)',
-                    background: item.status === 'done' ? 'rgba(0,245,212,.15)' : 'transparent'
-                  }}
-                  title={item.status === 'done' ? 'Mark as open' : 'Mark as done'}
-                >
-                  {toggling[item.id] ? (
-                    <Loader2 className="w-3 h-3 animate-spin" style={{ color: 'var(--text-tertiary)' }} />
-                  ) : item.status === 'done' ? (
-                    <CheckCircle className="w-3.5 h-3.5" style={{ color: 'var(--accent-secondary)' }} />
-                  ) : null}
-                </button>
-                <div className="flex-1 min-w-0">
-                  <p
-                    className={`text-sm font-medium ${item.status === 'done' ? 'line-through opacity-60' : ''}`}
-                    style={{ color: 'var(--text-primary)' }}
-                  >
-                    {item.task_description}
-                  </p>
-                  <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                    {item.assigned_to_name && (
-                      <span className="flex items-center gap-1">
-                        <span>Assigned:</span>
-                        {item.assigned_to_name}
-                      </span>
+  return (
+    <div className="bs-actions">
+      <div className="bs-actions-head">
+        <span className="bs-lbl">
+          {syncedCount} in CRM{pendingCount > 0 && ` · ${pendingCount} not sent`}{failedCount > 0 && ` · ${failedCount} failed`}
+        </span>
+        {hasPending && (
+          <Key size="sm" onClick={syncAllPending} disabled={anySyncing}>
+            {anySyncing && <Loader2 className="animate-spin" aria-hidden="true" />}
+            Send all to CRM
+          </Key>
+        )}
+      </div>
+
+      {error && (
+        <p role="alert" className="bs-actions-err">
+          <Signal tone="brand">Error</Signal> <span className="bs-sub">{error}</span>
+        </p>
+      )}
+
+      {groups.map((group) => (
+        <section key={group.key} aria-label={`${group.label} priority`}>
+          <div className="bs-group">
+            <Signal tone={group.tone}>{group.label} priority</Signal>
+            <span className="bs-lbl">{group.rows.length}</span>
+          </div>
+          <ul className="bs-rows">
+            {group.rows.map((item) => {
+              const done = item.status === 'done'
+              const canSend = item.crm_sync_status === 'pending' || item.crm_sync_status === 'failed'
+              const canCal = item.due_date && !item.calendar_event_id && !done
+              return (
+                <li key={item.id} className="bs-row bs-action" data-done={done || undefined}>
+                  <span className="bs-action-check">
+                    {toggling[item.id] ? (
+                      <Loader2 className="animate-spin" aria-hidden="true" />
+                    ) : (
+                      <input
+                        type="checkbox"
+                        className="bs-check"
+                        checked={done}
+                        onChange={() => toggleStatus(item.id, item.status)}
+                        aria-label={done ? `Mark open: ${item.task_description}` : `Mark done: ${item.task_description}`}
+                      />
                     )}
-                    {item.due_date && (
-                      <span className="flex items-center gap-1">
-                        <span>Due:</span>
-                        {new Date(item.due_date).toLocaleDateString()}
-                      </span>
+                  </span>
+                  <div className="bs-row-text">
+                    <div className="bs-action-title">{item.task_description}</div>
+                    <div className="bs-action-meta">
+                      {item.assigned_to_name && <span>{item.assigned_to_name}</span>}
+                      {item.due_date && (
+                        <span className="bs-mono">
+                          Due {new Date(`${item.due_date}T00:00:00`).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' })}
+                        </span>
+                      )}
+                      {crmSignal(item.crm_sync_status)}
+                    </div>
+                    {item.last_sync_error && item.crm_sync_status === 'failed' && (
+                      <div className="bs-why"><span className="bs-led brand" aria-hidden="true" />{item.last_sync_error}</div>
                     )}
+                    <div className="bs-agentnotes"><AgentNotes notes={item.agent_notes} /></div>
+                  </div>
+                  <div className="bs-action-keys">
                     {onJumpToTranscript && (
                       <TimecodeButton
                         atMs={item.transcript_at_ms}
                         onJump={onJumpToTranscript}
                         label={item.task_description}
+                        active={typeof item.transcript_at_ms === 'number' && item.transcript_at_ms === focusAtMs}
                       />
                     )}
+                    {canCal && (
+                      <Key size="sm" onClick={() => syncToCalendar(item.id)} disabled={calSyncing[item.id]} aria-label={`Add to calendar: ${item.task_description}`}>
+                        {calSyncing[item.id] ? <Loader2 className="animate-spin" aria-hidden="true" /> : <CalendarPlus aria-hidden="true" />}
+                        <span className="bs-dt">Calendar</span>
+                      </Key>
+                    )}
+                    {canSend && (
+                      <Key size="sm" onClick={() => syncItem(item.id)} disabled={syncing[item.id]} aria-label={`${item.crm_sync_status === 'failed' ? 'Retry sending' : 'Send'} to CRM: ${item.task_description}`}>
+                        {syncing[item.id] ? <Loader2 className="animate-spin" aria-hidden="true" /> : <RefreshCw aria-hidden="true" />}
+                        <span className="bs-dt">{item.crm_sync_status === 'failed' ? 'Retry' : 'CRM'}</span>
+                      </Key>
+                    )}
                   </div>
-                  {item.last_sync_error && item.crm_sync_status === 'failed' && (
-                    <p className="text-xs mt-1" style={{ color: 'var(--accent-primary)' }}>
-                      Error: {item.last_sync_error}
-                    </p>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {getSyncStatusBadge(item.crm_sync_status)}
-                  {item.due_date && !item.calendar_event_id && item.status !== 'done' && (
-                    <button
-                      onClick={() => syncToCalendar(item.id)}
-                      disabled={calSyncing[item.id]}
-                      className="p-1.5 rounded transition-colors disabled:opacity-50"
-                      style={{ color: 'var(--text-tertiary)' }}
-                      title="Add to Calendar"
-                    >
-                      {calSyncing[item.id] ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <CalendarPlus className="w-4 h-4" />
-                      )}
-                    </button>
-                  )}
-                  {(item.crm_sync_status === 'pending' || item.crm_sync_status === 'failed') && (
-                    <button
-                      onClick={() => syncItem(item.id)}
-                      disabled={syncing[item.id]}
-                      className="p-1.5 rounded transition-colors disabled:opacity-50"
-                      style={{ color: 'var(--text-tertiary)' }}
-                      title={item.crm_sync_status === 'failed' ? 'Retry sync' : 'Sync to CRM'}
-                    >
-                      {syncing[item.id] ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <RefreshCw className="w-4 h-4" />
-                      )}
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div>
-      {/* Header with sync all button */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-          <span style={{ color: 'var(--accent-secondary)' }}>{syncedCount} synced</span>
-          {pendingCount > 0 && <span className="ml-2" style={{ color: 'var(--accent-tertiary)' }}>{pendingCount} pending</span>}
-          {failedCount > 0 && <span className="ml-2" style={{ color: 'var(--accent-primary)' }}>{failedCount} failed</span>}
-        </div>
-        {hasPending && (
-          <button
-            onClick={syncAllPending}
-            disabled={Object.values(syncing).some(Boolean)}
-            className="text-xs font-medium flex items-center gap-1 disabled:opacity-50"
-            style={{ color: 'var(--accent-primary)' }}
-          >
-            {Object.values(syncing).some(Boolean) ? (
-              <Loader2 className="w-3 h-3 animate-spin" />
-            ) : (
-              <RefreshCw className="w-3 h-3" />
-            )}
-            Sync All
-          </button>
-        )}
-      </div>
-
-      {/* Error message */}
-      {error && (
-        <div
-          className="mb-4 p-2 rounded-lg text-xs"
-          style={{ background: 'rgba(255,45,107,.08)', border: '1px solid rgba(255,45,107,.2)', color: 'var(--accent-primary)' }}
-        >
-          {error}
-        </div>
-      )}
-
-      {/* Priority groups */}
-      {renderItems(highPriority, 'High Priority', 'high')}
-      {renderItems(mediumPriority, 'Medium Priority', 'medium')}
-      {renderItems(lowPriority, 'Low Priority', 'low')}
+                </li>
+              )
+            })}
+          </ul>
+        </section>
+      ))}
     </div>
   )
 }

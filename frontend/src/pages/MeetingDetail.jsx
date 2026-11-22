@@ -1,13 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import {
-  ArrowLeft, Clock, Users, FileText, CheckSquare, MessageSquare,
-  Send, Loader2, RefreshCw, Share2, X, Pencil, Check, CalendarPlus, StickyNote
-} from 'lucide-react'
+import { Loader2, Send } from 'lucide-react'
 import { meetingsApi, integrationsApi, calendarApi } from '../services/api'
 import ActionItemsList from '../components/ActionItemsList'
 import ChatChannelSelector from '../components/ChatChannelSelector'
-import { VCButton, VCBadge, VCTimeline } from '../components/vc'
 import { useToast } from '../components/vc/ToastProvider'
 import EcosystemSyncStatus from '../components/EcosystemSyncStatus'
 import MeetingNotesPanel from '../components/meetings/MeetingNotesPanel'
@@ -17,9 +13,15 @@ import RecordingStatus from '../components/meetings/RecordingStatus'
 import RecordingPlayer from '../components/meetings/RecordingPlayer'
 import { canPlay } from '../services/meetingRecorderService'
 import cache from '../services/apiCache'
-import { toSegments, toSummaryMoments } from '../services/meetingTranscriptService'
+import { formatClock, toSegments, toSummaryMoments } from '../services/meetingTranscriptService'
 import MeetingIntelligencePanel from '../components/intelligence/MeetingIntelligencePanel'
-import { getSentimentIcon } from '../utils/meetingHelpers'
+import {
+  TitleRule, Section, Key, Signal, Tag, Display, Tape, Grid, Cell, Tabs, TabPanel, Drawer,
+  TextInput, TextArea,
+} from '../components/bench'
+import { asList, meetingDate, meetingLengthMs, formatLength, speechDensity } from '../services/meetingView'
+
+const TABS_ID = 'meeting'
 
 export default function MeetingDetail() {
   const { id } = useParams()
@@ -30,15 +32,20 @@ export default function MeetingDetail() {
   const summaryMoments = useMemo(() => toSummaryMoments(meeting?.summary_moments), [meeting?.summary_moments])
   // Timecodes next to decisions, key points and action items jump the transcript here.
   const [focusAtMs, setFocusAtMs] = useState(null)
-  // A browser recording's audio, played beside the transcript; timecodes move it once loaded.
+  // A browser recording's audio, played under the tape; timecodes move it once it is loaded.
   const playerRef = useRef(null)
   const [playingAtMs, setPlayingAtMs] = useState(null)
   const playable = canPlay(meeting?.recording_job)
   const jumpToTranscript = useCallback((atMs) => {
     setFocusAtMs(atMs)
     if (playerRef.current?.isReady()) playerRef.current.playFrom(atMs)
-    document.getElementById('meeting-transcript')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    // The transcript sits beside the content on desktop; on phone it is below, so bring it up.
+    const el = document.getElementById('meeting-transcript')
+    if (el && el.getBoundingClientRect().top > window.innerHeight * 0.6) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
   }, [])
+  const [tab, setTab] = useState('minutes')
   const [loading, setLoading] = useState(true)
   const [question, setQuestion] = useState('')
   const [askingQuestion, setAskingQuestion] = useState(false)
@@ -75,6 +82,14 @@ export default function MeetingDetail() {
     loadMeeting()
   }, [loadMeeting])
 
+  // Browser tab title: "02 Meetings · <title> · Entomate" while the page is open.
+  useEffect(() => {
+    if (!meeting?.title) return
+    const previous = document.title
+    document.title = `${meeting.title} · 02 Meetings · Entomate`
+    return () => { document.title = previous }
+  }, [meeting?.title])
+
   // A browser recording being transcribed: re-read quietly (no spinner, no cache).
   const refreshMeeting = useCallback(async () => {
     try {
@@ -93,10 +108,11 @@ export default function MeetingDetail() {
     try {
       setAskingQuestion(true)
       const result = await meetingsApi.ask(id, question)
-      setAnswer(result)
+      setAnswer({ ...result, question: question.trim() })
       setQuestion('')
     } catch (error) {
       console.error('Failed to ask question:', error)
+      toast.error('Error', 'That question could not be answered. Try again.')
     } finally {
       setAskingQuestion(false)
     }
@@ -104,7 +120,10 @@ export default function MeetingDetail() {
 
   const handleSyncToCRM = async () => {
     const actionItemIds = meeting.actionItems?.map(a => a.id) || []
-    if (actionItemIds.length === 0) return
+    if (actionItemIds.length === 0) {
+      toast.info('Nothing to send', 'This meeting has no action items')
+      return
+    }
 
     try {
       setSyncing(true)
@@ -112,6 +131,7 @@ export default function MeetingDetail() {
       loadMeeting() // Reload to get updated sync status
     } catch (error) {
       console.error('Failed to sync to CRM:', error)
+      toast.error('Error', 'The action items could not be sent to the CRM')
     } finally {
       setSyncing(false)
     }
@@ -119,7 +139,7 @@ export default function MeetingDetail() {
 
   const handlePostToChat = async () => {
     if (!selectedChannel) {
-      setShowShareModal(true)
+      setShareResult({ success: false, message: 'Choose a channel first.' })
       return
     }
 
@@ -221,7 +241,6 @@ export default function MeetingDetail() {
     }
   }
 
-  // Calendar sync handler (4.2)
   const handleAddToCalendar = async () => {
     try {
       setCalendarSyncing(true)
@@ -234,443 +253,398 @@ export default function MeetingDetail() {
     }
   }
 
+  // ── Tape: the meeting's length with its decisions and action items ──
+  const lengthMs = meeting ? meetingLengthMs(meeting, transcriptSegments) : 0
+  const density = useMemo(() => speechDensity(transcriptSegments, lengthMs), [transcriptSegments, lengthMs])
+  const decisions = asList(meeting?.decisions)
+  const keyPoints = asList(meeting?.key_points)
+  const actionItems = meeting?.actionItems || []
+  const decisionMarks = transcriptSegments
+    ? decisions.flatMap((label, i) => (summaryMoments.decisions[i] != null ? [{ atMs: summaryMoments.decisions[i], label: `Decision: ${label}` }] : []))
+    : []
+  const actionMarks = transcriptSegments
+    ? actionItems.flatMap((a) => (typeof a.transcript_at_ms === 'number' ? [{ atMs: a.transcript_at_ms, label: `Action: ${a.task_description}` }] : []))
+    : []
+  const moments = [...decisionMarks, ...actionMarks].map(m => m.atMs).sort((a, b) => a - b)
+  const stepMoment = (dir) => {
+    if (!moments.length) return
+    const at = focusAtMs ?? (dir > 0 ? -1 : Infinity)
+    const next = dir > 0 ? moments.find(m => m > at) : [...moments].reverse().find(m => m < at)
+    jumpToTranscript(next ?? (dir > 0 ? moments[0] : moments[moments.length - 1]))
+  }
+  const showTape = Boolean(transcriptSegments && lengthMs > 0)
+  // While the recording plays, the tape follows it; otherwise it shows the last jump.
+  const tapeAtMs = playable && playingAtMs != null ? playingAtMs : focusAtMs
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="spinner" />
+      <div className="bs-mtg-empty" aria-busy="true">
+        <Signal tone="brand">Loading meeting</Signal>
       </div>
     )
   }
 
   if (!meeting) {
     return (
-      <div className="text-center py-12">
-        <h2
-          className="text-xl font-semibold"
-          style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
-        >
-          Meeting not found
-        </h2>
-        <Link
-          to="/meetings"
-          className="hover:underline mt-2 inline-block"
-          style={{ color: 'var(--accent-primary)' }}
-        >
-          Back to meetings
-        </Link>
+      <div>
+        <TitleRule title="Meeting not found" meta={<Link to="/meetings"><b>Meetings</b></Link>} />
+        <div className="bs-mtg-empty">
+          <p className="bs-h3">It may have been deleted, or it belongs to another workspace.</p>
+          <Link to="/meetings" className="bs-key">Back to meetings</Link>
+        </div>
       </div>
     )
   }
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start gap-4">
-        <Link
-          to="/meetings"
-          className="p-2 rounded-lg transition-colors"
-          style={{ color: 'var(--text-secondary)' }}
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </Link>
-        <div className="flex-1">
-          <div className="flex items-center gap-3 mb-2">
-            <span className="flex items-center">{getSentimentIcon(meeting.sentiment_label, 28)}</span>
-            {editingTitle ? (
-              <div className="flex items-center gap-2 flex-1">
-                <input
-                  type="text"
-                  className="input text-2xl font-bold flex-1"
-                  style={{ fontFamily: 'var(--font-display)' }}
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') saveTitle()
-                    if (e.key === 'Escape') setEditingTitle(false)
-                  }}
-                  autoFocus
-                  disabled={saving}
-                />
-                <VCButton variant="primary" onClick={saveTitle} disabled={saving}>
-                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                </VCButton>
-                <VCButton variant="ghost" onClick={() => setEditingTitle(false)} disabled={saving}>
-                  <X className="w-4 h-4" />
-                </VCButton>
-              </div>
-            ) : (
-              <h1
-                className="text-2xl font-bold cursor-pointer group flex items-center gap-2"
-                style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
-                onClick={startEditTitle}
-                title="Click to edit"
-              >
-                {meeting.title}
-                <Pencil className="w-4 h-4 opacity-0 group-hover:opacity-50 transition-opacity" />
-              </h1>
-            )}
-          </div>
-          <div
-            className="flex flex-wrap items-center gap-4 text-sm"
-            style={{ color: 'var(--text-tertiary)' }}
-          >
-            <span className="flex items-center gap-1">
-              <Clock className="w-4 h-4" />
-              {new Date(meeting.created_at).toLocaleDateString('en-US', {
-                weekday: 'long',
-                month: 'long',
-                day: 'numeric',
-                year: 'numeric'
-              })}
-            </span>
-            {meeting.duration_minutes && (
-              <span>{meeting.duration_minutes} minutes</span>
-            )}
-            {meeting.attendees?.length > 0 && (
-              <span className="flex items-center gap-1">
-                <Users className="w-4 h-4" />
-                {meeting.attendees.join(', ')}
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <VCButton variant="secondary" onClick={handleAddToCalendar} disabled={calendarSyncing}>
-            {calendarSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarPlus className="w-4 h-4" />}
-            Add to Calendar
-          </VCButton>
-          <VCButton variant="secondary" onClick={openShareModal}>
-            <Share2 className="w-4 h-4" />
-            Share
-            {meeting.chat_posted && (
-              <VCBadge color="mint" className="ml-1">posted</VCBadge>
-            )}
-          </VCButton>
-          <VCButton variant="primary" onClick={handleSyncToCRM} disabled={syncing}>
-            {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-            Sync to CRM
-          </VCButton>
-        </div>
-      </div>
+  const date = meetingDate(meeting)
+  const people = asList(meeting.attendees)
+  const meta = (
+    <>
+      <Link to="/meetings" className="bs-crumb-link"><b>Meetings</b></Link>
+      {' / '}
+      {date.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short', year: date.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' })}
+      {' · '}
+      {date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}
+      {lengthMs > 0 && <> · {formatLength(lengthMs)}</>}
+      {people.length > 0 && <> · {people.length} {people.length === 1 ? 'person' : 'people'}</>}
+    </>
+  )
 
-      <RecordingStatus meetingId={meeting.id} recordingJob={meeting.recording_job} onRefresh={refreshMeeting} hasSummary={!!meeting.summary} />
-
-      {/* Meeting Intelligence Panel */}
-      <MeetingIntelligencePanel
-        meetingId={meeting.id}
-        meetingTitle={meeting.title}
-        meetingDescription={meeting.description}
-        meetingTags={meeting.tags}
-        meetingParticipants={meeting.attendees || meeting.participants}
+  const title = editingTitle ? (
+    <form
+      className="bs-title-edit"
+      onSubmit={(e) => { e.preventDefault(); saveTitle() }}
+    >
+      <label htmlFor="meeting-title-input" className="bs-sr">Meeting title</label>
+      <input
+        id="meeting-title-input"
+        className="bs-title-input"
+        value={editTitle}
+        onChange={(e) => setEditTitle(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Escape') setEditingTitle(false) }}
+        maxLength={255}
+        autoFocus
+        disabled={saving}
       />
+    </form>
+  ) : meeting.title
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main content */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Summary */}
-          <div className="vc p-5">
-            <div className="flex items-center justify-between mb-3">
-              <h2
-                className="font-semibold"
-                style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
-              >
-                Summary
-              </h2>
-              {!editingSummary && (
-                <VCButton variant="ghost" onClick={startEditSummary} className="p-1">
-                  <Pencil className="w-4 h-4" />
-                </VCButton>
-              )}
-            </div>
-            {editingSummary ? (
-              <div className="space-y-2">
-                <textarea
-                  className="input w-full min-h-[120px]"
-                  value={editSummary}
-                  onChange={(e) => setEditSummary(e.target.value)}
-                  disabled={saving}
-                  autoFocus
-                />
-                <div className="flex gap-2 justify-end">
-                  <VCButton variant="ghost" onClick={() => setEditingSummary(false)} disabled={saving}>Cancel</VCButton>
-                  <VCButton variant="primary" onClick={saveSummary} disabled={saving}>
-                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
-                  </VCButton>
-                </div>
-              </div>
-            ) : (
-              <p style={{ color: 'var(--text-secondary)' }}>{meeting.summary || 'No summary available'}</p>
-            )}
-          </div>
+  const actions = editingTitle ? (
+    <>
+      <Key onClick={() => setEditingTitle(false)} disabled={saving}>Cancel</Key>
+      <Key variant="primary" onClick={saveTitle} disabled={saving}>
+        {saving && <Loader2 className="animate-spin" aria-hidden="true" />}Save title
+      </Key>
+    </>
+  ) : (
+    <>
+      <Key onClick={startEditTitle}>Rename</Key>
+      <Key onClick={handleAddToCalendar} disabled={calendarSyncing}>
+        {calendarSyncing && <Loader2 className="animate-spin" aria-hidden="true" />}Add to calendar
+      </Key>
+      <Key onClick={openShareModal}>
+        Share recap{meeting.chat_posted && <span className="bs-k">Posted</span>}
+      </Key>
+      <Key variant="primary" onClick={handleSyncToCRM} disabled={syncing}>
+        {syncing && <Loader2 className="animate-spin" aria-hidden="true" />}Send actions to CRM
+      </Key>
+    </>
+  )
 
-          {/* Key Points */}
-          {(meeting.key_points?.length > 0 || editingKeyPoints) && (
-            <div className="vc p-5">
-              <div className="flex items-center justify-between mb-3">
-                <h2
-                  className="font-semibold"
-                  style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
-                >
-                  Key Points
-                </h2>
-                {!editingKeyPoints && (
-                  <VCButton variant="ghost" onClick={startEditKeyPoints} className="p-1">
-                    <Pencil className="w-4 h-4" />
-                  </VCButton>
-                )}
-              </div>
-              {editingKeyPoints ? (
-                <div className="space-y-2">
-                  <textarea
-                    className="input w-full min-h-[150px]"
-                    value={editKeyPoints}
-                    onChange={(e) => setEditKeyPoints(e.target.value)}
-                    placeholder="One key point per line"
-                    disabled={saving}
-                    autoFocus
-                  />
-                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>One key point per line</p>
-                  <div className="flex gap-2 justify-end">
-                    <VCButton variant="ghost" onClick={() => setEditingKeyPoints(false)} disabled={saving}>Cancel</VCButton>
-                    <VCButton variant="primary" onClick={saveKeyPoints} disabled={saving}>
-                      {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
-                    </VCButton>
-                  </div>
-                </div>
-              ) : (
-                <VCTimeline
-                  events={meeting.key_points.map((point, index) => ({
-                    title: point,
-                    time: transcriptSegments && summaryMoments.keyPoints[index] != null ? (
-                      <span>
-                        Point {index + 1} ·{' '}
-                        <TimecodeButton atMs={summaryMoments.keyPoints[index]} onJump={jumpToTranscript} label={point} />
-                      </span>
-                    ) : `Point ${index + 1}`,
-                    color: index % 3 === 0 ? 'crimson' : index % 3 === 1 ? 'mint' : 'amber',
-                  }))}
-                />
-              )}
-            </div>
-          )}
+  const tabs = [
+    { value: 'minutes', label: 'Minutes' },
+    { value: 'actions', label: 'Actions', count: actionItems.length },
+    { value: 'notes', label: 'Notes' },
+    { value: 'ask', label: 'Ask' },
+    { value: 'intel', label: 'Context' },
+  ]
 
-          {/* Decisions */}
-          {meeting.decisions?.length > 0 && (
-            <div className="vc p-5">
-              <h2
-                className="font-semibold mb-3"
-                style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
-              >
-                Decisions Made
-              </h2>
-              <VCTimeline
-                events={meeting.decisions.map((decision, index) => ({
-                  title: decision,
-                  time: transcriptSegments && summaryMoments.decisions[index] != null ? (
-                    <TimecodeButton atMs={summaryMoments.decisions[index]} onJump={jumpToTranscript} label={decision} />
-                  ) : undefined,
-                  color: 'mint',
-                }))}
-              />
-            </div>
-          )}
+  return (
+    <div className="bs-mtg bs-mtg-detail">
+      <TitleRule title={title} meta={meta} actions={actions} />
 
-          {/* Audio Playback */}
-          {meeting.audio_file_url && (
-            <div className="vc p-5">
-              <h2
-                className="font-semibold mb-3 flex items-center gap-2"
-                style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
-              >
-                Recording
-              </h2>
-              <audio
-                controls
-                src={meeting.audio_file_url}
-                className="w-full"
-                style={{ borderRadius: '8px' }}
-              >
-                Your browser does not support the audio element.
-              </audio>
-            </div>
-          )}
-
-          {/* Transcript */}
-          <div id="meeting-transcript" className="vc p-5 scroll-mt-4">
-            <h2
-              className="font-semibold mb-3 flex items-center gap-2"
-              style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
-            >
-              <FileText className="w-5 h-5" />
-              Full Transcript
-            </h2>
-            {transcriptSegments ? (
-              // Timed lines (Recall bot meetings): search and speaker rename.
-              <>
-              {playable && (
-                <RecordingPlayer
-                  ref={playerRef}
-                  meetingId={meeting.id}
-                  durationMs={meeting.recording_job?.durationMs}
-                  onTime={setPlayingAtMs}
-                />
-              )}
-              <TranscriptPanel
-                meetingId={meeting.id}
-                segments={transcriptSegments}
-                focusAtMs={focusAtMs}
-                playingAtMs={playable ? playingAtMs : null}
-                onPlayFrom={playable ? (atMs) => playerRef.current?.playFrom(atMs) : undefined}
-                onRenamed={({ segments, transcript }) =>
-                  setMeeting(prev => ({ ...prev, transcript_segments: segments, transcript }))
-                }
-              />
-              </>
-            ) : (
-              <div
-                className="rounded-lg p-4 max-h-96 overflow-y-auto scrollbar-thin"
-                style={{ background: 'var(--bg-elevated)' }}
-              >
-                <pre
-                  className="whitespace-pre-wrap text-sm"
-                  style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}
-                >
-                  {meeting.transcript || 'No transcript available'}
-                </pre>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Action Items */}
-          <div className="vc p-5">
-            <h2
-              className="font-semibold mb-4 flex items-center gap-2"
-              style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
-            >
-              <CheckSquare className="w-5 h-5" />
-              Action Items ({meeting.actionItems?.length || 0})
-            </h2>
-            <ActionItemsList
-              items={meeting.actionItems || []}
-              meetingId={id}
-              onUpdate={loadMeeting}
-              onJumpToTranscript={transcriptSegments ? jumpToTranscript : undefined}
-            />
-          </div>
-
-          {/* My Notes (private by default, team on request) */}
-          <section className="vc p-5" aria-labelledby="meeting-notes-heading">
-            <h2
-              id="meeting-notes-heading"
-              className="font-semibold mb-3 flex items-center gap-2 font-display text-content-primary"
-            >
-              <StickyNote className="w-5 h-5" aria-hidden="true" />
-              Notes
-            </h2>
-            <MeetingNotesPanel meetingId={id} />
-          </section>
-
-          {/* Ecosystem Sync Status */}
-          <EcosystemSyncStatus meetingId={id} />
-
-          {/* Ask AI */}
-          <div className="vc p-5">
-            <h2
-              className="font-semibold mb-3 flex items-center gap-2"
-              style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
-            >
-              <MessageSquare className="w-5 h-5" />
-              Ask About This Meeting
-            </h2>
-            <form onSubmit={handleAskQuestion}>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  className="input flex-1"
-                  placeholder="Ask a question..."
-                  value={question}
-                  onChange={(e) => setQuestion(e.target.value)}
-                  disabled={askingQuestion}
-                />
-                <VCButton
-                  type="submit"
-                  variant="primary"
-                  disabled={askingQuestion || !question.trim()}
-                >
-                  {askingQuestion ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Send className="w-4 h-4" />
-                  )}
-                </VCButton>
-              </div>
-            </form>
-
-            {answer && (
-              <div
-                className="mt-4 p-3 rounded-lg"
-                style={{
-                  background: 'rgba(255,45,107,.08)',
-                  borderLeft: '2px solid var(--accent-primary)'
-                }}
-              >
-                <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{answer.answer}</p>
-                {answer.confidence && (
-                  <p className="text-xs mt-2" style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
-                    Confidence: {Math.round(answer.confidence * 100)}%
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+      <div className="bs-mtg-status-row">
+        <RecordingStatus meetingId={meeting.id} recordingJob={meeting.recording_job} onRefresh={refreshMeeting} hasSummary={!!meeting.summary} />
       </div>
 
-      {/* Share to Chat Modal */}
-      {showShareModal && (
-        <div className="vc-confirm-overlay" onClick={() => setShowShareModal(false)}>
-          <div className="vc rounded-xl shadow-xl max-w-md w-full mx-4 p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h3
-                className="text-lg font-semibold"
-                style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
-              >
-                Share Meeting Recap
-              </h3>
-              <VCButton
-                variant="ghost"
-                onClick={() => setShowShareModal(false)}
-                className="p-1"
-                aria-label="Close"
-              >
-                <X className="w-5 h-5" />
-              </VCButton>
+      {showTape && (
+        <div className="bs-cell">
+          <Display className="bs-transport">
+            <span className="bs-transport-reel bs-dt" aria-hidden="true" />
+            <div className="bs-transport-main">
+              <div className="bs-transport-head">
+                <span className="bs-lbl">
+                  Tape · <span className="bs-transport-key d" aria-hidden="true" /> decision · <span className="bs-transport-key a" aria-hidden="true" /> action item
+                </span>
+                <span className="bs-transport-clock" aria-live="polite">
+                  <b>{formatClock(tapeAtMs ?? 0)}</b> / {formatClock(lengthMs)}
+                </span>
+              </div>
+              <Tape
+                durationMs={lengthMs}
+                density={density}
+                decisions={decisionMarks}
+                actions={actionMarks}
+                progress={tapeAtMs != null ? Math.min(1, tapeAtMs / lengthMs) : 0}
+                playhead={tapeAtMs != null}
+                onSeek={jumpToTranscript}
+                label={`Meeting tape: ${decisionMarks.length} decisions and ${actionMarks.length} action items. Choose one to jump the transcript.`}
+              />
+              {/* Player slot: the synced video/audio player goes here, under the tape. */}
+              {playable ? (
+                <div className="bs-transport-media" data-slot="player">
+                  <RecordingPlayer
+                    ref={playerRef}
+                    meetingId={meeting.id}
+                    durationMs={meeting.recording_job?.durationMs}
+                    onTime={setPlayingAtMs}
+                  />
+                </div>
+              ) : meeting.audio_file_url && (
+                <div className="bs-transport-media" data-slot="player">
+                  <audio controls preload="none" src={meeting.audio_file_url}>
+                    Your browser does not support the audio element.
+                  </audio>
+                </div>
+              )}
             </div>
+            <div className="bs-transport-keys">
+              <Key size="sm" onDisplay onClick={() => stepMoment(-1)} disabled={!moments.length} aria-label="Previous moment">◀◀</Key>
+              <Key size="sm" onDisplay onClick={() => stepMoment(1)} disabled={!moments.length} aria-label="Next moment">▶▶</Key>
+            </div>
+          </Display>
+        </div>
+      )}
 
-            <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
-              Post a formatted recap of "{meeting.title}" to your team chat.
-            </p>
+      <Grid>
+        <Cell span={8}>
+          <Tabs label="Meeting sections" idBase={TABS_ID} items={tabs} value={tab} onChange={setTab} />
 
-            {meeting.chat_posted && (
-              <div
-                className="mb-4 p-3 text-sm rounded-lg"
-                style={{
-                  background: 'rgba(0,245,212,.08)',
-                  color: 'var(--accent-secondary)',
-                  border: '1px solid rgba(0,245,212,.18)'
-                }}
-              >
-                This meeting has already been posted to: {meeting.posted_to_channels?.join(', ') || 'chat'}
+          {tab === 'minutes' && (
+            <TabPanel idBase={TABS_ID} value="minutes">
+              <div className="bs-mtg-block">
+                <Section
+                  title="Summary"
+                  level={3}
+                  aside={!editingSummary && <Key size="sm" onClick={startEditSummary}>Edit</Key>}
+                />
+                {editingSummary ? (
+                  <div className="bs-mtg-edit">
+                    <label htmlFor="meeting-summary-input" className="bs-sr">Summary</label>
+                    <TextArea id="meeting-summary-input" rows={6} value={editSummary} onChange={(e) => setEditSummary(e.target.value)} disabled={saving} autoFocus />
+                    <div className="bs-mtg-edit-keys">
+                      <Key onClick={() => setEditingSummary(false)} disabled={saving}>Cancel</Key>
+                      <Key onClick={saveSummary} disabled={saving}>
+                        {saving && <Loader2 className="animate-spin" aria-hidden="true" />}Save summary
+                      </Key>
+                    </div>
+                  </div>
+                ) : meeting.summary ? (
+                  <p className="bs-para">{meeting.summary}</p>
+                ) : (
+                  <p className="bs-para bs-mut">No summary yet.</p>
+                )}
+              </div>
+
+              <div className="bs-mtg-block">
+                <Section
+                  title="Decisions"
+                  level={3}
+                  aside={decisions.length > 0 ? `${decisions.length}${decisionMarks.length ? ' · on the tape' : ''}` : undefined}
+                />
+                {decisions.length === 0 ? (
+                  <p className="bs-mtg-none">No decisions were recorded.</p>
+                ) : (
+                  <ul className="bs-rows">
+                    {decisions.map((decision, index) => {
+                      const at = transcriptSegments ? summaryMoments.decisions[index] : null
+                      return (
+                        <li key={index} className="bs-row bs-row-dec">
+                          <span className="bs-tick" aria-hidden="true" />
+                          <span className="bs-row-text">{decision}</span>
+                          <TimecodeButton atMs={at} onJump={jumpToTranscript} label={decision} active={at != null && at === focusAtMs} />
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </div>
+
+              {(keyPoints.length > 0 || editingKeyPoints) && (
+                <div className="bs-mtg-block">
+                  <Section
+                    title="Key points"
+                    level={3}
+                    aside={!editingKeyPoints && <Key size="sm" onClick={startEditKeyPoints}>Edit</Key>}
+                  />
+                  {editingKeyPoints ? (
+                    <div className="bs-mtg-edit">
+                      <label htmlFor="meeting-points-input" className="bs-lbl">One key point per line</label>
+                      <TextArea id="meeting-points-input" rows={7} value={editKeyPoints} onChange={(e) => setEditKeyPoints(e.target.value)} disabled={saving} autoFocus />
+                      <div className="bs-mtg-edit-keys">
+                        <Key onClick={() => setEditingKeyPoints(false)} disabled={saving}>Cancel</Key>
+                        <Key onClick={saveKeyPoints} disabled={saving}>
+                          {saving && <Loader2 className="animate-spin" aria-hidden="true" />}Save key points
+                        </Key>
+                      </div>
+                    </div>
+                  ) : (
+                    <ul className="bs-rows">
+                      {keyPoints.map((point, index) => {
+                        const at = transcriptSegments ? summaryMoments.keyPoints[index] : null
+                        return (
+                          <li key={index} className="bs-row">
+                            <span className="bs-row-dash" aria-hidden="true">—</span>
+                            <span className="bs-row-text">{point}</span>
+                            <TimecodeButton atMs={at} onJump={jumpToTranscript} label={point} active={at != null && at === focusAtMs} />
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {meeting.sentiment_label && (
+                <p className="bs-mtg-foot">
+                  <span className="bs-lbl">Tone</span>
+                  <Tag>{meeting.sentiment_label}{typeof meeting.sentiment_score === 'number' ? ` · ${meeting.sentiment_score.toFixed(2)}` : ''}</Tag>
+                </p>
+              )}
+            </TabPanel>
+          )}
+
+          {tab === 'actions' && (
+            <TabPanel idBase={TABS_ID} value="actions">
+              <div className="bs-mtg-block">
+                <ActionItemsList
+                  items={actionItems}
+                  meetingId={id}
+                  onUpdate={loadMeeting}
+                  onJumpToTranscript={transcriptSegments ? jumpToTranscript : undefined}
+                  focusAtMs={focusAtMs}
+                />
+              </div>
+            </TabPanel>
+          )}
+
+          {tab === 'notes' && (
+            <TabPanel idBase={TABS_ID} value="notes">
+              <section className="bs-mtg-block" aria-labelledby="meeting-notes-heading">
+                <Section id="meeting-notes-heading" title="Notes" level={3} aside="Private unless you share with the team" />
+                <div className="bs-skin bs-mtg-notes">
+                  <MeetingNotesPanel meetingId={id} />
+                </div>
+              </section>
+            </TabPanel>
+          )}
+
+          {tab === 'ask' && (
+            <TabPanel idBase={TABS_ID} value="ask">
+              <div className="bs-mtg-block">
+                <Section title="Ask about this meeting" level={3} aside="Answers come from the transcript" />
+                <form onSubmit={handleAskQuestion} className="bs-mtg-ask">
+                  <label htmlFor="meeting-ask-input" className="bs-sr">Question</label>
+                  <TextInput
+                    id="meeting-ask-input"
+                    placeholder="Who owns the spec? What did we decide about pricing?"
+                    value={question}
+                    onChange={(e) => setQuestion(e.target.value)}
+                    disabled={askingQuestion}
+                  />
+                  <Key type="submit" disabled={askingQuestion || !question.trim()}>
+                    {askingQuestion ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Send aria-hidden="true" />}
+                    Ask
+                  </Key>
+                </form>
+                {answer && (
+                  <div className="bs-mtg-answer" aria-live="polite">
+                    {answer.question && <div className="bs-lbl">Q · {answer.question}</div>}
+                    <p className="bs-para">{answer.answer}</p>
+                    {typeof answer.confidence === 'number' && (
+                      <div className="bs-why">
+                        <Signal tone="ai">Answer · {Math.round(answer.confidence * 100)}% confident</Signal>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </TabPanel>
+          )}
+
+          {tab === 'intel' && (
+            <TabPanel idBase={TABS_ID} value="intel">
+              <div className="bs-mtg-block bs-skin bs-mtg-intel">
+                <MeetingIntelligencePanel
+                  meetingId={meeting.id}
+                  meetingTitle={meeting.title}
+                  meetingDescription={meeting.description}
+                  meetingTags={meeting.tags}
+                  meetingParticipants={meeting.attendees || meeting.participants}
+                />
+                <EcosystemSyncStatus meetingId={id} />
+              </div>
+            </TabPanel>
+          )}
+        </Cell>
+
+        <Cell span={4} rule>
+          <section id="meeting-transcript" className="bs-mtg-transcript" aria-labelledby="meeting-transcript-heading">
+            <Section
+              id="meeting-transcript-heading"
+              title="Transcript"
+              level={3}
+              aside={transcriptSegments
+                ? <Signal tone={focusAtMs != null ? 'brand' : 'off'}>{focusAtMs != null ? `At ${formatClock(focusAtMs)}` : `${transcriptSegments.length} lines`}</Signal>
+                : meeting.transcript ? <Signal tone="off">Plain text</Signal> : undefined}
+            />
+            {transcriptSegments ? (
+              // Timed lines: search and speaker rename.
+              <div className="bs-transcript">
+                <TranscriptPanel
+                  meetingId={meeting.id}
+                  segments={transcriptSegments}
+                  focusAtMs={focusAtMs}
+                  playingAtMs={playable ? playingAtMs : null}
+                  onPlayFrom={playable ? (atMs) => playerRef.current?.playFrom(atMs) : undefined}
+                  onRenamed={({ segments, transcript }) =>
+                    setMeeting(prev => ({ ...prev, transcript_segments: segments, transcript }))
+                  }
+                />
+              </div>
+            ) : (
+              <div className="bs-transcript-plain">
+                <pre>{meeting.transcript || 'No transcript yet.'}</pre>
               </div>
             )}
+          </section>
+        </Cell>
+      </Grid>
 
-            <div className="mb-6">
-              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
-                Select Channel
-              </label>
+      {/* Share recap: a drawer on desktop, a sheet on phone */}
+      <Drawer
+        open={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        label="Share recap"
+        footer={(
+          <>
+            <Key onClick={() => setShowShareModal(false)} disabled={sharing}>Cancel</Key>
+            <Key variant="primary" onClick={handlePostToChat} disabled={sharing || !selectedChannel}>
+              {sharing && <Loader2 className="animate-spin" aria-hidden="true" />}
+              {sharing ? 'Posting' : 'Post recap'}
+            </Key>
+          </>
+        )}
+      >
+        <div className="bs-mtg-share">
+          <h2 className="bs-h2">{meeting.title}</h2>
+          <p className="bs-sub">Posts the summary, decisions and action items to a team chat channel. Private notes are never included.</p>
+          {meeting.chat_posted && (
+            <Signal tone="mint">Posted to {meeting.posted_to_channels?.join(', ') || 'chat'}</Signal>
+          )}
+          <div className="bs-mtg-share-field">
+            <span className="bs-lbl">Channel</span>
+            <div className="bs-skin">
               <ChatChannelSelector
                 selectedChannel={selectedChannel}
                 onChannelSelect={setSelectedChannel}
@@ -678,51 +652,15 @@ export default function MeetingDetail() {
                 showStatus={true}
               />
             </div>
-
-            {shareResult && (
-              <div
-                className="mb-4 p-3 rounded-lg text-sm"
-                style={
-                  shareResult.success
-                    ? { background: 'rgba(0,245,212,.08)', color: 'var(--accent-secondary)' }
-                    : { background: 'rgba(255,45,107,.08)', color: 'var(--accent-primary)' }
-                }
-              >
-                {shareResult.message}
-              </div>
-            )}
-
-            <div className="flex gap-3">
-              <VCButton
-                variant="secondary"
-                className="flex-1"
-                onClick={() => setShowShareModal(false)}
-                disabled={sharing}
-              >
-                Cancel
-              </VCButton>
-              <VCButton
-                variant="primary"
-                className="flex-1"
-                onClick={handlePostToChat}
-                disabled={sharing}
-              >
-                {sharing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Posting...
-                  </>
-                ) : (
-                  <>
-                    <Share2 className="w-4 h-4" />
-                    Post Recap
-                  </>
-                )}
-              </VCButton>
-            </div>
           </div>
+          {shareResult && (
+            <p role="status">
+              <Signal tone={shareResult.success ? 'mint' : 'brand'}>{shareResult.success ? 'Posted' : 'Not posted'}</Signal>{' '}
+              <span className="bs-sub">{shareResult.message}</span>
+            </p>
+          )}
         </div>
-      )}
+      </Drawer>
     </div>
   )
 }

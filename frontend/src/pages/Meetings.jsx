@@ -1,37 +1,58 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { Link } from 'react-router-dom'
-import {
-  Plus, Search, Clock, Users, MessageSquare, Trash2, AlertTriangle,
-  RefreshCw, Loader2, CheckSquare, Square, Download, X
-} from 'lucide-react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Search, Loader2 } from 'lucide-react'
 import MeetingRecorder from '../components/meetings/MeetingRecorder'
 import { meetingsApi, settingsApi } from '../services/api'
-import { VCButton, VCBadge } from '../components/vc'
 import { useConfirm } from '../components/vc/ConfirmDialog'
 import { useToast } from '../components/vc/ToastProvider'
-import { getSentimentIcon, getSentimentBadgeColor } from '../utils/meetingHelpers'
-import { MeetingCardSkeleton } from '../components/LoadingSkeletons'
+import {
+  TitleRule, Section, Key, Switch, Signal, Tape, RuledTable, DateStamp, TextInput,
+} from '../components/bench'
+import { toSegments } from '../services/meetingTranscriptService'
+import {
+  asList, attendeeLine, decisionMarkers, formatLength, groupByTime, matchesFilter,
+  meetingDate, meetingLengthMs, meetingStatus, speechDensity,
+} from '../services/meetingView'
+
+const PAGE_SIZE = 20
+
+const FILTERS = [
+  { value: 'all', label: 'All' },
+  { value: 'live', label: 'Live' },
+  { value: 'ready', label: 'Ready' },
+  { value: 'attention', label: 'Attention' },
+]
+
+const isThisWeek = (d) => {
+  const now = new Date()
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  start.setDate(start.getDate() - ((start.getDay() + 6) % 7))
+  return d.getTime() >= start.getTime()
+}
 
 export default function Meetings() {
   const confirm = useConfirm()
   const toast = useToast()
-  const PAGE_SIZE = 20
+  const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [meetings, setMeetings] = useState([])
+  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(false)
   const [error, setError] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [showRecorder, setShowRecorder] = useState(false)
+  const [filter, setFilter] = useState('all')
+  const [showRecorder, setShowRecorder] = useState(searchParams.get('new') === 'true')
   const [audioInputDeviceId, setAudioInputDeviceId] = useState('')
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [bulkDeleting, setBulkDeleting] = useState(false)
 
   const searchTimer = useRef(null)
+  const recorderRef = useRef(null)
 
   useEffect(() => {
-    loadMeetings()
     // Load user's preferred audio device
     settingsApi.getUser().then(res => {
       const deviceId = res?.settings?.meetings_json?.audioInputDeviceId
@@ -39,12 +60,22 @@ export default function Meetings() {
     }).catch(() => {})
   }, [])
 
-  // Debounced server-side search
+  // The rail's record key (and the phone dock) land here with ?new=true.
+  useEffect(() => {
+    if (searchParams.get('new') !== 'true') return
+    setShowRecorder(true)
+    const next = new URLSearchParams(searchParams)
+    next.delete('new')
+    setSearchParams(next, { replace: true })
+    requestAnimationFrame(() => recorderRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  }, [searchParams, setSearchParams])
+
+  // Debounced server-side search (also the first load)
   useEffect(() => {
     if (searchTimer.current) clearTimeout(searchTimer.current)
     searchTimer.current = setTimeout(() => {
       loadMeetings(searchQuery)
-    }, 300)
+    }, searchQuery ? 300 : 0)
     return () => clearTimeout(searchTimer.current)
   }, [searchQuery])
 
@@ -56,10 +87,11 @@ export default function Meetings() {
       if (search.trim()) params.search = search.trim()
       const data = await meetingsApi.list(params)
       setMeetings(data.meetings || [])
+      setTotal(data.count || (data.meetings || []).length)
       setHasMore(data.hasMore || false)
     } catch (err) {
       console.error('Failed to load meetings:', err)
-      setError('Failed to load meetings. Please try again.')
+      setError('The meetings could not be loaded.')
     } finally {
       setLoading(false)
     }
@@ -75,35 +107,32 @@ export default function Meetings() {
       setHasMore(data.hasMore || false)
     } catch (err) {
       console.error('Failed to load more meetings:', err)
+      toast.error('Error', 'More meetings could not be loaded')
     } finally {
       setLoadingMore(false)
     }
   }
 
   const handleMeetingProcessed = () => {
-    loadMeetings()
+    loadMeetings(searchQuery)
   }
 
-  const handleDelete = async (id, e) => {
-    e.preventDefault()
-    e.stopPropagation()
-
-    const ok = await confirm({ title: 'Delete Meeting', message: 'Are you sure you want to delete this meeting?', confirmLabel: 'Delete', variant: 'danger' })
+  const handleDelete = async (meeting) => {
+    const ok = await confirm({ title: 'Delete meeting', message: `Delete "${meeting.title}"? Its transcript, notes and action items go too.`, confirmLabel: 'Delete', variant: 'danger' })
     if (!ok) return
 
     try {
-      await meetingsApi.delete(id)
-      setMeetings(meetings.filter(m => m.id !== id))
-      toast.success('Deleted', 'Meeting removed successfully')
+      await meetingsApi.delete(meeting.id)
+      setMeetings(prev => prev.filter(m => m.id !== meeting.id))
+      setTotal(t => Math.max(0, t - 1))
+      toast.success('Deleted', 'Meeting removed')
     } catch (err) {
       console.error('Failed to delete meeting:', err)
-      toast.error('Error', 'Failed to delete meeting')
+      toast.error('Error', 'The meeting could not be deleted')
     }
   }
 
-  const toggleSelect = (id, e) => {
-    e.preventDefault()
-    e.stopPropagation()
+  const toggleSelect = (id) => {
     setSelectedIds(prev => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
@@ -112,12 +141,12 @@ export default function Meetings() {
     })
   }
 
+  const visible = useMemo(() => meetings.filter(m => matchesFilter(m, filter)), [meetings, filter])
+  const groups = useMemo(() => groupByTime(visible), [visible])
+
+  const allSelected = visible.length > 0 && visible.every(m => selectedIds.has(m.id))
   const toggleSelectAll = () => {
-    if (selectedIds.size === filteredMeetings.length) {
-      setSelectedIds(new Set())
-    } else {
-      setSelectedIds(new Set(filteredMeetings.map(m => m.id)))
-    }
+    setSelectedIds(allSelected ? new Set() : new Set(visible.map(m => m.id)))
   }
 
   const exitSelectionMode = () => {
@@ -129,9 +158,9 @@ export default function Meetings() {
     if (selectedIds.size === 0) return
 
     const ok = await confirm({
-      title: 'Delete Selected',
-      message: `Are you sure you want to delete ${selectedIds.size} meeting(s)?`,
-      confirmLabel: 'Delete All',
+      title: 'Delete selected',
+      message: `Delete ${selectedIds.size} meeting(s)? Their transcripts, notes and action items go too.`,
+      confirmLabel: 'Delete all',
       variant: 'danger'
     })
     if (!ok) return
@@ -140,10 +169,12 @@ export default function Meetings() {
       setBulkDeleting(true)
       await Promise.all([...selectedIds].map(id => meetingsApi.delete(id)))
       setMeetings(prev => prev.filter(m => !selectedIds.has(m.id)))
+      setTotal(t => Math.max(0, t - selectedIds.size))
       toast.success('Deleted', `${selectedIds.size} meeting(s) removed`)
       exitSelectionMode()
     } catch (err) {
-      toast.error('Error', 'Some meetings failed to delete')
+      toast.error('Error', 'Some meetings could not be deleted')
+      loadMeetings(searchQuery)
     } finally {
       setBulkDeleting(false)
     }
@@ -177,234 +208,206 @@ export default function Meetings() {
     toast.success('Exported', `${selected.length} meeting(s) exported`)
   }
 
-  // Search is now server-side — no client-side filtering needed
-  const filteredMeetings = meetings
+  // Title meta: totals from the server, this week's figures from the loaded rows.
+  const week = meetings.filter(m => isThisWeek(meetingDate(m)))
+  const weekMs = week.reduce((n, m) => n + meetingLengthMs(m), 0)
+  const weekDecisions = week.reduce((n, m) => n + asList(m.decisions).length, 0)
+
+  const columns = [
+    ...(selectionMode ? [{
+      key: 'sel',
+      header: <span className="bs-sr">Selected</span>,
+      className: 'bs-mtg-sel',
+      render: (m) => (
+        <input
+          type="checkbox"
+          className="bs-check"
+          checked={selectedIds.has(m.id)}
+          onChange={() => toggleSelect(m.id)}
+          aria-label={`Select ${m.title}`}
+        />
+      ),
+    }] : []),
+    {
+      key: 'date',
+      header: 'Date',
+      className: 'bs-mtg-date',
+      render: (m) => <DateStamp date={meetingDate(m)} />,
+    },
+    {
+      key: 'meeting',
+      header: 'Meeting',
+      render: (m) => {
+        const people = attendeeLine(m)
+        const time = meetingDate(m).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+        return (
+          <div className="bs-mtg-name">
+            <Link to={`/meetings/${m.id}`} className="bs-h3 bs-mtg-link">{m.title || 'Untitled meeting'}</Link>
+            <div className="bs-mtg-sub">
+              <span className="bs-mono">{time}</span>
+              {people && <> · {people}</>}
+            </div>
+          </div>
+        )
+      },
+    },
+    {
+      key: 'tape',
+      header: 'Tape · decisions',
+      secondary: true,
+      className: 'bs-mtg-tape',
+      render: (m) => {
+        // Only meetings with timed lines have a tape: the meter is real speech, the ticks real moments.
+        const segments = toSegments(m.transcript_segments)
+        const length = meetingLengthMs(m, segments)
+        if (!segments || !length) return <span className="bs-mut">—</span>
+        const marks = decisionMarkers(m)
+        return (
+          <Tape
+            durationMs={length}
+            density={speechDensity(segments, length, 56)}
+            decisions={marks}
+            label={`${marks.length} decisions on a ${formatLength(length)} tape`}
+          />
+        )
+      },
+    },
+    {
+      key: 'len',
+      header: 'Length',
+      secondary: true,
+      align: 'right',
+      className: 'bs-num',
+      render: (m) => formatLength(meetingLengthMs(m)),
+    },
+    {
+      key: 'dec',
+      header: 'Dec.',
+      secondary: true,
+      align: 'right',
+      className: 'bs-num',
+      render: (m) => asList(m.decisions).length || <span className="bs-mut">—</span>,
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      className: 'bs-mtg-status',
+      render: (m) => {
+        const s = meetingStatus(m)
+        return <Signal tone={s.tone}>{s.word}</Signal>
+      },
+    },
+    ...(!selectionMode ? [{
+      key: 'del',
+      header: <span className="bs-sr">Delete</span>,
+      secondary: true,
+      className: 'bs-mtg-del',
+      render: (m) => (
+        <Key size="sm" onClick={() => handleDelete(m)} aria-label={`Delete ${m.title}`}>Delete</Key>
+      ),
+    }] : []),
+  ]
+
+  const actions = selectionMode ? (
+    <>
+      <Key onClick={toggleSelectAll}>{allSelected ? 'Clear all' : 'Select all'}</Key>
+      <Key onClick={handleBulkExport} disabled={selectedIds.size === 0}>Export {selectedIds.size}</Key>
+      <Key variant="primary" onClick={handleBulkDelete} disabled={selectedIds.size === 0 || bulkDeleting}>
+        {bulkDeleting && <Loader2 className="animate-spin" aria-hidden="true" />}
+        Delete {selectedIds.size}
+      </Key>
+      <Key onClick={exitSelectionMode}>Done</Key>
+    </>
+  ) : (
+    <>
+      <Switch label="Filter meetings" options={FILTERS} value={filter} onChange={setFilter} />
+      <div className="bs-title-keys">
+        {meetings.length > 0 && <Key onClick={() => setSelectionMode(true)}>Select</Key>}
+        <Key onClick={() => navigate('/bot-launcher')}>Send a bot</Key>
+        {/* While the recorder is open its Start key is the view's one primary key. */}
+        <Key variant={showRecorder ? 'plain' : 'primary'} onClick={() => setShowRecorder(v => !v)} aria-expanded={showRecorder}>
+          {showRecorder ? 'Close recorder' : 'New meeting'}
+        </Key>
+      </div>
+    </>
+  )
 
   return (
-    <div className="space-y-6">
-      {/* Page header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1
-            className="text-2xl font-bold"
-            style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
-          >
-            Meetings
-          </h1>
-          <p style={{ color: 'var(--text-secondary)' }}>View and manage your meeting recordings</p>
-        </div>
-        <div className="flex gap-2">
-          {selectionMode ? (
-            <>
-              <VCButton variant="ghost" onClick={toggleSelectAll}>
-                {selectedIds.size === filteredMeetings.length ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
-                {selectedIds.size === filteredMeetings.length ? 'Deselect All' : 'Select All'}
-              </VCButton>
-              <VCButton variant="secondary" onClick={handleBulkExport} disabled={selectedIds.size === 0}>
-                <Download className="w-4 h-4" />
-                Export ({selectedIds.size})
-              </VCButton>
-              <VCButton variant="danger" onClick={handleBulkDelete} disabled={selectedIds.size === 0 || bulkDeleting}>
-                {bulkDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                Delete ({selectedIds.size})
-              </VCButton>
-              <VCButton variant="ghost" onClick={exitSelectionMode}>
-                <X className="w-4 h-4" />
-              </VCButton>
-            </>
-          ) : (
-            <>
-              {meetings.length > 0 && (
-                <VCButton variant="secondary" onClick={() => setSelectionMode(true)}>
-                  <CheckSquare className="w-4 h-4" />
-                  Select
-                </VCButton>
-              )}
-              <VCButton
-                variant="primary"
-                onClick={() => setShowRecorder(!showRecorder)}
-              >
-                <Plus className="w-4 h-4" />
-                New Meeting
-              </VCButton>
-            </>
-          )}
-        </div>
-      </div>
+    <div className="bs-mtg">
+      <TitleRule
+        title="Meetings"
+        meta={<><b>{total} meetings</b> · {week.length} this week · {formatLength(weekMs)} recorded · {weekDecisions} decisions</>}
+        actions={actions}
+      />
 
-      {/* Recorder panel */}
       {showRecorder && (
         // The panel stays open after recording: it offers the video download and a link to the meeting.
-        <MeetingRecorder onRecorded={handleMeetingProcessed} audioInputDeviceId={audioInputDeviceId} />
+        <section ref={recorderRef} className="bs-mtg-recorder" aria-label="New meeting">
+          <Section title="New meeting" level={3} aside={<Signal tone="off">In this browser · no bot</Signal>} />
+          <div className="bs-skin">
+            <MeetingRecorder onRecorded={handleMeetingProcessed} audioInputDeviceId={audioInputDeviceId} />
+          </div>
+        </section>
       )}
 
-      {/* Search and filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5"
-            style={{ color: 'var(--text-tertiary)' }}
-          />
-          <input
-            type="text"
-            placeholder="Search meetings..."
-            className="input pl-10"
-            aria-label="Search meetings"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-        {searchQuery && (
-          <VCButton variant="ghost" onClick={() => setSearchQuery('')}>
-            Clear
-          </VCButton>
-        )}
+      <div className="bs-mtg-search">
+        <TextInput
+          type="search"
+          icon={<Search />}
+          placeholder="Search titles, summaries and transcripts"
+          aria-label="Search meetings"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+        {searchQuery && <Key onClick={() => setSearchQuery('')}>Clear</Key>}
       </div>
 
-      {/* Meetings list */}
-      <div className="vc">
+      <div className="bs-mtg-list" aria-busy={loading || undefined}>
         {loading ? (
-          <div className="p-4">
-            <MeetingCardSkeleton count={4} />
+          <div className="bs-mtg-empty">
+            <Signal tone="brand">Loading meetings</Signal>
           </div>
         ) : error ? (
-          <div className="p-8 text-center">
-            <AlertTriangle className="w-12 h-12 mx-auto mb-3 vc-text-warning" />
-            <h3
-              className="text-lg font-medium mb-1"
-              style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
-            >
-              Something went wrong
-            </h3>
-            <p style={{ color: 'var(--text-tertiary)' }} className="mb-4">{error}</p>
-            <VCButton variant="secondary" onClick={loadMeetings}>
-              <RefreshCw className="w-4 h-4" />
-              Retry
-            </VCButton>
+          <div className="bs-mtg-empty">
+            <Signal tone="brand">Error</Signal>
+            <p className="bs-h3">{error}</p>
+            <Key onClick={() => loadMeetings(searchQuery)}>Try again</Key>
           </div>
-        ) : filteredMeetings.length === 0 ? (
-          <div className="p-8 text-center">
-            <MessageSquare
-              className="w-12 h-12 mx-auto mb-3"
-              style={{ color: 'var(--text-tertiary)' }}
-            />
-            <h3
-              className="text-lg font-medium mb-1"
-              style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
-            >
-              No meetings found
-            </h3>
-            <p style={{ color: 'var(--text-tertiary)' }}>
-              {searchQuery ? 'Try a different search term' : 'Record your first meeting to get started'}
+        ) : visible.length === 0 ? (
+          <div className="bs-mtg-empty">
+            <Signal tone="off">{searchQuery || filter !== 'all' ? 'No matches' : 'No meetings yet'}</Signal>
+            <p className="bs-h3">
+              {searchQuery
+                ? 'Nothing matches that search.'
+                : filter !== 'all'
+                  ? 'No loaded meeting has this status.'
+                  : 'Record one in this browser, or send a bot to a call.'}
             </p>
+            {!searchQuery && filter === 'all' && (
+              <div className="bs-title-keys">
+                <Key onClick={() => navigate('/bot-launcher')}>Send a bot</Key>
+                <Key onClick={() => setShowRecorder(true)}>Record now</Key>
+              </div>
+            )}
           </div>
         ) : (
           <>
-            <div className="divide-y" style={{ borderColor: 'var(--b1)' }}>
-              {filteredMeetings.map((meeting) => (
-                <div key={meeting.id} className="relative">
-                  <Link
-                    to={selectionMode ? '#' : `/meetings/${meeting.id}`}
-                    onClick={selectionMode ? (e) => toggleSelect(meeting.id, e) : undefined}
-                    className="block p-4 sm:p-5 hover:bg-surface-muted transition-colors"
-                    style={selectedIds.has(meeting.id) ? { background: 'rgba(255,45,107,.06)' } : {}}
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      {selectionMode && (
-                        <button
-                          onClick={(e) => toggleSelect(meeting.id, e)}
-                          className="mt-1 flex-shrink-0"
-                        >
-                          {selectedIds.has(meeting.id) ? (
-                            <CheckSquare className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
-                          ) : (
-                            <Square className="w-5 h-5" style={{ color: 'var(--text-tertiary)' }} />
-                          )}
-                        </button>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="flex items-center">{getSentimentIcon(meeting.sentiment_label, 22)}</span>
-                          <h3
-                            className="text-lg font-semibold truncate"
-                            style={{ color: 'var(--text-primary)' }}
-                          >
-                            {meeting.title}
-                          </h3>
-                          <VCBadge color={getSentimentBadgeColor(meeting.sentiment_label)}>
-                            {meeting.sentiment_label || 'Unknown'}
-                          </VCBadge>
-                        </div>
-
-                        {meeting.summary && (
-                          <p className="line-clamp-2 mb-3" style={{ color: 'var(--text-secondary)' }}>
-                            {meeting.summary}
-                          </p>
-                        )}
-
-                        <div className="flex flex-wrap items-center gap-4 text-sm" style={{ color: 'var(--text-tertiary)' }}>
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-4 h-4" />
-                            {new Date(meeting.created_at).toLocaleDateString('en-US', {
-                              month: 'short',
-                              day: 'numeric',
-                              year: 'numeric'
-                            })}
-                          </span>
-
-                          {meeting.duration_minutes && (
-                            <span>{meeting.duration_minutes} min</span>
-                          )}
-
-                          {meeting.attendees?.length > 0 && (
-                            <span className="flex items-center gap-1">
-                              <Users className="w-4 h-4" />
-                              {meeting.attendees.length} attendees
-                            </span>
-                          )}
-
-                          {meeting.key_points?.length > 0 && (
-                            <VCBadge color="neutral">
-                              {meeting.key_points.length} key points
-                            </VCBadge>
-                          )}
-                        </div>
-                      </div>
-
-                      {!selectionMode && (
-                        <VCButton
-                          variant="ghost"
-                          onClick={(e) => handleDelete(meeting.id, e)}
-                          className="p-2"
-                          title="Delete meeting"
-                          aria-label="Delete meeting"
-                        >
-                          <Trash2 className="w-5 h-5" />
-                        </VCButton>
-                      )}
-                    </div>
-                  </Link>
-                </div>
-              ))}
+            <RuledTable
+              caption="Meetings"
+              columns={columns}
+              groups={groups.map(g => ({ key: g.key, label: g.label, count: g.rows.length, rows: g.rows }))}
+              rowKey={(m) => m.id}
+              onRowClick={(m) => (selectionMode ? toggleSelect(m.id) : navigate(`/meetings/${m.id}`))}
+            />
+            <div className="bs-mtg-more">
+              <span className="bs-lbl">{meetings.length} of {total} loaded</span>
+              {hasMore && (
+                <Key onClick={loadMoreMeetings} disabled={loadingMore}>
+                  {loadingMore && <Loader2 className="animate-spin" aria-hidden="true" />}
+                  {loadingMore ? 'Loading' : 'Load more'}
+                </Key>
+              )}
             </div>
-            {hasMore && (
-              <div className="p-4 text-center">
-                <VCButton
-                  variant="secondary"
-                  onClick={loadMoreMeetings}
-                  disabled={loadingMore}
-                >
-                  {loadingMore ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Loading...
-                    </>
-                  ) : (
-                    'Load More'
-                  )}
-                </VCButton>
-              </div>
-            )}
           </>
         )}
       </div>

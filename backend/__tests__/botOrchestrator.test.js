@@ -420,20 +420,34 @@ describe('handleRecallWebhook', () => {
     });
     mockSupabase.__queueTerminal(
       { data: { id: 'sess-2' }, error: null }, // session resolution
-      { data: null, error: null }              // update terminal
+      { data: null, error: null },             // status update terminal
+      { data: null, error: null }              // URL update terminal
     );
     const result = await orchestrator.handleRecallWebhook({
       event: 'bot.done',
       data: { bot: { id: 'recall-2', metadata: { session_id: 'sess-2' } } }
     });
     expect(result.ok).toBe(true);
-    const updateCall = mockSupabase.update.mock.calls[0][0];
+    const updateCall = Object.assign({}, ...mockSupabase.update.mock.calls.map((c) => c[0]));
     expect(updateCall).toMatchObject({
       status: 'completed',
       recording_url: 'https://recall.test/video.mp4',
       transcript_url: 'https://recall.test/transcript.json'
     });
     expect(updateCall.ended_at).toBeTruthy();
+  });
+
+  test('status updates never overwrite a final status (late or retried webhook)', async () => {
+    mockSupabase.__queueTerminal(
+      { data: { id: 'sess-9' }, error: null },
+      { data: null, error: null }
+    );
+    await orchestrator.handleRecallWebhook({
+      event: 'bot.in_call_recording',
+      data: { bot: { id: 'recall-9', metadata: { session_id: 'sess-9' } } }
+    });
+    expect(mockSupabase.update).toHaveBeenCalledWith(expect.objectContaining({ status: 'in_call' }));
+    expect(mockSupabase.not).toHaveBeenCalledWith('status', 'in', '(completed,failed,stopped,timeout)');
   });
 
   test('bot.done with backfill failure → status still updates (best-effort)', async () => {
@@ -455,6 +469,7 @@ describe('handleRecallWebhook', () => {
   test('bot.fatal with fatal_reason → failure_reason recorded', async () => {
     mockSupabase.__queueTerminal(
       { data: { id: 'sess-4' }, error: null },
+      { data: null, error: null },
       { data: null, error: null }
     );
     await orchestrator.handleRecallWebhook({
@@ -464,7 +479,7 @@ describe('handleRecallWebhook', () => {
         fatal_reason: 'meeting host did not admit bot'
       }
     });
-    const updateCall = mockSupabase.update.mock.calls[0][0];
+    const updateCall = Object.assign({}, ...mockSupabase.update.mock.calls.map((c) => c[0]));
     expect(updateCall).toMatchObject({
       status: 'failed',
       failure_reason: 'meeting host did not admit bot'

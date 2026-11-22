@@ -60,6 +60,12 @@ function validateEnv() {
     }
   }
 
+  // Recall bots launch but their status webhooks are all rejected without
+  // the signing secret, so capture silently stalls (audit finding 5). Shout.
+  if (process.env.RECALL_API_KEY && !process.env.RECALL_WEBHOOK_SIGNING_SECRET) {
+    log.error('[ENV] RECALL_API_KEY is set but RECALL_WEBHOOK_SIGNING_SECRET is not: every Recall webhook will be rejected and bot sessions will stay "launching". Set the Svix whsec_... secret from the Recall dashboard.');
+  }
+
   // Print startup summary (redacted)
   const summary = {
     NODE_ENV: process.env.NODE_ENV || 'development',
@@ -67,6 +73,7 @@ function validateEnv() {
     AI_PROVIDER: process.env.OPENAI_API_KEY ? 'OpenAI' : process.env.GEMINI_API_KEY ? 'Gemini' : 'none',
     SENTRY: process.env.SENTRY_DSN ? 'enabled' : 'disabled',
     SLACK: process.env.SLACK_BOT_TOKEN ? 'enabled' : 'disabled',
+    RECALL_WEBHOOKS: process.env.RECALL_WEBHOOK_SIGNING_SECRET ? 'verified' : 'rejected',
   };
   log.info('[ENV] Startup config:', JSON.stringify(summary));
 }
