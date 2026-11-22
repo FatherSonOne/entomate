@@ -1,10 +1,10 @@
 /**
  * Settings view logic (pure). Direction A "Ledger" from the Settings Slate pass (2026-11-22):
- * one page, five numbered sections, every control inline, drawers for the long detail.
+ * one page, six numbered sections (Appearance got its own on 2026-11-22), every control inline, drawers for the long detail.
  * URL state: ?s=<section> scrolls to a section, ?dr=<drawer> opens a drawer, ?q= filters.
  */
 
-export type SectionId = 'you' | 'recording' | 'agents' | 'connections' | 'workspace'
+export type SectionId = 'you' | 'appearance' | 'recording' | 'agents' | 'connections' | 'workspace'
 export type DrawerId = 'profile' | 'invite' | 'billing' | 'learning' | 'ecosystem' | 'slack'
 
 export interface SectionDef {
@@ -15,11 +15,12 @@ export interface SectionDef {
 }
 
 export const SECTIONS: ReadonlyArray<SectionDef> = [
-  { id: 'you', number: '01', title: 'You', summary: 'Profile, appearance, notifications' },
-  { id: 'recording', number: '02', title: 'Recording', summary: 'Microphone, calendar, bot auto-join' },
-  { id: 'agents', number: '03', title: 'Meeting agents', summary: 'Which agents act, how sure they must be' },
-  { id: 'connections', number: '04', title: 'Connections', summary: 'Logos Vision, Pulse, calendar, bot, AI' },
-  { id: 'workspace', number: '05', title: 'Workspace', summary: 'Team, plan, data and privacy' },
+  { id: 'you', number: '01', title: 'You', summary: 'Profile, notifications' },
+  { id: 'appearance', number: '02', title: 'Appearance', summary: 'Theme, style, palette, logo and loading screen' },
+  { id: 'recording', number: '03', title: 'Recording', summary: 'Microphone, calendar, bot auto-join' },
+  { id: 'agents', number: '04', title: 'Meeting agents', summary: 'Which agents act, how sure they must be' },
+  { id: 'connections', number: '05', title: 'Connections', summary: 'Logos Vision, Pulse, calendar, bot, AI' },
+  { id: 'workspace', number: '06', title: 'Workspace', summary: 'Team, plan, data and privacy' },
 ]
 
 const SECTION_IDS: ReadonlyArray<string> = SECTIONS.map((s) => s.id)
@@ -39,7 +40,7 @@ export function isDrawerId(v: string | null | undefined): v is DrawerId {
 export const LEGACY_SECTIONS: Readonly<Record<string, { section: SectionId; drawer?: DrawerId }>> = {
   organization: { section: 'workspace' },
   profile: { section: 'you' },
-  appearance: { section: 'you' },
+  appearance: { section: 'appearance' },
   notifications: { section: 'you' },
   audio: { section: 'recording' },
   permissions: { section: 'recording' },
@@ -98,7 +99,10 @@ export interface FindEntry {
 
 export const FIND_INDEX: ReadonlyArray<FindEntry> = [
   { label: 'Profile', section: 'you', drawer: 'profile', words: 'name email photo avatar account sign out' },
-  { label: 'Appearance', section: 'you', words: 'theme light dark style palette logo loading reduce motion bench swiss' },
+  { label: 'Theme', section: 'appearance', words: 'appearance light dark system mode' },
+  { label: 'Reduce motion', section: 'appearance', words: 'appearance animation accessibility motion' },
+  { label: 'Design style and palette', section: 'appearance', words: 'appearance style palette bench swiss void crimson orbital look' },
+  { label: 'Logo and loading screen', section: 'appearance', words: 'appearance logo mark brand wordmark loading screen animation icon' },
   { label: 'Overdue task emails', section: 'you', words: 'notifications email overdue reminders alerts' },
   { label: 'Browser alerts', section: 'you', words: 'notifications push desktop permission' },
   { label: 'Microphone', section: 'recording', words: 'mic audio input device permission record' },

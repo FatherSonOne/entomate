@@ -10,6 +10,7 @@ describe('settingsView', () => {
     expect(resolveSection('ai-learning-full')).toEqual({ section: 'agents', drawer: 'learning' })
     expect(resolveSection('billing')).toEqual({ section: 'workspace', drawer: 'billing' })
     expect(resolveSection('connections')).toEqual({ section: 'connections' })
+    expect(resolveSection('appearance')).toEqual({ section: 'appearance' })
     expect(resolveSection('nope')).toBeNull()
     expect(resolveSection(null)).toBeNull()
   })
@@ -33,6 +34,7 @@ describe('settingsView', () => {
     expect(findSettings('mic').map((e) => e.label)).toContain('Microphone')
     expect(findSettings('invite').map((e) => e.label)).toEqual(['Team members'])
     expect(findSettings('gdpr consent').map((e) => e.label)).toEqual(['Consent rules'])
+    expect(findSettings('loading screen').map((e) => e.label)).toEqual(['Logo and loading screen'])
     expect(findSettings('zzz')).toEqual([])
   })
 

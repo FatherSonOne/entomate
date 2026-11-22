@@ -303,7 +303,11 @@ export default function Settings(): React.ReactElement {
                     )}
                   </div>
                 </div>
+              </section>
 
+              {/* ── 02 Appearance ── */}
+              <section id="set-appearance" className="bs-set-sec" aria-label="Appearance">
+                <Section number="02" title="Appearance" />
                 <AppearanceSettings
                   reduceMotion={settings.reduce_motion}
                   onReduceMotion={(on: boolean) => updateSetting('reduce_motion', on)}
@@ -311,18 +315,18 @@ export default function Settings(): React.ReactElement {
                 />
               </section>
 
-              {/* ── 02 Recording ── */}
+              {/* ── 03 Recording ── */}
               <section id="set-recording" className="bs-set-sec" aria-label="Recording">
-                <Section number="02" title="Recording" />
+                <Section number="03" title="Recording" />
                 <RecordingSettings
                   meetingsJson={settings.meetings_json}
                   onUpdate={(key, value) => updateJson('meetings_json', key, value)}
                 />
               </section>
 
-              {/* ── 03 Meeting agents ── */}
+              {/* ── 04 Meeting agents ── */}
               <section id="set-agents" className="bs-set-sec" aria-label="Meeting agents">
-                <Section number="03" title="Meeting agents" />
+                <Section number="04" title="Meeting agents" />
                 <MeetingAgentsSettings />
                 <div className="bs-set-row">
                   <div className="bs-set-l">
@@ -333,15 +337,15 @@ export default function Settings(): React.ReactElement {
                 </div>
               </section>
 
-              {/* ── 04 Connections ── */}
+              {/* ── 05 Connections ── */}
               <section id="set-connections" className="bs-set-sec" aria-label="Connections">
-                <Section number="04" title="Connections" />
+                <Section number="05" title="Connections" />
                 <ConnectionsSettings drawer={url.drawer} onDrawer={openDrawer} onJump={(s) => jump(s)} />
               </section>
 
-              {/* ── 05 Workspace ── */}
+              {/* ── 06 Workspace ── */}
               <section id="set-workspace" className="bs-set-sec" aria-label="Workspace">
-                <Section number="05" title="Workspace" />
+                <Section number="06" title="Workspace" />
                 {org ? (
                   <>
                     <div className="bs-set-row">
