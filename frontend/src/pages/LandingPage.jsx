@@ -158,7 +158,7 @@ export default function LandingPage() {
             <div className="lc-sh">
               <span className="lc-n">04</span>
               <h2 id="lc-agents-h">Four agents recommend the next step.</h2>
-              <p>Each recommendation carries a reason and a confidence score. Anything the agents change after a meeting is yours to edit.</p>
+              <p>Each recommendation carries a reason and a confidence score, one click away on the action item. Anything the agents change after a meeting is yours to edit.</p>
             </div>
             <ul className="lc-agents">
               {AGENTS.map((a) => (
