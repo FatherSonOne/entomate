@@ -265,6 +265,60 @@ function ProfileMenu({ user, items, onSignOut, onSettings, modKey }: {
   )
 }
 
+/* ── Record key: press and release ── */
+
+/** Shortest visible press, so a quick tap still reads as going down. */
+const MIN_PRESS_MS = 90
+
+interface PressProps {
+  'data-pressed': 'true' | undefined
+  onPointerDown: (e: React.PointerEvent) => void
+  onPointerUp: () => void
+  onPointerCancel: () => void
+  onPointerLeave: () => void
+  onKeyDown: (e: React.KeyboardEvent) => void
+  onKeyUp: () => void
+  onBlur: () => void
+}
+
+/**
+ * Pressed state driven by pointer and keyboard events rather than :active,
+ * which iOS Safari doesn't apply reliably on tap. Held for at least
+ * MIN_PRESS_MS so the key visibly goes down before it springs back.
+ */
+function usePress(): PressProps {
+  const [pressed, setPressed] = useState<boolean>(false)
+  const downAt = useRef<number>(0)
+  const timer = useRef<number | undefined>(undefined)
+  useEffect(() => () => window.clearTimeout(timer.current), [])
+  const down = (): void => {
+    window.clearTimeout(timer.current)
+    downAt.current = performance.now()
+    setPressed(true)
+  }
+  const up = (): void => {
+    const left = MIN_PRESS_MS - (performance.now() - downAt.current)
+    window.clearTimeout(timer.current)
+    if (left > 0) timer.current = window.setTimeout(() => setPressed(false), left)
+    else setPressed(false)
+  }
+  return {
+    'data-pressed': pressed ? 'true' : undefined,
+    onPointerDown: (e) => {
+      if (e.button !== 0) return
+      down()
+      // A short tick on phones that support it.
+      if (e.pointerType === 'touch' && !prefersReducedMotion()) navigator.vibrate?.(8)
+    },
+    onPointerUp: up,
+    onPointerCancel: up,
+    onPointerLeave: up,
+    onKeyDown: (e) => { if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) down() },
+    onKeyUp: up,
+    onBlur: up,
+  }
+}
+
 /* ── Phone dock icons, keyed by route ── */
 
 const DOCK_ICONS: Readonly<Record<string, LucideIcon>> = {
@@ -286,6 +340,8 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
   const [navOpen, setNavOpen] = useState<boolean>(false)
   const now = useClock()
   const online = useOnline()
+  const railPress = usePress()
+  const dockPress = usePress()
 
   // When a dock tab becomes active by any route (back button, a link in the
   // page), its icon draws in once. Taps already draw through the shared
@@ -340,7 +396,7 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
           <PatchPanel groups={railGroups} isActive={isActive} />
         </nav>
         {assistant ? <div className="la-launcher-wrap">{assistant}</div> : null}
-        <button type="button" className="bs-recbox group" onClick={onRecord}>
+        <button type="button" className="bs-recbox group" onClick={onRecord} {...railPress}>
           <span className="relative isolate inline-flex" aria-hidden="true">
             <RippleCircles className="-inset-[9px] -z-10 opacity-0 transition-opacity duration-300 [&_*]:[animation-play-state:paused] group-hover:opacity-100 group-hover:[&_*]:[animation-play-state:running] group-focus-visible:opacity-100 group-focus-visible:[&_*]:[animation-play-state:running]" />
             <span className="bs-rec" />
@@ -386,7 +442,7 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
       <nav className="bs-dock" aria-label="Quick navigation" ref={dockRef}>
         {d0 && dockItem(d0)}
         {d1 && dockItem(d1)}
-        <button type="button" className="bs-dock-rec" onClick={onRecord} aria-label="Record a meeting">
+        <button type="button" className="bs-dock-rec" onClick={onRecord} aria-label="Record a meeting" {...dockPress}>
           <span className="bs-rec" aria-hidden="true" />
         </button>
         {d2 && dockItem(d2)}

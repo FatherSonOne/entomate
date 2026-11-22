@@ -2,6 +2,9 @@
   "buildCommand": "cd frontend && npm install && npm run build && mkdir -p dist/logos && cp -r ../output/logos/. dist/logos/",
   "outputDirectory": "frontend/dist",
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/((?!assets/).*)",
+      "destination": "/index.html"
+    }
   ]
 }
