@@ -6119,3 +6119,53 @@ html.dark .la-sheet-handle-bar {
   border: 1.5px solid currentColor;
   background: none;
 }
+
+/* ============================================================================
+   STARTING STATE, BRIEF (2026-11-22)
+   One line naming the page, three questions, the composer. The live context sits in the
+   bar above in both states, so the welcome no longer repeats it as a hero card, and the
+   rows carry no section numbers (Bench Swiss: numbers only at major section breaks).
+   ============================================================================ */
+.logos-assistant.la-swiss .la-welcome-brief {
+  padding: 16px 8px 20px;
+}
+.logos-assistant.la-swiss .la-welcome-brief .la-welcome-title {
+  font-size: 22px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+.logos-assistant.la-swiss .la-welcome-brief .la-welcome-hero {
+  transform: scale(0.8);
+  transform-origin: bottom right;
+}
+.logos-assistant.la-swiss .la-welcome-brief .la-quick-actions {
+  margin-top: 16px;
+}
+.logos-assistant.la-swiss .la-welcome-brief .la-quick-actions-label {
+  padding-bottom: 4px;
+  border-bottom-color: var(--la-sw-hair);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--la-sw-muted);
+}
+.logos-assistant.la-swiss .la-welcome-brief .la-quick-actions-label::before {
+  content: none;
+}
+/* Three rows' height is held while the page's data loads, so nothing below jumps. */
+.logos-assistant.la-swiss .la-welcome-brief .la-quick-actions-list {
+  min-height: 132px;
+}
+.logos-assistant.la-swiss .la-welcome-brief .la-quick-action-btn {
+  grid-template-columns: minmax(0, 1fr) 14px;
+}
+.logos-assistant.la-swiss .la-welcome-brief .la-quick-action-btn::before {
+  content: none;
+}
+.logos-assistant.la-swiss .la-welcome-brief .la-quick-action-btn::after {
+  grid-column: 2;
+}
+.logos-assistant.la-swiss .la-welcome-brief .la-welcome-help {
+  margin-top: 12px;
+}

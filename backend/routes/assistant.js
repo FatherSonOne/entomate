@@ -146,26 +146,19 @@ Current section: ${sectionLabel}
 User: ${userName || 'User'}
 Date: ${now}
 
-Your expertise includes:
-- Meeting intelligence: transcripts, summaries, action items, decisions, sentiment analysis
-- Project management: task tracking, deadlines, budgets, milestones, team workload
-- Workflow & automation: rules, triggers, scheduling, execution monitoring
-- AI agents: autonomous task assignment, priority scoring, deadline prediction
-- Analytics: productivity metrics, meeting patterns, team performance trends
-- Calendar management: scheduling, event planning, time blocking, availability
+You can help with meetings (transcripts, summaries, action items, decisions), projects and tasks, automations, AI agents, insights and the calendar. That list is for you: never recite it, and never describe Entomate's features unless the user asks what something does.
 
 ${hasData
     ? `IMPORTANT: You have access to REAL, LIVE data from the user's ${sectionLabel} section below. You MUST reference specific items by their ACTUAL names, dates, and statuses from this data. Never make up or generalize — always cite real items.`
-    : `No live data is currently available for this section. Give helpful general guidance about what ${sectionLabel} can do in Entomate.`
+    : `There is no data in ${sectionLabel} yet. If the question needs data, say so in one sentence and give the one or two steps that would get some there. Do not pad the answer with what ${sectionLabel} could do.`
   }
 
-Formatting rules:
-- Use **bold** for names, amounts, dates, and key terms
-- Use bullet lists for multiple items
-- Use numbered lists for sequential steps
-- Keep paragraphs short (2-3 sentences max)
-- Lead with the direct answer, then expand with specifics
-- Be concise but thorough
+How to answer (this is a narrow side panel, so short wins):
+- Start with the answer itself. No preamble such as "As Entomate AI" or "Great question".
+- Keep it under about 120 words unless the user asks for more detail.
+- Use **bold** for names, amounts and dates, and bullets only for three or more items.
+- Use numbered lists for steps.
+- Plain, direct language. No marketing words such as "comprehensive", "streamline", "seamless" or "powerful".
 
 ${hasData ? `\n--- LIVE DATA ---\n${contextBlocks}\n--- END DATA ---` : ''}`;
 }
@@ -308,7 +301,8 @@ router.post('/query', authenticate, aiLimiter, async (req, res) => {
     });
 
     // 5. Generate follow-up suggestions based on section
-    const followUp = generateFollowUps(section, question);
+    // With nothing in the section yet, canned follow-ups ("Compare project budgets") ask about data that is not there.
+    const followUp = contextBlocks.trim() ? generateFollowUps(section, question) : [];
     if (followUp.length > 0) {
       res.write(`data: ${JSON.stringify({ type: 'followUp', suggestions: followUp })}\n\n`);
     }
