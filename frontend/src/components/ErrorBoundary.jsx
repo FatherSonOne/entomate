@@ -1,4 +1,5 @@
 import React from 'react';
+import { chunkReloadPending, isChunkError, reloadForStaleChunk } from '../services/chunkReload';
 
 export default class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -11,6 +12,8 @@ export default class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
+    // A page chunk from an older deploy: reload once onto the new build
+    if (isChunkError(error) && reloadForStaleChunk()) return;
     console.error('[ErrorBoundary] Caught error:', error, errorInfo);
   }
 
@@ -20,6 +23,10 @@ export default class ErrorBoundary extends React.Component {
 
   render() {
     if (this.state.hasError) {
+      // Reloading for a new deploy: keep the screen quiet instead of flashing the error
+      if (chunkReloadPending() || (isChunkError(this.state.error) && reloadForStaleChunk())) {
+        return <div style={{ minHeight: '100vh', background: 'var(--bg0)' }} aria-busy="true" />;
+      }
       return (
         <div style={{
           minHeight: '100vh',
