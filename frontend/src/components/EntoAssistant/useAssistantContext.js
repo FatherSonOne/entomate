@@ -15,6 +15,8 @@ export default function useAssistantContext(isOpen) {
   const [context, setContext] = useState({ section: 'dashboard', sectionLabel: 'Dashboard', data: {} })
   const [sectionSummary, setSectionSummary] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  // The section whose data has arrived (or failed) since the panel opened; null while closed.
+  const [loadedFor, setLoadedFor] = useState(null)
   const cancelRef = useRef(false)
 
   const section = resolveSection(location.pathname)
@@ -30,6 +32,7 @@ export default function useAssistantContext(isOpen) {
       // Clear data when panel closes to free memory
       setContext(prev => ({ ...prev, data: {} }))
       setSectionSummary('')
+      setLoadedFor(null)
       return
     }
 
@@ -41,13 +44,17 @@ export default function useAssistantContext(isOpen) {
       setContext(prev => ({ ...prev, section, sectionLabel, data }))
       setSectionSummary(getSectionSummary(section, data))
       setIsLoading(false)
+      setLoadedFor(section)
     }).catch(() => {
       if (cancelRef.current) return
       setIsLoading(false)
+      setLoadedFor(section)
     })
 
     return () => { cancelRef.current = true }
   }, [isOpen, section, sectionLabel])
 
-  return { context, sectionSummary, sectionLabel, isLoading }
+  const isReady = loadedFor === section
+
+  return { context, section, sectionSummary, sectionLabel, isLoading, isReady }
 }

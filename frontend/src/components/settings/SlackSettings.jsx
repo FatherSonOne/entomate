@@ -8,7 +8,8 @@ import {
   MessageSquare, RefreshCw, CheckCircle2, XCircle, AlertCircle,
   Loader2, Send, Hash
 } from 'lucide-react'
-import { VCButton, VCBadge, VCSelect, VCIconBox } from '../vc'
+import { VCButton, VCBadge, VCIconBox } from '../vc'
+import { Select } from '../bench'
 import slackApi from '../../services/slackApi'
 
 export default function SlackSettings() {
@@ -199,18 +200,15 @@ export default function SlackSettings() {
         <p className="text-xs mb-2" style={{ color: 'var(--text-tertiary)' }}>
           Notifications will be posted to this channel unless overridden.
         </p>
-        <VCSelect
+        <Select
+          label="Default channel"
+          className="w-full"
           value={settings.defaultChannel}
-          onChange={e => setSettings(prev => ({ ...prev, defaultChannel: e.target.value }))}
+          onChange={v => setSettings(prev => ({ ...prev, defaultChannel: v }))}
           disabled={!status?.connected || channels.length === 0}
-        >
-          <option value="">Select a channel...</option>
-          {channels.map(ch => (
-            <option key={ch.id} value={ch.id}>
-              {ch.displayName || `#${ch.name}`}{ch.isPrivate ? ' (private)' : ''}
-            </option>
-          ))}
-        </VCSelect>
+          placeholder="Select a channel…"
+          options={channels.map(ch => ({ value: String(ch.id), label: ch.displayName || `#${ch.name}`, hint: ch.isPrivate ? 'private' : undefined }))}
+        />
         {status?.connected && channels.length === 0 && (
           <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>
             No channels found. Invite the bot to at least one channel.

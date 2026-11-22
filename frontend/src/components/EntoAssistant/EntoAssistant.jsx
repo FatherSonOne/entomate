@@ -8,16 +8,11 @@
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { useNavigate } from 'react-router-dom'
 import { X, AlertCircle, User as UserIcon } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import { useAuth } from '../../contexts/AuthContext'
 import useAssistantContext from './useAssistantContext'
-import {
-  getQuickActions,
-  getSuggestedActions,
-  streamQuery,
-} from '../../services/entoAssistantService'
+import { getStarter, streamQuery } from '../../services/entoAssistantService'
 import { useMediaQuery } from '../bench/useMediaQuery'
 import { usePresence, MOTION } from '../bench/motion'
 import Composer from './Composer'
@@ -31,7 +26,14 @@ import './EntoAI.css'
 import './EntoAI.tokens.css'
 
 const STORAGE_KEY = 'ento-ai-history'
+const PARKED_KEY = 'ento-ai-parked'
 const MAX_MESSAGES = 50
+/**
+ * A conversation left this long, or started on another page, is set aside when the panel
+ * opens so the panel starts clean for the page you are on. It can be brought back from the
+ * starting state; it is not deleted.
+ */
+const STALE_AFTER_MS = 30 * 60 * 1000
 /** usePanelResize is desktop-only: below this the CSS media queries own the width. */
 const RESIZE_QUERY = '(min-width: 1281px)'
 
@@ -42,25 +44,37 @@ const MIC_ERRORS = {
   'audio-capture': 'No microphone found. Connect one, then try again.',
 }
 
-function loadHistory() {
+function loadHistory(key = STORAGE_KEY) {
   try {
-    const raw = sessionStorage.getItem(STORAGE_KEY)
-    return raw ? JSON.parse(raw) : []
+    const raw = sessionStorage.getItem(key)
+    const parsed = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed) ? parsed : []
   } catch { return [] }
 }
 
-function saveHistory(messages) {
+function saveHistory(messages, key = STORAGE_KEY) {
   try {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages.slice(-MAX_MESSAGES)))
+    if (messages.length) sessionStorage.setItem(key, JSON.stringify(messages.slice(-MAX_MESSAGES)))
+    else sessionStorage.removeItem(key)
   } catch { /* quota */ }
+}
+
+/** True when a saved conversation does not belong on the page the panel is opening over. */
+function isStale(messages, section) {
+  if (!messages.length) return false
+  const last = messages[messages.length - 1]
+  // Messages saved before conversations carried their page have no section: treat as stale.
+  if (!messages[0].section || messages[0].section !== section) return true
+  return !last.ts || Date.now() - last.ts > STALE_AFTER_MS
 }
 
 export default function EntoAssistant({ isOpen, onClose }) {
   const { user } = useAuth()
-  const navigate = useNavigate()
-  const { context, sectionSummary, sectionLabel, isLoading: contextLoading } = useAssistantContext(isOpen)
+  const { context, section, sectionSummary, sectionLabel, isLoading: contextLoading, isReady: contextReady } = useAssistantContext(isOpen)
 
   const [messages, setMessages] = useState(() => loadHistory())
+  // A conversation set aside on open (see STALE_AFTER_MS), offered back from the starting state.
+  const [parked, setParked] = useState(() => loadHistory(PARKED_KEY))
   const [inputValue, setInputValue] = useState('')
   const [isQuerying, setIsQuerying] = useState(false)
   const [streamingContent, setStreamingContent] = useState('')
@@ -81,6 +95,23 @@ export default function EntoAssistant({ isOpen, onClose }) {
 
   // Persist messages
   useEffect(() => { saveHistory(messages) }, [messages])
+  useEffect(() => { saveHistory(parked, PARKED_KEY) }, [parked])
+
+  // Opening the panel over another page, or long after the last answer, starts clean.
+  // Read through refs so this runs on open only, not on every message.
+  const messagesRef = useRef(messages)
+  messagesRef.current = messages
+  useEffect(() => {
+    if (!isOpen) return
+    const current = messagesRef.current
+    if (!isStale(current, section)) return
+    abortRef.current?.abort()
+    setIsQuerying(false)
+    setStreamingContent('')
+    setParked(current)
+    setMessages([])
+    setConversationId(null)
+  }, [isOpen]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-scroll
   useEffect(() => {
@@ -217,9 +248,11 @@ export default function EntoAssistant({ isOpen, onClose }) {
     setError(null)
     setInputValue('')
 
-    // Add user message
-    const userMsg = { role: 'user', content: query, ts: Date.now() }
+    // Add user message. The page it was asked on travels with it (see isStale).
+    const userMsg = { role: 'user', content: query, ts: Date.now(), section }
     setMessages(prev => [...prev, userMsg])
+    // A new conversation replaces the one set aside.
+    setParked([])
 
     // Abort previous
     abortRef.current?.abort()
@@ -254,6 +287,7 @@ export default function EntoAssistant({ isOpen, onClose }) {
               followUp: streamedFollowUp,
               confidence: result.confidence,
               ts: Date.now(),
+              section,
             }])
             setStreamingContent('')
             setIsQuerying(false)
@@ -271,7 +305,7 @@ export default function EntoAssistant({ isOpen, onClose }) {
       setIsQuerying(false)
       setStreamingContent('')
     }
-  }, [inputValue, isQuerying, context, user, conversationId])
+  }, [inputValue, isQuerying, context, section, user, conversationId])
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -287,16 +321,19 @@ export default function EntoAssistant({ isOpen, onClose }) {
     setStreamingContent('')
     setIsQuerying(false)
     setError(null)
-    sessionStorage.removeItem(STORAGE_KEY)
+    setParked([])
   }
 
-  const handleNavigate = (to) => {
-    navigate(to)
+  const handleResume = () => {
+    setMessages(parked)
+    setParked([])
   }
 
-  const quickActions = getQuickActions(context.section)
-  const suggestedActions = getSuggestedActions(context.section)
+  // Until this page's data arrives the questions are not shown, so they never flip from
+  // the regular set to the "nothing here yet" set in front of you.
+  const starter = getStarter(section, contextReady ? context.data : undefined)
   const hasMessages = messages.length > 0
+  const lastIdx = messages.length - 1
 
   const orbState = useSettledOrbState(orbStateFor({
     isListening,
@@ -313,26 +350,6 @@ export default function EntoAssistant({ isOpen, onClose }) {
   // Stays mounted through its exit so the panel slides away instead of vanishing.
   const { mounted, state: presence } = usePresence(isOpen, MOTION.base)
   if (!mounted) return null
-
-  const quickActionList = (label) => (
-    <div className="la-quick-actions">
-      <span className="la-quick-actions-label">
-        {label}<span className="la-quick-actions-count">{quickActions.length}</span>
-      </span>
-      <div className="la-quick-actions-list">
-        {quickActions.map((action, i) => (
-          <button
-            key={i}
-            type="button"
-            className="la-quick-action-btn"
-            onClick={() => handleSend(action.query)}
-          >
-            {action.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  )
 
   const panel = (
     <div className="logos-assistant la-swiss" role="dialog" aria-modal="true" aria-label="Entomate AI Assistant">
@@ -366,9 +383,7 @@ export default function EntoAssistant({ isOpen, onClose }) {
           </div>
         </div>
 
-        {hasMessages && (
-          <ContextCard variant="bar" sectionLabel={sectionLabel} sectionSummary={sectionSummary} context={context.data || {}} />
-        )}
+        <ContextCard variant="bar" sectionLabel={sectionLabel} sectionSummary={sectionSummary} context={context.data || {}} />
 
         {/* Messages area */}
         <div className="la-messages" role="log" aria-live="polite" aria-busy={isQuerying || undefined}>
@@ -386,22 +401,34 @@ export default function EntoAssistant({ isOpen, onClose }) {
           )}
 
           {!hasMessages && !isQuerying ? (
-            /* Welcome state */
-            <div className="la-welcome">
+            /* Starting state: one line, three questions, the composer. */
+            <div className="la-welcome la-welcome-brief">
               <div className="la-welcome-icon la-welcome-hero">
                 <WelcomeOrb state={orbState} />
               </div>
               <div className="la-welcome-head">
-                <div className="la-welcome-headings">
-                  <h3 className="la-welcome-title">Hi, I'm Entomate AI</h3>
-                  <p className="la-welcome-tagline">
-                    I'm context-aware and know which section you're in.
-                    Ask me anything — or use a quick action below.
-                  </p>
+                <h3 className="la-welcome-title">{starter.title}</h3>
+              </div>
+              <div className="la-quick-actions" aria-busy={!contextReady || undefined}>
+                <span className="la-quick-actions-label">Try asking</span>
+                <div className="la-quick-actions-list">
+                  {contextReady && starter.prompts.map((action) => (
+                    <button
+                      key={action.label}
+                      type="button"
+                      className="la-quick-action-btn"
+                      onClick={() => handleSend(action.query)}
+                    >
+                      {action.label}
+                    </button>
+                  ))}
                 </div>
               </div>
-              <ContextCard variant="hero" sectionLabel={sectionLabel} sectionSummary={sectionSummary} context={context.data || {}} />
-              {quickActionList('Try asking')}
+              {parked.length > 0 && (
+                <button type="button" className="la-welcome-help" onClick={handleResume}>
+                  Back to your last chat
+                </button>
+              )}
             </div>
           ) : (
             <>
@@ -423,7 +450,7 @@ export default function EntoAssistant({ isOpen, onClose }) {
                     )}
 
                     {/* Follow-up suggestions */}
-                    {msg.followUp?.length > 0 && (
+                    {idx === lastIdx && !isQuerying && msg.followUp?.length > 0 && (
                       <div className="la-suggested-list">
                         {msg.followUp.map((q, qi) => (
                           <button key={qi} type="button" className="la-suggested-btn" onClick={() => handleSend(q)}>
@@ -452,23 +479,6 @@ export default function EntoAssistant({ isOpen, onClose }) {
                   </div>
                 </div>
               )}
-
-              {/* Suggested navigation — show after last assistant message */}
-              {!isQuerying && hasMessages && messages[messages.length - 1]?.role === 'assistant' && suggestedActions.length > 0 && (
-                <div className="la-suggested-actions">
-                  <span className="la-suggested-label">Navigate to</span>
-                  <div className="la-suggested-list">
-                    {suggestedActions.map((action, i) => (
-                      <button key={i} type="button" className="la-suggested-btn" onClick={() => handleNavigate(action.to)}>
-                        {action.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Quick actions — always available at bottom of conversation */}
-              {!isQuerying && hasMessages && quickActionList('Quick actions')}
 
               <div ref={messagesEndRef} />
             </>

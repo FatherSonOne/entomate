@@ -12,6 +12,16 @@ import { calendarApi, meetingsApi } from '../services/api'
 import { VCButton } from '../components/vc'
 import ErrorState from '../components/vc/ErrorState'
 import { FullPageLoader } from '../components/EntoLoader'
+import { Select } from '../components/bench'
+
+const REPEAT_OPTIONS = [
+  { value: 'none', label: 'Does not repeat' },
+  { value: 'RRULE:FREQ=DAILY', label: 'Daily' },
+  { value: 'RRULE:FREQ=WEEKLY', label: 'Weekly' },
+  { value: 'RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR', label: 'Weekdays' },
+  { value: 'RRULE:FREQ=MONTHLY', label: 'Monthly' },
+  { value: 'RRULE:FREQ=YEARLY', label: 'Yearly' },
+]
 
 export default function Calendar() {
   const toast = useToast()
@@ -425,19 +435,14 @@ export default function Calendar() {
                 Sync Tasks
               </VCButton>
               {calendars.length > 1 && (
-                <select
-                  className="input text-sm"
-                  value={selectedCalendar}
-                  onChange={(e) => setSelectedCalendar(e.target.value)}
-                  style={{ maxWidth: 180, padding: '6px 8px' }}
-                  aria-label="Select calendar"
-                >
-                  {calendars.map(cal => (
-                    <option key={cal.id} value={cal.id}>
-                      {cal.summary}{cal.primary ? ' (primary)' : ''}
-                    </option>
-                  ))}
-                </select>
+                <Select
+                  size="sm"
+                  className="max-w-[200px]"
+                  label="Calendar"
+                  value={selectedCalendar === 'primary' ? (calendars.find(c => c.primary)?.id ?? selectedCalendar) : selectedCalendar}
+                  onChange={setSelectedCalendar}
+                  options={calendars.map(cal => ({ value: cal.id, label: cal.summary, textValue: cal.summary, hint: cal.primary ? 'primary' : undefined }))}
+                />
               )}
               <VCButton
                 variant="ghost"
@@ -880,18 +885,12 @@ export default function Calendar() {
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Repeat</label>
-                <select
-                  className="input w-full"
+                <Select
+                  label="Repeat"
                   value={newEvent.recurrence}
-                  onChange={(e) => setNewEvent(prev => ({ ...prev, recurrence: e.target.value }))}
-                >
-                  <option value="none">Does not repeat</option>
-                  <option value="RRULE:FREQ=DAILY">Daily</option>
-                  <option value="RRULE:FREQ=WEEKLY">Weekly</option>
-                  <option value="RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR">Weekdays</option>
-                  <option value="RRULE:FREQ=MONTHLY">Monthly</option>
-                  <option value="RRULE:FREQ=YEARLY">Yearly</option>
-                </select>
+                  onChange={(v) => setNewEvent(prev => ({ ...prev, recurrence: v }))}
+                  options={REPEAT_OPTIONS}
+                />
               </div>
               <div className="flex gap-3 justify-end pt-2">
                 <VCButton type="button" variant="ghost" onClick={() => setShowNewEvent(false)}>Cancel</VCButton>

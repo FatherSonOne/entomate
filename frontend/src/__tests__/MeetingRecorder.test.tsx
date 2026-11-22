@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { vi, describe, test, expect, beforeEach, afterEach } from 'vitest'
 
 const api = vi.hoisted(() => ({
+  botCheck: vi.fn(),
   start: vi.fn(),
   uploadPiece: vi.fn(),
   finish: vi.fn(),
@@ -48,7 +49,7 @@ describe('meetingRecorderService', () => {
     expect(toRecordingJob(null)).toBeNull()
     expect(toRecordingJob({ status: 'weird' })).toBeNull()
     expect(toRecordingJob({ status: 'failed', mode: 'tab', error: 'No speech', updatedAt: 'x' })).toEqual({
-      status: 'failed', mode: 'tab', error: 'No speech', updatedAt: 'x', speakers: null, summaryError: null,
+      status: 'failed', source: null, mode: 'tab', error: 'No speech', updatedAt: 'x', speakers: null, summaryError: null,
       stage: null, stageAt: null, finishedAt: null, durationMs: 0,
     })
     expect(toRecordingJob({ status: 'transcribing', stage: 'summary', stageAt: 'y', finishedAt: 'z', durationMs: 90000 })).toMatchObject({
@@ -166,6 +167,7 @@ beforeEach(() => {
   getUserMedia.mockResolvedValue(new FakeStream([new FakeTrack('audio')]))
   getDisplayMedia.mockResolvedValue(new FakeStream([new FakeTrack('video'), new FakeTrack('audio')]))
   HTMLCanvasElement.prototype.getContext = vi.fn(() => null) as unknown as typeof HTMLCanvasElement.prototype.getContext
+  api.botCheck.mockResolvedValue({ bot: null })
   api.start.mockResolvedValue({ meetingId: 'm-1' })
   api.uploadPiece.mockResolvedValue(undefined)
   api.finish.mockResolvedValue({ status: 'transcribing' })
@@ -298,5 +300,68 @@ describe('RecordingStatus', () => {
     render(<RecordingStatus meetingId="m" recordingJob={{ status: 'recording' }} onRefresh={onRefresh} />)
     fireEvent.click(screen.getByRole('button', { name: /transcribe the saved audio/i }))
     await waitFor(() => expect(api.salvage).toHaveBeenCalledWith('m'))
+  })
+})
+
+describe('one call, one meeting (recording beside the bot)', () => {
+  const BOT = { sessionId: 's-1', meetingId: 'bot-m', title: 'Weekly sync', platform: 'meet', phase: 'live', joinAt: null }
+
+  test('says the bot has this call and records into its meeting by default', async () => {
+    api.botCheck.mockResolvedValue({ bot: BOT })
+    api.start.mockResolvedValue({ meetingId: 'bot-m' })
+    renderRecorder()
+    expect(await screen.findByText('Your bot is in a call now')).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: /same call/i })).toBeChecked()
+    fireEvent.click(screen.getByRole('checkbox', { name: /knows it is being recorded/i }))
+    fireEvent.click(screen.getByRole('button', { name: /start recording/i }))
+    await screen.findByRole('button', { name: /stop recording/i })
+    expect(api.start).toHaveBeenCalledWith(expect.objectContaining({ botSessionId: 's-1' }))
+    expect(api.start.mock.calls[0]?.[0]?.separate).toBeUndefined()
+
+    fireEvent.click(screen.getByRole('button', { name: /stop recording/i }))
+    expect(await screen.findByText(/saved with the bot’s meeting/i)).toBeInTheDocument()
+  })
+
+  test('"a different meeting" records separately', async () => {
+    api.botCheck.mockResolvedValue({ bot: BOT })
+    renderRecorder()
+    fireEvent.click(await screen.findByRole('radio', { name: /a different meeting/i }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /knows it is being recorded/i }))
+    fireEvent.click(screen.getByRole('button', { name: /start recording/i }))
+    await screen.findByRole('button', { name: /stop recording/i })
+    expect(api.start).toHaveBeenCalledWith(expect.objectContaining({ separate: true }))
+  })
+
+  test('a bot that joined after the page loaded is caught on start, and the choice appears', async () => {
+    api.start.mockRejectedValueOnce({
+      message: 'Request failed',
+      originalError: { response: { data: { error: 'The bot is already in this call.', code: 'bot_in_call', bot: BOT } } },
+    })
+    renderRecorder()
+    fireEvent.click(screen.getByRole('checkbox', { name: /knows it is being recorded/i }))
+    fireEvent.click(screen.getByRole('button', { name: /start recording/i }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(/your bot is in a call now/i)
+    expect(screen.getByRole('radio', { name: /same call/i })).toBeChecked()
+  })
+})
+
+describe('RecordingStatus beside the bot', () => {
+  test('a backup recording says the bot is writing and can be used instead', async () => {
+    api.retry.mockResolvedValue({ status: 'transcribing' })
+    const onRefresh = vi.fn()
+    render(<RecordingStatus meetingId="m" recordingJob={{ status: 'backup', botSessionId: 's-1' }} onRefresh={onRefresh} />)
+    expect(screen.getByRole('status')).toHaveTextContent(/bot was in this call/i)
+    fireEvent.click(screen.getByRole('button', { name: /use my recording instead/i }))
+    await waitFor(() => expect(api.retry).toHaveBeenCalledWith('m'))
+  })
+
+  test('the bot\'s run shows the same loader with its own words', () => {
+    render(<RecordingStatus meetingId="m" recordingJob={{ status: 'transcribing', source: 'bot', stage: 'summary', updatedAt: new Date().toISOString() }} onRefresh={() => {}} />)
+    expect(screen.getByText('The bot left · writing the minutes')).toBeInTheDocument()
+  })
+
+  test('toRecordingJob reads backup and the source', () => {
+    expect(toRecordingJob({ status: 'backup', source: 'bot' })).toMatchObject({ status: 'backup', source: 'bot' })
+    expect(toRecordingJob({ status: 'done' })?.source).toBeNull()
   })
 })

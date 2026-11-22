@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { Select } from './bench'
 import { X, Clock, TrendingUp, Plus, CheckCircle2, Circle, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
 import { tasksApi } from '../services/api'
 import { VCButton, VCBadge } from './vc'
@@ -236,27 +237,11 @@ export default function TaskEditModal({ task, onClose, onSaved }) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="label">Status</label>
-              <select
-                className="input"
-                value={form.status}
-                onChange={(e) => update('status', e.target.value)}
-              >
-                {STATUS_OPTIONS.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
+              <Select label="Status" value={form.status} onChange={(v) => update('status', v)} options={STATUS_OPTIONS} />
             </div>
             <div>
               <label className="label">Priority</label>
-              <select
-                className="input"
-                value={form.priority}
-                onChange={(e) => update('priority', e.target.value)}
-              >
-                {PRIORITY_OPTIONS.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
+              <Select label="Priority" value={form.priority} onChange={(v) => update('priority', v)} options={PRIORITY_OPTIONS} />
             </div>
           </div>
 

@@ -1,9 +1,10 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect } from 'react'
 import { useLoading } from '../contexts/LoadingContext'
 import AnimatedLoadingLogo from './AnimatedLoadingLogo'
 import { Wordmark } from './Logo'
 import { isLogoId, logoById, useLogoSystem } from '../services/logoSystem'
-import { loaderMounted, loaderUnmounted } from '../services/loaderHandoff'
+import { useBoot } from '../services/bootProgress'
+import ProgressOrbit, { hasProgressOrbit } from './ProgressOrbit'
 import './EnhancedLoadingScreen.css'
 
 /*
@@ -27,20 +28,14 @@ const STAGE_ROWS = {
  * @param {'session'|'signin'|'page'|'preview'} [props.stage='session'] what the caller is waiting on.
  * @param {string} [props.logoId] show this logo system instead of the one in use (picker preview).
  * @param {() => void} [props.onClose] preview only: shows a Close key and closes on Escape.
+ * @param {{ progress: number, rows: Array<[string, string, string]>, label: string, stops: Array<{ at: number, done: boolean }> }} [props.boot]
+ *   first load only (BootLoader): measured stage rows and progress, drawn around the mark.
  */
-export default function EnhancedLoadingScreen({ autoAnimate = true, stage = 'session', logoId, onClose }) {
+export default function EnhancedLoadingScreen({ autoAnimate = true, stage = 'session', logoId, onClose, boot }) {
   const loadingContext = useLoading()
   const picked = useLogoSystem()
   const logo = isLogoId(logoId) ? logoById(logoId) : picked
-
-  // Real loaders (not the picker preview) hand off to the app when the last one goes
-  const logoRef = useRef(logo.id)
-  logoRef.current = logo.id
-  useEffect(() => {
-    if (onClose) return undefined
-    loaderMounted()
-    return () => loaderUnmounted(logoRef.current)
-  }, [onClose])
+  const covered = useBoot().covering && !boot && !onClose
 
   useEffect(() => {
     if (!onClose) return undefined
@@ -48,6 +43,44 @@ export default function EnhancedLoadingScreen({ autoAnimate = true, stage = 'ses
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
+
+  // The first-load loader is on top: draw only the ground, so nothing flashes and the motion is not run twice
+  if (covered) return <div className="en-loader" aria-hidden="true" />
+
+  if (boot) {
+    const pct = Math.round(boot.progress)
+    return (
+      <div className="en-loader en-loader--boot" role="progressbar" aria-valuemin={0} aria-valuemax={100}
+        aria-valuenow={pct} aria-valuetext={`${boot.label}, ${pct}%`} aria-label="Loading Entomate" data-logo={logo.id}>
+        <div className="en-loader-stage">
+          <AnimatedLoadingLogo logoId={logo.id} size={1024} />
+          {hasProgressOrbit(logo.id) && <ProgressOrbit logoId={logo.id} progress={boot.progress} stops={boot.stops} />}
+        </div>
+        <div className="en-loader-corner en-loader-tl en-signal-loader-wordmark"><Wordmark width={120} /></div>
+        <div className="en-loader-corner en-loader-tr">
+          <span className="en-loader-lbl">EN-01 · {logo.name}</span>
+          <span className="en-loader-lbl">{logo.motion}</span>
+        </div>
+        <div className="en-loader-corner en-loader-bl">
+          <div className="en-loader-head">
+            <span className="en-loader-lbl">First load</span>
+            <span className="en-loader-pct">{pct}<small>%</small></span>
+          </div>
+          <ul className="en-loader-rows">
+            {boot.rows.map(([name, tone, word]) => (
+              <li key={name}>
+                <span>{name}</span>
+                <span className="en-loader-sig"><i className={`en-loader-led en-loader-led--${tone}`} aria-hidden="true" />{word}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="en-signal-loader-track" aria-hidden="true">
+            <span style={{ transform: `scaleX(${boot.progress / 100})` }} />
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const real = !autoAnimate
   const progress = Math.max(0, Math.min(100, Math.round(loadingContext.progress || 0)))

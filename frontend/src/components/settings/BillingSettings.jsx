@@ -30,11 +30,13 @@ export default function BillingSettings() {
   const [billingCycle, setBillingCycle] = useState('monthly')
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(null)
+  const [billingUnavailable, setBillingUnavailable] = useState(false)
 
   useEffect(() => {
     if (!workspaceId) return
     const load = async () => {
       setLoading(true)
+      setBillingUnavailable(false)
       try {
         const [plansData, invoicesData, subData] = await Promise.all([
           billingService.getAvailablePlans(),
@@ -46,6 +48,7 @@ export default function BillingSettings() {
         setSubscription(subData)
       } catch (err) {
         console.error('Failed to load billing data:', err)
+        setBillingUnavailable(true)
       } finally {
         setLoading(false)
       }
@@ -80,6 +83,16 @@ export default function BillingSettings() {
   }, [workspaceId])
 
   const entPlans = plans.filter(p => p.app === 'entomate')
+
+  // No workspace, or the billing tables could not be read: say so instead of loading forever
+  if (!entLoading && (!workspaceId || billingUnavailable)) {
+    return (
+      <div role="status">
+        <p className="bs-set-note">Billing is not set up for this workspace yet</p>
+        <p className="bs-set-help">Plans, usage and invoices will show here when billing is turned on.</p>
+      </div>
+    )
+  }
 
   if (loading || entLoading) {
     return <div className="text-center text-sm text-gray-500 py-8">Loading billing information...</div>

@@ -1,75 +1,60 @@
 import React from 'react';
+import ErrorScreen from './ErrorScreen';
+import { chunkReloadPending, isChunkError, reloadForStaleChunk } from '../services/chunkReload';
+import { classifyError } from '../services/errorKinds';
 
+/**
+ * Catches render errors and shows ErrorScreen with words for the kind of
+ * error (stale deploy, offline, session, access, not found, server, page).
+ *
+ * scope="app" (main.jsx) covers the window. scope="page" (Layout, around the
+ * Outlet) keeps the shell, and resetKey (the pathname) clears it when the
+ * person navigates away, so one broken page never blocks the rest.
+ */
 export default class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { error: null, componentStack: undefined, resetKey: props.resetKey };
   }
 
   static getDerivedStateFromError(error) {
-    return { hasError: true, error };
+    return { error: error ?? new Error('Unknown error') };
+  }
+
+  static getDerivedStateFromProps(props, state) {
+    if (props.resetKey !== state.resetKey) {
+      return { error: null, componentStack: undefined, resetKey: props.resetKey };
+    }
+    return null;
   }
 
   componentDidCatch(error, errorInfo) {
-    console.error('[ErrorBoundary] Caught error:', error, errorInfo);
+    // A page chunk from an older deploy: reload once onto the new build
+    if (isChunkError(error) && reloadForStaleChunk()) return;
+    console.error(`[ErrorBoundary:${this.props.scope ?? 'app'}] ${classifyError(error)}:`, error, errorInfo?.componentStack);
+    this.setState({ componentStack: errorInfo?.componentStack });
   }
 
-  handleReload = () => {
-    window.location.reload();
+  retry = () => {
+    this.setState({ error: null, componentStack: undefined });
   };
 
   render() {
-    if (this.state.hasError) {
+    const { error, componentStack } = this.state;
+    if (error) {
+      // Reloading for a new deploy: keep the screen quiet instead of flashing the error
+      if (chunkReloadPending() || (isChunkError(error) && reloadForStaleChunk())) {
+        return <div className={this.props.scope === 'page' ? undefined : 'en-err-quiet'} aria-busy="true" />;
+      }
       return (
-        <div style={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'var(--bg0)',
-          color: 'var(--t0)',
-          padding: '2rem'
-        }}>
-          <div className="vc" style={{
-            maxWidth: 480,
-            padding: '2.5rem',
-            textAlign: 'center',
-            borderRadius: 12
-          }}>
-            <div style={{ fontSize: 48, marginBottom: '1rem', opacity: 0.5 }}>!</div>
-            <h1 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '0.75rem' }}>
-              Something went wrong
-            </h1>
-            <p style={{ color: 'var(--t1)', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
-              An unexpected error occurred. Try reloading the page.
-            </p>
-            {process.env.NODE_ENV !== 'production' && this.state.error && (
-              <pre style={{
-                textAlign: 'left',
-                fontSize: '0.75rem',
-                background: 'var(--bg1)',
-                padding: '1rem',
-                borderRadius: 8,
-                overflow: 'auto',
-                marginBottom: '1.5rem',
-                color: 'var(--c)',
-                maxHeight: 200
-              }}>
-                {this.state.error.toString()}
-              </pre>
-            )}
-            <button
-              onClick={this.handleReload}
-              className="vc-btn vc-btn-primary"
-              style={{ padding: '0.5rem 1.5rem' }}
-            >
-              Reload Page
-            </button>
-          </div>
-        </div>
+        <ErrorScreen
+          error={error}
+          componentStack={componentStack}
+          scope={this.props.scope ?? 'app'}
+          onRetry={this.retry}
+        />
       );
     }
-
     return this.props.children;
   }
 }

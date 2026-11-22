@@ -1,10 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Moon, Search, Settings, Sun } from 'lucide-react'
+import { AudioLines, House, LayoutGrid, ListChecks, Moon, Search, Settings, Sun } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { Drawer } from '../Drawer'
 import { Key } from '../Key'
 import { Led } from '../Signal'
 import { cx } from '../cx'
+import { drawIcon } from '../iconDraw'
+import { prefersReducedMotion } from '../motion'
 import { logoAsset, useLogoSystem } from '../../../services/logoSystem'
 import { RippleCircles } from '../../ui/ripple-circles'
 
@@ -62,7 +65,7 @@ export interface BenchShellProps {
   onSignOut: () => void
   /** "⌘" or "Ctrl". */
   modKey: string
-  /** Dock routes: Today, Meetings, Tasks. */
+  /** Dock routes: Today, Meetings, Tasks. Icons are keyed by href. */
   dock: ReadonlyArray<{ name: string; href: string }>
   /** The AI launcher, docked in the rail above Record (desktop). */
   assistant?: React.ReactNode
@@ -262,6 +265,83 @@ function ProfileMenu({ user, items, onSignOut, onSettings, modKey }: {
   )
 }
 
+/* ── Record key: press and release ── */
+
+/** Shortest visible press, so a quick tap still reads as going down. */
+const MIN_PRESS_MS = 90
+/** Ripple rings keep breathing this long after release (about half a cycle). */
+const RIPPLE_TAIL_MS = 1100
+
+interface PressProps {
+  'data-pressed': 'true' | undefined
+  /** Ripple rings on: from press until RIPPLE_TAIL_MS after release. */
+  'data-lit': 'true' | undefined
+  onPointerDown: (e: React.PointerEvent) => void
+  onPointerUp: () => void
+  onPointerCancel: () => void
+  onPointerLeave: () => void
+  onKeyDown: (e: React.KeyboardEvent) => void
+  onKeyUp: () => void
+  onBlur: () => void
+}
+
+/**
+ * Pressed state driven by pointer and keyboard events rather than :active,
+ * which iOS Safari doesn't apply reliably on tap. Held for at least
+ * MIN_PRESS_MS so the key visibly goes down before it springs back.
+ */
+function usePress(): PressProps {
+  const [pressed, setPressed] = useState<boolean>(false)
+  const [lit, setLit] = useState<boolean>(false)
+  const downAt = useRef<number>(0)
+  const timer = useRef<number | undefined>(undefined)
+  const litTimer = useRef<number | undefined>(undefined)
+  useEffect(() => () => {
+    window.clearTimeout(timer.current)
+    window.clearTimeout(litTimer.current)
+  }, [])
+  const down = (): void => {
+    window.clearTimeout(timer.current)
+    window.clearTimeout(litTimer.current)
+    downAt.current = performance.now()
+    setPressed(true)
+    setLit(true)
+  }
+  const up = (): void => {
+    const left = MIN_PRESS_MS - (performance.now() - downAt.current)
+    window.clearTimeout(timer.current)
+    if (left > 0) timer.current = window.setTimeout(() => setPressed(false), left)
+    else setPressed(false)
+    window.clearTimeout(litTimer.current)
+    litTimer.current = window.setTimeout(() => setLit(false), Math.max(left, 0) + RIPPLE_TAIL_MS)
+  }
+  return {
+    'data-pressed': pressed ? 'true' : undefined,
+    'data-lit': lit ? 'true' : undefined,
+    onPointerDown: (e) => {
+      if (e.button !== 0) return
+      down()
+      // A short tick on phones that support it.
+      if (e.pointerType === 'touch' && !prefersReducedMotion()) navigator.vibrate?.(8)
+    },
+    onPointerUp: up,
+    onPointerCancel: up,
+    onPointerLeave: up,
+    onKeyDown: (e) => { if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) down() },
+    onKeyUp: up,
+    onBlur: up,
+  }
+}
+
+/* ── Phone dock icons, keyed by route ── */
+
+const DOCK_ICONS: Readonly<Record<string, LucideIcon>> = {
+  '/dashboard': House,
+  // Not Mic: the Record key sits right beside it.
+  '/meetings': AudioLines,
+  '/tasks': ListChecks,
+}
+
 /* ── The shell ── */
 
 export function BenchShell(props: BenchShellProps): React.ReactElement {
@@ -274,13 +354,36 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
   const [navOpen, setNavOpen] = useState<boolean>(false)
   const now = useClock()
   const online = useOnline()
+  const railPress = usePress()
+  const dockPress = usePress()
 
+  // When a dock tab becomes active by any route (back button, a link in the
+  // page), its icon draws in once. Taps already draw through the shared
+  // pointer listener; the running guard keeps the two from doubling up.
+  const dockRef = useRef<HTMLElement>(null)
+  const activeDock = dock.find((d) => isActive(d.href))?.href ?? null
+  const seenDock = useRef<string | null | undefined>(undefined)
+  useEffect(() => {
+    const first = seenDock.current === undefined
+    seenDock.current = activeDock
+    if (first || !activeDock || prefersReducedMotion()) return
+    const svg = dockRef.current?.querySelector<SVGSVGElement>('.bs-dock-item[aria-current="page"] svg')
+    if (svg) drawIcon(svg)
+  }, [activeDock])
+
+  const dockLabel = (name: string, active: boolean): React.ReactElement => (
+    <span className="bs-dock-lbl">
+      <Led tone={active ? 'brand' : 'off'} />
+      {name}
+    </span>
+  )
   const dockItem = (d: { name: string; href: string }): React.ReactElement => {
     const active = isActive(d.href)
+    const Icon = DOCK_ICONS[d.href]
     return (
       <Link key={d.href} to={d.href} className="bs-dock-item" aria-current={active ? 'page' : undefined}>
-        <Led tone={active ? 'brand' : 'off'} />
-        {d.name}
+        {Icon ? <Icon aria-hidden="true" strokeWidth={1.6} /> : null}
+        {dockLabel(d.name, active)}
       </Link>
     )
   }
@@ -307,9 +410,9 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
           <PatchPanel groups={railGroups} isActive={isActive} />
         </nav>
         {assistant ? <div className="la-launcher-wrap">{assistant}</div> : null}
-        <button type="button" className="bs-recbox group" onClick={onRecord}>
+        <button type="button" className="bs-recbox group" onClick={onRecord} {...railPress}>
           <span className="relative isolate inline-flex" aria-hidden="true">
-            <RippleCircles className="-inset-[9px] -z-10 opacity-0 transition-opacity duration-300 [&_*]:[animation-play-state:paused] group-hover:opacity-100 group-hover:[&_*]:[animation-play-state:running] group-focus-visible:opacity-100 group-focus-visible:[&_*]:[animation-play-state:running]" />
+            <RippleCircles className="-inset-[9px] -z-10 opacity-0 transition-opacity duration-300 [&_*]:[animation-play-state:paused] group-hover:opacity-100 group-hover:[&_*]:[animation-play-state:running] group-focus-visible:opacity-100 group-focus-visible:[&_*]:[animation-play-state:running] group-data-[lit=true]:opacity-100 group-data-[lit=true]:[&_*]:[animation-play-state:running]" />
             <span className="bs-rec" />
           </span>
           <span>
@@ -350,16 +453,20 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
       </div>
 
       {/* Phone dock */}
-      <nav className="bs-dock" aria-label="Quick navigation">
+      <nav className="bs-dock" aria-label="Quick navigation" ref={dockRef}>
         {d0 && dockItem(d0)}
         {d1 && dockItem(d1)}
-        <button type="button" className="bs-dock-rec" onClick={onRecord} aria-label="Record a meeting">
-          <span className="bs-rec" aria-hidden="true" />
+        <button type="button" className="bs-dock-rec group" onClick={onRecord} aria-label="Record a meeting" {...dockPress}>
+          {/* The rail's hover ripple, here on press: touch has no hover. */}
+          <span className="relative isolate inline-flex" aria-hidden="true">
+            <RippleCircles className="-inset-[9px] -z-10 opacity-0 transition-opacity duration-300 [&_*]:[animation-play-state:paused] group-focus-visible:opacity-100 group-focus-visible:[&_*]:[animation-play-state:running] group-data-[lit=true]:opacity-100 group-data-[lit=true]:[&_*]:[animation-play-state:running]" />
+            <span className="bs-rec" />
+          </span>
         </button>
         {d2 && dockItem(d2)}
         <button type="button" className="bs-dock-item" onClick={() => setNavOpen(true)} aria-haspopup="dialog" aria-expanded={navOpen}>
-          <Led tone="off" />
-          More
+          <LayoutGrid aria-hidden="true" strokeWidth={1.6} />
+          {dockLabel('More', navOpen)}
         </button>
       </nav>
 

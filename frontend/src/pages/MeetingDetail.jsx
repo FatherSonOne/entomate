@@ -53,7 +53,7 @@ export default function MeetingDetail() {
   const [playingAtMs, setPlayingAtMs] = useState(null)
   const playable = canPlay(meeting?.recording_job)
   // A browser recording whose minutes are still being written: empty sections say so instead of "none".
-  const minutesPending = toRecordingJob(meeting?.recording_job)?.status === 'transcribing'
+  const minutesPending = ['transcribing', 'backup'].includes(toRecordingJob(meeting?.recording_job)?.status)
   const jumpToTranscript = useCallback((atMs) => {
     setFocusAtMs(atMs)
     if (playerRef.current?.isReady()) playerRef.current.playFrom(atMs)
@@ -518,6 +518,8 @@ export default function MeetingDetail() {
         )}
       </section>
       <CarryForward data={carryForward} title="From earlier meetings" />
+      {/* Transcript and sync stay in view while the minutes scroll (desktop). */}
+      <div className="bs-mtg-follow">
       <section id="meeting-transcript" className="bs-mtg-transcript" aria-labelledby="meeting-transcript-heading">
         <Section
           id="meeting-transcript-heading"
@@ -555,6 +557,7 @@ export default function MeetingDetail() {
       <div className="bs-mtg-sync">
         <EcosystemSyncStatus meetingId={id} />
       </div>
+      </div>
     </div>
   )
 
@@ -562,7 +565,8 @@ export default function MeetingDetail() {
     <div className="bs-mtg bs-mtg-detail">
       <TitleRule title={title} crumbs={<Breadcrumbs current={meeting.title || 'Untitled meeting'} />} meta={meta} actions={actions} />
 
-      {(searchParams.get('debrief') || meeting.recording_job?.source === 'bot') && (
+      {/* While the minutes are written, RecordingStatus shows the loader with real stages for both engines. */}
+      {toRecordingJob(meeting.recording_job)?.status !== 'transcribing' && (searchParams.get('debrief') || meeting.recording_job?.source === 'bot') && (
         <BotDebrief meetingId={meeting.id} forced={Boolean(searchParams.get('debrief'))} onOpenTab={openTab} onMinutesReady={refreshMeeting} onJump={playMoment} plays={playable} />
       )}
 

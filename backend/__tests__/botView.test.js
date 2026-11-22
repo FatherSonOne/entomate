@@ -80,3 +80,16 @@ describe('buildBotView', () => {
     expect(friendlyFailure(null)).toMatch(/could not finish/);
   });
 });
+
+describe('debrief steps while the minutes are written', () => {
+  test('a meeting claimed by the bot run but without lines yet is still writing the transcript', () => {
+    const v = buildBotView({
+      session: { ...base, status: 'completed' },
+      meeting: { id: 'm1', summary: null, transcript_segments: null, recording_job: { status: 'transcribing', source: 'bot', stage: 'transcript' } },
+      now: NOW,
+    });
+    expect(v.phase).toBe('processing');
+    expect(v.debrief.steps.find((s) => s.key === 'transcript')).toMatchObject({ state: 'working', value: 'Writing' });
+    expect(v.debrief.steps.find((s) => s.key === 'summary').state).toBe('waiting');
+  });
+});

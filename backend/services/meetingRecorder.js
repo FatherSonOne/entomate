@@ -26,11 +26,8 @@
 'use strict';
 
 const { supabase } = require('../config/supabase');
-const ai = require('../config/ai');
 const geminiRecording = require('../config/geminiRecording');
-const summaryTemplates = require('./summaryTemplates');
-const speakerNames = require('./speakerNames');
-const transcriptMoments = require('./transcriptMoments');
+const meetingFinish = require('./meetingFinish');
 const playbackFile = require('./playbackFile');
 const log = require('../utils/log');
 
@@ -43,13 +40,6 @@ const MAX_PIECE_MS = 120000;
 /** A job still marked transcribing after this long died with the server; it may be retried. */
 const STALE_JOB_MS = 20 * 60 * 1000;
 const MAX_TITLE = 200;
-
-const EMPTY_SUMMARY = { summary: null, keyPoints: [], decisions: [], topics: [], sentiment: null, sentimentScore: null };
-
-/** Lazy: routes/meetings.js requires services that would make this a require cycle. */
-function pipeline() {
-  return require('../routes/meetings')._pipeline;
-}
 
 class RecorderError extends Error {
   constructor(status, message, extra = {}) {
@@ -246,34 +236,158 @@ function isStale(job, now = Date.now()) {
 /** Meetings this server is transcribing right now. */
 const running = new Set();
 
+// ── Beside the bot ───────────────────────────────────────────────────────
+//
+// The Recall bot and this recorder are two ways to hear one call. Recording a call the
+// bot is in would make two meetings, two summaries and every action item twice, so the
+// recorder adds its audio to the bot's meeting instead and lets the bot write the minutes.
+
+/** bot_sessions statuses before the bot has finished. */
+const BOT_ACTIVE = ['pending', 'launching', 'joining', 'in_call'];
+/** A scheduled bot this close to its start counts as in the call. */
+const BOT_SOON_MS = 15 * 60 * 1000;
+/** A bot still "joining" this long after its start never got in. */
+const BOT_NO_SHOW_MS = 30 * 60 * 1000;
+/** A finished bot with no minutes after this long will not write any. */
+const BOT_INGEST_WAIT_MS = 20 * 60 * 1000;
+const BOT_RETRY_FAILED = "The bot's transcript could not be turned into minutes. Try again in a minute.";
+
+function botPhase(session, now) {
+  if (session.status === 'in_call') return 'live';
+  const joinAt = Date.parse(session.join_at || '');
+  return Number.isFinite(joinAt) && joinAt > now + 60 * 1000 ? 'scheduled' : 'joining';
+}
+
+/**
+ * This person's bots that are in a call now or about to join one, the likeliest first.
+ * @returns {Promise<Array<{ sessionId, meetingId, title, platform, phase, joinAt }>>}
+ */
+async function botsInCall({ orgId, userId, now = Date.now() }) {
+  if (!orgId || !userId) return [];
+  const { data, error } = await supabase
+    .from('bot_sessions')
+    .select('id, meeting_id, title, platform, status, join_at, started_at, created_at')
+    .eq('org_id', orgId)
+    .eq('consent_acknowledged_by', userId)
+    .in('status', BOT_ACTIVE)
+    .order('created_at', { ascending: false })
+    .limit(20);
+  if (error) throw error;
+  const rank = { live: 0, joining: 1, scheduled: 2 };
+  return (data || [])
+    .filter((s) => {
+      if (!s.meeting_id) return false;
+      const joinAt = Date.parse(s.join_at || s.created_at || '');
+      if (!Number.isFinite(joinAt)) return s.status === 'in_call';
+      if (s.status === 'in_call') return true;
+      return joinAt <= now + BOT_SOON_MS && now - joinAt <= BOT_NO_SHOW_MS;
+    })
+    .map((s) => ({
+      sessionId: s.id,
+      meetingId: s.meeting_id,
+      title: s.title || null,
+      platform: s.platform || null,
+      phase: botPhase(s, now),
+      joinAt: s.join_at || null,
+    }))
+    .sort((a, b) => rank[a.phase] - rank[b.phase]);
+}
+
+/**
+ * What a recording made beside a bot does when it stops:
+ *   'done'    the bot has already written the minutes; the audio is simply kept
+ *   'backup'  the bot will write them; the audio waits in case it cannot
+ *   'record'  the bot cannot (it failed, never joined, or left nothing): transcribe this
+ */
+async function botHandOff(meetingId, botSessionId, now = Date.now()) {
+  const [{ data: written }, { data: session }] = await Promise.all([
+    supabase.from('meetings').select('transcript_segments').eq('id', meetingId).maybeSingle(),
+    supabase.from('bot_sessions').select('status, join_at, started_at, ended_at').eq('id', botSessionId).maybeSingle(),
+  ]);
+  if (Array.isArray(written?.transcript_segments) && written.transcript_segments.length) return 'done';
+  if (!session) return 'record';
+  if (['failed', 'timeout'].includes(session.status)) return 'record';
+  if (session.status === 'stopped' && !session.started_at) return 'record';
+  if (BOT_ACTIVE.includes(session.status) && session.status !== 'in_call') {
+    const joinAt = Date.parse(session.join_at || '');
+    if (Number.isFinite(joinAt) && now - joinAt > BOT_NO_SHOW_MS) return 'record';
+  }
+  if (['completed', 'stopped'].includes(session.status)) {
+    const ended = Date.parse(session.ended_at || '');
+    if (Number.isFinite(ended) && now - ended > BOT_INGEST_WAIT_MS) return 'record';
+  }
+  return 'backup';
+}
+
+/**
+ * The bot could not write the minutes (it failed, heard nothing, or its transcript would
+ * not ingest). A recording made beside it takes over: its audio is transcribed instead.
+ * Does nothing when there is no such recording, or the minutes already exist.
+ */
+async function botCouldNotDeliver({ sessionId, meetingId = null }) {
+  let id = meetingId;
+  if (!id) {
+    const { data } = await supabase.from('bot_sessions').select('meeting_id').eq('id', sessionId).maybeSingle();
+    id = data?.meeting_id || null;
+  }
+  if (!id) return { status: 'skipped' };
+  const meeting = await loadMeeting(id);
+  const job = meeting?.recording_job;
+  if (!job || job.botSessionId !== sessionId || !(job.pieces > 0)) return { status: 'skipped' };
+  if (!['backup', 'failed', 'transcribing'].includes(job.status) || running.has(id)) return { status: 'skipped' };
+  const { data: written } = await supabase.from('meetings').select('transcript_segments').eq('id', id).maybeSingle();
+  if (Array.isArray(written?.transcript_segments) && written.transcript_segments.length) return { status: 'skipped' };
+  log.info('Recording: the bot could not deliver, transcribing the recording made beside it', { meetingId: id, sessionId });
+  await setJob(meeting, { status: 'transcribing', source: 'browser', error: null, stage: null, stageAt: null });
+  runInBackground(id);
+  return { status: 'transcribing' };
+}
+
 // ── Public API ───────────────────────────────────────────────────────────
 
 /**
  * Make the meeting a recording will fill.
  * @returns {Promise<{meetingId: string, recordingJob: object}>}
  */
-async function startRecording({ userId, orgId, title, attendees, mode, mimeType }) {
+async function startRecording({ userId, orgId, title, attendees, mode, mimeType, botSessionId = null, separate = false, now = Date.now() }) {
   if (!MODES.includes(mode)) throw new RecorderError(400, 'Choose microphone, camera or browser tab.');
   const mime = baseMime(mimeType);
   if (!mime) throw new RecorderError(400, 'This browser records in a format Entomate cannot transcribe.');
 
-  const now = new Date().toISOString();
-  const name = String(title || '').trim().slice(0, MAX_TITLE);
-  const recordingJob = { status: 'recording', mode, mimeType: mime, startedAt: now, startedBy: userId, updatedAt: now };
+  // One call, one meeting: a bot of this person's in a call now gets the recording added
+  // to its meeting (as a backup), unless they say this is a different meeting.
+  let bot = null;
+  if (botSessionId) {
+    bot = (await botsInCall({ orgId, userId, now })).find((b) => b.sessionId === botSessionId) || null;
+    if (!bot) throw new RecorderError(409, 'The bot has left that call. Start again to record on your own.');
+    const { data: taken, error: takenErr } = await supabase.from('meetings').select('id').eq('id', bot.meetingId).maybeSingle();
+    if (takenErr) throw takenErr;
+    if (taken) throw new RecorderError(409, 'That meeting is already being recorded.');
+  } else if (!separate) {
+    const [live] = await botsInCall({ orgId, userId, now });
+    if (live) throw new RecorderError(409, 'The bot is already in this call.', { code: 'bot_in_call', bot: live });
+  }
+
+  const at = new Date(now).toISOString();
+  const name = String(title || '').trim().slice(0, MAX_TITLE) || (bot?.title ? String(bot.title).slice(0, MAX_TITLE) : '');
+  const recordingJob = { status: 'recording', mode, mimeType: mime, startedAt: at, startedBy: userId, updatedAt: at };
+  if (bot) recordingJob.botSessionId = bot.sessionId;
   const { data, error } = await supabase
     .from('meetings')
     .insert({
-      title: name || `Recording, ${new Date(now).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
+      ...(bot ? { id: bot.meetingId } : {}),
+      title: name || `Recording, ${new Date(at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
       org_id: orgId,
       created_by: userId,
       attendees: cleanAttendees(attendees),
-      start_time: now,
+      start_time: at,
       recording_job: recordingJob,
-      created_at: now,
-      updated_at: now,
+      created_at: at,
+      updated_at: at,
     })
     .select('id, recording_job')
     .single();
+  if (error?.code === '23505') throw new RecorderError(409, 'That meeting is already being recorded.');
   if (error) throw error;
   return { meetingId: data.id, recordingJob: data.recording_job };
 }
@@ -337,19 +451,45 @@ async function finishRecording({ meetingId, pieces, salvage = false, now = Date.
   }
 
   const durationMs = saved.filter((p) => p.seq < pieces).reduce((sum, p) => sum + p.durationMs, 0);
-  await setJob(meeting, { status: 'transcribing', pieces, durationMs, finishedAt: new Date().toISOString(), error: null, stage: null, stageAt: null });
+  const finishedAt = new Date(now).toISOString();
+  // Recorded beside the bot: the bot writes the minutes, and this audio waits as a
+  // backup, transcribed only if the bot cannot deliver (botCouldNotDeliver).
+  if (job.botSessionId) {
+    const handOff = await botHandOff(meetingId, job.botSessionId, now);
+    if (handOff !== 'record') {
+      await setJob(meeting, { status: handOff, pieces, durationMs, finishedAt, error: null, stage: null, stageAt: null });
+      return { status: handOff };
+    }
+  }
+  await setJob(meeting, { status: 'transcribing', source: 'browser', pieces, durationMs, finishedAt, error: null, stage: null, stageAt: null });
   runInBackground(meetingId);
   return { status: 'transcribing' };
 }
 
-/** Try a failed (or abandoned) transcription again from the saved audio. */
+/**
+ * Try a failed (or abandoned) transcription again. A browser recording is transcribed
+ * from its saved audio; a bot meeting with no audio of its own asks Recall again.
+ * A backup recording beside a bot can be written up now instead of waiting on the bot.
+ */
 async function retryTranscription({ meetingId }) {
   const meeting = await loadMeeting(meetingId);
   const job = meeting?.recording_job;
   if (!job) throw new RecorderError(409, 'This meeting was not recorded here.');
-  const retryable = job.status === 'failed' || (job.status === 'transcribing' && !running.has(meetingId) && isStale(job));
+  const stuck = job.status === 'transcribing' && !running.has(meetingId) && isStale(job);
+  const retryable = job.status === 'failed' || job.status === 'backup' || stuck;
   if (!retryable) throw new RecorderError(409, job.status === 'transcribing' ? 'The transcript is still being written.' : 'There is nothing to retry.');
-  await setJob(meeting, { status: 'transcribing', error: null, stage: null, stageAt: null });
+  if (!(job.pieces > 0) && job.source === 'bot' && job.botSessionId) {
+    await setJob(meeting, { status: 'transcribing', error: null, stage: null, stageAt: null });
+    require('./botOrchestrator')
+      .ingestSessionTranscript(job.botSessionId)
+      .then((r) => (['ingested', 'already_ingested', 'in_progress'].includes(r?.status) ? null : setJob(meeting, { status: 'failed', error: BOT_RETRY_FAILED })))
+      .catch((err) => {
+        log.error('Recording: bot transcript retry failed', { meetingId, error: err.message });
+        return setJob(meeting, { status: 'failed', error: BOT_RETRY_FAILED }).catch(() => {});
+      });
+    return { status: 'transcribing' };
+  }
+  await setJob(meeting, { status: 'transcribing', source: 'browser', error: null, stage: null, stageAt: null });
   runInBackground(meetingId);
   return { status: 'transcribing' };
 }
@@ -411,7 +551,7 @@ async function transcribeMeeting(meetingId) {
     await markStage(meeting, 'transcript');
     const text = await geminiRecording.transcribeRecording(audio, job.mimeType || 'audio/webm');
     let segments = parseTimestampedTranscript(text);
-    let transcript = segments.length ? buildTranscriptText(segments) : String(text || '').trim();
+    const transcript = segments.length ? buildTranscriptText(segments) : String(text || '').trim();
     if (!transcript) {
       const err = new Error('Empty transcript');
       err.userMessage = 'No speech was heard in this recording. Check that the right microphone or tab audio was shared.';
@@ -419,45 +559,15 @@ async function transcribeMeeting(meetingId) {
     }
     const playback = await savePlaybackFile(meeting, audio, job.mimeType || 'audio/webm');
 
-    // Real names for "Speaker N" before the summary, so owners and carry-forward use them.
-    // Strong evidence renames; weaker guesses wait on the meeting page as suggestions.
-    let speakerSuggestions = [];
-    if (segments.length) {
-      await markStage(meeting, 'speakers');
-      try {
-        const candidates = await speakerNames.loadCandidates(meeting);
-        const { apply, suggestions } = await speakerNames.suggestNames(segments, candidates);
-        if (Object.keys(apply).length) {
-          segments = speakerNames.applyNames(segments, apply);
-          transcript = buildTranscriptText(segments);
-        }
-        speakerSuggestions = suggestions;
-      } catch (err) {
-        log.warn('Recording: speaker naming failed, keeping Speaker labels', { meetingId, error: err.message });
-      }
-    }
-
-    const { runAIPipeline, saveActionItems, firePostProcessing } = pipeline();
-    let summaryData = EMPTY_SUMMARY;
-    let actionItems = [];
-    let embedding = null;
-    // Saved on the job so a missing summary can be diagnosed from the database.
-    let summaryError = null;
-    await markStage(meeting, 'summary');
-    if (!ai.isConfigured()) {
-      summaryError = 'AI provider not configured';
-    } else {
-      try {
-        ({ summaryData, actionItems, embedding } = await runAIPipeline(transcript, meeting.title, { attendees: meeting.attendees, template: meeting.summary_template }));
-      } catch (err) {
-        // The transcript is the valuable part; the summary can be rebuilt with Reprocess.
-        summaryError = String(err?.message || err).slice(0, 500);
-        log.warn('Recording: AI pipeline failed, saving transcript only', { meetingId, error: err.message });
-      }
-    }
-    actionItems = transcriptMoments.withActionItemMoments(segments, actionItems);
-    const keyPoints = summaryData.keyPoints || [];
-    const decisions = summaryData.decisions || [];
+    const minutes = await meetingFinish.writeMinutes({
+      meeting,
+      segments,
+      transcript,
+      title: meeting.title,
+      attendees: meeting.attendees,
+      onStage: (stage) => markStage(meeting, stage),
+    });
+    segments = minutes.segments;
     const speakers = [...new Set(segments.map((s) => s.speaker))];
 
     await markStage(meeting, 'saving');
@@ -465,24 +575,18 @@ async function transcribeMeeting(meetingId) {
     const durationMs = job.durationMs || 0;
     const startMs = Date.parse(meeting.start_time || job.startedAt || now);
     const update = {
-      transcript,
-      transcript_segments: segments.length ? segments : null,
-      summary: summaryData.summary || null,
-      key_points: keyPoints,
-      decisions,
-      summary_moments: segments.length ? transcriptMoments.summaryMoments(segments, keyPoints, decisions) : null,
-      topics: summaryData.topics || [],
-      ...summaryTemplates.summaryFields(summaryData),
-      sentiment_label: summaryData.sentiment || null,
-      sentiment_score: summaryData.sentimentScore ?? null,
+      ...minutes.fields,
       // Names typed before recording win; otherwise the speakers Gemini heard.
       attendees: Array.isArray(meeting.attendees) && meeting.attendees.length ? meeting.attendees : speakers,
       duration_minutes: durationMs ? Math.max(1, Math.round(durationMs / 60000)) : null,
       end_time: Number.isFinite(startMs) && durationMs ? new Date(startMs + durationMs).toISOString() : now,
-      recording_job: { ...job, status: 'done', stage: null, stageAt: null, error: null, summaryError, speakerSuggestions, audioKept: true, playbackFile: playback, speakers: speakers.length, lines: segments.length, updatedAt: now },
+      recording_job: {
+        ...meeting.recording_job, source: 'browser', status: 'done', stage: null, stageAt: null, error: null,
+        summaryError: minutes.summaryError, speakerSuggestions: minutes.speakerSuggestions, audioKept: true,
+        playbackFile: playback, speakers: speakers.length, lines: segments.length, updatedAt: now,
+      },
       updated_at: now,
     };
-    if (embedding) update.transcript_embedding = embedding;
 
     const { data: saved, error } = await supabase
       .from('meetings')
@@ -493,10 +597,7 @@ async function transcribeMeeting(meetingId) {
       .single();
     if (error) throw error;
 
-    // A retry replaces the action items an earlier, half-finished run may have saved.
-    await supabase.from('action_items').delete().eq('meeting_id', meetingId);
-    const savedActionItems = await saveActionItems(meetingId, actionItems);
-    firePostProcessing(saved, summaryData, savedActionItems, { userId: job.startedBy || meeting.created_by || null });
+    await meetingFinish.publishMinutes(supabase, saved, minutes, { userId: job.startedBy || meeting.created_by || null });
 
     log.info('Recording transcribed', { meetingId, lines: segments.length, speakers: speakers.length });
     return { status: 'done', lines: segments.length };
@@ -574,6 +675,8 @@ module.exports = {
   PIECE_MAX_BYTES,
   RecorderError,
   startRecording,
+  botsInCall,
+  botCouldNotDeliver,
   savePiece,
   finishRecording,
   retryTranscription,
@@ -583,5 +686,5 @@ module.exports = {
   removeAudio,
   transcribeMeeting,
   parseTimestampedTranscript,
-  _internal: { baseMime, piecePath, parsePieceName, listPieces, isStale, cleanAttendees, running, STALE_JOB_MS },
+  _internal: { botHandOff, baseMime, piecePath, parsePieceName, listPieces, isStale, cleanAttendees, running, STALE_JOB_MS },
 };

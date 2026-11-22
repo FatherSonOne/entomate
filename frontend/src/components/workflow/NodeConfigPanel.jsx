@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react'
+import { Select } from '../bench'
 import {
   X, Settings, Play, Trash2, Copy, Pin, PinOff,
   Plus, Minus, ChevronDown, ChevronUp, HelpCircle
@@ -44,15 +45,13 @@ const FieldRenderers = {
   ),
 
   select: ({ field, value, onChange }) => (
-    <select
+    <Select
+      label={field.label || field.name}
+      className="w-full"
       value={value || field.default || ''}
-      onChange={(e) => onChange(field.name, e.target.value)}
-      className="w-full px-3 py-2 text-sm border border-line-default rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-    >
-      {field.options?.map(opt => (
-        <option key={opt.value} value={opt.value}>{opt.label}</option>
-      ))}
-    </select>
+      onChange={(v) => onChange(field.name, v)}
+      options={(field.options || []).map(opt => ({ value: String(opt.value), label: opt.label }))}
+    />
   ),
 
   boolean: ({ field, value, onChange }) => (
@@ -185,14 +184,13 @@ const FieldRenderers = {
         {conditions.map((cond, index) => (
           <div key={index} className="p-3 bg-surface-muted rounded-lg border border-line-default space-y-2">
             {index > 0 && (
-              <select
+              <Select
+                size="sm"
+                label="Combine with"
                 value={cond.combineWith || 'AND'}
-                onChange={(e) => updateCondition(index, 'combineWith', e.target.value)}
-                className="px-2 py-1 text-xs border border-line-default rounded"
-              >
-                <option value="AND">AND</option>
-                <option value="OR">OR</option>
-              </select>
+                onChange={(v) => updateCondition(index, 'combineWith', v)}
+                options={[{ value: 'AND', label: 'AND' }, { value: 'OR', label: 'OR' }]}
+              />
             )}
             <div className="flex gap-2">
               <input
@@ -202,15 +200,14 @@ const FieldRenderers = {
                 placeholder="Field path"
                 className="flex-1 px-2 py-1 text-sm border border-line-default rounded-md"
               />
-              <select
+              <Select
+                size="sm"
+                className="w-auto shrink-0"
+                label="Operator"
                 value={cond.operator || 'equals'}
-                onChange={(e) => updateCondition(index, 'operator', e.target.value)}
-                className="px-2 py-1 text-sm border border-line-default rounded-md"
-              >
-                {operators.map(op => (
-                  <option key={op.value} value={op.value}>{op.label}</option>
-                ))}
-              </select>
+                onChange={(v) => updateCondition(index, 'operator', v)}
+                options={operators}
+              />
             </div>
             {!['exists', 'not_exists', 'is_empty', 'is_not_empty'].includes(cond.operator) && (
               <input

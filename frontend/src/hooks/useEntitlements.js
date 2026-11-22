@@ -7,21 +7,29 @@ export function useEntitlements() {
   const [entitlements, setEntitlements] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [workspaceId, setWorkspaceId] = useState(null)
+  // True once the workspace lookup has finished, with or without a workspace
+  const [workspaceChecked, setWorkspaceChecked] = useState(false)
 
   // Get the user's workspace ID
   useEffect(() => {
     const getWorkspaceId = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
 
-      const { data } = await supabase
-        .from('workspace_members')
-        .select('workspace_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .single()
+        const { data } = await supabase
+          .from('workspace_members')
+          .select('workspace_id')
+          .eq('user_id', user.id)
+          .limit(1)
+          .single()
 
-      if (data) setWorkspaceId(data.workspace_id)
+        if (data) setWorkspaceId(data.workspace_id)
+      } catch (err) {
+        console.error('Failed to look up workspace:', err)
+      } finally {
+        setWorkspaceChecked(true)
+      }
     }
     getWorkspaceId()
   }, [])
@@ -29,7 +37,8 @@ export function useEntitlements() {
   const fetchEntitlements = useCallback(async () => {
     if (!workspaceId) {
       setEntitlements(null)
-      setIsLoading(false)
+      // Stay loading until the lookup says there is no workspace
+      if (workspaceChecked) setIsLoading(false)
       return
     }
     try {
@@ -41,7 +50,7 @@ export function useEntitlements() {
     } finally {
       setIsLoading(false)
     }
-  }, [workspaceId])
+  }, [workspaceId, workspaceChecked])
 
   useEffect(() => {
     fetchEntitlements()

@@ -91,6 +91,9 @@ export default function Meetings() {
   const loadMeetings = async (search = '') => {
     try {
       setLoading(true)
+      // A delete still in its undo window is on the server until it commits: send it first,
+      // or the reload brings the row back and it stays as a ghost after the delete lands.
+      await commitDelete()
       setError(null)
       const params = { limit: PAGE_SIZE, offset: 0 }
       if (search.trim()) params.search = search.trim()
@@ -110,6 +113,8 @@ export default function Meetings() {
   const loadMoreMeetings = async () => {
     try {
       setLoadingMore(true)
+      // Same reason, and the offset counts only rows the server still has.
+      await commitDelete()
       const params = { limit: PAGE_SIZE, offset: meetings.length }
       if (searchQuery.trim()) params.search = searchQuery.trim()
       if (filter !== 'all') params.status = filter
@@ -134,6 +139,8 @@ export default function Meetings() {
     if (!pending) return
     pendingDelete.current = null
     clearTimeout(pending.timer)
+    // Committed early (a second delete, a reload): its Undo no longer applies.
+    toast.dismiss(pending.toastId)
     const results = await Promise.allSettled(pending.rows.map(m => meetingsApi.delete(m.id)))
     const failed = pending.rows.filter((_, i) => results[i].status === 'rejected')
     if (failed.length === 0) return
@@ -146,9 +153,9 @@ export default function Meetings() {
     )
   }
 
-  const undoDelete = () => {
-    const pending = pendingDelete.current
-    if (!pending) return
+  // Undo only the delete this toast was for, never a later one.
+  const undoDelete = (pending) => {
+    if (!pending || pendingDelete.current !== pending) return
     pendingDelete.current = null
     clearTimeout(pending.timer)
     toast.dismiss(pending.toastId)
@@ -163,16 +170,18 @@ export default function Meetings() {
     const ids = new Set(rows.map(m => m.id))
     setMeetings(prev => prev.filter(m => !ids.has(m.id)))
     setTotal(t => Math.max(0, t - rows.length))
-    const toastId = toast.show({
+    const entry = { rows, toastId: null, timer: null }
+    entry.toastId = toast.show({
       title: rows.length === 1 ? 'Meeting deleted' : `${meetingsWord(rows.length)} deleted`,
       message: rows.length === 1
         ? `"${rows[0].title || 'Untitled meeting'}" and its transcript, notes and action items.`
         : 'With their transcripts, notes and action items.',
       color: 'mint',
       duration: UNDO_MS,
-      action: { label: 'Undo', onClick: undoDelete },
+      action: { label: 'Undo', onClick: () => undoDelete(entry) },
     })
-    pendingDelete.current = { rows, toastId, timer: setTimeout(commitDelete, UNDO_MS) }
+    entry.timer = setTimeout(commitDelete, UNDO_MS)
+    pendingDelete.current = entry
   }
 
   // Leaving the page sends any delete that is still waiting.

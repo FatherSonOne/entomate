@@ -66,13 +66,13 @@ function pipeline(session, meeting, actionItems) {
     { key: 'left', label: 'Left the call', state: ended ? 'done' : 'waiting', value: ended ? 'Done' : 'In call' },
     {
       key: 'transcript', label: 'Transcript',
-      state: meeting ? 'done' : ended ? 'working' : 'waiting',
-      value: meeting ? (segs ? `${segs.length} lines` : 'Saved') : ended ? 'Writing' : 'Waiting'
+      state: segs ? 'done' : ended ? 'working' : 'waiting',
+      value: segs ? `${segs.length} lines` : ended ? 'Writing' : 'Waiting'
     },
     {
       key: 'summary', label: 'Summary',
-      state: meeting?.summary ? 'done' : meeting ? 'working' : 'waiting',
-      value: meeting?.summary ? (meeting.summary_template ? titleCase(meeting.summary_template) : 'Done') : meeting ? 'Writing' : 'Waiting'
+      state: meeting?.summary ? 'done' : segs ? 'working' : 'waiting',
+      value: meeting?.summary ? (meeting.summary_template ? titleCase(meeting.summary_template) : 'Done') : segs ? 'Writing' : 'Waiting'
     },
     {
       key: 'actions', label: 'Action items',

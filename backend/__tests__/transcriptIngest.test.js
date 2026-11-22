@@ -460,3 +460,60 @@ describe('meeting routes are org-scoped', () => {
     expect((await request(app).patch(url).set(as(OUTSIDER)).send({ from: 'Bo', to: 'X' })).status).toBe(404);
   });
 });
+
+describe('ingestBotTranscript: one finishing step with the browser recorder', () => {
+  const url = { transcriptUrl: 'https://recall.example/t.json' };
+  const botMeeting = () => mockDb.meetings.find((m) => m.id === BOT_MEETING);
+
+  test('the meeting appears as soon as the transcript arrives, with real writing stages', async () => {
+    mockFetchJson(RECALL_TRANSCRIPT);
+    const seen = [];
+    ai.generateSummary.mockImplementationOnce(async () => {
+      seen.push({ ...botMeeting().recording_job });
+      return { summary: 'We agreed to ship.', keyPoints: [], decisions: [], topics: [] };
+    });
+    await ingest.ingestBotTranscript(SESSION, url);
+    expect(seen[0]).toMatchObject({ status: 'transcribing', source: 'bot', stage: 'summary', botSessionId: SESSION });
+    expect(botMeeting().recording_job).toMatchObject({ status: 'done', source: 'bot', stage: null, lines: 3, speakers: 2 });
+  });
+
+  test('a run already writing stops a repeated webhook', async () => {
+    mockFetchJson(RECALL_TRANSCRIPT);
+    mockDb.meetings.push({ id: BOT_MEETING, org_id: ORG_A, transcript_segments: null, recording_job: { status: 'transcribing', source: 'bot', updatedAt: new Date().toISOString() } });
+    expect(await ingest.ingestBotTranscript(SESSION, url)).toEqual({ status: 'in_progress', meetingId: BOT_MEETING });
+    expect(mockDb.action_items).toHaveLength(0);
+  });
+
+  test('a backup recording beside the bot gets the bot\'s minutes in the same meeting, keeping its title and template', async () => {
+    mockFetchJson(RECALL_TRANSCRIPT);
+    mockDb.meetings.push({
+      id: BOT_MEETING, org_id: ORG_A, title: 'Weekly sync', created_by: MEMBER, attendees: [], summary_template: 'standup',
+      transcript_segments: null, recording_job: { status: 'backup', pieces: 3, durationMs: 90000, botSessionId: SESSION, mode: 'tab' },
+    });
+    const result = await ingest.ingestBotTranscript(SESSION, url);
+    expect(result.status).toBe('ingested');
+    expect(mockDb.meetings.filter((m) => m.id === BOT_MEETING)).toHaveLength(1);
+    expect(botMeeting()).toMatchObject({ title: 'Weekly sync', summary: 'We agreed to ship.' });
+    expect(botMeeting().recording_job).toMatchObject({ status: 'done', source: 'bot', pieces: 3, mode: 'tab' });
+    expect(ai.generateSummary.mock.calls[0][1].addon).toBeDefined();
+    expect(mockDb.action_items).toHaveLength(1);
+  });
+
+  test('a browser recording still running keeps its state while the bot writes the minutes', async () => {
+    mockFetchJson(RECALL_TRANSCRIPT);
+    mockDb.meetings.push({ id: BOT_MEETING, org_id: ORG_A, title: 'Weekly sync', transcript_segments: null, recording_job: { status: 'recording', botSessionId: SESSION } });
+    await ingest.ingestBotTranscript(SESSION, url);
+    expect(botMeeting().recording_job.status).toBe('recording');
+    expect(botMeeting().transcript_segments).toHaveLength(3);
+  });
+
+  test('a failure while writing marks the meeting failed instead of leaving it writing', async () => {
+    mockFetchJson(RECALL_TRANSCRIPT);
+    const finish = require('../services/meetingFinish');
+    const spy = jest.spyOn(finish, 'writeMinutes').mockRejectedValueOnce(new Error('db down'));
+    await expect(ingest.ingestBotTranscript(SESSION, url)).rejects.toThrow('db down');
+    expect(botMeeting().transcript_segments ?? null).toBeNull();
+    expect(botMeeting().recording_job).toMatchObject({ status: 'failed', stage: null });
+    spy.mockRestore();
+  });
+});

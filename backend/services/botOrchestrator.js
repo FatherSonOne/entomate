@@ -863,7 +863,13 @@ async function handleRecallWebhook(payload) {
     transcriptIngest()
       .ingestBotTranscript(sessionId, { transcriptUrl: update.transcript_url })
       .then((r) => afterIngest(sessionId, r))
-      .catch((err) => log.error('Transcript ingest failed', { sessionId, error: err.message }));
+      .catch((err) => {
+        log.error('Transcript ingest failed', { sessionId, error: err.message });
+        backupTakesOver(sessionId);
+      });
+  } else if ((event === 'bot.done' && !update.transcript_url) || ['failed', 'timeout'].includes(statusUpdate.status)) {
+    // No transcript is coming: a recording made beside the bot writes the minutes instead.
+    backupTakesOver(sessionId);
   }
 
   return { ok: true, sessionId };
@@ -876,7 +882,19 @@ function afterIngest(sessionId, result) {
       .copyBotRecording(sessionId)
       .catch((err) => log.warn('Bot recording copy failed', { sessionId, error: err.message }));
   }
+  if (['empty', 'no_transcript'].includes(result?.status)) backupTakesOver(sessionId);
   return result;
+}
+
+/**
+ * The bot will not write this meeting's minutes. If its owner also recorded the call in
+ * the browser (services/meetingRecorder.js, "beside the bot"), that recording does.
+ * Fire-and-forget; does nothing when there is no such recording.
+ */
+function backupTakesOver(sessionId) {
+  require('./meetingRecorder')
+    .botCouldNotDeliver({ sessionId })
+    .catch((err) => log.warn('Backup recording could not take over', { sessionId, error: err.message }));
 }
 
 /** Lazy: transcriptIngest requires the meetings route, which must not load at require time here. */

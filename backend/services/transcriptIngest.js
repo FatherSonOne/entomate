@@ -22,10 +22,7 @@
 'use strict';
 
 const { supabaseAdmin } = require('../config/supabase');
-const ai = require('../config/ai');
 const log = require('../utils/log');
-const summaryTemplates = require('./summaryTemplates');
-const transcriptMoments = require('./transcriptMoments');
 
 const MAX_TRANSCRIPT_BYTES = 25 * 1024 * 1024;
 const FETCH_TIMEOUT_MS = 30 * 1000;
@@ -38,9 +35,18 @@ const db = () => {
   return supabaseAdmin;
 };
 
-/** The meetings route owns the AI pipeline; required lazily so load order never matters. */
-function pipeline() {
-  return require('../routes/meetings')._pipeline;
+/** Lazy: meetingFinish requires the meetings route, which must not load at require time here. */
+function meetingFinish() {
+  return require('./meetingFinish');
+}
+
+/** A claimed run that has not moved for this long died with the server; another may take over. */
+const STALE_RUN_MS = 20 * 60 * 1000;
+const INGEST_FAILED = "The bot's transcript could not be turned into minutes. Try again in a minute.";
+
+function isStale(job, now = Date.now()) {
+  const at = Date.parse(job?.updatedAt || '');
+  return !Number.isFinite(at) || now - at > STALE_RUN_MS;
 }
 
 function secondsToMs(value) {
@@ -221,8 +227,6 @@ async function downloadTranscript(url) {
   }
 }
 
-const EMPTY_SUMMARY = { summary: null, keyPoints: [], decisions: [], topics: [], sentiment: null, sentimentScore: null };
-
 /**
  * Ingest one finished bot session. Never throws for "nothing to do" outcomes; it throws
  * only for a failure worth retrying (download or database error).
@@ -244,7 +248,7 @@ async function ingestBotTranscript(sessionId, { transcriptUrl } = {}) {
 
   const { data: existing, error: existingErr } = await db()
     .from('meetings')
-    .select('id, org_id, transcript_segments')
+    .select('id, org_id, title, created_by, attendees, summary_template, transcript_segments, recording_job')
     .eq('id', session.meeting_id)
     .maybeSingle();
   if (existingErr) throw existingErr;
@@ -255,6 +259,11 @@ async function ingestBotTranscript(sessionId, { transcriptUrl } = {}) {
   }
   if (Array.isArray(existing?.transcript_segments) && existing.transcript_segments.length > 0) {
     return { status: 'already_ingested', meetingId: existing.id };
+  }
+  const priorJob = existing?.recording_job || null;
+  if (priorJob?.status === 'transcribing' && !isStale(priorJob)) {
+    // Another run (a repeated webhook, or the browser recording beside the bot) is writing it now.
+    return { status: 'in_progress', meetingId: existing.id };
   }
 
   const downloaded = await downloadTranscript(transcriptUrl);
@@ -270,86 +279,110 @@ async function ingestBotTranscript(sessionId, { transcriptUrl } = {}) {
   const segments = parseRecallTranscript(raw);
   if (segments.length === 0) {
     log.info('Transcript ingest: no speech in transcript', { sessionId });
-    return { status: 'empty' };
+    return { status: 'empty', meetingId: session.meeting_id };
   }
-  const transcript = buildTranscriptText(segments);
   const title = meetingTitle(session);
-  const { runAIPipeline, saveActionItems, firePostProcessing } = pipeline();
+  const attendees = attendeesFromTranscript(raw);
+  const userId = session.consent_acknowledged_by || null;
 
-  // An AI failure must not lose the transcript: save the meeting without a summary, and
-  // it can be reprocessed later from the meeting page.
-  let summaryData = EMPTY_SUMMARY;
-  let actionItems = [];
-  let embedding = null;
-  if (ai.isConfigured()) {
-    try {
-      ({ summaryData, actionItems, embedding } = await runAIPipeline(transcript, title, { attendees: attendeesFromTranscript(raw) }));
-    } catch (err) {
-      log.warn('Transcript ingest: AI pipeline failed, saving transcript only', { sessionId, error: err.message });
+  // Claim the meeting before the slow part, so the meeting page shows the minutes being
+  // written (with real stages) and a second webhook stops. The row's id is the session's
+  // meeting id: two concurrent webhooks race on the primary key, and the loser stops.
+  // A browser recording still running beside the bot keeps its own job state.
+  const browserRecording = priorJob?.status === 'recording';
+  const startedAt = new Date().toISOString();
+  const claimJob = {
+    ...(priorJob || {}),
+    status: 'transcribing', source: 'bot', botSessionId: sessionId,
+    stage: 'transcript', stageAt: startedAt, error: null, finishedAt: session.ended_at || startedAt, updatedAt: startedAt,
+    durationMs: priorJob?.durationMs || segments.reduce((m, x) => Math.max(m, Number(x.endMs ?? x.atMs) || 0), 0),
+  };
+  const meeting = existing
+    ? { ...existing }
+    : { id: session.meeting_id, org_id: session.org_id, created_by: userId || 'system', attendees, summary_template: null };
+  if (existing) {
+    if (!browserRecording) {
+      const { error } = await db().from('meetings').update({ recording_job: claimJob }).eq('id', existing.id).eq('org_id', session.org_id);
+      if (error) throw error;
+      meeting.recording_job = claimJob;
     }
+  } else {
+    const { error } = await db()
+      .from('meetings')
+      .insert({
+        id: session.meeting_id,
+        org_id: session.org_id,
+        title,
+        created_by: meeting.created_by,
+        start_time: session.started_at || session.created_at || null,
+        end_time: session.ended_at || null,
+        recording_job: claimJob,
+        created_at: startedAt,
+        updated_at: startedAt,
+      });
+    if (error?.code === '23505') return { status: 'already_ingested', meetingId: session.meeting_id };
+    if (error) throw error;
+    meeting.recording_job = claimJob;
   }
 
-  // Link each summary item and action item to the line it came from.
-  actionItems = transcriptMoments.withActionItemMoments(segments, actionItems);
-  const keyPoints = summaryData.keyPoints || [];
-  const decisions = summaryData.decisions || [];
-
-  const now = new Date().toISOString();
-  const meetingData = {
-    title,
-    transcript,
-    transcript_segments: segments,
-    summary: summaryData.summary || null,
-    key_points: keyPoints,
-    decisions,
-    summary_moments: transcriptMoments.summaryMoments(segments, keyPoints, decisions),
-    topics: summaryData.topics || [],
-    ...summaryTemplates.summaryFields(summaryData),
-    sentiment_label: summaryData.sentiment || null,
-    sentiment_score: summaryData.sentimentScore ?? null,
-    attendees: attendeesFromTranscript(raw),
-    duration_minutes: durationMinutes(segments),
-    start_time: session.started_at || session.created_at || null,
-    end_time: session.ended_at || null,
-    updated_at: now,
+  const markStage = async (stage) => {
+    if (browserRecording) return;
+    meeting.recording_job = { ...meeting.recording_job, stage, stageAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    const { error } = await db().from('meetings').update({ recording_job: meeting.recording_job }).eq('id', meeting.id);
+    if (error) log.warn('Transcript ingest: could not save the stage', { sessionId, stage, error: error.message });
   };
-  if (embedding) meetingData.transcript_embedding = embedding;
 
+  let minutes;
   let saved;
-  if (existing) {
+  try {
+    minutes = await meetingFinish().writeMinutes({ meeting, segments, title, attendees, onStage: markStage });
+    await markStage('saving');
+
+    const now = new Date().toISOString();
+    const lines = minutes.segments;
+    const doneJob = browserRecording
+      ? { ...priorJob, botSessionId: sessionId }
+      : {
+        ...meeting.recording_job, status: 'done', source: 'bot', stage: null, stageAt: null, error: null,
+        summaryError: minutes.summaryError, speakerSuggestions: minutes.speakerSuggestions,
+        speakers: new Set(lines.map((s) => s.speaker)).size, lines: lines.length, updatedAt: now,
+      };
+    const meetingData = {
+      ...minutes.fields,
+      title: existing?.title && !/^Recording, /.test(existing.title) ? existing.title : title,
+      attendees: Array.isArray(existing?.attendees) && existing.attendees.length ? existing.attendees : attendees,
+      duration_minutes: durationMinutes(lines),
+      start_time: session.started_at || session.created_at || null,
+      end_time: session.ended_at || null,
+      recording_job: doneJob,
+      updated_at: now,
+    };
     const { data, error } = await db()
       .from('meetings')
       .update(meetingData)
-      .eq('id', existing.id)
+      .eq('id', meeting.id)
       .eq('org_id', session.org_id)
       .is('transcript_segments', null)
       .select()
       .maybeSingle();
     if (error) throw error;
-    if (!data) return { status: 'already_ingested', meetingId: existing.id };
+    if (!data) return { status: 'already_ingested', meetingId: meeting.id };
     saved = data;
-  } else {
-    const { data, error } = await db()
-      .from('meetings')
-      .insert({
-        ...meetingData,
-        id: session.meeting_id,
-        org_id: session.org_id,
-        created_by: session.consent_acknowledged_by || 'system',
-        created_at: now,
-      })
-      .select()
-      .single();
-    if (error?.code === '23505') return { status: 'already_ingested', meetingId: session.meeting_id };
-    if (error) throw error;
-    saved = data;
+  } catch (err) {
+    // The meeting page must not show "writing" forever. A recording made beside the bot
+    // takes over (botOrchestrator → meetingRecorder.botCouldNotDeliver); otherwise the
+    // page offers Try again, which asks Recall for the transcript again.
+    if (!browserRecording) {
+      const failed = { ...meeting.recording_job, status: 'failed', stage: null, stageAt: null, error: INGEST_FAILED, updatedAt: new Date().toISOString() };
+      await db().from('meetings').update({ recording_job: failed }).eq('id', meeting.id).then(null, () => {});
+    }
+    throw err;
   }
 
-  const savedActionItems = await saveActionItems(saved.id, actionItems);
-  firePostProcessing(saved, summaryData, savedActionItems, { userId: session.consent_acknowledged_by || null });
-
-  log.info('Transcript ingested', { sessionId, meetingId: saved.id, segments: segments.length });
-  return { status: 'ingested', meetingId: saved.id, segments: segments.length };
+  // The minutes are saved; action items and post-processing follow (a failure here is logged by the caller).
+  await meetingFinish().publishMinutes(db(), saved, minutes, { userId });
+  log.info('Transcript ingested', { sessionId, meetingId: saved.id, segments: saved.transcript_segments.length });
+  return { status: 'ingested', meetingId: saved.id, segments: saved.transcript_segments.length };
 }
 
 /**

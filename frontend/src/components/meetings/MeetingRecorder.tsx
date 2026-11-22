@@ -10,18 +10,25 @@
  *
  * Replaces the earlier microphone-only recorder, keeping its title, attendees, chosen
  * microphone, timer and level meter.
+ *
+ * One call, one meeting: when a bot of yours is in a call (or about to join one), the
+ * recorder says so before you start. Recording that call adds the audio to the bot's
+ * meeting as a backup (the bot writes the minutes), so there are never two meetings,
+ * two summaries and every action item twice. You can say it is a different meeting.
  */
 
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, Camera, Download, Loader2, Mic, MonitorUp, Square, Trash2 } from 'lucide-react'
+import { AlertTriangle, Bot, Camera, Download, Loader2, Mic, MonitorUp, Square, Trash2 } from 'lucide-react'
 import { formatClock } from '../../services/meetingTranscriptService'
 import LiveCaptions, { speechRecognitionCtor } from './LiveCaptions'
 import {
+  BotInCallError,
   PIECE_MS,
   PieceUploader,
   baseMime,
   captureErrorMessage,
+  checkBotInCall,
   discardRecording,
   finishRecording,
   pickAudioMime,
@@ -30,6 +37,7 @@ import {
   sendPieceTo,
   startRecording,
   tabCaptureSupported,
+  type BotInCall,
   type RecorderMode,
   type UploaderState,
 } from '../../services/meetingRecorderService'
@@ -136,6 +144,11 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded }: MeetingRecor
   const [meetingId, setMeetingId] = useState<string | null>(null)
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
   const [, setTick] = useState(0)
+  // A bot of yours in a call now: this recording joins its meeting unless you say otherwise.
+  const [bot, setBot] = useState<BotInCall | null>(null)
+  const [sameAsBot, setSameAsBot] = useState(true)
+  const [handedToBot, setHandedToBot] = useState(false)
+  const [botCheck, setBotCheck] = useState(0)
 
   const capture = useRef<Capture | null>(null)
   const uploader = useRef<PieceUploader | null>(null)
@@ -154,6 +167,17 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded }: MeetingRecor
     c.streams.forEach((s) => s.getTracks().forEach((t) => t.stop()))
     void c.audioContext.close().catch(() => {})
   }, [])
+
+  // Ask once on arrival (and after "Record another") whether a bot of yours is in a call.
+  useEffect(() => {
+    let off = false
+    void checkBotInCall().then((found) => {
+      if (!off) setBot(found)
+    })
+    return () => {
+      off = true
+    }
+  }, [botCheck])
 
   // Leaving the page mid-recording: stop the devices; warn before losing unsent audio.
   useEffect(() => () => releaseDevices(), [releaseDevices])
@@ -240,14 +264,23 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded }: MeetingRecor
 
     let id: string
     try {
-      ;({ meetingId: id } = await startRecording({ title, attendees, mode, mimeType: audioMime }))
+      const beside = bot && sameAsBot ? { botSessionId: bot.sessionId } : { separate: true }
+      ;({ meetingId: id } = await startRecording({ title, attendees, mode, mimeType: audioMime, ...beside }))
     } catch (err) {
       opened.streams.forEach((s) => s.getTracks().forEach((t) => t.stop()))
       void audioContext.close()
-      setError(err instanceof Error ? err.message : 'The recording could not be started.')
+      if (err instanceof BotInCallError) {
+        // A bot joined after this page asked: show the choice, then start again.
+        setBot(err.bot)
+        setSameAsBot(true)
+        setError('Your bot is in a call now. Choose below whether this is the same meeting, then start again.')
+      } else {
+        setError(err instanceof Error ? err.message : 'The recording could not be started.')
+      }
       setPhase('setup')
       return
     }
+    setHandedToBot(Boolean(bot && sameAsBot))
 
     const pieces = new PieceUploader(sendPieceTo(id, baseMime(audioMime)), setUpload)
     uploader.current = pieces
@@ -354,6 +387,8 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded }: MeetingRecor
     setUpload({ recorded: 0, sent: 0, retrying: false, failed: null })
     setElapsedMs(0)
     setError(null)
+    setHandedToBot(false)
+    setBotCheck((n) => n + 1)
     setPhase('setup')
   }
 
@@ -376,8 +411,9 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded }: MeetingRecor
       {phase === 'done' && meetingId ? (
         <div className="space-y-3" aria-live="polite">
           <p className="text-sm text-content-primary">
-            Recording saved. The transcript, speakers, summary and action items are being written now. This takes about a
-            minute for every ten minutes recorded.
+            {handedToBot
+              ? 'Recording saved with the bot’s meeting. The bot writes the minutes; your recording is kept as a backup and is written up on its own if the bot cannot finish.'
+              : 'Recording saved. The transcript, speakers, summary and action items are being written now. This takes about a minute for every ten minutes recorded.'}
           </p>
           <div className="flex flex-wrap gap-2">
             <button type="button" className={PRIMARY} onClick={() => navigate(`/meetings/${meetingId}`)}>
@@ -396,6 +432,33 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded }: MeetingRecor
         </div>
       ) : (
         <>
+          {bot && (phase === 'setup' || phase === 'starting') && (
+            <fieldset data-testid="recorder-bot" className="space-y-2 rounded-lg border border-line p-3" disabled={locked}>
+              <legend className="flex items-center gap-2 px-1 text-sm font-medium text-content-primary">
+                <Bot className="h-4 w-4 text-accent-primary" aria-hidden="true" />
+                {bot.phase === 'live' ? 'Your bot is in a call now' : bot.phase === 'scheduled' ? 'Your bot joins a call soon' : 'Your bot is joining a call'}
+              </legend>
+              <p className="text-xs text-content-secondary">
+                {bot.title ? <>&ldquo;{bot.title}&rdquo;. </> : null}
+                It takes the notes for that call. Recording the same call here would make a second meeting with every action item twice.
+              </p>
+              <label className="flex items-start gap-2 text-sm text-content-primary">
+                <input type="radio" name={`${uid}-bot`} checked={sameAsBot} onChange={() => setSameAsBot(true)} className="mt-0.5 h-4 w-4 accent-accent-primary" />
+                <span>
+                  Same call: add my recording to the bot&apos;s meeting
+                  <span className="block text-xs text-content-secondary">One meeting. The bot writes the minutes; yours is the backup.</span>
+                </span>
+              </label>
+              <label className="flex items-start gap-2 text-sm text-content-primary">
+                <input type="radio" name={`${uid}-bot`} checked={!sameAsBot} onChange={() => setSameAsBot(false)} className="mt-0.5 h-4 w-4 accent-accent-primary" />
+                <span>A different meeting</span>
+              </label>
+              <button type="button" className="text-xs font-medium text-accent-primary underline-offset-2 hover:underline" onClick={() => navigate(`/meetings/${bot.meetingId}`)}>
+                Open the bot&apos;s meeting
+              </button>
+            </fieldset>
+          )}
+
           <fieldset disabled={locked} className="space-y-2">
             <legend className="mb-1.5 text-xs font-medium text-content-secondary">What to record</legend>
             <div className="flex flex-wrap gap-2">

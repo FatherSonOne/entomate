@@ -220,6 +220,11 @@ export const checkHealth = () => api.get('/health')
 // RECORDINGS API (in-browser recorder, no bot)
 // ========================================
 export const recordingsApi = {
+  // A bot of yours in a call now, if any; never cached (bots join and leave).
+  botCheck: () => {
+    cache.invalidate('/recordings/bot-check')
+    return api.get('/recordings/bot-check')
+  },
   start: (data) => api.post('/recordings', data),
   // One piece of audio as the raw body; the server stores it by number, so a repeat is safe.
   uploadPiece: (meetingId, seq, durationMs, blob, contentType) =>

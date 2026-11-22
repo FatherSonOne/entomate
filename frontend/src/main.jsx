@@ -16,6 +16,8 @@ import './styles/main.css'
 import './styles/motion.css'
 import { initReduceMotion } from './components/bench/motion'
 import { installIconDraw } from './components/bench/iconDraw'
+import { initBoot } from './services/bootProgress'
+import { installChunkReload } from './services/chunkReload'
 
 // Import Void × Crimson component system
 import './styles/vc-components.css'
@@ -37,12 +39,17 @@ import './styles/themes/bench-swiss.css'
 import './styles/design-style-picker.css'
 
 // Settings > Appearance > Reduce motion, remembered from the last visit
+// A tab left open across a deploy reloads onto the new build instead of erroring
+installChunkReload()
 initReduceMotion()
 installIconDraw()
 
+// First load into the app: the loading screen reports real stages (services/bootProgress)
+initBoot()
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <ErrorBoundary>
+    <ErrorBoundary scope="app">
     <LoadingProvider>
     <AuthProvider>
       <OrgProvider>
