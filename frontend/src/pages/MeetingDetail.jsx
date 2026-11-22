@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
   ArrowLeft, Clock, Users, FileText, CheckSquare, MessageSquare,
@@ -14,6 +14,8 @@ import MeetingNotesPanel from '../components/meetings/MeetingNotesPanel'
 import TranscriptPanel from '../components/meetings/TranscriptPanel'
 import TimecodeButton from '../components/meetings/TimecodeButton'
 import RecordingStatus from '../components/meetings/RecordingStatus'
+import RecordingPlayer from '../components/meetings/RecordingPlayer'
+import { canPlay } from '../services/meetingRecorderService'
 import cache from '../services/apiCache'
 import { toSegments, toSummaryMoments } from '../services/meetingTranscriptService'
 import MeetingIntelligencePanel from '../components/intelligence/MeetingIntelligencePanel'
@@ -28,8 +30,13 @@ export default function MeetingDetail() {
   const summaryMoments = useMemo(() => toSummaryMoments(meeting?.summary_moments), [meeting?.summary_moments])
   // Timecodes next to decisions, key points and action items jump the transcript here.
   const [focusAtMs, setFocusAtMs] = useState(null)
+  // A browser recording's audio, played beside the transcript; timecodes move it once loaded.
+  const playerRef = useRef(null)
+  const [playingAtMs, setPlayingAtMs] = useState(null)
+  const playable = canPlay(meeting?.recording_job)
   const jumpToTranscript = useCallback((atMs) => {
     setFocusAtMs(atMs)
+    if (playerRef.current?.isReady()) playerRef.current.playFrom(atMs)
     document.getElementById('meeting-transcript')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [])
   const [loading, setLoading] = useState(true)
@@ -499,14 +506,26 @@ export default function MeetingDetail() {
             </h2>
             {transcriptSegments ? (
               // Timed lines (Recall bot meetings): search and speaker rename.
+              <>
+              {playable && (
+                <RecordingPlayer
+                  ref={playerRef}
+                  meetingId={meeting.id}
+                  durationMs={meeting.recording_job?.durationMs}
+                  onTime={setPlayingAtMs}
+                />
+              )}
               <TranscriptPanel
                 meetingId={meeting.id}
                 segments={transcriptSegments}
                 focusAtMs={focusAtMs}
+                playingAtMs={playable ? playingAtMs : null}
+                onPlayFrom={playable ? (atMs) => playerRef.current?.playFrom(atMs) : undefined}
                 onRenamed={({ segments, transcript }) =>
                   setMeeting(prev => ({ ...prev, transcript_segments: segments, transcript }))
                 }
               />
+              </>
             ) : (
               <div
                 className="rounded-lg p-4 max-h-96 overflow-y-auto scrollbar-thin"

@@ -6,7 +6,8 @@
  *   - start makes an org-scoped meeting; consent and workspace are required
  *   - pieces are stored under the org/meeting folder; repeats are fine; outsiders get 404
  *   - finish refuses while pieces are missing, then transcribes in the background into
- *     transcript_segments, summary, decisions, action items with timecodes, and deletes audio
+ *     transcript_segments, summary, decisions, action items with timecodes, and keeps the audio
+ *   - playback hands out signed links to the pieces in order, org-scoped
  *   - a Gemini failure marks the job failed with a readable reason; retry recovers
  *   - discard removes the unfinished meeting and its audio
  */
@@ -93,6 +94,9 @@ function mockBucket(bucket) {
       const buf = mockStorage.get(key(path));
       if (!buf) return { data: null, error: { message: 'not found' } };
       return { data: { arrayBuffer: async () => buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.length) }, error: null };
+    },
+    async createSignedUrls(paths, expiresIn) {
+      return { data: paths.map((p) => ({ path: p, signedUrl: `https://signed.test/${p}?ttl=${expiresIn}`, error: null })), error: null };
     },
     async remove(paths) {
       paths.forEach((p) => mockStorage.delete(key(p)));
@@ -282,8 +286,9 @@ describe('recorder routes', () => {
     expect(mockDb.action_items).toHaveLength(1);
     expect(mockDb.action_items[0]).toMatchObject({ meeting_id: id, org_id: ORG_A, transcript_at_ms: 21000 });
 
-    // Audio is gone once the transcript is saved.
-    expect(mockStorage.size).toBe(0);
+    // The audio stays for playback (retention deletes it later).
+    expect(mockStorage.size).toBe(2);
+    expect(row.recording_job.audioKept).toBe(true);
 
     // The meeting page sees it.
     const page = await request(server).get(`/api/meetings/${id}`).set(as(MEMBER));
@@ -348,6 +353,32 @@ describe('recorder routes', () => {
     expect(res.status).toBe(200);
     expect(meeting(id)).toBeUndefined();
     expect(mockStorage.size).toBe(0);
+  });
+
+  test('playback signs the pieces in order for the meeting org only', async () => {
+    const server = app();
+    const id = await startAndUpload(server, 2);
+
+    const tooSoon = await request(server).get(`/api/recordings/${id}/playback`).set(as(MEMBER));
+    expect(tooSoon.status).toBe(404); // still recording
+
+    await request(server).post(`/api/recordings/${id}/finish`).set(as(MEMBER)).send({ pieces: 2 });
+    await settle(id);
+
+    const res = await request(server).get(`/api/recordings/${id}/playback`).set(as(MEMBER));
+    expect(res.status).toBe(200);
+    expect(res.headers['cache-control']).toBe('no-store');
+    expect(res.body).toMatchObject({ mimeType: 'audio/webm', durationMs: 60000 });
+    expect(res.body.pieces.map((p) => p.seq)).toEqual([0, 1]);
+    expect(res.body.pieces[0].url).toBe(`https://signed.test/${ORG_A}/${id}/000000-30000.webm?ttl=600`);
+
+    const outsider = await request(server).get(`/api/recordings/${id}/playback`).set(as(OUTSIDER));
+    expect(outsider.status).toBe(404);
+    expect(outsider.body.pieces).toBeUndefined();
+
+    meeting(id).recording_job.retentionDeletedAt = new Date().toISOString();
+    const expired = await request(server).get(`/api/recordings/${id}/playback`).set(as(MEMBER));
+    expect(expired.status).toBe(404);
   });
 
   test('deleting a meeting also deletes leftover recording audio', async () => {

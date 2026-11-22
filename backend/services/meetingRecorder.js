@@ -13,7 +13,9 @@
  *                output, so joined in order they are one valid file), Gemini transcribes it
  *                with speaker turns and times, and the meeting gets the same summary,
  *                decisions, action items and timecodes as a bot meeting.
- *   4. clean up  the audio is deleted once the transcript is saved.
+ *   4. playback  the audio is kept so the meeting page can play it beside the transcript
+ *                (signed URLs, `getPlayback`). Retention (`retentionService.sweepRecordings`)
+ *                deletes it after the workspace's retention days, with the transcript.
  *
  * The service-role client bypasses RLS: callers check meeting access first.
  */
@@ -327,7 +329,7 @@ function failureMessage(err) {
 }
 
 /**
- * The job: join the pieces, transcribe, summarise, save, clean up.
+ * The job: join the pieces, transcribe, summarise, save. The audio stays for playback.
  * Exported for tests; `runInBackground` is the caller.
  */
 async function transcribeMeeting(meetingId) {
@@ -403,7 +405,7 @@ async function transcribeMeeting(meetingId) {
       attendees: Array.isArray(meeting.attendees) && meeting.attendees.length ? meeting.attendees : speakers,
       duration_minutes: durationMs ? Math.max(1, Math.round(durationMs / 60000)) : null,
       end_time: Number.isFinite(startMs) && durationMs ? new Date(startMs + durationMs).toISOString() : now,
-      recording_job: { ...job, status: 'done', error: null, summaryError, speakers: speakers.length, lines: segments.length, updatedAt: now },
+      recording_job: { ...job, status: 'done', error: null, summaryError, audioKept: true, speakers: speakers.length, lines: segments.length, updatedAt: now },
       updated_at: now,
     };
     if (embedding) update.transcript_embedding = embedding;
@@ -422,11 +424,6 @@ async function transcribeMeeting(meetingId) {
     const savedActionItems = await saveActionItems(meetingId, actionItems);
     firePostProcessing(saved, summaryData, savedActionItems, { userId: job.startedBy || meeting.created_by || null });
 
-    try {
-      await purgeRecordingAudio(meeting.org_id, meetingId);
-    } catch (err) {
-      log.warn('Recording: transcript saved but audio not deleted', { meetingId, error: err.message });
-    }
     log.info('Recording transcribed', { meetingId, lines: segments.length, speakers: speakers.length });
     return { status: 'done', lines: segments.length };
   } catch (err) {
@@ -436,6 +433,35 @@ async function transcribeMeeting(meetingId) {
     );
     return { status: 'failed' };
   }
+}
+
+/** Signed playback links last this long; the page fetches the pieces at once. */
+const PLAYBACK_URL_TTL_S = 10 * 60;
+
+/**
+ * Signed links to a finished recording's pieces, in order. Joined in that order they are
+ * one playable file (a later piece alone is not: only the first carries the header).
+ * The caller has checked meeting access; `orgId` is the caller's org, which owns the folder.
+ */
+async function getPlayback({ orgId, meetingId }) {
+  const meeting = await loadMeeting(meetingId);
+  const job = meeting?.recording_job;
+  if (!job || meeting.org_id !== orgId || job.status === 'recording' || job.retentionDeletedAt) {
+    throw new RecorderError(404, 'There is no recording to play.');
+  }
+  const pieces = (await listPieces(orgId, meetingId)).filter((p) => p.seq < (job.pieces || MAX_PIECES));
+  if (!pieces.length || pieces[0].seq !== 0) throw new RecorderError(404, 'There is no recording to play.');
+  const { data, error } = await supabase.storage
+    .from(BUCKET)
+    .createSignedUrls(pieces.map((p) => p.path), PLAYBACK_URL_TTL_S);
+  if (error) throw error;
+  const urls = new Map((data || []).map((d) => [d.path, d.signedUrl]));
+  if (pieces.some((p) => !urls.get(p.path))) throw new Error('A playback link could not be signed');
+  return {
+    mimeType: job.mimeType || 'audio/webm',
+    durationMs: pieces.reduce((sum, p) => sum + p.durationMs, 0),
+    pieces: pieces.map((p) => ({ seq: p.seq, durationMs: p.durationMs, url: urls.get(p.path) })),
+  };
 }
 
 module.exports = {
@@ -449,6 +475,7 @@ module.exports = {
   retryTranscription,
   discardRecording,
   purgeRecordingAudio,
+  getPlayback,
   transcribeMeeting,
   parseTimestampedTranscript,
   _internal: { baseMime, piecePath, parsePieceName, listPieces, isStale, cleanAttendees, running, STALE_JOB_MS },

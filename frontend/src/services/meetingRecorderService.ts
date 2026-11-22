@@ -50,6 +50,47 @@ export function toRecordingJob(raw: unknown): RecordingJob | null {
   }
 }
 
+/** The recording's audio was kept after its transcript and retention has not removed it yet. */
+export function canPlay(raw: unknown): boolean {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false
+  const r = raw as Record<string, unknown>
+  return r.status === 'done' && r.audioKept === true && !r.retentionDeletedAt
+}
+
+interface PlaybackResponse {
+  mimeType?: unknown
+  durationMs?: unknown
+  pieces?: Array<{ url?: unknown }>
+}
+
+/**
+ * The whole recording as one Blob: the saved pieces fetched by their signed links and joined
+ * in order. A later piece alone does not play (only the first has the header), and a Blob
+ * in memory seeks well although the recorder's WebM has no index.
+ * shortcut: the whole file downloads before it plays (about 29 MB an hour); serve one indexed
+ * file from the server if long meetings make that wait too long.
+ */
+export async function loadRecordingAudio(meetingId: string, fetcher: typeof fetch = fetch): Promise<{ blob: Blob; durationMs: number }> {
+  let res: PlaybackResponse
+  try {
+    cache.invalidate(`/recordings/${meetingId}/playback`)
+    res = (await recordingsApi.playback(meetingId)) as unknown as PlaybackResponse
+  } catch (err) {
+    throw new Error(errorText(err, 'The recording could not be loaded.'))
+  }
+  const urls = (Array.isArray(res?.pieces) ? res.pieces : []).map((p) => p?.url)
+  if (!urls.length || urls.some((u) => typeof u !== 'string')) throw new Error('The recording could not be loaded.')
+  const parts = await Promise.all(
+    (urls as string[]).map(async (url) => {
+      const r = await fetcher(url)
+      if (!r.ok) throw new Error('Part of the recording could not be downloaded. Try again.')
+      return r.blob()
+    }),
+  )
+  const type = typeof res.mimeType === 'string' ? res.mimeType : 'audio/webm'
+  return { blob: new Blob(parts, { type }), durationMs: typeof res.durationMs === 'number' ? res.durationMs : 0 }
+}
+
 /** A job still transcribing after this long has died with the server and may be retried. */
 export const STALE_JOB_MS = 20 * 60 * 1000
 
