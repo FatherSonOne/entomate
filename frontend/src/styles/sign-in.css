@@ -157,7 +157,6 @@
 @media (max-width: 1199.98px) {
   .si-page { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .si-film { padding: 24px 28px 32px; }
-  .si-eyebrow-r { display: none; }
 }
 
 /* Tablet and phone: the film becomes a band above the plate. */
@@ -166,7 +165,7 @@
   .si-film { min-height: 0; padding: 16px 18px 22px; gap: 64px; }
   .si-film-bg .brand-motion-control { display: none; }
   .si-film h2 { font-size: 36px; margin: 14px 0 4px; }
-  .si-eyebrow-r, .si-minutes { display: none; }
+  .si-minutes { display: none; }
   .si-brand svg { width: 104px; height: auto; }
   .si-side { padding: 8px; }
   .si-plate.bs-plate { padding: 22px 18px; border-radius: 14px; }

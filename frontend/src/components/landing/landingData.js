@@ -97,7 +97,7 @@ export const MODULES = [
     src: 'services/explainability/* · services/learning/*',
   },
   {
-    name: 'Ecosystem', sig: 'brand', kicker: 'Integrations & Trifecto', media: 'bridge',
+    name: 'Ecosystem', sig: 'brand', kicker: 'Integrations & ecosystem', media: 'bridge',
     head: 'Works with the tools you use',
     tag: 'Connects to your team’s tools, and to Logos Vision and Pulse when they are connected.',
     features: [

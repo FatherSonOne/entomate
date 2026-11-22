@@ -59,8 +59,7 @@ export function AuthFrame({ title, actions, children }: AuthFrameProps): React.R
         </div>
         <div className="si-film-copy">
           <div className="si-eyebrow">
-            <span>The Hands of the Trifecto</span>
-            <span className="si-eyebrow-r">Meeting intelligence that executes</span>
+            <span>Meeting intelligence that executes</span>
           </div>
           <h2 id="si-film-h">{tagline.lead} <em>{tagline.accent}</em></h2>
           <ul className="si-minutes" aria-label="Sample minutes">
@@ -82,7 +81,7 @@ export function AuthFrame({ title, actions, children }: AuthFrameProps): React.R
           <div className="si-body">{children}</div>
           <TipLine />
           <footer className="si-foot">
-            <span>Part of the Trifecto</span>
+            <span>Ecosystem</span>
             <a href="https://crm.logosvision.org" target="_blank" rel="noopener noreferrer">Logos Vision</a>
             <a href="https://pulse.logosvision.org" target="_blank" rel="noopener noreferrer">Pulse</a>
             <b>Entomate</b>
