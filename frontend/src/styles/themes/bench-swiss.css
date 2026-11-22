@@ -390,10 +390,25 @@ html[data-style="bench-swiss"] :focus-visible { outline: 2px solid var(--bs-bran
   flex: none;
   background: radial-gradient(circle at 40% 32%, #ff7aa0, var(--bs-d-brand) 58%, #b0003b);
   box-shadow: 0 0 0 4px #2a2a2b, 0 0 0 5px #000, 0 4px 0 6px #000;
-  transition: transform 80ms, box-shadow 80ms;
+  /* Release: springs back up, a touch past rest, then settles. */
+  transition: transform 420ms var(--bs-spring), box-shadow 220ms var(--m-ease-out, ease-out), filter 220ms ease-out;
+  -webkit-tap-highlight-color: transparent;
 }
-.bs-recbox:active .bs-rec,
-.bs-dock-rec:active .bs-rec { transform: translateY(2px); box-shadow: 0 0 0 4px #2a2a2b, 0 0 0 5px #000, 0 2px 0 6px #000; }
+.bs-recbox, .bs-dock-rec { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+/* Press: the key sinks into its bezel and dims, fast. */
+:is(.bs-recbox, .bs-dock-rec)[data-pressed="true"] .bs-rec {
+  transform: translateY(3px) scale(0.94);
+  box-shadow: 0 0 0 4px #2a2a2b, 0 0 0 5px #000, 0 1px 0 6px #000, inset 0 3px 8px rgba(0, 0, 0, 0.35);
+  filter: brightness(0.9) saturate(1.1);
+  transition: transform 70ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 70ms ease-out, filter 70ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bs-rec, :is(.bs-recbox, .bs-dock-rec)[data-pressed="true"] .bs-rec { transition-duration: 1ms; }
+  :is(.bs-recbox, .bs-dock-rec)[data-pressed="true"] .bs-rec { transform: translateY(2px); }
+}
+html[data-motion="reduce"] .bs-rec,
+html[data-motion="reduce"] :is(.bs-recbox, .bs-dock-rec)[data-pressed="true"] .bs-rec { transition-duration: 1ms; }
+html[data-motion="reduce"] :is(.bs-recbox, .bs-dock-rec)[data-pressed="true"] .bs-rec { transform: translateY(2px); }
 
 /* Main column: toolbar on the case, then the faceplate */
 .bs-main { padding: 12px 18px 18px 0; min-width: 0; display: flex; flex-direction: column; }
