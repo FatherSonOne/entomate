@@ -265,6 +265,10 @@ export const meetingsApi = {
 
   // Ask question about meeting
   ask: (id, question) => api.post(`/meetings/${id}/ask`, { question }),
+  // What was promised before this meeting (earlier meetings with the same people or series)
+  carryForward: (id) => api.get(`/meetings/${id}/carry-forward`),
+  // Same, for an upcoming calendar event: { title, attendees, startsAt }
+  carryForwardPreview: (event) => api.post('/meetings/carry-forward', event),
   // Re-run the summary, decisions and action items from the saved transcript.
   reprocess: (id) => api.post(`/meetings/${id}/reprocess`),
 

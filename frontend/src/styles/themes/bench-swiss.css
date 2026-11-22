@@ -1139,6 +1139,19 @@ html.bs-scroll-lock, html.bs-scroll-lock body { overflow: hidden; }
 .bs-row-dash { font: 500 12px/1.9 var(--bs-mono); color: var(--bs-faint); }
 .bs-row > .bs-key.tc { margin-top: 1px; }
 
+/* Carry-forward: "From last time" (earlier commitments with the same people or series) */
+.bs-cf { padding-top: 22px; }
+.bs-cf > .bs-sec + * { margin-top: 10px; }
+.bs-cf-src { margin: 0 0 2px; font-size: 13.5px; color: var(--bs-ink2); }
+.bs-cf-link { color: var(--bs-ink); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+.bs-cf-row { align-items: baseline; }
+.bs-cf-row > .bs-sig { min-width: 9ch; }
+.bs-cf-meta { display: block; margin-top: 2px; font: 500 11.5px/1.5 var(--bs-mono); color: var(--bs-muted); }
+.bs-cf-from { font: 500 12px/1.9 var(--bs-mono); color: var(--bs-muted); text-decoration: none; white-space: nowrap; }
+.bs-cf-from:hover, .bs-cf-from:focus-visible { color: var(--bs-ink); text-decoration: underline; }
+.bs-cf-done .bs-row-text { color: var(--bs-ink2); }
+.bs-cf-more { margin: 0; padding-top: 10px; font-size: 13px; }
+
 /* Long-form reading: 16/26 at 62ch */
 .bs-para { font-size: 16px; line-height: 1.625; max-width: 62ch; color: var(--bs-ink); white-space: pre-line; overflow-wrap: anywhere; }
 

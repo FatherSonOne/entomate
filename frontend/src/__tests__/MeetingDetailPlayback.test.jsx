@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { vi, describe, test, expect, beforeEach } from 'vitest'
 
-const api = vi.hoisted(() => ({ get: vi.fn() }))
+const api = vi.hoisted(() => ({ get: vi.fn(), carryForward: vi.fn(() => Promise.resolve(null)) }))
 const player = vi.hoisted(() => ({ ready: false, playFrom: vi.fn() }))
 vi.mock('../services/api', () => ({ meetingsApi: api, integrationsApi: {}, calendarApi: {} }))
 vi.mock('../components/vc/ToastProvider', () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn() }) }))

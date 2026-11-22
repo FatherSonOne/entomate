@@ -547,7 +547,11 @@ router.get('/upcoming', authenticate, async (req, res) => {
           title: e.summary,
           date: e.start?.dateTime || e.start?.date,
           allDay: !e.start?.dateTime,
-          source: 'google_calendar'
+          source: 'google_calendar',
+          // For carry-forward on Today: who is invited (not the room or yourself twice).
+          attendees: (e.attendees || [])
+            .filter(a => !a.resource)
+            .map(a => ({ name: a.displayName || null, email: a.email || null }))
         }));
       } catch (e) {
         log.info('Could not fetch calendar events:', e.message);

@@ -61,4 +61,17 @@ const ask = z.object({
   })
 });
 
-module.exports = { process, transcript, list, update, ask };
+const carryForwardPreview = z.object({
+  body: z.object({
+    title: z.string().max(500).optional().nullable(),
+    attendees: z.array(z.union([
+      z.string().max(320),
+      z.object({ name: z.string().max(200).optional().nullable(), email: z.string().max(320).optional().nullable() }),
+    ])).max(200).optional(),
+    startsAt: z.string().datetime({ offset: true }).optional(),
+  }),
+  query: z.object({}).passthrough(),
+  params: z.object({}).passthrough()
+});
+
+module.exports = { process, transcript, list, update, ask, carryForwardPreview };

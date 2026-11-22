@@ -368,6 +368,7 @@ export interface UpcomingRow {
   title?: string | null
   date?: string | null
   allDay?: boolean
+  attendees?: ReadonlyArray<{ name?: string | null; email?: string | null }>
 }
 
 export interface CalendarEvent {
@@ -375,6 +376,8 @@ export interface CalendarEvent {
   title: string
   at: Date
   allDay: boolean
+  /** Invitees, for carry-forward ("what was promised last time these people met"). */
+  attendees?: ReadonlyArray<{ name?: string | null; email?: string | null }>
 }
 
 export function calendarEvents(rows: ReadonlyArray<UpcomingRow>): CalendarEvent[] {
@@ -383,7 +386,9 @@ export function calendarEvents(rows: ReadonlyArray<UpcomingRow>): CalendarEvent[
     if (r.type !== 'calendar' || !r.date) continue
     const at = parseDay(r.date)
     if (!at) continue
-    out.push({ id: r.id, title: r.title?.trim() || 'Untitled event', at, allDay: Boolean(r.allDay) })
+    const ev: CalendarEvent = { id: r.id, title: r.title?.trim() || 'Untitled event', at, allDay: Boolean(r.allDay) }
+    if (r.attendees?.length) ev.attendees = r.attendees
+    out.push(ev)
   }
   return out.sort((a, b) => a.at.getTime() - b.at.getTime())
 }

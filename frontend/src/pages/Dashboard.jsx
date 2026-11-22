@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useOutletContext } from 'react-router-dom'
 import IntelligenceDashboard from '../components/intelligence/IntelligenceDashboard'
+import CarryForward from '../components/meetings/CarryForward'
 import { meetingsApi, tasksApi, dashboardApi, calendarApi, learningApi, checkHealth } from '../services/api'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { useToast } from '../components/vc/ToastProvider'
@@ -109,6 +110,22 @@ export default function Today() {
   const events = useMemo(() => calendarEvents(upcoming), [upcoming])
   const live = useMemo(() => liveMeeting(meetings), [meetings])
   const next = useMemo(() => nextEvent(events), [events])
+
+  // Before the next meeting: what was promised last time these people (or this series) met.
+  const [carryForward, setCarryForward] = useState(null)
+  const nextKey = next ? `${next.id}|${next.at.getTime()}` : ''
+  useEffect(() => {
+    if (!next) { setCarryForward(null); return undefined }
+    let cancelled = false
+    meetingsApi.carryForwardPreview({
+      title: next.title,
+      attendees: (next.attendees || []).map((a) => ({ name: a.name || null, email: a.email || null })),
+      startsAt: next.at.toISOString(),
+    })
+      .then((data) => { if (!cancelled) setCarryForward(data) })
+      .catch(() => { if (!cancelled) setCarryForward(null) })
+    return () => { cancelled = true }
+  }, [nextKey]) // keyed on the event, not the object
   const now = useNow(Boolean(live || next))
 
   // Cheap to derive; recomputed each tick so buckets roll over at midnight.
@@ -319,6 +336,12 @@ export default function Today() {
       <Grid>
         <Cell span={8}>{renderTop()}</Cell>
         <Cell span={4} className="bs-today-ro">{readouts}</Cell>
+
+        {next && carryForward && (carryForward.openCount > 0 || carryForward.doneCount > 0) && (
+          <Cell span={8}>
+            <CarryForward data={carryForward} title={`Before ${next.title}`} limit={4} />
+          </Cell>
+        )}
 
         <Cell span={8}>
           <Section number="01" title="Action items" aside={openItems > ITEM_ROWS ? `${ITEM_ROWS} of ${openItems} open` : 'From your meetings'} />

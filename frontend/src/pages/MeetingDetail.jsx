@@ -9,6 +9,7 @@ import EcosystemSyncStatus from '../components/EcosystemSyncStatus'
 import MeetingNotesPanel from '../components/meetings/MeetingNotesPanel'
 import TranscriptPanel from '../components/meetings/TranscriptPanel'
 import TimecodeButton from '../components/meetings/TimecodeButton'
+import CarryForward from '../components/meetings/CarryForward'
 import RecordingStatus from '../components/meetings/RecordingStatus'
 import RecordingPlayer from '../components/meetings/RecordingPlayer'
 import { canPlay } from '../services/meetingRecorderService'
@@ -86,6 +87,18 @@ export default function MeetingDetail() {
   useEffect(() => {
     loadMeeting()
   }, [loadMeeting])
+
+  // "From last time": commitments from earlier meetings with the same people or series.
+  // Re-read when the attendee list changes (speaker rename turns "Speaker 1" into a name).
+  const [carryForward, setCarryForward] = useState(null)
+  const attendeeKey = JSON.stringify(meeting?.attendees || [])
+  useEffect(() => {
+    let cancelled = false
+    meetingsApi.carryForward(id)
+      .then((data) => { if (!cancelled) setCarryForward(data) })
+      .catch(() => { if (!cancelled) setCarryForward(null) })
+    return () => { cancelled = true }
+  }, [id, attendeeKey])
 
   // ?t=<ms> (from Today's decision timecodes) jumps the transcript once the meeting has loaded.
   const [searchParams] = useSearchParams()
@@ -540,6 +553,7 @@ export default function MeetingDetail() {
                   focusAtMs={focusAtMs}
                 />
               </div>
+              <CarryForward data={carryForward} title="From earlier meetings" />
             </TabPanel>
           )}
 

@@ -11,6 +11,7 @@ const { validate } = require('../middleware/validate');
 const schemas = require('../schemas/meetings');
 const log = require('../utils/log');
 const { getOrgIdForUser, getOrgIdForMeeting } = require('../utils/orgContext');
+const carryForward = require('../services/carryForward');
 
 const calendarService = require('../services/calendarService');
 const meetingNotes = require('../services/meetingNotesService');
@@ -572,6 +573,57 @@ router.patch('/action-items/:id', authenticate, async (req, res) => {
   } catch (error) {
     log.error('Error updating action item:', { error: error.message || error });
     res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/meetings/carry-forward
+ * Commitments to bring into an upcoming meeting (a calendar event that has no
+ * meetings row yet): open items from earlier meetings with the same people or
+ * series, and items those people own. Body: { title, attendees, startsAt }.
+ */
+router.post('/carry-forward', authenticate, validate(schemas.carryForwardPreview), async (req, res) => {
+  try {
+    const orgIds = await orgIdsForUser(req.user?.id);
+    const { title, attendees, startsAt } = req.body;
+    const result = await carryForward.load(
+      { title: title || '', attendees: attendees || [], at: startsAt || new Date().toISOString() },
+      orgIds
+    );
+    res.json(result);
+  } catch (error) {
+    log.error('Error building carry-forward preview:', { error: error.message || error });
+    res.status(500).json({ error: 'Could not load earlier commitments' });
+  }
+});
+
+/**
+ * GET /api/meetings/:id/carry-forward
+ * What was promised before this meeting: open and done items from earlier
+ * meetings with the same people or series.
+ */
+router.get('/:id/carry-forward', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const orgId = await meetingOrgOrRespond(req, res, id);
+    if (!orgId) return;
+
+    const { data: meeting, error } = await supabase
+      .from('meetings')
+      .select('id, title, attendees, created_at')
+      .eq('id', id)
+      .eq('org_id', orgId)
+      .single();
+    if (error || !meeting) return res.status(404).json({ error: 'Meeting not found' });
+
+    const result = await carryForward.load(
+      { id: meeting.id, title: meeting.title, attendees: meeting.attendees, at: meeting.created_at },
+      [orgId]
+    );
+    res.json(result);
+  } catch (error) {
+    log.error('Error building carry-forward:', { error: error.message || error });
+    res.status(500).json({ error: 'Could not load earlier commitments' });
   }
 });
 
