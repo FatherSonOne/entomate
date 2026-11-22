@@ -1248,6 +1248,10 @@ html[data-motion="reduce"] :is(.bs-key, .bs-av) { transition-duration: 1ms !impo
 .bs-mtg .bs-tbl td.bs-mtg-acts > span { display: block; }
 .bs-mtg-acts-mine { margin-top: 3px; color: var(--bs-brand); }
 .bs-mtg .bs-tbl td.bs-mtg-more-col { width: 1%; padding-right: 0; }
+.bs-mtg-rowkeys { display: inline-flex; align-items: center; gap: 6px; }
+.bs-mtg .bs-tbl .bs-mtg-open { height: 28px; width: 30px; padding: 0; justify-content: center; color: var(--bs-ink2); text-decoration: none; }
+.bs-mtg .bs-tbl .bs-mtg-open:hover { color: var(--bs-ink); }
+@media (max-width: 767.98px) { .bs-mtg-rowkeys { flex-direction: column; gap: 4px; } .bs-mtg .bs-tbl td.bs-mtg-more-col { padding-left: 10px; } }
 .bs-mtg .bs-tbl td { vertical-align: top; }
 .bs-mtg .bs-tbl td.bs-mtg-status, .bs-mtg .bs-tbl td.bs-num, .bs-mtg .bs-tbl td.bs-mtg-acts { padding-top: 14px; }
 

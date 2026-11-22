@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Search, Loader2 } from 'lucide-react'
+import { Search, Loader2, SquareArrowOutUpRight } from 'lucide-react'
 import MeetingRecorder from '../components/meetings/MeetingRecorder'
 import MeetingPreview from '../components/meetings/MeetingPreview'
 import { useAuth } from '../contexts/AuthContext'
@@ -334,6 +334,15 @@ export default function Meetings() {
       header: <span className="bs-sr">More</span>,
       className: 'bs-mtg-more-col',
       render: (m) => (
+        <span className="bs-mtg-rowkeys">
+        <Link
+          to={`/meetings/${m.id}`}
+          className="bs-key sm bs-mtg-open"
+          aria-label={`Open ${m.title || 'this meeting'}`}
+          title="Open meeting"
+        >
+          <SquareArrowOutUpRight size={15} strokeWidth={2} aria-hidden="true" />
+        </Link>
         <Menu
           label={`More for ${m.title || 'this meeting'}`}
           entries={[
@@ -342,6 +351,7 @@ export default function Meetings() {
             { key: 'del', label: 'Delete', hint: 'Undo for 8s', danger: true, onSelect: () => { if (previewId === m.id) setPreviewId(null); handleDelete(m) } },
           ]}
         />
+        </span>
       ),
     }] : []),
   ]
