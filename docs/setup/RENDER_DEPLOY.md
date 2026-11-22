@@ -54,7 +54,7 @@ In the service's **Environment** tab, fill in each `sync: false` var:
 | Var | When to set |
 |---|---|
 | `RECALL_API_KEY` | After signing up at https://recall.ai and copying the API key |
-| `RECALL_WEBHOOK_TOKEN` | Generate a random 24-byte hex: `node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"` |
+| `RECALL_WEBHOOK_SIGNING_SECRET` | The Svix `whsec_…` secret from Recall dashboard > Webhooks (replaces the old `RECALL_WEBHOOK_TOKEN`). Without it every bot status webhook is rejected. |
 | `BOT_CALLBACK_BASE_URL` | After this Render service is live — set to `https://<service-name>.onrender.com` |
 
 `RECALL_API_BASE` defaults to `https://us-east-1.recall.ai/api/v1` — adjust
