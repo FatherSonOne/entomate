@@ -15,6 +15,7 @@ import {
   describeCall, dueSummary, groupActionItems, hms, itemTitle, liveMeeting, nextEvent, parseDay,
   priorityConfidence, priorityTone, recordingStartedAt, startOfDay, todaySchedule,
 } from '../services/todayView'
+import SendBotKey from '../components/bot/SendBotKey'
 
 /**
  * 01 Today (Bench Swiss, direction A "Bench"): what's live or next, the action items
@@ -216,7 +217,7 @@ export default function Today() {
             <div className="bs-lbl">Starts in</div>
           </div>
           <div className="bs-today-disp-keys">
-            <Key size="sm" onDisplay onClick={() => navigate('/bot-launcher')}>Send a bot</Key>
+            <SendBotKey size="sm" onDisplay />
             <Key size="sm" onDisplay onClick={startRecording}>Record here</Key>
           </div>
         </Display>
@@ -242,7 +243,7 @@ export default function Today() {
         <Signal tone="off">{loading ? 'Loading' : 'Nothing recorded yet'}</Signal>
         <p className="bs-h3">Record a meeting in this browser, or send a bot to a call. Its decisions and action items land here.</p>
         <div className="bs-title-keys">
-          <Key onClick={() => navigate('/bot-launcher')}>Send a bot</Key>
+          <SendBotKey />
         </div>
       </div>
     )

@@ -16,11 +16,14 @@ const express = require('express');
 const { authenticate, authorizeOrgRole } = require('../middleware/auth');
 const { supabaseAdmin } = require('../config/supabase');
 const orchestrator = require('../services/botOrchestrator');
+const { buildBotView } = require('../services/botView');
 const log = require('../utils/log');
 
 const router = express.Router();
 
 const ADMIN_ROLES = ['owner', 'admin'];
+// Anyone in the workspace may read how a bot meeting went; only owners and admins send or stop bots.
+const MEMBER_ROLES = ['owner', 'admin', 'manager', 'member', 'viewer'];
 
 const orgFromBody = (req) => req.body?.workspaceId || null;
 const orgFromQuery = (req) => req.query?.workspaceId || null;
@@ -39,6 +42,86 @@ const orgFromSession = async (req) => {
   }
   return data?.org_id || null;
 };
+
+const orgFromMeeting = async (req) => {
+  const meetingId = req.params?.meetingId;
+  if (!meetingId || !supabaseAdmin) return null;
+  const { data } = await supabaseAdmin
+    .from('bot_sessions')
+    .select('org_id')
+    .eq('meeting_id', meetingId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data?.org_id || null;
+};
+
+const MEETING_FIELDS = 'id, org_id, title, summary, summary_template, decisions, attendees, transcript_segments, duration_minutes, recording_job';
+
+/** Join a session with its meeting, action items and invitees, and build the view. */
+async function viewsFor(sessions) {
+  if (!sessions.length) return [];
+  const meetingIds = sessions.map((s) => s.meeting_id).filter(Boolean);
+  const sessionIds = sessions.map((s) => s.id);
+  const [meetings, items, attendees] = await Promise.all([
+    supabaseAdmin.from('meetings').select(MEETING_FIELDS).in('id', meetingIds),
+    supabaseAdmin.from('action_items').select('id, meeting_id').in('meeting_id', meetingIds),
+    supabaseAdmin.from('bot_session_attendees').select('session_id, email_status, opted_out_at').in('session_id', sessionIds)
+  ]);
+  for (const r of [meetings, items, attendees]) if (r.error) throw r.error;
+  return sessions.map((session) => {
+    // A meeting from another org with the same id is never shown (ingest refuses it too).
+    const meeting = (meetings.data || []).find((m) => m.id === session.meeting_id && m.org_id === session.org_id) || null;
+    return buildBotView({
+      session,
+      meeting,
+      actionItems: meeting ? (items.data || []).filter((a) => a.meeting_id === meeting.id) : [],
+      attendees: (attendees.data || []).filter((a) => a.session_id === session.id)
+    });
+  });
+}
+
+/**
+ * GET /api/admin/bots/recent?workspaceId=<id> — the workspace's last bot runs
+ * (live, scheduled and finished), newest first, for the Bot page and the
+ * watcher that moves the app to a debrief when a call ends.
+ */
+router.get('/recent', authenticate, authorizeOrgRole(ADMIN_ROLES, orgFromQuery), async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 8, 1), 25);
+    const { data, error } = await supabaseAdmin
+      .from('bot_sessions')
+      .select('*')
+      .eq('org_id', req.orgId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    res.json({ sessions: await viewsFor(data || []) });
+  } catch (err) {
+    log.error('Bot recent list failed', { error: err.message });
+    res.status(500).json({ error: 'Bot list failed', message: err.message });
+  }
+});
+
+/** GET /api/admin/bots/meeting/:meetingId — the bot run behind a meeting (live view or debrief). */
+router.get('/meeting/:meetingId', authenticate, authorizeOrgRole(MEMBER_ROLES, orgFromMeeting), async (req, res) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('bot_sessions')
+      .select('*')
+      .eq('org_id', req.orgId)
+      .eq('meeting_id', req.params.meetingId)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (error) throw error;
+    const [view] = await viewsFor(data || []);
+    if (!view) return res.status(404).json({ error: 'No bot session for this meeting' });
+    res.json({ session: view, canControl: ADMIN_ROLES.includes(req.orgRole) });
+  } catch (err) {
+    log.error('Bot meeting view failed', { meetingId: req.params.meetingId, error: err.message });
+    res.status(500).json({ error: 'Bot view failed', message: err.message });
+  }
+});
 
 /**
  * POST /api/admin/bots/launch — launch a new bot session.

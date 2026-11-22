@@ -16,7 +16,7 @@ const Automations = React.lazy(() => import('./pages/Automations'))
 const Insights = React.lazy(() => import('./pages/Insights'))
 const Search = React.lazy(() => import('./pages/Search'))
 const Settings = React.lazy(() => import('./pages/Settings'))
-const BotLauncher = React.lazy(() => import('./pages/BotLauncher'))
+const Bot = React.lazy(() => import('./pages/Bot'))
 const Calendar = React.lazy(() => import('./pages/Calendar'))
 const WorkflowBuilder = React.lazy(() => import('./pages/WorkflowBuilder'))
 const UsersGuide = React.lazy(() => import('./components/UsersGuide/UsersGuide'))
@@ -64,7 +64,8 @@ export default function App() {
             <Route path="calendar" element={<Calendar />} />
             <Route path="search" element={<Search />} />
             <Route path="settings" element={<Settings />} />
-            <Route path="bot-launcher" element={<BotLauncher />} />
+            <Route path="bot" element={<Bot />} />
+            <Route path="bot-launcher" element={<Navigate to="/bot" replace />} />
             <Route path="guide" element={<UsersGuide />} />
           </Route>
 

@@ -938,7 +938,20 @@ export const botsApi = {
     api.delete(`/admin/bots/${sessionId}`, { data: { reason: reason || 'manual_stop' } }),
 
   // Fetch the full Recall bot state (status history, recording URL, etc).
-  getState: (sessionId) => api.get(`/admin/bots/${sessionId}/state`)
+  getState: (sessionId) => api.get(`/admin/bots/${sessionId}/state`),
+
+  // The workspace's last bot runs with phase + debrief (services/botView.js).
+  // Polled, so never served from the GET cache.
+  recent: (workspaceId, limit) => {
+    cache.invalidate('/admin/bots/recent')
+    return api.get('/admin/bots/recent', { params: { workspaceId, limit } })
+  },
+
+  // The bot run behind one meeting: { session, canControl }. 404 when there is none.
+  forMeeting: (meetingId) => {
+    cache.invalidate(`/admin/bots/meeting/${meetingId}`)
+    return api.get(`/admin/bots/meeting/${meetingId}`)
+  }
 }
 
 // ========================================

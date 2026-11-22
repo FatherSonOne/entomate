@@ -13,6 +13,7 @@ import {
   asList, attendeeLine, decisionMarkers, formatLength, groupByTime, matchesFilter,
   meetingDate, meetingLengthMs, meetingStatus, speechDensity,
 } from '../services/meetingView'
+import SendBotKey from '../components/bot/SendBotKey'
 
 const PAGE_SIZE = 20
 
@@ -323,7 +324,7 @@ export default function Meetings() {
       <Switch label="Filter meetings" options={FILTERS} value={filter} onChange={setFilter} />
       <div className="bs-title-keys">
         {meetings.length > 0 && <Key onClick={() => setSelectionMode(true)}>Select</Key>}
-        <Key onClick={() => navigate('/bot-launcher')}>Send a bot</Key>
+        <SendBotKey />
         {/* While the recorder is open its Start key is the view's one primary key. */}
         <Key variant={showRecorder ? 'plain' : 'primary'} onClick={() => setShowRecorder(v => !v)} aria-expanded={showRecorder}>
           {showRecorder ? 'Close recorder' : 'New meeting'}
@@ -385,7 +386,7 @@ export default function Meetings() {
             </p>
             {!searchQuery && filter === 'all' && (
               <div className="bs-title-keys">
-                <Key onClick={() => navigate('/bot-launcher')}>Send a bot</Key>
+                <SendBotKey />
                 <Key onClick={() => setShowRecorder(true)}>Record now</Key>
               </div>
             )}

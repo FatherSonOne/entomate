@@ -17,6 +17,7 @@ import cache from '../services/apiCache'
 import { clipToNotes } from '../services/searchNotesService'
 import { formatClock, toSegments, toSummaryMoments } from '../services/meetingTranscriptService'
 import MeetingIntelligencePanel from '../components/intelligence/MeetingIntelligencePanel'
+import { BotDebrief, BotMeetingPending } from '../components/bot/BotDebrief'
 import {
   TitleRule, Section, Key, Signal, Tag, Display, Tape, Grid, Cell, Tabs, TabPanel, Drawer,
   TextInput, TextArea,
@@ -389,7 +390,7 @@ export default function MeetingDetail() {
   }
 
   if (!meeting) {
-    return (
+    const notFound = (
       <div>
         <TitleRule title="Meeting not found" meta={<Link to="/meetings"><b>Meetings</b></Link>} />
         <div className="bs-mtg-empty">
@@ -398,6 +399,8 @@ export default function MeetingDetail() {
         </div>
       </div>
     )
+    // A bot meeting before its minutes exist: the live view, or the minutes being written.
+    return <BotMeetingPending meetingId={id} onReady={refreshMeeting} notFound={notFound} />
   }
 
   const date = meetingDate(meeting)
@@ -466,6 +469,10 @@ export default function MeetingDetail() {
   return (
     <div className="bs-mtg bs-mtg-detail">
       <TitleRule title={title} meta={meta} actions={actions} />
+
+      {(searchParams.get('debrief') || meeting.recording_job?.source === 'bot') && (
+        <BotDebrief meetingId={meeting.id} forced={Boolean(searchParams.get('debrief'))} onOpenTab={setTab} onMinutesReady={refreshMeeting} />
+      )}
 
       <div className="bs-mtg-status-row">
         <RecordingStatus meetingId={meeting.id} recordingJob={meeting.recording_job} onRefresh={refreshMeeting} hasSummary={!!meeting.summary} />

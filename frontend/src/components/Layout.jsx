@@ -21,6 +21,7 @@ import {
   BookOpen
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import useBotDebriefWatch from './bot/useBotDebriefWatch'
 import { useOrgSafe } from '../contexts/OrgContext'
 import { useKeyboardShortcuts, getModKey } from '../hooks/useKeyboardShortcuts'
 import CommandPalette from './CommandPalette'
@@ -41,8 +42,8 @@ import { settingsApi } from '../services/api'
 // Items with adminOnly: true are filtered out at render time for non-admin
 // users via useOrgSafe().myRole. The backend gates the routes independently.
 // Six modules (feature audit 2026-11-22), plus Search and the tools that have
-// not merged yet. Calendar lives on Today (schedule + connect), Bot Launcher is
-// "Send a bot" on Meetings and Today, Board is a view inside Projects, Goals is
+// not merged yet. Calendar lives on Today (schedule + connect), the bot is
+// Tools › Bot plus "Send a bot" on Meetings and Today, Board is a view inside Projects, Goals is
 // gone. Their routes still work, so old links don't break.
 const navGroups = [
   {
@@ -78,7 +79,7 @@ const navGroups = [
 const breadcrumbMap = {
   '/dashboard':        'Today',
   '/meetings':         'Meetings',
-  '/bot-launcher':     'Bot Launcher',
+  '/bot':              'Bot',
   '/calendar':         'Calendar',
   '/search':           'Search',
   '/projects':         'Projects',
@@ -149,6 +150,8 @@ export default function Layout() {
   const { user, signOut } = useAuth()
   const orgCtx = useOrgSafe()
   const isAdmin = orgCtx?.myRole === 'owner' || orgCtx?.myRole === 'admin'
+  // When a bot's call ends, the app moves to its debrief (bot Slate pass).
+  useBotDebriefWatch({ orgId: orgCtx?.org?.id, userId: user?.id || null, enabled: isAdmin })
 
   const handleSignOut = async () => {
     await signOut()
@@ -211,6 +214,7 @@ export default function Layout() {
       ...benchModules,
       { label: 'Tools', items: [
         { name: 'Search', href: '/search' },
+        ...(isAdmin ? [{ name: 'Bot', href: '/bot' }] : []),
         { name: 'Ask Entomate', onSelect: toggleAssistant, note: proactiveSuggestion ? 'NEW' : undefined, noteIsNew: proactiveSuggestion },
         { name: 'User Guide', href: '/guide', note: guideHasNew ? 'NEW' : undefined, noteIsNew: guideHasNew },
       ] },
