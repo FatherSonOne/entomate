@@ -683,6 +683,8 @@ async function resolveSessionFromPayload(payload) {
  *
  * @param {Object} payload — Recall webhook body (event + data)
  */
+const FINAL_STATUSES = ['completed', 'failed', 'stopped', 'timeout'];
+
 async function handleRecallWebhook(payload) {
   const event = payload?.event;
   const data = payload?.data || {};
@@ -701,11 +703,17 @@ async function handleRecallWebhook(payload) {
 
   log.info('Recall webhook', { sessionId, event, statusCode, mapped });
 
-  const update = {};
-  if (mapped) update.status = mapped;
-  if (mapped && ['completed', 'failed', 'stopped', 'timeout'].includes(mapped)) {
-    update.ended_at = new Date().toISOString();
+  // Status and the data fields are written separately (audit finding 6):
+  // Svix retries and does not promise order, so a late bot.in_call_recording
+  // must not reopen a finished session, and a second final event must not
+  // replace the first final status or move ended_at. Recording/transcript
+  // URLs and the failure reason are still saved whatever the status is.
+  const statusUpdate = {};
+  if (mapped) statusUpdate.status = mapped;
+  if (mapped && FINAL_STATUSES.includes(mapped)) {
+    statusUpdate.ended_at = new Date().toISOString();
   }
+  const update = {};
 
   // Recall doesn't fire a separate bot.recording.done / bot.transcript.done
   // event (verified against the dashboard event catalog 2026-04-26). On
@@ -737,6 +745,15 @@ async function handleRecallWebhook(payload) {
 
   if (event === 'bot.fatal' && data?.fatal_reason) {
     update.failure_reason = String(data.fatal_reason).slice(0, 500);
+  }
+
+  if (Object.keys(statusUpdate).length > 0) {
+    const { error: statusErr } = await db()
+      .from('bot_sessions')
+      .update(statusUpdate)
+      .eq('id', sessionId)
+      .not('status', 'in', `(${FINAL_STATUSES.join(',')})`);
+    if (statusErr) throw statusErr;
   }
 
   if (Object.keys(update).length > 0) {

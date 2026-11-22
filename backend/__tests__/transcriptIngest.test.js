@@ -67,6 +67,15 @@ function mockMakeQuery(table) {
     eq(col, val) { filters.push((r) => r[col] === val); return q; },
     in(col, vals) { filters.push((r) => vals.includes(r[col])); return q; },
     is(col, val) { filters.push((r) => (r[col] ?? null) === val); return q; },
+    not(col, op, val) {
+      if (op === 'in') {
+        const list = String(val).replace(/^\(|\)$/g, '').split(',');
+        filters.push((r) => !list.includes(String(r[col])));
+      } else if (op === 'is') {
+        filters.push((r) => (r[col] ?? null) !== val);
+      }
+      return q;
+    },
     like(col, pattern) {
       const re = new RegExp(`^${pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/%/g, '.*').replace(/_/g, '.')}$`);
       filters.push((r) => re.test(String(r[col] ?? '')));
