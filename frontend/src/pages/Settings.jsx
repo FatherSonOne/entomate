@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Settings as SettingsIcon, Database, Cpu, Palette, Sun, Moon, Monitor,
   Brain, ArrowLeft, Mic, Bell, Link2, RefreshCw, CheckCircle2,
@@ -10,7 +10,7 @@ import { integrationsApi, checkHealth, settingsApi } from '../services/api'
 import { authFetch } from '../services/authFetch'
 import { useOrg } from '../contexts/OrgContext'
 import { TENANT_PLAN_LABELS, PLAN_BADGE_COLORS, TENANT_PLAN_LIMITS } from '../constants/plans'
-import { useTheme, THEME_MODES } from '../context/ThemeContext'
+import { useTheme, THEME_MODES, DEFAULT_DESIGN_STYLE } from '../context/ThemeContext'
 import LearningDashboard from '../components/learning/LearningDashboard'
 import EcosystemSettings from '../components/EcosystemSettings'
 import SlackSettings from '../components/settings/SlackSettings'
@@ -25,6 +25,8 @@ import MeetingAgentsSettings from '../components/settings/MeetingAgentsSettings'
 import CalendarAutoJoinSettings from '../components/settings/CalendarAutoJoinSettings'
 
 // ── Settings Sections ──
+const SECTION_KEY = 'entomate-settings-section'
+
 const SECTIONS = [
   { id: 'organization', label: 'Organization', icon: Building2 },
   { id: 'appearance', label: 'Appearance', icon: Palette },
@@ -43,7 +45,20 @@ const SECTIONS = [
 
 export default function Settings() {
   const location = useLocation()
-  const [activeSection, setActiveSection] = useState('organization')
+  const navigate = useNavigate()
+  // The section survives a remount: switching to or from Bench Swiss swaps the whole
+  // app shell, which remounts this page, and it used to fall back to Organization.
+  const [activeSection, setActiveSectionState] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem(SECTION_KEY)
+      if (saved && SECTIONS.some((sec) => sec.id === saved)) return saved
+    } catch { /* storage blocked: use the default */ }
+    return 'organization'
+  })
+  const setActiveSection = (id) => {
+    setActiveSectionState(id)
+    try { sessionStorage.setItem(SECTION_KEY, id) } catch { /* storage blocked */ }
+  }
   const orgContext = useOrg()
   const DEFAULTS = {
     theme_mode: 'dark',
@@ -73,6 +88,30 @@ export default function Settings() {
   const [deleteLoading, setDeleteLoading] = useState(false)
 
   const { mode, setThemeMode, designStyle, designStyles, setDesignStyle, palette, palettes, setPalette } = useTheme()
+  const mainStyles = designStyles.filter((style) => style.id === DEFAULT_DESIGN_STYLE)
+  const moreStyles = designStyles.filter((style) => style.id !== DEFAULT_DESIGN_STYLE)
+  // Open when a secondary style is in use, so the selected card is never hidden.
+  const [moreStylesOpen, setMoreStylesOpen] = useState(() => designStyle !== DEFAULT_DESIGN_STYLE)
+  const renderStyle = (style) => {
+    const selected = designStyle === style.id
+    return (
+      <button
+        key={style.id}
+        type="button"
+        role="radio"
+        aria-checked={selected}
+        onClick={() => setDesignStyle(style.id)}
+        className={`design-style-option text-left p-3 rounded-lg border transition-colors ${selected ? 'border-accent-primary bg-accent-primary-dim' : 'border-line-subtle bg-surface-elevated hover:border-line'}`}
+      >
+        <span className={`design-style-swatch design-style-swatch--${style.id}`} aria-hidden="true" />
+        <span className="flex items-center justify-between gap-2 mt-3">
+          <span className="text-sm font-semibold text-content-primary">{style.label}</span>
+          {selected && <span className="text-xs font-medium text-accent-primary">In use</span>}
+        </span>
+        <span className="text-xs block mt-1 text-content-tertiary">{style.blurb}</span>
+      </button>
+    )
+  }
 
   // Load user settings from DB — merge over defaults so nothing is ever null
   useEffect(() => {
@@ -96,8 +135,10 @@ export default function Settings() {
   useEffect(() => {
     if (location.state?.section) {
       setActiveSection(location.state.section)
+      // Consume the state, or a later remount (style switch) would jump back to it.
+      navigate(`${location.pathname}${location.search}`, { replace: true, state: null })
     }
-  }, [location.state])
+  }, [location.state]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Back from Google Calendar sign-in (started on Bot auto-join).
   useEffect(() => {
@@ -460,27 +501,28 @@ export default function Settings() {
               <div className="px-5 pb-5">
                 <span id="design-style-label" className="text-sm font-medium block mb-1 text-content-primary">Design style</span>
                 <span className="text-xs block mb-3 text-content-tertiary">Changes the whole app's look in this browser. Light and dark mode still apply.</span>
-                <div role="radiogroup" aria-labelledby="design-style-label" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {designStyles.map((style) => {
-                    const selected = designStyle === style.id
-                    return (
+                <div role="radiogroup" aria-labelledby="design-style-label">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {mainStyles.map(renderStyle)}
+                  </div>
+                  {moreStyles.length > 0 && (
+                    <>
                       <button
-                        key={style.id}
                         type="button"
-                        role="radio"
-                        aria-checked={selected}
-                        onClick={() => setDesignStyle(style.id)}
-                        className={`design-style-option text-left p-3 rounded-lg border transition-colors ${selected ? 'border-accent-primary bg-accent-primary-dim' : 'border-line-subtle bg-surface-elevated hover:border-line'}`}
+                        aria-expanded={moreStylesOpen}
+                        aria-controls="more-design-styles"
+                        onClick={() => setMoreStylesOpen((open) => !open)}
+                        className="mt-3 text-sm font-medium text-content-secondary hover:text-content-primary transition-colors"
                       >
-                        <span className={`design-style-swatch design-style-swatch--${style.id}`} aria-hidden="true" />
-                        <span className="flex items-center justify-between gap-2 mt-3">
-                          <span className="text-sm font-semibold text-content-primary">{style.label}</span>
-                          {selected && <span className="text-xs font-medium text-accent-primary">In use</span>}
-                        </span>
-                        <span className="text-xs block mt-1 text-content-tertiary">{style.blurb}</span>
+                        {moreStylesOpen ? '\u2212 Fewer styles' : `+ More styles (${moreStyles.length})`}
                       </button>
-                    )
-                  })}
+                      {moreStylesOpen && (
+                        <div id="more-design-styles" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-3">
+                          {moreStyles.map(renderStyle)}
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
 
