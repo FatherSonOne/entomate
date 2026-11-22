@@ -26,7 +26,7 @@ const sectionLoaders = {
       supabase.from('meetings').select('id, title, summary, created_at, sentiment_label')
         .in('org_id', orgIds).order('created_at', { ascending: false }).limit(10),
       supabase.from('projects').select('id, name, status, start_date, end_date, budget, budget_spent')
-        .eq('owner_id', userId).eq('status', 'active').limit(10),
+        .in('org_id', orgIds).eq('status', 'active').limit(10),
     ]);
     return {
       tasks: tasks.status === 'fulfilled' ? tasks.value?.data || [] : [],
@@ -55,10 +55,10 @@ const sectionLoaders = {
     } catch { return { events: [] }; }
   },
 
-  async projects({ userId }) {
+  async projects({ orgIds }) {
     const { data } = await supabase.from('projects')
       .select('id, name, description, status, start_date, end_date, budget, budget_spent, created_at')
-      .eq('owner_id', userId)
+      .in('org_id', orgIds)
       .order('created_at', { ascending: false }).limit(15);
     return { projects: data || [] };
   },
@@ -89,18 +89,18 @@ const sectionLoaders = {
     return { workflows: data || [] };
   },
 
-  async automations({ userId }) {
+  async automations({ orgIds }) {
     const { data } = await supabase.from('automations')
       .select('id, name, description, enabled, trigger_type, last_run_at, created_at')
-      .eq('created_by', userId)
+      .in('org_id', orgIds)
       .order('created_at', { ascending: false }).limit(15);
     return { automations: data || [] };
   },
 
-  async agents({ userId }) {
+  async agents({ orgIds }) {
     const { data } = await supabase.from('agents')
       .select('id, name, type, description, enabled, last_execution_at, created_at')
-      .eq('created_by', userId)
+      .in('org_id', orgIds)
       .order('created_at', { ascending: false }).limit(15);
     return { agents: data || [] };
   },
@@ -110,7 +110,7 @@ const sectionLoaders = {
     const [tasks, meetings, projects] = await Promise.allSettled([
       supabase.from('tasks').select('status', { count: 'exact' }).in('org_id', orgIds),
       supabase.from('meetings').select('id', { count: 'exact' }).in('org_id', orgIds),
-      supabase.from('projects').select('status', { count: 'exact' }).eq('owner_id', userId),
+      supabase.from('projects').select('status', { count: 'exact' }).in('org_id', orgIds),
     ]);
     return {
       metrics: {

@@ -513,7 +513,8 @@ router.get('/project-insights', async (req, res) => {
     // Get all projects
     const { data: projects } = await supabase
       .from('projects')
-      .select('id, name, status, start_date, end_date, created_at');
+      .select('id, name, status, start_date, end_date, created_at')
+      .in('org_id', req.orgIds);
 
     // Get all tasks
     const { data: tasks } = await supabase

@@ -7,12 +7,15 @@ const { authenticate, apiKeyAuth } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const schemas = require('../schemas/automations');
 const log = require('../utils/log');
+const { attachOrgIds, getOrgIdForUser } = require('../utils/orgContext');
 
 const router = express.Router();
 
 // Every route needs a signed-in user except POST /trigger, which is
 // service-to-service and uses apiKeyAuth (audit finding 1).
 router.use((req, res, next) => (req.path === '/trigger' ? next() : authenticate(req, res, next)));
+// Signed-in routes only see their own orgs' automations (audit finding 3).
+router.use((req, res, next) => (req.path === '/trigger' ? next() : attachOrgIds(req, res, next)));
 
 // Initialize scheduler on module load
 automationScheduler.initialize().catch(err => {
@@ -103,6 +106,7 @@ router.post('/', authenticate, validate(schemas.create), async (req, res) => {
       actions: actions,
       enabled,
       created_by: req.user?.id || 'anonymous',
+      org_id: await getOrgIdForUser(req.user?.id),
       team_id: req.user?.teamId || 'default',
       execution_count: 0,
       last_executed_at: null,
@@ -153,6 +157,7 @@ router.get('/', validate(schemas.list), async (req, res) => {
     let query = supabase
       .from('automations')
       .select('*', { count: 'exact' })
+      .in('org_id', req.orgIds)
       .order('created_at', { ascending: false });
 
     if (enabled !== undefined) {
@@ -288,6 +293,7 @@ router.get('/:id', async (req, res) => {
     const { data: automation, error } = await supabase
       .from('automations')
       .select('*')
+      .in('org_id', req.orgIds)
       .eq('id', id)
       .single();
 
@@ -329,6 +335,7 @@ router.put('/:id', authenticate, validate(schemas.update), async (req, res) => {
     const { data: automation, error } = await supabase
       .from('automations')
       .update(filteredUpdates)
+      .in('org_id', req.orgIds)
       .eq('id', id)
       .select()
       .single();
@@ -373,6 +380,7 @@ router.delete('/:id', authenticate, async (req, res) => {
     const { error } = await supabase
       .from('automations')
       .delete()
+      .in('org_id', req.orgIds)
       .eq('id', id);
 
     if (error) {
@@ -406,6 +414,7 @@ router.post('/:id/toggle', authenticate, validate(schemas.toggle), async (req, r
       const { data: current } = await supabase
         .from('automations')
         .select('enabled')
+        .in('org_id', req.orgIds)
         .eq('id', id)
         .single();
       newEnabled = !current?.enabled;
@@ -417,6 +426,7 @@ router.post('/:id/toggle', authenticate, validate(schemas.toggle), async (req, r
         enabled: newEnabled,
         updated_at: new Date().toISOString()
       })
+      .in('org_id', req.orgIds)
       .eq('id', id)
       .select()
       .single();
@@ -453,6 +463,7 @@ router.post('/:id/execute', authenticate, validate(schemas.execute), async (req,
     const { data: automation, error: automationError } = await supabase
       .from('automations')
       .select('*')
+      .in('org_id', req.orgIds)
       .eq('id', id)
       .single();
 
@@ -501,6 +512,7 @@ router.post('/:id/execute', authenticate, validate(schemas.execute), async (req,
         execution_count: (automation.execution_count || 0) + 1,
         last_executed_at: new Date().toISOString()
       })
+      .in('org_id', req.orgIds)
       .eq('id', id);
 
     res.json({
@@ -674,7 +686,9 @@ function shouldTrigger(config, data) {
 
 // Delegate action execution to the real automation engine
 async function executeAction(action, triggerData, automation) {
-  return automationEngine.executeAction(action, triggerData);
+  // Rows an automation creates belong to the automation's org (audit finding 3).
+  const data = { ...(triggerData || {}), org_id: automation?.org_id || triggerData?.org_id || null };
+  return automationEngine.executeAction(action, data);
 }
 
 /**
@@ -708,6 +722,7 @@ router.post('/:id/schedule', authenticate, async (req, res) => {
     const { data: automation, error } = await supabase
       .from('automations')
       .select('*')
+      .in('org_id', req.orgIds)
       .eq('id', id)
       .single();
 
@@ -748,6 +763,7 @@ router.post('/:id/test', authenticate, validate(schemas.test), async (req, res) 
     const { data: automation, error } = await supabase
       .from('automations')
       .select('*')
+      .in('org_id', req.orgIds)
       .eq('id', id)
       .single();
 

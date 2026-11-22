@@ -98,6 +98,7 @@ router.post('/', authenticate, async (req, res) => {
       let projectQuery = supabase
         .from('projects')
         .select('id, name, description, status, created_at')
+        .in('org_id', req.orgIds)
         .or(`name.ilike.${searchTerm},description.ilike.${searchTerm}`)
         .order('created_at', { ascending: false })
         .limit(Math.ceil(limit / types.length));
@@ -665,6 +666,7 @@ router.get('/suggestions', authenticate, async (req, res) => {
     let projectQuery = supabase
       .from('projects')
       .select('name')
+      .in('org_id', req.orgIds)
       .order('created_at', { ascending: false })
       .limit(5);
 

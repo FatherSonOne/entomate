@@ -37,6 +37,7 @@ router.post('/', validate(schemas.create), async (req, res) => {
       start_date: startDate || null,
       end_date: endDate || null,
       owner_id: req.user.id,
+      org_id: await getOrgIdForUser(req.user.id),
       team_ids: teamIds || [],
       tags: tags || [],
       settings: {},
@@ -82,6 +83,7 @@ router.get('/', validate(schemas.list), async (req, res) => {
     let query = supabase
       .from('projects')
       .select('*', { count: 'exact' })
+      .in('org_id', req.orgIds)
       .order('created_at', { ascending: false });
 
     if (status) {
@@ -129,6 +131,7 @@ router.get('/:id', async (req, res) => {
     const { data: project, error: projectError } = await supabase
       .from('projects')
       .select('*')
+      .in('org_id', req.orgIds)
       .eq('id', id)
       .single();
 
@@ -201,6 +204,7 @@ router.put('/:id', validate(schemas.update), async (req, res) => {
     const { data: project, error } = await supabase
       .from('projects')
       .update(filteredUpdates)
+      .in('org_id', req.orgIds)
       .eq('id', id)
       .select()
       .single();
@@ -247,6 +251,7 @@ router.delete('/:id', async (req, res) => {
     const { error } = await supabase
       .from('projects')
       .delete()
+      .in('org_id', req.orgIds)
       .eq('id', id);
 
     if (error) {
@@ -283,6 +288,7 @@ router.post('/from-deal', validate(schemas.fromDeal), async (req, res) => {
       start_date: new Date().toISOString().split('T')[0],
       end_date: expectedCloseDate || null,
       owner_id: req.user.id,
+      org_id: await getOrgIdForUser(req.user.id),
       team_ids: [],
       tags: ['from-crm'],
       settings: { sourceType: 'crm_deal' },
@@ -438,6 +444,7 @@ router.get('/:id/dashboard', async (req, res) => {
     const { data: project, error: projectError } = await supabase
       .from('projects')
       .select('id, name, status, start_date, end_date')
+      .in('org_id', req.orgIds)
       .eq('id', id)
       .single();
 

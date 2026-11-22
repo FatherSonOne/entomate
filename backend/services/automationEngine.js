@@ -115,6 +115,8 @@ class AutomationEngine {
    */
   async execute(automation, triggerData) {
     const startTime = Date.now();
+    // Rows an automation creates belong to the automation's org (audit finding 3).
+    triggerData = { ...(triggerData || {}), org_id: automation.org_id || triggerData?.org_id || null };
     const executionLog = {
       automation_id: automation.id,
       triggered_at: new Date().toISOString(),
@@ -388,7 +390,8 @@ class AutomationEngine {
           crm_deal_id: data.deal_id || data.crm_deal_id,
           deal_value: data.deal_value || config.deal_value,
           status: 'planning',
-          owner_id: config.owner_id || data.owner_id
+          owner_id: config.owner_id || data.owner_id,
+          org_id: data.org_id || null
         })
         .select()
         .single();

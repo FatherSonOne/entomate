@@ -148,6 +148,7 @@ class DealRiskService {
       const { data: projects } = await supabase
         .from('projects')
         .select('*')
+        .in('org_id', requestOrgIds())
         .eq('owner_id', userId)
         .not('crm_deal_id', 'is', null)
         .limit(50);

@@ -46,7 +46,8 @@ router.get('/dashboard', asyncHandler(async (req, res) => {
       .lte('created_at', endDate.toISOString()),
     supabase
       .from('projects')
-      .select('*'),
+      .select('*')
+      .in('org_id', req.orgIds),
     supabase
       .from('action_items')
       .select('*')
