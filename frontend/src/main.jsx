@@ -15,6 +15,7 @@ import './styles/main.css'
 // Shared motion tokens and primitives (every style uses them)
 import './styles/motion.css'
 import { initReduceMotion } from './components/bench/motion'
+import { installIconDraw } from './components/bench/iconDraw'
 
 // Import Void × Crimson component system
 import './styles/vc-components.css'
@@ -37,6 +38,7 @@ import './styles/design-style-picker.css'
 
 // Settings > Appearance > Reduce motion, remembered from the last visit
 initReduceMotion()
+installIconDraw()
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
