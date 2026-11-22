@@ -8,6 +8,19 @@ const { supabase } = require('../config/supabase');
 const emailService = require('./emailService');
 const log = require('../utils/log');
 
+/**
+ * User ids that switched off overdue task emails in Settings.
+ * @param {Array<{user_id: string, notifications_json?: Record<string, unknown> | null}> | null | undefined} rows
+ * @returns {Set<string>}
+ */
+function overdueEmailOptOuts(rows) {
+  const out = new Set();
+  for (const row of rows || []) {
+    if (row && row.notifications_json && row.notifications_json.email_overdue_reminder === false) out.add(row.user_id);
+  }
+  return out;
+}
+
 class SchedulerService {
   constructor() {
     this.jobs = new Map();
@@ -136,9 +149,26 @@ class SchedulerService {
           byAssignee.get(key).push(task);
         });
 
+        // Honour Settings › You › Overdue task emails (notifications_json.email_overdue_reminder).
+        // Unset means on, which keeps the behaviour people had before the switch was wired.
+        const assigneeIds = [...byAssignee.keys()].filter(id => id !== 'unassigned');
+        let optedOut = new Set();
+        if (assigneeIds.length > 0) {
+          const { data: prefs, error: prefsError } = await supabase
+            .from('user_settings')
+            .select('user_id, notifications_json')
+            .in('user_id', assigneeIds);
+          if (prefsError) log.warn('Could not read overdue email preferences; sending to all', { error: prefsError.message });
+          else optedOut = overdueEmailOptOuts(prefs);
+        }
+
         // Look up user emails and send alerts
         for (const [assigneeId, tasks] of byAssignee) {
           if (assigneeId === 'unassigned') continue;
+          if (optedOut.has(assigneeId)) {
+            log.info(`Overdue task email off for user ${assigneeId}, skipping`);
+            continue;
+          }
 
           try {
             const { data: { user } } = await supabase.auth.admin.getUserById(assigneeId);
@@ -433,3 +463,4 @@ class SchedulerService {
 }
 
 module.exports = new SchedulerService();
+module.exports.overdueEmailOptOuts = overdueEmailOptOuts;

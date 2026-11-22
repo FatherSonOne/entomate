@@ -243,9 +243,9 @@ export default function Layout() {
           onSettings={() => goSettings()}
           settingsActive={isActive('/settings')}
           menuItems={[
-            { label: 'Profile', onSelect: () => goSettings('organization') },
-            { label: 'Workspace and team', onSelect: () => goSettings('permissions') },
-            { label: 'Connected calendars', onSelect: () => goSettings('integrations') },
+            { label: 'Profile', onSelect: () => goSettings('you') },
+            { label: 'Workspace and team', onSelect: () => goSettings('workspace') },
+            { label: 'Connected calendars', onSelect: () => goSettings('recording') },
             { label: 'Keyboard shortcuts', onSelect: () => setShortcutsHelpOpen(true), kbd: '?' },
           ]}
           onSignOut={handleSignOut}
