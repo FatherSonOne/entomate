@@ -1,9 +1,33 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Faceplate, Signal, Tag, TitleRule } from '../bench'
+import { Faceplate, Key, Signal, Tag, TitleRule } from '../bench'
 import BrandMotion from '../BrandMotion'
 import { EntomateMark, Wordmark } from '../Logo'
+import { nextHeroClip } from '../heroRotation'
+import { SIGNIN_TIPS, nextTagline, nextTipIndex } from '../../services/signInRotation'
 import '../../styles/sign-in.css'
+
+// Once per page load: the landing's hero film rotation (shared, so the
+// sign-in film follows on from the landing's), and a rotating headline.
+const heroClip = nextHeroClip() ?? 'hands'
+const tagline = nextTagline()
+const firstTip = nextTipIndex()
+
+const pad = (n: number): string => String(n).padStart(2, '0')
+
+/** One numbered tip from the catalog; Next tip steps through it. */
+function TipLine(): React.ReactElement {
+  const [index, setIndex] = useState(firstTip)
+  return (
+    <aside className="si-tip" aria-label="Tip">
+      <div className="si-tip-h">
+        <span className="si-lbl">Tip <b>{pad(index + 1)}</b> / {pad(SIGNIN_TIPS.length)}</span>
+        <Key size="sm" onClick={() => setIndex((i) => (i + 1) % SIGNIN_TIPS.length)}>Next tip</Key>
+      </div>
+      <p aria-live="polite">{SIGNIN_TIPS[index]}</p>
+    </aside>
+  )
+}
 
 export interface AuthFrameProps {
   /** Title rule text ("Sign in", "Create account"…). */
@@ -15,7 +39,7 @@ export interface AuthFrameProps {
 
 /**
  * Sign-in layout, Slate direction C "Film" (2026-11-22): the landing's
- * dark media zone on the left (hero film, headline, two lines of sample
+ * dark media zone on the left (hero film and headline, both rotating per load, two lines of sample
  * minutes), the Slate faceplate with the form on the right. On phone the
  * film becomes a band above the plate. Always Void Crimson (.bs-vc), so
  * it reads as the step between the landing and the app.
@@ -24,7 +48,7 @@ export function AuthFrame({ title, actions, children }: AuthFrameProps): React.R
   return (
     <div className="si-page bs-tokens bs-vc">
       <section className="si-film" aria-labelledby="si-film-h">
-        <BrandMotion clip="hands" className="si-film-bg" />
+        <BrandMotion clip={heroClip} className="si-film-bg" />
         <div className="si-scrim" aria-hidden="true" />
         <div className="si-film-top">
           <Link to="/" className="si-brand" aria-label="Entomate home">
@@ -38,7 +62,7 @@ export function AuthFrame({ title, actions, children }: AuthFrameProps): React.R
             <span>The Hands of the Trifecto</span>
             <span className="si-eyebrow-r">Meeting intelligence that executes</span>
           </div>
-          <h2 id="si-film-h">Meetings end. <em>The work shouldn’t.</em></h2>
+          <h2 id="si-film-h">{tagline.lead} <em>{tagline.accent}</em></h2>
           <ul className="si-minutes" aria-label="Sample minutes">
             <li className="is-decision">
               <span>Ship transcript ingestion before the notes editor</span>
@@ -56,6 +80,7 @@ export function AuthFrame({ title, actions, children }: AuthFrameProps): React.R
         <Faceplate className="si-plate">
           <TitleRule title={title} meta="Entomate · Early access" actions={actions} />
           <div className="si-body">{children}</div>
+          <TipLine />
           <footer className="si-foot">
             <span>Part of the Trifecto</span>
             <a href="https://crm.logosvision.org" target="_blank" rel="noopener noreferrer">Logos Vision</a>
