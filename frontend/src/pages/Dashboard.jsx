@@ -1,746 +1,504 @@
-import React, { useState, useEffect, useRef } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import {
-  Mic, FolderKanban, CheckSquare, Zap, ArrowRight,
-  Plus, Sparkles, AlertTriangle, Users, BarChart3,
-  ChevronDown, ChevronUp, Keyboard,
-} from 'lucide-react'
-import MeetingRecorder from '../components/meetings/MeetingRecorder'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate, useOutletContext } from 'react-router-dom'
 import IntelligenceDashboard from '../components/intelligence/IntelligenceDashboard'
-import { LearningInsightsWidget } from '../components/intelligence'
-import SentimentTrendMini from '../components/intelligence/SentimentTrendMini'
-import { meetingsApi, tasksApi, projectsApi, automationsApi, dashboardApi, learningApi, checkHealth } from '../services/api'
-import { VCBadge } from '../components/vc'
-import ErrorState from '../components/vc/ErrorState'
+import { meetingsApi, tasksApi, dashboardApi, calendarApi, learningApi, checkHealth } from '../services/api'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
-import { useAuth } from '../contexts/AuthContext'
-import { useTheme } from '../context/ThemeContext'
-import HeldHero from '../components/HeldHero'
 import { useToast } from '../components/vc/ToastProvider'
+import {
+  TitleRule, Grid, Cell, Section, Key, Signal, Led, Tag, Display, Readout, RuledTable, Drawer,
+} from '../components/bench'
+import { formatClock } from '../services/meetingTranscriptService'
+import { asList, formatLength, meetingDate, meetingLengthMs, meetingStatus } from '../services/meetingView'
+import {
+  AGENT_NAMES, agentCalls, agentWhy, calendarEvents, callSummary, clock, dayLabel, decisionsThisWeek,
+  describeCall, dueSummary, groupActionItems, hms, itemTitle, liveMeeting, nextEvent, parseDay,
+  priorityConfidence, priorityTone, recordingStartedAt, startOfDay, todaySchedule,
+} from '../services/todayView'
 
-/* ═══════════════════════════════════════════════════════════════
-   RING GAUGE
-   ═══════════════════════════════════════════════════════════════ */
-const RING_COLORS = {
-  crimson:  { stroke: '#FF2D6B', glow: 'rgba(255,45,107,.4)',  bg: 'rgba(255,45,107,.10)', text: '#FF2D6B' },
-  mint:     { stroke: '#00F5D4', glow: 'rgba(0,245,212,.35)',  bg: 'rgba(0,245,212,.10)',  text: '#00F5D4' },
-  neutral:  { stroke: '#968890', glow: 'rgba(150,136,144,.25)', bg: 'rgba(150,136,144,.12)', text: '#968890' },
-  // Reserved signals — use ONLY for their meaning: amber = AI/prediction, phosphor = live/real-time.
-  amber:    { stroke: '#FFB800', glow: 'rgba(255,184,0,.35)',   bg: 'rgba(255,184,0,.10)',  text: '#FFB800' },
-  phosphor: { stroke: '#A0FF32', glow: 'rgba(160,255,50,.30)', bg: 'rgba(160,255,50,.10)', text: '#A0FF32' },
-}
+/**
+ * 01 Today (Bench Swiss, direction A "Bench"): what's live or next, the action items
+ * your meetings produced, the calls agents made on them, this week's decisions and
+ * today's schedule. Meeting prep, deal risks and relationship briefs open in a drawer.
+ */
 
-function RingGauge({ value, max, label, icon, color = 'crimson', size = 84 }) {
-  const c   = RING_COLORS[color] || RING_COLORS.crimson
-  const r   = (size / 2) - 7
-  const circ = 2 * Math.PI * r
-  const pct  = Math.min(value / Math.max(max, 1), 1)
-  const [animated, setAnimated] = useState(0)
+const ITEM_ROWS = 8
+const CALL_ROWS = 6
+const DECISION_ROWS = 6
 
+/** A clock that ticks once a second, only while something on the page counts. */
+function useNow(ticking) {
+  const [now, setNow] = useState(() => new Date())
   useEffect(() => {
-    const id = setTimeout(() => setAnimated(pct * circ), 120)
-    return () => clearTimeout(id)
-  }, [pct, circ])
-
-  return (
-    <div className="vc" style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'12px 8px', gap:4, position:'relative' }}>
-      <svg width={size} height={size} style={{ transform:'rotate(-90deg)', flexShrink:0 }}>
-        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="var(--b1)" strokeWidth={4.5} />
-        <circle
-          cx={size/2} cy={size/2} r={r}
-          fill="none"
-          stroke={c.stroke}
-          strokeWidth={4.5}
-          strokeLinecap="round"
-          strokeDasharray={circ}
-          strokeDashoffset={circ - animated}
-          style={{ transition:'stroke-dashoffset 1.2s cubic-bezier(0.4,0,0.2,1)', filter:`drop-shadow(0 0 5px ${c.glow})` }}
-        />
-      </svg>
-
-      {/* Center label */}
-      <div style={{ position:'absolute', top:'50%', left:'50%', transform:'translate(-50%,-56%)', display:'flex', flexDirection:'column', alignItems:'center', gap:0 }}>
-        <span style={{ fontSize:18, fontWeight:700, fontFamily:'var(--font)', color:c.text, lineHeight:1 }}>{value}</span>
-        <span style={{ fontSize:11, color:'var(--t1)', fontFamily:'var(--font)', letterSpacing:'.04em', textTransform:'uppercase' }}>{label}</span>
-      </div>
-
-      {/* Icon dot bottom-right */}
-      <div style={{ position:'absolute', bottom:8, right:8, width:18, height:18, borderRadius:5, background:c.bg, display:'flex', alignItems:'center', justifyContent:'center' }}>
-        <span style={{ color:c.text, display:'flex' }}>{icon}</span>
-      </div>
-    </div>
-  )
+    if (!ticking) return undefined
+    const id = setInterval(() => setNow(new Date()), 1000)
+    return () => clearInterval(id)
+  }, [ticking])
+  return now
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   DOCKED QUICK ACTIONS BAR
-   ═══════════════════════════════════════════════════════════════ */
-function QuickActionsBar({ navigate, recorderRef }) {
-  const actions = [
-    { label:'Start Meeting', icon:<Mic style={{ width:13, height:13 }} />,          cls:'vbtn-primary',   action:() => recorderRef.current?.scrollIntoView({ behavior:'smooth', block:'center' }) },
-    { label:'New Task',      icon:<Plus style={{ width:13, height:13 }} />,          cls:'vbtn-ghost',     action:() => navigate('/tasks') },
-    { label:'New Project',   icon:<FolderKanban style={{ width:13, height:13 }} />,  cls:'vbtn-ghost',     action:() => navigate('/projects') },
-    { label:'AI Insights',   icon:<Sparkles style={{ width:13, height:13 }} />,      cls:'vbtn-ghost',     action:() => navigate('/reports') },
-    { label:'Automations',   icon:<Zap style={{ width:13, height:13 }} />,           cls:'vbtn-ghost',     action:() => navigate('/automations') },
-  ]
+export default function Today() {
+  const navigate = useNavigate()
+  const toast = useToast()
+  // The bench shell passes openAssistant; the legacy shells pass nothing.
+  const outlet = useOutletContext()
+  const openAssistant = outlet?.openAssistant
 
-  return (
-    <div className="vc" style={{
-      display:'flex', alignItems:'center', gap:8, flexWrap:'wrap',
-      padding:'10px 14px',
-    }}>
-      <span style={{ fontSize:11, fontWeight:700, letterSpacing:'.12em', textTransform:'uppercase', color:'var(--t1)', marginRight:2, whiteSpace:'nowrap' }}>Quick Actions</span>
-      <div style={{ width:1, height:16, background:'var(--b1)', flexShrink:0 }} />
-      {actions.map(a => (
-        <button key={a.label} onClick={a.action} className={`vbtn ${a.cls} vbtn-sm`} style={{ gap:5 }}>
-          {a.icon}
-          {a.label}
-        </button>
-      ))}
-    </div>
-  )
-}
+  const [meetings, setMeetings] = useState([])
+  const [meetingTotal, setMeetingTotal] = useState(0)
+  const [items, setItems] = useState([])
+  const [taskCount, setTaskCount] = useState(0)
+  const [upcoming, setUpcoming] = useState([])
+  const [calendarOn, setCalendarOn] = useState(null)
+  const [workload, setWorkload] = useState([])
+  const [systemStatus, setSystemStatus] = useState(null)
+  const [learning, setLearning] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [completing, setCompleting] = useState(() => new Set())
+  const [briefOpen, setBriefOpen] = useState(false)
+  const [keysOpen, setKeysOpen] = useState(false)
 
-/* ═══════════════════════════════════════════════════════════════
-   DASHBOARD HERO
-   ═══════════════════════════════════════════════════════════════ */
-function DashboardHero({ stats, loading, navigate, recorderRef }) {
-  const { user } = useAuth()
-  const { isHeldLight } = useTheme()
-  const hour = new Date().getHours()
-  const timeGreet = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
-  const firstName = user?.name?.trim().split(' ')[0] || 'there'
-  const greeting = `${timeGreet}, ${firstName}.`
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    // Each region degrades on its own; say which ones failed instead of showing empty data as real.
+    const failed = []
+    const track = (label, fallback) => (err) => {
+      failed.push(label)
+      console.warn(`Today: ${label} failed to load`, err)
+      return fallback
+    }
+    const [health, mtgs, actions, tasks, status, next, load] = await Promise.all([
+      checkHealth().catch(track('system status', { services: {} })),
+      meetingsApi.list({ limit: 20 }).catch(track('meetings', { meetings: [], count: 0 })),
+      dashboardApi.getActionItems({ status: 'all', sort: 'due_date', limit: 100 }).catch(track('action items', { actionItems: [] })),
+      tasksApi.list({ limit: 1, status: 'open' }).catch(track('tasks', { count: 0 })),
+      calendarApi.getStatus().catch(() => null),
+      calendarApi.getUpcoming(2).catch(() => ({ upcoming: [] })),
+      dashboardApi.getTeamWorkload().catch(track('team load', { workload: [] })),
+    ])
+    if (failed.length) toast.info('Some regions are out of date', `Couldn't refresh: ${failed.join(', ')}.`)
 
-  const rings = [
-    { label:'Meetings',  value:stats.meetings,  max:Math.max(stats.meetings, 15),  color:'crimson',  icon:<Mic style={{ width:9, height:9 }} />,          href:'/meetings' },
-    { label:'Tasks',     value:stats.tasks,     max:Math.max(stats.tasks, 20),     color:'neutral',  icon:<CheckSquare style={{ width:9, height:9 }} />,   href:'/tasks' },
-    { label:'Projects',  value:stats.projects,  max:Math.max(stats.projects, 10),  color:'mint',     icon:<FolderKanban style={{ width:9, height:9 }} />,  href:'/projects' },
-    { label:'Automations', value:stats.automations, max:Math.max(stats.automations, 10), color:'neutral', icon:<Zap style={{ width:9, height:9 }} />,        href:'/automations' },
-  ]
+    setSystemStatus(health)
+    setMeetings(mtgs.meetings || [])
+    setMeetingTotal(mtgs.count || (mtgs.meetings || []).length)
+    setItems(actions.actionItems || actions.data?.actionItems || [])
+    setTaskCount(tasks.count || 0)
+    setCalendarOn(status ? Boolean(status.connected) : null)
+    setUpcoming(next.upcoming || next.data?.upcoming || [])
+    setWorkload((load.data || load).workload || [])
+    setLoading(false)
 
-  return (
-    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-      {/* ── Greeting — HeldHero (hands + "you hold") under the flag, else legacy card ── */}
-      {isHeldLight ? (
-        <HeldHero />
-      ) : (
-        <div className="vc" style={{ padding:'20px 22px' }}>
-          <div style={{ fontSize:20, fontWeight:700, fontFamily:'var(--font)', color:'var(--t0)', lineHeight:1.3, letterSpacing:'-.01em' }}>
-            {greeting}
-          </div>
-          <div style={{ marginTop:6, fontSize:12, color:'var(--t1)' }}>
-            {new Date().toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' })}
-          </div>
-        </div>
-      )}
+    try {
+      const res = await learningApi.getInsights()
+      const ld = res?.data ?? res
+      if (ld?.success) setLearning(ld.insights)
+    } catch { /* learning insights are optional */ }
+  }, [toast])
 
-      {/* ── Metric strip — the single home for the four core counts ── */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:8 }}>
-        {rings.map(m => (
-          <a key={m.label} href={m.href} style={{ textDecoration:'none', display:'flex' }}>
-            <RingGauge
-              value={loading ? 0 : m.value}
-              max={m.max}
-              label={m.label}
-              icon={m.icon}
-              color={m.color}
-              size={84}
-            />
-          </a>
-        ))}
-      </div>
+  useEffect(() => { loadData() }, [loadData])
 
-      {/* ── Docked quick actions bar ── */}
-      <QuickActionsBar navigate={navigate} recorderRef={recorderRef} />
-    </div>
-  )
-}
+  const startRecording = () => navigate('/meetings?new=true')
 
-/* ═══════════════════════════════════════════════════════════════
-   SYSTEM STATUS BAR (with Ecosystem indicators)
-   ═══════════════════════════════════════════════════════════════ */
-function SystemStatus({ systemStatus }) {
-  const svc = (key) => {
-    const s = systemStatus?.services?.[key] || 'checking...'
-    return { status: s, ok: s.includes('connected') }
+  useKeyboardShortcuts({
+    r: { callback: () => { toast.info('Refreshing Today'); loadData() }, requireMod: false },
+    n: { callback: startRecording, requireMod: false },
+    t: { callback: () => navigate('/tasks'), requireMod: false },
+    '?': { callback: () => setKeysOpen((v) => !v), requireMod: false },
+  })
+
+  // ── Derived view ────────────────────────────────────────────
+  const events = useMemo(() => calendarEvents(upcoming), [upcoming])
+  const live = useMemo(() => liveMeeting(meetings), [meetings])
+  const next = useMemo(() => nextEvent(events), [events])
+  const now = useNow(Boolean(live || next))
+
+  // Cheap to derive; recomputed each tick so buckets roll over at midnight.
+  const groups = groupActionItems(items, now, ITEM_ROWS)
+  const due = useMemo(() => dueSummary(items), [items])
+  const calls = useMemo(() => agentCalls(items), [items])
+  const callsToday = useMemo(() => callSummary(calls), [calls])
+  const decisions = useMemo(() => decisionsThisWeek(meetings), [meetings])
+  const schedule = todaySchedule(meetings, events, now)
+  const todayCount = schedule.length
+  const latest = meetings.find((m) => m.summary) || null
+
+  const completeItem = async (item) => {
+    setCompleting((s) => new Set(s).add(item.id))
+    try {
+      await dashboardApi.updateActionItemStatus(item.id, 'done')
+      setItems((list) => list.map((i) => (i.id === item.id ? { ...i, status: 'done' } : i)))
+      toast.success('Marked done', itemTitle(item))
+    } catch (err) {
+      console.error('Failed to complete action item:', err)
+      toast.error('Could not mark it done', err.message || 'Please try again.')
+    } finally {
+      setCompleting((s) => { const n = new Set(s); n.delete(item.id); return n })
+    }
   }
 
-  const ecosystemApps = [
-    { label:'Pulse',      color:'#FF2D6B' },
-    { label:'Entomate',   color:'#00F5D4' },
-    { label:'LogosVision', color:'#38BDF8' },
-  ]
-
-  return (
-    <div style={{ padding:'8px 14px', borderTop:'1px solid var(--b0)' }}>
-      <div style={{ display:'flex', alignItems:'center', gap:16, flexWrap:'wrap', fontSize:11, fontFamily:'var(--font-mono, JetBrains Mono, monospace)' }}>
-        {[['AI', 'gemini'], ['DB', 'database']].map(([label, key]) => {
-          const { status, ok } = svc(key)
-          return (
-            <div key={key} style={{ display:'flex', alignItems:'center', gap:6 }}>
-              <div style={{ width:5, height:5, borderRadius:'50%', background: ok ? 'var(--m)' : 'var(--t1)', boxShadow: ok ? '0 0 6px var(--m)' : 'none' }} />
-              <span style={{ color:'var(--t1)' }}>{label}:</span>
-              <span style={{ color:'var(--t0)' }}>{status}</span>
-            </div>
-          )
-        })}
-
-        {/* Ecosystem separator */}
-        <div style={{ width:1, height:12, background:'var(--b1)' }} />
-        <span style={{ color:'var(--t1)', fontSize:11, fontWeight:700, letterSpacing:'.08em', textTransform:'uppercase' }}>Ecosystem</span>
-
-        {ecosystemApps.map(app => {
-          const ecoStatus = systemStatus?.ecosystem?.[app.label.toLowerCase()]
-          const ok = ecoStatus?.connected !== false
-          return (
-            <div key={app.label} style={{ display:'flex', alignItems:'center', gap:5 }}>
-              <div style={{ width:5, height:5, borderRadius:'50%', background: ok ? app.color : 'var(--t2)', boxShadow: ok ? `0 0 6px ${app.color}` : 'none', opacity: ok ? 1 : 0.4 }} />
-              <span style={{ color: ok ? 'var(--t0)' : 'var(--t2)' }}>{app.label}</span>
-            </div>
-          )
-        })}
-      </div>
+  // ── Title rule ──────────────────────────────────────────────
+  const dateWord = now.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' })
+  const meta = (
+    <>
+      <b>{dateWord}</b> · {todayCount} {todayCount === 1 ? 'meeting' : 'meetings'} today · {due.open} open {due.open === 1 ? 'action' : 'actions'}
+    </>
+  )
+  const actions = (
+    <div className="bs-title-keys">
+      <Key onClick={() => setBriefOpen(true)} aria-haspopup="dialog">Briefings</Key>
+      {openAssistant && <Key onClick={openAssistant}>Ask Entomate</Key>}
+      <Key variant="primary" onClick={startRecording}>Start recording</Key>
     </div>
   )
-}
 
-/* ═══════════════════════════════════════════════════════════════
-   OVERDUE ALERT BANNER
-   ═══════════════════════════════════════════════════════════════ */
-function OverdueAlertBanner({ items, navigate }) {
-  const [expanded, setExpanded] = useState(false)
-  if (!items || items.length === 0) return null
-
-  return (
-    <div className="vc" style={{ overflow:'hidden' }}>
-      {/* Header */}
-      <button
-        onClick={() => setExpanded(!expanded)}
-        style={{
-          width:'100%', padding:'10px 14px', display:'flex', alignItems:'center', gap:10,
-          background:'none', border:'none', cursor:'pointer', color:'var(--t0)',
-        }}
-      >
-        <AlertTriangle style={{ width:14, height:14, color:'var(--c)', flexShrink:0 }} />
-        <span style={{ fontSize:12, fontWeight:700, fontFamily:'var(--font)', color:'var(--c)' }}>
-          {items.length} overdue item{items.length !== 1 ? 's' : ''} need attention
-        </span>
-        <span style={{ marginLeft:'auto', display:'flex' }}>
-          {expanded
-            ? <ChevronUp style={{ width:14, height:14, color:'var(--t1)' }} />
-            : <ChevronDown style={{ width:14, height:14, color:'var(--t1)' }} />
-          }
-        </span>
-      </button>
-
-      {/* Expandable list */}
-      {expanded && (
-        <div style={{ padding:'0 14px 10px', display:'flex', flexDirection:'column', gap:4 }}>
-          {items.slice(0, 10).map(item => (
-            <div
-              key={item.id}
-              onClick={() => navigate(`/tasks`)}
-              style={{
-                padding:'6px 10px', borderRadius:8, display:'flex', alignItems:'center', gap:10,
-                cursor:'pointer', background:'rgba(255,45,107,.04)',
-              }}
-              onMouseEnter={e => e.currentTarget.style.background='rgba(255,45,107,.10)'}
-              onMouseLeave={e => e.currentTarget.style.background='rgba(255,45,107,.04)'}
-            >
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:12, fontWeight:600, color:'var(--t0)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                  {item.task_description || item.title}
-                </div>
-                <div style={{ fontSize:11, color:'var(--t1)', fontFamily:'var(--font-mono)' }}>
-                  {item.assigned_to_name && `${item.assigned_to_name} · `}Due: {new Date(item.due_date).toLocaleDateString()}
-                </div>
-              </div>
-              <VCBadge color="crimson">{item.days_overdue || Math.floor((Date.now() - new Date(item.due_date)) / 86400000)}d late</VCBadge>
+  // ── Top row: display (live or next) or the latest outcome ──
+  const renderTop = () => {
+    if (live) {
+      const s = meetingStatus(live)
+      const started = recordingStartedAt(live)
+      const recording = s.key === 'recording'
+      return (
+        <Display className="bs-today-disp">
+          <div className="bs-today-disp-head">
+            <Signal tone={recording ? 'live' : 'brand'}>{recording ? 'Live · recording' : 'Writing minutes'}</Signal>
+            <span className="bs-lbl">{started ? `Started ${clock(started)}` : 'This browser'}</span>
+          </div>
+          <div className="bs-today-disp-main">
+            <div className={`bs-disp-big ${recording ? 'bs-today-live' : ''}`}>
+              {recording && started ? hms(now.getTime() - started.getTime()) : formatLength(meetingLengthMs(live))}
             </div>
-          ))}
-          {items.length > 10 && (
-            <div style={{ fontSize:11, color:'var(--t1)', textAlign:'center', padding:4 }}>
-              +{items.length - 10} more overdue items
-            </div>
-          )}
+            <div className="bs-today-disp-title">{live.title || 'Untitled meeting'}</div>
+            <div className="bs-lbl">{recording ? 'Minutes write when you stop' : 'Summary, decisions and action items are on the way'}</div>
+          </div>
+          <div className="bs-today-disp-keys">
+            <Key size="sm" onDisplay onClick={() => navigate(`/meetings/${live.id}`)}>Open meeting</Key>
+          </div>
+        </Display>
+      )
+    }
+    if (next) {
+      return (
+        <Display className="bs-today-disp">
+          <div className="bs-today-disp-head">
+            <Signal tone="off">Next · {dayLabel(next.at, now)} {clock(next.at)}</Signal>
+            <span className="bs-lbl">Google Calendar</span>
+          </div>
+          <div className="bs-today-disp-main">
+            <div className="bs-disp-big">{hms(next.at.getTime() - now.getTime())}</div>
+            <div className="bs-today-disp-title">{next.title}</div>
+            <div className="bs-lbl">Starts in</div>
+          </div>
+          <div className="bs-today-disp-keys">
+            <Key size="sm" onDisplay onClick={() => navigate('/bot-launcher')}>Send a bot</Key>
+            <Key size="sm" onDisplay onClick={startRecording}>Record here</Key>
+          </div>
+        </Display>
+      )
+    }
+    // Nothing live or coming up: the newest meeting's outcome, in plain type (no display).
+    if (latest) {
+      const d = asList(latest.decisions)
+      return (
+        <div className="bs-today-latest">
+          <span className="bs-lbl">Latest meeting · {dayLabel(meetingDate(latest), now)} {clock(meetingDate(latest))}</span>
+          <Link to={`/meetings/${latest.id}`} className="bs-h2 bs-today-latest-title">{latest.title || 'Untitled meeting'}</Link>
+          <p className="bs-today-latest-sum">{latest.summary}</p>
+          <div className="bs-today-latest-foot">
+            <span className="bs-lbl">{d.length} {d.length === 1 ? 'decision' : 'decisions'} · {formatLength(meetingLengthMs(latest))}</span>
+            <Key size="sm" onClick={() => navigate(`/meetings/${latest.id}`)}>Open minutes</Key>
+          </div>
         </div>
-      )}
-    </div>
-  )
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   TEAM WORKLOAD WIDGET
-   ═══════════════════════════════════════════════════════════════ */
-function TeamWorkloadWidget({ workload }) {
-  if (!workload || workload.length === 0) return null
-
-  const maxAssigned = Math.max(...workload.map(m => m.total_assigned), 1)
-
-  return (
-    <div className="vc" style={{ display:'flex', flexDirection:'column', overflow:'hidden' }}>
-      <div style={{ padding:'10px 14px', borderBottom:'1px solid var(--b0)', display:'flex', alignItems:'center', gap:8 }}>
-        <Users style={{ width:13, height:13, color:'var(--m)' }} />
-        <h3 style={{ fontFamily:'var(--font)', fontWeight:600, fontSize:13, color:'var(--t0)' }}>Team Workload</h3>
-        <span style={{ fontSize:11, color:'var(--t1)', marginLeft:'auto' }}>{workload.length} member{workload.length !== 1 ? 's' : ''}</span>
-      </div>
-      <div style={{ padding:'10px 14px', display:'flex', flexDirection:'column', gap:10 }}>
-        {workload.slice(0, 8).map((member, i) => {
-          const pctDone = member.total_assigned > 0 ? (member.completed_items / member.total_assigned) * 100 : 0
-          const pctInProgress = member.total_assigned > 0 ? (member.in_progress_items / member.total_assigned) * 100 : 0
-          const pctPending = 100 - pctDone - pctInProgress
-          const barWidth = `${(member.total_assigned / maxAssigned) * 100}%`
-
-          return (
-            <div key={i}>
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:3 }}>
-                <span style={{ fontSize:12, fontWeight:600, color:'var(--t0)' }}>{member.team_member || member.name}</span>
-                <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:11, color:'var(--t1)' }}>
-                  {member.high_priority_count > 0 && (
-                    <span style={{ color:'var(--c)', fontWeight:700 }}>{member.high_priority_count} high</span>
-                  )}
-                  <span>{member.total_assigned} total</span>
-                </div>
-              </div>
-              {/* Stacked bar */}
-              <div style={{ height:6, borderRadius:3, background:'var(--b0)', overflow:'hidden', width:barWidth, minWidth:20 }}>
-                <div style={{ display:'flex', height:'100%' }}>
-                  <div style={{ width:`${pctDone}%`, background:'var(--m)' }} />
-                  <div style={{ width:`${pctInProgress}%`, background:'var(--c)' }} />
-                  <div style={{ width:`${pctPending}%`, background:'var(--t2)' }} />
-                </div>
-              </div>
-            </div>
-          )
-        })}
-        {/* Legend */}
-        <div style={{ display:'flex', gap:12, fontSize:11, color:'var(--t1)', marginTop:2 }}>
-          <span style={{ display:'flex', alignItems:'center', gap:3 }}><div style={{ width:6, height:6, borderRadius:2, background:'var(--m)' }} />Done</span>
-          <span style={{ display:'flex', alignItems:'center', gap:3 }}><div style={{ width:6, height:6, borderRadius:2, background:'var(--c)' }} />In Progress</span>
-          <span style={{ display:'flex', alignItems:'center', gap:3 }}><div style={{ width:6, height:6, borderRadius:2, background:'var(--t2)' }} />Pending</span>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   INSIGHTS & TRENDS PANEL
-   ═══════════════════════════════════════════════════════════════ */
-function InsightsTrendsPanel({ insights }) {
-  if (!insights || !insights.metrics) return null
-
-  const { metrics, sentimentCounts = {}, priorityCounts = {}, statusCounts = {} } = insights
-
-  // Sentiment donut data
-  const sentimentTotal = (sentimentCounts.Positive || 0) + (sentimentCounts.Neutral || 0) + (sentimentCounts.Negative || 0)
-  const sentimentSlices = [
-    { label:'Positive', value:sentimentCounts.Positive || 0, color:'#00F5D4' },
-    { label:'Neutral',  value:sentimentCounts.Neutral  || 0, color:'#968890' },
-    { label:'Negative', value:sentimentCounts.Negative || 0, color:'#FF2D6B' },
-  ]
-
-  // Priority bar data — crimson→neutral ramp (amber/phosphor are reserved signals, not a priority scale)
-  const maxPriority = Math.max(priorityCounts.high || 0, priorityCounts.medium || 0, priorityCounts.low || 0, 1)
-  const priorityBars = [
-    { label:'High',   value:priorityCounts.high   || 0, color:'#FF2D6B' },
-    { label:'Medium', value:priorityCounts.medium || 0, color:'#FF6699' },
-    { label:'Low',    value:priorityCounts.low    || 0, color:'#968890' },
-  ]
-
-  // Mini donut SVG helper
-  const renderDonut = (slices, total, size = 60) => {
-    if (total === 0) return null
-    const r = (size / 2) - 5
-    const circ = 2 * Math.PI * r
-    let offset = 0
-
+      )
+    }
     return (
-      <svg width={size} height={size} style={{ transform:'rotate(-90deg)' }}>
-        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="var(--b0)" strokeWidth={5} />
-        {slices.filter(s => s.value > 0).map((s, i) => {
-          const pct = s.value / total
-          const dash = pct * circ
-          const el = (
-            <circle
-              key={i}
-              cx={size/2} cy={size/2} r={r}
-              fill="none" stroke={s.color} strokeWidth={5}
-              strokeDasharray={`${dash} ${circ - dash}`}
-              strokeDashoffset={-offset}
-              strokeLinecap="round"
-              style={{ filter:`drop-shadow(0 0 3px ${s.color}44)` }}
-            />
-          )
-          offset += dash
-          return el
-        })}
-      </svg>
+      <div className="bs-today-latest">
+        <Signal tone="off">{loading ? 'Loading' : 'Nothing recorded yet'}</Signal>
+        <p className="bs-h3">Record a meeting in this browser, or send a bot to a call. Its decisions and action items land here.</p>
+        <div className="bs-title-keys">
+          <Key onClick={() => navigate('/bot-launcher')}>Send a bot</Key>
+        </div>
+      </div>
     )
   }
 
-  return (
-    <div className="vc" style={{ display:'flex', flexDirection:'column', overflow:'hidden' }}>
-      <div style={{ padding:'10px 14px', borderBottom:'1px solid var(--b0)', display:'flex', alignItems:'center', gap:8 }}>
-        <BarChart3 style={{ width:13, height:13, color:'var(--c)' }} />
-        <h3 style={{ fontFamily:'var(--font)', fontWeight:600, fontSize:13, color:'var(--t0)' }}>Insights & Trends</h3>
-      </div>
+  // ── Readouts ────────────────────────────────────────────────
+  const weekMeetings = meetings.filter((m) => meetingDate(m).getTime() >= startOfDay(now).getTime() - ((now.getDay() + 6) % 7) * 86_400_000)
+  const readouts = [
+    live && next
+      ? <Readout key="next" label={`Next · ${clock(next.at)}`} value={hms(next.at.getTime() - now.getTime())} context={next.title} />
+      : <Readout key="week" label="Meetings this week" value={weekMeetings.length} context={`${decisions.length} ${decisions.length === 1 ? 'decision' : 'decisions'} · ${meetingTotal} in all`} />,
+    <Readout
+      key="due"
+      label="Due today"
+      value={due.dueToday}
+      context={due.overdue > 0 ? <Signal tone="brand">{due.overdue} overdue</Signal> : 'Nothing overdue'}
+    />,
+    <Readout
+      key="calls"
+      label="Agent calls today"
+      value={callsToday.today}
+      context={callsToday.suggested > 0
+        ? <Signal tone="ai">{callsToday.suggested} need your OK</Signal>
+        : <span>{taskCount} open {taskCount === 1 ? 'task' : 'tasks'} · <Link to="/tasks" className="bs-today-link">Tasks</Link></span>}
+    />,
+  ]
 
-      <div style={{ padding:'14px', display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:14 }}>
-        {/* Sentiment Donut */}
-        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:6 }}>
-          {renderDonut(sentimentSlices, sentimentTotal)}
-          <span style={{ fontSize:11, fontWeight:700, color:'var(--t1)', letterSpacing:'.06em', textTransform:'uppercase' }}>Sentiment</span>
-          <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
-            {sentimentSlices.map(s => (
-              <div key={s.label} style={{ display:'flex', alignItems:'center', gap:4, fontSize:11, color:'var(--t1)' }}>
-                <div style={{ width:5, height:5, borderRadius:'50%', background:s.color }} />
-                {s.label}: {s.value}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Priority Bars */}
-        <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-          <span style={{ fontSize:11, fontWeight:700, color:'var(--t1)', letterSpacing:'.06em', textTransform:'uppercase', textAlign:'center' }}>Priority</span>
-          <div style={{ display:'flex', flexDirection:'column', gap:8, flex:1, justifyContent:'center' }}>
-            {priorityBars.map(b => (
-              <div key={b.label}>
-                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:2 }}>
-                  <span style={{ fontSize:11, color:'var(--t1)' }}>{b.label}</span>
-                  <span style={{ fontSize:11, color:b.color, fontWeight:700, fontFamily:'var(--font-mono)' }}>{b.value}</span>
-                </div>
-                <div style={{ height:4, borderRadius:2, background:'var(--b0)', overflow:'hidden' }}>
-                  <div style={{ height:'100%', width:'100%', background:b.color, borderRadius:2, transform:`scaleX(${(b.value / maxPriority) || 0})`, transformOrigin:'left', transition:'transform .8s cubic-bezier(0.22,1,0.36,1)' }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Completion Ring */}
-        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:6 }}>
-          <RingGauge value={metrics.overallCompletion || 0} max={100} label="Complete" color="mint" size={60} />
-          <div style={{ display:'flex', flexDirection:'column', gap:2, alignItems:'center' }}>
-            <span style={{ fontSize:11, color:'var(--t1)' }}>{metrics.completedItems || 0}/{metrics.totalItems || 0} items</span>
-            {(metrics.overdueItems || 0) > 0 && (
-              <span style={{ fontSize:11, color:'var(--c)', fontWeight:700 }}>{metrics.overdueItems} overdue</span>
-            )}
-            <span style={{ fontSize:11, color:'var(--t1)' }}>Avg progress: {metrics.avgProgress || 0}%</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   AUTOMATION ACTIVITY FEED
-   ═══════════════════════════════════════════════════════════════ */
-function AutomationActivityFeed({ count, navigate }) {
-  const [runs, setRuns] = useState([])
-  const [loadingRuns, setLoadingRuns] = useState(true)
-
-  useEffect(() => {
-    const loadRuns = async () => {
-      try {
-        const res = await automationsApi.list({ limit: 5 })
-        setRuns((res.automations || res.data?.automations || []).slice(0, 5))
-      } catch {}
-      setLoadingRuns(false)
-    }
-    loadRuns()
-  }, [])
-
-  return (
-    <div className="vc" style={{ display:'flex', flexDirection:'column', overflow:'hidden' }}>
-      <div style={{ padding:'10px 14px', borderBottom:'1px solid var(--b0)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-          <Zap style={{ width:13, height:13, color:'var(--c)' }} />
-          <h3 style={{ fontFamily:'var(--font)', fontWeight:600, fontSize:13, color:'var(--t0)' }}>Automations</h3>
-          <VCBadge color="neutral">{count} active</VCBadge>
-        </div>
-        <button onClick={() => navigate('/automations')} style={{ fontSize:12, color:'var(--c)', display:'flex', alignItems:'center', gap:4, background:'none', border:'none', cursor:'pointer' }}>
-          View all <ArrowRight style={{ width:12, height:12 }} />
-        </button>
-      </div>
-      <div style={{ padding:'6px 8px', display:'flex', flexDirection:'column', gap:2 }}>
-        {loadingRuns ? (
-          Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} style={{ height:32, borderRadius:8, background:'var(--b0)', animation:'pulse 1.5s ease-in-out infinite' }} />
-          ))
-        ) : runs.length === 0 ? (
-          <p style={{ fontSize:12, color:'var(--t1)', padding:'12px', textAlign:'center' }}>No automations configured</p>
-        ) : (
-          runs.map((auto) => (
-            <div
-              key={auto.id}
-              style={{ padding:'7px 10px', borderRadius:8, display:'flex', alignItems:'center', gap:10 }}
-              onMouseEnter={e => e.currentTarget.style.background='var(--b0)'}
-              onMouseLeave={e => e.currentTarget.style.background='transparent'}
-            >
-              <div style={{ width:6, height:6, borderRadius:'50%', background: auto.enabled ? '#A0FF32' : 'var(--t2)', boxShadow: auto.enabled ? '0 0 5px rgba(160,255,50,.4)' : 'none', flexShrink:0 }} />
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:12, fontWeight:600, color:'var(--t0)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{auto.name || auto.title}</div>
-                <div style={{ fontSize:11, color:'var(--t1)' }}>{auto.trigger_type || auto.type || 'workflow'}</div>
-              </div>
-              <VCBadge color={auto.enabled ? 'mint' : 'neutral'}>{auto.enabled ? 'active' : 'paused'}</VCBadge>
-            </div>
-          ))
-        )}
-      </div>
-    </div>
-  )
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   DASHBOARD PAGE
-   ═══════════════════════════════════════════════════════════════ */
-export default function Dashboard() {
-  const navigate = useNavigate()
-  const recorderRef = useRef(null)
-  const toast = useToast()
-
-  const [stats, setStats]               = useState({ meetings: 0, tasks: 0, projects: 0, automations: 0 })
-  const [recentMeetings, setRecentMeetings] = useState([])
-  const [pendingTasks, setPendingTasks]     = useState([])
-  const [overdueItems, setOverdueItems]     = useState([])
-  const [teamWorkload, setTeamWorkload]     = useState([])
-  const [insights, setInsights]             = useState(null)
-  const [systemStatus, setSystemStatus]     = useState(null)
-  const [loading, setLoading]               = useState(true)
-  const [error, setError]                   = useState(null)
-  const [learningInsights, setLearningInsights] = useState(null)
-
-  const loadData = async () => {
-    try {
-      setError(null)
-      setLoading(true)
-      // Each panel degrades independently; record which ones failed so we can tell
-      // the user instead of silently showing empty data as if it were real.
-      const failed = []
-      const track = (label, fallback) => (err) => { failed.push(label); console.warn(`Dashboard: ${label} failed to load`, err); return fallback }
-      const [health, meetings, tasks, projects, automations, overdue, workload, insightsRes] = await Promise.all([
-        checkHealth().catch(track('system status', { services: {} })),
-        meetingsApi.list({ limit: 5 }).catch(track('meetings', { meetings: [], count: 0 })),
-        tasksApi.list({ limit: 5, status: 'open' }).catch(track('tasks', { tasks: [], count: 0 })),
-        projectsApi.list({ limit: 5 }).catch(track('projects', { projects: [], count: 0 })),
-        automationsApi.list({ limit: 1 }).catch(track('automations', { count: 0 })),
-        dashboardApi.getOverdue().catch(track('overdue items', { data: { overdue: [], count: 0 } })),
-        dashboardApi.getTeamWorkload().catch(track('team workload', { data: { workload: [] } })),
-        dashboardApi.getInsights().catch(track('insights', { data: null })),
-      ])
-      if (failed.length) {
-        toast.info('Some panels are out of date', `Couldn't refresh: ${failed.join(', ')}.`)
-      }
-      setSystemStatus(health)
-      setRecentMeetings(meetings.meetings || [])
-      setPendingTasks(tasks.tasks || [])
-      setOverdueItems((overdue.data || overdue).overdue || [])
-      setTeamWorkload((workload.data || workload).workload || [])
-      setInsights((insightsRes.data || insightsRes).metrics ? (insightsRes.data || insightsRes) : null)
-      setStats({
-        meetings:    meetings.count    || 0,
-        tasks:       tasks.count       || 0,
-        projects:    projects.count    || 0,
-        automations: automations.count || 0,
-      })
-
-      try {
-        const { data: ld } = await learningApi.getInsights()
-        if (ld.success) setLearningInsights(ld.insights)
-      } catch {}
-    } catch (err) {
-      console.error('Failed to load dashboard data:', err)
-      setError(err.message || 'Failed to load dashboard')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => { loadData() }, [])
-
-  // Keyboard shortcuts: R=refresh, N=new meeting, T=new task, K=search
-  const [showShortcuts, setShowShortcuts] = useState(false)
-  useKeyboardShortcuts({
-    'r': { callback: () => { toast.info('Refreshing dashboard…'); loadData() }, requireMod: false },
-    'n': { callback: () => recorderRef.current?.scrollIntoView({ behavior:'smooth', block:'center' }), requireMod: false },
-    't': { callback: () => navigate('/tasks'), requireMod: false },
-    'mod+k': { callback: () => navigate('/search'), allowInInput: true },
-    '?': { callback: () => setShowShortcuts(s => !s), requireMod: false },
-  })
-
-  const handleReviewPatterns   = () => navigate('/settings', { state: { section: 'ai-learning' } })
-  const handleNavigateToLearn  = () => navigate('/settings', { state: { section: 'ai-learning' } })
-
-  if (error) return <ErrorState message={error} onRetry={loadData} />
-
-  return (
-    <div className="space-y-4">
-
-      {/* ── Hero section ── */}
-      <DashboardHero stats={stats} loading={loading} navigate={navigate} recorderRef={recorderRef} />
-
-      {/* ── Overdue alert banner ── */}
-      <OverdueAlertBanner items={overdueItems} navigate={navigate} />
-
-      {/* ── Full intelligence dashboard ── */}
-      <IntelligenceDashboard />
-
-      {/* ── AI learning insights ── */}
-      {learningInsights && (
-        <LearningInsightsWidget
-          insights={learningInsights}
-          onReview={handleReviewPatterns}
-          onNavigate={handleNavigateToLearn}
+  // ── Action items table ──────────────────────────────────────
+  const columns = [
+    {
+      key: 'done',
+      header: <span className="bs-sr">Done</span>,
+      className: 'bs-today-check',
+      render: (item) => (
+        <input
+          type="checkbox"
+          className="bs-check"
+          checked={false}
+          disabled={completing.has(item.id)}
+          onChange={() => completeItem(item)}
+          aria-label={`Mark "${itemTitle(item)}" done`}
         />
-      )}
+      ),
+    },
+    {
+      key: 'item',
+      header: 'Item',
+      render: (item) => {
+        const why = agentWhy(item)
+        return (
+          <div className="bs-today-item">
+            <div className="bs-today-item-title">{itemTitle(item)}</div>
+            {why && <div className="bs-why"><Led tone="ai" />{why.reason}</div>}
+            {item.meetings?.title && <div className="bs-today-item-src">{item.meetings.title}</div>}
+          </div>
+        )
+      },
+    },
+    { key: 'owner', header: 'Owner', secondary: true, render: (item) => item.assigned_to_name || <span className="bs-mut">—</span> },
+    {
+      key: 'due',
+      header: 'Due',
+      className: 'bs-mono bs-today-due',
+      render: (item) => {
+        const d = parseDay(item.due_date)
+        return d ? dayLabel(d, now) : <span className="bs-mut">—</span>
+      },
+    },
+    {
+      key: 'pri',
+      header: 'Priority',
+      render: (item) => {
+        const p = priorityTone(item.priority)
+        return <Signal tone={p.tone}>{p.word}</Signal>
+      },
+    },
+    {
+      key: 'agent',
+      header: 'Agent',
+      secondary: true,
+      align: 'right',
+      render: (item) => {
+        const c = priorityConfidence(item)
+        return c != null ? <Tag tone="ai">AI {c}%</Tag> : <span className="bs-mut">—</span>
+      },
+    },
+  ]
+  const openItems = groups.reduce((n, g) => n + g.total, 0)
 
-      {/* ── Insights & Trends + Team Workload row ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <InsightsTrendsPanel insights={insights} />
-        <TeamWorkloadWidget workload={teamWorkload} />
-      </div>
+  // ── System strip ────────────────────────────────────────────
+  const svc = (key) => {
+    const s = systemStatus?.services?.[key]
+    return typeof s === 'string' ? s : 'unknown'
+  }
+  const ecosystem = ['Pulse', 'Entomate', 'LogosVision']
+  const pendingPatterns = learning?.pendingApprovals || 0
 
-      {/* ── System status ── */}
-      {systemStatus && <SystemStatus systemStatus={systemStatus} />}
+  return (
+    <div className="bs-today">
+      <TitleRule title="Today" meta={meta} actions={actions} />
 
-      {/* ── Main content grid — recorder + recent meetings + tasks + automations ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <Grid>
+        <Cell span={8}>{renderTop()}</Cell>
+        <Cell span={4} className="bs-today-ro">{readouts}</Cell>
 
-        {/* Meeting Recorder */}
-        <div className="lg:col-span-1 space-y-4" ref={recorderRef}>
-          <MeetingRecorder onRecorded={loadData} />
-          <AutomationActivityFeed count={stats.automations} navigate={navigate} />
+        <Cell span={8}>
+          <Section number="01" title="Action items" aside={openItems > ITEM_ROWS ? `${ITEM_ROWS} of ${openItems} open` : 'From your meetings'} />
+          <RuledTable
+            caption="Open action items from your meetings"
+            columns={columns}
+            groups={groups.map((g) => ({ key: g.key, label: g.label, count: g.total, rows: g.rows }))}
+            rowKey={(item) => item.id}
+            onRowClick={(item) => item.meeting_id && navigate(`/meetings/${item.meeting_id}`)}
+            empty={loading ? 'Loading action items' : 'No open action items. New ones arrive after each meeting.'}
+          />
+          <div className="bs-today-foot">
+            <Key size="sm" onClick={() => navigate('/tasks')}>All work</Key>
+          </div>
+        </Cell>
+
+        <Cell span={4} rule>
+          <Section number="02" title="Agents" aside="Latest calls" />
+          {calls.length === 0 && pendingPatterns === 0 ? (
+            <p className="bs-today-empty">{loading ? 'Loading' : 'No agent calls yet. After a meeting, agents set each item’s priority, due date and owner, and say why.'}</p>
+          ) : (
+            <ul className="bs-rows">
+              {calls.slice(0, CALL_ROWS).map((c) => (
+                <li key={c.key} className="bs-row bs-today-call">
+                  <Led tone="ai" />
+                  <div className="bs-row-text">
+                    <div className="bs-today-call-head">
+                      <span className="bs-h3">{AGENT_NAMES[c.kind]}</span>
+                      <span className="bs-lbl">{c.applied ? 'Applied' : 'Needs your OK'}</span>
+                    </div>
+                    {c.meetingId
+                      ? <Link to={`/meetings/${c.meetingId}`} className="bs-today-call-what">{describeCall(c, now)}</Link>
+                      : <span className="bs-today-call-what">{describeCall(c, now)}</span>}
+                  </div>
+                  <div className="bs-today-call-side">
+                    <span className="bs-mono bs-mut">{dayLabel(c.at, now) === 'Today' ? clock(c.at) : dayLabel(c.at, now)}</span>
+                    {c.confidence != null && <Tag tone="ai">{c.confidence}%</Tag>}
+                  </div>
+                </li>
+              ))}
+              {pendingPatterns > 0 && (
+                <li className="bs-row bs-today-call">
+                  <Led tone="ai" />
+                  <div className="bs-row-text">
+                    <div className="bs-today-call-head"><span className="bs-h3">Learning</span><span className="bs-lbl">Needs your OK</span></div>
+                    <span className="bs-today-call-what">{pendingPatterns} {pendingPatterns === 1 ? 'pattern' : 'patterns'} learned from your overrides</span>
+                  </div>
+                  <Key size="sm" onClick={() => navigate('/settings', { state: { section: 'ai-learning' } })}>Review</Key>
+                </li>
+              )}
+            </ul>
+          )}
+        </Cell>
+
+        <Cell span={8}>
+          <Section number="03" title="Decided this week" aside={`${decisions.length} ${decisions.length === 1 ? 'decision' : 'decisions'}`} />
+          {decisions.length === 0 ? (
+            <p className="bs-today-empty">{loading ? 'Loading' : 'No decisions recorded since Monday.'}</p>
+          ) : (
+            <ul className="bs-rows">
+              {decisions.slice(0, DECISION_ROWS).map((d) => (
+                <li key={d.key} className="bs-row bs-row-dec">
+                  <span className="bs-tick" aria-hidden="true" />
+                  <div className="bs-row-text">
+                    <div>{d.text}</div>
+                    <Link to={`/meetings/${d.meetingId}`} className="bs-today-dec-src">{d.meetingTitle} · {dayLabel(d.date, now)}</Link>
+                  </div>
+                  {d.atMs != null ? (
+                    <Key size="tc" onClick={() => navigate(`/meetings/${d.meetingId}?t=${d.atMs}`)} aria-label={`Play "${d.text}" at ${formatClock(d.atMs)}`}>
+                      ▶ {formatClock(d.atMs)}
+                    </Key>
+                  ) : <span />}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Cell>
+
+        <Cell span={4} rule>
+          <Section number="04" title="Schedule" aside={calendarOn ? 'Google Calendar' : 'Recorded today'} />
+          <ScheduleRows schedule={schedule} now={now} />
+          {calendarOn === false && (
+            <div className="bs-today-cal">
+              <span className="bs-today-empty">Connect a calendar to see what’s coming up and count down to it.</span>
+              <Key size="sm" onClick={() => navigate('/settings', { state: { section: 'integrations' } })}>Connect calendar</Key>
+            </div>
+          )}
+        </Cell>
+
+        <Cell span={8}>
+          <Section number="05" title="Team load" aside="Open action items by owner" />
+          {workload.length === 0 ? (
+            <p className="bs-today-empty">{loading ? 'Loading' : 'No assigned action items yet.'}</p>
+          ) : (
+            <RuledTable
+              caption="Action items by owner"
+              columns={[
+                { key: 'who', header: 'Owner', render: (m) => <span className="bs-today-item-title">{m.team_member || m.name || 'Unassigned'}</span> },
+                { key: 'high', header: 'High', render: (m) => (m.high_priority_count > 0 ? <Signal tone="brand">{m.high_priority_count} high</Signal> : <span className="bs-mut">—</span>) },
+                { key: 'prog', header: 'In progress', secondary: true, align: 'right', className: 'bs-num', render: (m) => m.in_progress_items || 0 },
+                { key: 'done', header: 'Done', secondary: true, align: 'right', className: 'bs-num', render: (m) => m.completed_items || 0 },
+                { key: 'all', header: 'Total', align: 'right', className: 'bs-num', render: (m) => m.total_assigned || 0 },
+              ]}
+              rows={workload.slice(0, 8)}
+              rowKey={(m) => String(m.team_member || m.name)}
+            />
+          )}
+        </Cell>
+
+        <Cell span={4} rule>
+          <Section title="System" level={3} />
+          <ul className="bs-rows">
+            {[['AI', 'gemini'], ['Database', 'database']].map(([label, key]) => {
+              const s = svc(key)
+              const ok = s.includes('connected')
+              return (
+                <li key={key} className="bs-row bs-today-sys">
+                  <span className="bs-lbl">{label}</span>
+                  <span />
+                  <Signal tone={ok ? 'mint' : 'off'}>{ok ? 'Connected' : s}</Signal>
+                </li>
+              )
+            })}
+            {ecosystem.map((app) => {
+              const ok = systemStatus?.ecosystem?.[app.toLowerCase()]?.connected !== false
+              return (
+                <li key={app} className="bs-row bs-today-sys">
+                  <span className="bs-lbl">{app}</span>
+                  <span />
+                  <Signal tone={ok ? 'mint' : 'off'}>{ok ? 'Synced' : 'Off'}</Signal>
+                </li>
+              )
+            })}
+          </ul>
+          <button type="button" className="bs-today-keyhint bs-lbl" onClick={() => setKeysOpen(true)}>
+            Press ? for shortcuts
+          </button>
+        </Cell>
+      </Grid>
+
+      <Drawer open={briefOpen} onClose={() => setBriefOpen(false)} label="Briefings">
+        <p className="bs-today-empty">Meeting prep, deal risks and relationship notes, written by Entomate’s intelligence agents.</p>
+        <div className="bs-skin bs-today-brief">
+          {briefOpen && <IntelligenceDashboard />}
         </div>
+      </Drawer>
 
-        <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
-
-          {/* Recent Meetings */}
-          <div className="vc" style={{ display:'flex', flexDirection:'column', overflow:'hidden' }}>
-            <div style={{ padding:'10px 14px', borderBottom:'1px solid var(--b0)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-              <h3 style={{ fontFamily:'var(--font)', fontWeight:600, fontSize:13, color:'var(--t0)' }}>Recent Meetings</h3>
-              <Link to="/meetings" style={{ fontSize:12, color:'var(--c)', display:'flex', alignItems:'center', gap:4, textDecoration:'none' }}>
-                View all <ArrowRight style={{ width:12, height:12 }} />
-              </Link>
+      <Drawer open={keysOpen} onClose={() => setKeysOpen(false)} label="Keyboard shortcuts">
+        <dl className="bs-today-keys">
+          {[['R', 'Refresh Today'], ['N', 'Start recording'], ['T', 'Open Tasks'], ['⌘K', 'Search'], ['?', 'Show these shortcuts']].map(([k, label]) => (
+            <div key={k} className="bs-field">
+              <dt><span className="bs-k">{k}</span></dt>
+              <dd>{label}</dd>
             </div>
-            <div style={{ display:'flex', flexDirection:'column', gap:2, padding:'6px 8px' }}>
-              {loading
-                ? Array.from({ length: 4 }).map((_, i) => (
-                    <div key={i} style={{ height:36, borderRadius:8, background:'var(--b0)', animation:'pulse 1.5s ease-in-out infinite' }} />
-                  ))
-                : recentMeetings.length === 0
-                  ? <p style={{ fontSize:12, color:'var(--t1)', padding:'16px', textAlign:'center' }}>No recent meetings</p>
-                  : recentMeetings.map((m) => {
-                      const sc = m.sentiment_label === 'Positive' ? 'mint' : m.sentiment_label === 'Negative' ? 'crimson' : 'neutral'
-                      return (
-                        <div
-                          key={m.id}
-                          onClick={() => navigate(`/meetings/${m.id}`)}
-                          style={{ padding:'8px 10px', borderRadius:8, display:'flex', alignItems:'center', gap:10, cursor:'pointer', transition:'background .15s' }}
-                          onMouseEnter={e => e.currentTarget.style.background='var(--b0)'}
-                          onMouseLeave={e => e.currentTarget.style.background='transparent'}
-                        >
-                          <div style={{ flex:1, minWidth:0 }}>
-                            <div style={{ fontSize:12, fontWeight:600, color:'var(--t0)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{m.title}</div>
-                            <div style={{ fontSize:11, color:'var(--t1)', fontFamily:'var(--font-mono)' }}>{new Date(m.created_at).toLocaleString()}</div>
-                          </div>
-                          {m.sentiment && <SentimentTrendMini sentiment={m.sentiment} />}
-                          <VCBadge color={sc}>{m.sentiment_label || 'N/A'}</VCBadge>
-                        </div>
-                      )
-                    })
-              }
-            </div>
-          </div>
-
-          {/* Open Tasks */}
-          <div className="vc" style={{ display:'flex', flexDirection:'column', overflow:'hidden' }}>
-            <div style={{ padding:'10px 14px', borderBottom:'1px solid var(--b0)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-              <h3 style={{ fontFamily:'var(--font)', fontWeight:600, fontSize:13, color:'var(--t0)' }}>Open Tasks</h3>
-              <Link to="/tasks" style={{ fontSize:12, color:'var(--c)', display:'flex', alignItems:'center', gap:4, textDecoration:'none' }}>
-                View all <ArrowRight style={{ width:12, height:12 }} />
-              </Link>
-            </div>
-            <div>
-              {loading
-                ? Array.from({ length: 5 }).map((_, i) => (
-                    <div key={i} style={{ height:36, margin:'2px 0', background:'var(--b0)', animation:'pulse 1.5s ease-in-out infinite' }} />
-                  ))
-                : pendingTasks.length === 0
-                  ? <p style={{ fontSize:12, color:'var(--t1)', padding:'16px', textAlign:'center' }}>No open tasks</p>
-                  : pendingTasks.map((task) => (
-                      <div key={task.id} style={{ padding:'8px 14px', display:'flex', alignItems:'center', gap:10, borderBottom:'1px solid var(--b0)', cursor:'pointer' }}>
-                        <input
-                          type="checkbox"
-                          onChange={async (e) => {
-                            e.stopPropagation()
-                            const checkbox = e.currentTarget
-                            try {
-                              await tasksApi.complete(task.id)
-                              toast.success('Task completed', 'Reopen it any time from the Tasks page.')
-                              loadData()
-                            } catch (err) {
-                              console.error('Failed to complete task:', err)
-                              if (checkbox) checkbox.checked = false
-                              toast.error('Could not complete task', err.message || 'Please try again.')
-                            }
-                          }}
-                          style={{ width:13, height:13, accentColor:'var(--c)', flexShrink:0, cursor:'pointer' }}
-                        />
-                        <div style={{ flex:1, minWidth:0 }}>
-                          <p style={{ fontSize:12, color:'var(--t0)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{task.title}</p>
-                          {task.due_date && (
-                            <p style={{ fontSize:11, fontFamily:'var(--font-mono)', color: new Date(task.due_date) < new Date() ? 'var(--c)' : 'var(--t1)' }}>
-                              Due: {new Date(task.due_date).toLocaleDateString()}
-                            </p>
-                          )}
-                        </div>
-                        <VCBadge color={task.priority === 'high' ? 'crimson' : 'neutral'}>
-                          {task.priority}
-                        </VCBadge>
-                      </div>
-                    ))
-              }
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-      {/* ── Keyboard shortcuts overlay ── */}
-      {showShortcuts && (
-        <div
-          className="vc"
-          style={{
-            position:'fixed', bottom:16, right:16, zIndex:50,
-            padding:'12px 16px',
-            fontSize:12, color:'var(--t1)', fontFamily:'var(--font-mono)',
-          }}
-        >
-          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
-            <Keyboard style={{ width:13, height:13, color:'var(--c)' }} />
-            <span style={{ fontWeight:700, color:'var(--t0)', fontFamily:'var(--font)', fontSize:12 }}>Keyboard Shortcuts</span>
-            <button onClick={() => setShowShortcuts(false)} style={{ marginLeft:'auto', background:'none', border:'none', color:'var(--t1)', cursor:'pointer', fontSize:14, lineHeight:1 }}>&times;</button>
-          </div>
-          <div style={{ display:'grid', gridTemplateColumns:'40px 1fr', gap:'4px 10px' }}>
-            <kbd style={{ background:'var(--b0)', borderRadius:3, padding:'1px 5px', fontSize:11, textAlign:'center', color:'var(--t0)' }}>R</kbd><span>Refresh dashboard</span>
-            <kbd style={{ background:'var(--b0)', borderRadius:3, padding:'1px 5px', fontSize:11, textAlign:'center', color:'var(--t0)' }}>N</kbd><span>Start new meeting</span>
-            <kbd style={{ background:'var(--b0)', borderRadius:3, padding:'1px 5px', fontSize:11, textAlign:'center', color:'var(--t0)' }}>T</kbd><span>New task</span>
-            <kbd style={{ background:'var(--b0)', borderRadius:3, padding:'1px 5px', fontSize:11, textAlign:'center', color:'var(--t0)' }}>⌘K</kbd><span>Search</span>
-            <kbd style={{ background:'var(--b0)', borderRadius:3, padding:'1px 5px', fontSize:11, textAlign:'center', color:'var(--t0)' }}>?</kbd><span>Toggle this panel</span>
-          </div>
-        </div>
-      )}
-
-      {/* ── Shortcuts hint footer ── */}
-      <div style={{ textAlign:'center', padding:'4px 0' }}>
-        <span style={{ fontSize:11, color:'var(--t1)', cursor:'pointer' }} onClick={() => setShowShortcuts(s => !s)}>
-          Press <kbd style={{ background:'var(--b0)', borderRadius:2, padding:'0 3px', fontSize:11, color:'var(--t1)' }}>?</kbd> for keyboard shortcuts
-        </span>
-      </div>
+          ))}
+        </dl>
+      </Drawer>
     </div>
   )
+}
+
+/** Today's schedule: recorded meetings and calendar events in time order, with a NOW rule. */
+function ScheduleRows({ schedule, now }) {
+  if (schedule.length === 0) {
+    return <p className="bs-today-empty">Nothing on today’s schedule.</p>
+  }
+  const nowIndex = schedule.findIndex((e) => e.at && e.at.getTime() > now.getTime())
+  const rows = []
+  schedule.forEach((e, i) => {
+    if (i === nowIndex) rows.push(<li key="now" className="bs-today-now" aria-label={`Now, ${clock(now)}`}><span>Now</span><i /></li>)
+    rows.push(
+      <li key={e.key} className="bs-row bs-today-sched">
+        <span className="bs-mono bs-mut">{e.at ? clock(e.at) : 'All day'}</span>
+        <div className="bs-row-text">
+          {e.meetingId ? <Link to={`/meetings/${e.meetingId}`} className="bs-today-link">{e.title}</Link> : e.title}
+        </div>
+        <Signal tone={e.tone}>{e.word}</Signal>
+      </li>
+    )
+  })
+  if (nowIndex === -1) rows.push(<li key="now" className="bs-today-now" aria-label={`Now, ${clock(now)}`}><span>Now</span><i /></li>)
+  return <ul className="bs-rows">{rows}</ul>
 }

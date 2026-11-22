@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { Loader2, Send } from 'lucide-react'
 import { meetingsApi, integrationsApi, calendarApi } from '../services/api'
 import ActionItemsList from '../components/ActionItemsList'
@@ -74,6 +74,16 @@ export default function MeetingDetail() {
   useEffect(() => {
     loadMeeting()
   }, [loadMeeting])
+
+  // ?t=<ms> (from Today's decision timecodes) jumps the transcript once the meeting has loaded.
+  const [searchParams] = useSearchParams()
+  const startAtMs = Number(searchParams.get('t'))
+  const jumpedRef = useRef(false)
+  useEffect(() => {
+    if (jumpedRef.current || !transcriptSegments || !Number.isFinite(startAtMs) || startAtMs <= 0) return
+    jumpedRef.current = true
+    requestAnimationFrame(() => jumpToTranscript(startAtMs))
+  }, [transcriptSegments, startAtMs, jumpToTranscript])
 
   // Browser tab title: "02 Meetings · <title> · Entomate" while the page is open.
   useEffect(() => {
