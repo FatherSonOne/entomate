@@ -1,0 +1,6121 @@
+/**
+ * LogosAssistant.css
+ *
+ * Styles for the Logos Vision AI Assistant panel.
+ * Fixed right-side slide-in panel with full responsive support.
+ *
+ * Uses Logos Vision CRM design tokens (--cmf-*) for consistent theming.
+ * Dark mode driven by html.dark class.
+ * Folio palette: Terracotta primary + Patina secondary.
+ */
+
+/* ============================================================================
+   LOCAL ACCENT TOKENS — single source of truth for branded colors
+   Maps to the Folio palette via --cmf-* design tokens.
+   --la-accent = Terracotta (primary action color)
+   --la-secondary = Patina (AI identity, beacon, interactive accents)
+
+   U3/A2 — the Patina channels are declared once, as raw RGB triplets, so every
+   translucent accent in this file can be written `rgba(var(--la-secondary-rgb), a)`
+   instead of re-typing the Patina triplet inline. Before this there were ~107 literal
+   Patina values that did NOT read these tokens, which is why "the token is hardcoded"
+   badly understated the problem: the token was fine, most of the file bypassed it.
+   A2b then repointed those three triplets at the org's palette — done below.
+   ============================================================================ */
+
+.logos-assistant {
+  --la-accent: var(--cmf-accent, #B8614A);
+  --la-accent-light: var(--cmf-accent-hover, #D4765A);
+  --la-accent-dark: var(--cmf-accent, #B8614A);
+
+  /* A2b — the Patina channels now FOLLOW the org's palette instead of forking it.
+     These three lines are the whole white-label surface; the ~110 accents below all
+     read them.
+
+     The literals are fallbacks, not values. They are FOLIO_LIGHT's secondary /
+     secondaryLight / tertiary — exactly what this block hardcoded before — so first
+     paint (BrandPaletteContext sets --brand-* in an effect, after the CSS has already
+     painted) and any tree rendered without the provider stay byte-identical.
+     A var() fallback may contain commas, so the whole triplet survives as one.
+
+     --brand-secondary* are MODE-RESOLVED (BrandPaletteContext.tsx:35 picks palette.dark
+     or palette.light), which means --la-secondary is now mode-aware too. That is why the
+     dark overrides which hand-simulated exactly this swap were deleted: in Folio,
+     FOLIO_DARK.secondary IS FOLIO_LIGHT.secondaryLight, so the token now resolves to what
+     they hardcoded. Keeping them would have shifted those elements a second step. */
+  --la-secondary-rgb: var(--brand-secondary-rgb, 59, 158, 143);
+  --la-secondary-light-rgb: var(--brand-secondary-tint-rgb, 82, 181, 166);
+  --la-secondary-dark-rgb: var(--brand-secondary-shade-rgb, 45, 127, 115);
+
+  --la-secondary: rgb(var(--la-secondary-rgb));
+  --la-secondary-light: rgb(var(--la-secondary-light-rgb));
+  --la-secondary-dark: rgb(var(--la-secondary-dark-rgb));
+  --la-secondary-muted: rgba(var(--la-secondary-rgb), 0.12);
+  --la-secondary-subtle: rgba(var(--la-secondary-rgb), 0.06);
+
+  /* Live-microphone red. Deliberately NOT --cmf-error, for two reasons.
+     Semantics: recording is a state, not a failure — an error token on a
+     healthy control misreports it to anyone reading the stylesheet.
+     Contrast: the button paints a white glyph on this fill, and --cmf-error
+     (#f87171 dark / #fb7185 light) measures ~2.8:1 against white, under the
+     3:1 WCAG 1.4.11 asks for a non-text control. This value measures ~3.86:1
+     and passes. It is a token rather than a literal so the two call sites
+     cannot drift apart again — they were duplicated hex before. */
+  --la-recording: #e74c3c;
+
+  /* Motion curves — one physical language for the whole panel.
+     Built-in CSS easings are too weak; these carry intent. */
+  --la-ease-out: cubic-bezier(0.23, 1, 0.32, 1);      /* entrances / responses — starts fast */
+  --la-ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);   /* iOS-style panel slide */
+  --la-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* subtle overshoot for success pops */
+}
+
+/* ============================================================================
+   CONTAINER & BACKDROP
+   ============================================================================ */
+
+.logos-assistant {
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+  display: flex;
+  justify-content: flex-end;
+  font-family: var(--cmf-font-body, 'Inter', system-ui, -apple-system, sans-serif);
+}
+
+.la-backdrop {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+}
+
+/* Docked (U1): the container still spans the viewport so the panel can sit flush at the
+   right edge, but it must not intercept anything. Without this the app would look
+   interactive and quietly refuse every click — worse than the backdrop it replaced. */
+.logos-assistant.la-docked {
+  pointer-events: none;
+}
+
+.logos-assistant.la-docked .la-panel {
+  pointer-events: auto;
+}
+
+/* ============================================================================
+   PANEL
+   ============================================================================ */
+
+.la-panel {
+  position: relative;
+  width: 420px;
+  max-width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--cmf-bg, #FFFBF7);
+  border-left: 1px solid var(--cmf-border, rgba(30, 27, 24, 0.08));
+  box-shadow: -14px 0 44px -14px rgba(30, 27, 24, 0.20), inset 1px 0 0 rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+}
+
+/* ============================================================================
+   RESIZE HANDLE (U5)
+   ============================================================================ */
+
+/* Sits fully INSIDE the panel — it cannot straddle the border, because `.la-panel` is
+   `overflow: hidden` and anything hanging off the left edge would simply be clipped away.
+   8px is the compromise: wide enough to grab without aiming, narrow enough that it never
+   steals a click meant for the message text beside it. */
+.la-resize-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 8px;
+  /* Above the thread rail (z-index 5) so the panel stays resizable with history open. */
+  z-index: 6;
+  cursor: col-resize;
+  /* Required, not cosmetic: without it the browser claims the pointer for panning and the
+     drag dies on the first move on any touch or pen device. */
+  touch-action: none;
+}
+
+/* The affordance is a hairline that only appears on hover, focus, or during a drag. A
+   permanently visible divider would add a second vertical rule right beside the panel's own
+   border — visual noise on a surface that is open the whole session. */
+.la-resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  /* The DARK end of the Patina ramp, not the mid tone. Measured on the live panel: the mid
+     tone lands at 2.96:1 against the cream surface — just under the 3:1 WCAG 1.4.11 asks of
+     a focus indicator. The dark end clears it at 4.36:1. Same trap ThreadRail hit in dark
+     mode, inverted: a saturated mid tone needs the opposite end of its ramp per surface. */
+  background: var(--la-secondary-dark);
+  opacity: 0;
+  transition: opacity 140ms var(--la-ease-out);
+}
+
+/* On the near-black panel the dark end falls to ~2.4:1, so the handle takes the mid tone
+   instead — 7.5:1. A2b: this rule survives the dark-override cull precisely because the base
+   above is the ramp's DARK end rather than --la-secondary; deleting it would have dropped the
+   hairline to the 2.4:1 value and quietly re-broken U5's contrast fix. It reads --la-secondary
+   (not -light) because the token is mode-aware now: in dark it already resolves to the exact
+   #52B5A6 that was measured here. */
+html.dark .la-resize-handle::after,
+.la-dark .la-resize-handle::after {
+  background: var(--la-secondary);
+}
+
+.la-resize-handle:hover::after,
+.la-resize-handle:focus-visible::after,
+body.la-resizing .la-resize-handle::after {
+  opacity: 1;
+}
+
+/* The hairline IS the focus indicator — a default ring on an 8px full-height strip draws a
+   box around the entire panel edge. */
+.la-resize-handle:focus-visible {
+  outline: none;
+}
+
+/* While dragging, the cursor must not flicker back to a text caret every time it crosses a
+   paragraph, and a fast drag must not select the conversation on the way past. */
+body.la-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .la-resize-handle::after {
+    transition-duration: 1ms;
+  }
+}
+
+/* ============================================================================
+   HEADER
+   ============================================================================ */
+
+/* U3 — the quiet header.
+   It used to be a 64px teal gradient with a drifting aurora behind it: the loudest
+   thing in the panel, repeated on every single view, competing with the answer the
+   user actually came for. Now it is a 44px strip painted in the panel's own
+   background, so the first thing with any visual weight is the context bar beneath
+   it. The AI's identity moves to the mark, where it belongs. */
+.la-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 44px;          /* also the touch-target floor — matches the repo's 44px rule */
+  padding: 0 8px 0 12px;
+  background: var(--cmf-bg, #FFFBF7);
+  color: var(--cmf-text, #1E1B18);
+  flex-shrink: 0;
+}
+
+.la-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.la-header-title {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.la-header-title h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  white-space: nowrap;
+  color: var(--cmf-text, #1E1B18);
+}
+
+.la-header-right {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+/* Header controls sat on a dark teal fill, so they were white-on-translucent-white.
+   On the panel background that is invisible — they are now quiet glyphs that only
+   gain a surface on hover. */
+.la-clear-btn {
+  background: transparent;
+  border: none;
+  color: var(--cmf-text-muted, #6B6560);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.la-clear-btn:hover {
+  background: var(--cmf-surface-2, #EFE7DD);
+  color: var(--cmf-text, #1E1B18);
+}
+
+.la-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--cmf-text-muted, #6B6560);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.la-close-btn:hover {
+  background: var(--cmf-surface-2, #EFE7DD);
+  color: var(--cmf-text, #1E1B18);
+}
+
+/* ============================================================================
+   CONTEXT BAR
+   ============================================================================ */
+
+.la-context-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--cmf-border, rgba(30, 27, 24, 0.08));
+  background: var(--cmf-surface, #FDF8F3);
+  flex-shrink: 0;
+  min-height: 36px;
+}
+
+.la-section-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--la-secondary);
+  background: var(--la-secondary-subtle);
+  border: 1px solid rgba(var(--la-secondary-rgb), 0.15);
+  border-radius: 100px;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+
+.la-section-summary {
+  font-size: 12px;
+  color: var(--cmf-text-secondary, #3D3833);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* ----------------------------------------------------------------------------
+   U4 — the hero density.
+   A running conversation gets the compact command strip refined in UI-1B below.
+   This is what an EMPTY panel gets, where the only job is to prove the thing knows
+   what you are looking at. Same facts; they just stop being joined into one string.
+   ---------------------------------------------------------------------------- */
+.la-context-bar-hero {
+  display: block;
+  padding: 14px 16px 16px;
+}
+
+.la-context-hero-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Each fact gets its own box, so none of them can be the one that gets truncated.
+   Wrapping is the point — a section with five facts should be five facts tall, not
+   two facts and an ellipsis. */
+.la-context-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.la-context-fact {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: var(--cmf-bg, #FFFBF7);
+  border: 1px solid var(--cmf-border, rgba(30, 27, 24, 0.08));
+}
+
+/* The figure is the only thing in the panel allowed to be visually loud at rest.
+   Tabular numerals so a column of facts does not jitter as the data refreshes. */
+.la-context-fact-figure {
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--cmf-text, #1E1B18);
+  font-variant-numeric: tabular-nums;
+}
+
+.la-context-fact-label {
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--cmf-text-muted, #6B6560);
+}
+
+/* The moat, stated plainly: which datasets the model actually received. Deliberately
+   quiet — it is a proof, not a headline, and it is read once. */
+.la-context-scope {
+  margin: 10px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--cmf-text-muted, #6B6560);
+}
+
+.la-context-scope-lead {
+  font-weight: 600;
+  color: var(--la-secondary);
+}
+
+/* ============================================================================
+   MESSAGES AREA
+   ============================================================================ */
+
+.la-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Scrollbar */
+.la-messages::-webkit-scrollbar {
+  width: 5px;
+}
+
+.la-messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.la-messages::-webkit-scrollbar-thumb {
+  background: var(--cmf-border-strong, rgba(30, 27, 24, 0.12));
+  border-radius: 10px;
+}
+
+.la-messages::-webkit-scrollbar-thumb:hover {
+  background: var(--cmf-text-muted, #6B6560);
+}
+
+/* ============================================================================
+   WELCOME STATE
+   ============================================================================ */
+
+.la-welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 40px 20px 20px;
+  gap: 8px;
+}
+
+/* U7 — the mark, the name and the tagline share one row. `.la-welcome` centres its children,
+   so the row centres as a block while its own text reads left-aligned, which is what stops a
+   two-line stack from looking ragged next to a round mark. */
+.la-welcome-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+}
+
+.la-welcome-headings {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.la-welcome-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* U7 — 80 → 44. The box is the mark's aura, not the mark: it stays proportional to the 36px
+     glyph inside it so the ::before glow below keeps the same relationship it had at 72px. */
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  /* The orb carries its own motion (rotation, breath, voice); a bob on top of
+     it would be two rhythms fighting. The bob went with the brand mark. */
+}
+
+/* Soft aura behind the orb — the surface's own ink, never a brand colour, so
+   the only colour the orb ever shows is a state (patina listening, terracotta
+   speaking) drawn by the canvas itself. */
+.la-welcome-icon::before {
+  content: '';
+  position: absolute;
+  inset: -22%;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in oklab, var(--cmf-text, #1E1B18) 12%, transparent), transparent 62%);
+  will-change: transform, opacity;
+  animation: la-aura-breathe 4.5s ease-in-out infinite;
+}
+
+@keyframes la-aura-breathe {
+  0%, 100% { transform: scale(0.9); opacity: 0.5; }
+  50%      { transform: scale(1.08); opacity: 0.85; }
+}
+
+.la-welcome-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--cmf-text, #1E1B18);
+  letter-spacing: -0.01em;
+}
+
+/* U3 — the org-group tagline, relocated out of the header. Shown once, on the
+   empty state, where a first impression actually belongs. */
+.la-welcome-tagline {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  /* Secondary ink, not patina: coloured text under a heading reads as a link,
+     and this is not one. Brand colour on this surface stays a state. */
+  color: var(--cmf-text-secondary, #6b7280);
+  letter-spacing: 0.01em;
+}
+
+/* ============================================================================
+   QUICK ACTIONS (Welcome screen)
+   ============================================================================ */
+
+.la-quick-actions {
+  margin-top: 20px;
+  width: 100%;
+  max-width: 340px;
+}
+
+.la-quick-actions-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--cmf-text-secondary, #6b7280);
+  letter-spacing: 0.01em;
+  margin-bottom: 8px;
+}
+
+.la-quick-actions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.la-quick-action-btn {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--cmf-text-secondary, #3D3833);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+  line-height: 1.4;
+}
+
+/* "Show N more" — a text line in the chip column, not another chip. */
+.la-quick-actions-more {
+  display: block;
+  width: 100%;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--cmf-text-secondary, #6b7280);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.la-quick-actions-more:hover {
+  color: var(--cmf-text, #1E1B18);
+  background: var(--cmf-surface, #FDF8F3);
+}
+
+/* The brief's one-line purpose, parked at the chip's far end. */
+.la-quick-action-sub {
+  float: right;
+  margin-left: 8px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--cmf-text-muted, #888);
+}
+
+/* The one teaching link left on the welcome, quiet on purpose. */
+.la-welcome-help {
+  margin-top: 20px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--cmf-text-secondary, #6b7280);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--cmf-border, rgba(30, 27, 24, 0.2));
+}
+
+.la-welcome-help:hover {
+  color: var(--cmf-text, #1E1B18);
+  text-decoration-color: currentColor;
+}
+
+.la-quick-actions-more:focus-visible,
+.la-welcome-help:focus-visible {
+  outline: 2px solid var(--cmf-text, #1E1B18);
+  outline-offset: 2px;
+}
+
+.la-quick-action-btn:hover {
+  background: var(--cmf-surface, #FDF8F3);
+  border-color: var(--cmf-border, rgba(30, 27, 24, 0.08));
+  color: var(--cmf-text, #1E1B18);
+}
+
+/* ============================================================================
+   MESSAGE BUBBLES
+   ============================================================================ */
+
+.la-message {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  animation: la-fade-in 280ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+@keyframes la-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.la-message-avatar {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* User message — warm terracotta identity ("you") */
+.la-message-user .la-message-avatar {
+  background: var(--cmf-surface-2, #F7F2ED);
+  color: var(--la-accent, #B8614A);
+  box-shadow: inset 0 0 0 1px rgba(184, 92, 56, 0.14);
+}
+
+.la-message-user .la-message-content {
+  background: linear-gradient(180deg, rgba(184, 92, 56, 0.11), rgba(184, 92, 56, 0.055));
+  border: 1px solid rgba(184, 92, 56, 0.16);
+  border-radius: 4px 16px 16px 16px;
+  padding: 10px 14px;
+  max-width: calc(100% - 46px);
+}
+
+.la-message-user .la-message-content p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--cmf-text, #1E1B18);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Assistant message — patina identity ("Logos"), the avatar is the star */
+.la-message-assistant .la-message-avatar {
+  background: radial-gradient(circle at 38% 32%, var(--la-secondary-light), var(--la-secondary-dark));
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25),
+              0 0 0 1px rgba(var(--la-secondary-rgb), 0.22),
+              0 2px 8px -2px rgba(var(--la-secondary-rgb), 0.4);
+}
+
+.la-message-assistant .la-message-content {
+  background: var(--cmf-surface, #FDF8F3);
+  border: 1px solid var(--cmf-border, rgba(30, 27, 24, 0.08));
+  border-radius: 4px 16px 16px 16px;
+  padding: 11px 14px;
+  max-width: calc(100% - 46px);
+  /* Shadow tinted to the patina hue, not flat grey (Emil: tint shadows to context) */
+  box-shadow: 0 1px 2px rgba(var(--la-secondary-rgb), 0.05), 0 6px 18px -12px rgba(30, 27, 24, 0.14);
+}
+
+/* Loading state */
+.la-message-loading .la-message-content {
+  background: var(--cmf-surface, #FDF8F3);
+  border: 1px solid var(--cmf-border, rgba(30, 27, 24, 0.08));
+}
+
+.la-loading-dots {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--cmf-text-muted, #6B6560);
+}
+
+.la-spinner {
+  animation: la-spin 1s linear infinite;
+  color: var(--la-secondary);
+}
+
+@keyframes la-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Skeleton loading lines */
+.la-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.la-skeleton__line {
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    var(--cmf-border, rgba(30, 27, 24, 0.08)) 25%,
+    var(--cmf-bg, rgba(30, 27, 24, 0.04)) 50%,
+    var(--cmf-border, rgba(30, 27, 24, 0.08)) 75%
+  );
+  background-size: 200% 100%;
+  animation: la-skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+.la-skeleton__line:nth-child(1) { width: 85%; }
+.la-skeleton__line:nth-child(2) { width: 70%; }
+.la-skeleton__line:nth-child(3) { width: 55%; }
+
+@keyframes la-skeleton-pulse {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Error */
+.la-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--cmf-error-text, #dc2626);
+  background: rgba(220, 38, 38, 0.06);
+  border: 1px solid rgba(220, 38, 38, 0.12);
+  border-radius: 8px;
+  animation: la-fade-in 0.2s ease;
+  flex-wrap: wrap;
+}
+
+.la-retry-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--cmf-error-text, #dc2626);
+  background: rgba(220, 38, 38, 0.08);
+  border: 1px solid rgba(220, 38, 38, 0.18);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.la-retry-btn:hover {
+  background: rgba(220, 38, 38, 0.14);
+}
+
+/* Stop generating */
+.la-stop-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--cmf-text-muted, #6B6560);
+  background: var(--cmf-surface, #FDF8F3);
+  border: 1px solid var(--cmf-border, rgba(30, 27, 24, 0.08));
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  margin-bottom: 6px;
+}
+
+.la-stop-btn:hover {
+  color: var(--cmf-text, #1E1B18);
+  background: var(--cmf-surface-2, #F7F2ED);
+}
+
+/* Clear confirmation */
+.la-clear-confirm {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* The destructive step used to read as a pale wash over a dark teal header. On the
+   quiet header it has to carry the warning on its own, so the red moves into the
+   text and a border, not just a 20%-alpha fill nobody sees. */
+.la-clear-btn-confirm {
+  background: rgba(220, 38, 38, 0.08) !important;
+  border: 1px solid rgba(220, 38, 38, 0.35) !important;
+  color: var(--cmf-error-ink, #DC2626) !important;
+  font-weight: 600;
+}
+
+.la-clear-btn-confirm:hover {
+  background: rgba(220, 38, 38, 0.16) !important;
+  color: var(--cmf-error-ink, #DC2626) !important;
+}
+
+.la-clear-btn-cancel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0 !important;
+}
+
+/* ============================================================================
+   SUGGESTED ACTIONS (after AI response)
+   ============================================================================ */
+
+.la-suggested-actions {
+  padding: 4px 0 0;
+  animation: la-fade-in 0.3s ease;
+}
+
+.la-suggested-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--cmf-text-secondary, #6b7280);
+  margin-bottom: 6px;
+  padding-left: 38px;
+}
+
+.la-suggested-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-left: 38px;
+}
+
+.la-suggested-btn {
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--la-secondary);
+  background: rgba(var(--la-secondary-rgb), 0.06);
+  border: 1px solid rgba(var(--la-secondary-rgb), 0.15);
+  border-radius: 100px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.la-suggested-btn:hover {
+  background: rgba(var(--la-secondary-rgb), 0.12);
+  border-color: rgba(var(--la-secondary-rgb), 0.3);
+}
+
+/* ============================================================================
+   INPUT AREA
+   ============================================================================ */
+
+.la-input-area {
+  flex-shrink: 0;
+  padding: 12px 16px;
+  border-top: 1px solid var(--cmf-border, rgba(30, 27, 24, 0.08));
+  background: var(--cmf-surface, #FDF8F3);
+}
+
+.la-input-wrapper {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  background: var(--cmf-bg, #FFFBF7);
+  border: 1px solid var(--cmf-border, rgba(30, 27, 24, 0.08));
+  border-radius: 12px;
+  padding: 4px 4px 4px 12px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.la-input-wrapper:focus-within {
+  border-color: rgba(var(--la-secondary-rgb), 0.4);
+  box-shadow: 0 0 0 3px rgba(var(--la-secondary-rgb), 0.08);
+}
+
+.la-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--cmf-text, #1E1B18);
+  resize: none;
+  min-height: 20px;
+  max-height: 120px;
+  padding: 6px 0;
+  font-family: inherit;
+}
+
+.la-input::placeholder {
+  color: var(--cmf-text-muted, #6B6560);
+}
+
+.la-send-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: linear-gradient(160deg, var(--la-secondary-light), var(--la-secondary-dark));
+  color: #fff;
+  border-radius: 8px;
+  cursor: pointer;
+  flex-shrink: 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 2px 6px rgba(var(--la-secondary-rgb), 0.3);
+  transition: box-shadow 160ms var(--la-ease-out), transform 120ms var(--la-ease-out), opacity 160ms var(--la-ease-out);
+}
+
+.la-send-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.la-send-btn:disabled {
+  background: var(--cmf-surface-2, #F7F2ED);
+  color: var(--cmf-text-faint, #9A9590);
+  box-shadow: none;
+  opacity: 0.9;
+  cursor: not-allowed;
+}
+
+.la-input-hints {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 4px;
+  font-size: 10px;
+  color: var(--cmf-text-faint, #9A9590);
+  /* Keyboard affordances are learned once; pinned open they are permanent chrome at the
+     busiest edge of the panel. Focus alone is the wrong trigger — the composer autofocuses
+     when the panel opens, so "on focus" would still mean "basically always". Reveal them
+     only once there is text to send, which is the moment Enter vs Shift+Enter is a real
+     choice the user might be about to get wrong. */
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition:
+    max-height 220ms var(--la-ease-out),
+    opacity 180ms var(--la-ease-out),
+    padding-top 220ms var(--la-ease-out);
+}
+
+/* `:placeholder-shown` is true only while the textarea is empty, so :not() means
+   "the user has typed something". Paired with :focus-within it reveals the hint exactly
+   while a message is being composed, and hides it again the moment it is sent. */
+.la-input-area:focus-within:has(.la-input:not(:placeholder-shown)) .la-input-hints {
+  max-height: 16px;
+  opacity: 1;
+  padding-top: 4px;
+}
+
+/* ============================================================================
+   MARKDOWN RENDERING
+   ============================================================================ */
+
+.la-markdown {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--cmf-text, #1E1B18);
+  word-break: break-word;
+}
+
+.la-markdown p {
+  margin: 0 0 8px;
+}
+
+.la-markdown p:last-child {
+  margin-bottom: 0;
+}
+
+.la-markdown h1,
+.la-markdown h2,
+.la-markdown h3,
+.la-markdown h4,
+.la-markdown h5,
+.la-markdown h6 {
+  margin: 12px 0 6px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--cmf-text, #1E1B18);
+}
+
+.la-markdown h1 { font-size: 17px; }
+.la-markdown h2 { font-size: 15px; }
+.la-markdown h3 { font-size: 14px; }
+.la-markdown h4,
+.la-markdown h5,
+.la-markdown h6 { font-size: 13px; }
+
+.la-markdown strong {
+  font-weight: 700;
+  color: var(--cmf-text, #1E1B18);
+}
+
+.la-markdown em {
+  font-style: italic;
+}
+
+.la-markdown ul,
+.la-markdown ol {
+  margin: 6px 0;
+  padding-left: 20px;
+}
+
+.la-markdown li {
+  margin-bottom: 3px;
+}
+
+.la-markdown li::marker {
+  color: var(--la-secondary);
+}
+
+.la-markdown code {
+  font-family: var(--cmf-font-mono, 'JetBrains Mono', monospace);
+  font-size: 12px;
+  padding: 2px 5px;
+  background: var(--cmf-surface-2, #F7F2ED);
+  border-radius: 4px;
+  color: var(--la-secondary);
+}
+
+.la-markdown pre {
+  margin: 8px 0;
+  padding: 10px 12px;
+  background: var(--cmf-surface-2, #F7F2ED);
+  border-radius: 8px;
+  overflow-x: auto;
+  border: 1px solid var(--cmf-border, rgba(30, 27, 24, 0.08));
+}
+
+.la-markdown pre code {
+  background: transparent;
+  padding: 0;
+  color: var(--cmf-text, #1E1B18);
+}
+
+/* Task lists. This react-markdown build has no GFM, so `- [ ] item` would print
+   its brackets; the li renderer draws the box instead. It is a signal ("this is
+   a to-do"), not a control — creating the task is the action-items flow's job. */
+.la-markdown li.la-task-item {
+  list-style: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-left: -18px;
+}
+
+.la-task-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  margin-top: 3px;
+  border: 1.5px solid var(--cmf-text-muted, #9a9590);
+  border-radius: 3px;
+  color: #fff;
+}
+
+.la-task-item[data-checked] .la-task-box {
+  background: var(--la-secondary);
+  border-color: var(--la-secondary);
+}
+
+.la-task-item[data-checked] .la-task-text {
+  color: var(--cmf-text-secondary, #6b7280);
+  text-decoration: line-through;
+}
+
+.la-task-text > p {
+  margin: 0;
+}
+
+/* A record id the model printed anyway: shortened so the sentence still reads,
+   the full id one hover away, in muted ink so the record link beside it is the
+   thing that looks clickable. */
+.la-markdown code.la-markdown-id {
+  /* Same specificity as `.la-markdown code` above, later in the file, so the
+     muted ink wins over the patina every other code span carries. */
+  color: var(--cmf-text-muted, #6b7280);
+  letter-spacing: 0.02em;
+}
+
+.la-markdown blockquote {
+  margin: 8px 0;
+  padding: 8px 12px;
+  border-left: 2px solid var(--la-secondary);
+  background: rgba(var(--la-secondary-rgb), 0.04);
+  border-radius: 0 6px 6px 0;
+  color: var(--cmf-text-secondary, #3D3833);
+}
+
+.la-markdown a {
+  color: var(--la-secondary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.la-markdown a:hover {
+  color: var(--la-secondary-light);
+}
+
+/* Record links — inline buttons styled like links with a subtle background */
+.la-record-link {
+  display: inline;
+  background: var(--la-secondary-muted);
+  color: var(--la-secondary);
+  border: none;
+  border-radius: 3px;
+  padding: 1px 4px;
+  margin: 0 1px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.la-record-link:hover {
+  background: var(--la-secondary);
+  color: #fff;
+  text-decoration: none;
+}
+
+/* A2b: only the alpha still differs in dark (0.18 vs the base 0.12 muted). The colour
+   override is gone — --la-secondary now resolves to the lighter Patina here by itself. */
+html.dark .la-record-link,
+.la-dark .la-record-link {
+  background: rgba(var(--la-secondary-rgb), 0.18);
+}
+
+html.dark .la-record-link:hover,
+.la-dark .la-record-link:hover {
+  background: var(--la-secondary);
+  color: #fff;
+}
+
+/* PR-2333: the records an answer names, as a row of the same record-link buttons under it.
+   Colours come from .la-record-link above, so light and dark need nothing extra here. */
+.la-answer-records {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.la-answer-records .la-record-link {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+  padding: 2px 8px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+/* Section-navigation links (lv://go/<page>) — accent-toned + a ↗ affordance so
+   "take me to this section" reads distinctly from a patina record link. */
+.la-nav-link {
+  display: inline;
+  background: rgba(184, 97, 74, 0.12);
+  color: var(--la-accent);
+  border: none;
+  border-radius: 3px;
+  padding: 1px 4px;
+  margin: 0 1px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.la-nav-link::after {
+  content: '\2197'; /* ↗ */
+  font-size: 0.85em;
+  margin-left: 2px;
+  text-decoration: none;
+  opacity: 0.7;
+}
+
+.la-nav-link:hover {
+  background: var(--la-accent);
+  color: #fff;
+  text-decoration: none;
+}
+
+html.dark .la-nav-link,
+.la-dark .la-nav-link {
+  background: rgba(184, 97, 74, 0.2);
+  color: var(--la-accent-light);
+}
+
+html.dark .la-nav-link:hover,
+.la-dark .la-nav-link:hover {
+  background: var(--la-accent);
+  color: #fff;
+}
+
+.la-markdown hr {
+  margin: 12px 0;
+  border: none;
+  border-top: 1px solid var(--cmf-border, rgba(30, 27, 24, 0.08));
+}
+
+.la-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0;
+  font-size: 12px;
+}
+
+.la-markdown th,
+.la-markdown td {
+  padding: 6px 8px;
+  border: 1px solid var(--cmf-border, rgba(30, 27, 24, 0.08));
+  text-align: left;
+}
+
+.la-markdown th {
+  background: var(--cmf-surface-2, #F7F2ED);
+  font-weight: 600;
+}
+
+/* ============================================================================
+   DARK MODE
+   ============================================================================ */
+
+html.dark .la-panel,
+.la-dark .la-panel {
+  background: var(--cmf-bg, #020617);
+  border-left-color: var(--cmf-border, rgba(148, 163, 184, 0.15));
+  box-shadow: -8px 0 30px rgba(0, 0, 0, 0.3);
+}
+
+/* U3 — was a flat teal fill. The quiet header takes the panel's own background in
+   both modes; only the dark fallback differs, matching .la-panel above. */
+html.dark .la-header,
+.la-dark .la-header {
+  background: var(--cmf-bg, #020617);
+  color: var(--cmf-text, #F8FAFC);
+}
+
+html.dark .la-header-title h2,
+.la-dark .la-header-title h2 {
+  color: var(--cmf-text, #F8FAFC);
+}
+
+html.dark .la-context-bar,
+.la-dark .la-context-bar {
+  background: var(--cmf-surface, #0F172A);
+  border-bottom-color: var(--cmf-border, rgba(148, 163, 184, 0.15));
+}
+
+html.dark .la-section-chip,
+.la-dark .la-section-chip {
+  background: rgba(var(--la-secondary-rgb), 0.12);
+  border-color: rgba(var(--la-secondary-rgb), 0.2);
+}
+
+html.dark .la-section-summary,
+.la-dark .la-section-summary {
+  color: var(--cmf-text-secondary, #94A3B8);
+}
+
+/* U4 hero density. The fact tiles sit ON the context bar's surface, so in dark they take
+   the panel background to stay one step below it — the same figure/ground relationship the
+   light theme gets from --cmf-bg on --cmf-surface. */
+html.dark .la-context-fact,
+.la-dark .la-context-fact {
+  background: var(--cmf-bg, #020617);
+  border-color: var(--cmf-border, rgba(148, 163, 184, 0.15));
+}
+
+html.dark .la-context-fact-figure,
+.la-dark .la-context-fact-figure {
+  color: var(--cmf-text, #F8FAFC);
+}
+
+html.dark .la-context-fact-label,
+.la-dark .la-context-fact-label,
+html.dark .la-context-scope,
+.la-dark .la-context-scope {
+  color: var(--cmf-text-muted, #94A3B8);
+}
+
+/* Welcome. A2b: this one is NOT redundant — .la-welcome-icon declares no colour at all in
+   the base rule, so deleting it would drop the mark to whatever it inherits. It reads the
+   mode-aware token instead, which resolves to the same value it hardcoded. */
+html.dark .la-welcome-icon,
+.la-dark .la-welcome-icon {
+  color: var(--la-secondary);
+}
+
+html.dark .la-welcome-title,
+.la-dark .la-welcome-title {
+  color: var(--cmf-text, #F8FAFC);
+}
+
+/* Quick actions */
+html.dark .la-quick-actions-label,
+.la-dark .la-quick-actions-label {
+  color: var(--cmf-text-secondary, #9aa0aa);
+}
+
+html.dark .la-quick-action-btn,
+.la-dark .la-quick-action-btn {
+  color: var(--cmf-text-secondary, #94A3B8);
+  background: transparent;
+  border-color: transparent;
+}
+
+html.dark .la-quick-action-btn:hover,
+.la-dark .la-quick-action-btn:hover {
+  background: var(--cmf-surface, #0F172A);
+  border-color: var(--cmf-border, rgba(148, 163, 184, 0.15));
+  color: var(--cmf-text, #F8FAFC);
+}
+
+/* Messages */
+html.dark .la-message-user .la-message-avatar,
+.la-dark .la-message-user .la-message-avatar {
+  background: var(--cmf-surface-2, #1E293B);
+  color: var(--la-accent-light, #D4765A);
+  box-shadow: inset 0 0 0 1px rgba(212, 118, 90, 0.22);
+}
+
+html.dark .la-message-user .la-message-content,
+.la-dark .la-message-user .la-message-content {
+  background: linear-gradient(180deg, rgba(212, 118, 90, 0.14), rgba(212, 118, 90, 0.07));
+  border-color: rgba(212, 118, 90, 0.2);
+}
+
+html.dark .la-message-user .la-message-content p,
+.la-dark .la-message-user .la-message-content p {
+  color: var(--cmf-text, #F8FAFC);
+}
+
+html.dark .la-message-assistant .la-message-content,
+.la-dark .la-message-assistant .la-message-content {
+  background: var(--cmf-surface, #0F172A);
+  border-color: var(--cmf-border, rgba(148, 163, 184, 0.15));
+}
+
+html.dark .la-message-loading .la-message-content,
+.la-dark .la-message-loading .la-message-content {
+  background: var(--cmf-surface, #0F172A);
+  border-color: var(--cmf-border, rgba(148, 163, 184, 0.15));
+}
+
+html.dark .la-loading-dots,
+.la-dark .la-loading-dots {
+  color: var(--cmf-text-muted, #64748B);
+}
+
+html.dark .la-skeleton__line,
+.la-dark .la-skeleton__line {
+  background: linear-gradient(
+    90deg,
+    rgba(148, 163, 184, 0.12) 25%,
+    rgba(148, 163, 184, 0.06) 50%,
+    rgba(148, 163, 184, 0.12) 75%
+  );
+  background-size: 200% 100%;
+  animation: la-skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+/* Error */
+html.dark .la-error,
+.la-dark .la-error {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.08);
+  border-color: rgba(248, 113, 113, 0.15);
+}
+
+/* Suggested actions */
+html.dark .la-suggested-label,
+.la-dark .la-suggested-label {
+  color: var(--cmf-text-secondary, #9aa0aa);
+}
+
+html.dark .la-suggested-btn,
+.la-dark .la-suggested-btn {
+  background: rgba(var(--la-secondary-rgb), 0.08);
+  border-color: rgba(var(--la-secondary-rgb), 0.2);
+}
+
+html.dark .la-suggested-btn:hover,
+.la-dark .la-suggested-btn:hover {
+  background: rgba(var(--la-secondary-rgb), 0.15);
+  border-color: rgba(var(--la-secondary-rgb), 0.35);
+}
+
+/* Input area */
+html.dark .la-input-area,
+.la-dark .la-input-area {
+  background: var(--cmf-surface, #0F172A);
+  border-top-color: var(--cmf-border, rgba(148, 163, 184, 0.15));
+}
+
+html.dark .la-input-wrapper,
+.la-dark .la-input-wrapper {
+  background: var(--cmf-bg, #020617);
+  border-color: var(--cmf-border, rgba(148, 163, 184, 0.15));
+}
+
+html.dark .la-input-wrapper:focus-within,
+.la-dark .la-input-wrapper:focus-within {
+  border-color: rgba(var(--la-secondary-rgb), 0.5);
+  box-shadow: 0 0 0 3px rgba(var(--la-secondary-rgb), 0.1);
+}
+
+html.dark .la-input,
+.la-dark .la-input {
+  color: var(--cmf-text, #F8FAFC);
+}
+
+html.dark .la-input::placeholder,
+.la-dark .la-input::placeholder {
+  color: var(--cmf-text-muted, #64748B);
+}
+
+html.dark .la-input-hints,
+.la-dark .la-input-hints {
+  color: var(--cmf-text-faint, #475569);
+}
+
+/* Markdown dark mode */
+html.dark .la-markdown,
+.la-dark .la-markdown {
+  color: var(--cmf-text, #F8FAFC);
+}
+
+html.dark .la-markdown h1,
+html.dark .la-markdown h2,
+html.dark .la-markdown h3,
+html.dark .la-markdown h4,
+html.dark .la-markdown h5,
+html.dark .la-markdown h6,
+.la-dark .la-markdown h1,
+.la-dark .la-markdown h2,
+.la-dark .la-markdown h3,
+.la-dark .la-markdown h4,
+.la-dark .la-markdown h5,
+.la-dark .la-markdown h6 {
+  color: var(--cmf-text, #F8FAFC);
+}
+
+html.dark .la-markdown strong,
+.la-dark .la-markdown strong {
+  color: var(--cmf-text, #F8FAFC);
+}
+
+html.dark .la-markdown code,
+.la-dark .la-markdown code {
+  background: var(--cmf-surface-2, #1E293B);
+}
+
+html.dark .la-markdown pre,
+.la-dark .la-markdown pre {
+  background: var(--cmf-surface-2, #1E293B);
+  border-color: var(--cmf-border, rgba(148, 163, 184, 0.15));
+}
+
+html.dark .la-markdown pre code,
+.la-dark .la-markdown pre code {
+  color: var(--cmf-text, #F8FAFC);
+}
+
+html.dark .la-markdown blockquote,
+.la-dark .la-markdown blockquote {
+  background: rgba(var(--la-secondary-rgb), 0.06);
+  color: var(--cmf-text-secondary, #94A3B8);
+}
+
+html.dark .la-markdown hr,
+.la-dark .la-markdown hr {
+  border-top-color: var(--cmf-border, rgba(148, 163, 184, 0.15));
+}
+
+html.dark .la-markdown th,
+html.dark .la-markdown td,
+.la-dark .la-markdown th,
+.la-dark .la-markdown td {
+  border-color: var(--cmf-border, rgba(148, 163, 184, 0.15));
+}
+
+html.dark .la-markdown th,
+.la-dark .la-markdown th {
+  background: var(--cmf-surface-2, #1E293B);
+}
+
+/* Scrollbar dark mode */
+html.dark .la-messages::-webkit-scrollbar-thumb,
+.la-dark .la-messages::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.2);
+}
+
+html.dark .la-messages::-webkit-scrollbar-thumb:hover,
+.la-dark .la-messages::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.35);
+}
+
+/* Backdrop dark — transparent to keep page visible while chatting */
+html.dark .la-backdrop,
+.la-dark .la-backdrop {
+  background: transparent;
+}
+
+/* ============================================================================
+   RESPONSIVE BREAKPOINTS
+   ============================================================================ */
+
+/* Tablet landscape */
+@media (max-width: 1024px) {
+  .la-panel {
+    width: 360px;
+  }
+}
+
+/* Tablet portrait / small screens */
+@media (max-width: 768px) {
+  .la-panel {
+    width: 85%;
+    max-width: 340px;
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
+  }
+}
+
+/* Very small screens — allow wider panel but never full 100% */
+@media (max-width: 380px) {
+  .la-panel {
+    width: 90%;
+    max-width: none;
+  }
+}
+
+/* Mobile compact */
+@media (max-width: 480px) {
+  /* The header is already 44px — that is the touch-target floor, so it does not
+     shrink further on mobile. Only the side padding tightens. */
+  .la-header {
+    padding: 0 6px 0 10px;
+  }
+
+  .la-context-bar {
+    padding: 6px 12px;
+  }
+
+  /* Must follow .la-context-bar: both are one class deep, so source order decides, and
+     without this the hero would inherit the bar's 6px and lose its breathing room. */
+  .la-context-bar-hero {
+    padding: 12px 12px 14px;
+  }
+
+  .la-messages {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .la-welcome {
+    padding: 28px 16px 16px;
+  }
+
+  .la-welcome-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .la-welcome-title {
+    font-size: 16px;
+  }
+
+  .la-quick-actions {
+    max-width: 100%;
+  }
+
+  .la-quick-action-btn {
+    font-size: 12px;
+    padding: 8px 12px;
+  }
+
+  .la-message-content {
+    max-width: calc(100% - 40px) !important;
+  }
+
+  .la-input-area {
+    padding: 10px 12px;
+  }
+
+  .la-input {
+    font-size: 14px; /* Prevent iOS zoom */
+  }
+
+  .la-input-hints {
+    font-size: 9px;
+  }
+}
+
+/* ============================================================================
+   HEADER ACTION BUTTONS (Export)
+   ============================================================================ */
+
+.la-header-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--cmf-text-muted, #6B6560);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.la-header-action-btn:hover {
+  background: var(--cmf-surface-2, #EFE7DD);
+  color: var(--cmf-text, #1E1B18);
+}
+
+/* ============================================================================
+   MESSAGE ACTIONS (Copy, Feedback, Token info)
+   ============================================================================ */
+
+/* --- Write-tool proposals (S3 confirm/reject cards) --- */
+.la-proposals {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.la-proposal {
+  position: relative;
+  display: flex;
+  /* Stacked, not side-by-side: the summary gets the full card width (readable,
+     wraps by word) and the action buttons sit on their own row beneath it.
+     The old row layout squeezed a long summary into a sliver that wrapped one
+     character per line once the actions row carried 3 buttons. */
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(var(--la-secondary-rgb), 0.22);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(var(--la-secondary-light-rgb), 0.11), rgba(var(--la-secondary-light-rgb), 0.04));
+  box-shadow: 0 1px 2px rgba(var(--la-secondary-rgb), 0.08), 0 8px 20px -12px rgba(var(--la-secondary-rgb), 0.45);
+  overflow: hidden;
+  transition: box-shadow 260ms var(--la-ease-out),
+              border-color 260ms var(--la-ease-out),
+              background 260ms var(--la-ease-out);
+}
+
+/* Idle "awaiting your call" — a slow breathing glow so the card feels live */
+.la-proposal.la-proposal-proposed {
+  animation: la-proposal-idle 3.6s ease-in-out infinite;
+}
+
+@keyframes la-proposal-idle {
+  0%, 100% { box-shadow: 0 1px 2px rgba(var(--la-secondary-rgb), 0.08), 0 8px 20px -12px rgba(var(--la-secondary-rgb), 0.35); }
+  50%      { box-shadow: 0 1px 2px rgba(var(--la-secondary-rgb), 0.12), 0 10px 26px -12px rgba(var(--la-secondary-rgb), 0.6); }
+}
+
+/* Working — a light sweeps across while the action executes */
+.la-proposal-working::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.4) 50%, transparent 80%);
+  transform: translateX(-100%);
+  animation: la-proposal-shimmer 1.1s var(--la-ease-out) infinite;
+  pointer-events: none;
+}
+
+@keyframes la-proposal-shimmer {
+  to { transform: translateX(100%); }
+}
+
+/* Executed — the card settles into a confident success state */
+.la-proposal.la-proposal-executed {
+  border-color: rgba(42, 122, 110, 0.4);
+  background: linear-gradient(180deg, rgba(42, 122, 110, 0.14), rgba(42, 122, 110, 0.05));
+  box-shadow: 0 1px 2px rgba(42, 122, 110, 0.1), 0 8px 20px -12px rgba(42, 122, 110, 0.5);
+}
+
+.la-proposal-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* Icon chip — a small dimensional object, not a flat glyph */
+.la-proposal-chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 9px;
+  color: #fff;
+  background: linear-gradient(160deg, var(--la-secondary-light), var(--la-secondary-dark));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 2px 6px rgba(var(--la-secondary-rgb), 0.4);
+}
+
+.la-proposal-summary {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--cmf-text, #2A2521);
+  min-width: 0;
+  /* Read in full and wrap by word; break only genuinely long unbroken tokens
+     (a URL, an id) rather than mid-word. Never per-character. */
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.la-proposal-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.la-proposal-btn {
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+}
+
+.la-proposal-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.la-proposal-confirm {
+  background: linear-gradient(160deg, var(--la-secondary-light), var(--la-secondary-dark));
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 2px 6px rgba(var(--la-secondary-rgb), 0.32);
+}
+
+.la-proposal-confirm:hover:not(:disabled) {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 4px 12px rgba(var(--la-secondary-rgb), 0.45);
+}
+
+.la-proposal-reject {
+  background: transparent;
+  color: var(--cmf-text-muted, #6B6560);
+  border-color: var(--cmf-border, #E5E1DC);
+}
+
+.la-proposal-reject:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.la-proposal-undo {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  color: var(--cmf-text-muted, #6B6560);
+  border-color: var(--cmf-border, #E5E1DC);
+}
+
+.la-proposal-undo:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.04);
+  color: #C0392B;
+}
+
+/* S7 — "Edit" affordance on a pending proposal. A quiet ghost button (same weight
+   as Dismiss) so Confirm stays the primary action; editing is the exception path. */
+.la-proposal-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  color: var(--cmf-text-muted, #6B6560);
+  border-color: var(--cmf-border, #E5E1DC);
+}
+
+.la-proposal-edit-btn:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--la-secondary-dark);
+}
+
+/* S7 — inline edit form. Replaces the summary line while a proposal is being
+   tweaked; one labeled field per whitelisted payload key. */
+.la-proposal-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.la-proposal-edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.la-proposal-edit-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--cmf-text-muted, #6B6560);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.la-proposal-edit-input {
+  width: 100%;
+  padding: 6px 9px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--cmf-text, #2A2521);
+  background: var(--cmf-surface, #fff);
+  border: 1px solid var(--cmf-border, #E5E1DC);
+  border-radius: 7px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.la-proposal-edit-input:focus {
+  outline: none;
+  border-color: var(--la-secondary-dark);
+  box-shadow: 0 0 0 3px rgba(var(--la-secondary-rgb), 0.15);
+}
+
+textarea.la-proposal-edit-input {
+  resize: vertical;
+  min-height: 56px;
+  line-height: 1.45;
+}
+
+.la-proposal-edit-error {
+  margin: 0;
+  font-size: 12px;
+  color: #C0392B;
+}
+
+/* S8a — typed-confirm gate. Shown in place of the one-click actions for a SENSITIVE
+   proposal: an amber-tinted warning + a text input that must match the expected token
+   before Confirm enables. Reuses .la-proposal-edit-field/-input/-error for the field. */
+.la-proposal-confirm-gate {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 9px 10px;
+  border: 1px solid rgba(201, 138, 44, 0.35);
+  border-left: 3px solid #C98A2C;
+  border-radius: 8px;
+  background: rgba(201, 138, 44, 0.07);
+}
+
+.la-proposal-confirm-warning {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.4;
+  font-weight: 600;
+  color: #9A6A1E;
+}
+
+.la-dark .la-proposal-confirm-gate {
+  border-color: rgba(224, 168, 78, 0.4);
+  border-left-color: #E0A84E;
+  background: rgba(224, 168, 78, 0.1);
+}
+
+.la-dark .la-proposal-confirm-warning {
+  color: #E9BE72;
+}
+
+/* N4 "View it" — accent-tinted jump to where the executed work landed. Shares
+   the terracotta ↗ language of the inline .la-nav-link so "go there" reads the
+   same everywhere in the panel. */
+.la-proposal-view {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(184, 97, 74, 0.12);
+  color: var(--la-accent);
+  border-color: transparent;
+}
+
+.la-proposal-view:hover:not(:disabled) {
+  background: var(--la-accent);
+  color: #fff;
+}
+
+html.dark .la-proposal-view,
+.la-dark .la-proposal-view {
+  background: rgba(184, 97, 74, 0.2);
+  color: var(--la-accent-light);
+}
+
+html.dark .la-proposal-view:hover:not(:disabled),
+.la-dark .la-proposal-view:hover:not(:disabled) {
+  background: var(--la-accent);
+  color: #fff;
+}
+
+.la-proposal-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.la-proposal-status-done { color: #2A7A6E; }
+.la-proposal-status-dismissed { color: var(--cmf-text-muted, #6B6560); }
+.la-proposal-status-failed { color: #C0392B; }
+
+/* Terminal send (send_email): no Undo — a quiet note that the send is final. */
+.la-proposal-sent-note {
+  font-size: 0.72rem;
+  font-style: italic;
+  color: var(--cmf-text-muted, #6B6560);
+  align-self: center;
+}
+
+/* The check lands with a spring overshoot — the payoff moment */
+.la-proposal-status-done svg {
+  animation: la-check-pop 440ms var(--la-ease-spring) both;
+}
+
+@keyframes la-check-pop {
+  0%   { transform: scale(0.2) rotate(-12deg); opacity: 0; }
+  60%  { transform: scale(1.18) rotate(0deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+/* Resolved-away cards recede — quiet, flat, no glow (the moment has passed) */
+.la-proposal.la-proposal-rejected,
+.la-proposal.la-proposal-undone,
+.la-proposal.la-proposal-failed {
+  border-color: var(--cmf-border, #E5E1DC);
+  background: var(--cmf-surface-2, #F7F2ED);
+  box-shadow: none;
+  animation: none;
+}
+
+/* Their chip dims to match the receded state */
+.la-proposal-rejected .la-proposal-chip,
+.la-proposal-undone .la-proposal-chip,
+.la-proposal-failed .la-proposal-chip {
+  background: var(--cmf-border-strong, rgba(30, 27, 24, 0.14));
+  box-shadow: none;
+  opacity: 0.7;
+}
+
+.la-dark .la-proposal-undo:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.la-dark .la-proposal {
+  border-color: rgba(var(--la-secondary-rgb), 0.28);
+  background: linear-gradient(180deg, rgba(var(--la-secondary-light-rgb), 0.16), rgba(var(--la-secondary-light-rgb), 0.06));
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 20px -12px rgba(var(--la-secondary-rgb), 0.4);
+}
+
+/* Preserve state semantics in dark mode */
+.la-dark .la-proposal.la-proposal-executed {
+  border-color: rgba(var(--la-secondary-light-rgb), 0.45);
+  background: linear-gradient(180deg, rgba(var(--la-secondary-light-rgb), 0.2), rgba(var(--la-secondary-light-rgb), 0.08));
+}
+
+.la-dark .la-proposal.la-proposal-rejected,
+.la-dark .la-proposal.la-proposal-undone,
+.la-dark .la-proposal.la-proposal-failed {
+  border-color: rgba(148, 163, 184, 0.18);
+  background: rgba(148, 163, 184, 0.06);
+  box-shadow: none;
+}
+
+.la-dark .la-proposal-summary {
+  color: #F5F2EE;
+}
+
+.la-dark .la-proposal-reject:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* --- Plan cards (P4): a multi-step plan rendered as one card --- */
+/* Inherits the proposal card's tactile surface, but lays out vertically
+   (header → numbered steps → actions) since a plan carries N steps. */
+.la-plan {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(var(--la-secondary-rgb), 0.22);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(var(--la-secondary-light-rgb), 0.11), rgba(var(--la-secondary-light-rgb), 0.04));
+  box-shadow: 0 1px 2px rgba(var(--la-secondary-rgb), 0.08), 0 8px 20px -12px rgba(var(--la-secondary-rgb), 0.45);
+  overflow: hidden;
+  transition: box-shadow 260ms var(--la-ease-out),
+              border-color 260ms var(--la-ease-out),
+              background 260ms var(--la-ease-out);
+}
+
+/* Awaiting confirmation — same slow breathing glow as a single proposal */
+.la-plan.la-plan-proposed {
+  animation: la-proposal-idle 3.6s ease-in-out infinite;
+}
+
+/* Executing — the light sweep reuses the proposal shimmer */
+.la-plan.la-plan-working::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.4) 50%, transparent 80%);
+  transform: translateX(-100%);
+  animation: la-proposal-shimmer 1.1s var(--la-ease-out) infinite;
+  pointer-events: none;
+}
+
+/* Fully executed — settle into the confident success surface */
+.la-plan.la-plan-executed {
+  border-color: rgba(42, 122, 110, 0.4);
+  background: linear-gradient(180deg, rgba(42, 122, 110, 0.14), rgba(42, 122, 110, 0.05));
+  box-shadow: 0 1px 2px rgba(42, 122, 110, 0.1), 0 8px 20px -12px rgba(42, 122, 110, 0.5);
+}
+
+/* Partial — stopped part-way: a cautionary amber-leaning surface */
+.la-plan.la-plan-partial {
+  border-color: rgba(191, 149, 63, 0.4);
+  background: linear-gradient(180deg, rgba(191, 149, 63, 0.12), rgba(191, 149, 63, 0.04));
+  box-shadow: 0 1px 2px rgba(191, 149, 63, 0.1), 0 8px 20px -12px rgba(191, 149, 63, 0.42);
+}
+
+/* Resolved-away plans recede — flat, quiet, no glow */
+.la-plan.la-plan-failed,
+.la-plan.la-plan-undone,
+.la-plan.la-plan-dismissed {
+  border-color: var(--cmf-border, #E5E1DC);
+  background: var(--cmf-surface-2, #F7F2ED);
+  box-shadow: none;
+  animation: none;
+}
+
+.la-plan-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* U8b: the waiting / working orb at the right end of a proposal or plan card head */
+.la-card-orb {
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--la-secondary);
+}
+
+/* Ordered step list — numbered, each row is num chip + label */
+.la-plan-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.la-plan-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--cmf-text, #2A2521);
+  transition: opacity 200ms var(--la-ease-out);
+}
+
+/* Small circular step marker — number by default, icon on resolve */
+.la-plan-step-num {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--cmf-text-muted, #6B6560);
+  background: var(--cmf-surface-2, #F7F2ED);
+  border: 1px solid var(--cmf-border, #E5E1DC);
+}
+
+.la-plan-step-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* N4 (deepened): per-step jump to what an executed plan step created. Compact
+   accent chip pushed to the row's end; same terracotta ↗ language as the inline
+   nav links and the single-action "View it". */
+.la-plan-step-view {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 2px 7px;
+  border: none;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  background: rgba(184, 97, 74, 0.12);
+  color: var(--la-accent);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.la-plan-step-view:hover {
+  background: var(--la-accent);
+  color: #fff;
+}
+
+.la-dark .la-plan-step-view,
+html.dark .la-plan-step-view {
+  background: rgba(184, 97, 74, 0.2);
+  color: var(--la-accent-light);
+}
+
+.la-dark .la-plan-step-view:hover,
+html.dark .la-plan-step-view:hover {
+  background: var(--la-accent);
+  color: #fff;
+}
+
+/* The step currently in flight — pulses while its action runs */
+.la-plan-step-working .la-plan-step-num {
+  color: #fff;
+  background: linear-gradient(160deg, var(--la-secondary-light), var(--la-secondary-dark));
+  border-color: transparent;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 2px 6px rgba(var(--la-secondary-rgb), 0.4);
+  animation: la-proposal-idle 1.4s ease-in-out infinite;
+}
+
+/* Executed step — green marker, the check springs in (shared keyframe) */
+.la-plan-step-executed .la-plan-step-num {
+  color: #fff;
+  background: #2A7A6E;
+  border-color: transparent;
+}
+
+.la-plan-step-executed .la-plan-step-num svg {
+  animation: la-check-pop 440ms var(--la-ease-spring) both;
+}
+
+/* Failed step — red marker */
+.la-plan-step-failed .la-plan-step-num {
+  color: #fff;
+  background: #C0392B;
+  border-color: transparent;
+}
+
+/* Undone step — receded */
+.la-plan-step-undone {
+  opacity: 0.6;
+}
+
+.la-plan-step-undone .la-plan-step-num {
+  color: #fff;
+  background: var(--cmf-border-strong, rgba(30, 27, 24, 0.14));
+  border-color: transparent;
+}
+
+.la-plan-actions {
+  justify-content: flex-end;
+}
+
+/* Dark mode — mirror the proposal card's dark treatment */
+.la-dark .la-plan {
+  border-color: rgba(var(--la-secondary-rgb), 0.28);
+  background: linear-gradient(180deg, rgba(var(--la-secondary-light-rgb), 0.16), rgba(var(--la-secondary-light-rgb), 0.06));
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 20px -12px rgba(var(--la-secondary-rgb), 0.4);
+}
+
+.la-dark .la-plan.la-plan-executed {
+  border-color: rgba(var(--la-secondary-light-rgb), 0.45);
+  background: linear-gradient(180deg, rgba(var(--la-secondary-light-rgb), 0.2), rgba(var(--la-secondary-light-rgb), 0.08));
+}
+
+.la-dark .la-plan.la-plan-failed,
+.la-dark .la-plan.la-plan-undone,
+.la-dark .la-plan.la-plan-dismissed {
+  border-color: rgba(148, 163, 184, 0.18);
+  background: rgba(148, 163, 184, 0.06);
+  box-shadow: none;
+}
+
+.la-dark .la-plan-step {
+  color: #F5F2EE;
+}
+
+.la-dark .la-plan-step-num {
+  color: #C9C4BE;
+  background: rgba(148, 163, 184, 0.1);
+  border-color: rgba(148, 163, 184, 0.2);
+}
+
+.la-message-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+  padding-top: 4px;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.la-message.la-message-assistant:hover .la-message-actions,
+.la-message-actions:focus-within {
+  opacity: 1;
+}
+
+/* Touch screens have no hover, so the actions under an answer (Copy, Share, feedback)
+   were invisible on phones. Show them, and give each a finger-sized target. */
+@media (hover: none) {
+  .la-message.la-message-assistant .la-message-actions {
+    opacity: 1;
+  }
+  .la-message-actions .la-action-btn {
+    width: 36px;
+    height: 36px;
+  }
+  .la-message-actions .la-action-btn.la-action-btn-share {
+    width: auto;
+  }
+}
+
+/* Share (2026-10-28) is the one action with a word beside its icon: it is how an answer
+   leaves the chat, so it should be findable without hovering for a tooltip. */
+.la-action-btn.la-action-btn-share {
+  width: auto;
+  gap: 4px;
+  padding: 0 8px;
+}
+
+.la-action-btn-label {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* Always show actions for messages with feedback */
+.la-message.la-message-assistant .la-message-actions:has(.la-action-btn-active),
+.la-message.la-message-assistant .la-message-actions:has(.la-action-btn-negative) {
+  opacity: 1;
+}
+
+.la-message-actions-left {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.la-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  color: var(--cmf-text-muted, #6B6560);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.la-action-btn:hover {
+  background: var(--cmf-surface-2, #F7F2ED);
+  color: var(--cmf-text, #1E1B18);
+}
+
+.la-action-btn-active {
+  color: var(--la-secondary) !important;
+  background: rgba(var(--la-secondary-rgb), 0.08);
+}
+
+.la-action-btn-negative {
+  color: #E11D48 !important;
+  background: rgba(225, 29, 72, 0.06);
+}
+
+/* ============================================================================
+   TOKEN INFO
+   ============================================================================ */
+
+.la-token-info {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--cmf-text-muted, #6B6560);
+  white-space: nowrap;
+}
+
+.la-token-info svg {
+  opacity: 0.6;
+}
+
+.la-cached-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--la-secondary);
+  background: rgba(var(--la-secondary-rgb), 0.08);
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* Pattern 2 — the muted note under a partial answer kept after Stop or the idle timeout.
+   Muted text, not the secondary accent: it qualifies the answer, it is not an action. */
+/* FG-7d: what an answer opened in the app. */
+.la-opened-tag {
+  margin: 6px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cmf-text-muted, #6B6560);
+}
+
+.la-dark .la-opened-tag {
+  color: var(--cmf-text-muted, #9CA3AF);
+}
+
+.la-stopped-tag {
+  margin: 6px 0 0;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--cmf-text-muted, #6B6560);
+}
+
+/* ============================================================================
+   TYPEWRITER CURSOR
+   ============================================================================ */
+
+.la-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: var(--la-secondary);
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  animation: la-cursor-blink 1s ease-in-out infinite;
+}
+
+@keyframes la-cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.15; }
+}
+
+/* ============================================================================
+   DYNAMIC QUICK ACTIONS
+   ============================================================================ */
+
+.la-quick-action-dynamic {
+  border-color: rgba(var(--la-secondary-rgb), 0.2) !important;
+  background: var(--cmf-surface, #FDF8F3) !important;
+  color: var(--cmf-text, #1E1B18) !important;
+  font-weight: 500 !important;
+  position: relative;
+  padding-left: 32px !important;
+}
+
+.la-quick-action-dynamic:hover {
+  background: var(--cmf-surface-2, #F7F2ED) !important;
+  border-color: rgba(var(--la-secondary-rgb), 0.35) !important;
+}
+
+.la-dynamic-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--la-secondary);
+  flex-shrink: 0;
+}
+
+/* Proactive action nudges (S10a). Same chip shell as the dynamic question chips
+   but in the PRIMARY (terracotta) action color — a deliberate signal that these
+   DO something (open a proposal) rather than ask something. */
+.la-quick-action-proactive {
+  border-color: rgba(184, 92, 56, 0.28) !important;
+  background: var(--cmf-surface, #FDF8F3) !important;
+  color: var(--cmf-text, #1E1B18) !important;
+  font-weight: 500 !important;
+  position: relative;
+  padding-left: 32px !important;
+}
+
+.la-quick-action-proactive:hover {
+  background: var(--cmf-surface-2, #F7F2ED) !important;
+  border-color: rgba(184, 92, 56, 0.45) !important;
+}
+
+.la-proactive-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--la-accent);
+  flex-shrink: 0;
+}
+
+/* Pinned / saved queries */
+.la-pinned-query-wrapper {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+}
+
+.la-quick-action-pinned {
+  border-color: var(--la-secondary) !important;
+  background: var(--la-secondary-subtle) !important;
+  color: var(--cmf-text, #1E1B18) !important;
+  font-weight: 500 !important;
+  position: relative;
+  padding-left: 32px !important;
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+  border-right: none !important;
+}
+
+.la-quick-action-pinned:hover {
+  background: var(--la-secondary-muted) !important;
+}
+
+.la-pinned-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--la-secondary);
+  flex-shrink: 0;
+}
+
+.la-pinned-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  border: 1px solid var(--la-secondary);
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+  background: var(--la-secondary-subtle);
+  color: var(--cmf-text-muted, #888);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.la-pinned-remove:hover {
+  background: #ef4444;
+  color: #fff;
+}
+
+/* ============================================================================
+   ONBOARDING TOUR
+   ============================================================================ */
+
+.la-tour-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+  padding: 24px;
+}
+
+.la-tour-card {
+  background: var(--cmf-surface, #fff);
+  border: 1px solid var(--cmf-border, rgba(30, 27, 24, 0.08));
+  border-radius: 16px;
+  padding: 28px 24px 20px;
+  max-width: 320px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15);
+}
+
+.la-tour-step-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.la-tour-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--cmf-border, rgba(30, 27, 24, 0.15));
+  transition: background 0.2s, transform 0.2s;
+}
+
+.la-tour-dot-active {
+  background: var(--la-secondary);
+  transform: scale(1.3);
+}
+
+.la-tour-dot-done {
+  background: var(--la-secondary-light);
+}
+
+.la-tour-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--cmf-text, #1E1B18);
+  margin: 0 0 8px;
+  font-family: var(--font-heading, inherit);
+}
+
+.la-tour-body {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--cmf-text-muted, #666);
+  margin: 0 0 20px;
+}
+
+.la-tour-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.la-tour-skip {
+  background: none;
+  border: none;
+  font-size: 12px;
+  color: var(--cmf-text-muted, #888);
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+
+.la-tour-skip:hover {
+  background: var(--cmf-surface-2, rgba(0, 0, 0, 0.04));
+}
+
+.la-tour-next {
+  background: var(--la-secondary);
+  color: #fff;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.la-tour-next:hover {
+  background: var(--la-secondary-dark);
+}
+
+/* Tour dark mode */
+html.dark .la-tour-card,
+.la-dark .la-tour-card {
+  background: var(--cmf-surface, #1a1a1a);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+html.dark .la-tour-title,
+.la-dark .la-tour-title {
+  color: var(--cmf-text, #E5E7EB);
+}
+
+html.dark .la-tour-body,
+.la-dark .la-tour-body {
+  color: var(--cmf-text-muted, #9CA3AF);
+}
+
+/* ============================================================================
+   DARK MODE ADDITIONS
+   ============================================================================ */
+
+.la-dark .la-action-btn {
+  color: var(--cmf-text-muted, #9CA3AF);
+}
+
+.la-dark .la-action-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--cmf-text, #F3F4F6);
+}
+
+.la-dark .la-action-btn-active {
+  background: rgba(var(--la-secondary-rgb), 0.12);
+}
+
+.la-dark .la-action-btn-negative {
+  color: #FB7185 !important;
+  background: rgba(225, 29, 72, 0.12);
+}
+
+.la-dark .la-token-info,
+.la-dark .la-stopped-tag {
+  color: var(--cmf-text-muted, #9CA3AF);
+}
+
+.la-dark .la-cached-badge {
+  background: rgba(var(--la-secondary-rgb), 0.12);
+}
+
+.la-dark .la-quick-action-dynamic {
+  background: rgba(var(--la-secondary-rgb), 0.06) !important;
+  border-color: rgba(var(--la-secondary-rgb), 0.2) !important;
+}
+
+.la-dark .la-quick-action-dynamic:hover {
+  background: rgba(var(--la-secondary-rgb), 0.12) !important;
+}
+
+.la-dark .la-quick-action-proactive {
+  background: rgba(184, 92, 56, 0.08) !important;
+  border-color: rgba(184, 92, 56, 0.28) !important;
+}
+
+.la-dark .la-quick-action-proactive:hover {
+  background: rgba(184, 92, 56, 0.15) !important;
+}
+
+.la-dark .la-quick-action-pinned {
+  background: rgba(var(--la-secondary-rgb), 0.08) !important;
+  border-color: rgba(var(--la-secondary-rgb), 0.3) !important;
+}
+
+.la-dark .la-quick-action-pinned:hover {
+  background: rgba(var(--la-secondary-rgb), 0.15) !important;
+}
+
+.la-dark .la-pinned-remove {
+  border-color: rgba(var(--la-secondary-rgb), 0.3);
+  background: rgba(var(--la-secondary-rgb), 0.08);
+  color: var(--cmf-text-muted, #9CA3AF);
+}
+
+/* ============================================================================
+   RIPPLE ICON ANIMATIONS — brand patina pulse for all panel ripple icons
+   ============================================================================ */
+
+.logos-assistant .la-ring {
+  transform-origin: center;
+  animation: laRingPulse 4s ease-in-out infinite;
+}
+
+.logos-assistant .la-ring-2 { animation-delay: 0.6s; }
+.logos-assistant .la-ring-3 { animation-delay: 1.2s; }
+
+@keyframes laRingPulse {
+  0%, 100% { opacity: 0.25; transform: scale(1); }
+  50%      { opacity: 0.8; transform: scale(1.04); }
+}
+
+.logos-assistant .la-core-glow {
+  animation: laCoreGlow 3s ease-in-out infinite;
+}
+
+@keyframes laCoreGlow {
+  0%, 100% { opacity: 0.3; }
+  50%      { opacity: 0.7; }
+}
+
+.logos-assistant .la-center-dot {
+  animation: laDotPulse 2.5s ease-in-out infinite;
+}
+
+@keyframes laDotPulse {
+  0%, 100% { opacity: 0.85; }
+  50%      { opacity: 1; }
+}
+
+/* ============================================================================
+   REDUCED MOTION — disable all decorative animations
+   ============================================================================ */
+
+/* ============================================================================
+   SPRINT 4: Action Items Panel
+   ============================================================================ */
+
+.la-action-items-panel {
+  margin-top: 8px;
+  border: 1px solid rgba(var(--la-secondary-rgb), 0.25);
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(var(--la-secondary-rgb), 0.04);
+}
+
+.la-action-items-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--la-secondary);
+  border-bottom: 1px solid rgba(var(--la-secondary-rgb), 0.15);
+}
+
+.la-action-items-list {
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.la-action-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font-size: 12px;
+  color: var(--cmf-text, #333);
+  width: 100%;
+  transition: background 0.15s;
+}
+
+.la-action-item:hover {
+  background: rgba(var(--la-secondary-rgb), 0.08);
+}
+
+.la-action-item svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--cmf-text-muted, #888);
+}
+
+.la-action-item-selected svg {
+  color: var(--la-secondary);
+}
+
+.la-action-item-text {
+  flex: 1;
+  line-height: 1.4;
+}
+
+.la-action-item-date {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--cmf-text-faint, #aaa);
+  background: rgba(var(--la-secondary-rgb), 0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  margin-top: 1px;
+}
+
+.la-action-items-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-top: 1px solid rgba(var(--la-secondary-rgb), 0.15);
+}
+
+.la-action-items-select-all {
+  font-size: 11px;
+  color: var(--cmf-text-muted, #888);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.la-action-items-select-all:hover {
+  color: var(--la-secondary);
+}
+
+.la-action-items-create {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--la-secondary);
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.la-action-items-create:hover:not(:disabled) {
+  background: #339080;
+}
+
+.la-action-items-create:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ============================================================================
+   SPRINT 4: Voice Input Button
+   ============================================================================ */
+
+.la-voice-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--cmf-text-muted, #888);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 0.15s, background 0.15s;
+}
+
+.la-voice-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Listening is patina everywhere the assistant shows it — the orb, the header
+   readout, the launcher pill — so the composer's live mic agrees with them
+   instead of flashing recording-red under a patina header. */
+.la-voice-btn-active {
+  color: #2C2520; /* Ink: white on the patina fill read 3.08:1 */
+  background: #3B9E8F;
+  animation: la-pulse-mic 1.5s ease-in-out infinite;
+}
+
+@keyframes la-pulse-mic {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(59, 158, 143, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(59, 158, 143, 0); }
+}
+
+/* ============================================================================
+   SPRINT 4: Spinner Utility
+   ============================================================================ */
+
+.la-spin {
+  animation: la-spin-rotate 1s linear infinite;
+}
+
+@keyframes la-spin-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ============================================================================
+   SPRINT 4: Dark Mode Overrides
+   ============================================================================ */
+
+.la-dark .la-action-items-panel {
+  background: rgba(var(--la-secondary-rgb), 0.06);
+  border-color: rgba(var(--la-secondary-rgb), 0.2);
+}
+
+.la-dark .la-action-items-header {
+  border-bottom-color: rgba(var(--la-secondary-rgb), 0.12);
+}
+
+.la-dark .la-action-item:hover {
+  background: rgba(var(--la-secondary-rgb), 0.1);
+}
+
+.la-dark .la-action-items-footer {
+  border-top-color: rgba(var(--la-secondary-rgb), 0.12);
+}
+
+.la-dark .la-voice-btn-active {
+  color: #fff;
+  background: #52B5A6;
+}
+
+/* ============================================================================
+   AI DIALOG ANIMATIONS — thinking, streaming, welcome entrance
+   ============================================================================ */
+
+/* Welcome float — gentle breathing bob on empty state */
+@keyframes la-welcome-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
+}
+
+/* Welcome children stagger entrance */
+.la-welcome > *:not(.la-welcome-icon) {
+  opacity: 0;
+  animation: la-stagger-in 400ms cubic-bezier(0.23, 1, 0.32, 1) forwards;
+}
+
+.la-welcome > *:nth-child(2) { animation-delay: 80ms; }
+.la-welcome > *:nth-child(3) { animation-delay: 140ms; }
+.la-welcome > *:nth-child(4) { animation-delay: 200ms; }
+.la-welcome > *:nth-child(5) { animation-delay: 260ms; }
+.la-welcome > *:nth-child(6) { animation-delay: 320ms; }
+.la-welcome > *:nth-child(n+7) { animation-delay: 380ms; }
+
+@keyframes la-stagger-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Agent pipeline — live stages and tool steps while Logos AI works (AgentPipeline.tsx) */
+.la-pipeline {
+  width: 100%;
+  min-width: 248px;
+  padding: 4px 2px 2px;
+}
+
+.la-pipeline-track {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+.la-pipeline-node {
+  flex: none;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--cmf-border, rgba(30, 27, 24, 0.12));
+  background: var(--cmf-surface-2, transparent);
+  color: var(--cmf-text-secondary, #4A4540);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+  transition: color 0.25s, border-color 0.25s, background-color 0.25s, opacity 0.25s;
+}
+
+.la-pipeline-node.is-pending { opacity: 0.5; }
+
+.la-pipeline-node.is-done::before {
+  content: '\2713';
+  margin-right: 4px;
+  color: var(--la-secondary);
+}
+
+.la-pipeline-node.is-active {
+  color: var(--cmf-text, #1E1B18);
+  border-color: var(--la-secondary);
+  background: rgba(var(--la-secondary-rgb), 0.1);
+  animation: la-pipeline-glow 1.8s ease-in-out infinite;
+}
+
+/* Dashed connector; the one leading into the active stage carries a moving dot */
+.la-pipeline-edge {
+  position: relative;
+  flex: 1 1 10px;
+  min-width: 8px;
+  height: 1px;
+  background: repeating-linear-gradient(90deg,
+    rgba(var(--la-secondary-rgb), 0.4) 0 3px, transparent 3px 7px);
+}
+
+.la-pipeline-edge.is-flowing::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: 0;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--la-secondary);
+  animation: la-pipeline-flow 1.1s linear infinite;
+}
+
+.la-pipeline-status {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 9px;
+}
+
+.la-pipeline-orb {
+  flex-shrink: 0;
+  align-self: center;
+  color: var(--la-secondary);
+}
+
+.la-pipeline-caret {
+  color: var(--la-secondary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+}
+
+.la-pipeline-time {
+  margin-left: auto;
+  color: var(--cmf-text-faint, var(--cmf-text-muted, #6B6560));
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.la-pipeline-steps {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 6px 0 0;
+  border-top: 1px solid var(--cmf-border, rgba(30, 27, 24, 0.08));
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  color: var(--cmf-text-muted, #6B6560);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+}
+
+.la-pipeline-step {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  animation: la-fade-in 0.2s ease-out;
+}
+
+.la-pipeline-step-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--la-secondary);
+  animation: la-pipeline-pulse 1.2s ease-in-out infinite;
+}
+
+.la-pipeline-step.is-done .la-pipeline-step-dot {
+  background: var(--cmf-success, #16A34A);
+  animation: none;
+}
+
+.la-pipeline-step.is-failed .la-pipeline-step-dot {
+  background: var(--cmf-error-ink, #DC2626);
+  animation: none;
+}
+
+.la-pipeline-step-state {
+  margin-left: auto;
+  color: var(--cmf-text-faint, var(--cmf-text-muted, #6B6560));
+  font-size: 10px;
+}
+
+.la-pipeline-step.is-failed .la-pipeline-step-state { color: var(--cmf-error-ink, #DC2626); }
+
+/* The status line becomes a real toggle once the model has reasoning to show. */
+.la-pipeline-toggle {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.la-pipeline-toggle .la-pipeline-caret {
+  display: inline-block;
+  transition: transform 0.15s ease;
+}
+
+.la-pipeline-toggle.is-open .la-pipeline-caret { transform: rotate(90deg); }
+
+.la-pipeline-toggle:focus-visible {
+  outline: 2px solid var(--la-secondary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.la-pipeline-count {
+  color: var(--cmf-text-faint, var(--cmf-text-muted, #6B6560));
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.la-pipeline-toggle:hover .la-pipeline-count { color: var(--la-secondary); }
+
+/* The model's reasoning summaries: live under the pipeline, and kept on the finished answer. */
+.la-thoughts {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0 0 0 10px;
+  border-left: 2px solid rgba(var(--la-secondary-rgb), 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.la-thought {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: la-fade-in 0.2s ease-out;
+}
+
+.la-thought-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cmf-text, #1E1B18);
+}
+
+.la-thought-body {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--cmf-text-muted, #6B6560);
+}
+
+.la-thought-body p { margin: 0 0 6px; }
+.la-thought-body p:last-child { margin-bottom: 0; }
+
+.la-thought-body code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: rgba(var(--la-secondary-rgb), 0.08);
+}
+
+.la-reasoning {
+  margin: 0 0 8px;
+  font-size: 12px;
+}
+
+.la-reasoning > summary {
+  cursor: pointer;
+  width: fit-content;
+  color: var(--cmf-text-muted, #6B6560);
+  font-weight: 500;
+}
+
+.la-reasoning > summary:hover { color: var(--la-secondary); }
+
+.la-reasoning > summary:focus-visible {
+  outline: 2px solid var(--la-secondary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@keyframes la-pipeline-flow {
+  0% { left: 0; opacity: 0; }
+  20%, 80% { opacity: 1; }
+  100% { left: calc(100% - 5px); opacity: 0; }
+}
+
+@keyframes la-pipeline-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--la-secondary-rgb), 0); }
+  50% { box-shadow: 0 0 0 3px rgba(var(--la-secondary-rgb), 0.15); }
+}
+
+@keyframes la-pipeline-pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
+.la-pipeline-text {
+  font-size: 12.5px;
+  font-weight: 500;
+  /* A light travels through the label while the AI works on your data */
+  background: linear-gradient(90deg,
+    var(--cmf-text-muted, #6B6560) 0%,
+    var(--cmf-text-muted, #6B6560) 35%,
+    var(--la-secondary) 50%,
+    var(--cmf-text-muted, #6B6560) 65%,
+    var(--cmf-text-muted, #6B6560) 100%);
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: la-label-shimmer 2.4s linear infinite;
+}
+
+@keyframes la-label-shimmer {
+  from { background-position: 120% 0; }
+  to   { background-position: -120% 0; }
+}
+
+/* Avatar pulse ring while loading */
+.la-message-loading .la-message-avatar {
+  animation: la-avatar-pulse 2s ease-in-out infinite;
+  border-radius: 50%;
+}
+
+@keyframes la-avatar-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--la-secondary-rgb), 0); }
+  50%      { box-shadow: 0 0 0 4px rgba(var(--la-secondary-rgb), 0.15); }
+}
+
+/* Streaming cursor — blinks at end of last paragraph while AI types */
+.la-streaming p:last-of-type::after {
+  content: '';
+  display: inline-block;
+  width: 2px;
+  height: 0.85em;
+  background: var(--la-secondary);
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  border-radius: 1px;
+  animation: la-cursor-blink 0.8s ease-in-out infinite;
+}
+
+/* ============================================================================
+   Reduced Motion
+   ============================================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  .la-panel,
+  .la-input-hints {
+    transition: none;
+  }
+
+  .la-cursor {
+    animation: none;
+    opacity: 1;
+  }
+
+  .la-message,
+  .la-suggested-actions,
+  .la-error,
+  .la-welcome {
+    animation: none;
+  }
+
+  .logos-assistant .la-ring,
+  .logos-assistant .la-core-glow,
+  .logos-assistant .la-center-dot {
+    animation: none;
+  }
+
+  .la-voice-btn-active {
+    animation: none;
+  }
+
+  .la-spin {
+    animation: none;
+  }
+
+  .la-welcome-icon {
+    animation: none;
+  }
+
+  .la-welcome > * {
+    animation: none !important;
+    opacity: 1 !important;
+  }
+
+  .la-pipeline-node.is-active,
+  .la-pipeline-step,
+  .la-pipeline-step-dot,
+  .la-thought {
+    animation: none;
+  }
+
+  .la-pipeline-toggle .la-pipeline-caret { transition: none; }
+
+  /* Show the active connector as solid instead of a moving dot */
+  .la-pipeline-edge.is-flowing { background: var(--la-secondary); }
+  .la-pipeline-edge.is-flowing::after { display: none; }
+
+  .la-message-loading .la-message-avatar {
+    animation: none;
+  }
+
+  .la-streaming p:last-of-type::after {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+/* ============================================================================
+   UI-1B — WORKSPACE COPILOT INTERIOR (DIRECTION C)
+
+   The shell remains hybrid: docked on wide screens, modal slide-out below the
+   existing breakpoint. This layer changes only the interior hierarchy. Requests
+   and analysis become open reading regions; executable work remains deliberately
+   bounded so the confirm/reject safety boundary cannot be mistaken for prose.
+   ============================================================================ */
+
+.la-header {
+  z-index: 20;
+  min-height: 56px;
+  padding: 0 8px 0 14px;
+  border-bottom: 1px solid var(--cmf-border, rgba(30, 27, 24, 0.08));
+}
+
+.la-header-title {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+/* Labels in the panel are sentence-case, 11px, secondary ink — the craft floor
+   bans the uppercase mono kicker, and at 8.5px it failed AA in dark. Only the
+   orb's one-word state readout keeps the tracked uppercase, as a state word. */
+.la-header-mode,
+.la-artifact-heading {
+  font-family: var(--cmf-font-mono, 'SFMono-Regular', Consolas, 'Liberation Mono', monospace);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+}
+
+.la-header-mode {
+  /* The one word that names the orb's state: kept small, but at a readable
+     floor, and in secondary ink rather than faint. */
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  color: var(--cmf-text-secondary, #6b7280);
+  white-space: nowrap;
+  /* Holds its 10px line while empty so the name never jumps when a state
+     arrives; the word fades in rather than popping. */
+  display: block;
+  min-height: 10px;
+  opacity: 1;
+  transition: color 200ms ease-out, opacity 200ms ease-out;
+}
+
+.la-header-mode[data-voice="idle"] {
+  opacity: 0;
+}
+
+/* The readout takes the orb's state colour so the word and the sphere agree. */
+.la-header-mode[data-voice="listening"] { color: #286B61; }
+.la-header-mode[data-voice="speaking"]  { color: #B85C38; }
+.la-header-mode[data-voice="thinking"]  { color: var(--cmf-text-secondary, #6b7280); }
+html.dark .la-header-mode[data-voice="listening"],
+.la-dark .la-header-mode[data-voice="listening"] { color: #52B5A6; }
+html.dark .la-header-mode[data-voice="speaking"],
+.la-dark .la-header-mode[data-voice="speaking"]  { color: #D4765A; }
+
+.la-utility-menu-wrap {
+  position: relative;
+  display: flex;
+}
+
+.la-utility-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  width: 212px;
+  padding: 5px;
+  background: var(--cmf-bg, #FFFBF7);
+  border: 1px solid var(--cmf-border-strong, rgba(30, 27, 24, 0.14));
+  border-radius: 8px;
+  box-shadow: 0 18px 42px -18px rgba(30, 27, 24, 0.38), 0 4px 12px -6px rgba(30, 27, 24, 0.18);
+}
+
+.la-utility-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--cmf-text-secondary, #3D3833);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 150ms var(--la-ease-out), color 150ms var(--la-ease-out);
+}
+
+.la-utility-menu-item:hover:not(:disabled),
+.la-utility-menu-item:focus-visible {
+  background: var(--cmf-surface-2, #EFE7DD);
+  color: var(--cmf-text, #1E1B18);
+}
+
+.la-utility-menu-item:focus-visible,
+.la-utility-menu-confirm-btn:focus-visible {
+  outline: 2px solid rgba(var(--la-secondary-rgb), 0.48);
+  outline-offset: -2px;
+}
+
+.la-utility-menu-item:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.la-utility-menu-item-danger {
+  margin-top: 4px;
+  border-top: 1px solid var(--cmf-border, rgba(30, 27, 24, 0.08));
+  border-radius: 0 0 5px 5px;
+  color: var(--cmf-error-ink, #B42318);
+}
+
+.la-utility-menu-confirm {
+  margin-top: 4px;
+  padding: 9px;
+  border-top: 1px solid var(--cmf-border, rgba(30, 27, 24, 0.08));
+  color: var(--cmf-text-secondary, #3D3833);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.la-utility-menu-confirm > div {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.la-utility-menu-confirm-btn {
+  min-height: 28px;
+  padding: 5px 9px;
+  border: 1px solid var(--cmf-border-strong, rgba(30, 27, 24, 0.14));
+  border-radius: 5px;
+  background: transparent;
+  color: var(--cmf-text-secondary, #3D3833);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.la-utility-menu-confirm-danger {
+  border-color: rgba(180, 35, 24, 0.26);
+  background: rgba(180, 35, 24, 0.08);
+  color: var(--cmf-error-ink, #B42318);
+}
+
+.la-context-bar-command {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  min-height: 58px;
+  padding: 8px 16px;
+  background: var(--cmf-surface, #FDF8F3);
+}
+
+.la-context-command-line {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 18px;
+}
+
+.la-context-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--cmf-text-secondary, #6b7280);
+  white-space: nowrap;
+}
+
+.la-context-bar-command .la-section-chip {
+  display: block;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--la-secondary-dark);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+}
+
+.la-context-bar-command .la-section-summary {
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--cmf-text-secondary, #3D3833);
+}
+
+.la-messages {
+  gap: 0;
+  padding: 0 16px 16px;
+}
+
+.la-message {
+  gap: 10px;
+  min-width: 0;
+  padding: 17px 0;
+  border-bottom: 1px solid var(--cmf-border, rgba(30, 27, 24, 0.08));
+}
+
+.la-message-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.la-message-user .la-message-avatar {
+  display: none;
+}
+
+.la-message-user .la-message-content {
+  width: 100%;
+  max-width: 100%;
+  padding: 0 0 0 12px;
+  border: 0;
+  border-left: 2px solid var(--la-accent);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.la-message-assistant .la-message-avatar {
+  width: 24px;
+  height: 24px;
+  margin-top: 1px;
+}
+
+.la-message-assistant .la-message-content {
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.la-message-kicker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 12px;
+  margin-bottom: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--cmf-text-secondary, #6b7280);
+}
+
+/* Both kickers sit in secondary ink; brand colour on this surface is reserved
+   for the orb's state, never for a label. */
+.la-message-user .la-message-kicker,
+.la-message-assistant .la-message-kicker span:first-child {
+  color: var(--cmf-text-secondary, #6b7280);
+}
+
+.la-message-user .la-message-content p,
+.la-message-assistant .la-markdown {
+  font-size: 13px;
+  line-height: 1.58;
+}
+
+.la-artifact {
+  margin-top: 16px;
+  padding: 11px;
+  border: 1px solid rgba(var(--la-secondary-rgb), 0.22);
+  border-left: 3px solid var(--la-secondary);
+  border-radius: 7px;
+  background: rgba(var(--la-secondary-rgb), 0.035);
+}
+
+.la-artifact-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid rgba(var(--la-secondary-rgb), 0.14);
+  font-size: 8.5px;
+  font-weight: 650;
+  line-height: 1.1;
+  color: var(--la-secondary-dark);
+}
+
+.la-artifact-heading span:last-child {
+  color: var(--cmf-text-muted, #6B6560);
+  text-align: right;
+}
+
+.la-artifact .la-proposals {
+  margin-top: 9px;
+}
+
+.la-artifact .la-proposal,
+.la-artifact .la-plan {
+  border-radius: 6px;
+  box-shadow: none;
+}
+
+.la-artifact .la-proposal.la-proposal-proposed,
+.la-artifact .la-plan.la-plan-proposed {
+  animation: none;
+}
+
+.la-message-actions {
+  margin-top: 10px;
+  padding-top: 0;
+}
+
+.la-suggested-actions {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--cmf-border, rgba(30, 27, 24, 0.08));
+}
+
+.la-suggested-label {
+  margin-bottom: 7px;
+}
+
+.la-suggested-btn {
+  border-radius: 5px;
+}
+
+.la-input-area {
+  padding: 13px 14px 11px;
+  background: var(--cmf-bg, #FFFBF7);
+}
+
+.la-input-wrapper {
+  min-height: 44px;
+  padding: 5px 5px 5px 12px;
+  border-color: var(--cmf-border-strong, rgba(30, 27, 24, 0.14));
+  border-radius: 7px;
+  background: var(--cmf-surface, #FDF8F3);
+  box-shadow: 0 4px 14px -12px rgba(30, 27, 24, 0.28);
+}
+
+.la-input-wrapper:focus-within {
+  border-color: rgba(var(--la-secondary-rgb), 0.55);
+  box-shadow: 0 0 0 2px rgba(var(--la-secondary-rgb), 0.10);
+}
+
+.la-input {
+  min-height: 22px;
+  padding: 6px 0;
+  line-height: 1.55;
+}
+
+html.dark .la-message-user .la-message-content,
+.la-dark .la-message-user .la-message-content {
+  background: transparent;
+  border-top-color: transparent;
+  border-right-color: transparent;
+  border-bottom-color: transparent;
+  border-left-color: var(--la-accent);
+}
+
+html.dark .la-message-assistant .la-message-content,
+.la-dark .la-message-assistant .la-message-content {
+  background: transparent;
+}
+
+@media (max-width: 480px) {
+  .la-header {
+    min-height: 54px;
+    padding: 0 6px 0 10px;
+  }
+
+  .la-context-bar-command {
+    padding: 8px 12px;
+  }
+
+  .la-context-command-line {
+    grid-template-columns: 70px minmax(0, 1fr);
+    gap: 7px;
+  }
+
+  .la-messages {
+    gap: 0;
+    padding: 0 12px 12px;
+  }
+
+  .la-message {
+    padding: 15px 0;
+  }
+
+  .la-message-content {
+    max-width: 100% !important;
+  }
+
+  .la-input-area {
+    padding: 11px 12px 10px;
+  }
+
+  .la-header-action-btn,
+  .la-close-btn,
+  .la-action-btn,
+  .la-voice-btn,
+  .la-send-btn {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+  }
+
+  .la-proposal-btn,
+  .la-suggested-btn {
+    min-height: 44px;
+  }
+
+  .la-utility-menu {
+    width: min(212px, calc(100vw - 32px));
+  }
+}
+
+/* ============================================================================
+   ALIVE CRAFT LAYER
+   Appended last so its explicit, GPU-friendly transitions override any earlier
+   `transition: all` declarations (Emil: never animate `all`), and every
+   pressable element gains tactile press feedback.
+   ============================================================================ */
+
+.la-quick-action-btn,
+.la-suggested-btn,
+.la-action-btn,
+.la-proposal-btn,
+.la-header-action-btn,
+.la-close-btn,
+.la-clear-btn,
+.la-voice-btn,
+.la-retry-btn,
+.la-stop-btn,
+.la-tour-next,
+.la-tour-skip,
+.la-action-item,
+.la-action-items-create,
+.la-action-items-select-all {
+  transition: background-color 150ms var(--la-ease-out),
+              color 150ms var(--la-ease-out),
+              border-color 150ms var(--la-ease-out),
+              box-shadow 150ms var(--la-ease-out),
+              transform 130ms var(--la-ease-out);
+}
+
+/* Press — the UI physically acknowledges every tap */
+.la-header-action-btn:active,
+.la-close-btn:active,
+.la-clear-btn:active,
+.la-voice-btn:active:not(:disabled),
+.la-proposal-btn:active:not(:disabled),
+.la-action-items-create:active:not(:disabled),
+.la-tour-next:active,
+.la-retry-btn:active,
+.la-stop-btn:active {
+  transform: scale(0.97);
+}
+
+.la-quick-action-btn:active,
+.la-suggested-btn:active,
+.la-action-btn:active,
+.la-action-item:active {
+  transform: scale(0.975);
+}
+
+/* Hover lift — real pointers only, so a touch tap can't leave it stuck raised */
+@media (hover: hover) and (pointer: fine) {
+  .la-quick-action-btn:hover,
+  .la-suggested-btn:hover,
+  .la-header-action-btn:hover,
+  .la-close-btn:hover {
+    transform: translateY(-1px);
+  }
+}
+
+/* Reduced motion — silence the new ambient loops; press/color feedback stays */
+@media (prefers-reduced-motion: reduce) {
+  .la-welcome-icon::before,
+  .la-proposal.la-proposal-proposed,
+  .la-proposal-working::after,
+  .la-proposal-status-done svg {
+    animation: none !important;
+  }
+
+  .la-pipeline-text {
+    animation: none !important;
+    -webkit-text-fill-color: currentColor;
+    color: var(--cmf-text-muted, #6B6560);
+    background: none;
+  }
+}
+
+/* ============================================================================
+   COMPOSER CARD + STATUS ORBS (2026-10-24)
+   PromptInput adapted to Logos: the status orb sits inside the capsule, the
+   textarea grows to 160px, and one action button morphs mic -> send -> stop.
+   Placed BEFORE UI-1B on purpose: the composer style test reads the LAST
+   reduced-motion block, which must stay UI-1B's.
+   ============================================================================ */
+
+/* Scoped so it wins over UI-1B's padding below without depending on source order. */
+.logos-assistant .la-input-wrapper {
+  padding-left: 9px;
+}
+
+.la-ai-orb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  color: var(--cmf-text-muted, #6B6560);
+  transition: color 200ms var(--la-ease-out);
+}
+
+/* The welcome hero rests in the text colour, like the lattice it replaced, and takes the
+   composer orb's tint for every live state. */
+.la-welcome-orb {
+  display: block;
+  /* --cmf-text is themed, so no dark rule: one would outrank the state tints below. */
+  color: var(--cmf-text, #1E1B18);
+  transition: color 200ms var(--la-ease-out);
+}
+
+.la-welcome-orb-svg {
+  display: block;
+  animation: la-orb-look-in 400ms var(--la-ease-out);
+}
+
+@keyframes la-orb-look-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.la-ai-orb[data-state="listening"],
+.la-ai-orb[data-state="tool-call"],
+.la-ai-orb[data-state="tool-result"],
+.la-ai-orb[data-state="done"],
+.la-welcome-orb[data-state="listening"] { color: var(--la-secondary); }
+.la-ai-orb[data-state="thinking"],
+.la-ai-orb[data-state="reasoning"],
+.la-ai-orb[data-state="streaming"],
+.la-ai-orb[data-state="retrying"],
+.la-ai-orb[data-state="waiting-approval"] { color: var(--la-accent); }
+.la-ai-orb[data-state="error"],
+.la-welcome-orb[data-state="error"] { color: var(--la-recording); }
+
+.logos-assistant .la-input {
+  max-height: 160px;
+  overflow-y: auto;
+  transition: height 150ms var(--la-ease-out);
+}
+
+.la-action-icon {
+  display: flex;
+  animation: la-action-morph 220ms var(--la-ease-spring);
+}
+
+@keyframes la-action-morph {
+  from { opacity: 0; transform: scale(0.6) rotate(-20deg); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* The hero box sizes to the welcome orb; the 44px mark box it reuses keeps its aura. */
+.la-welcome-hero {
+  width: auto;
+  height: auto;
+}
+
+.la-lattice-orb {
+  display: block;
+  color: var(--cmf-text, #1E1B18);
+}
+
+html.dark .la-lattice-orb,
+.la-dark .la-lattice-orb {
+  color: var(--cmf-text, #F1F5F9);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .la-ai-orb,
+  .la-welcome-orb,
+  .logos-assistant .la-input {
+    transition: none;
+  }
+
+  .la-welcome-orb-svg {
+    animation: none;
+  }
+
+  .la-action-icon {
+    animation: none;
+  }
+}
+
+/* Phone sheet (see PHONE SHEET at the end of this file) — keyboard out: the welcome orb drifts out of focus (blurs, shrinks,
+   fades) and folds away, and the greeting rises into the space it leaves, so the greeting,
+   the suggestions and the composer all fit above the keyboard (Frank, 2026-10-27). The
+   curve and length roughly track the keyboard's own slide. */
+.logos-assistant.la-sheet .la-welcome-hero {
+  max-height: 160px;
+  transition:
+    max-height 460ms var(--la-ease-drawer),
+    opacity 320ms var(--la-ease-out),
+    filter 460ms var(--la-ease-drawer),
+    transform 460ms var(--la-ease-drawer);
+}
+
+.logos-assistant.la-sheet .la-welcome {
+  transition: padding 460ms var(--la-ease-drawer), gap 460ms var(--la-ease-drawer);
+}
+
+.logos-assistant.la-sheet[data-keyboard-open='true'] .la-welcome {
+  padding-top: 12px;
+  gap: 4px;
+}
+
+.logos-assistant.la-sheet[data-keyboard-open='true'] .la-welcome-hero {
+  max-height: 0;
+  opacity: 0;
+  filter: blur(10px);
+  transform: scale(0.55) translateY(-12px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logos-assistant.la-sheet .la-welcome-hero,
+  .logos-assistant.la-sheet .la-welcome {
+    transition: none;
+  }
+
+  .logos-assistant.la-sheet[data-keyboard-open='true'] .la-welcome-hero {
+    filter: none;
+    transform: none;
+  }
+}
+
+/* ============================================================================
+   UI-1B COMPOSER — DIRECTION A: SOFT CAPSULE
+   One visual surface owns shape and focus. The textarea reset is intentionally
+   scoped and important because the global theme applies important form chrome.
+   ============================================================================ */
+
+.la-input-area {
+  padding: 14px 14px 12px;
+}
+
+.la-input-wrapper {
+  min-height: 52px;
+  padding: 6px 7px 6px 16px;
+  border-color: var(--cmf-border-strong, rgba(30, 27, 24, 0.14));
+  border-radius: 16px;
+  background: var(--cmf-surface, #FDF8F3);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.56),
+    0 10px 30px -24px rgba(30, 27, 24, 0.52);
+  transition:
+    border-color 150ms var(--la-ease-out),
+    background-color 150ms var(--la-ease-out),
+    box-shadow 180ms var(--la-ease-out);
+}
+
+.la-input-wrapper:focus-within {
+  border-color: rgba(var(--la-secondary-rgb), 0.62);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.62),
+    0 0 0 3px rgba(var(--la-secondary-rgb), 0.10),
+    0 14px 32px -24px rgba(var(--la-secondary-rgb), 0.48);
+}
+
+html.dark .logos-assistant .la-input-wrapper,
+.logos-assistant.la-dark .la-input-wrapper {
+  background: var(--cmf-surface, #111827);
+  border-color: var(--cmf-border-strong, rgba(148, 163, 184, 0.20));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.045),
+    0 12px 32px -24px rgba(0, 0, 0, 0.9);
+}
+
+html.dark .logos-assistant .la-input-wrapper:focus-within,
+.logos-assistant.la-dark .la-input-wrapper:focus-within {
+  border-color: rgba(var(--la-secondary-rgb), 0.68);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 0 0 3px rgba(var(--la-secondary-rgb), 0.12),
+    0 16px 34px -24px rgba(0, 0, 0, 0.96);
+}
+
+.logos-assistant .la-input,
+.logos-assistant .la-input:focus {
+  align-self: center;
+  min-width: 0;
+  min-height: 26px;
+  padding: 7px 0 6px;
+  background-color: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.la-voice-btn,
+.la-send-btn {
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+  min-height: 38px;
+  border-radius: 50%;
+  transition:
+    background-color 150ms var(--la-ease-out),
+    color 150ms var(--la-ease-out),
+    border-color 150ms var(--la-ease-out),
+    box-shadow 160ms var(--la-ease-out),
+    opacity 150ms var(--la-ease-out),
+    transform 130ms var(--la-ease-out);
+}
+
+.la-voice-btn:not(.la-voice-btn-active) {
+  background: transparent;
+}
+
+.la-send-btn {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    0 5px 14px -8px rgba(var(--la-secondary-rgb), 0.78);
+}
+
+.la-send-btn:disabled {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.32);
+}
+
+.la-voice-btn:focus-visible,
+.la-send-btn:focus-visible {
+  outline: 2px solid rgba(var(--la-secondary-rgb), 0.78);
+  outline-offset: 2px;
+}
+
+.la-voice-btn:active:not(:disabled),
+.la-send-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+@media (max-width: 480px) {
+  .la-voice-btn,
+  .la-send-btn {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .la-voice-btn:hover:not(:disabled) {
+    color: var(--la-secondary);
+    background-color: rgba(var(--la-secondary-rgb), 0.09);
+    transform: translateY(-1px);
+  }
+
+  /* Live mic stays patina under the pointer, never red. Light lifts to the
+     patina tint so the Ink label keeps AA; dark goes a shade lighter. */
+  .la-voice-btn-active:hover:not(:disabled) {
+    color: #2C2520;
+    background-color: #52B5A6;
+    transform: none;
+  }
+
+  .la-dark .la-voice-btn-active:hover:not(:disabled) {
+    color: #fff;
+    background-color: #62C2B4;
+  }
+
+  .la-send-btn:hover:not(:disabled) {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.30),
+      0 7px 18px -8px rgba(var(--la-secondary-rgb), 0.72);
+    transform: translateY(-1px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .la-input-wrapper,
+  .la-voice-btn,
+  .la-send-btn {
+    transition: none;
+  }
+
+  .la-voice-btn:hover:not(:disabled),
+  .la-send-btn:hover:not(:disabled),
+  .la-voice-btn:active:not(:disabled),
+  .la-send-btn:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* ============================================================================
+   PHONE SHEET (Frank, 2026-10-27)
+   On a phone the panel slides up as a full-screen sheet, like the quick-add drawer,
+   instead of sliding in from the right. The container tracks the visible area
+   (--la-vv-top / --la-vv-height, set from visualViewport while the sheet is open), so
+   when the keyboard rises the conversation shrinks and the header stays on screen.
+   Before this the panel kept the full layout height and the browser panned the page to
+   reveal the composer, pushing the header and the top of the welcome off screen.
+   ============================================================================ */
+
+.logos-assistant.la-sheet {
+  top: var(--la-vv-top, 0px);
+  bottom: auto;
+  height: var(--la-vv-height, 100%);
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.logos-assistant.la-sheet .la-backdrop {
+  background: rgba(15, 12, 10, 0.32);
+}
+
+.logos-assistant.la-sheet .la-panel {
+  width: 100%;
+  max-width: none;
+  /* A sliver of the app shows above the sheet, so it reads as a drawer over the page. */
+  height: calc(100% - 8px - env(safe-area-inset-top, 0px));
+  border-left: none;
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -10px 40px -12px rgba(30, 27, 24, 0.28);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* The keyboard covers the home indicator, so the safe-area padding would only push the
+   composer up off the keyboard's edge. */
+.logos-assistant.la-sheet[data-keyboard-open='true'] .la-panel {
+  padding-bottom: 0;
+}
+
+.la-sheet-handle {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 18px;
+  flex-shrink: 0;
+  touch-action: none;
+  cursor: grab;
+  background: var(--cmf-bg, #FFFBF7);
+}
+
+.la-sheet-handle-bar {
+  width: 36px;
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--cmf-border-strong, rgba(30, 27, 24, 0.22));
+}
+
+.logos-assistant.la-sheet .la-header {
+  touch-action: none;
+}
+
+html.dark .logos-assistant.la-sheet .la-backdrop {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+html.dark .la-sheet-handle-bar {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+
+/* Phone: the greeting sits centred under the orb, a step larger, like the Claude and
+   ChatGPT apps' openers (Frank, 2026-10-27). */
+.logos-assistant.la-sheet .la-welcome-head {
+  text-align: center;
+}
+
+.logos-assistant.la-sheet .la-welcome-headings {
+  align-items: center;
+  gap: 6px;
+}
+
+.logos-assistant.la-sheet .la-welcome-title {
+  font-size: 21px;
+  letter-spacing: -0.015em;
+}
+
+.logos-assistant.la-sheet .la-welcome-tagline {
+  max-width: 300px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* The print preview of an answer mounts inside the assistant (see LogosAssistant.tsx).
+   Docked, the assistant's container ignores clicks so the app stays usable; the preview
+   is a modal and must take them back. Its own fixed z-50 root sits above the panel (z 6)
+   inside this layer's stacking context. */
+.la-preview-layer {
+  pointer-events: auto;
+}
+
+/* ============================================================================
+   SHARE PANEL (2026-10-28) — under an answer; reuses the action-items panel shell
+   ============================================================================ */
+
+.la-share-panel .la-action-item:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.la-share-hint {
+  display: block;
+  margin-top: 1px;
+  font-size: 11px;
+  color: var(--cmf-text-muted, #888);
+}
+
+.la-share-note {
+  padding: 4px 8px 8px 30px;
+}
+
+.la-share-note-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--cmf-text-muted, #888);
+  margin-bottom: 4px;
+}
+
+.la-share-note-row {
+  display: flex;
+  gap: 6px;
+}
+
+.la-share-note-input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  font-size: 13px;
+  border-radius: 6px;
+  border: 1px solid var(--cmf-border, #ddd);
+  background: var(--cmf-surface, #fff);
+  color: var(--cmf-text, #333);
+}
+
+.la-share-note-input:focus-visible {
+  outline: 2px solid var(--la-secondary);
+  outline-offset: 1px;
+}
+
+.la-share-matches {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.la-share-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.4;
+  border-top: 1px solid rgba(var(--la-secondary-rgb), 0.15);
+  color: var(--cmf-text, #333);
+}
+
+.la-share-status-done svg {
+  color: var(--la-secondary);
+}
+
+.la-share-status-error {
+  color: var(--cmf-error, #B42318);
+}
+
+.la-share-open {
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--la-secondary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+@media (hover: none) {
+  .la-share-panel .la-action-item {
+    padding: 10px 8px;
+  }
+  .la-share-note-input {
+    font-size: 16px; /* below 16px iOS zooms the page on focus */
+  }
+}
+
+.la-dark .la-share-note-input {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+/* ============================================================================
+   SWISS TRANSCRIPT — PR 1: shell, welcome, composer frame (Frank, 2026-11-10)
+   Direction C of the Swiss mockups (_design-playground/logos-ai-swiss-mockups).
+   Emphasis comes from type size, weight and rules, not from tinted cards: the
+   name row sits on a hairline, the greeting on a 2px ink rule, and each welcome
+   tier is a numbered section of ruled rows. One accent marks only what waits
+   for the user. Layout and style only: the orb, the mic/send morph and every
+   processing animation are untouched.
+   Every selector is scoped `.logos-assistant.la-swiss`, so it outranks the UI-1B
+   and dark layers above. !important appears only where those layers used it.
+   ============================================================================ */
+.logos-assistant.la-swiss {
+  --la-sw-rule: var(--cmf-text, #1E1B18);
+  --la-sw-hair: var(--cmf-border, rgba(30, 27, 24, 0.12));
+  --la-sw-ink: var(--cmf-text, #1E1B18);
+  --la-sw-sec: var(--cmf-text-secondary, #3D3833);
+  --la-sw-muted: var(--cmf-text-muted, #6B6560);
+  --la-sw-accent: var(--cmf-accent, #B85C38);
+  --la-sw-accent-ink: var(--cmf-accent-ink, var(--cmf-accent, #9E4A29));
+  --la-sw-hover: var(--cmf-hover-overlay, rgba(30, 27, 24, 0.045));
+}
+
+/* Shell: an ink edge instead of a shadow. */
+.logos-assistant.la-swiss .la-panel {
+  background: var(--cmf-bg, #FFFBF7);
+  border-left: 1px solid var(--la-sw-rule);
+  box-shadow: none;
+}
+.logos-assistant.la-swiss.la-sheet .la-panel {
+  border-left: 0;
+  border-top: 1px solid var(--la-sw-rule);
+  border-radius: 2px 2px 0 0;
+  box-shadow: none;
+}
+
+/* Header: the name as a small tracked label, the voice readout as a square plus a
+   word, and the controls as 2px outline squares. */
+.logos-assistant.la-swiss .la-header {
+  min-height: 52px;
+  padding: 0 16px 0 24px;
+  background: var(--cmf-bg, #FFFBF7);
+  border-bottom: 1px solid var(--la-sw-hair);
+}
+.logos-assistant.la-swiss .la-header-title {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+.logos-assistant.la-swiss .la-header-title h2 {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--la-sw-ink);
+}
+.logos-assistant.la-swiss .la-header-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 0;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.logos-assistant.la-swiss .la-header-mode::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  background: currentColor;
+}
+.logos-assistant.la-swiss .la-header-right {
+  gap: 6px;
+}
+.logos-assistant.la-swiss .la-header-action-btn,
+.logos-assistant.la-swiss .la-close-btn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--la-sw-hair);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--la-sw-sec);
+  box-shadow: none;
+}
+.logos-assistant.la-swiss .la-header-action-btn:hover,
+.logos-assistant.la-swiss .la-close-btn:hover,
+.logos-assistant.la-swiss .la-header-action-btn[aria-expanded="true"] {
+  border-color: var(--la-sw-rule);
+  background: transparent;
+  color: var(--la-sw-ink);
+  box-shadow: none;
+}
+.logos-assistant.la-swiss.la-sheet .la-header {
+  padding: 0 12px 0 16px;
+}
+.logos-assistant.la-swiss.la-sheet .la-header-action-btn,
+.logos-assistant.la-swiss.la-sheet .la-close-btn {
+  width: 40px;
+  height: 40px;
+}
+
+/* Welcome: the greeting is a poster on a 2px rule with the orb at its right; every
+   tier under it is a numbered section. The counters number only the tiers that
+   render, so a missing Needs attention never leaves a gap in the sequence. */
+.logos-assistant.la-swiss .la-welcome {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0;
+  /* `.la-messages` adds 16px a side; 8px more puts the text on the header's 24px line. */
+  padding: 20px 8px 28px;
+  text-align: left;
+  counter-reset: la-sw-sec;
+}
+.logos-assistant.la-swiss .la-welcome > * {
+  grid-column: 1 / -1;
+}
+.logos-assistant.la-swiss .la-welcome > .la-welcome-head {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: stretch;
+  display: flex;
+  align-items: flex-end;
+  padding: 0 12px 14px 0;
+  border-bottom: 2px solid var(--la-sw-rule);
+  text-align: left;
+}
+.logos-assistant.la-swiss .la-welcome > .la-welcome-hero {
+  grid-column: 2;
+  grid-row: 1;
+  padding-bottom: 14px;
+  border-bottom: 2px solid var(--la-sw-rule);
+}
+.logos-assistant.la-swiss .la-welcome-headings {
+  align-items: flex-start;
+  gap: 10px;
+}
+.logos-assistant.la-swiss .la-welcome-title {
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+  color: var(--la-sw-ink);
+}
+.logos-assistant.la-swiss .la-welcome-tagline {
+  max-width: none;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: 0;
+  color: var(--la-sw-muted);
+}
+.logos-assistant.la-swiss.la-sheet .la-welcome {
+  padding: 16px 4px 24px;
+}
+.logos-assistant.la-swiss.la-sheet .la-welcome-title {
+  font-size: 26px;
+}
+/* Keyboard out, the orb folds away (see the PHONE SHEET rules); the rule then spans the row. */
+.logos-assistant.la-swiss.la-sheet[data-keyboard-open='true'] .la-welcome > .la-welcome-head {
+  grid-column: 1 / -1;
+}
+.logos-assistant.la-swiss.la-sheet[data-keyboard-open='true'] .la-welcome > .la-welcome-hero {
+  padding-bottom: 0;
+  border-bottom-width: 0;
+}
+
+/* 0.0 — the context card's hero density, now inside the welcome. */
+.logos-assistant.la-swiss .la-context-bar-hero {
+  margin-top: 22px;
+  padding: 0;
+  background: none;
+  border-bottom: 0;
+}
+.logos-assistant.la-swiss .la-context-hero-head {
+  align-items: baseline;
+  gap: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--la-sw-rule);
+}
+.logos-assistant.la-swiss .la-context-hero-head::before {
+  content: "0.0";
+  content: "0.0" / "";
+  min-width: 40px;
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--la-sw-muted);
+}
+.logos-assistant.la-swiss .la-context-bar-hero .la-section-chip {
+  display: inline;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--la-sw-ink);
+}
+.logos-assistant.la-swiss .la-context-bar-hero .la-section-chip::before {
+  content: "Working in\00a0";
+}
+.logos-assistant.la-swiss .la-context-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 0;
+  margin-top: 0;
+  border-bottom: 1px solid var(--la-sw-hair);
+}
+.logos-assistant.la-swiss .la-context-fact {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 10px 12px 12px 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+.logos-assistant.la-swiss .la-context-fact + .la-context-fact {
+  padding-left: 12px;
+  border-left: 1px solid var(--la-sw-hair);
+}
+.logos-assistant.la-swiss .la-context-fact-figure {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--la-sw-ink);
+}
+.logos-assistant.la-swiss .la-context-fact-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  color: var(--la-sw-muted);
+}
+/* A fact with no leading figure ("All clear today") reads as a sentence, not a label. */
+.logos-assistant.la-swiss .la-context-fact-label:only-child {
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--la-sw-sec);
+}
+.logos-assistant.la-swiss .la-context-bar-hero .la-context-scope {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--la-sw-sec);
+}
+.logos-assistant.la-swiss .la-context-scope-lead {
+  font-weight: 500;
+  color: var(--la-sw-muted);
+}
+
+/* 0.1 – 0.3 — the action tiers as numbered, ruled rows. */
+.logos-assistant.la-swiss .la-quick-actions {
+  max-width: none;
+  margin-top: 22px;
+  counter-increment: la-sw-sec;
+  counter-reset: la-sw-row;
+}
+.logos-assistant.la-swiss .la-quick-actions-label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--la-sw-rule);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--la-sw-ink);
+}
+.logos-assistant.la-swiss .la-quick-actions-label::before {
+  content: "0." counter(la-sw-sec);
+  content: "0." counter(la-sw-sec) / "";
+  min-width: 40px;
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--la-sw-muted);
+}
+.logos-assistant.la-swiss .la-quick-actions-count {
+  margin-left: auto;
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--la-sw-muted);
+}
+.logos-assistant.la-swiss .la-quick-actions-count-due {
+  color: var(--la-sw-accent-ink);
+}
+.logos-assistant.la-swiss .la-quick-actions-list {
+  display: block;
+}
+.logos-assistant.la-swiss .la-quick-action-btn {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto 14px;
+  align-items: baseline;
+  column-gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 11px 0 !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--la-sw-hair) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none;
+  color: var(--la-sw-ink) !important;
+  font-size: 13px;
+  font-weight: 600 !important;
+  line-height: 1.35;
+  text-align: left;
+  counter-increment: la-sw-row;
+}
+.logos-assistant.la-swiss .la-quick-action-btn::before {
+  content: "0." counter(la-sw-sec) "." counter(la-sw-row);
+  content: "0." counter(la-sw-sec) "." counter(la-sw-row) / "";
+  grid-column: 1;
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--la-sw-muted);
+}
+.logos-assistant.la-swiss .la-quick-action-btn::after {
+  content: "\2192";
+  content: "\2192" / "";
+  grid-column: 4;
+  font-weight: 500;
+  color: var(--la-sw-muted);
+}
+.logos-assistant.la-swiss .la-quick-action-btn:hover {
+  background: var(--la-sw-hover) !important;
+  box-shadow: none;
+}
+.logos-assistant.la-swiss .la-quick-action-btn:hover::after {
+  color: var(--la-sw-ink);
+}
+.logos-assistant.la-swiss .la-quick-action-sub {
+  grid-column: 3;
+  float: none;
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--la-sw-muted);
+}
+.logos-assistant.la-swiss .la-pinned-query-wrapper {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 36px;
+  align-items: stretch;
+  border-bottom: 1px solid var(--la-sw-hair);
+}
+.logos-assistant.la-swiss .la-quick-action-pinned {
+  border-bottom: 0 !important;
+}
+.logos-assistant.la-swiss .la-quick-action-pinned::after {
+  content: none;
+}
+.logos-assistant.la-swiss .la-pinned-remove {
+  width: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--la-sw-muted);
+}
+.logos-assistant.la-swiss .la-pinned-remove:hover {
+  background: var(--la-sw-hover);
+  color: var(--la-sw-accent-ink);
+  box-shadow: none;
+}
+.logos-assistant.la-swiss .la-quick-actions-more {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  column-gap: 8px;
+  min-height: 40px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--la-sw-hair);
+  border-radius: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--la-sw-muted);
+}
+.logos-assistant.la-swiss .la-quick-actions-more::before {
+  content: "";
+}
+.logos-assistant.la-swiss .la-quick-actions-more:hover {
+  background: var(--la-sw-hover);
+  color: var(--la-sw-ink);
+  box-shadow: none;
+}
+.logos-assistant.la-swiss .la-welcome-help {
+  justify-self: start;
+  margin-top: 18px;
+  padding: 4px 0;
+  border-radius: 0;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--la-sw-accent-ink);
+}
+.logos-assistant.la-swiss .la-welcome-help::after {
+  content: "\00a0\2192";
+}
+.logos-assistant.la-swiss .la-welcome-help:hover {
+  background: none;
+  box-shadow: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.logos-assistant.la-swiss .la-quick-action-btn:focus-visible,
+.logos-assistant.la-swiss .la-quick-actions-more:focus-visible,
+.logos-assistant.la-swiss .la-pinned-remove:focus-visible,
+.logos-assistant.la-swiss .la-welcome-help:focus-visible,
+.logos-assistant.la-swiss .la-header-action-btn:focus-visible,
+.logos-assistant.la-swiss .la-close-btn:focus-visible {
+  outline: 2px solid var(--la-sw-accent);
+  outline-offset: 2px;
+}
+
+/* Composer frame: a hairline box on an ink rule. The orb inside it and the round
+   mic/send morph are left exactly as they were. */
+.logos-assistant.la-swiss .la-input-area {
+  padding: 12px 24px 14px;
+  border-top: 1px solid var(--la-sw-rule);
+  background: var(--cmf-bg, #FFFBF7);
+}
+/* `.la-input-area` lifts these over `html.dark .logos-assistant .la-input-wrapper` (0,3,1). */
+.logos-assistant.la-swiss .la-input-area .la-input-wrapper {
+  min-height: 48px;
+  border: 1px solid var(--la-sw-rule);
+  border-radius: 2px;
+  background: var(--cmf-surface, #FDF8F3);
+  box-shadow: none;
+}
+.logos-assistant.la-swiss .la-input-area .la-input-wrapper:focus-within {
+  border-color: var(--la-sw-accent);
+  box-shadow: 0 0 0 1px var(--la-sw-accent);
+}
+.logos-assistant.la-swiss.la-sheet .la-input-area {
+  padding: 10px 16px 14px;
+}
+
+/* ============================================================================
+   SWISS TRANSCRIPT — PR 2: the conversation as numbered turns (Frank, 2026-11-10)
+   Each request takes the next turn number in a 40px left gutter (the avatar slot
+   it already had); the answer keeps that number and heads its parts N.1 analysis,
+   N.2 execution artifact, N.3 next. A 1px ink rule opens every turn after the
+   first. The current request's number is the one accent. The orb glyph, the
+   loading pulse, the streaming cursor and the AgentPipeline are left as they are.
+   Number columns: 8px panel inset + 40px gutter + 8px gap = 56px to the text
+   (52px on the phone sheet, whose messages inset is 12px, not 16px).
+   ============================================================================ */
+.logos-assistant.la-swiss .la-messages {
+  counter-reset: la-sw-turn;
+}
+.logos-assistant.la-swiss .la-message {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  column-gap: 8px;
+  align-items: start;
+  padding: 16px 8px 6px;
+  border-bottom: 0;
+}
+.logos-assistant.la-swiss .la-messages > * + .la-message-user {
+  margin-top: 12px;
+  border-top: 1px solid var(--la-sw-rule);
+}
+.logos-assistant.la-swiss .la-message-assistant {
+  padding-top: 10px;
+  padding-bottom: 8px;
+}
+.logos-assistant.la-swiss.la-sheet .la-message {
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+/* The gutter: the request's number; the answer's static orb glyph under it. */
+.logos-assistant.la-swiss .la-message-user {
+  counter-increment: la-sw-turn;
+  counter-reset: la-sw-sub;
+}
+.logos-assistant.la-swiss .la-message-user .la-message-avatar {
+  display: block;
+  width: auto;
+  height: auto;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--la-sw-ink);
+}
+.logos-assistant.la-swiss .la-message-user .la-message-avatar svg {
+  display: none;
+}
+.logos-assistant.la-swiss .la-message-user .la-message-avatar::before {
+  content: counter(la-sw-turn);
+  content: counter(la-sw-turn) / "";
+  display: block;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 0.9;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.logos-assistant.la-swiss .la-message-current .la-message-avatar {
+  color: var(--la-sw-accent-ink);
+}
+.logos-assistant.la-swiss .la-message-assistant .la-message-avatar {
+  justify-self: start;
+  width: 24px;
+  height: 24px;
+  margin-top: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--la-sw-ink);
+}
+
+/* The request: an eyebrow, then the words at 15px. */
+.logos-assistant.la-swiss .la-message .la-message-content {
+  max-width: none;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.logos-assistant.la-swiss .la-message-user .la-message-kicker {
+  justify-content: flex-start;
+  min-height: 0;
+  margin-bottom: 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--la-sw-muted);
+}
+.logos-assistant.la-swiss .la-message-current .la-message-kicker {
+  color: var(--la-sw-accent-ink);
+}
+.logos-assistant.la-swiss .la-message-user .la-message-content p {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.005em;
+  color: var(--la-sw-ink);
+}
+
+/* Sub-heads: N.1 for the analysis, N.2 for the execution artifact. */
+.logos-assistant.la-swiss .la-message-assistant .la-message-kicker,
+.logos-assistant.la-swiss .la-artifact-heading,
+.logos-assistant.la-swiss .la-suggested-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-start;
+  gap: 8px;
+  min-height: 0;
+  margin: 0 0 10px;
+  padding: 0 0 5px;
+  border-bottom: 1px solid var(--la-sw-rule);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--la-sw-ink);
+}
+.logos-assistant.la-swiss .la-message-assistant .la-message-kicker span:first-child {
+  color: var(--la-sw-ink);
+}
+.logos-assistant.la-swiss .la-message-assistant .la-message-kicker::before,
+.logos-assistant.la-swiss .la-artifact-heading::before,
+.logos-assistant.la-swiss .la-suggested-label::before {
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--la-sw-muted);
+}
+/* Sub-heads count within the turn, so a turn with no artifact still reads 2.1, 2.2. */
+.logos-assistant.la-swiss .la-message-assistant .la-message-kicker,
+.logos-assistant.la-swiss .la-artifact-heading,
+.logos-assistant.la-swiss .la-suggested-label {
+  counter-increment: la-sw-sub;
+}
+.logos-assistant.la-swiss .la-message-assistant .la-message-kicker::before,
+.logos-assistant.la-swiss .la-artifact-heading::before,
+.logos-assistant.la-swiss .la-suggested-label::before {
+  content: counter(la-sw-turn) "." counter(la-sw-sub);
+  content: counter(la-sw-turn) "." counter(la-sw-sub) / "";
+}
+.logos-assistant.la-swiss .la-reasoning {
+  margin: 0 0 10px;
+}
+
+/* The answer. */
+.logos-assistant.la-swiss .la-message-assistant .la-markdown {
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+.logos-assistant.la-swiss .la-markdown li::marker {
+  color: var(--la-sw-muted);
+}
+/* Tailwind's preflight strips list markers; the marker colour above shows they were meant to show. */
+.logos-assistant.la-swiss .la-markdown ul {
+  list-style: square;
+}
+.logos-assistant.la-swiss .la-markdown ol {
+  list-style: decimal;
+}
+.logos-assistant.la-swiss .la-markdown blockquote {
+  padding: 2px 0 2px 12px;
+  border-left: 2px solid var(--la-sw-rule);
+  border-radius: 0;
+  background: none;
+}
+.logos-assistant.la-swiss .la-markdown code,
+.logos-assistant.la-swiss .la-markdown pre {
+  border-radius: 2px;
+}
+.logos-assistant.la-swiss .la-markdown table {
+  font-variant-numeric: tabular-nums;
+}
+.logos-assistant.la-swiss .la-markdown th,
+.logos-assistant.la-swiss .la-markdown td {
+  padding: 7px 10px 7px 0;
+  border: 0;
+  border-bottom: 1px solid var(--la-sw-hair);
+}
+.logos-assistant.la-swiss .la-markdown th {
+  border-bottom-color: var(--la-sw-rule);
+  background: none;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--la-sw-muted);
+}
+.logos-assistant.la-swiss .la-stopped-tag {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 600;
+  color: var(--cmf-warning-ink, #A15C07);
+}
+.logos-assistant.la-swiss .la-stopped-tag::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  background: currentColor;
+}
+
+/* N.2 — the artifact frame becomes a sub-head; its cards are PR 3. */
+.logos-assistant.la-swiss .la-artifact {
+  margin-top: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+.logos-assistant.la-swiss .la-artifact-heading span:last-child {
+  margin-left: auto;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--la-sw-muted);
+}
+
+/* Answer actions: words, not icons, on a hairline; always shown. */
+.logos-assistant.la-swiss .la-message-actions {
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 8px;
+  border-top: 1px solid var(--la-sw-hair);
+  opacity: 1;
+}
+.logos-assistant.la-swiss .la-message-user .la-message-actions {
+  margin-top: 6px;
+  padding-top: 0;
+  border-top: 0;
+}
+.logos-assistant.la-swiss .la-message-actions-left {
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.logos-assistant.la-swiss .la-action-btn,
+.logos-assistant.la-swiss .la-action-btn.la-action-btn-share {
+  width: auto;
+  height: auto;
+  min-height: 28px;
+  padding: 0;
+  justify-content: flex-start; /* the phone rule keeps a 44px min-width; the word stays on the text edge */
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--la-sw-sec);
+}
+.logos-assistant.la-swiss .la-action-btn svg {
+  display: none;
+}
+.logos-assistant.la-swiss .la-action-btn-label {
+  font-size: 12px;
+  font-weight: 600;
+}
+.logos-assistant.la-swiss .la-action-btn:hover {
+  background: none;
+  color: var(--la-sw-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.logos-assistant.la-swiss .la-action-btn-active {
+  background: none;
+  color: var(--la-sw-ink) !important;
+  box-shadow: inset 0 -2px 0 var(--la-sw-accent);
+}
+.logos-assistant.la-swiss .la-action-btn-negative {
+  background: none;
+  color: var(--la-sw-accent-ink) !important;
+  box-shadow: inset 0 -2px 0 var(--la-sw-accent);
+}
+@media (hover: none) {
+  .logos-assistant.la-swiss .la-message-actions .la-action-btn {
+    width: auto;
+    height: auto;
+    min-height: 40px;
+  }
+}
+.logos-assistant.la-swiss .la-token-info {
+  gap: 0;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--la-sw-muted);
+}
+.logos-assistant.la-swiss .la-token-info svg {
+  display: none;
+}
+.logos-assistant.la-swiss .la-cached-badge {
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--la-sw-muted);
+}
+.logos-assistant.la-swiss .la-cached-badge::before {
+  content: "\00a0·\00a0";
+}
+
+/* The working turn: Stop is a 2px outline button under the pipeline. */
+.logos-assistant.la-swiss .la-stop-btn {
+  display: inline-flex;
+  width: auto;
+  height: 32px;
+  margin: 14px 0 6px;
+  padding: 0 12px;
+  border: 1px solid var(--la-sw-rule);
+  border-radius: 2px;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--la-sw-ink);
+}
+.logos-assistant.la-swiss .la-stop-btn:hover {
+  background: var(--la-sw-hover);
+  color: var(--la-sw-ink);
+}
+
+/* Error: a status square and a word, on hairlines, in the text column. */
+.logos-assistant.la-swiss .la-error {
+  gap: 10px;
+  margin: 12px 8px 0 56px;
+  padding: 10px 0;
+  border: 0;
+  border-top: 1px solid var(--la-sw-hair);
+  border-bottom: 1px solid var(--la-sw-hair);
+  border-radius: 0;
+  background: none;
+  color: var(--la-sw-ink);
+}
+.logos-assistant.la-swiss .la-error > svg {
+  display: none;
+}
+.logos-assistant.la-swiss .la-error::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  background: var(--cmf-error-text, #DC2626);
+}
+.logos-assistant.la-swiss .la-retry-btn {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--la-sw-rule);
+  border-radius: 2px;
+  background: transparent;
+  font-weight: 600;
+  color: var(--la-sw-ink);
+}
+.logos-assistant.la-swiss .la-retry-btn:hover {
+  background: var(--la-sw-hover);
+}
+
+/* N.3 — what to do next, as ruled rows in the text column. A second block
+   (Navigate to, after a Reply or Next block) takes N.4. */
+.logos-assistant.la-swiss .la-suggested-actions {
+  margin-top: 8px;
+  padding: 0 8px 0 56px;
+  border-bottom: 0;
+}
+.logos-assistant.la-swiss.la-sheet .la-suggested-actions {
+  padding: 0 4px 0 52px;
+}
+.logos-assistant.la-swiss.la-sheet .la-error {
+  margin: 12px 4px 0 52px;
+}
+.logos-assistant.la-swiss .la-suggested-label {
+  margin-bottom: 0;
+}
+.logos-assistant.la-swiss .la-suggested-list {
+  display: block;
+  padding: 0;
+}
+.logos-assistant.la-swiss .la-suggested-btn {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 14px;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  padding: 10px 0;
+  border: 0;
+  border-bottom: 1px solid var(--la-sw-hair);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: left;
+  white-space: normal;
+  color: var(--la-sw-ink);
+}
+.logos-assistant.la-swiss .la-suggested-btn::after {
+  content: "\2192";
+  content: "\2192" / "";
+  font-weight: 500;
+  color: var(--la-sw-muted);
+}
+.logos-assistant.la-swiss .la-suggested-btn:hover {
+  border-color: var(--la-sw-hair);
+  background: var(--la-sw-hover);
+  box-shadow: none;
+}
+.logos-assistant.la-swiss .la-suggested-btn:hover::after {
+  color: var(--la-sw-ink);
+}
+.logos-assistant.la-swiss .la-action-btn:focus-visible,
+.logos-assistant.la-swiss .la-suggested-btn:focus-visible,
+.logos-assistant.la-swiss .la-stop-btn:focus-visible,
+.logos-assistant.la-swiss .la-retry-btn:focus-visible {
+  outline: 2px solid var(--la-sw-accent);
+  outline-offset: 2px;
+}
+
+/* ============================================================================
+   SWISS TRANSCRIPT — PR 3: the execution artifact cards (Frank, 2026-11-10)
+   Under the N.2 sub-head, a proposal or a plan is a ruled block, not a tinted
+   card: a small tracked eyebrow, the summary in bold, hairline rows, and 2px
+   outline buttons with one filled accent for the main action. A status is an
+   8px square and a word. The card orb, the working sweep and the step pulse
+   are untouched; the share and action-items panels follow the same rules.
+   ============================================================================ */
+.logos-assistant.la-swiss .la-artifact-heading {
+  margin-bottom: 0;
+}
+.logos-assistant.la-swiss .la-proposals {
+  gap: 0;
+  margin-top: 0;
+}
+.logos-assistant.la-swiss .la-proposal,
+.logos-assistant.la-swiss .la-plan {
+  gap: 10px;
+  padding: 12px 0 14px;
+  border: 0;
+  border-bottom: 1px solid var(--la-sw-hair);
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+
+/* Head: eyebrow and card orb on one line, the summary under them. */
+.logos-assistant.la-swiss .la-proposal-head,
+.logos-assistant.la-swiss .la-plan-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 5px;
+}
+.logos-assistant.la-swiss .la-proposal-head::before,
+.logos-assistant.la-swiss .la-plan-head::before,
+.logos-assistant.la-swiss .la-proposal-edit::before {
+  grid-column: 1;
+  grid-row: 1;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 14px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--la-sw-muted);
+}
+.logos-assistant.la-swiss .la-proposal-head::before {
+  content: "Action";
+  content: "Action" / "";
+}
+.logos-assistant.la-swiss .la-plan-head::before {
+  content: "Plan";
+  content: "Plan" / "";
+}
+.logos-assistant.la-swiss .la-proposal-edit::before {
+  content: "Edit the action";
+  content: "Edit the action" / "";
+}
+.logos-assistant.la-swiss .la-proposal-head .la-proposal-chip,
+.logos-assistant.la-swiss .la-plan-head .la-proposal-chip {
+  display: none;
+}
+.logos-assistant.la-swiss .la-proposal-head .la-proposal-summary,
+.logos-assistant.la-swiss .la-plan-head .la-proposal-summary {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: -0.005em;
+  color: var(--la-sw-ink);
+}
+.logos-assistant.la-swiss .la-proposal-rejected .la-proposal-summary,
+.logos-assistant.la-swiss .la-proposal-undone .la-proposal-summary,
+.logos-assistant.la-swiss .la-proposal-failed .la-proposal-summary,
+.logos-assistant.la-swiss .la-plan-dismissed .la-proposal-summary,
+.logos-assistant.la-swiss .la-plan-undone .la-proposal-summary,
+.logos-assistant.la-swiss .la-plan-failed .la-proposal-summary {
+  color: var(--la-sw-sec);
+}
+
+/* Buttons: 32px, 2px corners, ink outline; Confirm is the one accent fill. */
+.logos-assistant.la-swiss .la-proposal-actions {
+  gap: 8px;
+}
+.logos-assistant.la-swiss .la-plan-actions {
+  justify-content: flex-start;
+}
+.logos-assistant.la-swiss .la-proposal-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--la-sw-rule);
+  border-radius: 2px;
+  background: transparent;
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--la-sw-ink);
+}
+.logos-assistant.la-swiss .la-proposal-btn:hover:not(:disabled) {
+  background: var(--la-sw-hover);
+  box-shadow: none;
+  color: var(--la-sw-ink);
+}
+.logos-assistant.la-swiss .la-proposal-btn.la-proposal-confirm {
+  border-color: var(--la-sw-accent);
+  background: var(--la-sw-accent);
+  color: var(--cmf-accent-text, #fff);
+}
+.logos-assistant.la-swiss .la-proposal-btn.la-proposal-confirm:hover:not(:disabled) {
+  border-color: var(--la-sw-accent-ink);
+  background: var(--la-sw-accent-ink);
+  color: var(--cmf-accent-text, #fff);
+}
+.logos-assistant.la-swiss .la-proposal-btn.la-proposal-reject {
+  border-color: var(--la-sw-hair);
+  color: var(--la-sw-sec);
+}
+.logos-assistant.la-swiss .la-proposal-edit-btn svg,
+.logos-assistant.la-swiss .la-proposal-undo svg {
+  display: none;
+}
+.logos-assistant.la-swiss .la-proposal-btn:focus-visible,
+.logos-assistant.la-swiss .la-plan-step-view:focus-visible,
+.logos-assistant.la-swiss .la-action-item:focus-visible,
+.logos-assistant.la-swiss .la-action-items-create:focus-visible,
+.logos-assistant.la-swiss .la-action-items-select-all:focus-visible,
+.logos-assistant.la-swiss .la-share-open:focus-visible {
+  outline: 2px solid var(--la-sw-accent);
+  outline-offset: 2px;
+}
+
+/* Status: an 8px square and a word. Done = success, failed or unresolved =
+   error, dismissed or undone = an outlined square in muted ink. */
+.logos-assistant.la-swiss .la-proposal-status {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  flex-shrink: 1;
+  color: var(--la-sw-ink);
+}
+.logos-assistant.la-swiss .la-proposal-status::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-top: 4px;
+  background: currentColor;
+}
+.logos-assistant.la-swiss .la-proposal-status svg {
+  display: none;
+}
+.logos-assistant.la-swiss .la-proposal-status-done::before {
+  background: var(--cmf-success-ink, #035D41);
+}
+.logos-assistant.la-swiss .la-proposal-status-failed {
+  color: var(--cmf-error-text, #961A1A);
+}
+.logos-assistant.la-swiss .la-proposal-status-dismissed {
+  color: var(--la-sw-muted);
+}
+.logos-assistant.la-swiss .la-proposal-status-dismissed::before {
+  box-sizing: border-box;
+  border: 1.5px solid currentColor;
+  background: none;
+}
+.logos-assistant.la-swiss .la-proposal-sent-note {
+  font-size: 11.5px;
+  font-style: normal;
+  font-weight: 500;
+  color: var(--la-sw-muted);
+}
+
+/* Edit form and typed-confirm gate. */
+.logos-assistant.la-swiss .la-proposal-edit {
+  gap: 10px;
+}
+.logos-assistant.la-swiss .la-proposal-edit-field {
+  gap: 4px;
+}
+.logos-assistant.la-swiss .la-proposal-edit-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--la-sw-muted);
+}
+.logos-assistant.la-swiss .la-proposal-edit-label strong {
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--la-sw-ink);
+}
+.logos-assistant.la-swiss .la-proposal-edit-input {
+  padding: 7px 9px;
+  border-radius: 2px;
+}
+.logos-assistant.la-swiss .la-proposal-edit-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-weight: 600;
+  line-height: 16px;
+  color: var(--cmf-error-text, #961A1A);
+}
+.logos-assistant.la-swiss .la-proposal-edit-error::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-top: 4px;
+  background: currentColor;
+}
+.logos-assistant.la-swiss .la-proposal-confirm-gate {
+  gap: 10px;
+  padding: 2px 0 2px 12px;
+  border: 0;
+  border-left: 2px solid var(--cmf-warning-ink, #824704);
+  border-radius: 0;
+  background: none;
+}
+.logos-assistant.la-swiss .la-proposal-confirm-warning {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--cmf-warning-ink, #824704);
+}
+
+/* Plan steps: numbered hairline rows. The step in flight keeps its pulse. */
+.logos-assistant.la-swiss .la-plan-steps {
+  gap: 0;
+  padding: 0;
+  border-top: 1px solid var(--la-sw-hair);
+}
+.logos-assistant.la-swiss .la-plan-step {
+  align-items: baseline;
+  gap: 6px;
+  min-height: 32px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--la-sw-hair);
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--la-sw-sec);
+}
+.logos-assistant.la-swiss .la-plan-step-num {
+  align-self: flex-start;
+  justify-content: flex-start;
+  width: 22px;
+  height: 18px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  font-size: 10.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--la-sw-muted);
+}
+.logos-assistant.la-swiss .la-plan-step-working .la-plan-step-num {
+  justify-content: center;
+  width: 18px;
+  margin-right: 4px;
+  border-radius: 2px;
+  background: var(--la-sw-accent);
+  color: var(--cmf-accent-text, #fff);
+}
+.logos-assistant.la-swiss .la-plan-step-working .la-plan-step-label {
+  color: var(--la-sw-ink);
+}
+.logos-assistant.la-swiss .la-plan-step-executed .la-plan-step-num,
+.logos-assistant.la-swiss .la-plan-step-undone .la-plan-step-num {
+  background: none;
+  color: var(--cmf-success-ink, #035D41);
+}
+.logos-assistant.la-swiss .la-plan-step-undone .la-plan-step-num {
+  color: var(--la-sw-muted);
+}
+.logos-assistant.la-swiss .la-plan-step-failed .la-plan-step-num {
+  background: none;
+  color: var(--cmf-error-text, #961A1A);
+}
+.logos-assistant.la-swiss .la-plan-step-view {
+  align-self: center;
+  padding: 2px 0;
+  border-radius: 0;
+  background: none;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--la-sw-ink);
+}
+.logos-assistant.la-swiss .la-plan-step-view:hover {
+  background: none;
+  color: var(--la-sw-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Share and action-items panels: a 2px rule, a title, hairline rows. */
+.logos-assistant.la-swiss .la-action-items-panel {
+  margin-top: 14px;
+  border: 0;
+  border-top: 2px solid var(--la-sw-rule);
+  border-radius: 0;
+  background: none;
+  overflow: visible;
+}
+.logos-assistant.la-swiss .la-action-items-header {
+  gap: 0;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--la-sw-hair);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--la-sw-ink);
+}
+.logos-assistant.la-swiss .la-action-items-header svg {
+  display: none;
+}
+.logos-assistant.la-swiss .la-action-items-list {
+  gap: 0;
+  padding: 0;
+}
+.logos-assistant.la-swiss .la-action-item {
+  align-items: baseline;
+  gap: 10px;
+  min-height: 40px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--la-sw-hair);
+  border-radius: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--la-sw-ink);
+}
+.logos-assistant.la-swiss .la-action-item:hover {
+  background: var(--la-sw-hover);
+}
+.logos-assistant.la-swiss .la-action-item svg {
+  align-self: flex-start;
+  margin-top: 1px;
+  color: var(--la-sw-muted);
+}
+.logos-assistant.la-swiss .la-action-item-selected svg {
+  color: var(--la-sw-ink);
+}
+.logos-assistant.la-swiss .la-action-item-date {
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  font-size: 11.5px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--la-sw-muted);
+}
+.logos-assistant.la-swiss .la-action-items-footer {
+  padding: 10px 0 0;
+  border-top: 0;
+}
+.logos-assistant.la-swiss .la-action-items-select-all {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--la-sw-sec);
+}
+.logos-assistant.la-swiss .la-action-items-select-all:hover {
+  color: var(--la-sw-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.logos-assistant.la-swiss .la-action-items-create {
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--la-sw-accent);
+  border-radius: 2px;
+  background: var(--la-sw-accent);
+  font-size: 12px;
+  color: var(--cmf-accent-text, #fff);
+}
+.logos-assistant.la-swiss .la-action-items-create:hover:not(:disabled) {
+  border-color: var(--la-sw-accent-ink);
+  background: var(--la-sw-accent-ink);
+}
+
+/* Share rows: words and an arrow, like the N.3 rows; the copy row keeps its word swap. */
+.logos-assistant.la-swiss .la-share-panel .la-action-item > svg {
+  display: none;
+}
+.logos-assistant.la-swiss .la-share-panel .la-action-item::after {
+  content: "\2192";
+  content: "\2192" / "";
+  flex: none;
+  font-weight: 500;
+  color: var(--la-sw-muted);
+}
+.logos-assistant.la-swiss .la-share-panel .la-action-item-selected::after {
+  content: "\2193";
+  content: "\2193" / "";
+  color: var(--la-sw-ink);
+}
+.logos-assistant.la-swiss .la-share-hint {
+  margin-top: 2px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--la-sw-muted);
+}
+.logos-assistant.la-swiss .la-share-note {
+  padding: 10px 0 12px;
+  border-bottom: 1px solid var(--la-sw-hair);
+}
+.logos-assistant.la-swiss .la-share-note-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--la-sw-muted);
+}
+.logos-assistant.la-swiss .la-share-note-row {
+  gap: 8px;
+}
+/* Field fill, border and focus come from the app-wide input rule in design-tokens.css (!important). */
+.logos-assistant.la-swiss .la-share-note-input {
+  padding: 7px 9px;
+  border-radius: 2px;
+}
+.logos-assistant.la-swiss .la-share-note-input:focus-visible {
+  outline: 0;
+}
+.logos-assistant.la-swiss .la-share-matches {
+  gap: 0;
+  margin-top: 8px;
+  border-top: 1px solid var(--la-sw-hair);
+}
+.logos-assistant.la-swiss .la-share-matches .la-action-item:last-child {
+  border-bottom: 0;
+}
+.logos-assistant.la-swiss .la-share-status {
+  gap: 7px;
+  padding: 10px 0;
+  border-top: 0;
+  border-bottom: 1px solid var(--la-sw-hair);
+  font-weight: 600;
+  color: var(--la-sw-ink);
+}
+.logos-assistant.la-swiss .la-share-status-done > svg {
+  display: none;
+}
+.logos-assistant.la-swiss .la-share-status-done::before,
+.logos-assistant.la-swiss .la-share-status-error::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  background: var(--cmf-success-ink, #035D41);
+}
+.logos-assistant.la-swiss .la-share-status-error {
+  color: var(--cmf-error-text, #961A1A);
+}
+.logos-assistant.la-swiss .la-share-status-error::before {
+  background: currentColor;
+}
+.logos-assistant.la-swiss .la-share-open {
+  color: var(--la-sw-ink);
+  text-underline-offset: 3px;
+}
+
+/* ============================================================================
+   SWISS TRANSCRIPT — PR 4: thread title, contents strip, menu, tour, sheet
+   (Frank, 2026-11-10)
+   A running conversation opens with its title on a 2px ink rule and, from the
+   second turn, a contents strip that jumps between turns; the accent underlines
+   only the turn being read. The context bar becomes one plain line under it.
+   The utility menu and the panel tour lose their shadows and rounded cards for
+   ink borders, hairline rows and square step marks. The orb, the mic and every
+   processing animation are untouched.
+   ============================================================================ */
+.logos-assistant.la-swiss .la-header-history-btn {
+  width: auto;
+  min-width: 32px;
+  padding: 0 11px;
+}
+.logos-assistant.la-swiss .la-header-action-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+/* Thread title and contents strip */
+.logos-assistant.la-swiss .la-thread-head {
+  flex-shrink: 0;
+  padding: 14px 16px 0 24px;
+  background: var(--cmf-bg, #FFFBF7);
+}
+.logos-assistant.la-swiss .la-thread-title {
+  display: -webkit-box;
+  margin: 0;
+  padding-bottom: 10px;
+  overflow: hidden;
+  border-bottom: 2px solid var(--la-sw-rule);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+  color: var(--la-sw-ink);
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.logos-assistant.la-swiss .la-contents {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  border-bottom: 1px solid var(--la-sw-hair);
+}
+.logos-assistant.la-swiss .la-contents-label {
+  flex: none;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--la-sw-muted);
+}
+.logos-assistant.la-swiss .la-contents-list {
+  display: flex;
+  gap: 16px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+  list-style: none;
+  scrollbar-width: none;
+}
+.logos-assistant.la-swiss .la-contents-list::-webkit-scrollbar {
+  display: none;
+}
+.logos-assistant.la-swiss .la-contents-list > li {
+  flex: none;
+  min-width: 0;
+}
+.logos-assistant.la-swiss .la-contents-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 200px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--la-sw-muted);
+  cursor: pointer;
+}
+.logos-assistant.la-swiss .la-contents-num {
+  flex: none;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+.logos-assistant.la-swiss .la-contents-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.logos-assistant.la-swiss .la-contents-link:hover {
+  color: var(--la-sw-ink);
+}
+.logos-assistant.la-swiss .la-contents-link[aria-current="location"] {
+  color: var(--la-sw-ink);
+  box-shadow: inset 0 -2px 0 var(--la-sw-accent);
+}
+.logos-assistant.la-swiss .la-contents-link:focus-visible {
+  outline: 2px solid var(--la-sw-rule);
+  outline-offset: -2px;
+}
+
+/* Context bar: one line under the strip. "Live summary" stays for screen readers. */
+.logos-assistant.la-swiss .la-context-bar-command {
+  flex-direction: row;
+  align-items: center;
+  gap: 0;
+  min-height: 0;
+  padding: 7px 16px 7px 24px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--la-sw-hair);
+  background: var(--cmf-bg, #FFFBF7);
+  white-space: nowrap;
+}
+.logos-assistant.la-swiss .la-context-command-line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  min-height: 0;
+}
+.logos-assistant.la-swiss .la-context-command-line:first-child {
+  flex: none;
+}
+.logos-assistant.la-swiss .la-context-command-summary {
+  flex: 1;
+}
+.logos-assistant.la-swiss .la-context-command-summary::before {
+  content: "\00B7";
+  content: "\00B7" / "";
+  padding: 0 6px;
+  font-size: 11px;
+  color: var(--la-sw-muted);
+}
+.logos-assistant.la-swiss .la-context-bar-command .la-context-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--la-sw-muted);
+}
+.logos-assistant.la-swiss .la-context-command-summary .la-context-eyebrow {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.logos-assistant.la-swiss .la-context-bar-command .la-section-chip {
+  flex: none;
+  overflow: visible;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--la-sw-ink);
+}
+.logos-assistant.la-swiss .la-context-bar-command .la-section-summary {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 11px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--la-sw-sec);
+}
+
+/* Utility menu: an ink-bordered list of text rows. design-tokens.css forces every dark
+   [role="menu"] and [role="menuitem"] to surface colours with !important (it turned the
+   delete row grey), so the colours here answer with !important inside this scope only. */
+.logos-assistant.la-swiss .la-utility-menu {
+  top: calc(100% + 6px);
+  width: 220px;
+  padding: 0;
+  border: 1px solid var(--la-sw-rule);
+  border-color: var(--la-sw-rule) !important;
+  border-radius: 2px;
+  background: var(--cmf-bg, #FFFBF7);
+  background-color: var(--cmf-bg, #FFFBF7) !important;
+  box-shadow: none;
+}
+.logos-assistant.la-swiss .la-utility-menu-item {
+  min-height: 38px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--la-sw-hair);
+  border-radius: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--la-sw-ink) !important;
+}
+.logos-assistant.la-swiss .la-utility-menu-item svg {
+  display: none;
+}
+.logos-assistant.la-swiss .la-utility-menu-item:hover:not(:disabled),
+.logos-assistant.la-swiss .la-utility-menu-item:focus-visible {
+  background: var(--la-sw-hover);
+  background-color: var(--la-sw-hover) !important;
+  color: var(--la-sw-ink) !important;
+}
+.logos-assistant.la-swiss .la-utility-menu-item:focus-visible,
+.logos-assistant.la-swiss .la-utility-menu-confirm-btn:focus-visible {
+  outline: 2px solid var(--la-sw-rule);
+  outline-offset: -2px;
+}
+.logos-assistant.la-swiss .la-utility-menu-item-danger {
+  margin-top: 0;
+  border-top: 0;
+  border-bottom: 0;
+  border-radius: 0;
+  color: var(--cmf-error-ink, #B42318) !important;
+}
+.logos-assistant.la-swiss .la-utility-menu-item-danger:hover:not(:disabled) {
+  color: var(--cmf-error-ink, #B42318) !important;
+}
+.logos-assistant.la-swiss .la-utility-menu-confirm {
+  margin-top: 0;
+  padding: 10px 12px 12px;
+  border-top: 0;
+  font-size: 12px;
+  color: var(--la-sw-sec);
+}
+.logos-assistant.la-swiss .la-utility-menu-confirm-btn {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--la-sw-hair);
+  border-radius: 2px;
+  background: transparent;
+  font-size: 12px;
+  color: var(--la-sw-ink) !important;
+}
+.logos-assistant.la-swiss .la-utility-menu-confirm-btn:hover {
+  background-color: var(--la-sw-hover) !important;
+}
+.logos-assistant.la-swiss .la-utility-menu-confirm-danger {
+  border-color: currentColor;
+  background: transparent;
+  color: var(--cmf-error-ink, #B42318) !important;
+}
+
+/* Panel tour: a ruled card, square step marks, one filled main action. */
+.logos-assistant.la-swiss .la-tour-overlay {
+  background: rgba(15, 12, 10, 0.36);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.logos-assistant.la-swiss .la-tour-card {
+  max-width: 340px;
+  padding: 16px 20px 18px;
+  border: 1px solid var(--la-sw-rule);
+  border-radius: 2px;
+  background: var(--cmf-bg, #FFFBF7);
+  box-shadow: none;
+  text-align: left;
+}
+.logos-assistant.la-swiss .la-tour-step-indicator {
+  justify-content: flex-start;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+.logos-assistant.la-swiss .la-tour-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--la-sw-muted);
+  transform: none;
+}
+.logos-assistant.la-swiss .la-tour-dot-done {
+  background: var(--la-sw-ink);
+  box-shadow: none;
+}
+.logos-assistant.la-swiss .la-tour-dot-active {
+  background: var(--la-sw-accent);
+  box-shadow: none;
+  transform: none;
+}
+.logos-assistant.la-swiss .la-tour-title {
+  margin: 0 0 10px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--la-sw-rule);
+  font-family: inherit;
+  font-size: 18px;
+  letter-spacing: -0.01em;
+  color: var(--la-sw-ink);
+}
+.logos-assistant.la-swiss .la-tour-body {
+  margin: 0 0 18px;
+  color: var(--la-sw-sec);
+}
+.logos-assistant.la-swiss .la-tour-actions {
+  justify-content: flex-end;
+  gap: 8px;
+}
+.logos-assistant.la-swiss .la-tour-skip,
+.logos-assistant.la-swiss .la-tour-next {
+  min-height: 32px;
+  padding: 0 14px;
+  border-radius: 2px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.logos-assistant.la-swiss .la-tour-skip {
+  border: 1px solid var(--la-sw-hair);
+  background: transparent;
+  color: var(--la-sw-ink);
+}
+.logos-assistant.la-swiss .la-tour-skip:hover {
+  border-color: var(--la-sw-rule);
+  background: transparent;
+}
+.logos-assistant.la-swiss .la-tour-next {
+  border: 1px solid var(--la-sw-accent);
+  background: var(--la-sw-accent);
+  color: var(--cmf-accent-text, #fff);
+}
+.logos-assistant.la-swiss .la-tour-next:hover {
+  border-color: var(--la-sw-accent-ink);
+  background: var(--la-sw-accent-ink);
+}
+.logos-assistant.la-swiss .la-tour-skip:focus-visible,
+.logos-assistant.la-swiss .la-tour-next:focus-visible {
+  outline: 2px solid var(--la-sw-rule);
+  outline-offset: 2px;
+}
+
+/* Phone sheet: a flat grip, the same title and strip at the sheet's 16px line,
+   and touch-size controls. The title and strip give way while the keyboard is up. */
+.logos-assistant.la-swiss .la-sheet-handle-bar {
+  width: 32px;
+  height: 3px;
+  border-radius: 1px;
+  background: var(--la-sw-muted);
+}
+.logos-assistant.la-swiss.la-sheet .la-thread-head {
+  padding: 10px 12px 0 16px;
+}
+.logos-assistant.la-swiss.la-sheet .la-thread-title {
+  font-size: 20px;
+}
+.logos-assistant.la-swiss.la-sheet .la-contents-link {
+  height: 40px;
+}
+.logos-assistant.la-swiss.la-sheet .la-header-history-btn {
+  width: auto;
+  padding: 0 12px;
+}
+.logos-assistant.la-swiss.la-sheet .la-context-bar-command {
+  padding: 7px 12px 7px 16px;
+}
+.logos-assistant.la-swiss.la-sheet[data-keyboard-open='true'] .la-thread-head {
+  display: none;
+}
+/* Composer: nothing moves while typing (Frank, 2026-11-11). The keyboard hints still
+   appear only once there is text to send (U6), but they fade in at a fixed spot in the
+   area's bottom padding instead of opening a row that lifted the box 16px. A long
+   placeholder stays on one line, so the box does not shrink on the first character. */
+.logos-assistant.la-swiss .la-input-area {
+  position: relative;
+  padding-bottom: 18px;
+}
+.logos-assistant.la-swiss .la-input-area .la-input-hints {
+  position: absolute;
+  right: 24px;
+  bottom: 3px;
+  left: 24px;
+  max-height: none;
+  padding: 0;
+  line-height: 12px;
+}
+.logos-assistant.la-swiss .la-input-area:focus-within:has(.la-input:not(:placeholder-shown)) .la-input-hints {
+  max-height: none;
+  padding-top: 0;
+}
+.logos-assistant.la-swiss.la-sheet .la-input-area .la-input-hints {
+  right: 16px;
+  left: 16px;
+}
+.logos-assistant.la-swiss .la-input::placeholder {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.logos-assistant.la-swiss.la-sheet .la-utility-menu-item,
+.logos-assistant.la-swiss.la-sheet .la-tour-skip,
+.logos-assistant.la-swiss.la-sheet .la-tour-next,
+.logos-assistant.la-swiss.la-sheet .la-utility-menu-confirm-btn {
+  min-height: 44px;
+}
+
+/* ============================================================================
+   SWISS TRANSCRIPT — N.2 artifact state (Frank, 2026-11-11)
+   The state word by "Execution artifact" gets the same 8px square as the card
+   statuses: accent while it waits for review, error ink when a step failed,
+   success when all ran, an outline when dismissed or undone. A mixed record
+   keeps the plain muted word.
+   ============================================================================ */
+/* Every rule here has the same specificity, so the tone rules win by order. */
+.logos-assistant.la-swiss .la-artifact-heading span[data-state] {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--la-sw-ink);
+}
+.logos-assistant.la-swiss .la-artifact-heading span[data-state]::before {
+  content: "";
+  flex: none;
+  box-sizing: border-box;
+  width: 8px;
+  height: 8px;
+  background: currentColor;
+}
+.logos-assistant.la-swiss .la-artifact-heading span[data-state="record"] {
+  color: var(--la-sw-muted);
+}
+.logos-assistant.la-swiss .la-artifact-heading span[data-state="record"]::before {
+  content: none;
+}
+.logos-assistant.la-swiss .la-artifact-heading span[data-state="review"]::before {
+  background: var(--la-sw-accent);
+}
+.logos-assistant.la-swiss .la-artifact-heading span[data-state="attention"] {
+  color: var(--cmf-error-text, #961A1A);
+}
+.logos-assistant.la-swiss .la-artifact-heading span[data-state="done"]::before {
+  background: var(--cmf-success-ink, #035D41);
+}
+.logos-assistant.la-swiss .la-artifact-heading span[data-state="dismissed"] {
+  color: var(--la-sw-muted);
+}
+.logos-assistant.la-swiss .la-artifact-heading span[data-state="dismissed"]::before {
+  border: 1.5px solid currentColor;
+  background: none;
+}

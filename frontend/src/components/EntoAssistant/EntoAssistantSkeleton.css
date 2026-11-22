@@ -1,0 +1,241 @@
+/* ============================================================================
+   LogosAssistantSkeleton — Suspense fallback for the lazy AI panel.
+
+   WHY THIS FILE IS SEPARATE FROM LogosAssistant.css:
+   The panel's real stylesheet is imported INSIDE the lazy chunk
+   (LogosAssistant.tsx `import './LogosAssistant.css'`), so it does not exist
+   until that chunk finishes downloading — which is exactly the window this
+   skeleton fills. A skeleton that reused `.la-panel` etc. would paint unstyled.
+   This stylesheet ships with the main bundle (AppInner imports the skeleton
+   statically), so the frame is styled the instant Suspense shows it.
+
+   Geometry mirrors LogosAssistant.css `.la-panel` (420px right-edge drawer +
+   the same responsive breakpoints) so the skeleton→real-panel swap doesn't jump.
+   Colors read the global --cmf-* design tokens, so it's theme-aware in both
+   light and dark with no JS.
+   ============================================================================ */
+
+.la-skel {
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+  display: flex;
+  justify-content: flex-end;
+  /* Transient placeholder — never intercept clicks meant for the app beneath. */
+  pointer-events: none;
+}
+
+.la-skel-panel {
+  width: 420px;
+  max-width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--cmf-bg, #FFFBF7);
+  border-left: 1px solid var(--cmf-border, rgba(30, 27, 24, 0.08));
+  box-shadow: -14px 0 44px -14px rgba(30, 27, 24, 0.20);
+  overflow: hidden;
+}
+
+/* Header — matches the real 44px header height and side padding. */
+.la-skel-header {
+  height: 44px;
+  flex: 0 0 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px 0 14px;
+  border-bottom: 1px solid var(--cmf-border, rgba(30, 27, 24, 0.08));
+}
+
+.la-skel-header-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  flex: 0 0 22px;
+}
+
+.la-skel-header-title {
+  width: 128px;
+  height: 13px;
+  border-radius: 4px;
+}
+
+.la-skel-header-spacer { flex: 1; }
+
+.la-skel-header-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  flex: 0 0 22px;
+}
+
+/* Body — a few placeholder bubbles standing in for the conversation. */
+.la-skel-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 16px;
+  overflow: hidden;
+}
+
+.la-skel-line {
+  height: 12px;
+  border-radius: 6px;
+}
+
+.la-skel-bubble {
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.la-skel-bubble--me {
+  align-self: flex-end;
+  width: 62%;
+  background: var(--cmf-surface-2, rgba(184, 97, 74, 0.08));
+}
+
+.la-skel-bubble--ai {
+  align-self: flex-start;
+  width: 82%;
+  background: var(--cmf-surface, rgba(30, 27, 24, 0.03));
+}
+
+/* Composer — bottom input bar placeholder. */
+.la-skel-composer {
+  flex: 0 0 auto;
+  padding: 12px 16px;
+  border-top: 1px solid var(--cmf-border, rgba(30, 27, 24, 0.08));
+}
+
+.la-skel-composer-field {
+  height: 44px;
+  border-radius: 12px;
+  background: var(--cmf-surface, rgba(30, 27, 24, 0.03));
+}
+
+/* Shimmer — a moving highlight sweep across every placeholder block. */
+.la-skel-shimmer {
+  background: linear-gradient(
+    100deg,
+    rgba(128, 128, 128, 0.10) 30%,
+    rgba(128, 128, 128, 0.18) 50%,
+    rgba(128, 128, 128, 0.10) 70%
+  );
+  background-size: 200% 100%;
+  animation: la-skel-sweep 1.4s ease-in-out infinite;
+}
+
+@keyframes la-skel-sweep {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Dark mode — brighten the placeholders so they read against the dark panel. */
+html.dark .la-skel-panel,
+.la-dark .la-skel-panel {
+  background: var(--cmf-bg, #121417);
+}
+
+html.dark .la-skel-shimmer,
+.la-dark .la-skel-shimmer {
+  background: linear-gradient(
+    100deg,
+    rgba(255, 255, 255, 0.05) 30%,
+    rgba(255, 255, 255, 0.11) 50%,
+    rgba(255, 255, 255, 0.05) 70%
+  );
+  background-size: 200% 100%;
+}
+
+/* Respect reduced-motion: hold a static tint instead of sweeping. */
+@media (prefers-reduced-motion: reduce) {
+  .la-skel-shimmer { animation: none; }
+}
+
+/* Responsive — mirror the real panel's breakpoints so the frame width matches. */
+@media (max-width: 1024px) {
+  .la-skel-panel { width: 360px; }
+}
+@media (max-width: 768px) {
+  .la-skel-panel {
+    width: 85%;
+    max-width: 340px;
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
+  }
+}
+@media (max-width: 480px) {
+  .la-skel-header { padding: 0 6px 0 10px; }
+}
+@media (max-width: 380px) {
+  .la-skel-panel {
+    width: 90%;
+    max-width: none;
+  }
+}
+
+/* Phone — the real panel is a full-screen sheet that slides up (LogosAssistant.css,
+   PHONE SHEET), so the placeholder takes the same shape, dims the page the same way and
+   slides up on the same curve. The real panel then takes its place without moving
+   (assistantChunk.ts handoff). Before this, the old right-edge frame flashed first. */
+.la-skel-handle {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .la-skel {
+    align-items: flex-end;
+    justify-content: center;
+    background: rgba(15, 12, 10, 0.32);
+    animation: la-skel-dim-in 400ms ease-out both;
+  }
+
+  html.dark .la-skel {
+    background: rgba(0, 0, 0, 0.5);
+  }
+
+  .la-skel-panel {
+    width: 100%;
+    max-width: none;
+    height: calc(100% - 8px - env(safe-area-inset-top, 0px));
+    border-left: none;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -10px 40px -12px rgba(30, 27, 24, 0.28);
+    animation: la-skel-sheet-in 500ms cubic-bezier(0.32, 0.72, 0, 1) both;
+  }
+
+  .la-skel-handle {
+    display: block;
+    flex: 0 0 auto;
+    width: 36px;
+    height: 4px;
+    margin: 7px auto;
+    border-radius: 9999px;
+    background: var(--cmf-border-strong, rgba(30, 27, 24, 0.22));
+  }
+
+  html.dark .la-skel-handle {
+    background: rgba(255, 255, 255, 0.24);
+  }
+}
+
+@keyframes la-skel-sheet-in {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+@keyframes la-skel-dim-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .la-skel,
+  .la-skel-panel {
+    animation: none;
+  }
+}

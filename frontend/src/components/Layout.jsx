@@ -32,12 +32,13 @@ import { useGuideNewFeatures } from './UsersGuide/useGuideNewFeatures'
 import '../styles/navigation.css'
 import VCCanvas from './vc/VCCanvas'
 import Logo from './Logo'
-import EntoAssistant from './EntoAssistant/EntoAssistant'
+import EntoAssistantSkeleton from './EntoAssistant/EntoAssistantSkeleton'
 import EntoAssistantButton from './EntoAssistant/EntoAssistantButton'
 import EntoAIProactiveChecker from './EntoAssistant/EntoAIProactiveChecker'
 import { BenchShell } from './bench/shell/BenchShell'
 import { Faceplate } from './bench'
 import { settingsApi } from '../services/api'
+const EntoAssistant = React.lazy(() => import('./EntoAssistant/EntoAssistant'))
 
 // Grouped navigation structure — 4 sections
 // Items with adminOnly: true are filtered out at render time for non-admin
@@ -144,6 +145,9 @@ export default function Layout() {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [shortcutsHelpOpen, setShortcutsHelpOpen] = useState(false)
   const [assistantOpen, setAssistantOpen] = useState(false)
+  // The panel chunk loads on first open, then stays mounted so its conversation survives a close.
+  const [assistantMounted, setAssistantMounted] = useState(false)
+  useEffect(() => { if (assistantOpen) setAssistantMounted(true) }, [assistantOpen])
   const [proactiveSuggestion, setProactiveSuggestion] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
@@ -200,10 +204,14 @@ export default function Layout() {
         isOpen={shortcutsHelpOpen}
         onClose={() => setShortcutsHelpOpen(false)}
       />
-      <EntoAssistant
-        isOpen={assistantOpen}
-        onClose={() => setAssistantOpen(false)}
-      />
+      {assistantMounted && (
+        <Suspense fallback={<EntoAssistantSkeleton />}>
+          <EntoAssistant
+            isOpen={assistantOpen}
+            onClose={() => setAssistantOpen(false)}
+          />
+        </Suspense>
+      )}
       <EntoAIProactiveChecker onProactiveChange={setProactiveSuggestion} />
     </>
   )
