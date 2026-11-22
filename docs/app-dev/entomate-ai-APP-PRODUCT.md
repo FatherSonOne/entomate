@@ -38,13 +38,24 @@
 
 ## 2. Security floor — must close BEFORE any port work
 
-**Confirmed in source 2026-11-22, not probed live** (a probe writes `conversations` rows):
+**CLOSED 2026-11-22 (EAI-01).** The finding below was written against a local checkout 125 commits behind `origin/main`.
 
-- `backend/routes/assistant.js:259` — `router.post('/query', optionalAuth, …)`. Anonymous calls are accepted.
-- Every section loader reads through `supabase` from `config/supabase.js:32` — the **service-role** client, which bypasses RLS.
-- No loader filters by `org_id` or `user_id`.
+**Pre-flight re-derivation (EAI-01 sweep):**
 
-**Effect:** any caller, with or without a login, can read every tenant's tasks, meetings, projects, goals and workflows through the assistant. A new agent built on this route inherits the leak. Phase 0 fixes it.
+| Inherited claim | Verdict on `origin/main` `01d5342` |
+|---|---|
+| `/query` uses `optionalAuth`, anon accepted | **Already closed upstream** — `authenticate` (`0fb489d`, `b8a62a0`) |
+| Loaders read via the service client with no org filter | **Mechanism swapped** — still the service client, but every loader had `.in('org_id', orgIds)` (`cf300d3`, `db604cb`) |
+| No `aiLimiter` | **Confirmed** — only the global `apiLimiter` (100/min) |
+| Loaders do not use a user-JWT client (D2) | **Confirmed** |
+| Goals loader exists | **Gone** — Goals removed in `5264fec`; workflows/automations merged in `8161670` |
+| `conversations` rows written with no user | **Already closed upstream** — `user_id` written + owned-conversation check (`db604cb`) |
+
+**What EAI-01 shipped:** `aiLimiter` on `/query`; `createUserClient(token)` in `config/supabase.js`; tasks, meetings, workflows and the conversation writes go through the caller's JWT client, so RLS (`org_id IN get_my_org_ids()`, `user_id = auth.uid()`) is the perimeter and the `org_id` filter is a second fence.
+
+**Not moved (EAI-01b):** live RLS on `projects` (owner or `team_ids`) and `agents` (`created_by`) is narrower than the org filter the app uses. Moving them to the user client would hide org rows the caller did not create. They stay on the service client with the org filter until their RLS is org-scoped. `calendar_events` does not exist in the live DB.
+
+**Evidence:** jest `assistant-route.test.js` 11/11 green; on `01d5342` the 9 D2 cases fail and the 2 401 cases pass (upstream already had `authenticate`); live anon/forged → 401 on the real router; self-aborting probe as an org-A owner read 0 org-B rows in tasks, meetings, workflows (control: 14 org-A tasks, 8 meetings).
 
 ---
 
@@ -92,7 +103,8 @@ Each phase is one or more `/app-dev sweep` sessions. Lines are rough ported + ne
 
 | Phase | Row | Deliverable | Size | Gate |
 |---|---|---|---|---|
-| **P0** | EAI-01 | Assistant route: `optionalAuth` → `authenticate`; every loader scoped to the caller's org through the user client (D2); add `aiLimiter`. | S (~60) | Probe: anon call → 401; org A user cannot read org B rows |
+| **P0** | EAI-01 | ✅ **DONE 2026-11-22** — `aiLimiter`; org-RLS loaders + conversation writes through the user client (D2). See §2. | S | anon → 401 ✔; org A reads 0 org B rows ✔ |
+| **P0** | EAI-01b | Migration: org-scope `projects` and `agents` SELECT RLS (`org_id IN get_my_org_ids()`), then move their assistant loaders to the user client. | S–M | Probe: an org member who did not create a project/agent still sees it; org B still 0 |
 | **P1** | EAI-02 | **Visual shell port** — panel, launcher, `LogosOrb` → Ento orb, `DotMatrix`, `ThreadRail`, `Composer`, `ContextCard`, skeleton, `usePanelResize`, full CSS + token bridge (D5). Wired to the existing `/api/assistant/query` so behaviour is unchanged. | L (~7,000 ported) | **Needs Frank's approval — replaces EntoAssistant (§8)**. Playwright: both themes, desktop + phone |
 | **P2** | EAI-03 | Real streaming (Gemini `generateContentStream`) + `ento_ai_threads` table (user + org RLS, `tenant_organizations` FK) replacing localStorage history. | M (~600) | Thread survives reload and a second device; RLS probe |
 | **P3** | EAI-04 | Function-calling loop in `routes/entoAi.js` + the ≈10 read tools (§4) + tool-call chips in the panel. | L (~1,500) | Each tool answers a real question on demo data; cross-org probe returns nothing |
@@ -138,7 +150,8 @@ Each phase is one or more `/app-dev sweep` sessions. Lines are rough ported + ne
 ## 9. Known side findings (not this file's rows)
 
 - `ai.chat()` is called by `assignmentAgent`, `priorityAgent`, `deadlineAgent`, `followupAgent` (6 sites) but not defined in `config/ai.js` → parent roadmap **S8**. Not runtime-verified.
-- `conversations.user_id` is nullable and the assistant writes rows with no user → retire with P2.
+- `conversations.user_id` is nullable. The assistant now writes `user_id` (upstream `db604cb`) and inserts through the user client, so RLS rejects a missing user. Retire the column's nullability with P2.
+- §4 lists `list_goals`; Goals was removed upstream in `5264fec`. Drop it at P3.
 
 ## 10. Score
 

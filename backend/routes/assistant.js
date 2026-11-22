@@ -4,27 +4,32 @@
  */
 
 const express = require('express');
-const { supabase } = require('../config/supabase');
+const { supabase, createUserClient } = require('../config/supabase');
 const ai = require('../config/ai');
 const log = require('../utils/log');
 const askService = require('../services/askService');
 const { authenticate } = require('../middleware/auth');
+const { aiLimiter } = require('../middleware/rateLimiter');
 const { getOrgIdsForUser } = require('../utils/orgContext');
 
 const router = express.Router();
 
 // ── Section data loaders ───────────────────────────────
 // Each loader fetches the data relevant to a specific app section.
-// The backend uses the service-role key, so every query must be limited to the
-// caller: org-owned tables by org_id, the rest (no org_id column yet) by owner.
-// Audit finding 3.
+// Every query is limited to the caller: org-owned tables by org_id, the rest
+// (no org_id column yet) by owner. Audit finding 3.
+// `db` is the caller's user-JWT client (EAI-01 / D2): tables whose RLS is
+// org-scoped (tasks, meetings, workflows) read through it, so RLS is the
+// perimeter and the org_id filter is a second fence. projects and agents stay
+// on the service client until their RLS is org-scoped too (EAI-01b) — their
+// current owner-only policies would hide org rows the app shows elsewhere.
 
 const sectionLoaders = {
-  async dashboard({ orgIds, userId }) {
+  async dashboard({ orgIds, db }) {
     const [tasks, meetings, projects] = await Promise.allSettled([
-      supabase.from('tasks').select('id, title, description, status, priority, due_date, assigned_to, project_id')
+      db.from('tasks').select('id, title, description, status, priority, due_date, assigned_to, project_id')
         .in('org_id', orgIds).order('due_date', { ascending: true }).limit(20),
-      supabase.from('meetings').select('id, title, summary, created_at, sentiment_label')
+      db.from('meetings').select('id, title, summary, created_at, sentiment_label')
         .in('org_id', orgIds).order('created_at', { ascending: false }).limit(10),
       supabase.from('projects').select('id, name, status, start_date, end_date, budget, budget_spent')
         .in('org_id', orgIds).eq('status', 'active').limit(10),
@@ -36,8 +41,8 @@ const sectionLoaders = {
     };
   },
 
-  async meetings({ orgIds }) {
-    const { data } = await supabase.from('meetings')
+  async meetings({ orgIds, db }) {
+    const { data } = await db.from('meetings')
       .select('id, title, summary, key_points, decisions, created_at, sentiment_label, transcript')
       .in('org_id', orgIds)
       .order('created_at', { ascending: false }).limit(15);
@@ -64,8 +69,8 @@ const sectionLoaders = {
     return { projects: data || [] };
   },
 
-  async tasks({ orgIds }) {
-    const { data } = await supabase.from('tasks')
+  async tasks({ orgIds, db }) {
+    const { data } = await db.from('tasks')
       .select('id, title, description, status, priority, due_date, assigned_to, project_id, created_at')
       .in('org_id', orgIds)
       .order('due_date', { ascending: true }).limit(25);
@@ -76,8 +81,8 @@ const sectionLoaders = {
   // Automations and workflows are one module on the workflow engine.
   async workflows(ctx) { return sectionLoaders.automations(ctx); },
 
-  async automations({ orgIds }) {
-    const { data } = await supabase.from('workflows')
+  async automations({ orgIds, db }) {
+    const { data } = await db.from('workflows')
       .select('id, name, description, active, nodes, last_executed_at, execution_count, created_at')
       .in('org_id', orgIds)
       .eq('is_template', false)
@@ -98,11 +103,11 @@ const sectionLoaders = {
     return { agents: data || [] };
   },
 
-  async analytics({ orgIds, userId }) {
+  async analytics({ orgIds, db }) {
     // Aggregate metrics
     const [tasks, meetings, projects] = await Promise.allSettled([
-      supabase.from('tasks').select('status', { count: 'exact' }).in('org_id', orgIds),
-      supabase.from('meetings').select('id', { count: 'exact' }).in('org_id', orgIds),
+      db.from('tasks').select('status', { count: 'exact' }).in('org_id', orgIds),
+      db.from('meetings').select('id', { count: 'exact' }).in('org_id', orgIds),
       supabase.from('projects').select('status', { count: 'exact' }).in('org_id', orgIds),
     ]);
     return {
@@ -116,12 +121,12 @@ const sectionLoaders = {
 };
 
 // Fallback loader for sections without specific data
-async function loadSectionData(section, userId) {
+async function loadSectionData(section, userId, db) {
   const loader = sectionLoaders[section];
   if (!loader) return {};
   try {
     const orgIds = await getOrgIdsForUser(userId);
-    return await loader({ orgIds, userId });
+    return await loader({ orgIds, userId, db });
   } catch (err) {
     log.warn(`[Assistant] Failed to load ${section} data:`, err.message);
     return {};
@@ -254,7 +259,7 @@ const SECTION_LABELS = {
  *
  * Body: { question, section, conversationId? }
  */
-router.post('/query', authenticate, async (req, res) => {
+router.post('/query', authenticate, aiLimiter, async (req, res) => {
   try {
     const { question, section = 'dashboard', conversationId } = req.body;
 
@@ -266,13 +271,19 @@ router.post('/query', authenticate, async (req, res) => {
       return res.status(503).json({ error: 'AI service not configured' });
     }
 
+    // authenticate guarantees a verified Bearer token on this header.
+    const db = createUserClient(req.headers.authorization.split(' ')[1]);
+    if (!db) {
+      return res.status(503).json({ error: 'Database not configured' });
+    }
+
     const userId = req.user?.id;
     const userName = req.user?.name || req.user?.email || 'User';
     const sectionLabel = SECTION_LABELS[section] || 'Dashboard';
 
     // 1. Load section-specific data from database
     log.info(`[Assistant] Query in ${sectionLabel}: "${question.substring(0, 80)}"`);
-    const sectionData = await loadSectionData(section, userId);
+    const sectionData = await loadSectionData(section, userId, db);
 
     // 2. Build context and system prompt
     const contextBlocks = buildContextBlocks(sectionData);
@@ -306,24 +317,22 @@ router.post('/query', authenticate, async (req, res) => {
     // 6. Save to conversation history
     // Only append to a conversation the caller owns (audit finding 3).
     let newConversationId = await askService.ownedConversationId(conversationId, req.user?.id);
-    if (supabase) {
-      try {
-        if (!newConversationId) {
-          const { data: newConv } = await supabase
-            .from('conversations')
-            .insert({ user_id: req.user?.id, started_at: new Date(), title: `[AI] ${question.substring(0, 80)}` })
-            .select().single();
-          if (newConv) newConversationId = newConv.id;
-        }
-        if (newConversationId) {
-          await supabase.from('conversation_messages').insert([
-            { conversation_id: newConversationId, role: 'user', content: question },
-            { conversation_id: newConversationId, role: 'assistant', content: fullAnswer },
-          ]);
-        }
-      } catch (err) {
-        log.warn('[Assistant] Could not save conversation:', err.message);
+    try {
+      if (!newConversationId) {
+        const { data: newConv } = await db
+          .from('conversations')
+          .insert({ user_id: req.user?.id, started_at: new Date(), title: `[AI] ${question.substring(0, 80)}` })
+          .select().single();
+        if (newConv) newConversationId = newConv.id;
       }
+      if (newConversationId) {
+        await db.from('conversation_messages').insert([
+          { conversation_id: newConversationId, role: 'user', content: question },
+          { conversation_id: newConversationId, role: 'assistant', content: fullAnswer },
+        ]);
+      }
+    } catch (err) {
+      log.warn('[Assistant] Could not save conversation:', err.message);
     }
 
     // 7. Complete

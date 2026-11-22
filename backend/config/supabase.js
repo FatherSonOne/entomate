@@ -38,4 +38,14 @@ const supabaseAdmin = supabaseUrl && supabaseServiceKey
   ? createClient(supabaseUrl, supabaseServiceKey)
   : null;
 
-module.exports = { supabase, supabaseAdmin, supabaseAnon };
+// Per-request client that acts AS the caller: anon key + the caller's JWT, so
+// RLS (auth.uid(), get_my_org_ids()) is the perimeter. Use this for reads and
+// writes made on a user's behalf. Returns null when the anon key is unset.
+const createUserClient = (accessToken) => supabaseUrl && supabaseAnonKey && accessToken
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: `Bearer ${accessToken}` } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    })
+  : null;
+
+module.exports = { supabase, supabaseAdmin, supabaseAnon, createUserClient };
