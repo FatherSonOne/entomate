@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { flushSync } from 'react-dom';
 
 const ThemeContext = createContext(null);
 
@@ -174,9 +175,21 @@ export function ThemeProvider({ children }) {
     setPaletteState(id);
   }, []);
 
-  const chooseDesignStyle = useCallback((id) => {
+  // Crossfades between styles with the View Transitions API where it exists.
+  // Skipped for reduced motion (OS setting, or { animate: false } from the app setting).
+  const chooseDesignStyle = useCallback((id, { animate = true } = {}) => {
     if (!STYLE_IDS.includes(id)) return;
     localStorage.setItem(STYLE_KEY, id);
+    const reduced = typeof window !== 'undefined'
+      && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (animate && !reduced && typeof document !== 'undefined' && document.startViewTransition) {
+      document.documentElement.classList.add('style-switching');
+      const transition = document.startViewTransition(() => {
+        flushSync(() => setDesignStyle(id));
+      });
+      transition.finished.finally(() => document.documentElement.classList.remove('style-switching'));
+      return;
+    }
     setDesignStyle(id);
   }, []);
 

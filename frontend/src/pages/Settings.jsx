@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Settings as SettingsIcon, Database, Cpu, Palette, Sun, Moon, Monitor,
@@ -26,6 +26,8 @@ import CalendarAutoJoinSettings from '../components/settings/CalendarAutoJoinSet
 
 // ── Settings Sections ──
 const SECTION_KEY = 'entomate-settings-section'
+// Set just before a style switch; the remounted page scrolls the picker back into view.
+const STYLE_SCROLL_KEY = 'entomate-settings-style-scroll'
 
 const SECTIONS = [
   { id: 'organization', label: 'Organization', icon: Building2 },
@@ -92,6 +94,23 @@ export default function Settings() {
   const moreStyles = designStyles.filter((style) => style.id !== DEFAULT_DESIGN_STYLE)
   // Open when a secondary style is in use, so the selected card is never hidden.
   const [moreStylesOpen, setMoreStylesOpen] = useState(() => designStyle !== DEFAULT_DESIGN_STYLE)
+  const stylePickerRef = useRef(null)
+  const chooseStyle = (id) => {
+    if (id === designStyle) return
+    try { sessionStorage.setItem(STYLE_SCROLL_KEY, '1') } catch { /* storage blocked */ }
+    setDesignStyle(id, { animate: !userSettings?.reduce_motion })
+  }
+  // Layout effect so the scroll lands before the crossfade captures the new view.
+  useLayoutEffect(() => {
+    let pending = false
+    try {
+      pending = sessionStorage.getItem(STYLE_SCROLL_KEY) === '1'
+      sessionStorage.removeItem(STYLE_SCROLL_KEY)
+    } catch { /* storage blocked */ }
+    if (pending && activeSection === 'appearance') {
+      stylePickerRef.current?.scrollIntoView({ block: 'center' })
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const renderStyle = (style) => {
     const selected = designStyle === style.id
     return (
@@ -100,7 +119,7 @@ export default function Settings() {
         type="button"
         role="radio"
         aria-checked={selected}
-        onClick={() => setDesignStyle(style.id)}
+        onClick={() => chooseStyle(style.id)}
         className={`design-style-option text-left p-3 rounded-lg border transition-colors ${selected ? 'border-accent-primary bg-accent-primary-dim' : 'border-line-subtle bg-surface-elevated hover:border-line'}`}
       >
         <span className={`design-style-swatch design-style-swatch--${style.id}`} aria-hidden="true" />
@@ -498,7 +517,7 @@ export default function Settings() {
               </div>
 
               {/* Design style picker (2026-11-21) */}
-              <div className="px-5 pb-5">
+              <div ref={stylePickerRef} className="px-5 pb-5">
                 <span id="design-style-label" className="text-sm font-medium block mb-1 text-content-primary">Design style</span>
                 <span className="text-xs block mb-3 text-content-tertiary">Changes the whole app's look in this browser. Light and dark mode still apply.</span>
                 <div role="radiogroup" aria-labelledby="design-style-label">
