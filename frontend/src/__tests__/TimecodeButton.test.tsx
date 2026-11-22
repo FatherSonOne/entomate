@@ -18,6 +18,12 @@ describe('TimecodeButton', () => {
     expect(onJump).toHaveBeenCalledWith(42_500)
   })
 
+  test('says it plays when the meeting has audio', () => {
+    render(<TimecodeButton atMs={42_500} onJump={vi.fn()} label="Launch moves to March" plays />)
+    const btn = screen.getByRole('button', { name: 'Play from 0:42: Launch moves to March' })
+    expect(btn).toHaveAttribute('title', 'Play from this moment')
+  })
+
   test('renders nothing without a timecode', () => {
     const { container } = render(<TimecodeButton atMs={null} onJump={vi.fn()} />)
     expect(container).toBeEmptyDOMElement()

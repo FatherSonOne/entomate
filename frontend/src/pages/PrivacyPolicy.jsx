@@ -4,7 +4,7 @@ import { Logo } from '../components/Logo'
 import BackToTop from '../components/BackToTop'
 
 export default function PrivacyPolicy() {
-  const lastUpdated = 'April 27, 2026'
+  const lastUpdated = 'November 21, 2026'
 
   return (
     <div className="legal-page">
@@ -184,6 +184,7 @@ export default function PrivacyPolicy() {
             <ul>
               <li>
                 <strong>OpenAI</strong> and/or <strong>Google Gemini</strong> —
+                transcription of meetings you record in the browser,
                 summarization, action-item extraction, and agent reasoning.
               </li>
               <li>
@@ -212,6 +213,16 @@ export default function PrivacyPolicy() {
             </ul>
             <p>
               A full, current list of subprocessors is available on request.
+            </p>
+            <p>
+              <strong>Live captions (optional)</strong> — when you record a
+              meeting in the browser, you can turn on live captions. They come
+              from your browser’s own speech recognition, not from Entomate: in
+              Google Chrome, for example, the audio is sent to Google to be
+              recognized. That service is part of your browser and is covered
+              by its maker’s terms, not by our subprocessor agreements.
+              Captions are off until you turn them on, and Entomate does not
+              save them.
             </p>
           </section>
 
@@ -376,6 +387,16 @@ export default function PrivacyPolicy() {
               (date, organizer, participant list, audit fields) is preserved
               indefinitely so legal-hold requests and audits remain
               answerable. Already-deleted recordings cannot be restored.
+            </p>
+            <p>
+              <strong>Meetings recorded in the browser</strong> — the audio is
+              kept in our authenticated file storage so that you can play it
+              beside the transcript, through links that expire within an hour.
+              It is deleted after the same retention window (30, 90, or 365
+              days; default 90), when the meeting is deleted, or sooner when
+              someone with access to the meeting chooses{' '}
+              <em>Remove audio</em>. The transcript stays until the retention
+              window ends.
             </p>
             <p>
               Retention enforcement runs as a daily sweep; changes apply on

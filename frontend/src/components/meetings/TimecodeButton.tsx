@@ -11,6 +11,8 @@ import { formatClock } from '../../services/meetingTranscriptService'
 export interface TimecodeButtonProps {
   atMs: number | null | undefined
   onJump: (atMs: number) => void
+  /** The meeting has audio: the key also plays from this moment, so it says so. */
+  plays?: boolean
   /** What the moment is, for the accessible name: "Jump to 0:42 in the transcript: <label>". */
   label?: string
   /** Shown pressed: the transcript is on this moment. */
@@ -18,15 +20,15 @@ export interface TimecodeButtonProps {
   className?: string
 }
 
-export function TimecodeButton({ atMs, onJump, label, active = false, className }: TimecodeButtonProps): React.ReactElement | null {
+export function TimecodeButton({ atMs, onJump, label, plays = false, active = false, className }: TimecodeButtonProps): React.ReactElement | null {
   if (typeof atMs !== 'number' || !Number.isFinite(atMs) || atMs < 0) return null
   const clock = formatClock(atMs)
   return (
     <Key
       size="tc"
       onClick={() => onJump(atMs)}
-      aria-label={`Jump to ${clock} in the transcript${label ? `: ${label}` : ''}`}
-      title="Jump to this moment in the transcript"
+      aria-label={`${plays ? `Play from ${clock}` : `Jump to ${clock} in the transcript`}${label ? `: ${label}` : ''}`}
+      title={plays ? 'Play from this moment' : 'Jump to this moment in the transcript'}
       data-down={active || undefined}
       className={className}
     >

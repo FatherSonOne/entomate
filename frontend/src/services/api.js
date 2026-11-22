@@ -232,6 +232,8 @@ export const recordingsApi = {
   // The recording tab closed before Stop: transcribe the audio that reached the server.
   salvage: (meetingId) => api.post(`/recordings/${meetingId}/finish`, { salvage: true }),
   retry: (meetingId) => api.post(`/recordings/${meetingId}/retry`),
+  // Remove a finished recording's audio; the transcript stays.
+  removeAudio: (meetingId) => api.delete(`/recordings/${meetingId}/audio`),
   discard: (meetingId) => api.delete(`/recordings/${meetingId}`),
   // Signed links to the saved audio, in order; they expire, so never read this from the cache.
   playback: (meetingId) => api.get(`/recordings/${meetingId}/playback`),

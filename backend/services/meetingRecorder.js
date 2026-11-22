@@ -14,8 +14,11 @@
  *                with speaker turns and times, and the meeting gets the same summary,
  *                decisions, action items and timecodes as a bot meeting.
  *   4. playback  the audio is kept so the meeting page can play it beside the transcript
- *                (signed URLs, `getPlayback`). Retention (`retentionService.sweepRecordings`)
- *                deletes it after the workspace's retention days, with the transcript.
+ *                (signed URLs, `getPlayback`). After the transcript is written, ffmpeg also
+ *                makes one seekable copy, {org}/{meeting}/playback.webm, which the browser
+ *                streams; without it the browser joins the pieces. Retention
+ *                (`retentionService.sweepRecordings`) deletes the whole folder after the
+ *                workspace's retention days, and a member can remove it sooner (`removeAudio`).
  *
  * The service-role client bypasses RLS: callers check meeting access first.
  */
@@ -26,6 +29,7 @@ const { supabase } = require('../config/supabase');
 const ai = require('../config/ai');
 const geminiRecording = require('../config/geminiRecording');
 const transcriptMoments = require('./transcriptMoments');
+const playbackFile = require('./playbackFile');
 const log = require('../utils/log');
 
 const BUCKET = 'meeting-recordings';
@@ -69,6 +73,11 @@ function recordingFolder(orgId, meetingId) {
 function piecePath(orgId, meetingId, { seq, durationMs, mimeType }) {
   const ext = EXT[baseMime(mimeType)] || 'webm';
   return `${recordingFolder(orgId, meetingId)}/${String(seq).padStart(6, '0')}-${Math.max(0, Math.round(durationMs))}.${ext}`;
+}
+
+/** The seekable copy made for playback; `listPieces` skips it (its name has no number). */
+function playbackPath(orgId, meetingId, mimeType) {
+  return `${recordingFolder(orgId, meetingId)}/playback.${EXT[baseMime(mimeType)] || 'webm'}`;
 }
 
 const PIECE_NAME = /^(\d{6})-(\d+)\.[a-z0-9]+$/;
@@ -135,33 +144,59 @@ function cleanAttendees(input) {
 
 // ── Storage ──────────────────────────────────────────────────────────────
 
-async function listPieces(orgId, meetingId) {
+/** Every file in a meeting's recording folder: the pieces and the playback copy. */
+async function listFolder(orgId, meetingId) {
   const bucket = supabase.storage.from(BUCKET);
   const folder = recordingFolder(orgId, meetingId);
-  const pieces = [];
+  const files = [];
   for (let offset = 0; ; offset += 1000) {
     const { data, error } = await bucket.list(folder, { limit: 1000, offset, sortBy: { column: 'name', order: 'asc' } });
     if (error) throw error;
-    for (const f of data || []) {
-      const parsed = parsePieceName(f.name);
-      if (parsed) pieces.push({ ...parsed, path: `${folder}/${f.name}`, createdAt: f.created_at || null });
-    }
+    for (const f of data || []) files.push({ name: f.name, path: `${folder}/${f.name}`, createdAt: f.created_at || null });
     if ((data || []).length < 1000) break;
+  }
+  return files;
+}
+
+async function listPieces(orgId, meetingId) {
+  const pieces = [];
+  for (const f of await listFolder(orgId, meetingId)) {
+    const parsed = parsePieceName(f.name);
+    if (parsed) pieces.push({ ...parsed, path: f.path, createdAt: f.createdAt });
   }
   return pieces.sort((a, b) => a.seq - b.seq);
 }
 
-/** Deletes a meeting's saved audio. Idempotent. */
+/** Deletes a meeting's saved audio: the pieces and the playback copy. Idempotent. */
 async function purgeRecordingAudio(orgId, meetingId) {
   if (!supabase || !orgId || !meetingId) return { removed: 0 };
-  const pieces = await listPieces(orgId, meetingId);
-  if (!pieces.length) return { removed: 0 };
+  const files = await listFolder(orgId, meetingId);
+  if (!files.length) return { removed: 0 };
   const bucket = supabase.storage.from(BUCKET);
-  for (let i = 0; i < pieces.length; i += 100) {
-    const { error } = await bucket.remove(pieces.slice(i, i + 100).map((p) => p.path));
+  for (let i = 0; i < files.length; i += 100) {
+    const { error } = await bucket.remove(files.slice(i, i + 100).map((f) => f.path));
     if (error) throw error;
   }
-  return { removed: pieces.length };
+  return { removed: files.length };
+}
+
+/**
+ * Save the seekable copy for playback. Returns its path, or null when it could not be made
+ * (no ffmpeg, a damaged file); playback then joins the pieces, so this never fails the job.
+ */
+async function savePlaybackFile(meeting, audio, mimeType) {
+  const path = playbackPath(meeting.org_id, meeting.id, mimeType);
+  try {
+    const file = await playbackFile.makeSeekable(audio, EXT[baseMime(mimeType)] || 'webm');
+    const { error } = await supabase.storage
+      .from(BUCKET)
+      .upload(path, file, { contentType: baseMime(mimeType) || 'audio/webm', upsert: true });
+    if (error) throw error;
+    return path;
+  } catch (err) {
+    log.warn('Recording: no seekable playback copy, the pieces will be joined instead', { meetingId: meeting.id, error: err.message });
+    return null;
+  }
 }
 
 // ── Job state ────────────────────────────────────────────────────────────
@@ -357,7 +392,8 @@ async function transcribeMeeting(meetingId) {
       throw err;
     }
 
-    const text = await geminiRecording.transcribeRecording(Buffer.concat(parts), job.mimeType || 'audio/webm');
+    const audio = Buffer.concat(parts);
+    const text = await geminiRecording.transcribeRecording(audio, job.mimeType || 'audio/webm');
     const segments = parseTimestampedTranscript(text);
     const transcript = segments.length ? buildTranscriptText(segments) : String(text || '').trim();
     if (!transcript) {
@@ -365,6 +401,7 @@ async function transcribeMeeting(meetingId) {
       err.userMessage = 'No speech was heard in this recording. Check that the right microphone or tab audio was shared.';
       throw err;
     }
+    const playback = await savePlaybackFile(meeting, audio, job.mimeType || 'audio/webm');
 
     const { runAIPipeline, saveActionItems, firePostProcessing } = pipeline();
     let summaryData = EMPTY_SUMMARY;
@@ -405,7 +442,7 @@ async function transcribeMeeting(meetingId) {
       attendees: Array.isArray(meeting.attendees) && meeting.attendees.length ? meeting.attendees : speakers,
       duration_minutes: durationMs ? Math.max(1, Math.round(durationMs / 60000)) : null,
       end_time: Number.isFinite(startMs) && durationMs ? new Date(startMs + durationMs).toISOString() : now,
-      recording_job: { ...job, status: 'done', error: null, summaryError, audioKept: true, speakers: speakers.length, lines: segments.length, updatedAt: now },
+      recording_job: { ...job, status: 'done', error: null, summaryError, audioKept: true, playbackFile: playback, speakers: speakers.length, lines: segments.length, updatedAt: now },
       updated_at: now,
     };
     if (embedding) update.transcript_embedding = embedding;
@@ -435,19 +472,29 @@ async function transcribeMeeting(meetingId) {
   }
 }
 
-/** Signed playback links last this long; the page fetches the pieces at once. */
+/** Signed links to the pieces last this long; the page fetches them all at once. */
 const PLAYBACK_URL_TTL_S = 10 * 60;
+/** The playback copy streams while it plays; the page asks for a new link if this one ends. */
+const PLAYBACK_FILE_TTL_S = 60 * 60;
 
 /**
- * Signed links to a finished recording's pieces, in order. Joined in that order they are
- * one playable file (a later piece alone is not: only the first carries the header).
+ * A signed link to the seekable playback copy (`url`) when there is one. Otherwise signed
+ * links to the pieces, in order (`pieces`): joined in that order they are one playable file
+ * (a later piece alone is not: only the first carries the header).
  * The caller has checked meeting access; `orgId` is the caller's org, which owns the folder.
  */
 async function getPlayback({ orgId, meetingId }) {
   const meeting = await loadMeeting(meetingId);
   const job = meeting?.recording_job;
-  if (!job || meeting.org_id !== orgId || job.status === 'recording' || job.retentionDeletedAt) {
+  if (!job || meeting.org_id !== orgId || job.status === 'recording' || job.retentionDeletedAt || job.audioRemovedAt) {
     throw new RecorderError(404, 'There is no recording to play.');
+  }
+  if (typeof job.playbackFile === 'string' && job.playbackFile.startsWith(`${recordingFolder(orgId, meetingId)}/`)) {
+    const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(job.playbackFile, PLAYBACK_FILE_TTL_S);
+    if (!error && data?.signedUrl) {
+      return { mimeType: job.mimeType || 'audio/webm', durationMs: job.durationMs || 0, url: data.signedUrl };
+    }
+    log.warn('Recording: playback copy could not be signed, using the pieces', { meetingId, error: error?.message });
   }
   const pieces = (await listPieces(orgId, meetingId)).filter((p) => p.seq < (job.pieces || MAX_PIECES));
   if (!pieces.length || pieces[0].seq !== 0) throw new RecorderError(404, 'There is no recording to play.');
@@ -464,6 +511,20 @@ async function getPlayback({ orgId, meetingId }) {
   };
 }
 
+/**
+ * Remove a finished recording's audio now; the transcript, summary and notes stay.
+ * The caller has checked meeting access. This cannot be undone.
+ */
+async function removeAudio({ orgId, meetingId }) {
+  const meeting = await loadMeeting(meetingId);
+  const job = meeting?.recording_job;
+  if (!job || meeting.org_id !== orgId || job.status !== 'done') {
+    throw new RecorderError(409, 'Only the audio of a finished recording can be removed.');
+  }
+  await purgeRecordingAudio(orgId, meetingId);
+  return setJob(meeting, { audioKept: false, audioRemovedAt: new Date().toISOString(), playbackFile: null });
+}
+
 module.exports = {
   BUCKET,
   MODES,
@@ -476,6 +537,7 @@ module.exports = {
   discardRecording,
   purgeRecordingAudio,
   getPlayback,
+  removeAudio,
   transcribeMeeting,
   parseTimestampedTranscript,
   _internal: { baseMime, piecePath, parsePieceName, listPieces, isStale, cleanAttendees, running, STALE_JOB_MS },

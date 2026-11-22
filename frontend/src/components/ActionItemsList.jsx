@@ -12,9 +12,10 @@ import { Key, Signal } from './bench'
  *
  * @param {(atMs: number) => void} [onJumpToTranscript]  When given, items with a
  *   transcript_at_ms show a timecode that jumps the transcript to where it was said.
+ * @param {boolean} [timecodesPlay]  The meeting has audio: the timecodes also play it.
  * @param {number|null} [focusAtMs]  The transcript moment in view; its timecode shows pressed.
  */
-export default function ActionItemsList({ items = [], onUpdate, meetingId, onJumpToTranscript, focusAtMs = null }) {
+export default function ActionItemsList({ items = [], onUpdate, meetingId, onJumpToTranscript, timecodesPlay = false, focusAtMs = null }) {
   const [syncing, setSyncing] = useState({})
   const [toggling, setToggling] = useState({})
   const [calSyncing, setCalSyncing] = useState({})
@@ -187,6 +188,7 @@ export default function ActionItemsList({ items = [], onUpdate, meetingId, onJum
                         atMs={item.transcript_at_ms}
                         onJump={onJumpToTranscript}
                         label={item.task_description}
+                        plays={timecodesPlay}
                         active={typeof item.transcript_at_ms === 'number' && item.transcript_at_ms === focusAtMs}
                       />
                     )}
