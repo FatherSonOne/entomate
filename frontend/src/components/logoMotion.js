@@ -12,17 +12,17 @@ export const LOGO_MOTIONS = {
   'relay-orbits': { name: 'Orbital handoff', note: 'The crescent winds back, spins a full turn and settles; then the signal axis fires and the core kicks.', type: 'nested' },
   relay: { name: 'Signal relay', note: 'The two outer cores lunge in and hand the signal to the ring, while the small satellites orbit it.', type: 'relay' },
   orbit: { name: 'Ribbon exchange', note: 'The ribbon mass rocks on its axis and throws off a wave of itself at each turn.', type: 'ribbons' },
-  'orbital-network': { name: 'Network convergence', note: 'Each satellite spins in toward the core in turn; the core ratchets a quarter turn as each one docks.', type: 'network' },
+  'orbital-network': { name: 'Network convergence', note: 'Each satellite winds back and lunges in to dock in turn; the core kicks and charges as it arrives.', type: 'network' },
   constellation: { name: 'Connected cores', note: 'The dial carries its three cores round in three clicks while the inner scope sweeps the other way.', type: 'constellation' },
   trinity: { name: 'Three-part harmony', note: 'The two upper rings spin in turn and the lower orbit tilts, one after the other.', type: 'trinity' },
   'circuit-e': { name: 'Sequential execution', note: 'Each node fires and its bar shoots out from the spine, top to bottom, then all three retract.', type: 'circuit' },
   'circuit-spire': { name: 'Circuit ascent', note: 'The circuit builds upward from its root behind a charged leading edge, then drains away.', type: 'spire' },
   'catalyst-core': { name: 'Catalyst lock', note: 'The outer rings spin apart and snap back into alignment, and the core flares as they lock.', type: 'core' },
   'routed-signal': { name: 'Routed charge', note: 'Each route draws out to its terminal, which pops on arrival; the charge rolls in to the centre.', type: 'routes' },
-  ignition: { name: 'Agent ignition', note: 'The core compresses, then fires: the spire stretches, the ring whips round and a shock wave leaves.', type: 'ignition' },
+  ignition: { name: 'Agent ignition', note: 'The core compresses, then fires: the spire stretches, the ring blows outward and a shock wave leaves.', type: 'ignition' },
   aperture: { name: 'Aperture calibration', note: 'The crescent dial clicks round in three calibrated steps while the core turns against it.', type: 'aperture' },
-  bloom: { name: 'Living bloom', note: 'The bloom swells and turns, and each lobe charges in turn around the centre.', type: 'bloom' },
-  'flow-field': { name: 'Vortex flow', note: 'The four vortices whip round in turn, each against its neighbours, with a wind-up and a settle.', type: 'vortices' },
+  bloom: { name: 'Living bloom', note: 'The bloom turns a quarter at a time, winding back and swinging past before it settles and charges.', type: 'bloom' },
+  'flow-field': { name: 'Vortex flow', note: 'Each vortex eye whips round in turn against its neighbours, and its loop charges as it spins.', type: 'vortices' },
   'neural-core': { name: 'Neural exchange', note: 'The core charges and pushes a pulse out through the loops, which turn around it.', type: 'neural' },
   'ribbon-catalyst': { name: 'Ribbon circulation', note: 'The torus winds back, then turns a third with a surge and eases to rest.', type: 'torus' },
   'signal-cascade': { name: 'Signal cascade', note: 'The rings themselves ripple outward from the core while the outer orbit carries its node round.', type: 'cascade' },
@@ -174,17 +174,17 @@ export function renderLogoMotion(id, href, duration = 6, title = id) {
       + wave(null, 500, 490, 1.14, 0, 0.35, [0.38, 0.72])
       + wave(null, 500, 490, 1.14, 0.5, 0.25, [0.38, 0.72])
   } else if (kind === 'network') {
-    // Orbital Network: each satellite spins in to the core in turn; the core ratchets as it docks.
+    // Orbital Network: each satellite lunges in to dock in turn; the core kicks and charges as it arrives.
     const sats = [[320, 322], [730, 340], [720, 650], [166, 510]]
-    moving = part({ shape: ring(500, 500, 150, 66), cx: 500, cy: 500,
-      rot: [0, 1, 2, 3].flatMap((i) => [[i / 4 + 0.13, i * 90], [i / 4 + 0.19, i * 90 + 96, 'out'], [i / 4 + 0.23, i * 90 + 90, 'io']]).reduce((f, k) => f.concat([k]), [[0, 0]]).concat([[1, 360]]) })
+    const kicks = [0, 1, 2, 3].flatMap((i) => [[i / 4 + 0.12, 1], [i / 4 + 0.15, 1.07, 'out'], [i / 4 + 0.23, 1, 'io']])
+    moving = part({ shape: ring(500, 500, 150, 66), cx: 500, cy: 500, scale: [[0, 1], ...kicks, [1, 1]] })
       + sats.map(([x, y], i) => {
-        const dx = (500 - x) * 0.22, dy = (500 - y) * 0.22
-        return part({ shape: circle(x, y, 62), cx: x, cy: y, phase: -i / 4, trail: [0.02, 0.2],
-          move: [[0, '0 0'], [0.03, `${-dx * 0.12} ${-dy * 0.12}`, 'io'], [0.13, `${dx} ${dy}`, 'in'], [0.2, `${-dx * 0.08} ${-dy * 0.08}`, 'out'], [0.26, '0 0', 'io'], [1, '0 0']],
-          rot: [[0, 0], [0.03, 0], [0.2, 200, 'out'], [0.26, 180, 'io'], [1, 180]] })
+        const dx = (500 - x) * 0.24, dy = (500 - y) * 0.24
+        return part({ shape: circle(x, y, 62), cx: x, cy: y, phase: -i / 4, trail: [0.03, 0.2], smear: true,
+          move: [[0, '0 0'], [0.03, `${-dx * 0.14} ${-dy * 0.14}`, 'io'], [0.13, `${dx} ${dy}`, 'in'], [0.19, `${-dx * 0.1} ${-dy * 0.1}`, 'out'], [0.26, '0 0', 'io'], [1, '0 0']],
+          scale: [[0, 1], [0.03, 1.05, 'io'], [0.13, 0.9, 'in'], [0.2, 1.03, 'out'], [0.26, 1, 'io'], [1, 1]] })
       }).join('')
-      + [0, 1, 2, 3].map((i) => charge(circle(500, 500, 150), [[0, 0], [0.12, 0], [0.14, 0.7, 'out'], [0.24, 0, 'io'], [1, 0]], -i / 4)).join('')
+      + [0, 1, 2, 3].map((i) => charge(circle(500, 500, 150), [[0, 0], [0.12, 0], [0.14, 0.75, 'out'], [0.26, 0, 'io'], [1, 0]], -i / 4)).join('')
   } else if (kind === 'constellation') {
     // Constellation: the dial carries its cores round in three clicks; the scope sweeps against it.
     const clicks = [0, 1, 2].flatMap((i) => [[i / 3 + 0.08, i * 120], [i / 3 + 0.12, i * 120 - 5, 'io'], [i / 3 + 0.24, i * 120 + 124, 'out'], [i / 3 + 0.3, i * 120 + 120, 'io']])
@@ -235,13 +235,13 @@ export function renderLogoMotion(id, href, duration = 6, title = id) {
         move: [[0, '-380 0'], [0.26, '-380 0'], [0.4, '14 0', 'out'], [0.46, '0 0', 'io'], [0.84, '0 0'], [0.92, '0 0'], [1, '-380 0', 'in']],
         fade: [[0, 0], [0.26, 0], [0.28, 1, 'out'], [0.86, 1], [0.95, 0, 'io'], [1, 0]] })
   } else if (kind === 'ignition') {
-    // Ignition: the core compresses, then fires; the spire stretches, the ring whips, a shock wave leaves.
-    moving = part({ shape: ring(500, 500, 218, 118), cx: 500, cy: 500, trail: [0.32, 0.56],
-      rot: [[0, 0], [0.3, -10, 'in'], [0.52, 128, 'out'], [0.6, 120, 'io'], [1, 120]] })
+    // Ignition: the core compresses, then fires; the spire stretches, the ring blows outward, a shock wave leaves.
+    moving = part({ shape: ring(500, 500, 222, 112), cx: 500, cy: 500, trail: [0.33, 0.5],
+      scale: [[0, 1], [0.3, 0.94, 'in'], [0.36, 1.09, 'out'], [0.47, 0.985, 'io'], [0.56, 1, 'io'], [1, 1]] })
       + part({ shape: rect(455, 60, 110, 880), cx: 500, cy: 500,
         scale: [[0, 1], [0.3, '1 .9', 'in'], [0.36, '1 1.1', 'out'], [0.48, '1 .98', 'io'], [0.56, 1, 'io'], [1, 1]] })
-      + part({ shape: circle(500, 500, 92), cx: 500, cy: 500,
-        scale: [[0, 1], [0.3, 0.86, 'in'], [0.35, 1.16, 'out'], [0.46, 0.97, 'io'], [0.54, 1, 'io'], [1, 1]],
+      + part({ shape: circle(500, 500, 112), cx: 500, cy: 500,
+        scale: [[0, 1], [0.3, 0.84, 'in'], [0.35, 1.14, 'out'], [0.46, 0.97, 'io'], [0.54, 1, 'io'], [1, 1]],
         hot: [[0, 0], [0.3, 0.7, 'in'], [0.36, 1, 'out'], [0.6, 0, 'io'], [1, 0]] })
       + wave(null, 500, 500, 1.3, 0, 0.5, [0.34, 0.7])
   } else if (kind === 'aperture') {
@@ -251,17 +251,17 @@ export function renderLogoMotion(id, href, duration = 6, title = id) {
       + part({ shape: circle(340, 496, 120), cx: 340, cy: 496, rot: [[0, 0], [1, -360, 'lin']] })
       + [0, 1, 2].map((i) => charge(circle(340, 496, 60), [[0, 0], [0.2, 0], [0.23, 0.8, 'out'], [0.32, 0, 'io'], [1, 0]], -i / 3)).join('')
   } else if (kind === 'bloom') {
-    // Bloom: the bloom swells and turns; each lobe charges in turn.
-    const lobes = [[275, 245], [725, 230], [770, 745], [225, 740]]
-    moving = part({ shape: null, cx: 500, cy: 500,
-      scale: [[0, 1], [0.5, 1.04, 'io'], [1, 1, 'io']], rot: [[0, 0], [0.5, 6, 'io'], [1, 0, 'io']] })
-      + lobes.map(([x, y], i) => charge(circle(x, y, 205), [[0, 0], [0.04, 0], [0.12, 0.55, 'out'], [0.3, 0, 'io'], [1, 0]], -i / 4)).join('')
-      + wave(circle(500, 500, 470), 500, 500, 1.1, 0.25, 0.3, [0.2, 0.6])
+    // Bloom: four quarter-turns a loop; each winds back, swings past and settles, and the lobe that lands on top charges.
+    const turns = [0, 1, 2, 3].flatMap((i) => [[i / 4 + 0.04, i * 90], [i / 4 + 0.08, i * 90 - 5, 'io'], [i / 4 + 0.19, i * 90 + 96, 'out'], [i / 4 + 0.24, i * 90 + 90, 'io']])
+    const swell = [0, 1, 2, 3].flatMap((i) => [[i / 4 + 0.08, 1], [i / 4 + 0.14, 1.04, 'out'], [i / 4 + 0.24, 1, 'io']])
+    moving = part({ shape: null, cx: 500, cy: 500, rot: [[0, 0], ...turns, [1, 360]], scale: [[0, 1], ...swell, [1, 1]], trail: [0.08, 0.2] })
+      + [0, 1, 2, 3].map((i) => charge(circle(500, 500, 210), [[0, 0], [0.17, 0], [0.2, 0.6, 'out'], [0.3, 0, 'io'], [1, 0]], -i / 4)).join('')
   } else if (kind === 'vortices') {
-    // Flow Field: four vortices turn like gears, each against its neighbours, surging and easing.
+    // Flow Field: each vortex's eye whips round in turn against its neighbours, and its loop charges as it spins.
     const v = [[362, 352, 1, 0], [632, 360, -1, 0.25], [650, 650, 1, 0.5], [362, 642, -1, 0.75]]
-    moving = v.map(([x, y, d, p]) => part({ shape: circle(x, y, 134), cx: x, cy: y, phase: -p, trail: [0.08, 0.3],
-      rot: [[0, 0], [0.06, -14 * d, 'io'], [0.3, 376 * d, 'out'], [0.38, 360 * d, 'io'], [1, 360 * d]] })).join('')
+    moving = v.map(([x, y, d, p]) => part({ shape: circle(x, y, 92), cx: x, cy: y, phase: -p, trail: [0.06, 0.3], cut: true,
+        rot: [[0, 0], [0.06, -16 * d, 'io'], [0.28, 372 * d, 'out'], [0.36, 360 * d, 'io'], [1, 360 * d]] })
+        + charge(circle(x, y, 150), [[0, 0], [0.08, 0], [0.16, 0.55, 'out'], [0.4, 0, 'io'], [1, 0]], -p)).join('')
   } else if (kind === 'neural') {
     // Neural Core: the core charges and pushes a pulse out through the loops, which turn around it.
     moving = part({ shape: ring(482, 482, 440, 205), cx: 482, cy: 482, rot: [[0, 0], [0.4, 8, 'in'], [0.62, 128, 'out'], [1, 120, 'io']], trail: [0.42, 0.64] })
