@@ -107,8 +107,7 @@ cache.setTTL('/api/meetings', 60 * 1000)     // 60s - meetings don't change fast
 cache.setTTL('/api/tasks', 15 * 1000)        // 15s - tasks change frequently
 cache.setTTL('/api/projects', 60 * 1000)     // 60s
 cache.setTTL('/api/analytics', 120 * 1000)   // 2min - expensive queries
-cache.setTTL('/api/agents', 30 * 1000)       // 30s
-cache.setTTL('/api/automations', 30 * 1000)  // 30s
+cache.setTTL('/api/agents', 30 * 1000)       // 30s (built-in meeting agents)
 cache.setTTL('/api/workflows', 30 * 1000)    // 30s
 cache.setTTL('/api/health', 10 * 1000)       // 10s
 cache.setTTL('/api/intelligence', 30 * 1000) // 30s

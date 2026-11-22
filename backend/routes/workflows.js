@@ -35,15 +35,14 @@ router.get('/', authenticate, async (req, res) => {
 
     let query = supabase
       .from('workflows')
-      .select('id, name, description, active, is_template, version, execution_count, last_executed_at, created_at, updated_at', { count: 'exact' })
+      .select('id, name, description, active, is_template, version, execution_count, last_executed_at, created_at, updated_at, nodes, settings', { count: 'exact' })
       .in('org_id', req.orgIds)
       .order('updated_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
-    // Filter by user (RLS will also enforce this)
-    if (req.user?.id) {
-      query = query.eq('user_id', req.user.id);
-    }
+    // Automations belong to the workspace, not to whoever made them, so the
+    // list is org-scoped only (rows converted from the old automations table
+    // have no user_id).
 
     // Apply filters
     if (active !== undefined) {
@@ -69,6 +68,57 @@ router.get('/', authenticate, async (req, res) => {
 
   } catch (error) {
     log.error('[Workflows] List error:', { error: error.message || error });
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/workflows/runs/recent?limit=20
+ * The latest runs across every automation in the caller's org, newest first.
+ * Feeds "Recent runs" on the Automations page.
+ */
+router.get('/runs/recent', authenticate, async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
+
+    const { data: workflows, error: wfError } = await supabase
+      .from('workflows')
+      .select('id, name')
+      .in('org_id', req.orgIds);
+    if (wfError) throw wfError;
+
+    const names = new Map((workflows || []).map(w => [w.id, w.name]));
+    if (names.size === 0) return res.json({ success: true, data: [] });
+
+    const { data: runs, error } = await supabase
+      .from('workflow_executions')
+      .select('id, workflow_id, status, mode, started_at, finished_at, duration_ms, error_message, triggered_by, input_data')
+      .in('workflow_id', [...names.keys()])
+      .order('started_at', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+
+    const data = (runs || []).map(r => {
+      const input = r.input_data && typeof r.input_data === 'object' ? r.input_data : {};
+      return {
+        id: r.id,
+        workflow_id: r.workflow_id,
+        workflow_name: names.get(r.workflow_id) || 'Automation',
+        status: r.status,
+        mode: r.mode,
+        started_at: r.started_at,
+        finished_at: r.finished_at,
+        duration_ms: r.duration_ms,
+        error_message: r.error_message,
+        triggered_by: r.triggered_by,
+        meeting_id: input.meeting_id || null,
+        meeting_title: input.meeting_title || (r.triggered_by === 'meeting_processed' ? input.title || null : null)
+      };
+    });
+
+    res.json({ success: true, data });
+  } catch (error) {
+    log.error('[Workflows] Recent runs error:', { error: error.message || error });
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -430,7 +480,8 @@ router.post('/:id/execute', authenticate, aiLimiter, validate(schemas.execute), 
 router.post('/:id/test', authenticate, validate(schemas.test), async (req, res) => {
   try {
     const { id } = req.params;
-    const { inputData = {} } = req.body;
+    let { inputData = {} } = req.body;
+    let meetingRef = null;
 
     // Get workflow
     const { data: workflow, error } = await supabase
@@ -445,10 +496,22 @@ router.post('/:id/test', authenticate, validate(schemas.test), async (req, res) 
       return res.status(404).json({ success: false, error: 'Workflow not found' });
     }
 
+    // "Test on last meeting": build the same payload a real meeting end
+    // sends (services/meetingEvents.js), from the org's newest meeting.
+    if (req.body.lastMeeting === true) {
+      const built = await lastMeetingPayload(req.orgIds, workflow);
+      if (!built) {
+        return res.status(404).json({ success: false, error: 'No meeting to test with yet' });
+      }
+      inputData = built.payload;
+      meetingRef = built.meeting;
+    }
+
     // Execute in test mode
     const result = await workflowExecutor.test(workflow, inputData);
 
     res.json({
+      meeting: meetingRef,
       success: result.success,
       executionId: result.executionId,
       output: result.output,
@@ -851,6 +914,48 @@ const TRIGGER_TYPES = new Set([
 
 function isTriggerNode(node) {
   return node.type === 'trigger' || TRIGGER_TYPES.has(node.type) || TRIGGER_TYPES.has(node.subtype);
+}
+
+/**
+ * The payload a meeting_processed / action_item_created trigger receives,
+ * built from the org's newest meeting. Used by "Test on last meeting".
+ */
+async function lastMeetingPayload(orgIds, workflow) {
+  const { data: meeting, error } = await supabase
+    .from('meetings')
+    .select('id, title, summary, transcript, attendees, org_id, created_at')
+    .in('org_id', orgIds)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error || !meeting) return null;
+
+  const { data: items } = await supabase
+    .from('action_items')
+    .select('id, task_description, priority, due_date, assigned_to_name, assigned_to_email, status, org_id')
+    .eq('meeting_id', meeting.id)
+    .in('org_id', orgIds)
+    .limit(25);
+  const actionItems = items || [];
+
+  const trigger = (workflow.nodes || []).find(n => n?.type === 'trigger')?.subtype;
+  const ref = { id: meeting.id, title: meeting.title };
+  if (trigger === 'action_item_created' && actionItems[0]) {
+    return { meeting: ref, payload: { ...actionItems[0], org_id: meeting.org_id, meeting_id: meeting.id, meeting_title: meeting.title } };
+  }
+  return {
+    meeting: ref,
+    payload: {
+      id: meeting.id,
+      org_id: meeting.org_id,
+      meeting_id: meeting.id,
+      title: meeting.title,
+      transcript: meeting.transcript,
+      summary: meeting.summary,
+      attendees: meeting.attendees || [],
+      action_items: actionItems
+    }
+  };
 }
 
 function validateWorkflow({ nodes, connections }) {

@@ -378,43 +378,6 @@ export const tasksApi = {
 // ========================================
 // AUTOMATIONS API
 // ========================================
-export const automationsApi = {
-  // Create automation
-  create: (data) => api.post('/automations', data),
-
-  // List automations
-  list: (params = {}) => api.get('/automations', { params }),
-
-  // Get templates
-  getTemplates: () => api.get('/automations/templates'),
-
-  // Get automation by ID
-  get: (id) => api.get(`/automations/${id}`),
-
-  // Update automation
-  update: (id, data) => api.put(`/automations/${id}`, data),
-
-  // Delete automation
-  delete: (id) => api.delete(`/automations/${id}`),
-
-  // Toggle enabled state
-  toggle: (id, enabled) => api.post(`/automations/${id}/toggle`, { enabled }),
-
-  // Execute automation manually
-  execute: (id, triggerData) => api.post(`/automations/${id}/execute`, { triggerData }),
-
-  // Get logs
-  getLogs: (id, params = {}) => api.get(`/automations/${id}/logs`, { params }),
-
-  // Test automation (dry-run preview)
-  test: (id, sampleData = {}) => api.post(`/automations/${id}/test`, { sampleData }),
-
-  // Get scheduler status (all scheduled automations)
-  getSchedulerStatus: () => api.get('/automations/scheduler/status'),
-
-  // Schedule/reschedule an automation
-  schedule: (id) => api.post(`/automations/${id}/schedule`)
-}
 
 // ========================================
 // SEARCH API
@@ -697,57 +660,11 @@ export const integrationsApi = {
 // AI AGENTS API (Phase 5 - Week 7)
 // ========================================
 export const agentsApi = {
-  // List all agents
-  list: (params = {}) => api.get('/agents', { params }),
-
-  // Get agent templates
-  getTemplates: () => api.get('/agents/templates'),
-
-  // Get available built-in agents (assignment, priority, deadline)
+  // The four built-in meeting agents. The custom-agent builder was removed
+  // (feature audit 2026-11-22); which agents run is set in Settings › Meeting agents.
   getAvailable: () => api.get('/agents/available'),
 
-  // Create agent
-  create: (data) => api.post('/agents', data),
-
-  // Create from template
-  createFromTemplate: (templateId, customizations = {}) =>
-    api.post('/agents/from-template', { templateId, customizations }),
-
-  // Get agent by ID
-  get: (id) => api.get(`/agents/${id}`),
-
-  // Update agent
-  update: (id, data) => api.put(`/agents/${id}`, data),
-
-  // Delete agent
-  delete: (id) => api.delete(`/agents/${id}`),
-
-  // Toggle enabled state
-  toggle: (id) => api.post(`/agents/${id}/toggle`),
-
-  // Execute agent manually
-  execute: (id, triggerType, triggerData = {}) =>
-    api.post(`/agents/${id}/execute`, { trigger_type: triggerType, trigger_data: triggerData }),
-
-  // Get agent execution logs
-  getLogs: (id, limit = 50) => api.get(`/agents/${id}/logs`, { params: { limit } }),
-
-  // Get agent stats
-  getStats: (id) => api.get(`/agents/${id}/stats`),
-
-  // Provide feedback on execution
-  provideFeedback: (executionId, rating, notes = '') =>
-    api.post(`/agents/executions/${executionId}/feedback`, { rating, notes }),
-
-  // Get explanation for an agent execution
-  getExplanation: (executionId) =>
-    api.get(`/agents/executions/${executionId}/explanation`),
-
-  // Trigger all matching agents
-  trigger: (triggerType, data = {}) =>
-    api.post('/agents/trigger', { trigger_type: triggerType, data }),
-
-  // Run a specific built-in agent
+  // Run one agent with context
   runAgent: (agentName, context) =>
     api.post(`/agents/run/${agentName}`, context),
 
@@ -763,7 +680,7 @@ export const agentsApi = {
   applySuggestions: (actionItemId, suggestions, options = {}) =>
     api.post('/agents/apply-suggestions', { actionItemId, suggestions, options }),
 
-  // Get orchestrator logs
+  // Orchestrator logs
   getOrchestratorLogs: (limit = 20) =>
     api.get('/agents/orchestrator/logs', { params: { limit } })
 }
@@ -818,8 +735,9 @@ export const workflowsApi = {
     api.post(`/workflows/${id}/execute`, { inputData, mode }),
 
   // Test workflow (dry run)
-  test: (id, inputData = {}) =>
-    api.post(`/workflows/${id}/test`, { inputData }),
+  // Pass { lastMeeting: true } to test on the workspace's newest meeting
+  test: (id, inputData = {}, options = {}) =>
+    api.post(`/workflows/${id}/test`, { inputData, ...options }),
 
   // Toggle workflow active state
   toggle: (id, active) =>
@@ -863,7 +781,10 @@ export const workflowsApi = {
   getTemplates: () => api.get('/workflows/templates'),
 
   // Get specific template
-  getTemplate: (templateId) => api.get(`/workflows/templates/${templateId}`)
+  getTemplate: (templateId) => api.get(`/workflows/templates/${templateId}`),
+
+  // Latest runs across the org's automations (Automations › Recent runs)
+  recentRuns: (limit = 20) => api.get('/workflows/runs/recent', { params: { limit } })
 }
 
 // ========================================
@@ -978,6 +899,10 @@ export const intelligenceApi = {
 // SETTINGS API
 // ========================================
 export const settingsApi = {
+  // Meeting agents (Settings › Meeting agents): which run on meeting end, and their confidence bars
+  getMeetingAgents: (workspaceId) => api.get('/settings/meeting-agents', { params: { workspaceId } }),
+  updateMeetingAgents: (workspaceId, settings) => api.put('/settings/meeting-agents', { workspaceId, settings }),
+
   // Get current user settings
   getUser: () => api.get('/settings/user'),
 
@@ -1097,7 +1022,6 @@ const apiClient = {
   meetings: meetingsApi,
   projects: projectsApi,
   tasks: tasksApi,
-  automations: automationsApi,
   search: searchApi,
   dashboard: dashboardApi,
   reports: reportsApi,

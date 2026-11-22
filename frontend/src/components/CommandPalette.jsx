@@ -16,7 +16,7 @@ const commands = [
   { id: 'nav-board', name: 'Go to Project Board', icon: Kanban, action: 'navigate', path: '/projects?view=board', category: 'Navigation' },
   { id: 'nav-tasks', name: 'Go to Tasks', icon: CheckSquare, action: 'navigate', path: '/tasks', category: 'Navigation' },
   { id: 'nav-automations', name: 'Go to Automations', icon: Zap, action: 'navigate', path: '/automations', category: 'Navigation' },
-  { id: 'nav-agents', name: 'Go to AI Agents', icon: Bot, action: 'navigate', path: '/agents', category: 'Navigation' },
+  { id: 'nav-agents', name: 'Meeting agents (Settings)', icon: Bot, action: 'navigate', path: '/settings', state: { section: 'meeting-agents' }, category: 'Navigation' },
   { id: 'nav-analytics', name: 'Go to Insights', icon: BarChart3, action: 'navigate', path: '/analytics', category: 'Navigation' },
   { id: 'nav-export', name: 'Export a report', icon: FileText, action: 'navigate', path: '/analytics?export=', category: 'Navigation' },
   { id: 'nav-calendar', name: 'Go to Calendar', icon: Calendar, action: 'navigate', path: '/calendar', category: 'Navigation' },
@@ -117,7 +117,7 @@ export default function CommandPalette({ isOpen, onClose, onShowShortcuts }) {
 
     switch (command.action) {
       case 'navigate':
-        navigate(command.path)
+        navigate(command.path, command.state ? { state: command.state } : undefined)
         break
       case 'showShortcuts':
         onShowShortcuts?.()

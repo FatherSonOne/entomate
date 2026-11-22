@@ -246,8 +246,8 @@ app.use('/api/projects', require('./routes/projects'));
 // Tasks
 app.use('/api/tasks', require('./routes/tasks'));
 
-// Automations
-app.use('/api/automations', require('./routes/automations'));
+// Automations run on the workflow engine (/api/workflows). /api/automations
+// and its rules engine were removed when the modules merged (2026-11-22).
 
 // Search
 app.use('/api/search', require('./routes/search'));

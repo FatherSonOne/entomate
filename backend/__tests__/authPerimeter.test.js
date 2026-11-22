@@ -8,14 +8,6 @@ process.env.SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'test-anon';
 process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'test-service';
 process.env.NODE_ENV = 'test';
 
-jest.mock('../services/automationScheduler', () => ({
-  initialize: jest.fn().mockResolvedValue(),
-  handleAutomationUpdate: jest.fn(),
-  handleAutomationDelete: jest.fn(),
-  getScheduledStatus: jest.fn(() => ({})),
-  getAutomationStatus: jest.fn(() => ({}))
-}));
-
 const express = require('express');
 const request = require('supertest');
 
@@ -35,7 +27,6 @@ const OPEN_BEFORE = [
   ['../routes/assistant', '/api/assistant', [['post', '/query']]],
   ['../routes/crossAppSearch', '/api/cross-search', [['get', '/?q=ab']]],
   ['../routes/integrations', '/api/integrations', [['get', '/crm/deals'], ['get', '/logs'], ['post', '/webhooks/crm']]],
-  ['../routes/automations', '/api/automations', [['get', '/'], ['get', '/templates'], ['post', '/trigger']]],
   ['../routes/ecosystem', '/api/ecosystem', [['get', '/status'], ['post', '/config'], ['get', '/events']]],
 ];
 

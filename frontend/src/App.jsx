@@ -13,14 +13,12 @@ const Projects = React.lazy(() => import('./pages/Projects'))
 const ProjectDetail = React.lazy(() => import('./pages/ProjectDetail'))
 const Tasks = React.lazy(() => import('./pages/Tasks'))
 const Automations = React.lazy(() => import('./pages/Automations'))
-const Agents = React.lazy(() => import('./pages/Agents'))
 const Insights = React.lazy(() => import('./pages/Insights'))
 const Search = React.lazy(() => import('./pages/Search'))
 const Settings = React.lazy(() => import('./pages/Settings'))
 const BotLauncher = React.lazy(() => import('./pages/BotLauncher'))
 const ProjectDashboard = React.lazy(() => import('./pages/ProjectDashboard'))
 const Calendar = React.lazy(() => import('./pages/Calendar'))
-const Workflows = React.lazy(() => import('./pages/Workflows'))
 const WorkflowBuilder = React.lazy(() => import('./pages/WorkflowBuilder'))
 const UsersGuide = React.lazy(() => import('./components/UsersGuide/UsersGuide'))
 const SignIn = React.lazy(() => import('./pages/SignIn'))
@@ -57,8 +55,9 @@ export default function App() {
             <Route path="project-dashboard" element={<Navigate to="/projects?view=board" replace />} />
             <Route path="tasks" element={<Tasks />} />
             <Route path="automations" element={<Automations />} />
-            <Route path="workflows" element={<Workflows />} />
-            <Route path="agents" element={<Agents />} />
+            {/* Workflows and Agents merged into Automations (2026-11-22). The builder stays at /workflows/:id. */}
+            <Route path="workflows" element={<Navigate to="/automations" replace />} />
+            <Route path="agents" element={<Navigate to="/settings" replace state={{ section: 'meeting-agents' }} />} />
             <Route path="goals" element={<Navigate to="/projects" replace />} />
             <Route path="analytics" element={<Insights />} />
             <Route path="insights" element={<Navigate to="/analytics" replace />} />

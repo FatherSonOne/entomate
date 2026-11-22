@@ -252,6 +252,57 @@ router.put('/workspace', authenticate, authorizeOrgRole(ADMIN_ROLES, orgFromBody
 });
 
 // ========================================
+// MEETING AGENTS (Settings › Meeting agents)
+// ========================================
+
+const meetingAgentConfig = require('../services/meetingAgentConfig');
+const MEMBER_ROLES = ['owner', 'admin', 'manager', 'member', 'viewer'];
+
+/**
+ * GET /api/settings/meeting-agents?workspaceId=<org-uuid>
+ * Which meeting agents run on meeting end, and their confidence bars.
+ * Any member can read; defaults are returned when nothing is saved.
+ */
+router.get('/meeting-agents', authenticate, authorizeOrgRole(MEMBER_ROLES, orgFromQuery), async (req, res) => {
+  try {
+    const settings = await meetingAgentConfig.load(req.orgId, supabaseAdmin);
+    res.json({ success: true, settings, defaults: meetingAgentConfig.normalize() });
+  } catch (error) {
+    log.error('[Settings] GET /meeting-agents error:', error.message);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+/**
+ * PUT /api/settings/meeting-agents
+ * Body: { workspaceId, settings: { assignment?, priority?, deadline? } }
+ * Owner/admin only. Values are normalised (confidence 50–95%).
+ */
+router.put('/meeting-agents', authenticate, authorizeOrgRole(ADMIN_ROLES, orgFromBody), async (req, res) => {
+  try {
+    const input = req.body?.settings;
+    if (!input || typeof input !== 'object' || Array.isArray(input)) {
+      return res.status(400).json({ success: false, error: 'invalid_settings' });
+    }
+    const settings = await meetingAgentConfig.save(req.orgId, input, supabaseAdmin);
+
+    await writeAudit({
+      orgId: req.orgId,
+      userId: req.user.id,
+      action: 'settings.meeting_agents.update',
+      resourceType: 'tenant_organizations',
+      resourceId: req.orgId,
+      changed: Object.keys(input),
+    });
+
+    res.json({ success: true, settings });
+  } catch (error) {
+    log.error('[Settings] PUT /meeting-agents error:', error.message);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// ========================================
 // AUDIT LOGS (admin only)
 // ========================================
 

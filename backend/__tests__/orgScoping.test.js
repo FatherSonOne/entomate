@@ -13,7 +13,6 @@ const TASK_A = '0000000a-0000-4000-8000-00000000000a';
 const TASK_B = '0000000b-0000-4000-8000-00000000000b';
 const PROJ_A = '00000a00-0000-4000-8000-000000000a00';
 const PROJ_B = '00000b00-0000-4000-8000-000000000b00';
-const AUTO_B = '0000b000-0000-4000-8000-00000000b000';
 
 const mockDb = {};
 function resetDb() {
@@ -26,7 +25,6 @@ function resetDb() {
     { id: PROJ_A, org_id: ORG_A, name: 'mine' },
     { id: PROJ_B, org_id: ORG_B, name: 'theirs' },
   ];
-  mockDb.automations = [{ id: AUTO_B, org_id: ORG_B, name: 'their automation', enabled: true }];
 }
 
 function mockQuery(table) {
@@ -111,9 +109,8 @@ describe('tasks are limited to the caller\'s org', () => {
 });
 
 
-describe('projects and automations are limited to the caller\'s org', () => {
+describe('projects are limited to the caller\'s org', () => {
   const projects = () => app('../routes/projects', '/api/projects');
-  const automations = () => app('../routes/automations', '/api/automations');
 
   test('project list hides other orgs; their project is not found', async () => {
     const list = await request(projects()).get('/api/projects');
@@ -135,13 +132,6 @@ describe('projects and automations are limited to the caller\'s org', () => {
     const res = await request(projects()).post('/api/projects').send({ name: 'new one' });
     expect(res.status).toBe(201);
     expect(mockDb.projects.find((p) => p.name === 'new one').org_id).toBe(ORG_A);
-  });
-
-  test('another org\'s automation is hidden and cannot be deleted', async () => {
-    const list = await request(automations()).get('/api/automations');
-    expect(JSON.stringify(list.body)).not.toContain(AUTO_B);
-    await request(automations()).delete(`/api/automations/${AUTO_B}`);
-    expect(mockDb.automations).toHaveLength(1);
   });
 });
 

@@ -121,7 +121,8 @@ describe('hasTrigger / hasCodeNode', () => {
 });
 
 describe('handleMeetingProcessed', () => {
-  function setup({ workflows = [], suggestions } = {}) {
+  const { normalize } = require('../meetingAgentConfig');
+  function setup({ workflows = [], suggestions, agents } = {}) {
     const db = makeDb({ workflows });
     const orchestrator = {
       processMeetingWithAgents: jest.fn().mockResolvedValue({
@@ -132,14 +133,18 @@ describe('handleMeetingProcessed', () => {
       })
     };
     const executor = { execute: jest.fn().mockResolvedValue({ success: true }) };
-    return { db, orchestrator, executor, events: new MeetingEvents({ db, orchestrator, executor }) };
+    const agentConfig = { load: jest.fn().mockResolvedValue(normalize(agents)) };
+    return { db, orchestrator, executor, agentConfig, events: new MeetingEvents({ db, orchestrator, executor, agentConfig }) };
   }
 
   it('runs agents and writes only the allowed updates, scoped by org', async () => {
     const { db, orchestrator, events } = setup();
     const result = await events.handleMeetingProcessed(meeting, items);
 
-    expect(orchestrator.processMeetingWithAgents).toHaveBeenCalledWith(meeting, items);
+    expect(orchestrator.processMeetingWithAgents).toHaveBeenCalledWith(meeting, items, {
+      agents: { assignment: true, priority: true, deadline: true },
+      assignMinConfidence: 0.7
+    });
     // a1 gets its changes plus notes; a2 only notes (nothing applied)
     expect(db.calls.updates).toHaveLength(2);
     expect(db.calls.updates[0].values).toMatchObject({ priority: 'high', due_date: '2026-12-05' });
@@ -152,20 +157,51 @@ describe('handleMeetingProcessed', () => {
   });
 
   it('still applies changes before the agent_notes column exists', async () => {
-    const { orchestrator, executor } = setup();
+    const { orchestrator, executor, agentConfig } = setup();
     const db = makeDb({ failOn: 'agent_notes' });
-    const events = new MeetingEvents({ db, orchestrator, executor });
+    const events = new MeetingEvents({ db, orchestrator, executor, agentConfig });
     const result = await events.handleMeetingProcessed(meeting, items);
     const retried = db.calls.updates.find(u => !('agent_notes' in u.values));
     expect(retried.values).toMatchObject({ priority: 'high', due_date: '2026-12-05' });
     expect(result.agents).toEqual({ reviewed: 2, updated: 1 });
   });
 
-  it('does not fire workflows by default', async () => {
+  it('fires workflows by default', async () => {
+    const { executor, events } = setup({ workflows: [{ id: 'w1', org_id: 'org-a', active: true, nodes: [trigger('meeting_processed')] }] });
+    const result = await events.handleMeetingProcessed(meeting, items);
+    expect(executor.execute).toHaveBeenCalledTimes(1);
+    expect(executor.execute.mock.calls[0][1].org_id).toBe('org-a');
+    expect(result.workflows).toEqual({ fired: 1, failed: 0 });
+  });
+
+  it('respects MEETING_WORKFLOW_TRIGGERS_ENABLED=false', async () => {
+    process.env.MEETING_WORKFLOW_TRIGGERS_ENABLED = 'false';
     const { executor, events } = setup({ workflows: [{ id: 'w1', org_id: 'org-a', active: true, nodes: [trigger('meeting_processed')] }] });
     const result = await events.handleMeetingProcessed(meeting, items);
     expect(executor.execute).not.toHaveBeenCalled();
     expect(result.workflows).toEqual({ skipped: true });
+  });
+
+  it('runs only the agents switched on in Settings, at the workspace bar', async () => {
+    const { orchestrator, agentConfig, db, events } = setup({
+      agents: { priority: { enabled: true, minConfidence: 0.95 }, deadline: { enabled: false } }
+    });
+    await events.handleMeetingProcessed(meeting, items);
+    expect(agentConfig.load).toHaveBeenCalledWith('org-a', db);
+    expect(orchestrator.processMeetingWithAgents.mock.calls[0][2].agents)
+      .toEqual({ assignment: true, priority: true, deadline: false });
+    // priority confidence 0.9 is under the 0.95 bar, so it is noted but not applied
+    expect(db.calls.updates[0].values).not.toHaveProperty('priority');
+    expect(db.calls.updates[0].values.agent_notes.priority).toMatchObject({ applied: false });
+  });
+
+  it('skips the agent step when every agent is off', async () => {
+    const { orchestrator, events } = setup({
+      agents: { assignment: { enabled: false }, priority: { enabled: false }, deadline: { enabled: false } }
+    });
+    const result = await events.handleMeetingProcessed(meeting, items);
+    expect(orchestrator.processMeetingWithAgents).not.toHaveBeenCalled();
+    expect(result.agents).toMatchObject({ reviewed: 0, disabled: true });
   });
 
   it('respects MEETING_AGENTS_ENABLED=false', async () => {

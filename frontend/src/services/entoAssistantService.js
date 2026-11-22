@@ -8,8 +8,6 @@ import {
   projectsApi,
   dashboardApi,
   calendarApi,
-  agentsApi,
-  automationsApi,
   workflowsApi,
   assistantApi,
 } from './api'
@@ -184,13 +182,10 @@ const DATA_LOADERS = {
     const res = await workflowsApi.list({ limit: 15 })
     return { workflows: res?.data?.workflows || res?.data || [] }
   },
+  // Automations run on the workflow engine
   automations: async () => {
-    const res = await automationsApi.list({ limit: 15 })
-    return { automations: res?.data?.automations || res?.data || [] }
-  },
-  agents: async () => {
-    const res = await agentsApi.list({ limit: 15 })
-    return { agents: res?.data?.agents || res?.data || [] }
+    const res = await workflowsApi.list({ limit: 15, template: false })
+    return { automations: res?.data || [] }
   },
   analytics: async () => {
     const res = await dashboardApi.getSummary()

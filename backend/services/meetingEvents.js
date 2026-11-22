@@ -12,11 +12,15 @@
  *   2. Workflow triggers — active workflows in the meeting's org that start
  *      with a `meeting_processed` or `action_item_created` trigger are run.
  *
+ * Which agents run, and how confident they must be, is set per workspace in
+ * Settings › Meeting agents (services/meetingAgentConfig.js).
+ *
  * Safety:
- *   - Workflow triggers are OFF unless MEETING_WORKFLOW_TRIGGERS_ENABLED=true.
- *     Keep them off until the workflow Code node / expression evaluation is
- *     sandboxed (codebase audit, finding 19).
- *   - Even when on, workflows containing a Code node are never auto-fired.
+ *   - Workflow triggers are ON by default (they are how Automations run after
+ *     a meeting). Expressions are evaluated by a small interpreter, not
+ *     eval (a50f04d). Set MEETING_WORKFLOW_TRIGGERS_ENABLED=false to stop them.
+ *   - Workflows containing a Code node are never auto-fired.
+ *   - Only workflows switched on (active = true) fire.
  *   - Workflow lookup is scoped to the meeting's org_id; meetings without an
  *     org_id fire nothing.
  *   - Assignment picks only from the meeting's org (agents/orgTeam.js) and
@@ -164,6 +168,13 @@ class MeetingEvents {
     return this._deps.orchestrator;
   }
 
+  get agentConfig() {
+    if (!this._deps.agentConfig) {
+      this._deps.agentConfig = require('./meetingAgentConfig');
+    }
+    return this._deps.agentConfig;
+  }
+
   get executor() {
     if (!this._deps.executor) {
       const WorkflowExecutor = require('./workflow/WorkflowExecutor');
@@ -193,7 +204,7 @@ class MeetingEvents {
       }
     }
 
-    if (flagEnabled('MEETING_WORKFLOW_TRIGGERS_ENABLED', false)) {
+    if (flagEnabled('MEETING_WORKFLOW_TRIGGERS_ENABLED', true)) {
       try {
         summary.workflows = await this.fireWorkflowTriggers(meeting, items);
       } catch (error) {
@@ -215,14 +226,31 @@ class MeetingEvents {
       return { items: actionItems, summary: { reviewed: 0, updated: 0 } };
     }
 
-    const result = await this.orchestrator.processMeetingWithAgents(meeting, items);
+    const config = await this.agentConfig.load(meeting.org_id || null, this._deps.db || null);
+    const agents = {
+      assignment: config.assignment.enabled,
+      priority: config.priority.enabled,
+      deadline: config.deadline.enabled
+    };
+    if (!agents.assignment && !agents.priority && !agents.deadline) {
+      return { items: actionItems, summary: { reviewed: 0, updated: 0, disabled: true } };
+    }
+    const thresholds = {
+      priorityMinConfidence: config.priority.minConfidence,
+      assignMinConfidence: config.assignment.minConfidence
+    };
+
+    const result = await this.orchestrator.processMeetingWithAgents(meeting, items, {
+      agents,
+      assignMinConfidence: thresholds.assignMinConfidence
+    });
     const byId = new Map((result?.actionItems || []).map(r => [r.id, r.suggestions || {}]));
 
     let updated = 0;
     const merged = [];
     for (const item of actionItems) {
       const suggestions = byId.get(item.id);
-      const updates = suggestions ? decideUpdates(item, suggestions) : {};
+      const updates = suggestions ? decideUpdates(item, suggestions, thresholds) : {};
       const notes = suggestions ? buildAgentNotes(suggestions, updates) : null;
       if ((Object.keys(updates).length === 0 && !notes) || !this.db) {
         merged.push(item);
@@ -307,6 +335,7 @@ class MeetingEvents {
 
     const meetingPayload = {
       id: meeting.id,
+      org_id: orgId,
       meeting_id: meeting.id,
       title: meeting.title,
       transcript: meeting.transcript,
@@ -322,7 +351,7 @@ class MeetingEvents {
     const itemWorkflows = await this.findWorkflows(orgId, 'action_item_created');
     if (itemWorkflows.length > 0) {
       for (const item of actionItems.slice(0, DEFAULTS.maxActionItems)) {
-        const itemPayload = { ...item, meeting_id: meeting.id, meeting_title: meeting.title };
+        const itemPayload = { ...item, org_id: item.org_id || orgId, meeting_id: meeting.id, meeting_title: meeting.title };
         for (const workflow of itemWorkflows) {
           tally(await this._run(workflow, itemPayload, 'action_item_created'));
         }

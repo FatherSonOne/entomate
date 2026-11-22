@@ -10,14 +10,6 @@ process.env.SUPABASE_SERVICE_KEY = 'test-service';
 process.env.NODE_ENV = 'test';
 process.env.INTERNAL_API_KEY = 'test-internal-key';
 
-jest.mock('../services/automationScheduler', () => ({
-  initialize: jest.fn().mockResolvedValue(),
-  handleAutomationUpdate: jest.fn(),
-  handleAutomationDelete: jest.fn(),
-  getScheduledStatus: jest.fn(() => ({})),
-  getAutomationStatus: jest.fn(() => ({})),
-}));
-
 const fs = require('fs');
 const path = require('path');
 const express = require('express');

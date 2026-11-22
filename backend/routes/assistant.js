@@ -73,20 +73,21 @@ const sectionLoaders = {
   },
 
 
-  async workflows({ orgIds }) {
-    const { data } = await supabase.from('workflows')
-      .select('id, name, description, status, enabled, last_run_at, created_at')
-      .in('org_id', orgIds)
-      .order('created_at', { ascending: false }).limit(15);
-    return { workflows: data || [] };
-  },
+  // Automations and workflows are one module on the workflow engine.
+  async workflows(ctx) { return sectionLoaders.automations(ctx); },
 
   async automations({ orgIds }) {
-    const { data } = await supabase.from('automations')
-      .select('id, name, description, enabled, trigger_type, last_run_at, created_at')
+    const { data } = await supabase.from('workflows')
+      .select('id, name, description, active, nodes, last_executed_at, execution_count, created_at')
       .in('org_id', orgIds)
+      .eq('is_template', false)
       .order('created_at', { ascending: false }).limit(15);
-    return { automations: data || [] };
+    const automations = (data || []).map(w => ({
+      id: w.id, name: w.name, description: w.description, enabled: !!w.active,
+      trigger_type: Array.isArray(w.nodes) ? (w.nodes.find(n => n?.type === 'trigger')?.subtype || null) : null,
+      last_run_at: w.last_executed_at, runs: w.execution_count || 0,
+    }));
+    return { automations };
   },
 
   async agents({ orgIds }) {
