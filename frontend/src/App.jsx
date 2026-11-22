@@ -14,12 +14,11 @@ const ProjectDetail = React.lazy(() => import('./pages/ProjectDetail'))
 const Tasks = React.lazy(() => import('./pages/Tasks'))
 const Automations = React.lazy(() => import('./pages/Automations'))
 const Agents = React.lazy(() => import('./pages/Agents'))
-const Analytics = React.lazy(() => import('./pages/Analytics'))
+const Insights = React.lazy(() => import('./pages/Insights'))
 const Search = React.lazy(() => import('./pages/Search'))
 const Settings = React.lazy(() => import('./pages/Settings'))
 const BotLauncher = React.lazy(() => import('./pages/BotLauncher'))
 const ProjectDashboard = React.lazy(() => import('./pages/ProjectDashboard'))
-const Reports = React.lazy(() => import('./pages/Reports'))
 const Calendar = React.lazy(() => import('./pages/Calendar'))
 const Workflows = React.lazy(() => import('./pages/Workflows'))
 const WorkflowBuilder = React.lazy(() => import('./pages/WorkflowBuilder'))
@@ -61,8 +60,9 @@ export default function App() {
             <Route path="workflows" element={<Workflows />} />
             <Route path="agents" element={<Agents />} />
             <Route path="goals" element={<Navigate to="/projects" replace />} />
-            <Route path="analytics" element={<Analytics />} />
-            <Route path="reports" element={<Reports />} />
+            <Route path="analytics" element={<Insights />} />
+            <Route path="insights" element={<Navigate to="/analytics" replace />} />
+            <Route path="reports" element={<Navigate to="/analytics?export=" replace />} />
             <Route path="calendar" element={<Calendar />} />
             <Route path="search" element={<Search />} />
             <Route path="settings" element={<Settings />} />

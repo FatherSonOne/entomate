@@ -140,6 +140,17 @@ class AIService {
   }
 
   /**
+   * Plain text completion. The agents call this (ai.chat was missing, so every
+   * agent fell back to its default with "ai.chat is not a function").
+   * @param {string|Array<{role: string, content: string}>} input
+   * @param {{temperature?: number}} [options]
+   * @returns {Promise<string>}
+   */
+  async chat(input, options = {}) {
+    return this.provider.chat(input, options);
+  }
+
+  /**
    * Format meeting recap for chat posting
    * @param {Object} meeting - Meeting object
    * @returns {Promise<string>} Formatted message for chat

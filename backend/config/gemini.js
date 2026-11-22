@@ -302,6 +302,26 @@ Return ONLY valid JSON:
   }
 
   /**
+   * Plain text completion for the agents (priority, deadline, assignment, follow-up).
+   * @param {string|Array<{role: string, content: string}>} input - Prompt or chat messages
+   * @param {{temperature?: number}} [options]
+   * @returns {Promise<string>} Model text
+   */
+  async chat(input, options = {}) {
+    if (!this.isConfigured()) {
+      throw new Error('Gemini API not configured');
+    }
+    const messages = Array.isArray(input) ? input : [{ role: 'user', content: String(input) }];
+    const contents = messages.map((m) => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: String(m.content ?? '') }]
+    }));
+    const generationConfig = typeof options.temperature === 'number' ? { temperature: options.temperature } : undefined;
+    const response = await this.model.generateContent({ contents, generationConfig });
+    return response.response.text();
+  }
+
+  /**
    * Format meeting recap for chat posting
    * @param {Object} meeting - Meeting object with summary, action items, etc.
    * @returns {Promise<string>} Formatted message for chat

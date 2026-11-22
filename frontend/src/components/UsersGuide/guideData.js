@@ -1,7 +1,7 @@
 // ─── Entomate User Guide Data ─────────────────────────────────────────────
 // Version tracking — update these when guide content changes
 
-export const guideVersion = '2026-11-22'
+export const guideVersion = '2026-11-22b'
 export const guideUpdated = 'April 12, 2026'
 
 // ─── Version key for localStorage new-feature detection ───────────────────
@@ -14,7 +14,7 @@ export const CATEGORIES = [
   { label: 'Meetings & Time',    ids: ['meetings', 'meeting-details', 'calendar'] },
   { label: 'Work Management',    ids: ['tasks', 'projects'] },
   { label: 'Automation & AI',    ids: ['workflows', 'automations', 'agents', 'ento-assistant'] },
-  { label: 'Intelligence',       ids: ['search', 'analytics', 'reports'] },
+  { label: 'Intelligence',       ids: ['search', 'analytics'] },
   { label: 'Ecosystem',           ids: ['ecosystem', 'meeting-intelligence'] },
   { label: 'Configuration',      ids: ['settings', 'keyboard-shortcuts', 'troubleshooting'] },
 ]
@@ -84,7 +84,7 @@ export const guideSections = [
           'Meetings \u2014 01 Today, 02 Meetings.',
           'Work \u2014 03 Tasks, 04 Projects (switch Projects to Board view for the kanban).',
           'Follow-through \u2014 05 Automations, 06 Insights.',
-          'Tools \u2014 Search, Workflows, Agents, Reports, Ask Entomate, User Guide. Admins send bots from Meetings or Today.',
+          'Tools \u2014 Search, Workflows, Agents, Ask Entomate, User Guide. Insights (with exports) sits under Follow-through. Admins send bots from Meetings or Today.',
           'Your calendar lives on Today: the schedule, the countdown to the next meeting, and Connect calendar.',
           'Settings and your user profile are at the bottom of the sidebar.',
         ],
@@ -885,92 +885,41 @@ export const guideSections = [
 
   {
     id: 'analytics',
-    title: 'Analytics',
+    title: 'Insights',
     icon: 'trending',
-    badge: 'Updated',
-    summary: 'Performance metrics with Recharts visualizations, CSV export, sentiment trends, and team performance tables.',
+    badge: 'New',
+    summary: 'Is what you agree in meetings getting done, and who is behind? Follow-through, who owes what, weekly trend, agent calls and every export in one place.',
     steps: [
-      'Navigate to Analytics from the sidebar.',
-      'Select a time period: 7 days, 30 days, 90 days, or 1 year.',
-      'Browse tabs: Overview, Meetings, Tasks, AI, and Team.',
-      'Click Refresh to update data, or Export to download as CSV.',
+      'Open Insights from the sidebar (Follow-through group).',
+      'Pick a period in the title: 7, 30 or 90 days.',
+      'Read follow-through on the display: the share of action items that fell due in the period and were done by their due date. The bars show the last six weeks (crimson is under 70%).',
+      'Click an owner in Who owes what to see their open and late items, with a link to the meeting each came from.',
+      'Press Export (or a PDF / CSV key in the side column) to download a report.',
     ],
     subsections: [
       {
-        id: 'ana-overview',
-        title: 'Overview Tab',
+        id: 'ins-readouts',
+        title: 'Readouts',
         steps: [
-          'Key metric cards: Meetings Processed, Tasks Completed, Action Items, Automations Run.',
-          'Time Saved breakdown showing savings from transcription, summarization, action items, and automations.',
-          'Task Status breakdown: Completed, In Progress, Open, and Blocked.',
-          'Meeting Sentiment distribution: Positive, Neutral, and Negative.',
-          'Projects Overview: Total, Active, Completed, Planning, and total Deal Value.',
+          'Meetings captured and the decisions recorded in them.',
+          'Action items created in the period and how many are done.',
+          'Agent calls kept: owner, due date and priority changes the agents made that nobody changed back.',
         ],
       },
       {
-        id: 'ana-meetings',
-        title: 'Meetings Tab',
-        description: 'Charts and metrics focused on meeting activity.',
-        steps: [
-          'Total meetings count, total and average duration.',
-          'Average action items per meeting.',
-          'Sentiment Over Time \u2014 Area chart showing positive, neutral, and negative trends.',
-          'Meetings Over Time \u2014 Bar chart with daily meeting counts.',
-        ],
-      },
-      {
-        id: 'ana-team',
-        title: 'Team Tab',
-        description: 'A performance table for each team member.',
-        steps: [
-          'Tasks created and completed by each member.',
-          'Completion rate with color-coded badge.',
-          'High priority task count.',
-          'Average days to complete tasks.',
-        ],
-      },
-    ],
-    tips: [
-      'Check the Time Saved card to see exactly how much time AI is saving your team.',
-      'The AI tab shows transcription accuracy and action item extraction rates.',
-      'Export analytics data as CSV for use in spreadsheets or BI tools.',
-    ],
-  },
-
-  {
-    id: 'reports',
-    title: 'Reports & Exports',
-    icon: 'document',
-    summary: 'Generate PDF reports and export data as CSV.',
-    steps: [
-      'Navigate to Reports from the sidebar.',
-      'Select a report type: Meeting Recap, Project Report, or Weekly Summary.',
-      'Click Download to generate the PDF.',
-      'Use the CSV Export section to download raw data for meetings, action items, or tasks.',
-    ],
-    subsections: [
-      {
-        id: 'rep-pdf',
-        title: 'PDF Reports',
-        steps: [
-          'Meeting Recap \u2014 Select a meeting from the dropdown and download a formatted PDF.',
-          'Weekly Summary \u2014 Download a 7-day overview as a PDF.',
-        ],
-      },
-      {
-        id: 'rep-csv',
-        title: 'CSV Exports',
+        id: 'ins-export',
+        title: 'Export',
         badge: 'Updated',
         steps: [
-          'Meetings \u2014 Export all meeting data.',
-          'Action Items \u2014 Filter by status (All, Open, Completed, Missed) then export.',
-          'Tasks \u2014 Export all tasks with status, priority, tags, and assignee info.',
-          'Automations \u2014 Export automation execution logs with run history and timing.',
+          'PDF: Meeting recap (pick a meeting), Weekly summary (your last 7 days), Project report (pick a project). Preview a PDF in the drawer before downloading.',
+          'CSV: Meetings, Action items (all or one status), Tasks.',
+          'To email a recap, open the meeting and use Share recap.',
         ],
       },
     ],
     tips: [
-      'Use CSV exports to bring data into spreadsheets or BI tools for custom analysis.',
+      'Overdue in the title counts open items whose due date has passed, whenever they were created.',
+      'Learning effectiveness moved to Settings, under the learning panel.',
     ],
   },
 
@@ -1339,8 +1288,7 @@ export const guideSections = [
         title: 'Can I export my data?',
         scenario: 'You need to get your data out of Entomate for external analysis.',
         steps: [
-          'Go to the Reports page for PDF reports and CSV data exports.',
-          'Export analytics data as CSV from the Analytics page.',
+          'Open Insights and press Export for PDF reports and CSV data exports.',
           'Bulk export meetings as Markdown from the Meetings page.',
         ],
       },

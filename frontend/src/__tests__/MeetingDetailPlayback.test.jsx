@@ -5,7 +5,7 @@ import { vi, describe, test, expect, beforeEach } from 'vitest'
 
 const api = vi.hoisted(() => ({ get: vi.fn(), carryForward: vi.fn(() => Promise.resolve(null)) }))
 const player = vi.hoisted(() => ({ ready: false, playFrom: vi.fn() }))
-vi.mock('../services/api', () => ({ meetingsApi: api, integrationsApi: {}, calendarApi: {} }))
+vi.mock('../services/api', () => ({ meetingsApi: api, integrationsApi: {}, calendarApi: {}, reportsApi: {} }))
 vi.mock('../components/vc/ToastProvider', () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn() }) }))
 vi.mock('../components/intelligence/MeetingIntelligencePanel', () => ({ default: () => null }))
 vi.mock('../components/EcosystemSyncStatus', () => ({ default: () => null }))

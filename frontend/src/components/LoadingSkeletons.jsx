@@ -217,26 +217,3 @@ export function MeetingsPageSkeleton() {
   )
 }
 
-// ── Analytics Page Skeleton ──────────────────────
-export function AnalyticsSkeleton() {
-  return (
-    <div className="space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <Bone className="h-7 w-36" />
-        <Bone className="h-9 w-40 rounded-md" />
-      </div>
-      <StatsSkeleton />
-      {/* Chart placeholders */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="vc p-5">
-          <Bone className="h-5 w-36 mb-4" />
-          <Bone className="h-48 w-full rounded-lg" />
-        </div>
-        <div className="vc p-5">
-          <Bone className="h-5 w-32 mb-4" />
-          <Bone className="h-48 w-full rounded-lg" />
-        </div>
-      </div>
-    </div>
-  )
-}

@@ -13,4 +13,12 @@ const record = z.object({
   params: z.object({}).passthrough()
 });
 
-module.exports = { record };
+const insights = z.object({
+  body: z.object({}).passthrough(),
+  query: z.object({
+    days: z.enum(['7', '30', '90']).optional()
+  }).passthrough(),
+  params: z.object({}).passthrough()
+});
+
+module.exports = { record, insights };

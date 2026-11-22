@@ -46,8 +46,8 @@ export const SECTIONS = {
   workflows:        { label: 'Workflows',     path: '/workflows' },
   automations:      { label: 'Automations',   path: '/automations' },
   agents:           { label: 'AI Agents',     path: '/agents' },
-  analytics:        { label: 'Analytics',     path: '/analytics' },
-  reports:          { label: 'Reports',       path: '/reports' },
+  analytics:        { label: 'Insights',      path: '/analytics' },
+  reports:          { label: 'Export',        path: '/analytics?export=' },
   settings:         { label: 'Settings',      path: '/settings' },
   guide:            { label: 'User Guide',    path: '/guide' },
 }
@@ -140,8 +140,8 @@ const SUGGESTED_NAV = {
   agents:     [{ label: 'View Tasks', to: '/tasks' }, { label: 'Check Automations', to: '/automations' }, { label: 'Go to Dashboard', to: '/dashboard' }],
   automations:[{ label: 'View Workflows', to: '/workflows' }, { label: 'Check Agents', to: '/agents' }, { label: 'Go to Dashboard', to: '/dashboard' }],
   workflows:  [{ label: 'Check Automations', to: '/automations' }, { label: 'View Projects', to: '/projects' }, { label: 'Go to Dashboard', to: '/dashboard' }],
-  analytics:  [{ label: 'View Reports', to: '/reports' }, { label: 'Open Tasks', to: '/tasks' }, { label: 'Go to Dashboard', to: '/dashboard' }],
-  reports:    [{ label: 'View Analytics', to: '/analytics' }, { label: 'Open Tasks', to: '/tasks' }, { label: 'Go to Dashboard', to: '/dashboard' }],
+  analytics:  [{ label: 'Export a report', to: '/analytics?export=' }, { label: 'Open Tasks', to: '/tasks' }, { label: 'Go to Dashboard', to: '/dashboard' }],
+  reports:    [{ label: 'View Insights', to: '/analytics' }, { label: 'Open Tasks', to: '/tasks' }, { label: 'Go to Dashboard', to: '/dashboard' }],
 }
 
 export function getSuggestedActions(section) {

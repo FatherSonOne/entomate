@@ -281,6 +281,25 @@ Return ONLY valid JSON:
   }
 
   /**
+   * Plain text completion for the agents (priority, deadline, assignment, follow-up).
+   * @param {string|Array<{role: string, content: string}>} input - Prompt or chat messages
+   * @param {{temperature?: number}} [options]
+   * @returns {Promise<string>} Model text
+   */
+  async chat(input, options = {}) {
+    if (!this.isConfigured()) {
+      throw new Error('OpenAI API not configured');
+    }
+    const messages = Array.isArray(input) ? input : [{ role: 'user', content: String(input) }];
+    const response = await this.client.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages,
+      ...(typeof options.temperature === 'number' ? { temperature: options.temperature } : {})
+    });
+    return response.choices?.[0]?.message?.content || '';
+  }
+
+  /**
    * Format meeting recap for chat posting
    * @param {Object} meeting - Meeting object with summary, action items, etc.
    * @returns {Promise<string>} Formatted message for chat

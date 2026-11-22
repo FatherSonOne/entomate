@@ -13,7 +13,6 @@ import {
   Menu,
   X,
   ChevronRight,
-  FileText,
   Command,
   Workflow,
   Moon,
@@ -77,7 +76,6 @@ const navGroups = [
       { name: 'Search',       href: '/search',        icon: Search,   iconKey: 'search'    },
       { name: 'Workflows',    href: '/workflows',     icon: Workflow, iconKey: 'workflows' },
       { name: 'AI Agents',    href: '/agents',        icon: Bot,      iconKey: 'agents'    },
-      { name: 'Reports',      href: '/reports',       icon: FileText, iconKey: 'reports'   },
     ],
   },
 ]
@@ -96,7 +94,6 @@ const breadcrumbMap = {
   '/automations':      'Automations',
   '/agents':           'AI Agents',
   '/analytics':        'Insights',
-  '/reports':          'Reports',
   '/settings':         'Settings',
   '/guide':            'User Guide',
 }
@@ -245,7 +242,6 @@ export default function Layout() {
         { name: 'Search', href: '/search' },
         { name: 'Workflows', href: '/workflows' },
         { name: 'Agents', href: '/agents' },
-        { name: 'Reports', href: '/reports' },
         { name: 'Ask Entomate', onSelect: toggleAssistant, note: proactiveSuggestion ? 'NEW' : undefined, noteIsNew: proactiveSuggestion },
         { name: 'User Guide', href: '/guide', note: guideHasNew ? 'NEW' : undefined, noteIsNew: guideHasNew },
       ] },

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { Loader2, Send } from 'lucide-react'
-import { meetingsApi, integrationsApi, calendarApi } from '../services/api'
+import { meetingsApi, integrationsApi, calendarApi, reportsApi } from '../services/api'
 import ActionItemsList from '../components/ActionItemsList'
 import ChatChannelSelector from '../components/ChatChannelSelector'
 import { useToast } from '../components/vc/ToastProvider'
@@ -162,6 +162,39 @@ export default function MeetingDetail() {
       toast.error('Error', 'The action items could not be sent to the CRM')
     } finally {
       setSyncing(false)
+    }
+  }
+
+  // Recap email and PDF (moved here from the old Reports page, Insights pass 2026-11-22)
+  const [recapBusy, setRecapBusy] = useState(null)
+  const handleEmailRecap = async () => {
+    setRecapBusy('email')
+    try {
+      const { supabase } = await import('../services/supabaseClient')
+      const { data: { session } } = await supabase.auth.getSession()
+      const email = session?.user?.email
+      if (!email) {
+        toast.error('Error', 'Could not find your email address')
+        return
+      }
+      await reportsApi.sendMeetingRecap(id, email)
+      toast.success('Sent', `Recap emailed to ${email}`)
+    } catch (err) {
+      console.error('Failed to email recap:', err)
+      toast.error('Error', 'The recap email could not be sent')
+    } finally {
+      setRecapBusy(null)
+    }
+  }
+  const handleRecapPdf = async () => {
+    setRecapBusy('pdf')
+    try {
+      await reportsApi.downloadMeetingPDF(id)
+    } catch (err) {
+      console.error('Failed to download recap PDF:', err)
+      toast.error('Error', 'The recap PDF could not be made')
+    } finally {
+      setRecapBusy(null)
     }
   }
 
@@ -688,6 +721,17 @@ export default function MeetingDetail() {
               <span className="bs-sub">{shareResult.message}</span>
             </p>
           )}
+          <div className="bs-mtg-share-field">
+            <span className="bs-lbl">Email or PDF</span>
+            <div className="bs-mtg-share-keys">
+              <Key size="sm" onClick={handleEmailRecap} disabled={recapBusy !== null}>
+                {recapBusy === 'email' ? 'Sending' : 'Email me the recap'}
+              </Key>
+              <Key size="sm" onClick={handleRecapPdf} disabled={recapBusy !== null}>
+                {recapBusy === 'pdf' ? 'Preparing' : 'Download PDF'}
+              </Key>
+            </div>
+          </div>
         </div>
       </Drawer>
     </div>
