@@ -20,6 +20,14 @@ export interface DrawerProps {
   footer?: React.ReactNode
   /** Hide the Esc hint on the close key (e.g. on phone-only sheets). */
   hideEscHint?: boolean
+  /**
+   * false: a side panel that leaves the page usable (no scrim, no scroll lock,
+   * no focus trap, focus stays where it was). Esc still closes it. Desktop
+   * only: on phone the sheet stays modal.
+   */
+  modal?: boolean
+  /** Extra class on the panel (width variants). */
+  className?: string
 }
 
 /**
@@ -28,8 +36,9 @@ export interface DrawerProps {
  * shut (180ms). Esc, scrim click and the Close key dismiss it; focus moves
  * in and returns on close. On phone, drag the grip down past 90px to close.
  */
-export function Drawer({ open, onClose, label, children, footer, hideEscHint = false }: DrawerProps): React.ReactPortal | null {
+export function Drawer({ open, onClose, label, children, footer, hideEscHint = false, modal: modalProp = true, className }: DrawerProps): React.ReactPortal | null {
   const isPhone = useMediaQuery(PHONE_QUERY)
+  const modal = modalProp || isPhone
   const [mounted, setMounted] = useState<boolean>(open)
   const [shown, setShown] = useState<boolean>(false)
   const [dragging, setDragging] = useState<boolean>(false)
@@ -59,7 +68,7 @@ export function Drawer({ open, onClose, label, children, footer, hideEscHint = f
 
   // Focus in on open, back to the opener on close. Lock page scroll.
   useEffect(() => {
-    if (!mounted) return
+    if (!mounted || !modal) return
     const root = document.documentElement
     root.classList.add('bs-scroll-lock')
     const panel = panelRef.current
@@ -69,7 +78,15 @@ export function Drawer({ open, onClose, label, children, footer, hideEscHint = f
       root.classList.remove('bs-scroll-lock')
       returnFocusRef.current?.focus({ preventScroll: true })
     }
-  }, [mounted])
+  }, [mounted, modal])
+
+  // Side panel: Esc closes it from anywhere on the page.
+  useEffect(() => {
+    if (!open || modal) return
+    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [open, modal, onClose])
 
   const onKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Escape') {
@@ -77,7 +94,7 @@ export function Drawer({ open, onClose, label, children, footer, hideEscHint = f
       onClose()
       return
     }
-    if (e.key !== 'Tab' || !panelRef.current) return
+    if (e.key !== 'Tab' || !modal || !panelRef.current) return
     const items = Array.from(panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE))
     if (items.length === 0) return
     const firstEl = items[0]
@@ -90,7 +107,7 @@ export function Drawer({ open, onClose, label, children, footer, hideEscHint = f
       e.preventDefault()
       firstEl.focus()
     }
-  }, [onClose])
+  }, [onClose, modal])
 
   // Phone: drag the grip or head down to dismiss.
   const setDrag = (px: number): void => {
@@ -128,12 +145,13 @@ export function Drawer({ open, onClose, label, children, footer, hideEscHint = f
 
   return createPortal(
     <>
-      <div className="bs-scrim" data-open={shown} onClick={onClose} aria-hidden="true" />
+      {modal && <div className="bs-scrim" data-open={shown} onClick={onClose} aria-hidden="true" />}
       <div
         ref={panelRef}
-        className="bs-drawer"
-        role="dialog"
-        aria-modal="true"
+        className={className ? `bs-drawer ${className}` : 'bs-drawer'}
+        role={modal ? 'dialog' : 'complementary'}
+        aria-modal={modal ? 'true' : undefined}
+        data-modal={modal}
         aria-labelledby={labelId}
         tabIndex={-1}
         data-open={shown}

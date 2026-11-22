@@ -19,13 +19,26 @@ afterEach(() => {
 const card = (name) => screen.getAllByRole('radio').find((el) => el.textContent.includes(name) && el.textContent.startsWith(name))
 
 describe('logo system picker', () => {
-  it('plays the loading motion in the picked card only, and moves it on a new pick', () => {
+  it('plays the motion in the picked card until a pick docks the side panel, which follows each pick', () => {
     const { container } = render(<LogoSystemPicker />)
-    const live = () => [...container.querySelectorAll('.lp-card [data-loading-logo]')].map((el) => el.getAttribute('data-loading-logo'))
-    expect(live()).toEqual(['relay-orbits'])
+    const inCards = () => [...container.querySelectorAll('.lp-card [data-loading-logo]')].map((el) => el.getAttribute('data-loading-logo'))
+    const inPanel = () => document.querySelector('.lp-panel [data-loading-logo]')?.getAttribute('data-loading-logo')
+    expect(inCards()).toEqual(['relay-orbits'])
     fireEvent.click(card('Aperture'))
-    expect(live()).toEqual(['aperture'])
     expect(card('Aperture').getAttribute('aria-checked')).toBe('true')
+    expect(inPanel()).toBe('aperture')
+    expect(inCards()).toEqual([])
+    expect(document.querySelector('.bs-scrim')).toBeNull()
+    fireEvent.click(card('Bloom'))
+    expect(inPanel()).toBe('bloom')
+  })
+
+  it('stays closed on later picks once closed by hand', () => {
+    render(<LogoSystemPicker />)
+    fireEvent.click(card('Aperture'))
+    fireEvent.click(screen.getByRole('button', { name: 'Hide preview' }))
+    fireEvent.click(card('Bloom'))
+    expect(screen.getByRole('button', { name: 'Show preview' })).toBeTruthy()
   })
 
   it('nests no buttons inside the cards', () => {
