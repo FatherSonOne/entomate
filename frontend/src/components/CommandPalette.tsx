@@ -146,7 +146,7 @@ export default function CommandPalette({ isOpen, onClose, onShowShortcuts }: Com
   const body = (
     <div className="bs-pal-wrap" onKeyDown={onKeyDown}>
       <div className="bs-pal-scrim" onClick={onClose} aria-hidden="true" />
-      <div className="bs-pal" role="dialog" aria-modal="true" aria-label="Search or ask">
+      <div className="bs-pal" role="dialog" aria-modal="true" aria-label="Search or Ask Entomate">
         <div className="bs-pal-in">
           <SearchIcon aria-hidden="true" strokeWidth={1.6} />
           <input

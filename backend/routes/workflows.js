@@ -5,6 +5,7 @@
  */
 
 const express = require('express');
+const { expireStaleRuns } = require('../services/workflow/staleRuns');
 const router = express.Router();
 const { supabase } = require('../config/supabase');
 const { authenticate } = require('../middleware/auth');
@@ -89,6 +90,9 @@ router.get('/runs/recent', authenticate, async (req, res) => {
 
     const names = new Map((workflows || []).map(w => [w.id, w.name]));
     if (names.size === 0) return res.json({ success: true, data: [] });
+
+    // Runs a restart cut off stay "running" forever; close them before listing.
+    await expireStaleRuns(supabase, [...names.keys()]);
 
     const { data: runs, error } = await supabase
       .from('workflow_executions')

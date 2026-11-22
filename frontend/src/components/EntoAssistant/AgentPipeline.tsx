@@ -109,7 +109,7 @@ export function AgentPipeline({ steps, answering = false }: AgentPipelineProps) 
   const rounds = new Set(steps.map((s) => s.turn)).size;
   const nodes: Array<{ key: string; label: string; state: NodeState }> = [
     { key: 'question', label: 'Question', state: 'done' },
-    { key: 'model', label: 'Entomate AI', state: answering || steps.length > 0 ? 'done' : 'active' },
+    { key: 'model', label: 'Ask Entomate', state: answering || steps.length > 0 ? 'done' : 'active' },
     { key: 'data', label: rounds > 1 ? `Your data · ${rounds} rounds` : 'Your data', state: steps.length === 0 ? 'pending' : answering ? 'done' : 'active' },
     { key: 'answer', label: 'Answer', state: answering ? 'active' : 'pending' },
   ];

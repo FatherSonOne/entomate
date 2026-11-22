@@ -366,7 +366,7 @@ export default function EntoAssistant({ isOpen, onClose }) {
   if (!mounted) return null
 
   const panel = (
-    <div className="logos-assistant la-swiss" role="dialog" aria-modal="true" aria-label="Entomate AI Assistant">
+    <div className="logos-assistant la-swiss" role="dialog" aria-modal="true" aria-label="Ask Entomate">
       <div className="la-backdrop" data-state={presence} onClick={onClose} />
       <div
         ref={panelRef}
@@ -379,7 +379,7 @@ export default function EntoAssistant({ isOpen, onClose }) {
         <div className="la-header">
           <div className="la-header-left">
             <div className="la-header-title">
-              <h2>Entomate AI</h2>
+              <h2>Ask Entomate</h2>
               <span className="la-header-mode" data-voice={voiceState}>
                 {contextLoading ? 'Loading context' : AI_ORB_LABELS[orbState]}
               </span>
@@ -447,13 +447,13 @@ export default function EntoAssistant({ isOpen, onClose }) {
           ) : (
             <>
               {messages.map((msg, idx) => (
-                <article key={idx} className={`la-message la-message-${msg.role}`} aria-label={msg.role === 'user' ? 'Request' : 'Entomate AI answer'}>
+                <article key={idx} className={`la-message la-message-${msg.role}`} aria-label={msg.role === 'user' ? 'Request' : 'Ask Entomate answer'}>
                   <div className="la-message-avatar">
                     {msg.role === 'user' ? <UserIcon size={16} /> : <EntoOrbGlyph size={20} />}
                   </div>
                   <div className="la-message-content">
                     <div className="la-message-kicker" aria-hidden="true">
-                      <span>{msg.role === 'user' ? 'Request' : 'Entomate AI'}</span>
+                      <span>{msg.role === 'user' ? 'Request' : 'Ask Entomate'}</span>
                     </div>
                     {msg.role === 'assistant' ? (
                       <>
@@ -488,7 +488,7 @@ export default function EntoAssistant({ isOpen, onClose }) {
                   </div>
                   <div className="la-message-content">
                     <div className="la-message-kicker" aria-hidden="true">
-                      <span>Entomate AI</span>
+                      <span>Ask Entomate</span>
                     </div>
                     {streamingContent ? (
                       <div className="la-markdown la-streaming">

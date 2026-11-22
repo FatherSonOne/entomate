@@ -1,11 +1,12 @@
 import React, { forwardRef } from 'react'
 import { cx } from './cx'
 
-export type KeyVariant = 'plain' | 'primary'
+export type KeyVariant = 'plain' | 'primary' | 'danger'
 export type KeySize = 'md' | 'sm' | 'tc'
 
 export interface KeyProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  /** One primary (crimson) key per view. */
+  /** One primary (crimson) key per view. `danger` is a plain key with crimson
+   *  text, for destructive verbs that must not compete with the primary key. */
   variant?: KeyVariant
   /** md 34px, sm 26px, tc = 24px mono timecode key ("▶ 12:20"). */
   size?: KeySize
@@ -31,6 +32,7 @@ export const Key = forwardRef<HTMLButtonElement, KeyProps>(function Key(
       className={cx(
         'bs-key',
         variant === 'primary' && 'pri',
+        variant === 'danger' && 'danger',
         size !== 'md' && size,
         iconOnly && 'bs-ikey',
         onDisplay && 'on-display',

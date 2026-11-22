@@ -61,7 +61,9 @@ export default function CalendarAutoJoinSettings() {
 
   const load = useCallback(async () => {
     try {
-      setState(await calendarApi.getAutoJoin())
+      // A partial response (no settings yet) must not crash Settings: fill the defaults.
+      const res = (await calendarApi.getAutoJoin()) || {}
+      setState({ ...res, settings: { enabled: false, scope: 'organized', ...(res.settings || {}) }, upcoming: Array.isArray(res.upcoming) ? res.upcoming : [] })
     } catch (err) {
       setError(err.message || 'Could not load auto-join settings')
     }

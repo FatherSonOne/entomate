@@ -415,7 +415,7 @@ export default function Meetings() {
     <>
       <Key onClick={toggleSelectAll}>{allSelected ? 'Clear all' : 'Select all'}</Key>
       <Key onClick={handleBulkExport} disabled={selectedIds.size === 0}>Export {selectedIds.size}</Key>
-      <Key variant="primary" onClick={handleBulkDelete} disabled={selectedIds.size === 0}>
+      <Key variant="danger" onClick={handleBulkDelete} disabled={selectedIds.size === 0}>
         Delete {selectedIds.size}
       </Key>
       <Key onClick={exitSelectionMode}>Done</Key>

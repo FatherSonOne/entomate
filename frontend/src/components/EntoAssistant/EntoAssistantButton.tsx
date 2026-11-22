@@ -11,7 +11,7 @@ import './EntoAI.tokens.css';
 /* Ported from Logos AI's LogosAssistantButton (EAI-02a). Same markup and CSS; the
    name is Entomate AI, and the chunk prefetch is local (Entomate has no assistantChunk). */
 
-const ASSISTANT_NAME = 'Entomate AI';
+const ASSISTANT_NAME = 'Ask Entomate';
 
 // ---------------------------------------------------------------------------
 // Types

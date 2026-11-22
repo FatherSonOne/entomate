@@ -222,3 +222,31 @@ export function writeUrlState(params: URLSearchParams, next: Partial<InsightsUrl
   }
   return out
 }
+
+const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
+const rateOrNull = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null)
+const arr = <T>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : [])
+
+/**
+ * Fill every field the page reads, so a partial or older response renders with
+ * zeros and dashes instead of crashing the page (surface audit 2026-11-22).
+ */
+export function normalizeInsights(raw: unknown): InsightsData | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Record<string, unknown>
+  const ft = (r.followThrough ?? {}) as Record<string, unknown>
+  const ai = (r.actionItems ?? {}) as Record<string, unknown>
+  const ag = (r.agents ?? {}) as Record<string, unknown>
+  const p = (r.period ?? {}) as Record<string, unknown>
+  return {
+    period: { days: num(p.days), from: String(p.from ?? ''), to: String(p.to ?? '') },
+    followThrough: { due: num(ft.due), onTime: num(ft.onTime), rate: rateOrNull(ft.rate) },
+    overdue: num(r.overdue),
+    meetings: num(r.meetings),
+    decisions: num(r.decisions),
+    actionItems: { created: num(ai.created), done: num(ai.done) },
+    agents: { calls: num(ag.calls), kept: num(ag.kept), rate: rateOrNull(ag.rate), byAgent: arr<AgentRow>(ag.byAgent) },
+    owners: arr<OwnerRow>(r.owners).filter(Boolean).map((o) => ({ ...o, items: arr<OwnerItem>((o as { items?: unknown }).items) })),
+    weeks: arr<WeekRow>(r.weeks),
+  }
+}

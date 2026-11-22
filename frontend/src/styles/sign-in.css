@@ -184,3 +184,4 @@
 .si-tip-h b { color: var(--bs-brand); font-weight: 500; }
 .si-tip p { font-size: 14px; line-height: 1.5; color: var(--bs-ink2); }
 @media (max-width: 860px) { .si-tip { max-width: none; } }
+.org-or { margin: 22px 0; max-width: 440px; }

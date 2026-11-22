@@ -646,7 +646,7 @@ export const guideSections = [
       'Open 05 Automations from the rail.',
       'Automations are grouped: After a meeting, and On a schedule or webhook.',
       'Use the toggle on a row to turn it on or off.',
-      'Press New automation, or Start from a template and pick a recipe.',
+      'Press New automation, or Browse recipes and pick one.',
       'Click a row to rename it, see its runs, open it in the builder or delete it.',
     ],
     subsections: [
