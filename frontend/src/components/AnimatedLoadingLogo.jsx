@@ -1,23 +1,24 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { PRIMARY_LOGO } from './Logo'
 import { LOGO_MOTIONS, renderLogoMotion } from './logoMotion'
+import { isLogoId, logoAsset, useLogoSystem } from '../services/logoSystem'
 import './AnimatedLoadingLogo.css'
 
-// Use the approved primary identity for every application loading state.
-const appLoadingLogo = PRIMARY_LOGO
-
-export default function AnimatedLoadingLogo() {
+/**
+ * The animated mark of a logo system. Uses the system picked in
+ * Settings > Appearance unless `logoId` is given (the picker's previews).
+ * `size` picks the artwork resolution: 512 for small stages, 1024 full screen.
+ */
+export default function AnimatedLoadingLogo({ logoId, size = 512 }) {
+  const picked = useLogoSystem().id
+  const id = isLogoId(logoId) ? logoId : picked
   const artRef = useRef(null)
   const [playing, setPlaying] = useState(() => !window.matchMedia('(prefers-reduced-motion: reduce)').matches)
   const [manual, setManual] = useState(false)
   const [supported, setSupported] = useState(true)
   const [failed, setFailed] = useState(false)
-  const markup = useMemo(() => renderLogoMotion(
-    appLoadingLogo,
-    `/brand/${appLoadingLogo}-512.webp`,
-    6,
-    LOGO_MOTIONS[appLoadingLogo].name,
-  ), [])
+  const markup = useMemo(() => renderLogoMotion(id, logoAsset(id, size), 6, LOGO_MOTIONS[id].name), [id, size])
+
+  useEffect(() => { setFailed(false) }, [id])
 
   useEffect(() => {
     const query = window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -60,10 +61,10 @@ export default function AnimatedLoadingLogo() {
       image?.removeEventListener('error', error)
       svg.pauseAnimations()
     }
-  }, [playing, manual, failed])
+  }, [playing, manual, failed, markup])
 
   return (
-    <div className={`en-app-loading-logo ${supported ? '' : 'en-app-loading-still'}`} data-loading-logo={appLoadingLogo}>
+    <div className={`en-app-loading-logo ${supported ? '' : 'en-app-loading-still'}`} data-loading-logo={id}>
       {failed ? (
         <img className="en-app-loading-logo-art" src="/favicon.svg" alt="" aria-hidden="true" />
       ) : (
@@ -77,7 +78,7 @@ export default function AnimatedLoadingLogo() {
             if (!playing) setManual(true)
             setPlaying(value => !value)
           }}>
-          {playing ? 'Ⅱ Pause animation' : '▷ Play animation'}
+          {playing ? 'Pause motion' : 'Play motion'}
         </button>
       )}
     </div>

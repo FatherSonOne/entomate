@@ -18,7 +18,9 @@
 
 /* ── 1. Bench tokens ─────────────────────────────────────────── */
 
-html[data-style="bench-swiss"] {
+/* .bs-tokens: Bench parts used outside the Bench Swiss style (Settings > Appearance). */
+html[data-style="bench-swiss"],
+html:not([data-style="bench-swiss"]) .bs-tokens {
   --bs-case: #D9D8D2;
   --bs-plate: #ECEBE6;
   --bs-key: #F5F4F0;
@@ -60,7 +62,8 @@ html[data-style="bench-swiss"] {
   }
 }
 
-html[data-style="bench-swiss"].dark {
+html[data-style="bench-swiss"].dark,
+html.dark:not([data-style="bench-swiss"]) .bs-tokens {
   --bs-case: #0E0E0F;
   --bs-plate: #19191A;
   --bs-key: #252527;

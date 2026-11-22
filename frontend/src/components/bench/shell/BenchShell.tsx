@@ -5,6 +5,7 @@ import { Drawer } from '../Drawer'
 import { Key } from '../Key'
 import { Led } from '../Signal'
 import { cx } from '../cx'
+import { logoAsset, useLogoSystem } from '../../../services/logoSystem'
 
 /* ============================================================
    Bench Swiss shell: patch-panel rail (desktop), slim toolbar on
@@ -63,7 +64,6 @@ export interface BenchShellProps {
   children: React.ReactNode
 }
 
-const BRAND_MARK = '/brand/relay-orbits-128.webp'
 
 function initials(name: string): string {
   const parts = name.replace(/@.*/, '').split(/[\s._-]+/).filter(Boolean)
@@ -260,6 +260,8 @@ function ProfileMenu({ user, items, onSignOut, onSettings, modKey }: {
 /* ── The shell ── */
 
 export function BenchShell(props: BenchShellProps): React.ReactElement {
+  // The logo system picked in Settings > Appearance (tight-cropped small mark).
+  const brandMark = logoAsset(useLogoSystem().id, 'small')
   const {
     groups, isActive, user, isDark, onThemeChange, onSearch, onRecord,
     onSettings, settingsActive, menuItems, onSignOut, modKey, dock, children,
@@ -286,7 +288,7 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
       {/* Rail: the patch panel (desktop) */}
       <aside className="bs-rail" aria-label="Main navigation">
         <Link to="/dashboard" className="bs-brand" aria-label="Entomate, go to Today">
-          <img src={BRAND_MARK} alt="" width={28} height={28} />
+          <img src={brandMark} alt="" width={28} height={28} />
           entomate
           <span className="bs-ver" aria-hidden="true">EN-01</span>
         </Link>
@@ -309,7 +311,7 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
       <div className="bs-main">
         <div className="bs-tbar">
           <Link to="/dashboard" className="bs-tbar-brand" aria-label="Entomate, go to Today">
-            <img src={BRAND_MARK} alt="" width={22} height={22} />
+            <img src={brandMark} alt="" width={22} height={22} />
             entomate
           </Link>
           <div className="bs-tbar-stat bs-lbl">

@@ -1,70 +1,82 @@
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect } from 'react'
 import { useLoading } from '../contexts/LoadingContext'
 import AnimatedLoadingLogo from './AnimatedLoadingLogo'
 import { Wordmark } from './Logo'
+import { isLogoId, logoById, useLogoSystem } from '../services/logoSystem'
+import './EnhancedLoadingScreen.css'
 
-export default function EnhancedLoadingScreen({ autoAnimate = true, inline = false }) {
+/*
+ * Loading screen, Bench Swiss "Instrument" (Settings > Appearance, 2026-11-22).
+ * The logo system's animation fills the screen, centred, on black (its motion
+ * colours only read on a dark ground). The wordmark, the system name and the
+ * status rows sit small in the corners. Status rows say what is really
+ * happening for the caller; there is no invented percentage.
+ */
+const STAGE_ROWS = {
+  session: [['Session', 'live', 'Checking'], ['Workspace', 'off', 'Waiting']],
+  signin: [['Sign-in', 'live', 'Signing in'], ['Workspace', 'off', 'Waiting']],
+  page: [['Session', 'mint', 'Done'], ['Page', 'live', 'Loading']],
+  preview: [['Session', 'mint', 'Done'], ['Workspace', 'live', 'Loading'], ['Today', 'off', 'Waiting']],
+}
+
+/**
+ * @param {object} props
+ * @param {boolean} [props.autoAnimate=true] true when the caller has no real progress to report.
+ *   false reads the stage label and progress from LoadingContext.
+ * @param {'session'|'signin'|'page'|'preview'} [props.stage='session'] what the caller is waiting on.
+ * @param {string} [props.logoId] show this logo system instead of the one in use (picker preview).
+ * @param {() => void} [props.onClose] preview only: shows a Close key and closes on Escape.
+ */
+export default function EnhancedLoadingScreen({ autoAnimate = true, stage = 'session', logoId, onClose }) {
   const loadingContext = useLoading()
-  const [displayProgress, setDisplayProgress] = useState(0)
-  const animationRef = useRef(null)
-  const startTimeRef = useRef(null)
+  const picked = useLogoSystem()
+  const logo = isLogoId(logoId) ? logoById(logoId) : picked
 
   useEffect(() => {
-    if (!autoAnimate) {
-      setDisplayProgress(loadingContext.progress)
-      return
-    }
-    const duration = 6000
-    const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3)
+    if (!onClose) return undefined
+    const onKey = (e) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
 
-    const tick = (timestamp) => {
-      if (!startTimeRef.current) startTimeRef.current = timestamp
-      const elapsed = timestamp - startTimeRef.current
-      const raw = Math.min(elapsed / duration, 1)
-      setDisplayProgress(easeOutCubic(raw) * 100)
-      if (raw < 1) animationRef.current = requestAnimationFrame(tick)
-    }
-    animationRef.current = requestAnimationFrame(tick)
-    return () => { if (animationRef.current) cancelAnimationFrame(animationRef.current) }
-  }, [autoAnimate, loadingContext.progress])
-
-  const progress = autoAnimate ? displayProgress : loadingContext.progress
-
-  // Stage labels
-  const stageMessages = [
-    'Authenticating...',
-    'Restoring session...',
-    'Loading intelligence...',
-    'Syncing services...',
-    'Almost ready...',
-  ]
-  const stageIndex = Math.min(Math.floor(progress / 20), stageMessages.length - 1)
-  const stageLabel = autoAnimate ? stageMessages[stageIndex] : loadingContext.currentStageLabel
+  const real = !autoAnimate
+  const progress = Math.max(0, Math.min(100, Math.round(loadingContext.progress || 0)))
+  const label = real ? loadingContext.currentStageLabel : (STAGE_ROWS[stage] || STAGE_ROWS.session).find(([, tone]) => tone === 'live')?.[2] || 'Loading'
+  const rows = real
+    ? [[String(loadingContext.currentStageLabel || 'Loading').replace(/\.+$/, ''), 'live', `${progress}%`]]
+    : (STAGE_ROWS[stage] || STAGE_ROWS.session)
 
   return (
-    <div className={`en-signal-loader ${inline ? 'en-signal-inline' : 'en-signal-full'}`}
-      role="status" aria-live="polite" aria-label={`Loading: ${stageLabel}`}>
-      <div className="en-signal-loader-content">
-        <AnimatedLoadingLogo />
-        <div className="en-signal-loader-wordmark"><Wordmark width={178} /></div>
-        <div className="en-signal-loader-track" aria-hidden="true">
-          <span style={{ width: `${Math.max(0, Math.min(100, progress))}%` }} />
-        </div>
-        <p className="en-signal-loader-label">{stageLabel}</p>
-        <span className="en-signal-loader-percent" aria-hidden="true">{Math.round(progress)}%</span>
+    <div className={`en-loader${onClose ? ' en-loader--preview' : ''}`} role={onClose ? 'dialog' : 'status'}
+      aria-live={onClose ? undefined : 'polite'} aria-modal={onClose ? 'true' : undefined}
+      aria-label={onClose ? `${logo.name} loading screen preview` : `Loading: ${label}`} data-logo={logo.id}>
+      <div className="en-loader-stage">
+        <AnimatedLoadingLogo logoId={logo.id} size={1024} />
       </div>
-      <style>{`
-        .en-signal-loader { display: flex; align-items: center; justify-content: center; background: #080808; color: #f8f0f2; }
-        .en-signal-full { position: fixed; inset: 0; z-index: 9999; }
-        .en-signal-inline { width: 100%; min-height: min(560px, 100svh); height: 100%; }
-        .en-signal-loader-content { width: min(500px, 92vw); text-align: center; padding: 36px 12px; }
-        .en-signal-loader-wordmark { display: flex; align-items: center; width: 178px; height: 36px; margin: 0 auto; }
-        .en-signal-loader-track { width: 220px; height: 2px; background: #312a30; margin: 32px auto 20px; }
-        .en-signal-loader-track span { display: block; height: 2px; background: #ff2d6b; transition: width 180ms linear; }
-        .en-signal-loader-label { margin: 0 0 12px; font: 12px/1.5 system-ui, sans-serif; color: #b9aeb6; }
-        .en-signal-loader-percent { font: 11px/1.5 monospace; color: #00f5d4; }
-        @media (prefers-reduced-motion: reduce) { .en-signal-loader-track span { transition: none; } }
-      `}</style>
+
+      <div className="en-loader-corner en-loader-tl en-signal-loader-wordmark"><Wordmark width={120} /></div>
+
+      <div className="en-loader-corner en-loader-tr">
+        <span className="en-loader-lbl">EN-01 · {logo.name}</span>
+        <span className="en-loader-lbl">{logo.motion}</span>
+        {onClose && <button type="button" className="en-loader-close" onClick={onClose} autoFocus>Close preview</button>}
+      </div>
+
+      <div className="en-loader-corner en-loader-bl">
+        <ul className="en-loader-rows">
+          {rows.map(([name, tone, word]) => (
+            <li key={name}>
+              <span>{name}</span>
+              <span className="en-loader-sig"><i className={`en-loader-led en-loader-led--${tone}`} aria-hidden="true" />{word}</span>
+            </li>
+          ))}
+        </ul>
+        {real && (
+          <div className="en-signal-loader-track" aria-hidden="true">
+            <span style={{ width: `${progress}%` }} />
+          </div>
+        )}
+      </div>
     </div>
   )
 }

@@ -36,5 +36,5 @@ export default function AuthCallback() {
     handleCallback()
   }, [navigate])
 
-  return <EnhancedLoadingScreen autoAnimate />
+  return <EnhancedLoadingScreen stage="signin" />
 }

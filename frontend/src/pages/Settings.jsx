@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
-  Settings as SettingsIcon, Database, Cpu, Palette, Sun, Moon, Monitor,
+  Settings as SettingsIcon, Database, Cpu, Palette,
   Brain, ArrowLeft, Mic, Bell, Link2, RefreshCw, CheckCircle2,
   XCircle, AlertCircle, Loader2, MessageSquare, Info, Shield, CreditCard, Building2,
   Trash2, Archive, Bot, CalendarClock
@@ -23,6 +23,9 @@ import { VCButton, VCIconBox, VCBadge } from '../components/vc'
 import DeleteOrgDialog from '../components/settings/DeleteOrgDialog'
 import MeetingAgentsSettings from '../components/settings/MeetingAgentsSettings'
 import CalendarAutoJoinSettings from '../components/settings/CalendarAutoJoinSettings'
+import LogoSystemPicker from '../components/settings/LogoSystemPicker'
+import { Section, Switch, Toggle } from '../components/bench'
+import { LOGO_SYSTEMS } from '../services/logoSystem'
 
 // ── Settings Sections ──
 const SECTION_KEY = 'entomate-settings-section'
@@ -448,78 +451,49 @@ export default function Settings() {
         )}
 
         {/* ═══════ APPEARANCE ═══════ */}
+        {/* Bench Swiss rows + logo system picker (2026-11-22, Slate direction A). */}
         {activeSection === 'appearance' && (
           <>
-            <SectionHeader title="Appearance" subtitle="Customize the look and feel of your workspace" />
+            <SectionHeader title="Appearance" subtitle="How Entomate looks in this browser" />
 
-            <div className="vc">
-              <div className="p-5">
-                <label
-                  className="text-sm font-medium block mb-3"
-                  style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}
-                >
-                  Theme Mode
-                </label>
-                <div className="grid grid-cols-3 gap-3">
-                  {[
-                    { key: THEME_MODES.light, label: 'Light', Icon: Sun },
-                    { key: THEME_MODES.dark, label: 'Dark', Icon: Moon },
-                    { key: THEME_MODES.system, label: 'System', Icon: Monitor }
-                  ].map(({ key, label, Icon }) => (
-                    <button
-                      key={key}
-                      onClick={() => handleThemeChange(key)}
-                      className="flex flex-col items-center gap-2 p-4 rounded-lg transition-all"
-                      style={{
-                        background: mode === key ? 'rgba(255,45,107,.08)' : 'var(--bg-elevated)',
-                        border: `1.5px solid ${mode === key ? 'var(--accent-primary)' : 'var(--b1)'}`,
-                        cursor: 'pointer',
-                        color: mode === key ? 'var(--accent-primary)' : 'var(--text-secondary)'
-                      }}
-                    >
-                      <Icon className="w-6 h-6" />
-                      <span className="text-sm font-medium">{label}</span>
-                    </button>
-                  ))}
+            <div className="bs-tokens ap">
+              <Section number="01" title="Display" aside="This browser" />
+
+              <div className="ap-row">
+                <div>
+                  <div id="theme-mode-label" className="ap-row-title">Theme</div>
+                  <div className="ap-row-help">The toolbar switch flips light and dark; System follows your device.</div>
                 </div>
+                <Switch
+                  label="Theme"
+                  value={mode}
+                  onChange={handleThemeChange}
+                  options={[
+                    { value: THEME_MODES.light, label: 'Light' },
+                    { value: THEME_MODES.dark, label: 'Dark' },
+                    { value: THEME_MODES.system, label: 'System' },
+                  ]}
+                />
               </div>
 
-              {/* Reduce Motion */}
-              <div className="px-5 pb-5">
-                <div
-                  className="flex items-center justify-between p-3 rounded-lg"
-                  style={{ background: 'var(--bg-elevated)', border: '1px solid var(--b1)' }}
-                >
-                  <div>
-                    <span className="text-sm font-medium block" style={{ color: 'var(--text-primary)' }}>Reduce Motion</span>
-                    <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Minimize animations for accessibility</span>
-                  </div>
-                  <button
-                    role="switch"
-                    aria-checked={userSettings?.reduce_motion || false}
-                    onClick={() => updateSetting('reduce_motion', !userSettings?.reduce_motion)}
-                    className="relative inline-flex h-5 w-9 flex-shrink-0 rounded-full transition-colors"
-                    style={{
-                      background: userSettings?.reduce_motion ? 'var(--accent-primary)' : 'var(--b2, #333)',
-                      cursor: 'pointer',
-                      border: 'none'
-                    }}
-                  >
-                    <span
-                      className="inline-block h-4 w-4 rounded-full bg-white transition-transform"
-                      style={{
-                        transform: userSettings?.reduce_motion ? 'translateX(16px)' : 'translateX(2px)',
-                        marginTop: 2
-                      }}
-                    />
-                  </button>
+              <div className="ap-row">
+                <div>
+                  <div className="ap-row-title">Reduce motion</div>
+                  <div className="ap-row-help">Fewer animations for accessibility.</div>
                 </div>
+                <Toggle
+                  label="Reduce motion"
+                  checked={!!userSettings?.reduce_motion}
+                  onChange={(on) => updateSetting('reduce_motion', on)}
+                />
               </div>
 
               {/* Design style picker (2026-11-21) */}
-              <div ref={stylePickerRef} className="px-5 pb-5">
-                <span id="design-style-label" className="text-sm font-medium block mb-1 text-content-primary">Design style</span>
-                <span className="text-xs block mb-3 text-content-tertiary">Changes the whole app's look in this browser. Light and dark mode still apply.</span>
+              <div ref={stylePickerRef} className="ap-row ap-row--stack">
+                <div>
+                  <div id="design-style-label" className="ap-row-title">Design style</div>
+                  <div className="ap-row-help">Changes the whole app's look in this browser. Light and dark mode still apply.</div>
+                </div>
                 <div role="radiogroup" aria-labelledby="design-style-label">
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {mainStyles.map(renderStyle)}
@@ -547,18 +521,23 @@ export default function Settings() {
 
               {/* Bench Swiss palette (2026-11-22): Draft 1 Neutral now, Void Crimson kept as the alternative */}
               {designStyle === 'bench-swiss' && (
-                <div className="px-5 pb-5">
-                  <span id="bench-palette-label" className="text-sm font-medium block mb-1 text-content-primary">Bench Swiss palette</span>
-                  <span className="text-xs block mb-3 text-content-tertiary">Neutral is the current palette. Void Crimson brings back the brand tones and type.</span>
-                  <div className="bs-switch" role="group" aria-labelledby="bench-palette-label">
-                    {palettes.map((p) => (
-                      <button key={p.id} type="button" aria-pressed={palette === p.id} onClick={() => setPalette(p.id)}>
-                        {p.label}
-                      </button>
-                    ))}
+                <div className="ap-row">
+                  <div>
+                    <div className="ap-row-title">Palette</div>
+                    <div className="ap-row-help">Neutral is the current palette. Void Crimson brings back the brand tones and type.</div>
                   </div>
+                  <Switch
+                    label="Bench Swiss palette"
+                    value={palette}
+                    onChange={setPalette}
+                    options={palettes.map((p) => ({ value: p.id, label: p.label }))}
+                  />
                 </div>
               )}
+
+              <div className="ap-gap" />
+              <Section number="02" title="Logo and loading screen" aside={`${LOGO_SYSTEMS.length} systems`} />
+              <LogoSystemPicker />
             </div>
           </>
         )}

@@ -6,7 +6,7 @@ export default function ProtectedRoute({ children }) {
   const { loading, isSignedIn } = useAuth()
 
   if (loading) {
-    return <EnhancedLoadingScreen autoAnimate />
+    return <EnhancedLoadingScreen stage="session" />
   }
 
   if (!isSignedIn) {
