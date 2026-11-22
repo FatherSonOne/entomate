@@ -376,6 +376,12 @@ async function gracefulShutdown(signal) {
     // Ignore if not initialized
   }
 
+  try {
+    require('./services/calendarAutoJoin').stop();
+  } catch {
+    // Ignore if not initialized
+  }
+
   // Stop retention scheduler
   try {
     const retentionScheduler = require('./services/retentionScheduler');
@@ -445,6 +451,14 @@ if (process.env.NODE_ENV !== 'test') {
       ecosystemScheduler.initialize();
     } catch (error) {
       logger.warn('Ecosystem scheduler not initialized:', error.message);
+    }
+
+    // Calendar auto-join: schedule bots for upcoming meetings every 10 min
+    // while awake (GitHub Actions calls /api/internal/jobs/autojoin too).
+    try {
+      require('./services/calendarAutoJoin').initialize();
+    } catch (error) {
+      logger.warn('Calendar auto-join not initialized:', error.message);
     }
 
     // Initialize retention sweep scheduler (P1.7 Slice 3 — daily 03:00 UTC)

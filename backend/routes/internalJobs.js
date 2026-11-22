@@ -17,6 +17,7 @@ router.use(apiKeyAuth);
 const JOBS = {
   retention: () => require('../services/retentionService').runRetentionSweep(),
   embeddings: () => require('../services/embeddingService').backfillMissing(),
+  autojoin: () => require('../services/calendarAutoJoin').runAutoJoin(),
 };
 
 const running = new Set();

@@ -70,4 +70,15 @@ const syncMeeting = z.object({
   })
 });
 
-module.exports = { createEvent, updateEvent, syncActionItem, syncActionItems, syncMeeting };
+const autoJoin = z.object({
+  body: z.object({
+    enabled: z.boolean(),
+    scope: z.enum(['organized', 'all']).optional(),
+    orgId: z.string().uuid().optional(),
+    consentAcknowledged: z.boolean().optional()
+  }),
+  query: z.object({}).passthrough(),
+  params: z.object({}).passthrough()
+});
+
+module.exports = { createEvent, updateEvent, syncActionItem, syncActionItems, syncMeeting, autoJoin };

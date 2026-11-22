@@ -4,7 +4,7 @@ import {
   Settings as SettingsIcon, Database, Cpu, Palette, Sun, Moon, Monitor,
   Brain, ArrowLeft, Mic, Bell, Link2, RefreshCw, CheckCircle2,
   XCircle, AlertCircle, Loader2, MessageSquare, Info, Shield, CreditCard, Building2,
-  Trash2, Archive, Bot
+  Trash2, Archive, Bot, CalendarClock
 } from 'lucide-react'
 import { integrationsApi, checkHealth, settingsApi } from '../services/api'
 import { authFetch } from '../services/authFetch'
@@ -22,6 +22,7 @@ import DataRetentionSettings from '../components/settings/DataRetentionSettings'
 import { VCButton, VCIconBox, VCBadge } from '../components/vc'
 import DeleteOrgDialog from '../components/settings/DeleteOrgDialog'
 import MeetingAgentsSettings from '../components/settings/MeetingAgentsSettings'
+import CalendarAutoJoinSettings from '../components/settings/CalendarAutoJoinSettings'
 
 // ── Settings Sections ──
 const SECTIONS = [
@@ -34,6 +35,7 @@ const SECTIONS = [
   { id: 'notifications', label: 'Notifications', icon: Bell },
   { id: 'integrations', label: 'Integrations', icon: Link2 },
   { id: 'meeting-agents', label: 'Meeting agents', icon: Bot },
+  { id: 'auto-join', label: 'Bot auto-join', icon: CalendarClock },
   { id: 'ai-learning', label: 'AI & Learning', icon: Brain },
   { id: 'system',     label: 'System Status', icon: SettingsIcon },
   { id: 'about',      label: 'About', icon: Info },
@@ -96,6 +98,13 @@ export default function Settings() {
       setActiveSection(location.state.section)
     }
   }, [location.state])
+
+  // Back from Google Calendar sign-in (started on Bot auto-join).
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get('connected') === 'true') {
+      setActiveSection('auto-join')
+    }
+  }, [location.search])
 
   // ── Settings persistence helpers ──
 
@@ -566,6 +575,13 @@ export default function Settings() {
                 <SlackSettings />
               </div>
             </div>
+          </>
+        )}
+
+        {activeSection === 'auto-join' && (
+          <>
+            <SectionHeader title="Bot auto-join" subtitle="Send the meeting bot to calls on your calendar without launching it by hand" />
+            <CalendarAutoJoinSettings />
           </>
         )}
 

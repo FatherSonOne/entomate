@@ -12,6 +12,7 @@ const { authenticate } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const schemas = require('../schemas/calendar');
 const { attachOrgIds } = require('../utils/orgContext');
+const autoJoin = require('../services/calendarAutoJoin');
 router.use(attachOrgIds); // org-owned tables below are limited to req.orgIds (audit finding 3)
 
 // Initialize calendar service
@@ -121,6 +122,11 @@ router.get('/callback', async (req, res) => {
  * Disconnect calendar integration
  */
 router.post('/disconnect', authenticate, async (req, res) => {
+  // Bots auto-join scheduled from this calendar would still join: withdraw them.
+  if (req.user?.id) {
+    await autoJoin.withdrawScheduled(req.user.id).catch((err) =>
+      log.warn('Auto-join withdraw on disconnect failed:', err.message));
+  }
   // Clear DB tokens
   if (supabase && req.user?.id) {
     await supabase
@@ -185,13 +191,24 @@ const getTokens = async (req) => {
  */
 const saveTokensToDB = (userId, tokens) => {
   if (!supabase || !userId || !tokens) return;
-  const calendarJson = { tokens, connected_at: new Date().toISOString() };
+  const { _onRefresh, ...clean } = tokens;
+  // Keep other calendar settings (auto_join) when the tokens change.
   supabase
     .from('user_settings')
-    .upsert({ user_id: userId, calendar_json: calendarJson }, { onConflict: 'user_id' })
-    .then(({ error }) => {
-      if (error) log.warn('Failed to save calendar tokens to DB:', error.message);
-    });
+    .select('calendar_json')
+    .eq('user_id', userId)
+    .maybeSingle()
+    .then(({ data }) => {
+      const prev = data?.calendar_json || {};
+      const calendarJson = { ...prev, tokens: clean, connected_at: prev.connected_at || new Date().toISOString() };
+      return supabase
+        .from('user_settings')
+        .upsert({ user_id: userId, calendar_json: calendarJson }, { onConflict: 'user_id' });
+    })
+    .then((res) => {
+      if (res?.error) log.warn('Failed to save calendar tokens to DB:', res.error.message);
+    })
+    .catch((err) => log.warn('Failed to save calendar tokens to DB:', err.message));
 };
 
 /**
@@ -554,6 +571,108 @@ router.get('/upcoming', authenticate, async (req, res) => {
   } catch (error) {
     log.error('Error getting upcoming items:', { error: error.message || error });
     res.status(500).json({ error: 'Failed to get upcoming items', details: error.message });
+  }
+});
+
+/**
+ * GET /api/calendar/auto-join
+ * The user's auto-join settings and what it will do with their next day.
+ */
+router.get('/auto-join', authenticate, async (req, res) => {
+  try {
+    const tokens = await getTokens(req);
+    const { data } = await supabase
+      .from('user_settings')
+      .select('calendar_json')
+      .eq('user_id', req.user.id)
+      .maybeSingle();
+    const settings = autoJoin.normalizeSettings(data?.calendar_json?.auto_join);
+    let upcoming = [];
+    let previewError = null;
+    if (tokens && calendarService.isConfigured()) {
+      try {
+        upcoming = await autoJoin.preview(req.user.id, tokens, settings);
+      } catch (err) {
+        previewError = 'Could not read your calendar. Try connecting it again.';
+        log.warn('Auto-join preview failed:', err.message);
+      }
+    }
+    res.json({
+      configured: calendarService.isConfigured(),
+      botsConfigured: Boolean(process.env.RECALL_API_KEY),
+      connected: Boolean(tokens),
+      settings,
+      upcoming,
+      previewError
+    });
+  } catch (error) {
+    log.error('Error getting auto-join settings:', { error: error.message || error });
+    res.status(500).json({ error: 'Failed to load auto-join settings' });
+  }
+});
+
+/**
+ * PUT /api/calendar/auto-join
+ * Switch auto-join on or off. Turning it on needs a connected calendar, an
+ * org the user owns or administers, and their consent: they confirm that
+ * the people they invite are told the meeting is recorded. Turning it off
+ * withdraws bots that have not joined yet.
+ */
+router.put('/auto-join', authenticate, validate(schemas.autoJoin), async (req, res) => {
+  try {
+    const { enabled, scope, orgId, consentAcknowledged } = req.body;
+    const { data } = await supabase
+      .from('user_settings')
+      .select('calendar_json')
+      .eq('user_id', req.user.id)
+      .maybeSingle();
+    const calendarJson = data?.calendar_json || {};
+    const prev = autoJoin.normalizeSettings(calendarJson.auto_join);
+    let next;
+
+    if (enabled) {
+      if (!calendarJson.tokens) {
+        return res.status(400).json({ error: 'calendar_not_connected', message: 'Connect Google Calendar first.' });
+      }
+      const targetOrg = orgId || prev.org_id || req.orgIds?.[0];
+      if (!targetOrg || !req.orgIds?.includes(targetOrg)) {
+        return res.status(403).json({ error: 'org_not_allowed', message: 'Pick a workspace you belong to.' });
+      }
+      const { data: member } = await supabase
+        .from('org_members')
+        .select('role')
+        .eq('user_id', req.user.id)
+        .eq('org_id', targetOrg)
+        .maybeSingle();
+      if (!['owner', 'admin'].includes(member?.role)) {
+        return res.status(403).json({ error: 'admin_required', message: 'Only workspace owners and admins can send the bot.' });
+      }
+      if (consentAcknowledged !== true && !prev.consent_at) {
+        return res.status(400).json({ error: 'consent_required', message: 'Confirm that your invitees are told the meeting is recorded.' });
+      }
+      next = {
+        enabled: true,
+        scope: scope || prev.scope,
+        org_id: targetOrg,
+        consent_at: consentAcknowledged === true ? new Date().toISOString() : prev.consent_at
+      };
+    } else {
+      next = { ...prev, enabled: false, scope: scope || prev.scope };
+    }
+
+    const { error } = await supabase
+      .from('user_settings')
+      .update({ calendar_json: { ...calendarJson, auto_join: next } })
+      .eq('user_id', req.user.id);
+    if (error) throw error;
+
+    let withdrawn = 0;
+    if (!enabled) withdrawn = await autoJoin.withdrawScheduled(req.user.id);
+
+    res.json({ settings: autoJoin.normalizeSettings(next), withdrawn });
+  } catch (error) {
+    log.error('Error saving auto-join settings:', { error: error.message || error });
+    res.status(500).json({ error: 'Failed to save auto-join settings' });
   }
 });
 

@@ -583,6 +583,10 @@ export const calendarApi = {
   // Disconnect calendar
   disconnect: () => api.post('/calendar/disconnect'),
 
+  // Bot auto-join for calendar meetings
+  getAutoJoin: () => api.get('/calendar/auto-join'),
+  updateAutoJoin: (body) => api.put('/calendar/auto-join', body),
+
   // Get user's calendars
   getCalendars: () => api.get('/calendar/calendars'),
 

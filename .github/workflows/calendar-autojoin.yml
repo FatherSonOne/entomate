@@ -1,0 +1,36 @@
+name: Calendar auto-join
+
+# Schedules the meeting bot for upcoming calendar events (feature audit
+# 2026-11-22, rec 1). The backend also runs this every 10 minutes while it
+# is awake; this call wakes it on Render's free plan. Each run looks two
+# hours ahead and is idempotent, so a late or doubled run is harmless.
+#
+# Uses the same repository secrets as nightly-jobs.yml:
+#   ENTOMATE_BACKEND_URL, ENTOMATE_INTERNAL_API_KEY
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+jobs:
+  autojoin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Schedule bots for upcoming meetings
+        env:
+          BACKEND_URL: ${{ secrets.ENTOMATE_BACKEND_URL }}
+          API_KEY: ${{ secrets.ENTOMATE_INTERNAL_API_KEY }}
+        run: |
+          if [ -z "$BACKEND_URL" ] || [ -z "$API_KEY" ]; then
+            echo "::error::Set ENTOMATE_BACKEND_URL and ENTOMATE_INTERNAL_API_KEY repository secrets"; exit 1
+          fi
+          for i in 1 2 3; do
+            code=$(curl -s -o out.json -w '%{http_code}' --max-time 90 -X POST \
+              -H "X-API-Key: $API_KEY" "${BACKEND_URL%/}/api/internal/jobs/autojoin" || true)
+            echo "attempt $i: HTTP $code"; cat out.json 2>/dev/null; echo
+            if [ "$code" = "202" ] || [ "$code" = "409" ]; then exit 0; fi
+            sleep 30
+          done
+          echo "::error::Auto-join run could not be started"; exit 1

@@ -171,7 +171,10 @@ async function launchBotSession(p) {
   const {
     workspaceId, meetingId, meetingUrl, platform, botName,
     consentAcknowledgedBy, consentAcknowledgedByName, consentAcknowledgedByEmail,
-    participantEmails
+    participantEmails,
+    // Calendar auto-join (services/calendarAutoJoin.js): when the bot should
+    // join, which calendar event it is for, and the event's title.
+    joinAt, calendarEventKey, title
   } = p || {};
   if (!workspaceId || !meetingId || !meetingUrl || !platform) {
     throw new Error('launchBotSession: workspaceId, meetingId, meetingUrl, platform are required');
@@ -198,6 +201,9 @@ async function launchBotSession(p) {
     insertRow.consent_acknowledged_at = new Date().toISOString();
     insertRow.consent_acknowledged_by = consentAcknowledgedBy;
   }
+  if (calendarEventKey) insertRow.calendar_event_key = calendarEventKey;
+  if (title) insertRow.title = String(title).slice(0, 200);
+  if (joinAt) insertRow.join_at = joinAt;
 
   const { error: insertErr } = await db()
     .from('bot_sessions')
@@ -207,6 +213,9 @@ async function launchBotSession(p) {
   const recallPayload = {
     meeting_url: meetingUrl,
     bot_name: botName || DEFAULT_BOT_NAME,
+    // A join_at more than a minute ahead makes this a scheduled bot; Recall
+    // joins at that time. Otherwise it joins now.
+    ...(joinAt && new Date(joinAt).getTime() > Date.now() + 60 * 1000 ? { join_at: joinAt } : {}),
     // Webhooks are configured at the Recall workspace level (dashboard),
     // not per-bot — Recall's bot create endpoint has no webhook_url field.
     // Status events arrive via the Svix-signed POST to

@@ -118,6 +118,8 @@ function durationMinutes(segments) {
 }
 
 function meetingTitle(session) {
+  // Bots scheduled from the calendar carry the event's own title.
+  if (session.title && String(session.title).trim()) return String(session.title).trim();
   const label = PLATFORM_LABEL[session.platform] || 'Bot';
   const when = new Date(session.started_at || session.created_at || Date.now());
   const date = Number.isNaN(when.getTime())
@@ -234,7 +236,7 @@ async function ingestBotTranscript(sessionId, { transcriptUrl } = {}) {
 
   const { data: session, error: sessionErr } = await db()
     .from('bot_sessions')
-    .select('id, org_id, meeting_id, platform, created_at, started_at, ended_at, consent_acknowledged_by')
+    .select('*')
     .eq('id', sessionId)
     .maybeSingle();
   if (sessionErr) throw sessionErr;
