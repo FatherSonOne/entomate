@@ -24,6 +24,7 @@ const orchestrator = require('./botOrchestrator');
 
 /** Lazy: transcriptIngest pulls in the meetings route. */
 const transcriptIngest = () => require('./transcriptIngest');
+const meetingRecorder = () => require('./meetingRecorder');
 
 const ALLOWED_RETENTION_DAYS = [30, 90, 365];
 const DEFAULT_RETENTION_DAYS = 90;
@@ -151,6 +152,51 @@ async function sweepWorkspace(workspaceId, retentionDays) {
 }
 
 /**
+ * Browser recordings (meetings with `recording_job`) expire on the same setting: any audio
+ * still saved (an unfinished or failed recording) and the transcript are deleted; the
+ * meeting, summary, decisions and action items stay, as for a bot meeting. The job is
+ * stamped `retentionDeletedAt` so a row is swept once.
+ */
+async function sweepRecordings(workspaceId, retentionDays) {
+  const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString();
+  const { data: rows, error } = await db()
+    .from('meetings')
+    .select('id, org_id, created_at, recording_job')
+    .eq('org_id', workspaceId)
+    .not('recording_job', 'is', null)
+    .is('recording_job->>retentionDeletedAt', null)
+    .lt('created_at', cutoff)
+    .order('created_at', { ascending: true })
+    .limit(MAX_ROWS_PER_SWEEP);
+  if (error) {
+    log.error('Recording retention query failed', { workspaceId, error: error.message });
+    return { visited: 0, deleted: 0, failed: 0, error: error.message };
+  }
+
+  let deleted = 0;
+  let failed = 0;
+  const due = (rows || []).filter((r) => r.recording_job && !r.recording_job.retentionDeletedAt);
+  for (const row of due) {
+    try {
+      await meetingRecorder().purgeRecordingAudio(row.org_id, row.id);
+      await transcriptIngest().purgeMeetingTranscript(row.org_id, row.id);
+      const now = new Date().toISOString();
+      const { error: updErr } = await db()
+        .from('meetings')
+        .update({ recording_job: { ...row.recording_job, retentionDeletedAt: now, retentionError: null } })
+        .eq('id', row.id)
+        .eq('org_id', row.org_id);
+      if (updErr) throw new Error(`meetings update failed: ${updErr.message}`);
+      deleted += 1;
+    } catch (err) {
+      failed += 1;
+      log.warn('[Retention] Recording sweep row failed; will retry next sweep', { meetingId: row.id, error: err.message });
+    }
+  }
+  return { visited: due.length, deleted, failed };
+}
+
+/**
  * Top-level sweep — iterates all workspaces with bot_sessions and
  * applies their retention setting. Safe to invoke manually.
  *
@@ -173,11 +219,30 @@ async function runRetentionSweep() {
     return { error: wsErr.message };
   }
 
-  const distinct = Array.from(new Set((workspaces || []).map((r) => r.org_id))).filter(Boolean);
+  // Workspaces with browser recordings expire on the same setting.
+  const { data: recorded, error: recErr } = await db()
+    .from('meetings')
+    .select('org_id')
+    .not('recording_job', 'is', null)
+    .is('recording_job->>retentionDeletedAt', null);
+  if (recErr) log.warn('[Retention] Recording workspace enumeration failed', { error: recErr.message });
+
+  const botOrgs = new Set((workspaces || []).map((r) => r.org_id).filter(Boolean));
+  const recordingOrgs = new Set((recorded || []).map((r) => r.org_id).filter(Boolean));
+  const distinct = Array.from(new Set([...botOrgs, ...recordingOrgs]));
   const results = [];
   for (const workspaceId of distinct) {
     const days = await getRetentionDays(workspaceId);
-    const result = await sweepWorkspace(workspaceId, days);
+    const result = botOrgs.has(workspaceId)
+      ? await sweepWorkspace(workspaceId, days)
+      : { workspaceId, retentionDays: days, visited: 0, deleted: 0, failed: 0 };
+    if (recordingOrgs.has(workspaceId)) {
+      const rec = await sweepRecordings(workspaceId, days);
+      result.visited += rec.visited;
+      result.deleted += rec.deleted;
+      result.failed += rec.failed;
+      result.recordings = rec;
+    }
     results.push(result);
   }
 
@@ -202,6 +267,7 @@ async function runRetentionSweep() {
 module.exports = {
   runRetentionSweep,
   sweepWorkspace,
+  sweepRecordings,
   getRetentionDays,
   deleteRecallMedia,
   ALLOWED_RETENTION_DAYS,

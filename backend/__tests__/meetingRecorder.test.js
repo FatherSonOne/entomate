@@ -55,6 +55,13 @@ function mockMakeQuery(table) {
     eq(col, val) { filters.push((r) => r[col] === val); return q; },
     in(col, vals) { filters.push((r) => vals.includes(r[col])); return q; },
     is(col, val) { filters.push((r) => (r[col] ?? null) === val); return q; },
+    not(col, op, val) { filters.push((r) => (op === 'is' ? (r[col] ?? null) !== val : true)); return q; },
+    lt(col, val) { filters.push((r) => r[col] < val); return q; },
+    like(col, pattern) {
+      const re = new RegExp(`^${pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/%/g, '.*').replace(/_/g, '.')}$`);
+      filters.push((r) => re.test(String(r[col] ?? '')));
+      return q;
+    },
     order() { return q; },
     limit() { return q; },
     maybeSingle() { const { rows } = run(); return Promise.resolve({ data: rows[0] || null, error: null }); },
@@ -374,5 +381,49 @@ describe('salvage after a closed tab', () => {
     } finally {
       supabase.storage.from = original;
     }
+  });
+});
+
+describe('retention for browser recordings', () => {
+  const OLD = '2026-01-01T00:00:00.000Z';
+
+  test('an expired recording loses its transcript and leftover audio, once; the meeting stays', async () => {
+    const { sweepRecordings, runRetentionSweep } = require('../services/retentionService');
+    const done = '00000000-0000-4000-8000-00000000f101';
+    const abandoned = '00000000-0000-4000-8000-00000000f102';
+    const fresh = '00000000-0000-4000-8000-00000000f103';
+    mockDb.meetings.push(
+      { id: done, org_id: ORG_A, created_at: OLD, summary: 'Kept', transcript: 'Speaker 1: hi', transcript_segments: [{ atMs: 0, speaker: 'Speaker 1', text: 'hi' }], summary_moments: { keyPoints: [0], decisions: [] }, recording_job: { status: 'done' } },
+      { id: abandoned, org_id: ORG_A, created_at: OLD, recording_job: { status: 'recording', mimeType: 'audio/webm' } },
+      { id: fresh, org_id: ORG_A, created_at: new Date().toISOString(), transcript: 'new', recording_job: { status: 'done' } },
+    );
+    mockDb.action_items.push({ id: 'ai-1', meeting_id: done, transcript_at_ms: 0 });
+    mockDb.embeddings = [
+      { source_id: done, source_type: 'meeting', content_type: 'transcript_chunk_0' },
+      { source_id: done, source_type: 'meeting', content_type: 'summary' },
+    ];
+    mockStorage.set(`meeting-recordings/${ORG_A}/${abandoned}/000000-30000.webm`, Buffer.from('a'));
+
+    const out = await sweepRecordings(ORG_A, 30);
+    expect(out).toEqual({ visited: 2, deleted: 2, failed: 0 });
+
+    const kept = meeting(done);
+    expect(kept).toMatchObject({ summary: 'Kept', transcript: null, transcript_segments: null, summary_moments: null });
+    expect(kept.recording_job.retentionDeletedAt).toEqual(expect.any(String));
+    expect(mockDb.action_items[0].transcript_at_ms).toBeNull();
+    expect(mockDb.embeddings.map((e) => e.content_type)).toEqual(['summary']);
+    expect(mockStorage.size).toBe(0);
+    expect(meeting(fresh).transcript).toBe('new');
+
+    // Already swept rows are not visited again.
+    expect(await sweepRecordings(ORG_A, 30)).toEqual({ visited: 0, deleted: 0, failed: 0 });
+
+    // The daily sweep finds workspaces that only have browser recordings.
+    mockDb.bot_sessions = [];
+    mockDb.workspace_settings = [];
+    meeting(abandoned).recording_job = { status: 'failed' };
+    const total = await runRetentionSweep();
+    expect(total.workspaces).toBe(1);
+    expect(total.totals.deleted).toBe(1);
   });
 });
