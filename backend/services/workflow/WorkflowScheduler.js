@@ -12,6 +12,7 @@ const log = require('../../utils/log');
 class WorkflowScheduler {
   constructor() {
     this.jobs = new Map();
+    this.jobWorkflows = new Map(); // scheduleId -> workflowId
     this.executor = new WorkflowExecutor();
     this.isInitialized = false;
   }
@@ -136,6 +137,7 @@ class WorkflowScheduler {
     });
 
     this.jobs.set(scheduleId, job);
+    this.jobWorkflows.set(scheduleId, workflow_id);
 
     // Update next run time
     const nextRun = this.getNextRunTime(cron_expression, timezone);
@@ -155,10 +157,42 @@ class WorkflowScheduler {
     if (job) {
       job.stop();
       this.jobs.delete(scheduleId);
+      this.jobWorkflows.delete(scheduleId);
       log.info(`[WorkflowScheduler] Schedule ${scheduleId} stopped`);
       return true;
     }
     return false;
+  }
+
+  /**
+   * Re-sync every schedule of one workflow with the database.
+   * Called after a workflow is created, edited, toggled or deleted so
+   * cron jobs match what is stored without a server restart.
+   */
+  async syncWorkflow(workflowId) {
+    for (const [scheduleId, wfId] of [...this.jobWorkflows.entries()]) {
+      if (wfId === workflowId) this.stopSchedule(scheduleId);
+    }
+
+    const { data: schedules, error } = await supabase
+      .from('workflow_schedules')
+      .select('*, workflows(*)')
+      .eq('workflow_id', workflowId)
+      .eq('enabled', true);
+
+    if (error) {
+      log.error('[WorkflowScheduler] syncWorkflow error:', { workflowId, error: error.message });
+      return 0;
+    }
+
+    let started = 0;
+    for (const schedule of schedules || []) {
+      if (schedule.workflows?.active) {
+        await this.startSchedule(schedule);
+        started += 1;
+      }
+    }
+    return started;
   }
 
   /**

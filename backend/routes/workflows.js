@@ -219,6 +219,7 @@ router.post('/', authenticate, validate(schemas.create), async (req, res) => {
 
     // Create schedules for schedule trigger nodes
     await createSchedulesForWorkflow(workflow);
+    await syncScheduler(workflow.id);
 
     res.status(201).json({
       success: true,
@@ -323,6 +324,7 @@ router.put('/:id', authenticate, validate(schemas.update), async (req, res) => {
     if (nodes) {
       await updateSchedulesForWorkflow(workflow);
     }
+    await syncScheduler(workflow.id);
 
     res.json({
       success: true,
@@ -350,6 +352,7 @@ router.delete('/:id', authenticate, async (req, res) => {
       .eq('id', id);
 
     if (error) throw error;
+    await syncScheduler(id);
 
     res.json({
       success: true,
@@ -482,18 +485,19 @@ router.post('/:id/toggle', authenticate, validate(schemas.toggle), async (req, r
 
     if (error) throw error;
 
-    // If activating, ensure webhooks and schedules are enabled
-    if (workflow.active) {
-      await supabase
-        .from('webhooks')
-        .update({ enabled: true })
-        .eq('workflow_id', id);
+    // Webhooks and schedules follow the workflow's active flag both ways
+    const enabled = !!workflow.active;
+    await supabase
+      .from('webhooks')
+      .update({ enabled })
+      .eq('workflow_id', id);
 
-      await supabase
-        .from('workflow_schedules')
-        .update({ enabled: true })
-        .eq('workflow_id', id);
-    }
+    await supabase
+      .from('workflow_schedules')
+      .update({ enabled })
+      .eq('workflow_id', id);
+
+    await syncScheduler(id);
 
     res.json({
       success: true,
@@ -895,15 +899,28 @@ function validateWorkflow({ nodes, connections }) {
 }
 
 /**
+ * Keep the in-process cron jobs in step with workflow_schedules.
+ * Never fails the request: a sync error is logged and the next restart reloads.
+ */
+async function syncScheduler(workflowId) {
+  try {
+    const workflowScheduler = require('../services/workflow/WorkflowScheduler');
+    await workflowScheduler.syncWorkflow(workflowId);
+  } catch (error) {
+    log.error('[Workflows] scheduler sync failed:', { workflowId, error: error.message || error });
+  }
+}
+
+/**
  * Create webhooks for webhook trigger nodes
  */
 async function createWebhooksForWorkflow(workflow) {
-  const webhookNodes = workflow.nodes.filter(n => n.subtype === 'webhook');
+  const webhookNodes = (workflow.nodes || []).filter(n => n.subtype === 'webhook');
 
   for (const node of webhookNodes) {
     const path = node.config?.path || `wh-${workflow.id.slice(0, 8)}-${node.id.slice(0, 8)}`;
 
-    await supabase
+    const { error } = await supabase
       .from('webhooks')
       .upsert({
         workflow_id: workflow.id,
@@ -913,7 +930,8 @@ async function createWebhooksForWorkflow(workflow) {
         authentication: node.config?.authentication || { type: 'none' },
         response_mode: node.config?.responseMode || 'immediate',
         enabled: workflow.active
-      });
+      }, { onConflict: 'workflow_id,node_id' });
+    if (error) console.error('[Workflows] webhook upsert failed:', workflow.id, node.id, error.message);
   }
 }
 
@@ -935,11 +953,11 @@ async function updateWebhooksForWorkflow(workflow) {
  * Create schedules for schedule trigger nodes
  */
 async function createSchedulesForWorkflow(workflow) {
-  const scheduleNodes = workflow.nodes.filter(n => n.subtype === 'schedule');
+  const scheduleNodes = (workflow.nodes || []).filter(n => n.subtype === 'schedule');
 
   for (const node of scheduleNodes) {
     if (node.config?.cron) {
-      await supabase
+      const { error } = await supabase
         .from('workflow_schedules')
         .upsert({
           workflow_id: workflow.id,
@@ -947,7 +965,8 @@ async function createSchedulesForWorkflow(workflow) {
           cron_expression: node.config.cron,
           timezone: node.config.timezone || 'UTC',
           enabled: workflow.active
-        });
+        }, { onConflict: 'workflow_id,node_id' });
+      if (error) console.error('[Workflows] schedule upsert failed:', workflow.id, node.id, error.message);
     }
   }
 }
