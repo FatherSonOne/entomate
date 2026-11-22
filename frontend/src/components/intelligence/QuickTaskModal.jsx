@@ -1,7 +1,14 @@
 import React, { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { CheckSquare, X } from 'lucide-react'
-import { VCButton, VCInput, VCSelect } from '../vc'
+import { VCButton, VCInput } from '../vc'
+import { Select } from '../bench'
+
+const PRIORITIES = [
+  { value: 'low', label: 'Low' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'high', label: 'High' },
+]
 import api from '../../services/api'
 import { useToast } from '../vc/ToastProvider'
 
@@ -78,11 +85,7 @@ export default function QuickTaskModal({ isOpen, onClose, context }) {
           <div className="flex gap-3">
             <div className="flex-1">
               <label className="vform-label">Priority</label>
-              <VCSelect value={form.priority} onChange={e => update('priority', e.target.value)}>
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-              </VCSelect>
+              <Select label="Priority" value={form.priority} onChange={v => update('priority', v)} options={PRIORITIES} />
             </div>
             <div className="flex-1">
               <label className="vform-label">Due Date</label>

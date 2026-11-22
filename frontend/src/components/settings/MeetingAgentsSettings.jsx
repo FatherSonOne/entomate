@@ -13,7 +13,7 @@ import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { settingsApi } from '../../services/api'
 import { useOrg } from '../../contexts/OrgContext'
-import { Key, Signal, Toggle } from '../bench'
+import { Key, Select, Signal, Toggle } from '../bench'
 
 const AGENTS = [
   { key: 'assignment', name: 'Owner', what: 'Gives an action item nobody owns to someone in the meeting.', bar: true },
@@ -88,17 +88,18 @@ export default function MeetingAgentsSettings() {
                 </div>
                 <p className="bs-agents-what">{a.what}</p>
                 {a.bar && (
-                  <label className="bs-agents-bar">
-                    <span className="bs-lbl">Apply when confidence is at least</span>
-                    <select
-                      className="bs-input bs-agents-select"
+                  <div className="bs-agents-bar">
+                    <span className="bs-lbl" id={`agent-bar-${a.key}`}>Apply when confidence is at least</span>
+                    <Select
+                      className="bs-agents-select"
+                      aria-labelledby={`agent-bar-${a.key}`}
+                      sheetLabel={`${a.name}: confidence`}
                       value={String(cfg.minConfidence)}
                       disabled={!canEdit || !cfg.enabled}
-                      onChange={(e) => update(a.key, { minConfidence: Number(e.target.value) })}
-                    >
-                      {BARS.map((b) => <option key={b} value={String(b)}>{pct(b)}</option>)}
-                    </select>
-                  </label>
+                      onChange={(v) => update(a.key, { minConfidence: Number(v) })}
+                      options={BARS.map((b) => ({ value: String(b), label: pct(b) }))}
+                    />
+                  </div>
                 )}
               </div>
               <Toggle

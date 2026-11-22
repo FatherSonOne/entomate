@@ -32,7 +32,12 @@ export interface DrawerProps {
   modal?: boolean
   /** Extra class on the panel (width variants). */
   className?: string
+  /** 'top': sits above legacy modals (z 10000), for pickers opened from inside them. */
+  layer?: 'base' | 'top'
 }
+
+/** Open modal drawers; the page stays locked until the last one closes. */
+let scrollLocks = 0
 
 /**
  * Desktop: a 440px panel from the right over a scrim. Phone: the same
@@ -41,7 +46,7 @@ export interface DrawerProps {
  * in and returns on close. On phone, drag the grip down past 90px (or flick
  * it) to close; dragging up meets friction.
  */
-export function Drawer({ open, onClose, label, children, footer, hideEscHint = false, modal: modalProp = true, className }: DrawerProps): React.ReactPortal | null {
+export function Drawer({ open, onClose, label, children, footer, hideEscHint = false, modal: modalProp = true, className, layer = 'base' }: DrawerProps): React.ReactPortal | null {
   const isPhone = useMediaQuery(PHONE_QUERY)
   const modal = modalProp || isPhone
   const [mounted, setMounted] = useState<boolean>(open)
@@ -76,12 +81,14 @@ export function Drawer({ open, onClose, label, children, footer, hideEscHint = f
   useEffect(() => {
     if (!mounted || !modal) return
     const root = document.documentElement
+    scrollLocks += 1
     root.classList.add('bs-scroll-lock')
     const panel = panelRef.current
     const first = panel?.querySelector<HTMLElement>(FOCUSABLE)
     ;(first ?? panel)?.focus({ preventScroll: true })
     return () => {
-      root.classList.remove('bs-scroll-lock')
+      scrollLocks = Math.max(0, scrollLocks - 1)
+      if (scrollLocks === 0) root.classList.remove('bs-scroll-lock')
       returnFocusRef.current?.focus({ preventScroll: true })
     }
   }, [mounted, modal])
@@ -154,13 +161,14 @@ export function Drawer({ open, onClose, label, children, footer, hideEscHint = f
 
   return createPortal(
     <>
-      {modal && <div className="bs-scrim" data-open={shown} onClick={onClose} aria-hidden="true" />}
+      {modal && <div className="bs-scrim" data-open={shown} data-layer={layer === 'top' ? 'top' : undefined} onClick={onClose} aria-hidden="true" />}
       <div
         ref={panelRef}
         className={className ? `bs-drawer ${className}` : 'bs-drawer'}
         role={modal ? 'dialog' : 'complementary'}
         aria-modal={modal ? 'true' : undefined}
         data-modal={modal}
+        data-layer={layer === 'top' ? 'top' : undefined}
         aria-labelledby={labelId}
         tabIndex={-1}
         data-open={shown}

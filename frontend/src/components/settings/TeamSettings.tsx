@@ -7,7 +7,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { tenantOrgService } from '../../services/tenantOrgService'
 import { useOrg } from '../../contexts/OrgContext'
 import { useAuth } from '../../contexts/AuthContext'
-import { Drawer, Key, Signal, Switch, TextInput } from '../bench'
+import { Drawer, Key, Select, Signal, Switch, TextInput } from '../bench'
 import { initials } from '../../services/settingsView'
 import { ago, canAdmin } from './settingsTypes'
 import type { AuthCtx, OrgCtx, OrgInvite, OrgMember, OrgRole } from './settingsTypes'
@@ -22,6 +22,10 @@ interface OrgService {
 const svc = tenantOrgService as unknown as OrgService
 
 const ROLE_LABEL: Record<OrgRole, string> = { owner: 'Owner', admin: 'Admin', member: 'Member' }
+const ROLE_OPTIONS = [
+  { value: 'member', label: 'Member' },
+  { value: 'admin', label: 'Admin' },
+] as const
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export interface TeamSettingsProps {
@@ -83,16 +87,15 @@ export default function TeamSettings({ inviteOpen, onInviteOpen }: TeamSettingsP
               </div>
               <div className="bs-set-mem-role">
                 {editable ? (
-                  <select
-                    className="bs-input bs-set-select bs-set-select--sm"
-                    aria-label={`Role for ${m.userName || m.userEmail || 'member'}`}
+                  <Select
+                    size="sm"
+                    className="bs-set-select bs-set-select--sm"
+                    label={`Role for ${m.userName || m.userEmail || 'member'}`}
                     value={m.role}
                     disabled={busy === m.id}
-                    onChange={(e) => { void run(m.id, () => svc.updateMemberRole(m.id, e.target.value as OrgRole)).then((ok) => { if (ok) void refreshOrg() }) }}
-                  >
-                    <option value="member">Member</option>
-                    <option value="admin">Admin</option>
-                  </select>
+                    onChange={(v) => { void run(m.id, () => svc.updateMemberRole(m.id, v as OrgRole)).then((ok) => { if (ok) void refreshOrg() }) }}
+                    options={ROLE_OPTIONS}
+                  />
                 ) : <span className="bs-mono">{ROLE_LABEL[m.role]}</span>}
               </div>
               <div className="bs-set-mem-act">

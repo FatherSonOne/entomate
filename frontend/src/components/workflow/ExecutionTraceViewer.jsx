@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useEffect } from 'react'
+import { Select } from '../bench'
 import {
   Play, CheckCircle2, XCircle, Clock, ChevronDown, ChevronRight,
   AlertCircle, Loader2, RefreshCw, Download, Filter, Search,
@@ -337,16 +338,19 @@ export default function ExecutionTraceViewer({
             className="w-full pl-8 pr-3 py-1.5 text-sm border border-line-default rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
-        <select
+        <Select
+          size="sm"
+          className="w-auto shrink-0"
+          label="Filter steps"
           value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="px-2 py-1.5 text-sm border border-line-default rounded-md"
-        >
-          <option value="all">All</option>
-          <option value="completed">Completed</option>
-          <option value="failed">Failed</option>
-          <option value="skipped">Skipped</option>
-        </select>
+          onChange={setFilter}
+          options={[
+            { value: 'all', label: 'All' },
+            { value: 'completed', label: 'Completed' },
+            { value: 'failed', label: 'Failed' },
+            { value: 'skipped', label: 'Skipped' },
+          ]}
+        />
       </div>
 
       {/* Execution steps */}
