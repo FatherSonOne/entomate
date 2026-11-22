@@ -41,4 +41,15 @@ describe('CarryForward', () => {
     const { container } = wrap(<CarryForward data={{ ...data, openCount: 0, doneCount: 0, open: [], done: [] }} />)
     expect(container.textContent).toBe('')
   })
+
+  test('a malformed reply renders nothing instead of breaking the page', () => {
+    const bad = { items: [] } as unknown as CarryForwardData
+    const { container } = wrap(<CarryForward data={bad} />)
+    expect(container.textContent).toBe('')
+  })
+
+  test('missing lists are read as empty, counts fall back to the lists', () => {
+    const partial = { openCount: 1, open: undefined, done: undefined } as unknown as CarryForwardData
+    expect(() => wrap(<CarryForward data={partial} />)).not.toThrow()
+  })
 })

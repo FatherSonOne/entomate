@@ -580,8 +580,10 @@ export default function MeetingDetail() {
             <span className="bs-transport-reel bs-dt" aria-hidden="true" />
             <div className="bs-transport-main">
               <div className="bs-transport-head">
-                <span className="bs-lbl">
-                  Tape · <span className="bs-transport-key d" aria-hidden="true" /> decision · <span className="bs-transport-key a" aria-hidden="true" /> action item
+                <span className="bs-lbl bs-transport-legend">
+                  <span className="bs-transport-word">Tape</span>
+                  {decisionMarks.length > 0 && <span><span className="bs-transport-key d" aria-hidden="true" /> {decisionMarks.length === 1 ? 'decision' : 'decisions'}</span>}
+                  {actionMarks.length > 0 && <span><span className="bs-transport-key a" aria-hidden="true" /> {actionMarks.length === 1 ? 'action item' : 'action items'}</span>}
                 </span>
                 <span className="bs-transport-clock" aria-live="polite">
                   <b>{formatClock(tapeAtMs ?? 0)}</b> / {formatClock(lengthMs)}

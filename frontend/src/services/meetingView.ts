@@ -208,3 +208,12 @@ export function plural(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`
 }
 
+
+const DATE_PART = '[A-Z][a-z]{2} \\d{1,2}(?:, \\d{4})?'
+const AUTO_TITLE = new RegExp(`^(?:(?:Google Meet|Zoom|Microsoft Teams|Bot) meeting(?:, ${DATE_PART})?|Recording, ${DATE_PART}|Untitled meeting)$`)
+
+/** A name the app made up (the bot's "Zoom meeting, Nov 20", a recording's "Recording, Nov 22, 2026"), worth a rename. */
+export function isAutoTitle(title: string | null | undefined): boolean {
+  const t = (title || '').trim()
+  return t === '' || AUTO_TITLE.test(t)
+}
