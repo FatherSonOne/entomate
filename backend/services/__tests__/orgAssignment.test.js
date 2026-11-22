@@ -68,11 +68,19 @@ describe('getOrgTeam', () => {
     expect(await getOrgTeam(null, mockDb)).toEqual([]);
   });
 
+  // public.users has full_name and no name/active columns (X1).
   it('falls back to the org users when no team_members rows match', async () => {
     tables.team_members = [];
-    tables.users = [{ id: 'u1', name: 'Priya S.', email: 'priya@a.test', active: true }, { id: 'u9', name: 'Other', active: true }];
+    tables.users = [
+      { id: 'u1', full_name: 'Priya S.', email: 'priya@a.test' },
+      { id: 'u2', full_name: null, email: 'jon@a.test' },
+      { id: 'u9', full_name: 'Other', email: 'x@b.test' }
+    ];
     const team = await getOrgTeam('org-a', mockDb);
-    expect(team).toEqual([{ name: 'Priya S.', email: 'priya@a.test', user_id: 'u1', role: null, skills: [] }]);
+    expect(team).toEqual([
+      { name: 'Priya S.', email: 'priya@a.test', user_id: 'u1', role: null, skills: [] },
+      { name: 'jon@a.test', email: 'jon@a.test', user_id: 'u2', role: null, skills: [] }
+    ]);
   });
 
   it('matches names case-insensitively', () => {

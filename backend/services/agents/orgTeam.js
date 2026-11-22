@@ -39,15 +39,15 @@ async function getOrgTeam(orgId, db) {
         .map(m => ({ name: m.name, email: m.email || null, user_id: m.user_id, role: m.role || null, skills: m.skills || [] }));
     }
 
+    // public.users has full_name, no name/active; org membership is the active check.
     const { data: users } = await db
       .from('users')
-      .select('id, name, email, role')
-      .in('id', userIds)
-      .eq('active', true);
+      .select('id, full_name, email, role')
+      .in('id', userIds);
 
     return (users || [])
-      .filter(u => u.name || u.email)
-      .map(u => ({ name: u.name || u.email, email: u.email || null, user_id: u.id, role: u.role || null, skills: [] }));
+      .filter(u => u.full_name || u.email)
+      .map(u => ({ name: u.full_name || u.email, email: u.email || null, user_id: u.id, role: u.role || null, skills: [] }));
   } catch (error) {
     log.warn('[orgTeam] Could not load org team:', error.message);
     return [];

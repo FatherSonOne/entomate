@@ -242,18 +242,20 @@ router.post('/:id/auto-assign', async (req, res) => {
       return res.json({ success: false, reason: 'No active team members found' });
     }
 
-    // Get active team members with their workload
+    // Get the org's users with their workload. public.users has full_name and
+    // no name/active columns; org membership above is the active check.
     const { data: users, error: usersError } = await supabase
       .from('users')
-      .select('id, name, email, role')
-      .in('id', memberIds)
-      .eq('active', true);
+      .select('id, full_name, email, role')
+      .in('id', memberIds);
 
     if (usersError || !users || users.length === 0) {
       return res.json({ success: false, reason: 'No active team members found' });
     }
 
-    const eligible = users.filter(u => !excludeUsers.includes(u.id));
+    const eligible = users
+      .filter(u => !excludeUsers.includes(u.id))
+      .map(u => ({ ...u, name: u.full_name || u.email }));
     if (eligible.length === 0) {
       return res.json({ success: false, reason: 'All team members excluded' });
     }
