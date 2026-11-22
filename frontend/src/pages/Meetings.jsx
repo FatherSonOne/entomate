@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Search, Loader2, SquareArrowOutUpRight } from 'lucide-react'
+import { Search, Loader2 } from 'lucide-react'
+import { ExternalLinkIcon } from '../components/icons/ExternalLinkIcon'
 import MeetingRecorder from '../components/meetings/MeetingRecorder'
 import MeetingPreview from '../components/meetings/MeetingPreview'
 import { useAuth } from '../contexts/AuthContext'
@@ -341,7 +342,7 @@ export default function Meetings() {
           aria-label={`Open ${m.title || 'this meeting'}`}
           title="Open meeting"
         >
-          <SquareArrowOutUpRight size={15} strokeWidth={2} aria-hidden="true" />
+          <ExternalLinkIcon size={15} aria-hidden="true" />
         </Link>
         <Menu
           label={`More for ${m.title || 'this meeting'}`}

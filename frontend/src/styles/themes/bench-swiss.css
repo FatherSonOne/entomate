@@ -1251,6 +1251,15 @@ html[data-motion="reduce"] :is(.bs-key, .bs-av) { transition-duration: 1ms !impo
 .bs-mtg-rowkeys { display: inline-flex; align-items: center; gap: 6px; }
 .bs-mtg .bs-tbl .bs-mtg-open { height: 28px; width: 30px; padding: 0; justify-content: center; color: var(--bs-ink2); text-decoration: none; }
 .bs-mtg .bs-tbl .bs-mtg-open:hover { color: var(--bs-ink); }
+/* Dash-drawn icons (line-md): fully drawn at rest, the draw replays on hover/focus of the key. */
+.bs-draw-icon path { stroke-dashoffset: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .bs-key:hover .bs-draw-icon path, .bs-key:focus-visible .bs-draw-icon path { animation: bs-draw 0.2s ease-out both; }
+  .bs-key:hover .bs-draw-icon path:nth-child(1), .bs-key:focus-visible .bs-draw-icon path:nth-child(1) { animation-duration: 0.5s; }
+  .bs-key:hover .bs-draw-icon path:nth-child(2), .bs-key:focus-visible .bs-draw-icon path:nth-child(2) { animation-delay: 0.5s; }
+  .bs-key:hover .bs-draw-icon path:nth-child(3), .bs-key:focus-visible .bs-draw-icon path:nth-child(3) { animation-delay: 0.7s; }
+}
+@keyframes bs-draw { from { stroke-dashoffset: var(--dash); } to { stroke-dashoffset: 0; } }
 @media (max-width: 767.98px) { .bs-mtg-rowkeys { flex-direction: column; gap: 4px; } .bs-mtg .bs-tbl td.bs-mtg-more-col { padding-left: 10px; } }
 .bs-mtg .bs-tbl td { vertical-align: top; }
 .bs-mtg .bs-tbl td.bs-mtg-status, .bs-mtg .bs-tbl td.bs-num, .bs-mtg .bs-tbl td.bs-mtg-acts { padding-top: 14px; }
