@@ -272,7 +272,7 @@ export function TranscriptPanel({ meetingId, segments, onRenamed, focusAtMs, pla
                 onClick={() => onPlayFrom(line.atMs)}
                 aria-label={`Play from ${formatClock(line.atMs)}`}
                 title="Play from here"
-                className="-mx-1 self-start rounded px-1 pt-px text-left text-xs tabular-nums text-content-secondary underline decoration-line underline-offset-2 hover:text-content-primary hover:decoration-accent-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary"
+                className="self-start rounded pt-px text-left text-xs tabular-nums text-content-secondary underline decoration-line underline-offset-2 hover:text-content-primary hover:decoration-accent-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary"
               >
                 {formatClock(line.atMs)}
               </button>
