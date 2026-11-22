@@ -121,7 +121,7 @@ const db = () => {
   return supabaseAdmin;
 };
 
-const PLAN_LABELS = { solo: 'Solo', team: 'Team' };
+const PLAN_LABELS = { free: 'Free', solo: 'Solo', team: 'Team' };
 
 /** The message shown when an org has no bot hours left. */
 function botHoursMessage(hours) {
@@ -130,6 +130,11 @@ function botHoursMessage(hours) {
   const resets = new Date(hours.resets_at).toLocaleDateString('en-US', {
     month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC'
   });
+  if (hours.plan === 'free') {
+    return `No bot hours left. Your Free plan includes ${Number(hours.included_hours)} bot hours a month, ` +
+      `and this workspace has used them all. ` +
+      `Upgrade to Solo or Team, or wait until ${resets}, when the hours reset.`;
+  }
   return `No bot hours left. Your ${plan} plan includes ${Number(hours.included_hours)}${shared} bot hours a month, ` +
     `and this workspace has used them all, with no extra hours left. ` +
     `Add a 10-hour pack ($10), or wait until ${resets}, when the hours reset.`;

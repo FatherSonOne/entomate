@@ -610,6 +610,16 @@ describe('launchBotSession — bot-hour limit', () => {
     expect(err.message).toMatch(/^No bot hours left\. Your Team plan includes 75 shared bot hours a month/);
   });
 
+  test('Free message points to Solo or Team, not to packs', async () => {
+    mockSupabase.rpc.mockResolvedValue({ data: hours({ plan: 'free', included_hours: 2, used_hours: 2 }), error: null });
+    const err = await launch().catch((e) => e);
+    expect(err.code).toBe('bot_hours_exhausted');
+    expect(err.message).toBe(
+      'No bot hours left. Your Free plan includes 2 bot hours a month, and this workspace has used them all. ' +
+      'Upgrade to Solo or Team, or wait until December 1, 2026, when the hours reset.'
+    );
+  });
+
   test('hours left (plan or pack): launches', async () => {
     mockSupabase.rpc.mockResolvedValue({ data: hours({ used_hours: 20, pack_hours: 0.5, remaining_hours: 0.5 }), error: null });
     const res = await launch();
