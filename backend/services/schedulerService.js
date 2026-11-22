@@ -182,10 +182,9 @@ class SchedulerService {
       weekAgo.setDate(weekAgo.getDate() - 7);
       const weekAgoISO = weekAgo.toISOString();
 
-      const [meetingsRes, actionItemsRes, goalsRes] = await Promise.all([
+      const [meetingsRes, actionItemsRes] = await Promise.all([
         supabase.from('meetings').select('*').gte('created_at', weekAgoISO),
-        supabase.from('action_items').select('*'),
-        supabase.from('goals').select('*').eq('status', 'active')
+        supabase.from('action_items').select('*')
       ]);
 
       const period = `${weekAgo.toLocaleDateString()} - ${new Date().toLocaleDateString()}`;
@@ -204,7 +203,6 @@ class SchedulerService {
           await emailService.sendWeeklySummary(email, {
             meetings: meetingsRes.data || [],
             actionItems: actionItemsRes.data || [],
-            goals: goalsRes.data || [],
             period
           });
           log.info(`Weekly summary sent to ${email}`);
@@ -239,7 +237,7 @@ class SchedulerService {
         .from('action_items')
         .select('*')
         .lt('due_date', now)
-        .not('status', 'in', '("done","complete")')
+        .not('status', 'in', '("done","complete","completed","cancelled")')
         .order('due_date', { ascending: true });
 
       if (!overdueItems || overdueItems.length === 0) {

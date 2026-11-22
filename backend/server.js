@@ -261,8 +261,6 @@ app.use('/api/agents', require('./routes/agents'));
 // Agent Task Intelligence (ETA, overdue, auto-assign)
 app.use('/api/agent-tasks', require('./routes/agentTasks'));
 
-// Goals & OKRs
-app.use('/api/goals', require('./routes/goals'));
 
 // Analytics
 app.use('/api/analytics', require('./routes/analytics'));

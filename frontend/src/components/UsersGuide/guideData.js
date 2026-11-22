@@ -1,7 +1,7 @@
 // ─── Entomate User Guide Data ─────────────────────────────────────────────
 // Version tracking — update these when guide content changes
 
-export const guideVersion = '1.5.0'
+export const guideVersion = '2026-11-22'
 export const guideUpdated = 'April 12, 2026'
 
 // ─── Version key for localStorage new-feature detection ───────────────────
@@ -12,7 +12,7 @@ export const GUIDE_VERSION_KEY = 'entomate_guide_version'
 export const CATEGORIES = [
   { label: 'Start Here',         ids: ['introduction', 'getting-started', 'organizations', 'billing', 'dashboard'] },
   { label: 'Meetings & Time',    ids: ['meetings', 'meeting-details', 'calendar'] },
-  { label: 'Work Management',    ids: ['tasks', 'projects', 'goals'] },
+  { label: 'Work Management',    ids: ['tasks', 'projects'] },
   { label: 'Automation & AI',    ids: ['workflows', 'automations', 'agents', 'ento-assistant'] },
   { label: 'Intelligence',       ids: ['search', 'analytics', 'reports'] },
   { label: 'Ecosystem',           ids: ['ecosystem', 'meeting-intelligence'] },
@@ -43,7 +43,6 @@ export const guideSections = [
           'Action Items \u2014 Tasks automatically extracted from meetings, with AI-suggested assignments and deadlines.',
           'Workflows \u2014 Visual, node-based automations that connect meeting events to actions.',
           'Agents \u2014 AI bots that run continuously, handling assignment, priority, and follow-up detection.',
-          'Goals \u2014 OKR-style goal hierarchies with key results and progress tracking.',
         ],
       },
       {
@@ -80,12 +79,13 @@ export const guideSections = [
       {
         id: 'gs-navigation',
         title: 'Navigating the App',
-        description: 'The sidebar is organized into four groups.',
+        description: 'The sidebar has six numbered modules, then Tools.',
         steps: [
-          'Intelligence \u2014 Today, Meetings, Calendar, Search.',
-          'Work \u2014 Projects, Project Board, Tasks, Goals.',
-          'Automation \u2014 Workflows, Automations, AI Agents.',
-          'Output \u2014 Analytics, Reports.',
+          'Meetings \u2014 01 Today, 02 Meetings.',
+          'Work \u2014 03 Tasks, 04 Projects (switch Projects to Board view for the kanban).',
+          'Follow-through \u2014 05 Automations, 06 Insights.',
+          'Tools \u2014 Search, Workflows, Agents, Reports, Ask Entomate, User Guide. Admins send bots from Meetings or Today.',
+          'Your calendar lives on Today: the schedule, the countdown to the next meeting, and Connect calendar.',
           'Settings and your user profile are at the bottom of the sidebar.',
         ],
         note: 'Use keyboard shortcut Ctrl+K to open the Command Palette for quick navigation.',
@@ -593,7 +593,7 @@ export const guideSections = [
     id: 'projects',
     title: 'Projects',
     icon: 'folder',
-    summary: 'Organize tasks, meetings, and goals into project workspaces.',
+    summary: 'Organize tasks and meetings into project workspaces.',
     steps: [
       'Navigate to Projects from the sidebar.',
       'Follow the 3-step wizard: Create \u2192 Organize \u2192 Track.',
@@ -626,56 +626,6 @@ export const guideSections = [
     tips: [
       'Use the search bar on the Projects page to filter by name.',
       'The Project Board (Kanban) view offers a drag-and-drop alternative.',
-    ],
-  },
-
-  {
-    id: 'goals',
-    title: 'Goals & OKRs',
-    icon: 'target',
-    summary: 'Create and track Objectives and Key Results at Company, Team, and Individual levels.',
-    steps: [
-      'Navigate to Goals from the sidebar.',
-      'Click New Goal and fill in the title, description, type, quarter, and optional parent goal.',
-      'View goals in Hierarchy (Company \u2192 Team \u2192 Individual) or List mode.',
-      'Click any goal to open the Detail Panel on the right.',
-    ],
-    subsections: [
-      {
-        id: 'goals-kr',
-        title: 'Key Results',
-        description: 'Measurable outcomes that define goal progress.',
-        steps: [
-          'Each goal can have multiple key results.',
-          'Update progress by entering new values in the Detail Panel.',
-          'Add new key results using the form at the bottom of the panel.',
-          'Progress percentage is calculated automatically from key results.',
-        ],
-      },
-      {
-        id: 'goals-hierarchy',
-        title: 'Goal Hierarchy',
-        steps: [
-          'Company Goals sit at the top level.',
-          'Team Goals roll up to Company Goals.',
-          'Individual Goals roll up to Team Goals.',
-          'Expand any goal to see its children in the hierarchy view.',
-        ],
-      },
-      {
-        id: 'goals-stats',
-        title: 'Stats Overview',
-        steps: [
-          'Total Goals \u2014 all goals across all levels.',
-          'Average Progress \u2014 mean completion percentage.',
-          'On Track \u2014 goals progressing as expected.',
-          'At Risk \u2014 goals behind schedule.',
-        ],
-      },
-    ],
-    tips: [
-      'Link goals to a parent to build cascading OKR trees.',
-      'Switch between Hierarchy and List view using the toggle at the top.',
     ],
   },
 
@@ -994,9 +944,9 @@ export const guideSections = [
     summary: 'Generate PDF reports and export data as CSV.',
     steps: [
       'Navigate to Reports from the sidebar.',
-      'Select a report type: Meeting Recap, Goals & OKRs, or Weekly Summary.',
+      'Select a report type: Meeting Recap, Project Report, or Weekly Summary.',
       'Click Download to generate the PDF.',
-      'Use the CSV Export section to download raw data for meetings, action items, or goals.',
+      'Use the CSV Export section to download raw data for meetings, action items, or tasks.',
     ],
     subsections: [
       {
@@ -1004,7 +954,6 @@ export const guideSections = [
         title: 'PDF Reports',
         steps: [
           'Meeting Recap \u2014 Select a meeting from the dropdown and download a formatted PDF.',
-          'Goals & OKRs \u2014 Select a quarter and download a goals progress PDF.',
           'Weekly Summary \u2014 Download a 7-day overview as a PDF.',
         ],
       },
@@ -1015,7 +964,6 @@ export const guideSections = [
         steps: [
           'Meetings \u2014 Export all meeting data.',
           'Action Items \u2014 Filter by status (All, Open, Completed, Missed) then export.',
-          'Goals \u2014 Select a quarter, then export goals and key results.',
           'Tasks \u2014 Export all tasks with status, priority, tags, and assignee info.',
           'Automations \u2014 Export automation execution logs with run history and timing.',
         ],
@@ -1023,7 +971,6 @@ export const guideSections = [
     ],
     tips: [
       'Use CSV exports to bring data into spreadsheets or BI tools for custom analysis.',
-      'Quick Stats cards at the top show total meetings, goals, completed goals, and avg progress.',
     ],
   },
 
@@ -1370,10 +1317,10 @@ export const guideSections = [
       {
         id: 'faq-no-record',
         title: 'Can I use Entomate without recording meetings?',
-        scenario: 'You want to use Tasks, Projects, Goals, Workflows, and Agents independently.',
+        scenario: 'You want to use Tasks, Projects, Workflows, and Agents independently.',
         steps: [
           'Yes \u2014 all features work independently of meeting recordings.',
-          'Create tasks, projects, and goals directly from their respective pages.',
+          'Create tasks and projects directly from their pages.',
           'Workflows and automations can be triggered by events other than meetings.',
         ],
       },

@@ -1,12 +1,12 @@
 import {
-  FileText, Download, Calendar, Target, Clock, Briefcase, Mail, Loader2, Eye
+  FileText, Download, Calendar, Clock, Briefcase, Mail, Loader2, Eye
 } from 'lucide-react'
 import { VCButton, VCIconBox } from '../vc'
 
 export default function PDFReportsSection({
   meetings, projects, generating, selectedMeeting, setSelectedMeeting,
-  selectedQuarter, setSelectedQuarter, selectedProject, setSelectedProject,
-  sendingEmail, onDownload, onPreview, onSendRecap, getQuarterOptions
+  selectedProject, setSelectedProject,
+  sendingEmail, onDownload, onPreview, onSendRecap
 }) {
   return (
     <div className="vc p-6">
@@ -82,56 +82,6 @@ export default function PDFReportsSection({
               )}
               Email Recap
             </VCButton>
-          </div>
-        </div>
-
-        {/* Goals Report */}
-        <div className="vc p-4 transition-colors">
-          <div className="flex items-start gap-3 mb-3">
-            <VCIconBox color="amber" size="sm">
-              <Target className="h-5 w-5" />
-            </VCIconBox>
-            <div>
-              <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>Goals &amp; OKRs</h3>
-              <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
-                Progress report for all goals
-              </p>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <select
-              value={selectedQuarter}
-              onChange={(e) => setSelectedQuarter(e.target.value)}
-              className="input text-sm"
-            >
-              {getQuarterOptions().map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-            <div className="flex gap-2">
-              <VCButton
-                variant="primary"
-                className="flex-1 text-sm"
-                onClick={() => onDownload('goals-pdf', { quarter: selectedQuarter })}
-                disabled={generating === 'goals-pdf'}
-              >
-                {generating === 'goals-pdf' ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <Download className="h-4 w-4 mr-2" />
-                )}
-                PDF
-              </VCButton>
-              <VCButton
-                variant="ghost"
-                className="text-sm"
-                onClick={() => onPreview('goals-pdf', { quarter: selectedQuarter })}
-                disabled={generating === 'goals-pdf'}
-                aria-label="Preview goals PDF"
-              >
-                <Eye className="h-4 w-4" />
-              </VCButton>
-            </div>
           </div>
         </div>
 

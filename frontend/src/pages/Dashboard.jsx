@@ -111,6 +111,17 @@ export default function Today() {
   const live = useMemo(() => liveMeeting(meetings), [meetings])
   const next = useMemo(() => nextEvent(events), [events])
 
+  // Google sign-in for the calendar, back to Today afterwards (the Calendar page is off the sidebar).
+  const connectCalendar = useCallback(async () => {
+    try {
+      const res = await calendarApi.getAuthUrl('/dashboard')
+      if (res?.authUrl) window.location.href = res.authUrl
+      else toast.error('Calendar', 'Google Calendar is not set up on the server.')
+    } catch {
+      toast.error('Calendar', 'Could not start Google sign-in. Try again in a moment.')
+    }
+  }, [toast])
+
   // Before the next meeting: what was promised last time these people (or this series) met.
   const [carryForward, setCarryForward] = useState(null)
   const nextKey = next ? `${next.id}|${next.at.getTime()}` : ''
@@ -421,12 +432,12 @@ export default function Today() {
         </Cell>
 
         <Cell span={4} rule>
-          <Section number="04" title="Schedule" aside={calendarOn ? 'Google Calendar' : 'Recorded today'} />
+          <Section number="04" title="Schedule" aside={calendarOn ? <Link to="/calendar" className="bs-today-link">Google Calendar</Link> : 'Recorded today'} />
           <ScheduleRows schedule={schedule} now={now} />
           {calendarOn === false && (
             <div className="bs-today-cal">
               <span className="bs-today-empty">Connect a calendar to see what’s coming up and count down to it.</span>
-              <Key size="sm" onClick={() => navigate('/settings', { state: { section: 'integrations' } })}>Connect calendar</Key>
+              <Key size="sm" onClick={connectCalendar}>Connect calendar</Key>
             </div>
           )}
         </Cell>

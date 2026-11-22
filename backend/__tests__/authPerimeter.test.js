@@ -31,7 +31,6 @@ function mount(routerPath, prefix, { user } = {}) {
 }
 
 const OPEN_BEFORE = [
-  ['../routes/goals', '/api/goals', [['get', '/'], ['delete', '/00000000-0000-0000-0000-000000000000']]],
   ['../routes/intelligence', '/api/intelligence', [['get', '/today'], ['get', '/dashboard']]],
   ['../routes/assistant', '/api/assistant', [['post', '/query']]],
   ['../routes/crossAppSearch', '/api/cross-search', [['get', '/?q=ab']]],

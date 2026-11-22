@@ -72,15 +72,6 @@ const sectionLoaders = {
     return { tasks: data || [] };
   },
 
-  async goals({ orgIds }) {
-    try {
-      const { data } = await supabase.from('goals')
-        .select('id, title, description, status, progress, target_value, current_value, due_date')
-        .in('org_id', orgIds)
-        .order('due_date', { ascending: true }).limit(15);
-      return { goals: data || [] };
-    } catch { return { goals: [] }; }
-  },
 
   async workflows({ orgIds }) {
     const { data } = await supabase.from('workflows')
@@ -209,13 +200,6 @@ function buildContextBlocks(data) {
     }));
     blocks.push(`[Calendar Events (${slim.length})]\n${JSON.stringify(slim, null, 1)}`);
   }
-  if (data.goals?.length) {
-    const slim = data.goals.slice(0, 15).map(g => ({
-      id: g.id, title: g.title, status: g.status,
-      progress: g.progress, target: g.target_value, current: g.current_value,
-    }));
-    blocks.push(`[Goals (${slim.length})]\n${JSON.stringify(slim, null, 1)}`);
-  }
   if (data.workflows?.length) {
     const slim = data.workflows.slice(0, 10).map(w => ({
       id: w.id, name: w.name, status: w.status, enabled: w.enabled, lastRun: w.last_run_at,
@@ -250,7 +234,6 @@ const SECTION_LABELS = {
   projects: 'Projects',
   'project-dashboard': 'Project Board',
   tasks: 'Tasks',
-  goals: 'Goals',
   workflows: 'Workflows',
   automations: 'Automations',
   agents: 'AI Agents',
@@ -397,11 +380,6 @@ function generateFollowUps(section, question) {
       "Which project needs the most attention?",
       "Compare project budgets",
       "Show project timeline status",
-    ],
-    goals: [
-      "Which goals are at risk?",
-      "Update me on key results",
-      "How can I accelerate progress?",
     ],
     agents: [
       "What did agents do today?",

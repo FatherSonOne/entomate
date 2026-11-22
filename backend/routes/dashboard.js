@@ -4,7 +4,7 @@
  */
 
 const express = require('express');
-const { supabase, supabaseAdmin } = require('../config/supabase');
+const { supabase } = require('../config/supabase');
 const { authenticate } = require('../middleware/auth');
 const log = require('../utils/log');
 const { aggregateTeamWorkload } = require('../utils/teamWorkload');
@@ -15,137 +15,6 @@ const router = express.Router();
 // Require authentication for all dashboard routes
 router.use(authenticate);
 router.use(attachOrgIds); // org-owned tables below are limited to req.orgIds (audit finding 3)
-
-/**
- * GET /api/dashboard/projects
- * Get all projects (meetings) with statistics
- */
-router.get('/projects', async (req, res) => {
-  try {
-    const { status = 'all', sort = 'updated', limit = 50, search } = req.query;
-
-    log.info('Fetching dashboard projects...');
-
-    if (!supabase) {
-      return res.status(503).json({ error: 'Database not configured' });
-    }
-
-    // Query the project_statistics view
-    let query = supabase
-      .from('project_statistics')
-      .select('*');
-
-    // Apply search filter
-    if (search) {
-      query = query.ilike('title', `%${search}%`);
-    }
-
-    // Apply sorting
-    const sortMap = {
-      'name': { column: 'title', ascending: true },
-      'progress': { column: 'progress_percent', ascending: false },
-      'updated': { column: 'updated_at', ascending: false },
-      'created': { column: 'created_at', ascending: false }
-    };
-    const sortConfig = sortMap[sort] || sortMap['updated'];
-    query = query.order(sortConfig.column, { ascending: sortConfig.ascending });
-
-    // Limit results
-    query = query.limit(parseInt(limit));
-
-    const { data: projects, error } = await query;
-
-    if (error) throw error;
-
-    log.info(`Found ${projects?.length || 0} projects`);
-
-    res.json({
-      projects: projects || [],
-      count: projects?.length || 0
-    });
-
-  } catch (error) {
-    log.error('Error fetching projects:', { error: error.message || error });
-    res.status(500).json({
-      error: 'Failed to fetch projects',
-      details: error.message
-    });
-  }
-});
-
-/**
- * GET /api/dashboard/projects/:id
- * Get project details with action items and team
- */
-router.get('/projects/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    if (!supabase) {
-      return res.status(503).json({ error: 'Database not configured' });
-    }
-
-    // Get project stats from view
-    const { data: project, error: projectError } = await supabase
-      .from('project_statistics')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (projectError && projectError.code !== 'PGRST116') {
-      throw projectError;
-    }
-
-    if (!project) {
-      return res.status(404).json({ error: 'Project not found' });
-    }
-
-    // Get action items for this project
-    const { data: actionItems } = await supabase
-      .from('action_items')
-      .select('*')
-      .in('org_id', req.orgIds)
-      .eq('meeting_id', id)
-      .order('due_date', { ascending: true });
-
-    // Get unique team members
-    const teamMap = new Map();
-    (actionItems || []).forEach(item => {
-      if (item.assigned_to_email) {
-        teamMap.set(item.assigned_to_email, {
-          name: item.assigned_to_name,
-          email: item.assigned_to_email
-        });
-      }
-    });
-    const team = Array.from(teamMap.values());
-
-    // Get meeting details
-    const { data: meeting } = await supabase
-      .from('meetings')
-      .select('summary, key_points, decisions')
-      .in('org_id', req.orgIds)
-      .eq('id', id)
-      .single();
-
-    res.json({
-      ...project,
-      summary: meeting?.summary,
-      keyPoints: meeting?.key_points,
-      decisions: meeting?.decisions,
-      actionItems: actionItems || [],
-      team,
-      timeline: actionItems || []
-    });
-
-  } catch (error) {
-    log.error('Error fetching project detail:', { error: error.message || error });
-    res.status(500).json({
-      error: 'Failed to fetch project',
-      details: error.message
-    });
-  }
-});
 
 /**
  * GET /api/dashboard/action-items
@@ -290,51 +159,40 @@ router.get('/team-workload', async (req, res) => {
       return res.status(503).json({ error: 'Database not configured' });
     }
 
-    // Try view first, fall back to direct query
-    let workload = [];
-    const { data: viewData, error: viewError } = await supabase
-      .from('team_workload')
-      .select('*')
-      .order('total_assigned', { ascending: false });
+    // Computed from action_items, limited to the caller's orgs. (The team_workload
+    // view never existed in production and would not have been org-scoped.)
+    const { data: actionItems, error: itemsError } = await supabase
+      .from('action_items')
+      .select('assigned_to_name, assigned_to_email, status, priority')
+      .in('org_id', req.orgIds);
+    if (itemsError) throw itemsError;
 
-    if (viewError && viewError.message.includes('schema cache')) {
-      // View doesn't exist, calculate from action_items directly
-      const { data: actionItems } = await supabase
-        .from('action_items')
-        .select('assigned_to_name, assigned_to_email, status, priority')
-        .in('org_id', req.orgIds);
+    const DONE = new Set(['done', 'complete', 'completed', 'cancelled']);
+    const workloadMap = new Map();
+    (actionItems || []).forEach(item => {
+      if (!item.assigned_to_name) return;
+      if (!workloadMap.has(item.assigned_to_name)) {
+        workloadMap.set(item.assigned_to_name, {
+          team_member: item.assigned_to_name,
+          email: item.assigned_to_email,
+          total_assigned: 0,
+          pending_items: 0,
+          in_progress_items: 0,
+          completed_items: 0,
+          high_priority_count: 0
+        });
+      }
+      const member = workloadMap.get(item.assigned_to_name);
+      const done = DONE.has(item.status);
+      member.total_assigned++;
+      if (item.status === 'open' || item.status === 'pending') member.pending_items++;
+      if (item.status === 'in_progress') member.in_progress_items++;
+      if (done) member.completed_items++;
+      if (item.priority === 'high' && !done) member.high_priority_count++;
+    });
 
-      // Group by assignee
-      const workloadMap = new Map();
-      (actionItems || []).forEach(item => {
-        if (!item.assigned_to_name) return;
-
-        if (!workloadMap.has(item.assigned_to_name)) {
-          workloadMap.set(item.assigned_to_name, {
-            team_member: item.assigned_to_name,
-            email: item.assigned_to_email,
-            total_assigned: 0,
-            pending_items: 0,
-            in_progress_items: 0,
-            completed_items: 0,
-            high_priority_count: 0
-          });
-        }
-
-        const member = workloadMap.get(item.assigned_to_name);
-        member.total_assigned++;
-
-        if (item.status === 'open' || item.status === 'pending') member.pending_items++;
-        if (item.status === 'in_progress') member.in_progress_items++;
-        if (item.status === 'done' || item.status === 'complete') member.completed_items++;
-        if (item.priority === 'high' && item.status !== 'done') member.high_priority_count++;
-      });
-
-      workload = Array.from(workloadMap.values())
-        .sort((a, b) => b.total_assigned - a.total_assigned);
-    } else if (!viewError) {
-      workload = viewData || [];
-    }
+    const workload = Array.from(workloadMap.values())
+      .sort((a, b) => b.total_assigned - a.total_assigned);
 
     res.json({
       workload,
@@ -362,41 +220,23 @@ router.get('/overdue', async (req, res) => {
       return res.status(503).json({ error: 'Database not configured' });
     }
 
-    // Try view first, fall back to direct query
-    let overdue = [];
-    const { data: viewData, error: viewError } = await supabase
-      .from('overdue_items')
-      .select('*')
+    // Straight from action_items, limited to the caller's orgs (the overdue_items
+    // view never existed in production).
+    const now = new Date().toISOString();
+    const { data: overdueItems, error: overdueError } = await supabase
+      .from('action_items')
+      .select('id, task_description, assigned_to_name, assigned_to_email, due_date, priority, status, meeting_id')
+      .in('org_id', req.orgIds)
+      .lt('due_date', now)
+      .not('status', 'in', '("done","complete","completed","cancelled")')
+      .order('due_date', { ascending: true })
       .limit(50);
+    if (overdueError) throw overdueError;
 
-    if (viewError && viewError.message.includes('schema cache')) {
-      // View doesn't exist, query directly from action_items
-      const now = new Date().toISOString();
-      const { data: overdueItems } = await supabase
-        .from('action_items')
-        .select(`
-          id,
-          task_description,
-          assigned_to_name,
-          assigned_to_email,
-          due_date,
-          priority,
-          status,
-          meeting_id
-        `)
-        .in('org_id', req.orgIds)
-        .lt('due_date', now)
-        .not('status', 'in', '("done","complete")')
-        .order('due_date', { ascending: true })
-        .limit(50);
-
-      overdue = (overdueItems || []).map(item => ({
-        ...item,
-        days_overdue: Math.floor((new Date() - new Date(item.due_date)) / (1000 * 60 * 60 * 24))
-      }));
-    } else if (!viewError) {
-      overdue = viewData || [];
-    }
+    const overdue = (overdueItems || []).map(item => ({
+      ...item,
+      days_overdue: Math.floor((new Date() - new Date(item.due_date)) / (1000 * 60 * 60 * 24))
+    }));
 
     res.json({
       overdue,
@@ -408,91 +248,6 @@ router.get('/overdue', async (req, res) => {
     log.error('Error fetching overdue items:', { error: error.message || error });
     res.status(500).json({
       error: 'Failed to fetch overdue items',
-      details: error.message
-    });
-  }
-});
-
-/**
- * GET /api/dashboard/insights
- * Get dashboard insights and trends for charts
- */
-router.get('/insights', async (req, res) => {
-  try {
-    log.info('Generating insights...');
-
-    if (!supabase) {
-      return res.status(503).json({ error: 'Database not configured' });
-    }
-
-    // Get trends data
-    const { data: trends } = await supabase
-      .from('action_item_trends')
-      .select('*')
-      .order('date', { ascending: false })
-      .limit(30);
-
-    // Get overall project stats
-    const { data: stats } = await supabase
-      .from('project_statistics')
-      .select('*');
-
-    // Calculate aggregate metrics
-    const totalProjects = stats?.length || 0;
-    const avgProgress = stats?.length > 0
-      ? Math.round(stats.reduce((sum, p) => sum + (p.progress_percent || 0), 0) / stats.length)
-      : 0;
-    const totalItems = stats?.reduce((sum, p) => sum + (p.total_items || 0), 0) || 0;
-    const completedItems = stats?.reduce((sum, p) => sum + (p.complete_items || 0), 0) || 0;
-    const overdueItems = stats?.reduce((sum, p) => sum + (p.overdue_items || 0), 0) || 0;
-    const overallCompletion = totalItems > 0
-      ? Math.round((completedItems / totalItems) * 100)
-      : 0;
-
-    // Sentiment breakdown
-    const sentimentCounts = {
-      Positive: stats?.filter(p => p.sentiment_label === 'Positive').length || 0,
-      Neutral: stats?.filter(p => p.sentiment_label === 'Neutral').length || 0,
-      Negative: stats?.filter(p => p.sentiment_label === 'Negative').length || 0
-    };
-
-    // Priority breakdown from action items
-    const { data: actionItems } = await supabase
-      .from('action_items')
-      .select('priority, status')
-      .in('org_id', req.orgIds);
-
-    const priorityCounts = {
-      high: actionItems?.filter(i => i.priority === 'high').length || 0,
-      medium: actionItems?.filter(i => i.priority === 'medium').length || 0,
-      low: actionItems?.filter(i => i.priority === 'low').length || 0
-    };
-
-    const statusCounts = {
-      open: actionItems?.filter(i => i.status === 'open').length || 0,
-      in_progress: actionItems?.filter(i => i.status === 'in_progress').length || 0,
-      done: actionItems?.filter(i => i.status === 'done').length || 0
-    };
-
-    res.json({
-      metrics: {
-        totalProjects,
-        avgProgress,
-        totalItems,
-        completedItems,
-        overdueItems,
-        overallCompletion
-      },
-      sentimentCounts,
-      priorityCounts,
-      statusCounts,
-      trends: trends || []
-    });
-
-  } catch (error) {
-    log.error('Error generating insights:', { error: error.message || error });
-    res.status(500).json({
-      error: 'Failed to generate insights',
       details: error.message
     });
   }
@@ -678,41 +433,6 @@ router.get('/summary', async (req, res) => {
   } catch (error) {
     log.error('Error fetching summary:', { error: error.message || error });
     res.status(500).json({ error: error.message });
-  }
-});
-
-/**
- * POST /api/dashboard/refresh-views
- * Refresh materialized dashboard views (project_statistics, team_workload)
- */
-router.post('/refresh-views', async (req, res) => {
-  try {
-    log.info('Refreshing materialized dashboard views...');
-
-    const { error } = await supabaseAdmin.rpc('refresh_dashboard_views');
-
-    if (error) {
-      // If materialized views don't exist yet, the function won't exist either
-      if (error.message?.includes('does not exist')) {
-        return res.json({
-          success: true,
-          message: 'Materialized views not yet created — using regular views'
-        });
-      }
-      throw error;
-    }
-
-    log.info('Dashboard views refreshed successfully');
-    res.json({
-      success: true,
-      message: 'Dashboard views refreshed'
-    });
-  } catch (error) {
-    log.error('Error refreshing views:', { error: error.message || error });
-    res.status(500).json({
-      error: 'Failed to refresh views',
-      details: error.message
-    });
   }
 });
 

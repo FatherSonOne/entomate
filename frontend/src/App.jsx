@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import ProtectedRoute from './components/ProtectedRoute'
 import OrgSetupGate from './components/teams/OrgSetupGate'
 import Layout from './components/Layout'
@@ -14,7 +14,6 @@ const ProjectDetail = React.lazy(() => import('./pages/ProjectDetail'))
 const Tasks = React.lazy(() => import('./pages/Tasks'))
 const Automations = React.lazy(() => import('./pages/Automations'))
 const Agents = React.lazy(() => import('./pages/Agents'))
-const Goals = React.lazy(() => import('./pages/Goals'))
 const Analytics = React.lazy(() => import('./pages/Analytics'))
 const Search = React.lazy(() => import('./pages/Search'))
 const Settings = React.lazy(() => import('./pages/Settings'))
@@ -56,12 +55,12 @@ export default function App() {
             <Route path="projects" element={<Projects />} />
             <Route path="projects/:id" element={<ProjectDetail />} />
             <Route path="projects/:id/dashboard" element={<ProjectDashboard />} />
-            <Route path="project-dashboard" element={<ProjectDashboard />} />
+            <Route path="project-dashboard" element={<Navigate to="/projects?view=board" replace />} />
             <Route path="tasks" element={<Tasks />} />
             <Route path="automations" element={<Automations />} />
             <Route path="workflows" element={<Workflows />} />
             <Route path="agents" element={<Agents />} />
-            <Route path="goals" element={<Goals />} />
+            <Route path="goals" element={<Navigate to="/projects" replace />} />
             <Route path="analytics" element={<Analytics />} />
             <Route path="reports" element={<Reports />} />
             <Route path="calendar" element={<Calendar />} />

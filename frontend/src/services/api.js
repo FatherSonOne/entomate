@@ -560,12 +560,6 @@ export const dashboardApi = {
   // Get dashboard summary
   getSummary: () => api.get('/dashboard/summary'),
 
-  // Get projects with stats
-  getProjects: (params = {}) => api.get('/dashboard/projects', { params }),
-
-  // Get single project dashboard
-  getProject: (id) => api.get(`/dashboard/projects/${id}`),
-
   // Get action items
   getActionItems: (params = {}) => api.get('/dashboard/action-items', { params }),
 
@@ -577,9 +571,6 @@ export const dashboardApi = {
 
   // Get overdue items
   getOverdue: () => api.get('/dashboard/overdue'),
-
-  // Get AI insights
-  getInsights: () => api.get('/dashboard/insights'),
 
   // Get project-based insights (from projects + tasks tables)
   getProjectInsights: () => api.get('/dashboard/project-insights')
@@ -596,9 +587,6 @@ export const reportsApi = {
   downloadMeetingPDF: (meetingId) =>
     downloadFile(`/reports/meeting/${meetingId}/pdf`, 'meeting-recap.pdf'),
 
-  // Download goals report PDF
-  downloadGoalsPDF: (quarter) =>
-    downloadFile('/reports/goals/pdf', 'goals-report.pdf', quarter ? { quarter } : {}),
 
   // Download project report PDF
   downloadProjectPDF: (projectId) =>
@@ -616,9 +604,6 @@ export const reportsApi = {
   downloadActionItemsCSV: (params = {}) =>
     downloadFile('/reports/action-items/csv', 'action-items.csv', params),
 
-  // Download goals CSV
-  downloadGoalsCSV: (params = {}) =>
-    downloadFile('/reports/goals/csv', 'goals-export.csv', params),
 
   // Download tasks CSV
   downloadTasksCSV: (params = {}) =>
@@ -666,9 +651,6 @@ export const calendarApi = {
   syncAllActionItems: (calendarId, meetingId) =>
     api.post('/calendar/sync/action-items', { calendarId, meetingId }),
 
-  // Sync goal to calendar
-  syncGoal: (id, calendarId) =>
-    api.post(`/calendar/sync/goal/${id}`, { calendarId }),
 
   // Sync meeting to calendar
   syncMeeting: (id, calendarId) =>

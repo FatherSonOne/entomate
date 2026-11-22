@@ -11,7 +11,6 @@ const ORG_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const USER_A = '11111111-1111-4111-8111-111111111111';
 const TASK_A = '0000000a-0000-4000-8000-00000000000a';
 const TASK_B = '0000000b-0000-4000-8000-00000000000b';
-const GOAL_B = '000000b0-0000-4000-8000-0000000000b0';
 const PROJ_A = '00000a00-0000-4000-8000-000000000a00';
 const PROJ_B = '00000b00-0000-4000-8000-000000000b00';
 const AUTO_B = '0000b000-0000-4000-8000-00000000b000';
@@ -23,7 +22,6 @@ function resetDb() {
     { id: TASK_A, org_id: ORG_A, title: 'mine', status: 'open' },
     { id: TASK_B, org_id: ORG_B, title: 'theirs', status: 'open' },
   ];
-  mockDb.goals = [{ id: GOAL_B, org_id: ORG_B, title: 'their goal' }];
   mockDb.projects = [
     { id: PROJ_A, org_id: ORG_A, name: 'mine' },
     { id: PROJ_B, org_id: ORG_B, name: 'theirs' },
@@ -109,25 +107,6 @@ describe('tasks are limited to the caller\'s org', () => {
     expect(row).toBeDefined();
     expect(row.title).toBe('theirs');
     expect(row.status).toBe('open');
-  });
-});
-
-describe('goals are limited to the caller\'s org', () => {
-  const goals = () => app('../routes/goals', '/api/goals');
-
-  test('another org\'s goal is not found', async () => {
-    const res = await request(goals()).get(`/api/goals/${GOAL_B}`);
-    expect(res.status).toBe(404);
-  });
-
-  test('another org\'s goal cannot be deleted', async () => {
-    await request(goals()).delete(`/api/goals/${GOAL_B}`);
-    expect(mockDb.goals).toHaveLength(1);
-  });
-
-  test('list hides other orgs', async () => {
-    const res = await request(goals()).get('/api/goals');
-    expect(JSON.stringify(res.body)).not.toContain(GOAL_B);
   });
 });
 

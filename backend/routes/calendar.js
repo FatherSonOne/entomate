@@ -408,7 +408,7 @@ router.post('/sync/action-items', authenticate, requireCalendar, validate(schema
       .select('*')
       .in('org_id', req.orgIds)
       .not('due_date', 'is', null)
-      .not('status', 'in', '("done","complete")');
+      .not('status', 'in', '("done","complete","completed","cancelled")');
 
     if (meetingId) {
       query = query.eq('meeting_id', meetingId);
@@ -433,50 +433,6 @@ router.post('/sync/action-items', authenticate, requireCalendar, validate(schema
   } catch (error) {
     log.error('Error syncing action items:', { error: error.message || error });
     res.status(500).json({ error: 'Failed to sync action items', details: error.message });
-  }
-});
-
-/**
- * POST /api/calendar/sync/goal/:id
- * Sync a goal deadline to calendar
- */
-router.post('/sync/goal/:id', authenticate, requireCalendar, validate(schemas.syncGoal), async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { calendarId = 'primary' } = req.body;
-
-    if (!supabase) {
-      return res.status(503).json({ error: 'Database not configured' });
-    }
-
-    const { data: goal, error } = await supabase
-      .from('goals')
-      .select('*')
-      .in('org_id', req.orgIds)
-      .eq('id', id)
-      .single();
-
-    if (error || !goal) {
-      return res.status(404).json({ error: 'Goal not found' });
-    }
-
-    if (!goal.target_date) {
-      return res.status(400).json({ error: 'Goal has no target date' });
-    }
-
-    const event = await calendarService.createEventFromGoal(req.calendarTokens, goal, calendarId);
-
-    res.json({
-      success: true,
-      event: {
-        id: event.id,
-        title: event.summary,
-        htmlLink: event.htmlLink
-      }
-    });
-  } catch (error) {
-    log.error('Error syncing goal:', { error: error.message || error });
-    res.status(500).json({ error: 'Failed to sync goal', details: error.message });
   }
 });
 
@@ -566,7 +522,7 @@ router.get('/upcoming', authenticate, async (req, res) => {
         .select('id, task_description, due_date, priority, status')
         .in('org_id', req.orgIds)
         .not('due_date', 'is', null)
-        .not('status', 'in', '("done","complete")')
+        .not('status', 'in', '("done","complete","completed","cancelled")')
         .gte('due_date', now.toISOString())
         .lte('due_date', endDate.toISOString())
         .order('due_date');
@@ -582,33 +538,9 @@ router.get('/upcoming', authenticate, async (req, res) => {
       }));
     }
 
-    // Get goals with target dates
-    let goals = [];
-    if (supabase) {
-      const { data } = await supabase
-        .from('goals')
-        .select('id, title, target_date, goal_type, status, progress')
-        .in('org_id', req.orgIds)
-        .not('target_date', 'is', null)
-        .neq('status', 'completed')
-        .neq('status', 'abandoned')
-        .gte('target_date', now.toISOString())
-        .lte('target_date', endDate.toISOString())
-        .order('target_date');
-
-      goals = (data || []).map(goal => ({
-        type: 'goal',
-        id: goal.id,
-        title: goal.title,
-        date: goal.target_date,
-        goalType: goal.goal_type,
-        progress: goal.progress,
-        source: 'entomate'
-      }));
-    }
 
     // Combine and sort by date
-    const allItems = [...calendarEvents, ...actionItems, ...goals]
+    const allItems = [...calendarEvents, ...actionItems]
       .sort((a, b) => new Date(a.date) - new Date(b.date));
 
     res.json({
@@ -616,7 +548,6 @@ router.get('/upcoming', authenticate, async (req, res) => {
       counts: {
         calendarEvents: calendarEvents.length,
         actionItems: actionItems.length,
-        goals: goals.length,
         total: allItems.length
       }
     });

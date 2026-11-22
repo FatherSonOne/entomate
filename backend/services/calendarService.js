@@ -310,48 +310,6 @@ class CalendarService {
   }
 
   /**
-   * Create event from goal deadline
-   */
-  async createEventFromGoal(tokens, goal, calendarId = 'primary') {
-    if (!goal.target_date) {
-      throw new Error('Goal has no target date');
-    }
-
-    // Skip if already synced to calendar
-    if (goal.calendar_event_id) {
-      log.info(`Goal ${goal.id} already synced (event: ${goal.calendar_event_id}), skipping`);
-      return { id: goal.calendar_event_id, summary: goal.title, alreadySynced: true };
-    }
-
-    const targetDate = parseISO(goal.target_date);
-
-    const eventData = {
-      title: `[Goal Due] ${goal.title}`,
-      description: this.buildGoalDescription(goal),
-      startDate: startOfDay(targetDate).toISOString(),
-      endDate: endOfDay(targetDate).toISOString(),
-      allDay: true,
-      colorId: this.getGoalTypeColor(goal.goal_type),
-      reminders: {
-        useDefault: false,
-        overrides: [
-          { method: 'popup', minutes: 60 * 24 * 7 }, // 1 week before
-          { method: 'popup', minutes: 60 * 24 }      // 1 day before
-        ]
-      }
-    };
-
-    const event = await this.createEvent(tokens, eventData, calendarId);
-
-    // Track the calendar event ID to prevent duplicates
-    if (supabase && goal.id) {
-      await supabase.from('goals').update({ calendar_event_id: event.id }).eq('id', goal.id);
-    }
-
-    return event;
-  }
-
-  /**
    * Build description for action item event
    */
   buildActionItemDescription(item) {
@@ -384,25 +342,6 @@ class CalendarService {
   }
 
   /**
-   * Build description for goal event
-   */
-  buildGoalDescription(goal) {
-    let desc = `Goal: ${goal.title}\n`;
-    if (goal.description) desc += `\n${goal.description}\n`;
-    desc += `\nType: ${goal.goal_type}`;
-    desc += `\nProgress: ${goal.progress || 0}%`;
-    desc += `\nStatus: ${goal.status}`;
-    if (goal.key_results && goal.key_results.length > 0) {
-      desc += '\n\nKey Results:';
-      goal.key_results.forEach(kr => {
-        desc += `\n• ${kr.title}: ${kr.current}/${kr.target} ${kr.unit || ''}`;
-      });
-    }
-    desc += '\n\n---\nManaged by Entomate';
-    return desc;
-  }
-
-  /**
    * Get Google Calendar color ID based on priority
    */
   getPriorityColor(priority) {
@@ -412,18 +351,6 @@ class CalendarService {
       low: '10'      // Green
     };
     return colors[priority] || '9'; // Default blue
-  }
-
-  /**
-   * Get Google Calendar color ID based on goal type
-   */
-  getGoalTypeColor(goalType) {
-    const colors = {
-      company: '3',     // Purple
-      team: '1',        // Blue
-      individual: '10'  // Green
-    };
-    return colors[goalType] || '9';
   }
 
   /**

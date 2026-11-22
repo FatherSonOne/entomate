@@ -1,11 +1,11 @@
 import {
-  FileSpreadsheet, Download, Calendar, Target, CheckSquare, ListChecks, Loader2
+  FileSpreadsheet, Download, Calendar, CheckSquare, ListChecks, Loader2
 } from 'lucide-react'
 import { VCButton, VCIconBox } from '../vc'
 
 export default function CSVExportSection({
-  meetings, goals, generating, actionItemStatus, setActionItemStatus,
-  goalsCsvQuarter, setGoalsCsvQuarter, onDownload, getQuarterOptions
+  meetings, generating, actionItemStatus, setActionItemStatus,
+  onDownload
 }) {
   return (
     <div className="vc p-6">
@@ -82,48 +82,6 @@ export default function CSVExportSection({
                 aria-label="Download action items CSV"
               >
                 {generating === 'action-items-csv' ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4" />
-                )}
-              </VCButton>
-            </div>
-          </div>
-        </div>
-
-        {/* Goals Export */}
-        <div className="vc p-4 transition-colors">
-          <div className="flex items-start gap-3 mb-3">
-            <VCIconBox color="amber" size="sm">
-              <Target className="h-5 w-5" />
-            </VCIconBox>
-            <div>
-              <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>Goals</h3>
-              <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
-                Export goals data by quarter
-              </p>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <select
-              value={goalsCsvQuarter}
-              onChange={(e) => setGoalsCsvQuarter(e.target.value)}
-              className="input text-sm"
-            >
-              {getQuarterOptions().map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-            <div className="flex items-center justify-between">
-              <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>{goals.length} goals</span>
-              <VCButton
-                variant="ghost"
-                size="sm"
-                onClick={() => onDownload('goals-csv', goalsCsvQuarter ? { quarter: goalsCsvQuarter } : {})}
-                disabled={generating === 'goals-csv'}
-                aria-label="Download goals CSV"
-              >
-                {generating === 'goals-csv' ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <Download className="h-4 w-4" />

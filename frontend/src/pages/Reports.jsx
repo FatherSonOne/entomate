@@ -7,23 +7,19 @@ import { supabase } from '../services/supabaseClient'
 import ErrorState from '../components/vc/ErrorState'
 import PDFReportsSection from '../components/reports/PDFReportsSection'
 import CSVExportSection from '../components/reports/CSVExportSection'
-import ReportsQuickStats from '../components/reports/ReportsQuickStats'
 import ReportsLoadingSkeleton from '../components/reports/ReportsLoadingSkeleton'
 import EffectivenessReport from '../components/learning/EffectivenessReport'
 
 export default function Reports() {
   const toast = useToast()
   const [meetings, setMeetings] = useState([])
-  const [goals, setGoals] = useState([])
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [generating, setGenerating] = useState(null)
   const [selectedMeeting, setSelectedMeeting] = useState('')
-  const [selectedQuarter, setSelectedQuarter] = useState('')
   const [selectedProject, setSelectedProject] = useState('')
   const [actionItemStatus, setActionItemStatus] = useState('')
-  const [goalsCsvQuarter, setGoalsCsvQuarter] = useState('')
   const [sendingEmail, setSendingEmail] = useState(false)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
@@ -38,13 +34,11 @@ export default function Reports() {
     try {
       setError(null)
       setLoading(true)
-      const [meetingsRes, goalsRes, projectsRes] = await Promise.all([
+      const [meetingsRes, projectsRes] = await Promise.all([
         meetingsApi.list({ limit: 50 }).catch(() => ({ meetings: [] })),
-        api.get('/goals').catch(() => ({ data: [] })),
         projectsApi.list({ limit: 100 }).catch(() => ({ projects: [] }))
       ])
       setMeetings(meetingsRes.meetings || [])
-      setGoals(goalsRes.data || [])
       setProjects(projectsRes.projects || [])
     } catch (error) {
       console.error('Failed to load data:', error)
@@ -66,9 +60,6 @@ export default function Reports() {
           if (!params.meetingId) return toast.info('Info', 'Please select a meeting')
           await reportsApi.downloadMeetingPDF(params.meetingId)
           break
-        case 'goals-pdf':
-          await reportsApi.downloadGoalsPDF(params.quarter)
-          break
         case 'weekly-pdf':
           await reportsApi.downloadWeeklyPDF()
           break
@@ -77,9 +68,6 @@ export default function Reports() {
           break
         case 'action-items-csv':
           await reportsApi.downloadActionItemsCSV(params)
-          break
-        case 'goals-csv':
-          await reportsApi.downloadGoalsCSV(params)
           break
         case 'tasks-csv':
           await reportsApi.downloadTasksCSV(params)
@@ -107,9 +95,6 @@ export default function Reports() {
         case 'meeting-pdf':
           if (!params.meetingId) return toast.info('Info', 'Please select a meeting')
           path = `/reports/meeting/${params.meetingId}/pdf`
-          break
-        case 'goals-pdf':
-          path = `/reports/goals/pdf${params.quarter ? `?quarter=${params.quarter}` : ''}`
           break
         case 'weekly-pdf':
           path = '/reports/weekly/pdf'
@@ -152,18 +137,6 @@ export default function Reports() {
     } finally {
       setSendingEmail(false)
     }
-  }
-
-  const getQuarterOptions = () => {
-    const now = new Date()
-    const year = now.getFullYear()
-    const options = [{ value: '', label: 'All Quarters' }]
-    for (let y = year + 1; y >= year - 1; y--) {
-      for (let q = 4; q >= 1; q--) {
-        options.push({ value: `Q${q}-${y}`, label: `Q${q} ${y}` })
-      }
-    }
-    return options
   }
 
   if (loading) {
@@ -226,32 +199,22 @@ export default function Reports() {
         generating={generating}
         selectedMeeting={selectedMeeting}
         setSelectedMeeting={setSelectedMeeting}
-        selectedQuarter={selectedQuarter}
-        setSelectedQuarter={setSelectedQuarter}
         selectedProject={selectedProject}
         setSelectedProject={setSelectedProject}
         sendingEmail={sendingEmail}
         onDownload={handleDownload}
         onPreview={handlePreview}
         onSendRecap={handleSendRecap}
-        getQuarterOptions={getQuarterOptions}
       />
 
       {/* CSV Export */}
       <CSVExportSection
         meetings={meetings}
-        goals={goals}
         generating={generating}
         actionItemStatus={actionItemStatus}
         setActionItemStatus={setActionItemStatus}
-        goalsCsvQuarter={goalsCsvQuarter}
-        setGoalsCsvQuarter={setGoalsCsvQuarter}
         onDownload={handleDownload}
-        getQuarterOptions={getQuarterOptions}
       />
-
-      {/* Quick Stats */}
-      <ReportsQuickStats meetings={meetings} goals={goals} />
 
       {/* Learning Effectiveness */}
       <div className="vc p-6">

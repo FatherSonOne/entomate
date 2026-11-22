@@ -13,7 +13,7 @@ const commands = [
   { id: 'nav-dashboard', name: 'Go to Today', icon: LayoutDashboard, action: 'navigate', path: '/dashboard', category: 'Navigation' },
   { id: 'nav-meetings', name: 'Go to Meetings', icon: Mic, action: 'navigate', path: '/meetings', category: 'Navigation' },
   { id: 'nav-projects', name: 'Go to Projects', icon: FolderKanban, action: 'navigate', path: '/projects', category: 'Navigation' },
-  { id: 'nav-board', name: 'Go to Project Board', icon: Kanban, action: 'navigate', path: '/project-dashboard', category: 'Navigation' },
+  { id: 'nav-board', name: 'Go to Project Board', icon: Kanban, action: 'navigate', path: '/projects?view=board', category: 'Navigation' },
   { id: 'nav-tasks', name: 'Go to Tasks', icon: CheckSquare, action: 'navigate', path: '/tasks', category: 'Navigation' },
   { id: 'nav-automations', name: 'Go to Automations', icon: Zap, action: 'navigate', path: '/automations', category: 'Navigation' },
   { id: 'nav-agents', name: 'Go to AI Agents', icon: Bot, action: 'navigate', path: '/agents', category: 'Navigation' },
