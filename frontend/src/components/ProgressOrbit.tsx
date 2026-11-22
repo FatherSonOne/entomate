@@ -1,28 +1,57 @@
 import React from 'react'
 
 /**
- * First-load progress drawn into the logo's own geometry (pilot, 2026-11-22).
- * Sits over the loader art in the same 1000-unit box, so a ring here lands on
- * the mark. Relay Orbits only for now: an outer orbit that fills from the
- * left end of its signal axis, clockwise over the top, with a tick per stage.
- * Other systems keep the corner bar until they get geometry here.
+ * First-load progress drawn into each logo's own geometry (2026-11-22).
+ * Sits over the loader art in the same 1000-unit box, so the track lands on
+ * the mark. Round marks get an orbit just outside the art, starting where the
+ * mark's own motion starts; the two horizontal marks (Circuit E, Routed
+ * Signal) get a rule under the bars instead. A tick marks each stage.
  */
-interface OrbitGeometry { cx: number; cy: number; r: number; startDeg: number }
+type Geometry =
+  | { kind: 'orbit'; cx: number; cy: number; r: number; startDeg: number }
+  | { kind: 'rule'; x1: number; x2: number; y: number }
 
-const ORBITS: Record<string, OrbitGeometry> = {
-  // Outside the outer circuit (r≈340), clear of the art; 180° = the signal axis's left end
-  'relay-orbits': { cx: 500, cy: 500, r: 418, startDeg: 180 },
+const orbit = (r: number, startDeg = 270, cx = 500, cy = 500): Geometry => ({ kind: 'orbit', cx, cy, r, startDeg })
+
+/* Radii clear the art (measured from each mark's alpha); 180° starts on a horizontal axis's left end, 270° at the top, 90° at the root. */
+export const PROGRESS_GEOMETRY: Record<string, Geometry> = {
+  'relay-orbits': orbit(418, 180),
+  relay: orbit(432, 180),
+  orbit: orbit(480),
+  'orbital-network': orbit(432, 180),
+  constellation: orbit(412),
+  trinity: orbit(432),
+  'circuit-e': { kind: 'rule', x1: 130, x2: 910, y: 968 },
+  'circuit-spire': orbit(404, 90),
+  'catalyst-core': orbit(440),
+  'routed-signal': { kind: 'rule', x1: 100, x2: 900, y: 940 },
+  ignition: orbit(404),
+  aperture: orbit(490),
+  bloom: orbit(486),
+  'flow-field': orbit(402),
+  'neural-core': orbit(440),
+  'ribbon-catalyst': orbit(472),
+  'signal-cascade': orbit(334),
 }
 
 export function hasProgressOrbit(logoId: string): boolean {
-  return logoId in ORBITS
+  return logoId in PROGRESS_GEOMETRY
 }
 
 const MINT = '#9affed'
 
-function point(g: OrbitGeometry, share: number): { x: number; y: number } {
+function point(g: Geometry, share: number): { x: number; y: number } {
+  if (g.kind === 'rule') return { x: g.x1 + (g.x2 - g.x1) * share, y: g.y }
   const a = ((g.startDeg + share * 360) * Math.PI) / 180
   return { x: g.cx + g.r * Math.cos(a), y: g.cy + g.r * Math.sin(a) }
+}
+
+function tick(g: Geometry, share: number): [{ x: number; y: number }, { x: number; y: number }] {
+  if (g.kind === 'rule') {
+    const { x, y } = point(g, share)
+    return [{ x, y: y - 9 }, { x, y: y + 9 }]
+  }
+  return [point({ ...g, r: g.r - 9 }, share), point({ ...g, r: g.r + 9 }, share)]
 }
 
 interface Props {
@@ -34,11 +63,14 @@ interface Props {
 }
 
 export default function ProgressOrbit({ logoId, progress, stops = [] }: Props): React.ReactElement | null {
-  const g = ORBITS[logoId]
+  const g = PROGRESS_GEOMETRY[logoId]
   if (!g) return null
   const share = Math.max(0, Math.min(1, progress / 100))
-  const length = 2 * Math.PI * g.r
   const head = point(g, share)
+  const track = g.kind === 'rule'
+    ? { el: 'line' as const, props: { x1: g.x1, y1: g.y, x2: g.x2, y2: g.y }, length: g.x2 - g.x1 }
+    : { el: 'circle' as const, props: { cx: g.cx, cy: g.cy, r: g.r, transform: `rotate(${g.startDeg} ${g.cx} ${g.cy})` }, length: 2 * Math.PI * g.r }
+  const Track = track.el
   return (
     <svg className="en-orbit" viewBox="0 0 1000 1000" aria-hidden="true">
       <defs>
@@ -46,25 +78,11 @@ export default function ProgressOrbit({ logoId, progress, stops = [] }: Props): 
           <feGaussianBlur stdDeviation="4" />
         </filter>
       </defs>
-      <circle cx={g.cx} cy={g.cy} r={g.r} fill="none" stroke="#fff" strokeOpacity=".09" strokeWidth="1.5" />
-      {/* Fill: a circle drawn from the start angle, revealed by its dash */}
-      <circle
-        className="en-orbit-fill"
-        cx={g.cx}
-        cy={g.cy}
-        r={g.r}
-        fill="none"
-        stroke={MINT}
-        strokeWidth="3"
-        strokeLinecap="round"
-        strokeDasharray={`${share * length} ${length}`}
-        transform={`rotate(${g.startDeg} ${g.cx} ${g.cy})`}
-      />
+      <Track {...track.props} fill="none" stroke="#fff" strokeOpacity=".09" strokeWidth="1.5" />
+      <Track {...track.props} className="en-orbit-fill" fill="none" stroke={MINT} strokeWidth="3" strokeLinecap="round"
+        strokeDasharray={`${share * track.length} ${track.length}`} />
       {stops.map(({ at, done }) => {
-        const inner = { ...g, r: g.r - 9 }
-        const outer = { ...g, r: g.r + 9 }
-        const a = point(inner, at)
-        const b = point(outer, at)
+        const [a, b] = tick(g, at)
         return (
           <line key={at} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={done ? MINT : '#fff'}
             strokeOpacity={done ? 0.9 : 0.22} strokeWidth="2" strokeLinecap="round" />

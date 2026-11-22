@@ -44,6 +44,8 @@ export default function AnimatedLoadingLogo({ logoId, size = 512, controls = tru
     let visible = false
     svg.pauseAnimations()
     svg.classList.toggle('motion-opt-in', manual)
+    // Paused (or reduced motion): show the whole still mark, not a frame with parts cut away
+    svg.classList.toggle('motion-still', !playing)
     const sync = () => {
       if (playing && visible && !document.hidden) svg.unpauseAnimations()
       else svg.pauseAnimations()
