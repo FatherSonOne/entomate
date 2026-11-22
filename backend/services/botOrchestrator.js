@@ -276,10 +276,21 @@ async function launchBotSession(p) {
   try {
     // Recall's API rejects trailing slashes on these endpoints (returns
     // auth_failed misleadingly on POST /bot/).
-    bot = await recallFetch('/bot', {
-      method: 'POST',
-      body: JSON.stringify(recallPayload)
-    });
+    try {
+      bot = await recallFetch('/bot', {
+        method: 'POST',
+        body: JSON.stringify(recallPayload)
+      });
+    } catch (err) {
+      // Live captions are extra: if Recall refuses the realtime endpoint, send the bot without it.
+      if (!recallPayload.recording_config.realtime_endpoints || !/\b400\b/.test(err.message)) throw err;
+      log.warn('Recall refused realtime captions; launching without them', { sessionId, error: err.message });
+      delete recallPayload.recording_config.realtime_endpoints;
+      bot = await recallFetch('/bot', {
+        method: 'POST',
+        body: JSON.stringify(recallPayload)
+      });
+    }
   } catch (err) {
     await db()
       .from('bot_sessions')

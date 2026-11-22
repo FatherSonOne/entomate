@@ -503,3 +503,55 @@ describe('handleRecallWebhook', () => {
     expect(updateCall.status).toBe('in_call');
   });
 });
+
+describe('launchBotSession — live captions', () => {
+  let originalFetch;
+  const env = { ...process.env };
+  beforeEach(() => {
+    mockSupabase.__reset();
+    originalFetch = global.fetch;
+    global.fetch = jest.fn();
+    process.env.RECALL_API_KEY = 'test-key';
+    process.env.RENDER_EXTERNAL_URL = 'https://entomate.example.com';
+  });
+  afterEach(() => {
+    global.fetch = originalFetch;
+    process.env = { ...env };
+  });
+
+  const ok = (json) => ({ ok: true, status: 201, headers: new Map([['content-type', 'application/json']]), json: () => Promise.resolve(json), text: () => Promise.resolve('') });
+  const bad = (status, text) => ({ ok: false, status, headers: new Map(), text: () => Promise.resolve(text) });
+  const launch = () => orchestrator.launchBotSession({
+    workspaceId: 'org-1', meetingId: 'm-1', meetingUrl: 'https://meet.google.com/abc-defg-hij', platform: 'meet'
+  });
+  const botPosts = () => global.fetch.mock.calls.filter(([url, opts]) => /\/bot$/.test(url) && opts?.method === 'POST');
+
+  test('asks Recall to post transcript.data to our tokenised realtime URL', async () => {
+    global.fetch.mockResolvedValueOnce(ok({ id: 'recall-1' }));
+    await launch();
+    const body = JSON.parse(botPosts()[0][1].body);
+    const [endpoint] = body.recording_config.realtime_endpoints;
+    expect(endpoint).toMatchObject({ type: 'webhook', events: ['transcript.data'] });
+    expect(endpoint.url).toMatch(/^https:\/\/entomate\.example\.com\/api\/admin\/bots\/realtime\/[0-9a-f-]{36}\?token=/);
+  });
+
+  test('a 400 over the realtime endpoint relaunches without captions', async () => {
+    global.fetch
+      .mockResolvedValueOnce(bad(400, '{"realtime_endpoints":["bad"]}'))
+      .mockResolvedValueOnce(ok({ id: 'recall-2' }));
+    const res = await launch();
+    expect(res.recallBotId).toBe('recall-2');
+    const posts = botPosts();
+    expect(posts).toHaveLength(2);
+    expect(JSON.parse(posts[1][1].body).recording_config.realtime_endpoints).toBeUndefined();
+  });
+
+  test('no public URL means no realtime endpoint', async () => {
+    delete process.env.RENDER_EXTERNAL_URL;
+    delete process.env.BACKEND_URL;
+    delete process.env.RECALL_REALTIME_BASE_URL;
+    global.fetch.mockResolvedValueOnce(ok({ id: 'recall-3' }));
+    await launch();
+    expect(JSON.parse(botPosts()[0][1].body).recording_config.realtime_endpoints).toBeUndefined();
+  });
+});
