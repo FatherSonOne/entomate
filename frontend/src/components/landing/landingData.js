@@ -60,11 +60,11 @@ export const MODULES = [
   {
     name: 'Agents', sig: 'ai', kicker: 'AI · Action items', media: 'glyphs',
     head: 'From talk to owned tasks',
-    tag: 'After every processed meeting, the agents set the priority and fill in a due date for each action item.',
+    tag: 'After every processed meeting, the agents set the priority, fill in a due date and suggest an owner from your team for anything unassigned.',
     features: [
       ['4 specialized agents with explanations', 'ship'],
       ['Due dates and priority set after every meeting', 'ship'],
-      ['Owner recommended automatically', 'plan'],
+      ['Owner suggested for unassigned items', 'ship'],
       ['Promised follow-ups detected', 'ship'],
       ['Send action items to your CRM in one click', 'ship'],
     ],
@@ -118,7 +118,7 @@ export const STATUS = {
 }
 
 export const AGENTS = [
-  { n: '4.1 · Assignment', head: 'Finds the owner', body: 'Recommends an owner by skills and current workload when you run it.' },
+  { n: '4.1 · Assignment', head: 'Finds the owner', body: 'Picks an owner from your own team by skills and current workload.' },
   { n: '4.2 · Priority', head: 'Ranks the work', body: 'Weighs meeting sentiment, urgency language and due dates.' },
   { n: '4.3 · Deadline', head: 'Sets a date', body: 'Suggests realistic due dates from task complexity and priority.' },
   { n: '4.4 · Follow-up', head: 'Catches promises', body: 'Detects promised follow-ups in the conversation.' },

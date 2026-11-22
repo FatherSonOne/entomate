@@ -259,14 +259,16 @@ class AgentOrchestrator {
         priority: item.priority,
         actionItemId: item.id,
         triggerEventId: `meeting:${meeting.id}:item:${item.id}`,
-        team: [] // Would come from user's team settings
+        orgId: meeting.org_id || null, // Assignment Agent picks from this org's members only
+        team: []
       };
 
-      // Run priority and deadline agents in parallel (they don't depend on each other)
-      const suggestions = await this.orchestrateParallel(
-        ['priority', 'deadline'],
-        context
-      );
+      // Priority, deadline and assignment don't depend on each other.
+      // Assignment only runs for unassigned items in a known org.
+      const agents = ['priority', 'deadline'];
+      if (context.orgId && !item.assigned_to_name && !item.assigned_to_email) agents.push('assignment');
+
+      const suggestions = await this.orchestrateParallel(agents, context);
 
       results.actionItems.push({
         id: item.id,

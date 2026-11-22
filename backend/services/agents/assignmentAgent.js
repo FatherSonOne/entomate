@@ -8,6 +8,7 @@ const BaseAgent = require('./baseAgent');
 const ai = require('../../config/ai');
 const { supabase } = require('../../config/supabase');
 const LearningEngine = require('../learning/LearningEngine');
+const { getOrgTeam, findMember } = require('./orgTeam');
 
 class AssignmentAgent extends BaseAgent {
   constructor() {
@@ -24,33 +25,29 @@ class AssignmentAgent extends BaseAgent {
   async analyze(context, automation) {
     this.log('Analyzing assignment context');
 
-    // Get team members
-    let teamMembers = context.team || [];
-
-    // If no team provided, try to get from database
-    if (teamMembers.length === 0 && supabase) {
-      try {
-        const { data: members } = await supabase
-          .from('team_members')
-          .select('*')
-          .eq('active', true);
-
-        teamMembers = members || [];
-      } catch (error) {
-        this.log('Could not fetch team members', { error: error.message });
-      }
+    // Team: an explicit list from the caller, else the org's members.
+    // orgId must be set server-side by the caller; with no orgId there is
+    // no team (team_members has no org_id, so an unscoped read would show
+    // every tenant's people).
+    const orgId = context.orgId || null;
+    let teamMembers = Array.isArray(context.team) ? context.team : [];
+    if (teamMembers.length === 0) {
+      teamMembers = orgId ? await getOrgTeam(orgId, supabase) : [];
+      if (!orgId) this.log('No orgId in context; no team to assign from');
     }
 
-    // Get current workload for each team member
+    // Get current workload for each team member (within the org)
     const workload = {};
     if (supabase && teamMembers.length > 0) {
       try {
         for (const member of teamMembers) {
-          const { count } = await supabase
+          let query = supabase
             .from('action_items')
             .select('*', { count: 'exact', head: true })
             .eq('assigned_to_name', member.name)
             .in('status', ['open', 'in_progress']);
+          if (orgId) query = query.eq('org_id', orgId);
+          const { count } = await query;
 
           workload[member.name] = count || 0;
         }
@@ -73,10 +70,31 @@ class AssignmentAgent extends BaseAgent {
    * Generate assignment suggestion
    */
   async suggest(context, automation) {
+    let analysis;
+    try {
+      analysis = await this.analyze(context, automation);
+    } catch (error) {
+      this.log('Error analyzing assignment context', { error: error.message });
+      return { recommended: null, reason: `Error in analysis: ${error.message}`, confidence: 0, alternatives: [] };
+    }
+
+    const suggestion = await this._suggest(context, automation, analysis);
+
+    // Attach the matched member so callers can store email / user id too.
+    // A name that isn't on the team is dropped.
+    const member = findMember(analysis.teamMembers, suggestion?.recommended);
+    if (suggestion && suggestion.recommended && !member) {
+      return { ...suggestion, recommended: null, confidence: 0, recommendedMember: null };
+    }
+    return {
+      ...suggestion,
+      recommendedMember: member ? { name: member.name, email: member.email || null, user_id: member.user_id || null } : null
+    };
+  }
+
+  async _suggest(context, automation, analysis) {
     try {
       this.log('Generating assignment suggestion');
-
-      const analysis = await this.analyze(context, automation);
 
       // If no team members, return unassigned
       if (!analysis.teamMembers || analysis.teamMembers.length === 0) {
@@ -150,6 +168,15 @@ Return ONLY this JSON (no markdown, no explanation):
       if (jsonMatch) {
         suggestion = JSON.parse(jsonMatch[0]);
         this.log('AI suggestion generated', { recommended: suggestion.recommended });
+        // Only accept people who are actually on the team
+        if (!findMember(analysis.teamMembers, suggestion.recommended)) {
+          suggestion = {
+            recommended: null,
+            reason: `AI suggested "${suggestion.recommended}", who is not on this team`,
+            confidence: 0,
+            alternatives: []
+          };
+        }
       } else {
         // Fallback if AI response parsing fails
         suggestion = {

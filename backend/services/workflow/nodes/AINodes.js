@@ -27,7 +27,9 @@ class AIAgentNode extends BaseNode {
         transcript: inputData.transcript,
         summary: inputData.summary,
         actionItems: inputData.action_items || inputData.actionItems,
-        actionItemId: inputData.id || inputData.actionItemId
+        actionItemId: inputData.id || inputData.actionItemId,
+        // org comes from the workflow, never from input data
+        orgId: context?.context?.workflow?.org_id || null
       };
 
       const result = await agentOrchestrator.runAgent(agent, agentContext);

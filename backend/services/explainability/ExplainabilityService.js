@@ -883,13 +883,10 @@ class ExplainabilityService {
   async getAllOptions(agentType, context) {
     try {
       if (agentType === 'assignment') {
-        // Get team members as assignment options
-        const { data: members } = await db
-          .from('team_members')
-          .select('*')
-          .limit(10);
-
-        return members || [];
+        // Team members of the caller's org only (team_members has no org_id)
+        const { getOrgTeam } = require('../agents/orgTeam');
+        const members = await getOrgTeam(context?.orgId, db);
+        return members.slice(0, 10);
       }
 
       // For other agent types, return empty for now

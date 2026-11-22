@@ -4,7 +4,8 @@
  * Runs once a meeting has been processed and its action items saved
  * (called from firePostProcessing in routes/meetings.js). Two steps:
  *
- *   1. Agents — Priority + Deadline agents review every action item. Their
+ *   1. Agents — Priority, Deadline and (for unassigned items) Assignment
+ *      agents review every action item. Their
  *      suggestions are applied conservatively (see decideUpdates) and every
  *      run is logged to agent_runs, so it shows up with its reasoning on the
  *      Agents page and can be overridden.
@@ -18,8 +19,8 @@
  *   - Even when on, workflows containing a Code node are never auto-fired.
  *   - Workflow lookup is scoped to the meeting's org_id; meetings without an
  *     org_id fire nothing.
- *   - Assignment is NOT automated: team_members has no org_id, so the
- *     Assignment Agent can't be scoped to one org yet.
+ *   - Assignment picks only from the meeting's org (agents/orgTeam.js) and
+ *     only fills items nobody owns yet.
  *   - Nothing here throws; failures are logged and the pipeline continues.
  */
 
@@ -29,6 +30,7 @@ const PRIORITIES = ['high', 'medium', 'low'];
 
 const DEFAULTS = {
   priorityMinConfidence: 0.75,
+  assignMinConfidence: 0.7,
   maxActionItems: 25,   // matches the orchestrator's maxActionsPerRun guardrail
   maxWorkflows: 10
 };
@@ -47,6 +49,8 @@ function flagEnabled(name, defaultValue) {
  *    new date (never overwrites a date someone set or the meeting stated).
  *  - priority: changed only when the agent is confident enough and the
  *    value is valid and different.
+ *  - owner: filled only when nobody owns the item, the agent is confident
+ *    enough, and the person matched a member of the org's team.
  */
 function decideUpdates(item, suggestions = {}, opts = {}) {
   const minConfidence = opts.priorityMinConfidence ?? DEFAULTS.priorityMinConfidence;
@@ -74,6 +78,22 @@ function decideUpdates(item, suggestions = {}, opts = {}) {
     priority.confidence >= minConfidence
   ) {
     updates.priority = recommended;
+  }
+
+  const assignment = suggestions.assignment;
+  const member = assignment?.recommendedMember;
+  const assignMin = opts.assignMinConfidence ?? DEFAULTS.assignMinConfidence;
+  if (
+    !item.assigned_to_name &&
+    !item.assigned_to_email &&
+    !item.assigned_to_id &&
+    member?.name &&
+    typeof assignment.confidence === 'number' &&
+    assignment.confidence >= assignMin
+  ) {
+    updates.assigned_to_name = member.name;
+    if (member.email) updates.assigned_to_email = member.email;
+    if (member.user_id) updates.assigned_to_id = member.user_id;
   }
 
   return updates;
