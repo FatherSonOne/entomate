@@ -1,0 +1,98 @@
+/* ============================================================
+   MOTION — shared tokens and primitives (2026-11-22)
+   ------------------------------------------------------------
+   One vocabulary for every surface, in every design style:
+
+   enter   things arriving: strong ease-out, 160–240ms
+   exit    things leaving: faster than they came, 120–180ms
+   move    things changing place on screen: ease-in-out
+   spring  drawers and sheets (Bench Swiss --bs-spring), 460ms
+
+   Only transform and opacity move. Nothing grows from scale(0):
+   popovers start at 0.97 from their trigger, modals at 0.97 from
+   centre, panels and toasts slide a short way in.
+
+   Reduced motion (OS setting or Settings > Appearance > Reduce
+   motion, which sets html[data-motion="reduce"]) keeps the fades
+   and drops the travel: distances go to 0 and scale to 1, so
+   nothing pops but nothing moves either.
+
+   JS side: components/bench/motion.ts (usePresence, useEnterOnChange,
+   prefersReducedMotion). Keep the ms values there in step with these.
+   ============================================================ */
+
+:root {
+  --m-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --m-ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --m-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --m-ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
+  --m-press: 140ms;
+  --m-fast: 160ms;
+  --m-base: 220ms;
+  --m-slow: 300ms;
+  --m-exit: 160ms;
+  --m-stagger: 40ms;
+
+  /* Travel. Reduced motion zeroes these. */
+  --m-rise: 6px;
+  --m-slide: 16px;
+  --m-pop-scale: 0.97;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --m-rise: 0px; --m-slide: 0px; --m-pop-scale: 1; }
+}
+html[data-motion="reduce"] { --m-rise: 0px; --m-slide: 0px; --m-pop-scale: 1; }
+
+/* ── Keyframes (mount-only entrances; toggled states use transitions) ── */
+@keyframes m-fade-in { from { opacity: 0; } }
+@keyframes m-rise-in { from { opacity: 0; transform: translate3d(0, var(--m-rise), 0); } }
+@keyframes m-pop-in { from { opacity: 0; transform: scale(var(--m-pop-scale)); } }
+@keyframes m-slide-up-in { from { opacity: 0; transform: translate3d(0, var(--m-slide), 0); } }
+@keyframes m-slide-left-in { from { opacity: 0; transform: translate3d(var(--m-slide), 0, 0); } }
+
+/* ── Primitives ──────────────────────────────────────────────── */
+
+/* Arrives once when mounted: inline panels, revealed rows, swapped content. */
+.m-enter { animation: m-rise-in var(--m-base) var(--m-ease-out) backwards; }
+.m-fade { animation: m-fade-in var(--m-base) var(--m-ease-out) backwards; }
+
+/* Stagger the first few children of a freshly mounted list. Decorative only:
+   rows are clickable at once and the cascade stops after eight. */
+.m-stagger > * { animation: m-rise-in var(--m-base) var(--m-ease-out) backwards; }
+.m-stagger > :nth-child(2) { animation-delay: calc(var(--m-stagger) * 1); }
+.m-stagger > :nth-child(3) { animation-delay: calc(var(--m-stagger) * 2); }
+.m-stagger > :nth-child(4) { animation-delay: calc(var(--m-stagger) * 3); }
+.m-stagger > :nth-child(5) { animation-delay: calc(var(--m-stagger) * 4); }
+.m-stagger > :nth-child(6) { animation-delay: calc(var(--m-stagger) * 5); }
+.m-stagger > :nth-child(7) { animation-delay: calc(var(--m-stagger) * 6); }
+.m-stagger > :nth-child(n + 8) { animation-delay: calc(var(--m-stagger) * 7); }
+
+/* Presence pairs: render with data-state="open" | "closed" (usePresence). */
+.m-scrim { opacity: 0; transition: opacity var(--m-exit) var(--m-ease-exit); }
+.m-scrim[data-state="open"] { opacity: 1; transition: opacity var(--m-base) var(--m-ease-out); }
+
+/* Modal: centred, so it scales from centre. */
+.m-modal { opacity: 0; transform: scale(var(--m-pop-scale)); transition: opacity var(--m-exit) var(--m-ease-exit), transform var(--m-exit) var(--m-ease-exit); }
+.m-modal[data-state="open"] { opacity: 1; transform: none; transition: opacity var(--m-base) var(--m-ease-out), transform var(--m-base) var(--m-ease-out); }
+
+/* Popover / menu: scales from its trigger. Set transform-origin per use. */
+.m-pop { opacity: 0; transform: scale(var(--m-pop-scale)); transition: opacity 120ms var(--m-ease-exit), transform 120ms var(--m-ease-exit); }
+.m-pop[data-state="open"] { opacity: 1; transform: none; transition: opacity var(--m-fast) var(--m-ease-out), transform var(--m-fast) var(--m-ease-out); }
+
+/* Side panel from the right (non-Bench panels such as the assistant). */
+.m-panel-right { opacity: 0; transform: translate3d(var(--m-slide), 0, 0); transition: opacity var(--m-exit) var(--m-ease-exit), transform var(--m-exit) var(--m-ease-exit); }
+.m-panel-right[data-state="open"] { opacity: 1; transform: none; transition: opacity var(--m-base) var(--m-ease-out), transform var(--m-slow) var(--m-ease-drawer); }
+
+/* Collapsible region: animates its height with grid rows (no measuring). */
+.m-collapse { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows var(--m-base) var(--m-ease-out), opacity var(--m-fast) var(--m-ease-out); }
+.m-collapse > * { min-height: 0; overflow: hidden; }
+.m-collapse[data-state="open"] { grid-template-rows: 1fr; opacity: 1; }
+
+/* Pressables: a small dip confirms the press. */
+.m-press { transition: transform var(--m-press) var(--m-ease-out); }
+.m-press:active:not(:disabled) { transform: scale(0.97); }
+
+/* Hover lift only where hover is real. */
+@media (hover: none) { .m-hover-only { transition: none; } }

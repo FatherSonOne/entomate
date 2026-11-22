@@ -9,7 +9,7 @@ import { usePermissions } from '../hooks/usePermissions'
 import { TENANT_PLAN_LABELS } from '../constants/plans'
 import { version } from '../../package.json'
 import {
-  Cell, Drawer, Grid, Key, Readout, Section, Signal, Tag, TextInput, TitleRule, Toggle,
+  Cell, Drawer, Grid, Key, Readout, Section, Signal, Tag, TextInput, TitleRule, Toggle, applyReduceMotion,
 } from '../components/bench'
 import AppearanceSettings, { STYLE_SCROLL_KEY } from '../components/settings/AppearanceSettings'
 import RecordingSettings from '../components/settings/RecordingSettings'
@@ -98,7 +98,11 @@ export default function Settings(): React.ReactElement {
   useEffect(() => {
     let live = true
     userApi.getUser()
-      .then((res) => { if (live && res?.settings) setSettings((prev) => ({ ...prev, ...res.settings })) })
+      .then((res) => {
+        if (!live || !res?.settings) return
+        setSettings((prev) => ({ ...prev, ...res.settings }))
+        if (typeof res.settings.reduce_motion === 'boolean') applyReduceMotion(res.settings.reduce_motion)
+      })
       .catch(() => { /* defaults keep the page usable */ })
     return () => { live = false }
   }, [])
@@ -310,7 +314,7 @@ export default function Settings(): React.ReactElement {
                 <Section number="02" title="Appearance" />
                 <AppearanceSettings
                   reduceMotion={settings.reduce_motion}
-                  onReduceMotion={(on: boolean) => updateSetting('reduce_motion', on)}
+                  onReduceMotion={(on: boolean) => { applyReduceMotion(on); updateSetting('reduce_motion', on) }}
                   onThemeChange={onThemeChange}
                 />
               </section>

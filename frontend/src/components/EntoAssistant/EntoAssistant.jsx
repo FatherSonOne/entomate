@@ -16,6 +16,7 @@ import {
 } from '../../services/entoAssistantService'
 import './EntoAssistant.css'
 import { EntomateMark, Wordmark } from '../Logo'
+import { usePresence, MOTION } from '../bench/motion'
 
 const STORAGE_KEY = 'ento-ai-history'
 const MAX_MESSAGES = 50
@@ -165,12 +166,14 @@ export default function EntoAssistant({ isOpen, onClose }) {
   const suggestedActions = getSuggestedActions(context.section)
   const hasMessages = messages.length > 0
 
-  if (!isOpen) return null
+  // Stays mounted through its exit so it slides away instead of vanishing.
+  const { mounted, state: presence } = usePresence(isOpen, MOTION.base)
+  if (!mounted) return null
 
   const panel = (
     <>
-      <div className="ea-backdrop" onClick={onClose} />
-      <div className="ea-panel" role="dialog" aria-modal="true" aria-label="Entomate AI Assistant">
+      <div className="ea-backdrop" data-state={presence} onClick={onClose} />
+      <div className="ea-panel" data-state={presence} role="dialog" aria-modal="true" aria-label="Entomate AI Assistant">
 
         {/* Header */}
         <div className="ea-header">
