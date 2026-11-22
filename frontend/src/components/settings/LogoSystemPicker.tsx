@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Display, GroupHead, Key, Signal } from '../bench'
+import { Display, Drawer, GroupHead, Key, PHONE_QUERY, Signal, useMediaQuery } from '../bench'
 import AnimatedLoadingLogo from '../AnimatedLoadingLogo'
 import EnhancedLoadingScreen from '../EnhancedLoadingScreen'
 import { Wordmark } from '../Logo'
@@ -38,59 +38,46 @@ function SizeProof({ logo, compact = false }: { logo: LogoSystem; compact?: bool
 
 /**
  * Settings > Appearance: pick the logo system (mark + wordmark). Each system
- * brings its own loading animation. A preview card per system, grouped by
- * family; a pick applies at once (rail, toolbar, loading screen), and the
- * picked card plays its loading motion in place.
+ * brings its own loading animation. A sticky "In use" bar sits over a preview
+ * card per system, grouped by family; a pick applies at once (rail, toolbar,
+ * loading screen). The live preview lives in a right side panel that stays
+ * open beside the grid, so it can be watched while switching. On phone it is a
+ * sheet and the picked card plays its motion in place instead.
  */
 export default function LogoSystemPicker(): React.ReactElement {
   const inUse = useLogoSystem()
+  const isPhone = useMediaQuery(PHONE_QUERY)
   const [preview, setPreview] = useState<boolean>(false)
-  const nowRef = useRef<HTMLDivElement>(null)
-  /** The pinned bar shows once the "In use" strip has scrolled out of view. */
-  const [pinned, setPinned] = useState<boolean>(false)
+  const [panel, setPanel] = useState<boolean>(false)
+  /** Once closed by hand, a pick no longer reopens the panel until asked. */
+  const closedByHand = useRef<boolean>(false)
 
-  useEffect(() => {
-    const el = nowRef.current
-    if (!el || typeof IntersectionObserver === 'undefined') return
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry) setPinned(!entry.isIntersecting && entry.boundingClientRect.top < 0)
-    })
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [])
+  const pick = (id: string): void => {
+    setLogo(id)
+    if (!isPhone && !closedByHand.current) setPanel(true)
+  }
+  const openPanel = (): void => { closedByHand.current = false; setPanel(true) }
+  const closePanel = useCallback((): void => {
+    // Esc while the full-screen preview is up closes only the preview
+    if (preview) return
+    closedByHand.current = true
+    setPanel(false)
+  }, [preview])
+  const docked = panel && !isPhone
 
   return (
-    <div className="lp">
-      <div className="lp-now" ref={nowRef}>
-        <Display className="lp-now-disp">
-          <span className="bs-lbl lp-corner lp-corner--l">Loading screen · live</span>
-          <span className="bs-lbl lp-corner lp-corner--r">{inUse.motion}</span>
-          <AnimatedLoadingLogo logoId={inUse.id} size={512} controls={false} />
-        </Display>
-        <div className="lp-now-side">
-          <div>
-            <Signal tone="brand">In use</Signal>
-            <div className="lp-now-name">{inUse.name}</div>
-            <p className="lp-note">{inUse.note}</p>
-          </div>
-          <SizeProof logo={inUse} />
-          <div className="lp-actions">
-            <Key variant="primary" onClick={() => setPreview(true)}>Preview loading screen</Key>
-          </div>
+    <div className="lp" data-panel={docked}>
+      {/* Sticky: the pick's icon and wordmark at real size, and the panel key */}
+      <div className="lp-bar">
+        <div className="lp-bar-name">
+          <Signal tone="brand">In use</Signal>
+          <span className="bs-h3">{inUse.name}</span>
         </div>
-      </div>
-
-      <div className="lp-list">
-      {/* Pinned while browsing: the pick's icon and wordmark at real size */}
-      <div className="lp-pin" data-on={pinned} aria-hidden={!pinned}>
-        <div className="lp-pin-bar">
-          <div className="lp-pin-name">
-            <Signal tone="brand">In use</Signal>
-            <span className="bs-h3">{inUse.name}</span>
-          </div>
-          <SizeProof logo={inUse} compact />
-          <Key variant="primary" tabIndex={pinned ? 0 : -1} onClick={() => setPreview(true)}>Preview</Key>
-        </div>
+        <SizeProof logo={inUse} compact />
+        <Key variant={panel ? undefined : 'primary'} aria-expanded={panel}
+          onClick={() => (panel ? closePanel() : openPanel())}>
+          {panel ? 'Hide preview' : 'Show preview'}
+        </Key>
       </div>
 
       <div role="radiogroup" aria-label="Logo system">
@@ -104,10 +91,10 @@ export default function LogoSystemPicker(): React.ReactElement {
                   const on = logo.id === inUse.id
                   return (
                     <button key={logo.id} type="button" role="radio" aria-checked={on}
-                      className="lp-card" onClick={() => setLogo(logo.id)}>
+                      className="lp-card" onClick={() => pick(logo.id)}>
                       <Display className="lp-card-disp">
-                        {/* The picked card plays its loading motion in place, so it stays in view while browsing */}
-                        {on
+                        {/* With the panel docked the motion plays there; otherwise the picked card plays it in place */}
+                        {on && !docked
                           ? <AnimatedLoadingLogo logoId={logo.id} size={512} controls={false} />
                           : <img src={logoAsset(logo.id, 256)} alt="" loading="lazy" width={128} height={128} />}
                       </Display>
@@ -128,7 +115,20 @@ export default function LogoSystemPicker(): React.ReactElement {
           )
         })}
       </div>
-      </div>
+
+      <Drawer open={panel} onClose={closePanel} label="Loading screen · live" modal={false} className="bs-tokens lp-panel"
+        footer={<Key variant="primary" onClick={() => setPreview(true)}>Full-screen preview</Key>}>
+        <Display className="lp-panel-disp">
+          <span className="bs-lbl lp-corner lp-corner--r">{inUse.motion}</span>
+          {panel && <AnimatedLoadingLogo logoId={inUse.id} size={512} controls={false} />}
+        </Display>
+        <div className="lp-panel-meta">
+          <Signal tone="brand">In use</Signal>
+          <div className="lp-now-name">{inUse.name}</div>
+          <p className="lp-note">{inUse.note}</p>
+        </div>
+        <SizeProof logo={inUse} />
+      </Drawer>
 
       {preview && createPortal(
         <EnhancedLoadingScreen stage="preview" logoId={inUse.id} onClose={() => setPreview(false)} />,
