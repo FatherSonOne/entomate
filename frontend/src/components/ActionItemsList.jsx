@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { RefreshCw, Loader2, CheckCircle, XCircle, Clock, CalendarPlus } from 'lucide-react'
 import { integrationsApi, meetingsApi, calendarApi } from '../services/api'
 import TimecodeButton from './meetings/TimecodeButton'
+import AgentNotes from './meetings/AgentNotes'
 
 /**
  * @param {(atMs: number) => void} [onJumpToTranscript]  When given, items with a
@@ -219,6 +220,7 @@ export default function ActionItemsList({ items = [], onUpdate, meetingId, onJum
                       />
                     )}
                   </div>
+                  <AgentNotes notes={item.agent_notes} />
                   {item.last_sync_error && item.crm_sync_status === 'failed' && (
                     <p className="text-xs mt-1" style={{ color: 'var(--accent-primary)' }}>
                       Error: {item.last_sync_error}

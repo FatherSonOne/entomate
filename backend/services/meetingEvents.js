@@ -6,9 +6,9 @@
  *
  *   1. Agents — Priority, Deadline and (for unassigned items) Assignment
  *      agents review every action item. Their
- *      suggestions are applied conservatively (see decideUpdates) and every
- *      run is logged to agent_runs, so it shows up with its reasoning on the
- *      Agents page and can be overridden.
+ *      suggestions are applied conservatively (see decideUpdates). What each
+ *      agent recommended, why, and whether it was applied is saved to
+ *      action_items.agent_notes and shown under the item ("Why").
  *   2. Workflow triggers — active workflows in the meeting's org that start
  *      with a `meeting_processed` or `action_item_created` trigger are run.
  *
@@ -97,6 +97,33 @@ function decideUpdates(item, suggestions = {}, opts = {}) {
   }
 
   return updates;
+}
+
+/**
+ * What each agent recommended and why, for action_items.agent_notes.
+ * Pure function. A deadline the meeting already stated is left out: the
+ * agent only echoed it back.
+ */
+function buildAgentNotes(suggestions = {}, updates = {}, now = new Date()) {
+  const note = (s, field, value) => s && {
+    recommended: value ?? null,
+    reason: typeof s.reason === 'string' ? s.reason.slice(0, 500) : null,
+    confidence: typeof s.confidence === 'number' ? Math.round(s.confidence * 100) / 100 : null,
+    applied: field in updates
+  };
+
+  const notes = {};
+  if (suggestions.priority?.recommended) {
+    notes.priority = note(suggestions.priority, 'priority', String(suggestions.priority.recommended).toLowerCase());
+  }
+  if (suggestions.deadline?.recommended && !suggestions.deadline.isExisting) {
+    notes.deadline = note(suggestions.deadline, 'due_date', String(suggestions.deadline.recommended).slice(0, 10));
+  }
+  if (suggestions.assignment && (suggestions.assignment.recommendedMember?.name || suggestions.assignment.reason)) {
+    notes.assignment = note(suggestions.assignment, 'assigned_to_name', suggestions.assignment.recommendedMember?.name || null);
+  }
+  if (Object.keys(notes).length === 0) return null;
+  return { reviewed_at: now.toISOString(), ...notes };
 }
 
 /** True if a workflow contains a node of the given trigger subtype. */
@@ -196,23 +223,31 @@ class MeetingEvents {
     for (const item of actionItems) {
       const suggestions = byId.get(item.id);
       const updates = suggestions ? decideUpdates(item, suggestions) : {};
-      if (Object.keys(updates).length === 0 || !this.db) {
+      const notes = suggestions ? buildAgentNotes(suggestions, updates) : null;
+      if ((Object.keys(updates).length === 0 && !notes) || !this.db) {
         merged.push(item);
         continue;
       }
 
-      let query = this.db
-        .from('action_items')
-        .update({ ...updates, updated_at: new Date().toISOString() })
-        .eq('id', item.id);
-      if (item.org_id) query = query.eq('org_id', item.org_id);
+      const write = async (fields) => {
+        let query = this.db
+          .from('action_items')
+          .update({ ...fields, updated_at: new Date().toISOString() })
+          .eq('id', item.id);
+        if (item.org_id) query = query.eq('org_id', item.org_id);
+        return query;
+      };
 
-      const { error } = await query;
+      let { error } = await write(notes ? { ...updates, agent_notes: notes } : updates);
+      // Before the agent_notes migration runs, still apply the changes themselves.
+      if (error && notes && /agent_notes/.test(error.message || '') && Object.keys(updates).length > 0) {
+        ({ error } = await write(updates));
+      }
       if (error) {
         log.warn(`[MeetingEvents] Could not apply agent suggestions to ${item.id}:`, error.message);
         merged.push(item);
       } else {
-        updated++;
+        if (Object.keys(updates).length > 0) updated++;
         merged.push({ ...item, ...updates });
       }
     }
@@ -304,5 +339,6 @@ const meetingEvents = new MeetingEvents();
 module.exports = meetingEvents;
 module.exports.MeetingEvents = MeetingEvents;
 module.exports.decideUpdates = decideUpdates;
+module.exports.buildAgentNotes = buildAgentNotes;
 module.exports.hasTrigger = hasTrigger;
 module.exports.hasCodeNode = hasCodeNode;
