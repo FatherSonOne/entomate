@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  buildContents, changedSince, eyebrow, findEntry, highlight, prevNext, readUrlState, searchGuide,
+  buildContents, changedSince, chapterKey, eyebrow, findEntry, highlight, prevNext, readUrlState, searchGuide,
   shortDate, versionDate, writeUrlState,
 } from '../services/guideView'
 import type { GuideCategory, GuideChange, GuideSection } from '../components/UsersGuide/guideData'
@@ -122,5 +122,12 @@ describe('guide content', () => {
     expect(keys).not.toContain('⌘ P')
     expect(keys).not.toContain('⌘ T')
     expect(SHORTCUTS.filter((s) => s.top).length).toBe(5)
+  })
+})
+
+describe('chapter colour', () => {
+  it('keys every contents group', () => {
+    expect(chapterKey('Settings & help')).toBe('settings-help')
+    expect(CATEGORIES.map((c) => chapterKey(c.label))).toEqual(['start', 'meetings', 'work', 'follow-through', 'tools', 'settings-help'])
   })
 })

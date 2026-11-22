@@ -209,3 +209,8 @@ export function writeUrlState(params: URLSearchParams, next: Partial<GuideUrlSta
   if ('mark' in next) put('hl', next.mark)
   return out
 }
+
+/** "Settings & help" → "settings-help". Drives the chapter colour on the guide. */
+export function chapterKey(group: string): string {
+  return group.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+}

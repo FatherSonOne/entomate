@@ -2444,3 +2444,49 @@ a.bs-proj-pt:focus-visible { outline: 2px solid var(--bs-brand); outline-offset:
   .bs-dl-line, .bs-dl-line u { transition: none; }
 }
 @media print { .bs-dl { display: none; } }
+
+/* 15b. Guide colour (2026-11-22, Frankie: "no color, not easy on the eyes").
+   Each chapter of the guide has an accent: a bar over the title, the chapter
+   chip, tinted step keys, a tinted Good to know block and the contents
+   swatch. Chapter colour is wayfinding, never status: it never sits beside an
+   LED word, so the signal law still holds (status is LED + word only). */
+.bs-guide [data-chapter] { --gc: var(--bs-ink2); }
+.bs-guide [data-chapter="start"] { --gc: var(--bs-mint); }
+.bs-guide [data-chapter="meetings"] { --gc: var(--bs-brand); }
+.bs-guide [data-chapter="work"] { --gc: var(--bs-ai); }
+.bs-guide [data-chapter="follow-through"] { --gc: var(--bs-live); }
+.bs-guide [data-chapter="tools"] { --gc: color-mix(in srgb, var(--bs-ai) 50%, var(--bs-brand)); }
+.bs-guide [data-chapter="settings-help"] { --gc: color-mix(in srgb, var(--bs-mint) 45%, var(--bs-ink2)); }
+.bs-guide [data-chapter] { --gc-ink: color-mix(in srgb, var(--gc) 72%, var(--bs-ink)); --gc-wash: color-mix(in srgb, var(--gc) 9%, transparent); --gc-wash2: color-mix(in srgb, var(--gc) 16%, transparent); }
+
+.bs-guide-bar { display: block; width: 56px; height: 4px; border-radius: 2px; background: var(--gc); margin-bottom: 14px; }
+.bs-guide-chip { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 4px; background: var(--gc-wash2); color: var(--gc-ink); font: 600 10.5px/1 var(--bs-mono); letter-spacing: 0.1em; text-transform: uppercase; }
+.bs-guide article[data-chapter] .bs-guide-blk > .bs-sec { border-bottom-color: color-mix(in srgb, var(--gc) 45%, transparent); }
+.bs-guide article[data-chapter] .bs-guide-steps li::before { display: inline-grid; place-items: center; width: 22px; height: 22px; padding: 0; border-radius: 5px; background: var(--gc-wash2); color: var(--gc-ink); font-weight: 600; font-size: 11px; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gc) 28%, transparent); }
+.bs-guide article[data-chapter] .bs-guide-steps li { align-items: start; }
+.bs-guide article[data-chapter] .bs-guide-steps li > span { padding-top: 1px; }
+.bs-guide-tip { padding: 16px 18px 6px; border-radius: 12px; background: var(--gc-wash); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gc) 18%, transparent); }
+.bs-guide-tip > .bs-lbl { margin: 0 0 4px; color: var(--gc-ink); font-weight: 600; }
+.bs-guide-tip .bs-guide-bul li { border-bottom-color: color-mix(in srgb, var(--gc) 14%, transparent); }
+.bs-guide-tip .bs-guide-bul li:last-child { border-bottom: 0; }
+.bs-guide-tip .bs-guide-bul li::before { background: var(--gc); }
+.bs-guide article[data-chapter] .bs-guide-note { margin-top: 8px; padding: 10px 12px; border-bottom: 0; border-radius: 8px; background: var(--gc-wash); }
+.bs-guide article[data-chapter] .bs-guide-note > .bs-lbl { color: var(--gc-ink); font-weight: 600; }
+.bs-guide-tg { display: flex; align-items: center; gap: 8px; }
+.bs-guide-tg i { width: 8px; height: 8px; border-radius: 2px; background: var(--gc); flex: none; }
+.bs-guide-toc [data-chapter] .bs-guide-ti[aria-current="page"] .bs-guide-n { color: var(--gc-ink); }
+
+/* Screenshots: the real app in a sunk bezel; the theme's version shows. */
+.bs-guide-fig { margin: 22px 0 6px; }
+.bs-guide-shot { padding: 6px; border-radius: 14px; background: var(--bs-sunk); box-shadow: inset 0 1px 2px var(--bs-lo), inset 0 0 0 1px var(--bs-rule2); }
+.bs-guide-shot img { display: block; width: 100%; height: auto; border-radius: 9px; box-shadow: 0 0 0 1px var(--bs-rule); }
+.bs-guide-shot img.is-dark { display: none; }
+html.dark .bs-guide-shot img.is-light { display: none; }
+html.dark .bs-guide-shot img.is-dark { display: block; }
+.bs-guide-fig figcaption { margin-top: 8px; font: 500 11px/1.5 var(--bs-mono); letter-spacing: 0.04em; color: var(--bs-muted); }
+.bs-guide-blk .bs-guide-fig { margin-top: 14px; }
+.bs-guide-head { padding: 22px 24px 22px; border-radius: 14px; background: linear-gradient(135deg, var(--gc-wash2), var(--gc-wash) 45%, transparent 85%); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gc) 14%, transparent); }
+.bs-guide-head .bs-guide-sum { color: var(--bs-ink); opacity: 0.82; }
+.bs-guide article[data-chapter] .bs-guide-blk > .bs-sec .bs-h3 { color: var(--bs-ink); }
+.bs-guide article[data-chapter] .bs-guide-blk > .bs-sec { border-bottom-width: 1px; border-bottom-color: color-mix(in srgb, var(--gc) 55%, transparent); }
+@media (max-width: 767.98px) { .bs-guide-head { padding: 18px 16px; } }

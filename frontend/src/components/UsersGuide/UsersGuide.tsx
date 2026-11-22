@@ -5,11 +5,12 @@ import {
 } from './guideData'
 import type { GuideSection, GuideShortcut } from './guideData'
 import { markGuideSeen, readSeenVersion } from './useGuideNewFeatures'
+import { GUIDE_SHOTS } from './guideShots'
 import {
   Cell, Drawer, GroupHead, Grid, Key, PHONE_QUERY, Section, Signal, TextInput, TitleRule, useMediaQuery,
 } from '../bench'
 import {
-  SECTION_LINKS, buildContents, changedSince, eyebrow, findEntry, flatten, highlight, prevNext,
+  SECTION_LINKS, buildContents, chapterKey, changedSince, eyebrow, findEntry, flatten, highlight, prevNext,
   readUrlState, searchGuide, shortDate, writeUrlState,
 } from '../../services/guideView'
 import type { ContentsEntry, ContentsGroup, GuideHit, GuideUrlState } from '../../services/guideView'
@@ -48,6 +49,24 @@ function Steps({ items, q }: { items: ReadonlyArray<string>; q: string }): React
   )
 }
 
+/**
+ * A screenshot of the real app (seeded qntmecos workspace). Both themes ship;
+ * CSS shows the one matching html.dark. Missing ids render nothing.
+ */
+function GuideFigure({ id }: { id: string }): React.ReactElement | null {
+  const shot = GUIDE_SHOTS[id]
+  if (!shot) return null
+  return (
+    <figure className="bs-guide-fig">
+      <div className="bs-guide-shot">
+        <img className="is-light" src={`/guide/${id}-light.webp`} alt={shot.alt} loading="lazy" decoding="async" width={shot.w} height={shot.h} />
+        <img className="is-dark" src={`/guide/${id}-dark.webp`} alt="" aria-hidden="true" loading="lazy" decoding="async" width={shot.w} height={shot.h} />
+      </div>
+      <figcaption>{shot.caption}</figcaption>
+    </figure>
+  )
+}
+
 export function KeyMap({ items }: { items: ReadonlyArray<GuideShortcut> }): React.ReactElement {
   return (
     <dl className="bs-guide-keymap">
@@ -77,9 +96,11 @@ function Reader({ entry, q, updated, groups, onGo }: {
     navigator.clipboard?.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1600) }).catch(() => { /* clipboard refused */ })
   }
   return (
-    <article aria-labelledby="guide-section-title">
+    <article aria-labelledby="guide-section-title" data-chapter={chapterKey(entry.group)}>
+      <header className="bs-guide-head">
+      <span className="bs-guide-bar" aria-hidden="true" />
       <div className="bs-guide-eyebrow">
-        <span className="bs-lbl">{eyebrow(entry)}</span>
+        <span className="bs-guide-chip">{eyebrow(entry)}</span>
         {updated && <Signal tone="ai">Updated</Signal>}
       </div>
       <h2 id="guide-section-title" className="bs-guide-h"><Hl text={s.title} q={q} /></h2>
@@ -88,6 +109,8 @@ function Reader({ entry, q, updated, groups, onGo }: {
         {href && <Link to={href} className="bs-key pri">Open {s.title} →</Link>}
         <Key size="sm" onClick={copyLink}>{copied ? 'Copied' : 'Copy link'}</Key>
       </div>
+      </header>
+      <GuideFigure id={s.id} />
 
       {s.id === 'keyboard-shortcuts' && (
         <div className="bs-guide-blk">
@@ -105,8 +128,9 @@ function Reader({ entry, q, updated, groups, onGo }: {
         <div key={sub.id} className="bs-guide-blk" id={`guide-${sub.id}`}>
           <Section level={3} title={<Hl text={sub.title} q={q} />} />
           {sub.description && <p className="bs-guide-desc">{sub.description}</p>}
+          <GuideFigure id={sub.id} />
           <Steps items={sub.steps} q={q} />
-          {sub.note && <p className="bs-guide-note"><Signal tone="ai">Note</Signal><span><Hl text={sub.note} q={q} /></span></p>}
+          {sub.note && <p className="bs-guide-note"><span className="bs-lbl">Note</span><span><Hl text={sub.note} q={q} /></span></p>}
         </div>
       ))}
       {(s.useCases?.length ?? 0) > 0 && (
@@ -121,8 +145,8 @@ function Reader({ entry, q, updated, groups, onGo }: {
         </div>
       )}
       {(s.tips?.length ?? 0) > 0 && (
-        <div className="bs-guide-blk">
-          <Section level={3} title="Good to know" />
+        <div className="bs-guide-blk bs-guide-tip">
+          <p className="bs-lbl">Good to know</p>
           <ul className="bs-guide-bul">
             {(s.tips ?? []).map((t, i) => <li key={i} className={hasHit(t, q) ? 'is-hit' : undefined}><span><Hl text={t} q={q} /></span></li>)}
           </ul>
@@ -148,8 +172,8 @@ function Contents({ groups, current, updated, news, onGo, onNews }: {
   return (
     <nav className="bs-guide-toc" aria-label="Guide contents">
       {groups.map((g) => (
-        <div key={g.label}>
-          <span className="bs-lbl bs-guide-tg">{g.label}</span>
+        <div key={g.label} data-chapter={chapterKey(g.label)}>
+          <span className="bs-lbl bs-guide-tg"><i aria-hidden="true" />{g.label}</span>
           {g.entries.map((e) => {
             const on = !news && e.id === current
             return (
