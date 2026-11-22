@@ -6199,3 +6199,22 @@ html.dark .la-sheet-handle-bar {
   font-variant-numeric: tabular-nums;
 }
 .la-tool-chip.is-failed .la-tool-chip-count { color: var(--cmf-error-ink, #DC2626); }
+
+/* ── Clean the edges (2026-11-22): Bench rules in the Ask panel ──
+   No coloured side stripes on cards or messages: a hairline frame does the
+   job. No gradient text: the working label is plain muted text with a live
+   LED beside it (the pipeline already draws one). Blockquotes keep their rule. */
+.logos-assistant.la-swiss :is(.la-message-user .la-message-content, .la-artifact, .la-thoughts) {
+  border-left: 0;
+}
+.logos-assistant.la-swiss .la-proposal-confirm-gate {
+  padding: 10px 12px;
+  border: 1px solid var(--la-sw-rule, rgba(0, 0, 0, 0.12));
+  border-radius: 6px;
+}
+.logos-assistant.la-swiss .la-pipeline-text {
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  color: var(--cmf-text-muted, #6B6560);
+  animation: none;
+}

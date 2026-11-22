@@ -188,7 +188,7 @@ export default function Projects(): React.ReactElement {
             {loading ? <p className="bs-proj-empty">Loading projects</p> : shown.length === 0 ? (
               <div className="bs-proj-empty">
                 <p>{search || url.show !== 'all' ? 'No projects match.' : 'No projects yet. A project collects the decisions and action items of the meetings you link to it.'}</p>
-                {!search && url.show === 'all' && <Key variant="primary" onClick={() => setUrl({ drawer: 'new' })}>New project</Key>}
+                {!search && url.show === 'all' && <Key onClick={() => setUrl({ drawer: 'new' })}>New project</Key>}
               </div>
             ) : (
               <ul className="bs-rows">

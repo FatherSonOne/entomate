@@ -21,7 +21,7 @@ export const SECTION_LINKS: Readonly<Record<string, string>> = {
   dashboard: '/dashboard',
   meetings: '/meetings',
   'meeting-details': '/meetings',
-  calendar: '/calendar',
+  calendar: '/dashboard',
   tasks: '/tasks',
   projects: '/projects',
   automations: '/automations',

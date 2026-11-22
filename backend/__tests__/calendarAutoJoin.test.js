@@ -168,3 +168,35 @@ describe('missed meetings', () => {
     expect(aj.healthOf(null)).toEqual({ lastRunAt: null, missed: [] });
   });
 });
+
+describe('per-meeting skip and join', () => {
+  const key = aj.eventKey(event());
+  test('skip keeps the bot out of a meeting auto-join would take', () => {
+    const d = aj.decide(event(), { now, overrides: { [key]: 'skip' } });
+    expect(d).toMatchObject({ join: false, reason: 'skipped', override: 'skip', canJoin: true });
+  });
+  test("join sends it to someone else's meeting, but never one without a link", () => {
+    const theirs = event({ organizer: { email: 'lee@client.com' } });
+    const k = aj.eventKey(theirs);
+    expect(aj.decide(theirs, { now }).join).toBe(false);
+    expect(aj.decide(theirs, { now, overrides: { [k]: 'join' } })).toMatchObject({ join: true, override: 'join' });
+    const noLink = event({ organizer: { email: 'lee@client.com' }, hangoutLink: undefined });
+    expect(aj.decide(noLink, { now, overrides: { [aj.eventKey(noLink)]: 'join' } })).toMatchObject({ join: false, reason: 'not_organizer', canJoin: false });
+  });
+  test('overrides keep valid entries and drop old meetings', () => {
+    const out = aj.normalizeOverrides({ [key]: 'skip', 'old@2026-11-01T10:00:00.000Z': 'join', bad: 'maybe' }, now);
+    expect(out).toEqual({ [key]: 'skip' });
+  });
+  test('runForUser respects a skip and withdraws the scheduled bot', async () => {
+    mockLaunch.mockClear(); mockStop.mockClear(); mockGetEvents.mockReset();
+    mockTables = {
+      org_members: [{ user_id: 'u1', org_id: 'o1', role: 'owner' }],
+      bot_sessions: [{ id: 's1', org_id: 'o1', consent_acknowledged_by: 'u1', calendar_event_key: key, status: 'pending', join_at: inMin(30) }],
+    };
+    mockGetEvents.mockResolvedValue([event()]);
+    const row = { user_id: 'u1', calendar_json: { tokens: { access_token: 't' }, auto_join: { enabled: true, org_id: 'o1', consent_at: '2026-11-22T00:00:00Z', overrides: { [key]: 'skip' } } } };
+    const r = await aj.runForUser(row, now);
+    expect(r.scheduled).toBe(0);
+    expect(mockStop).toHaveBeenCalledWith('s1', 'calendar_changed');
+  });
+});

@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import ProtectedRoute from './components/ProtectedRoute'
 import OrgSetupGate from './components/teams/OrgSetupGate'
 import Layout from './components/Layout'
@@ -19,7 +19,6 @@ const Insights = React.lazy(() => import('./pages/Insights'))
 const Search = React.lazy(() => import('./pages/Search'))
 const Settings = React.lazy(() => import('./pages/Settings'))
 const Bot = React.lazy(() => import('./pages/Bot'))
-const Calendar = React.lazy(() => import('./pages/Calendar'))
 const WorkflowBuilder = React.lazy(() => import('./pages/WorkflowBuilder'))
 const UsersGuide = React.lazy(() => import('./components/UsersGuide/UsersGuide'))
 const SignIn = React.lazy(() => import('./pages/SignIn'))
@@ -31,6 +30,14 @@ const Terms = React.lazy(() => import('./pages/Terms'))
 const OptOut = React.lazy(() => import('./pages/OptOut'))
 const DataDeletion = React.lazy(() => import('./pages/DataDeletion'))
 const NotFound = React.lazy(() => import('./pages/NotFound'))
+
+// The Calendar page was retired (surface audit 2026-11-22): Today shows the schedule and
+// Settings › Recording holds the Google connection. Old links and OAuth returns to
+// /calendar land on Today with their query intact.
+function CalendarMoved() {
+  const location = useLocation()
+  return <Navigate to={{ pathname: '/dashboard', search: location.search }} replace />
+}
 
 export default function App() {
   return (
@@ -67,7 +74,7 @@ export default function App() {
             <Route path="analytics" element={<Insights />} />
             <Route path="insights" element={<Navigate to="/analytics" replace />} />
             <Route path="reports" element={<Navigate to="/analytics?export=" replace />} />
-            <Route path="calendar" element={<Calendar />} />
+            <Route path="calendar" element={<CalendarMoved />} />
             <Route path="search" element={<Search />} />
             <Route path="settings" element={<Settings />} />
             <Route path="bot" element={<Bot />} />

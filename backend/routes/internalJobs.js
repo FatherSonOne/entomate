@@ -4,15 +4,17 @@
  * On Render's free plan the web process sleeps when idle, so the in-process
  * 03:00 UTC retention timer can be missed. An external scheduler (the
  * GitHub Actions workflow .github/workflows/nightly-jobs.yml) calls this
- * endpoint daily. Service-to-service only: X-API-Key = INTERNAL_API_KEY.
+ * endpoint daily, and Supabase pg_cron calls autojoin every 10 minutes.
+ * Service-to-service only: X-API-Key = INTERNAL_API_KEY, or X-Cron-Token
+ * (see middleware/cronTokenAuth.js).
  * Jobs are idempotent, so the in-process timer firing as well is harmless.
  */
 const express = require('express');
-const { apiKeyAuth } = require('../middleware/auth');
+const { internalJobAuth } = require('../middleware/cronTokenAuth');
 const log = require('../utils/log');
 
 const router = express.Router();
-router.use(apiKeyAuth);
+router.use(internalJobAuth);
 
 const JOBS = {
   retention: () => require('../services/retentionService').runRetentionSweep(),
@@ -38,7 +40,7 @@ router.post('/jobs/:job', (req, res) => {
   const startedAt = new Date().toISOString();
   Promise.resolve()
     .then(run)
-    .then((result) => log.info('[InternalJobs] finished', { job, result }))
+    .then((result) => log.info('[InternalJobs] finished', { job, caller: req.jobCaller || 'api_key', result }))
     .catch((err) => log.error('[InternalJobs] failed', { job, error: err.message }))
     .finally(() => running.delete(job));
 

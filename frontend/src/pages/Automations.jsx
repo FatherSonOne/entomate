@@ -156,7 +156,7 @@ export default function Automations() {
         meta={meta}
         actions={(
           <>
-            <Key onClick={() => setParam('new', '1')}>Start from a template</Key>
+            <Key onClick={() => setParam('new', '1')}>Browse recipes</Key>
             <Key variant="primary" onClick={newBlank}>New automation</Key>
           </>
         )}
@@ -173,7 +173,7 @@ export default function Automations() {
           {!loading && described.length === 0 && (
             <div className="bs-auto-empty">
               <p>No automations yet. Start with a meeting recipe: it runs every time a meeting is processed.</p>
-              <Key variant="primary" onClick={() => setParam('new', '1')}>Pick a recipe</Key>
+              <Key onClick={() => setParam('new', '1')}>Browse recipes</Key>
             </div>
           )}
 
@@ -537,7 +537,7 @@ function RecipesDrawer({ open, onClose, onCreated, onBlank, toast }) {
   }
 
   return (
-    <Drawer open={open} onClose={onClose} label="Start from a template">
+    <Drawer open={open} onClose={onClose} label="Recipes">
       <GroupHead label="After a meeting" count={meeting.length} />
       <ul className="bs-auto-tpls">{meeting.map(row)}</ul>
       <GroupHead label="On a schedule" count={other.length} />

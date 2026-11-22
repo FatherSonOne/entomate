@@ -10,6 +10,7 @@ import type { RuledColumn } from '../components/bench'
 import {
   EXPORTS, PERIODS, findExport, findOwner, isBehind, meterBars, ownerKey, ownerLabel, periodLabel,
   plural, rateLabel, readUrlState, shortDay, titleMeta, weekLabel, writeUrlState,
+  normalizeInsights,
 } from '../services/insightsView'
 import type { ExportDef, ExportKind, InsightsData, OwnerRow, Period, WeekRow } from '../services/insightsView'
 
@@ -80,7 +81,7 @@ export default function Insights(): React.ReactElement {
     setError(null)
     try {
       const res = (await http.get('/analytics/insights', { params: { days: period } })) as InsightsResponse
-      setData(res.data)
+      setData(normalizeInsights(res?.data))
     } catch (err) {
       console.error('[Insights] load error:', err)
       setError('Insights could not be loaded.')

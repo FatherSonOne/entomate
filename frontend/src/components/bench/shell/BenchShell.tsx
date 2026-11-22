@@ -403,8 +403,8 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
           entomate
           <span className="bs-ver" aria-hidden="true">EN-01</span>
         </Link>
-        <Key className="bs-search" onClick={onSearch} kbd={`${modKey}K`} aria-label="Search or ask">
-          <span className="bs-search-label">Search or ask</span>
+        <Key className="bs-search" onClick={onSearch} kbd={`${modKey}K`} aria-label="Search or Ask Entomate">
+          <span className="bs-search-label">Search</span>
         </Key>
         <nav className="bs-patch" aria-label="Modules">
           <PatchPanel groups={railGroups} isActive={isActive} />
@@ -435,7 +435,7 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
             <span aria-hidden="true">·</span>
             <time dateTime={now.toISOString()}>{DATE_FMT.format(now)} · {TIME_FMT.format(now)}</time>
           </div>
-          <Key className="bs-ph-only" iconOnly onClick={onSearch} aria-label="Search or ask" icon={<Search aria-hidden="true" strokeWidth={1.6} />} />
+          <Key className="bs-ph-only" iconOnly onClick={onSearch} aria-label="Search or Ask Entomate" icon={<Search aria-hidden="true" strokeWidth={1.6} />} />
           <ThemeSwitch isDark={isDark} onChange={onThemeChange} />
           <Key
             iconOnly

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  findOwner, isBehind, meterBars, ownerKey, ownerLabel, rateLabel, readUrlState,
+  findOwner, isBehind, meterBars, normalizeInsights, ownerKey, ownerLabel, rateLabel, readUrlState,
   shortDay, titleMeta, weekLabel, writeUrlState, type InsightsData, type WeekRow,
 } from '../services/insightsView'
 
@@ -74,5 +74,23 @@ describe('URL state', () => {
     const p = writeUrlState(new URLSearchParams('owner=Jon'), { period: '7', exportKind: '' })
     expect(p.toString()).toBe('owner=Jon&per=7&export=')
     expect(writeUrlState(p, { period: '30', owner: null, exportKind: null }).toString()).toBe('')
+  })
+})
+
+describe('normalizeInsights', () => {
+  it('returns null for an empty response', () => {
+    expect(normalizeInsights(undefined)).toBeNull()
+    expect(normalizeInsights(null)).toBeNull()
+  })
+
+  it('fills every section when the server sends a partial body (Insights.tsx crash)', () => {
+    const out = normalizeInsights({ meetings: 3, owners: [{ name: 'Dana' }] })
+    expect(out).not.toBeNull()
+    expect(out!.meetings).toBe(3)
+    expect(out!.actionItems).toEqual({ created: 0, done: 0 })
+    expect(out!.followThrough.rate).toBeNull()
+    expect(out!.agents.byAgent).toEqual([])
+    expect(out!.owners[0]?.items).toEqual([])
+    expect(out!.weeks).toEqual([])
   })
 })

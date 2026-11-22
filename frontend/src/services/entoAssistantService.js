@@ -37,7 +37,7 @@ function setCache(key, value) {
 export const SECTIONS = {
   dashboard:        { label: 'Dashboard',     path: '/dashboard' },
   meetings:         { label: 'Meetings',      path: '/meetings' },
-  calendar:         { label: 'Calendar',      path: '/calendar' },
+  calendar:         { label: 'Schedule',      path: '/dashboard' },
   search:           { label: 'Search',        path: '/search' },
   projects:         { label: 'Projects',      path: '/projects' },
   'project-dashboard': { label: 'Project Board', path: '/projects?view=board' },

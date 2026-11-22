@@ -27,7 +27,7 @@ import './EntoAI.tokens.css'; // the skeleton reads --cmf-*; the bench-swiss she
  */
 const EntoAssistantSkeleton: React.FC = () => {
   return (
-  <div className="la-skel" role="status" aria-label="Loading Entomate AI">
+  <div className="la-skel" role="status" aria-label="Loading Ask Entomate">
     <div className="la-skel-panel">
       <div className="la-skel-handle" aria-hidden="true" />
       {/* Header */}

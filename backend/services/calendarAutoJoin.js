@@ -20,7 +20,12 @@
  * whose event was moved, cancelled or no longer qualifies is withdrawn.
  *
  * Settings live at user_settings.calendar_json.auto_join:
- *   { enabled, scope, org_id, consent_at }
+ *   { enabled, scope, org_id, consent_at, overrides }
+ *
+ * overrides: { [eventKey]: 'skip' | 'join' }, set per meeting from
+ * Meetings › Upcoming. 'skip' keeps the bot out of a meeting auto-join would
+ * take; 'join' sends it to one it would pass over because someone else
+ * organizes it or nobody else is invited. 'join' never adds a missing link.
  */
 
 'use strict';
@@ -113,7 +118,45 @@ function normalizeSettings(raw) {
     scope: SCOPES.includes(s.scope) ? s.scope : 'organized',
     org_id: typeof s.org_id === 'string' ? s.org_id : null,
     consent_at: typeof s.consent_at === 'string' ? s.consent_at : null,
+    overrides: normalizeOverrides(s.overrides),
   };
+}
+
+const OVERRIDES = ['skip', 'join'];
+const MAX_OVERRIDES = 300;
+/** Reasons a person may overrule with 'join'. */
+const JOINABLE = ['not_organizer', 'no_invitees'];
+
+/** Valid entries only; drops meetings that started more than a day ago. */
+function normalizeOverrides(raw, now = new Date()) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const cutoff = now.getTime() - 24 * 60 * 60 * 1000;
+  const out = {};
+  for (const [key, v] of Object.entries(raw)) {
+    if (!OVERRIDES.includes(v) || typeof key !== 'string' || key.length > 300) continue;
+    const at = Date.parse(key.slice(key.lastIndexOf('@') + 1));
+    if (Number.isFinite(at) && at < cutoff) continue;
+    out[key] = v;
+    if (Object.keys(out).length >= MAX_OVERRIDES) break;
+  }
+  return out;
+}
+
+/**
+ * qualifies() plus the person's per-meeting choice.
+ * @returns {{ join: boolean, reason?: string, link?: object, override: 'skip'|'join'|null, canJoin: boolean }}
+ */
+function decide(event, { scope = 'organized', now = new Date(), lookaheadMs = LOOKAHEAD_MS, overrides = {} } = {}) {
+  const q = qualifies(event, { scope, now, lookaheadMs });
+  const override = overrides[eventKey(event)] || null;
+  if (q.join) {
+    if (override === 'skip') return { join: false, reason: 'skipped', link: q.link, override, canJoin: true };
+    return { ...q, override: null, canJoin: true };
+  }
+  const link = meetingLink(event);
+  const canJoin = JOINABLE.includes(q.reason) && Boolean(link);
+  if (override === 'join' && canJoin) return { join: true, link, override, canJoin };
+  return { ...q, override: null, canJoin };
 }
 
 // ── Job ──
@@ -183,7 +226,7 @@ async function runForUser(row, now = new Date()) {
 
   const wanted = new Map();
   for (const event of events) {
-    const q = qualifies(event, { scope: settings.scope, now });
+    const q = decide(event, { scope: settings.scope, now, overrides: settings.overrides });
     if (q.join) wanted.set(eventKey(event), { event, link: q.link });
     else out.skipped += 1;
   }
@@ -240,7 +283,7 @@ async function runForUser(row, now = new Date()) {
       log.warn('[AutoJoin] could not withdraw bot', { sessionId: s.id, error: err.message });
     }
   }
-  await recordHealth(userId, missedEvents(events, existing || [], settings.scope, now), now, me)
+  await recordHealth(userId, missedEvents(events, existing || [], settings.scope, now, settings.overrides), now, me)
     .catch((err) => log.warn('[AutoJoin] could not save the run', { userId, error: err.message }));
   return out;
 }
@@ -249,7 +292,7 @@ async function runForUser(row, now = new Date()) {
  * Qualifying events that started 3 to 60 minutes ago with no bot, or whose bot failed.
  * Pure: `sessions` are this user's auto-join bot_sessions rows.
  */
-function missedEvents(events, sessions, scope, now = new Date()) {
+function missedEvents(events, sessions, scope, now = new Date(), overrides = {}) {
   const byKey = new Map(sessions.map((s) => [s.calendar_event_key, s]));
   const out = [];
   for (const event of events || []) {
@@ -258,7 +301,7 @@ function missedEvents(events, sessions, scope, now = new Date()) {
     const ago = now.getTime() - start.getTime();
     if (ago < MISSED_AFTER_MS || ago > MISSED_WINDOW_MS) continue;
     // Would auto-join have taken it, judged at its own start time?
-    if (!qualifies(event, { scope, now: start }).join) continue;
+    if (!decide(event, { scope, now: start, overrides }).join) continue;
     const key = eventKey(event);
     const session = byKey.get(key);
     if (session && !FAILED_STATUSES.includes(session.status)) continue;
@@ -366,7 +409,7 @@ async function preview(userId, tokens, settings, now = new Date()) {
   return events
     .filter((e) => startOf(e))
     .map((e) => {
-      const q = qualifies(e, { scope: s.scope, now, lookaheadMs: 24 * 60 * 60 * 1000 });
+      const q = decide(e, { scope: s.scope, now, lookaheadMs: 24 * 60 * 60 * 1000, overrides: s.overrides });
       const key = eventKey(e);
       return {
         id: e.id,
@@ -376,6 +419,64 @@ async function preview(userId, tokens, settings, now = new Date()) {
         join: q.join,
         reason: q.join ? null : q.reason,
         botStatus: byKey.get(key) || null,
+      };
+    });
+}
+
+const UPCOMING_MAX_DAYS = 90;
+
+/** All-day events have a date, not a time. */
+function dayOf(event) {
+  if (event?.start?.dateTime) return new Date(event.start.dateTime);
+  if (event?.start?.date) return new Date(`${event.start.date}T00:00:00`);
+  return null;
+}
+
+/**
+ * Meetings › Upcoming: the next `days` of events with what the bot will do
+ * for each, and why. Read-only. With auto-join off, `join` says what it would do.
+ */
+async function upcoming(userId, tokens, settings, { days = 60, now = new Date() } = {}) {
+  const s = normalizeSettings(settings);
+  const span = Math.min(Math.max(Number(days) || 60, 1), UPCOMING_MAX_DAYS);
+  const events = await calendar().getEvents(tokens, {
+    timeMin: new Date(now.getTime() - GRACE_MS).toISOString(),
+    timeMax: new Date(now.getTime() + span * 24 * 60 * 60 * 1000).toISOString(),
+    maxResults: 250,
+  });
+  const { data: sessions } = await db()
+    .from('bot_sessions')
+    .select('id, calendar_event_key, status')
+    .eq('consent_acknowledged_by', userId)
+    .not('calendar_event_key', 'is', null)
+    .neq('status', 'stopped')
+    .gte('join_at', new Date(now.getTime() - GRACE_MS).toISOString());
+  const byKey = new Map((sessions || []).map((x) => [x.calendar_event_key, x]));
+  return events
+    .filter((e) => dayOf(e) && e.status !== 'cancelled')
+    .map((e) => {
+      const allDay = !e.start?.dateTime;
+      const d = allDay ? { join: false, reason: 'all_day', override: null, canJoin: false }
+        : decide(e, { scope: s.scope, now, lookaheadMs: span * 24 * 60 * 60 * 1000, overrides: s.overrides });
+      const key = allDay ? null : eventKey(e);
+      const session = key ? byKey.get(key) : null;
+      const organizer = e.organizer?.self ? 'you' : (e.organizer?.displayName || e.organizer?.email || null);
+      return {
+        id: e.id,
+        key,
+        title: e.summary || 'Untitled event',
+        start: allDay ? e.start.date : e.start.dateTime,
+        end: allDay ? (e.end?.date || null) : (e.end?.dateTime || null),
+        allDay,
+        platform: d.link?.platform || meetingLink(e)?.platform || null,
+        join: d.join,
+        reason: d.join ? null : d.reason,
+        override: d.override,
+        canJoin: d.canJoin,
+        organizer,
+        attendees: (e.attendees || []).filter((a) => !a.resource).map((a) => ({ name: a.displayName || null, email: a.email || null, self: Boolean(a.self) })),
+        botStatus: session?.status || null,
+        htmlLink: typeof e.htmlLink === 'string' ? e.htmlLink : null,
       };
     });
 }
@@ -440,7 +541,10 @@ module.exports = {
   otherInvitees,
   eventKey,
   qualifies,
+  decide,
   normalizeSettings,
+  normalizeOverrides,
+  upcoming,
   runForUser,
   runAutoJoin,
   missedEvents,

@@ -728,7 +728,8 @@ router.put('/auto-join', authenticate, validate(schemas.autoJoin), async (req, r
         enabled: true,
         scope: scope || prev.scope,
         org_id: targetOrg,
-        consent_at: consentAcknowledged === true ? new Date().toISOString() : prev.consent_at
+        consent_at: consentAcknowledged === true ? new Date().toISOString() : prev.consent_at,
+        overrides: prev.overrides
       };
     } else {
       next = { ...prev, enabled: false, scope: scope || prev.scope };
@@ -753,6 +754,88 @@ router.put('/auto-join', authenticate, validate(schemas.autoJoin), async (req, r
   } catch (error) {
     log.error('Error saving auto-join settings:', { error: error.message || error });
     res.status(500).json({ error: 'Failed to save auto-join settings' });
+  }
+});
+
+/**
+ * GET /api/calendar/upcoming-meetings?days=60
+ * Meetings › Upcoming: calendar events for the next days with what the bot
+ * will do for each (join, reason, the person's own skip/join) and why.
+ */
+router.get('/upcoming-meetings', authenticate, async (req, res) => {
+  try {
+    const { data } = await supabase
+      .from('user_settings')
+      .select('calendar_json')
+      .eq('user_id', req.user.id)
+      .maybeSingle();
+    const calendarJson = data?.calendar_json || {};
+    const settings = autoJoin.normalizeSettings(calendarJson.auto_join);
+    const tokens = calendarJson.tokens || null;
+    const base = {
+      configured: calendarService.isConfigured(),
+      connected: Boolean(tokens),
+      autoJoin: { enabled: settings.enabled, scope: settings.scope },
+      health: autoJoin.healthOf(calendarJson),
+      events: [],
+      error: null
+    };
+    if (!tokens || !base.configured) return res.json(base);
+    try {
+      base.events = await autoJoin.upcoming(req.user.id, tokens, settings, { days: req.query.days });
+    } catch (err) {
+      log.warn('Upcoming meetings failed:', err.message);
+      base.error = 'Could not read your calendar. Try connecting it again.';
+    }
+    res.set('Cache-Control', 'no-store');
+    res.json(base);
+  } catch (error) {
+    log.error('Error getting upcoming meetings:', { error: error.message || error });
+    res.status(500).json({ error: 'Failed to load upcoming meetings' });
+  }
+});
+
+/**
+ * PUT /api/calendar/auto-join/override  { eventKey, decision: 'skip'|'join'|null }
+ * One meeting's bot choice. Takes effect on the next auto-join run; when
+ * auto-join is on, this person's run happens now so a skip withdraws a
+ * scheduled bot straight away.
+ */
+router.put('/auto-join/override', authenticate, validate(schemas.autoJoinOverride), async (req, res) => {
+  try {
+    const { eventKey, decision } = req.body;
+    const { data } = await supabase
+      .from('user_settings')
+      .select('user_id, calendar_json')
+      .eq('user_id', req.user.id)
+      .maybeSingle();
+    if (!data?.calendar_json?.tokens) {
+      return res.status(400).json({ error: 'calendar_not_connected', message: 'Connect Google Calendar first.' });
+    }
+    const calendarJson = data.calendar_json;
+    const prev = autoJoin.normalizeSettings(calendarJson.auto_join);
+    const overrides = { ...prev.overrides };
+    if (decision) overrides[eventKey] = decision;
+    else delete overrides[eventKey];
+    const raw = { ...(calendarJson.auto_join || {}), overrides: autoJoin.normalizeOverrides(overrides) };
+    const nextJson = { ...calendarJson, auto_join: raw };
+    const { error } = await supabase
+      .from('user_settings')
+      .update({ calendar_json: nextJson })
+      .eq('user_id', req.user.id);
+    if (error) throw error;
+
+    let run = null;
+    if (prev.enabled) {
+      run = await autoJoin.runForUser({ user_id: req.user.id, calendar_json: nextJson }).catch((err) => {
+        log.warn('Auto-join run after override failed:', err.message);
+        return null;
+      });
+    }
+    res.json({ eventKey, decision: decision || null, applied: Boolean(run) });
+  } catch (error) {
+    log.error('Error saving auto-join override:', { error: error.message || error });
+    res.status(500).json({ error: 'Failed to save that choice' });
   }
 });
 

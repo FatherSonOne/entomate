@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useOutletContext } from 'react-router-dom'
 import IntelligenceDashboard from '../components/intelligence/IntelligenceDashboard'
 import CarryForward from '../components/meetings/CarryForward'
-import { meetingsApi, tasksApi, dashboardApi, calendarApi, learningApi, checkHealth } from '../services/api'
+import { meetingsApi, tasksApi, dashboardApi, calendarApi, learningApi } from '../services/api'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { useToast } from '../components/vc/ToastProvider'
 import {
@@ -51,8 +51,6 @@ export default function Today() {
   const [taskCount, setTaskCount] = useState(0)
   const [upcoming, setUpcoming] = useState([])
   const [calendarOn, setCalendarOn] = useState(null)
-  const [workload, setWorkload] = useState([])
-  const [systemStatus, setSystemStatus] = useState(null)
   const [learning, setLearning] = useState(null)
   const [loading, setLoading] = useState(true)
   const [completing, setCompleting] = useState(() => new Set())
@@ -68,25 +66,21 @@ export default function Today() {
       console.warn(`Today: ${label} failed to load`, err)
       return fallback
     }
-    const [health, mtgs, actions, tasks, status, next, load] = await Promise.all([
-      checkHealth().catch(track('system status', { services: {} })),
+    const [mtgs, actions, tasks, status, next] = await Promise.all([
       meetingsApi.list({ limit: 20 }).catch(track('meetings', { meetings: [], count: 0 })),
       dashboardApi.getActionItems({ status: 'all', sort: 'due_date', limit: 100 }).catch(track('action items', { actionItems: [] })),
       tasksApi.list({ limit: 1, status: 'open' }).catch(track('tasks', { count: 0 })),
       calendarApi.getStatus().catch(() => null),
       calendarApi.getUpcoming(2).catch(() => ({ upcoming: [] })),
-      dashboardApi.getTeamWorkload().catch(track('team load', { workload: [] })),
     ])
     if (failed.length) toast.info('Some regions are out of date', `Couldn't refresh: ${failed.join(', ')}.`)
 
-    setSystemStatus(health)
     setMeetings(mtgs.meetings || [])
     setMeetingTotal(mtgs.count || (mtgs.meetings || []).length)
     setItems(actions.actionItems || actions.data?.actionItems || [])
     setTaskCount(tasks.count || 0)
     setCalendarOn(status ? Boolean(status.connected) : null)
     setUpcoming(next.upcoming || next.data?.upcoming || [])
-    setWorkload((load.data || load).workload || [])
     setLoading(false)
 
     try {
@@ -342,12 +336,6 @@ export default function Today() {
   ]
   const openItems = groups.reduce((n, g) => n + g.total, 0)
 
-  // ── System strip ────────────────────────────────────────────
-  const svc = (key) => {
-    const s = systemStatus?.services?.[key]
-    return typeof s === 'string' ? s : 'unknown'
-  }
-  const ecosystem = ['Pulse', 'Entomate', 'LogosVision']
   const pendingPatterns = learning?.pendingApprovals || 0
 
   return (
@@ -442,7 +430,7 @@ export default function Today() {
         </Cell>
 
         <Cell span={4} rule>
-          <Section number="04" title="Schedule" aside={calendarOn ? <Link to="/calendar" className="bs-today-link">Google Calendar</Link> : 'Recorded today'} />
+          <Section number="04" title="Schedule" aside={calendarOn ? <a href="https://calendar.google.com" target="_blank" rel="noopener noreferrer" className="bs-today-link">Google Calendar</a> : 'Recorded today'} />
           <ScheduleRows schedule={schedule} now={now} />
           {calendarOn === false && (
             <div className="bs-today-cal">
@@ -450,57 +438,11 @@ export default function Today() {
               <Key size="sm" onClick={connectCalendar}>Connect calendar</Key>
             </div>
           )}
-        </Cell>
-
-        <Cell span={8}>
-          <Section number="05" title="Team load" aside="Open action items by owner" />
-          {workload.length === 0 ? (
-            <p className="bs-today-empty">{loading ? 'Loading' : 'No assigned action items yet.'}</p>
-          ) : (
-            <RuledTable
-              caption="Action items by owner"
-              columns={[
-                { key: 'who', header: 'Owner', render: (m) => <span className="bs-today-item-title">{m.team_member || m.name || 'Unassigned'}</span> },
-                { key: 'high', header: 'High', render: (m) => (m.high_priority_count > 0 ? <Signal tone="brand">{m.high_priority_count} high</Signal> : <span className="bs-mut">—</span>) },
-                { key: 'prog', header: 'In progress', secondary: true, align: 'right', className: 'bs-num', render: (m) => m.in_progress_items || 0 },
-                { key: 'done', header: 'Done', secondary: true, align: 'right', className: 'bs-num', render: (m) => m.completed_items || 0 },
-                { key: 'all', header: 'Total', align: 'right', className: 'bs-num', render: (m) => m.total_assigned || 0 },
-              ]}
-              rows={workload.slice(0, 8)}
-              rowKey={(m) => String(m.team_member || m.name)}
-            />
-          )}
-        </Cell>
-
-        <Cell span={4} rule>
-          <Section title="System" level={3} />
-          <ul className="bs-rows">
-            {[['AI', 'gemini'], ['Database', 'database']].map(([label, key]) => {
-              const s = svc(key)
-              const ok = s.includes('connected')
-              return (
-                <li key={key} className="bs-row bs-today-sys">
-                  <span className="bs-lbl">{label}</span>
-                  <span />
-                  <Signal tone={ok ? 'mint' : 'off'}>{ok ? 'Connected' : s}</Signal>
-                </li>
-              )
-            })}
-            {ecosystem.map((app) => {
-              const ok = systemStatus?.ecosystem?.[app.toLowerCase()]?.connected !== false
-              return (
-                <li key={app} className="bs-row bs-today-sys">
-                  <span className="bs-lbl">{app}</span>
-                  <span />
-                  <Signal tone={ok ? 'mint' : 'off'}>{ok ? 'Synced' : 'Off'}</Signal>
-                </li>
-              )
-            })}
-          </ul>
           <button type="button" className="bs-today-keyhint bs-lbl" onClick={() => setKeysOpen(true)}>
             Press ? for shortcuts
           </button>
         </Cell>
+
       </Grid>
 
       <Drawer open={briefOpen} onClose={() => setBriefOpen(false)} label="Briefings">

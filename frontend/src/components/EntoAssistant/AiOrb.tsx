@@ -104,7 +104,7 @@ export function useSettledOrbState(state: AiOrbState): AiOrbState {
 }
 
 export const AiOrb: React.FC<{ state: AiOrbState; size?: number }> = ({ state, size = 28 }) => (
-  <span className="la-ai-orb" data-state={state} role="img" aria-label={`Entomate AI status: ${AI_ORB_LABELS[state]}`}>
+  <span className="la-ai-orb" data-state={state} role="img" aria-label={`Ask Entomate status: ${AI_ORB_LABELS[state]}`}>
     <Orb {...LOOKS[state]} size={size} paused={STILL.has(state)} />
   </span>
 );

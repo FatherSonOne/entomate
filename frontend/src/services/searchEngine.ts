@@ -258,7 +258,6 @@ export const COMMANDS: ReadonlyArray<Command> = [
   { id: 'go-projects', label: 'Go to Projects', hint: 'Page', path: '/projects', keywords: 'board' },
   { id: 'go-automations', label: 'Go to Automations', hint: 'Page', path: '/automations', keywords: 'workflows recipes' },
   { id: 'go-insights', label: 'Go to Insights', hint: 'Page', path: '/analytics', keywords: 'analytics reports follow-through' },
-  { id: 'go-calendar', label: 'Go to Calendar', hint: 'Page', path: '/calendar', keywords: 'schedule' },
   { id: 'go-search', label: 'Go to Search', hint: 'Page', path: '/search', keywords: 'notes find' },
   { id: 'go-settings', label: 'Go to Settings', hint: 'Page', path: '/settings', keywords: 'preferences account' },
   { id: 'go-agents', label: 'Meeting agents', hint: 'Settings', path: '/settings', keywords: 'agents ai', state: { section: 'meeting-agents' } },
