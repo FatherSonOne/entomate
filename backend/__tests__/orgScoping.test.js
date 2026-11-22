@@ -165,3 +165,24 @@ describe('projects and automations are limited to the caller\'s org', () => {
     expect(mockDb.automations).toHaveLength(1);
   });
 });
+
+describe('conversations are private to their owner', () => {
+  const askService = require('../services/askService');
+  const USER_B = '22222222-2222-4222-8222-222222222222';
+  const CONV_B = '0000c00b-0000-4000-8000-00000000c00b';
+
+  beforeEach(() => {
+    mockDb.conversations = [{ id: CONV_B, user_id: USER_B, title: 'theirs' }];
+    mockDb.conversation_messages = [{ id: 'm1', conversation_id: CONV_B, role: 'user', content: 'secret' }];
+  });
+
+  test('another user\'s conversation is not owned, listed, read or deleted', async () => {
+    expect(await askService.ownedConversationId(CONV_B, USER_A)).toBeNull();
+    expect(await askService.ownedConversationId(CONV_B, USER_B)).toBe(CONV_B);
+    expect(await askService.listConversations(20, USER_A)).toEqual([]);
+    expect(await askService.getConversation(CONV_B, USER_A)).toEqual([]);
+    await askService.deleteConversation(CONV_B, USER_A);
+    expect(mockDb.conversations).toHaveLength(1);
+    expect(mockDb.conversation_messages).toHaveLength(1);
+  });
+});
