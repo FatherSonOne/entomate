@@ -59,6 +59,11 @@ describe('searchEngine', () => {
     expect(metaLine(item, now)).toBe('No owner · due Tue 17 Nov · Northwind check-in')
   })
 
+  test('an item due today is not late in any time zone', () => {
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+    expect(statusSignal({ ...item, meta: { ...item.meta, dueDate: today } }, now)?.word).toBe('Open')
+  })
+
   test('isQuestion', () => {
     expect(isQuestion('pricing?')).toBe(true)
     expect(isQuestion('what did we decide about pricing')).toBe(true)
