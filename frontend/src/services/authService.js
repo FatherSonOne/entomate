@@ -1,5 +1,5 @@
 // Auth Service — Handles all authentication operations using Supabase Auth
-// Pattern mirrors Logos Vision / Pulse for consistency across the Trifecto
+// Pattern mirrors Logos Vision / Pulse for consistency across the ecosystem
 import { supabase } from './supabaseClient'
 
 export const authService = {

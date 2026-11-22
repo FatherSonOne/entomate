@@ -37,7 +37,7 @@ export default function PrivacyPolicy() {
               content, extracts action items, and integrates with the tools your
               team already uses. This Privacy Policy explains what personal data
               we collect, why we collect it, how we use and share it, and the
-              choices you have. Entomate is part of the <em>Trifecto</em>{' '}
+              choices you have. Entomate is part of a product
               ecosystem alongside Logos Vision and Pulse.
             </p>
             <p>
@@ -115,7 +115,7 @@ export default function PrivacyPolicy() {
               </li>
               <li>
                 <strong>Ecosystem Bridge</strong> — if you are also a user of
-                Logos Vision or Pulse (the Trifecto ecosystem), you may grant
+                Logos Vision or Pulse (its sister products), you may grant
                 cross-app data sharing so action items, contacts, or meeting
                 context flow between products. Sharing is opt-in per workspace.
               </li>
