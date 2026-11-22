@@ -128,25 +128,92 @@ export function getQuickActions(section) {
   return QUICK_ACTIONS[section] || QUICK_ACTIONS.dashboard
 }
 
-// ── Suggested navigation after response ────────────────
-const SUGGESTED_NAV = {
-  dashboard:  [{ label: 'Open Tasks', to: '/tasks' }, { label: 'Check Calendar', to: '/calendar' }, { label: 'View Meetings', to: '/meetings' }],
-  meetings:   [{ label: 'Open Tasks', to: '/tasks' }, { label: 'Check Calendar', to: '/calendar' }, { label: 'Go to Dashboard', to: '/dashboard' }],
-  calendar:   [{ label: 'Open Meetings', to: '/meetings' }, { label: 'View Tasks', to: '/tasks' }, { label: 'Go to Dashboard', to: '/dashboard' }],
-  projects:   [{ label: 'View Tasks', to: '/tasks' }, { label: 'Open Board', to: '/projects?view=board' }, { label: 'Go to Dashboard', to: '/dashboard' }],
-  tasks:      [{ label: 'View Projects', to: '/projects' }, { label: 'Check Calendar', to: '/calendar' }, { label: 'Go to Dashboard', to: '/dashboard' }],
-  agents:     [{ label: 'View Tasks', to: '/tasks' }, { label: 'Check Automations', to: '/automations' }, { label: 'Go to Dashboard', to: '/dashboard' }],
-  automations:[{ label: 'View Workflows', to: '/workflows' }, { label: 'Check Agents', to: '/agents' }, { label: 'Go to Dashboard', to: '/dashboard' }],
-  workflows:  [{ label: 'Check Automations', to: '/automations' }, { label: 'View Projects', to: '/projects' }, { label: 'Go to Dashboard', to: '/dashboard' }],
-  analytics:  [{ label: 'Export a report', to: '/analytics?export=' }, { label: 'Open Tasks', to: '/tasks' }, { label: 'Go to Dashboard', to: '/dashboard' }],
-  reports:    [{ label: 'View Insights', to: '/analytics' }, { label: 'Open Tasks', to: '/tasks' }, { label: 'Go to Dashboard', to: '/dashboard' }],
+// ── Starting state ─────────────────────────────────────
+// The panel's empty state is one line and three questions. The line names what the
+// current page holds; the questions fit what is actually there, so an empty Meetings page
+// asks how to get a first meeting in rather than "What action items came out of my
+// recent meetings?".
+const STARTER_SUBJECT = {
+  dashboard: 'your day',
+  meetings: 'your meetings',
+  calendar: 'your calendar',
+  projects: 'your projects',
+  'project-dashboard': 'your projects',
+  tasks: 'your tasks',
+  workflows: 'your automations',
+  automations: 'your automations',
+  agents: 'your agents',
+  analytics: 'your numbers',
+  reports: 'your reports',
+  search: 'anything you recorded',
+  settings: 'setting up Entomate',
+  guide: 'how Entomate works',
 }
 
-export function getSuggestedActions(section) {
-  return SUGGESTED_NAV[section] || SUGGESTED_NAV.dashboard
+/** The data key whose emptiness means "nothing here yet" for each section. */
+const STARTER_DATA_KEY = {
+  meetings: 'meetings',
+  calendar: 'events',
+  projects: 'projects',
+  'project-dashboard': 'projects',
+  tasks: 'tasks',
+  workflows: 'automations',
+  automations: 'automations',
+}
+
+const EMPTY_QUICK_ACTIONS = {
+  meetings: [
+    { label: 'Record my first meeting', query: 'How do I record or import my first meeting in Entomate? Keep it to the steps.' },
+    { label: 'What a meeting gives me', query: 'What does Entomate pull out of a meeting once it is recorded? Keep it short.' },
+    { label: 'Connect my calendar',     query: 'How do I connect my calendar so Entomate can join my meetings?' },
+  ],
+  calendar: [
+    { label: 'Connect my calendar',     query: 'How do I connect my calendar to Entomate?' },
+    { label: 'What shows up here',      query: 'What appears on the Entomate calendar? Keep it short.' },
+  ],
+  projects: [
+    { label: 'Start my first project',  query: 'How do I create my first project in Entomate? Keep it to the steps.' },
+    { label: 'How projects fill in',    query: 'How do meeting action items and decisions end up in a project? Keep it short.' },
+  ],
+  tasks: [
+    { label: 'Where tasks come from',   query: 'Where do tasks in Entomate come from? Keep it short.' },
+    { label: 'Add my first task',       query: 'How do I add a task by hand?' },
+  ],
+  automations: [
+    { label: 'Build my first automation', query: 'How do I build my first automation? Keep it to the steps.' },
+    { label: 'What I can automate',     query: 'What kinds of things can an automation do in Entomate? Give three examples.' },
+  ],
+}
+EMPTY_QUICK_ACTIONS['project-dashboard'] = EMPTY_QUICK_ACTIONS.projects
+EMPTY_QUICK_ACTIONS.workflows = EMPTY_QUICK_ACTIONS.automations
+
+/**
+ * The starting state for a section: a short title and up to three questions.
+ * `data` is the section data the panel loaded; until it arrives (or if a fetch failed and
+ * the key is missing) the regular questions show, so nothing flips to "get started" on a
+ * page that has content.
+ */
+export function getStarter(section, data) {
+  const subject = STARTER_SUBJECT[section] || 'your work'
+  const key = STARTER_DATA_KEY[section]
+  const list = key ? data?.[key] : undefined
+  const isEmpty = Array.isArray(list) && list.length === 0
+  const prompts = (isEmpty && EMPTY_QUICK_ACTIONS[section]) || getQuickActions(section)
+  return { title: `Ask about ${subject}`, prompts: prompts.slice(0, 3) }
 }
 
 // ── Context data loaders ───────────────────────────────
+// The api client's interceptor already returns the response body, so `res` is the JSON the
+// route sent ({ meetings: [...] }, { data: [...] }, ...), never an axios response. Reading
+// `res.data.meetings` here made every section report "No meetings yet" whatever was there.
+function pickList(res, key) {
+  if (Array.isArray(res?.[key])) return res[key]
+  if (Array.isArray(res?.data?.[key])) return res.data[key]
+  if (Array.isArray(res?.data)) return res.data
+  if (Array.isArray(res)) return res
+  return []
+}
+
 const DATA_LOADERS = {
   dashboard: async () => {
     const [summary, overdue] = await Promise.allSettled([
@@ -154,42 +221,42 @@ const DATA_LOADERS = {
       dashboardApi.getOverdue(),
     ])
     return {
-      summary: summary.status === 'fulfilled' ? summary.value?.data : null,
-      overdue: overdue.status === 'fulfilled' ? overdue.value?.data : null,
+      summary: summary.status === 'fulfilled' ? summary.value || null : null,
+      overdue: overdue.status === 'fulfilled' ? pickList(overdue.value, 'overdue') : [],
     }
   },
   meetings: async () => {
     const res = await meetingsApi.list({ limit: 15, sort: 'date', order: 'desc' })
-    return { meetings: res?.data?.meetings || res?.data || [] }
+    return { meetings: pickList(res, 'meetings') }
   },
   calendar: async () => {
     const res = await calendarApi.getUpcoming(14)
-    return { events: res?.data?.items || res?.data || [] }
+    return { events: pickList(res, 'upcoming') }
   },
   projects: async () => {
     const res = await projectsApi.list({ limit: 15 })
-    return { projects: res?.data?.projects || res?.data || [] }
+    return { projects: pickList(res, 'projects') }
   },
   'project-dashboard': async () => {
     const res = await projectsApi.list({ limit: 15 })
-    return { projects: res?.data?.projects || res?.data || [] }
+    return { projects: pickList(res, 'projects') }
   },
   tasks: async () => {
     const res = await tasksApi.list({ limit: 20 })
-    return { tasks: res?.data?.tasks || res?.data || [] }
+    return { tasks: pickList(res, 'tasks') }
   },
   workflows: async () => {
     const res = await workflowsApi.list({ limit: 15 })
-    return { workflows: res?.data?.workflows || res?.data || [] }
+    return { workflows: pickList(res, 'workflows') }
   },
   // Automations run on the workflow engine
   automations: async () => {
     const res = await workflowsApi.list({ limit: 15, template: false })
-    return { automations: res?.data || [] }
+    return { automations: pickList(res, 'automations') }
   },
   analytics: async () => {
     const res = await dashboardApi.getSummary()
-    return { metrics: res?.data || null }
+    return { metrics: res || null }
   },
   reports: async () => ({ reports: [] }), // reports are on-demand
   search:  async () => ({ }),
@@ -216,9 +283,9 @@ export function getSectionSummary(section, data) {
         const s = data.summary
         if (!s) return ''
         const parts = []
-        if (s.meetingsThisWeek) parts.push(`${s.meetingsThisWeek} meetings this week`)
-        if (s.tasksInProgress) parts.push(`${s.tasksInProgress} tasks in progress`)
-        if (s.overdueTasks || data.overdue?.length) parts.push(`${data.overdue?.length || s.overdueTasks || 0} overdue`)
+        if (s.openItems) parts.push(`${s.openItems} open items`)
+        const overdue = data.overdue?.length || s.overdue || 0
+        if (overdue) parts.push(`${overdue} overdue`)
         return parts.join(' · ') || 'All caught up'
       }
       case 'meetings': {
