@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Search, Loader2 } from 'lucide-react'
 import { ExternalLinkIcon } from '../components/icons/ExternalLinkIcon'
 import MeetingRecorder from '../components/meetings/MeetingRecorder'
+import InlineRename from '../components/meetings/InlineRename'
 import MeetingPreview from '../components/meetings/MeetingPreview'
 import { useAuth } from '../contexts/AuthContext'
 import { meetingsApi, settingsApi } from '../services/api'
@@ -12,8 +13,7 @@ import {
 } from '../components/bench'
 import {
   actionCounts, attendeeLine, firstDecision, formatLength, groupByTime, matchesFilter,
-  meetingDate, meetingLengthMs, meetingStatus, plural,
-} from '../services/meetingView'
+  meetingDate, meetingLengthMs, meetingStatus, plural, isAutoTitle } from '../services/meetingView'
 import SendBotKey from '../components/bot/SendBotKey'
 
 const PAGE_SIZE = 20
@@ -245,7 +245,42 @@ export default function Meetings() {
   const week = meetings.filter(m => isThisWeek(meetingDate(m)))
   const weekMs = week.reduce((n, m) => n + meetingLengthMs(m), 0)
 
+  const renameMeeting = async (id, title) => {
+    await meetingsApi.update(id, { title })
+    setMeetings(prev => prev.map(m => (m.id === id ? { ...m, title } : m)))
+  }
+
   const previewRow = previewId ? meetings.find(m => m.id === previewId) || null : null
+
+  // Keyboard: ↓/j and ↑/k move through the list with the preview following, Enter opens
+  // the previewed meeting, Esc (handled by the panel) closes it. Ignored while typing,
+  // inside a menu, or with a modifier held.
+  const order = useMemo(() => groups.flatMap(g => g.rows), [groups])
+  useEffect(() => {
+    if (selectionMode) return undefined
+    const onKey = (e) => {
+      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return
+      const t = e.target
+      if (t instanceof HTMLElement && (t.isContentEditable || t.closest('input, textarea, select, [role="menu"], [role="dialog"]'))) return
+      const down = e.key === 'ArrowDown' || e.key === 'j'
+      const up = e.key === 'ArrowUp' || e.key === 'k'
+      if (down || up) {
+        if (!order.length) return
+        e.preventDefault()
+        const at = order.findIndex(m => m.id === previewId)
+        const next = at === -1 ? (down ? 0 : order.length - 1) : Math.min(order.length - 1, Math.max(0, at + (down ? 1 : -1)))
+        setPreviewId(order[next].id)
+        requestAnimationFrame(() => document.querySelector('tr[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' }))
+        return
+      }
+      if (e.key === 'Enter' && previewId && !(t instanceof HTMLElement && t.closest('a, button, tr'))) {
+        e.preventDefault()
+        navigate(`/meetings/${previewId}`)
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [order, previewId, selectionMode, navigate])
 
   const columns = [
     ...(selectionMode ? [{
@@ -279,7 +314,12 @@ export default function Meetings() {
         const status = meetingStatus(m)
         return (
           <div className="bs-mtg-name">
-            <Link to={`/meetings/${m.id}`} className="bs-h3 bs-mtg-link">{m.title || 'Untitled meeting'}</Link>
+            <div className="bs-mtg-titlerow">
+              <Link to={`/meetings/${m.id}`} className="bs-h3 bs-mtg-link">{m.title || 'Untitled meeting'}</Link>
+              {!selectionMode && isAutoTitle(m.title) && (
+                <InlineRename title={m.title || 'Untitled meeting'} onSave={(t) => renameMeeting(m.id, t)} />
+              )}
+            </div>
             <div className="bs-mtg-sub">
               <span className="bs-mono">{time}</span>
               {people && <> · {people}</>}
@@ -449,7 +489,7 @@ export default function Meetings() {
               onRowClick={(m) => (selectionMode ? toggleSelect(m.id) : setPreviewId(m.id))}
             />
             <div className="bs-mtg-more">
-              <span className="bs-lbl">{meetings.length} of {total} loaded</span>
+              <span className="bs-lbl">{meetings.length} of {total} loaded<span className="bs-mtg-keyhint"> · ↑ ↓ to preview · Enter to open</span></span>
               {hasMore && (
                 <Key onClick={loadMoreMeetings} disabled={loadingMore}>
                   {loadingMore && <Loader2 className="animate-spin" aria-hidden="true" />}

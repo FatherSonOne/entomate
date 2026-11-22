@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 
 vi.mock('../services/supabaseClient', () => ({ supabase: {} }))
 import { meetingLengthMs } from '../services/meetingView'
+import { isAutoTitle } from '../services/meetingView'
 
 const seg = (atMs: number) => ({ atMs, speaker: 'A', text: 'hello' })
 
@@ -33,5 +34,21 @@ describe('list row helpers', () => {
   it('pluralises', () => {
     expect(plural(1, 'action')).toBe('1 action')
     expect(plural(2, 'action')).toBe('2 actions')
+  })
+})
+
+describe('isAutoTitle', () => {
+  test('spots the names the app makes up', () => {
+    expect(isAutoTitle('Google Meet meeting, Nov 20, 2026')).toBe(true)
+    expect(isAutoTitle('Zoom meeting')).toBe(true)
+    expect(isAutoTitle('Google Meet meeting, Nov 20')).toBe(true)
+    expect(isAutoTitle('Recording, Nov 22, 2026')).toBe(true)
+    expect(isAutoTitle('')).toBe(true)
+    expect(isAutoTitle(null)).toBe(true)
+  })
+  test('leaves real names alone', () => {
+    expect(isAutoTitle('Northwind pilot scope')).toBe(false)
+    expect(isAutoTitle('Recording studio review')).toBe(false)
+    expect(isAutoTitle('Zoom meeting with Dana')).toBe(false)
   })
 })

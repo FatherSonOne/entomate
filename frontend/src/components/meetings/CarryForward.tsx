@@ -52,7 +52,25 @@ function itemMeta(item: CarryForwardItem): string {
   return parts.join(' · ')
 }
 
-export default function CarryForward({ data, title = 'From last time', limit }: CarryForwardProps): React.ReactElement | null {
+/** The server's reply, read defensively: a missing list or count never breaks the page it sits on. */
+function normalize(raw: CarryForwardData | null | undefined): CarryForwardData | null {
+  if (!raw || typeof raw !== 'object') return null
+  const open = Array.isArray(raw.open) ? raw.open : []
+  const done = Array.isArray(raw.done) ? raw.done : []
+  const num = (v: unknown, fallback: number): number => (typeof v === 'number' && Number.isFinite(v) ? v : fallback)
+  return {
+    lastMeeting: raw.lastMeeting && typeof raw.lastMeeting === 'object' ? raw.lastMeeting : null,
+    relatedMeetings: num(raw.relatedMeetings, 0),
+    openCount: num(raw.openCount, open.length),
+    overdueCount: num(raw.overdueCount, open.filter((i) => i.overdue).length),
+    doneCount: num(raw.doneCount, done.length),
+    open,
+    done,
+  }
+}
+
+export default function CarryForward({ data: raw, title = 'From last time', limit }: CarryForwardProps): React.ReactElement | null {
+  const data = normalize(raw)
   if (!data || (data.openCount === 0 && data.doneCount === 0)) return null
 
   const open = typeof limit === 'number' ? data.open.slice(0, limit) : data.open
@@ -79,7 +97,7 @@ export default function CarryForward({ data, title = 'From last time', limit }: 
         <ul className="bs-rows">
           {open.map((item) => (
             <li key={item.id} className="bs-row bs-cf-row">
-              <Signal tone={item.overdue ? 'live' : 'off'}>{item.overdue ? 'Overdue' : 'Open'}</Signal>
+              <Signal tone={item.overdue ? 'brand' : 'off'}>{item.overdue ? 'Overdue' : 'Open'}</Signal>
               <span className="bs-row-text">
                 {item.text}
                 <span className="bs-cf-meta">{itemMeta(item)}</span>

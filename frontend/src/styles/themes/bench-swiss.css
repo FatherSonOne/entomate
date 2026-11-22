@@ -1249,6 +1249,16 @@ html[data-motion="reduce"] :is(.bs-key, .bs-av) { transition-duration: 1ms !impo
 .bs-mtg-acts-mine { margin-top: 3px; color: var(--bs-brand); }
 .bs-mtg .bs-tbl td.bs-mtg-more-col { width: 1%; padding-right: 0; }
 .bs-mtg-rowkeys { display: inline-flex; align-items: center; gap: 6px; }
+/* Rename a made-up title in place */
+.bs-mtg-titlerow { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; }
+.bs-mtg-rename { opacity: 0.72; }
+.bs-mtg-rename:hover, .bs-mtg-rename:focus-visible { opacity: 1; }
+.bs-mtg-renamer { display: flex; align-items: center; gap: 6px; flex: 1 1 220px; min-width: 0; }
+.bs-mtg-rename-in { flex: 1; min-width: 0; height: 28px; padding: 0 9px; border: 1px solid var(--bs-rule-ink); border-radius: 6px; background: var(--bs-sunk); color: var(--bs-ink); font: 500 14px/1 var(--bs-sans); }
+.bs-mtg-rename-in:focus-visible { outline: 2px solid var(--bs-ink); outline-offset: 1px; }
+.bs-mtg-rename-err { flex-basis: 100%; font-size: 12.5px; color: var(--bs-brand); }
+.bs-mtg-keyhint { color: var(--bs-faint); }
+@media (max-width: 767.98px) { .bs-mtg-keyhint { display: none; } }
 .bs-mtg .bs-tbl .bs-mtg-open { height: 28px; width: 30px; padding: 0; justify-content: center; color: var(--bs-ink2); text-decoration: none; }
 .bs-mtg .bs-tbl .bs-mtg-open:hover { color: var(--bs-ink); }
 @media (max-width: 767.98px) { .bs-mtg-rowkeys { flex-direction: column; gap: 4px; } .bs-mtg .bs-tbl td.bs-mtg-more-col { padding-left: 10px; } }
@@ -1362,9 +1372,13 @@ html[data-motion="reduce"] .bs-menu-list { animation: none; }
 .bs-transport-main { min-width: 0; display: flex; flex-direction: column; gap: 9px; }
 .bs-transport-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
 .bs-transport-head .bs-lbl { color: var(--bs-d-mut); }
-.bs-transport-key { display: inline-block; width: 7px; height: 7px; border-radius: 1px; vertical-align: 0; }
-.bs-transport-key.d { background: var(--bs-d-brand); }
-.bs-transport-key.a { background: var(--bs-d-ai); }
+/* Legend: LEDs, only for the marks this tape has, one line on a phone */
+.bs-transport-legend { display: inline-flex; align-items: center; gap: 0 12px; white-space: nowrap; min-width: 0; overflow: hidden; }
+.bs-transport-legend > span { display: inline-flex; align-items: center; gap: 6px; }
+.bs-transport-key { display: inline-block; width: 6px; height: 6px; border-radius: 50%; flex: none; }
+.bs-transport-key.d { background: var(--bs-d-brand); box-shadow: 0 0 5px var(--bs-d-brand); }
+.bs-transport-key.a { background: var(--bs-d-ai); box-shadow: 0 0 5px var(--bs-d-ai); }
+@media (max-width: 767.98px) { .bs-transport-word { display: none !important; } }
 .bs-transport-clock { font: 500 12px var(--bs-mono); color: var(--bs-d-mut); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .bs-transport-clock b { font-weight: 500; color: var(--bs-d-live); }
 .bs-transport .bs-tape { height: 56px; background: #0a0a0b; box-shadow: inset 0 1px 3px #000; }
