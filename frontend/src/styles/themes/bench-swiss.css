@@ -1389,3 +1389,73 @@ html.bs-scroll-lock, html.bs-scroll-lock body { overflow: hidden; }
 
 /* Page slot under the toolbar */
 .bs-page-wrap { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+/* ── 10. Today module (2026-11-22) ───────────────────────────── */
+
+.bs-today .bs-g12 > .bs-cell:nth-child(n+3) { padding-top: 34px; }
+
+/* Display: live recording or the next meeting */
+.bs-today-disp { height: 100%; min-height: 236px; display: flex; flex-direction: column; }
+.bs-today-disp-head { display: flex; justify-content: space-between; align-items: center; gap: 8px 14px; flex-wrap: wrap; }
+.bs-today-disp-head .bs-sig { color: var(--bs-d-ink); }
+.bs-today-disp-head .bs-lbl { color: var(--bs-d-mut); }
+.bs-today-disp-main { margin-top: 18px; min-width: 0; }
+.bs-today-disp-main .bs-disp-big { font-variant-numeric: tabular-nums; }
+.bs-today-disp-main .bs-lbl { color: var(--bs-d-mut); margin-top: 3px; display: block; }
+.bs-today-live { color: var(--bs-d-live); }
+.bs-today-disp-title { margin-top: 10px; font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
+.bs-today-disp-keys { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; padding-top: 18px; }
+
+/* Latest meeting, when nothing is live or next (plain type, no display) */
+.bs-today-latest { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding-bottom: 18px; border-bottom: 1px solid var(--bs-rule); }
+.bs-today-latest-title { color: var(--bs-ink); text-decoration: none; overflow-wrap: anywhere; }
+.bs-today-latest-sum { margin: 0; max-width: 62ch; font-size: 15px; line-height: 1.6; color: var(--bs-ink2); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.bs-today-latest-foot { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+
+/* Readouts */
+.bs-today-ro .bs-readout-ctx { overflow-wrap: anywhere; }
+
+/* Action items */
+.bs-today .bs-tbl td.bs-today-check { width: 26px; padding-top: 13px; }
+.bs-today-item { min-width: 0; }
+.bs-today-item-title { font-weight: 600; color: var(--bs-ink); overflow-wrap: anywhere; }
+.bs-today-item-src { margin-top: 3px; font-size: 12px; color: var(--bs-muted); overflow-wrap: anywhere; }
+.bs-today .bs-tbl td.bs-today-due { font-size: 12px; white-space: nowrap; }
+.bs-today-foot { display: flex; justify-content: flex-end; padding-top: 14px; }
+.bs-today-empty { margin: 14px 0 0; font-size: 13.5px; line-height: 1.55; color: var(--bs-muted); }
+
+/* Agent calls */
+.bs-today-call > .bs-led { margin-top: 6px; }
+.bs-today-call-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.bs-today-call-what { display: block; margin-top: 2px; font-size: 12.5px; line-height: 1.5; color: var(--bs-ink2); text-decoration: none; overflow-wrap: anywhere; }
+a.bs-today-call-what:hover, .bs-today-link:hover, .bs-today-dec-src:hover { text-decoration: underline; text-underline-offset: 2px; }
+.bs-today-call-side { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; font-size: 11px; }
+
+/* Decisions */
+.bs-today-dec-src { display: block; margin-top: 2px; font-size: 12.5px; font-weight: 400; color: var(--bs-muted); text-decoration: none; }
+
+/* Schedule with a NOW rule */
+.bs-today-sched { grid-template-columns: 52px minmax(0, 1fr) auto; align-items: baseline; }
+.bs-today-sched > .bs-mono { font-size: 12px; }
+.bs-today-link { color: inherit; text-decoration: none; }
+.bs-today-now { list-style: none; display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 14px; align-items: center; margin: 2px 0; }
+.bs-today-now span { font: 600 10px var(--bs-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--bs-brand); }
+.bs-today-now i { height: 2px; background: var(--bs-brand); border-radius: 1px; }
+.bs-today-cal { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+
+/* System */
+.bs-today-sys { grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; padding: 9px 0; }
+.bs-today-keyhint { margin-top: 18px; padding: 0; border: 0; background: none; cursor: pointer; }
+.bs-today-keyhint:hover { color: var(--bs-ink); }
+.bs-today-keys .bs-field { grid-template-columns: 56px minmax(0, 1fr); align-items: center; }
+.bs-today-brief { margin-top: 14px; }
+
+@media (max-width: 767.98px) {
+  .bs-today .bs-g12 > .bs-cell:nth-child(n+3) { padding-top: 30px; }
+  .bs-today-disp { min-height: 0; }
+  /* The old three-up ring row was clipped here: now Next/Meetings spans the row, the two counts share the next. */
+  .bs-today-ro { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; padding-top: 18px; }
+  .bs-today-ro .bs-readout { padding: 12px 0 0; border-bottom: 0; }
+  .bs-today-ro .bs-readout:first-child { grid-column: 1 / -1; padding: 0 0 12px; border-bottom: 1px solid var(--bs-rule2); }
+  .bs-today-ro .bs-readout:not(:first-child) b { font-size: 26px; }
+}

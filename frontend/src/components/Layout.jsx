@@ -295,7 +295,8 @@ export default function Layout() {
           dock={benchDock}
         >
           <Faceplate>
-            <Outlet />
+            {/* Pages reach shell overlays through the outlet context (Today's Ask Entomate key). */}
+            <Outlet context={{ openAssistant: () => { setAssistantOpen(true); setProactiveSuggestion(false) } }} />
           </Faceplate>
         </BenchShell>
         {overlays}
