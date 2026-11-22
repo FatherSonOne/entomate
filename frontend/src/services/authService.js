@@ -36,10 +36,26 @@ export const authService = {
       email,
       password,
       options: {
-        data: metadata || {}
+        data: metadata || {},
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
       }
     })
-    return { user: data.user, error }
+    // session is null when the project asks new users to confirm their email.
+    return { user: data.user, session: data.session, error }
+  },
+
+  // Email a link to set a new password. The link opens /reset-password.
+  async resetPassword(email) {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    })
+    return { error }
+  },
+
+  // Set a new password for the signed-in (recovery) session.
+  async updatePassword(password) {
+    const { error } = await supabase.auth.updateUser({ password })
+    return { error }
   },
 
   // Sign out — comprehensive cleanup

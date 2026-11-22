@@ -87,8 +87,11 @@ html.dark:not([data-style="bench-swiss"]) .bs-tokens {
   --bs-scrim: rgba(0, 0, 0, 0.55);
 }
 
-/* Void Crimson alternative (section 3a of the brief). */
-html[data-style="bench-swiss"][data-palette="void-crimson"] {
+/* Void Crimson alternative (section 3a of the brief).
+   .bs-vc pins it on one page whatever the pick (sign-in, which sits
+   between the Void Crimson landing and the app). Pair with .bs-tokens. */
+html[data-style="bench-swiss"][data-palette="void-crimson"],
+html .bs-tokens.bs-vc {
   --bs-case: #F3E8EC;
   --bs-plate: #FFF8FA;
   --bs-key: #FFFFFF;
@@ -114,7 +117,8 @@ html[data-style="bench-swiss"][data-palette="void-crimson"] {
   --bs-sans: 'Space Grotesk', 'Inter', system-ui, sans-serif;
   --bs-mono: 'JetBrains Mono', ui-monospace, monospace;
 }
-html[data-style="bench-swiss"][data-palette="void-crimson"].dark {
+html[data-style="bench-swiss"][data-palette="void-crimson"].dark,
+html.dark .bs-tokens.bs-vc {
   --bs-case: #080808;
   --bs-plate: #101010;
   --bs-key: #1E1E1E;

@@ -62,6 +62,12 @@ export const AuthProvider = ({ children }) => {
           isUserSignOut.current = false
         }
 
+        // A reset link that fell back to the site URL still lands on the reset page.
+        if (event === 'PASSWORD_RECOVERY' && window.location.pathname !== '/reset-password') {
+          window.location.replace('/reset-password')
+          return
+        }
+
         if (session?.user) {
           setUser(authService.toAuthUser(session.user))
         } else {
@@ -92,12 +98,16 @@ export const AuthProvider = ({ children }) => {
   }, [])
 
   const signUp = useCallback(async (email, password, metadata) => {
-    const { user: authUser, error } = await authService.signUp(email, password, metadata)
-    if (authUser && !error) {
+    const { user: authUser, session: newSession, error } = await authService.signUp(email, password, metadata)
+    // Without a session the account waits for email confirmation: stay signed out.
+    if (authUser && newSession && !error) {
       setUser(authService.toAuthUser(authUser))
     }
-    return { error }
+    return { error, needsConfirmation: !error && !!authUser && !newSession }
   }, [])
+
+  const resetPassword = useCallback((email) => authService.resetPassword(email), [])
+  const updatePassword = useCallback((password) => authService.updatePassword(password), [])
 
   const signOut = useCallback(async () => {
     isUserSignOut.current = true
@@ -123,9 +133,11 @@ export const AuthProvider = ({ children }) => {
     signIn,
     signInWithOAuth,
     signUp,
+    resetPassword,
+    updatePassword,
     signOut,
     getToken
-  }), [user, session, loading, signIn, signInWithOAuth, signUp, signOut, getToken])
+  }), [user, session, loading, signIn, signInWithOAuth, signUp, resetPassword, updatePassword, signOut, getToken])
 
   return (
     <AuthContext.Provider value={value}>

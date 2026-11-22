@@ -24,6 +24,7 @@ const WorkflowBuilder = React.lazy(() => import('./pages/WorkflowBuilder'))
 const UsersGuide = React.lazy(() => import('./components/UsersGuide/UsersGuide'))
 const SignIn = React.lazy(() => import('./pages/SignIn'))
 const AuthCallback = React.lazy(() => import('./pages/AuthCallback'))
+const ResetPassword = React.lazy(() => import('./pages/ResetPassword'))
 const LandingPage = React.lazy(() => import('./pages/LandingPage'))
 const PrivacyPolicy = React.lazy(() => import('./pages/PrivacyPolicy'))
 const Terms = React.lazy(() => import('./pages/Terms'))
@@ -46,6 +47,7 @@ export default function App() {
           <Route path="/data-deletion" element={<DataDeletion />} />
           <Route path="/sign-in" element={<SignIn />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
 
           {/* Protected routes */}
           <Route path="/" element={<ProtectedRoute><OrgSetupGate><Layout /></OrgSetupGate></ProtectedRoute>}>

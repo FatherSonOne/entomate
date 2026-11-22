@@ -8,7 +8,7 @@ export const PRIMARY_LOGO = DEFAULT_LOGO
 const SIZES = { sm: { mark: 32, word: 116 }, md: { mark: 40, word: 148 }, lg: { mark: 56, word: 188 }, xl: { mark: 120, word: 280 } }
 const LETTERS = [{"d":"M42 45H5C5 18 44 18 44 44M5 45C5 73 31 75 43 62","transform":"translate(0 0)"},{"d":"M5 70V28M5 42C5 22 42 22 42 43V70","transform":"translate(59 0)"},{"d":"M22 9V56Q22 73 40 69M5 29H40","transform":"translate(117 0)"},{"d":"M25 27C-2 27-2 70 25 70C52 70 52 27 25 27Z","transform":"translate(165 0)"},{"d":"M5 70V28M5 43C5 22 34 23 34 43V70M34 43C34 22 64 23 64 43V70","transform":"translate(226 0)"},{"d":"M43 70V29M43 49C43 20 4 20 4 49C4 77 43 78 43 49","transform":"translate(307 0)"},{"d":"M22 9V56Q22 73 40 69M5 29H40","transform":"translate(365 0)"},{"d":"M42 45H5C5 18 44 18 44 44M5 45C5 73 31 75 43 62","transform":"translate(413 0)"}]
 
-export function EntomateMark({ size = 36, alt = 'Entomate', style, className = '' }) {
+export function EntomateMark({ size = 36, alt = 'Entomate', style = undefined, className = '' }) {
   const { id } = useLogoSystem()
   return <img className={`en-brand-mark ${className}`} src={`/brand/${id}-128.webp`}
     srcSet={`/brand/${id}-128.webp 128w, /brand/${id}-256.webp 256w, /brand/${id}-512.webp 512w`}

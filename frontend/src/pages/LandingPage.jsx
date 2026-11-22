@@ -76,7 +76,7 @@ export default function LandingPage() {
             {isLight ? 'Dark' : 'Light'}
           </button>
           <Link className="lc-signin" to="/sign-in">Sign in</Link>
-          <Link className="lc-btn is-primary" to="/sign-in">Start free</Link>
+          <Link className="lc-btn is-primary" to="/sign-in?mode=signup">Start free</Link>
         </div>
       </header>
 
@@ -93,7 +93,7 @@ export default function LandingPage() {
               After every meeting, its agents prioritize and schedule each one, then you route them with workflows you design.
             </p>
             <div className="lc-ctas">
-              <Link className="lc-btn is-primary" to="/sign-in">Start free <span aria-hidden="true">→</span></Link>
+              <Link className="lc-btn is-primary" to="/sign-in?mode=signup">Start free <span aria-hidden="true">→</span></Link>
               <a className="lc-btn" href="#modules">See how it works</a>
             </div>
             <div className="lc-status lc-mono"><span>Early access</span><span>Web</span><span>entomate.logosvision.org</span></div>
@@ -192,7 +192,7 @@ export default function LandingPage() {
             <div className="lc-eyebrow">06 · Start free</div>
             <h2 id="lc-close-h">Ready to turn meetings <em>into motion?</em></h2>
             <div className="lc-ctas">
-              <Link className="lc-btn is-primary" to="/sign-in">Start free <span aria-hidden="true">→</span></Link>
+              <Link className="lc-btn is-primary" to="/sign-in?mode=signup">Start free <span aria-hidden="true">→</span></Link>
               <a className="lc-btn" href="https://qntmecos.com" target="_blank" rel="noopener noreferrer">Meet the Trifecto</a>
             </div>
             <p className="lc-where lc-mono">entomate.logosvision.org · Web</p>

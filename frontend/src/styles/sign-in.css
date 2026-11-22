@@ -1,0 +1,180 @@
+/* ============================================================
+   Sign-in · Slate direction C "Film" (2026-11-22)
+   Left: the landing's dark media zone (hero film, headline, sample
+   minutes). Right: the Slate faceplate with the form. Phone: the
+   film is a band above the plate. Tokens are Bench (--bs-*), pinned
+   to Void Crimson by .bs-tokens.bs-vc on .si-page.
+   ============================================================ */
+
+.si-page {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--bs-case);
+  color: var(--bs-ink);
+  font-family: var(--bs-sans);
+  font-size: 14px;
+  line-height: 1.55;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+.si-page *, .si-page *::before, .si-page *::after { box-sizing: border-box; }
+.si-page :is(h1, h2, p, ul) { margin: 0; padding: 0; }
+.si-page a { color: inherit; }
+.si-page a:focus-visible,
+.si-page button:focus-visible { outline: 2px solid var(--bs-brand); outline-offset: 3px; }
+
+/* ── Film (always dark: the footage is dark) ── */
+.si-film {
+  --bs-ink: #F8F0F2; --bs-ink2: #D6CACF; --bs-muted: #A89BA1; --bs-faint: #585055;
+  --bs-rule: rgba(248, 240, 242, 0.16); --bs-brand: #FF2D6B; --bs-ai: #FFB800; --bs-live: #A0FF32;
+  --bs-key: #1E1E1E; --bs-key-edge: #000000; --bs-sunk: #0C0C0C; --bs-hi: rgba(248, 240, 242, 0.06);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 32px;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 26px 40px 40px;
+  background: #080808;
+  color: var(--bs-ink);
+}
+.si-film-bg { position: absolute; inset: 0; }
+.si-film-bg .brand-motion-control { bottom: auto; top: 76px; right: 40px; }
+.si-scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(8, 8, 8, 0.6) 0%, rgba(8, 8, 8, 0.08) 30%, rgba(8, 8, 8, 0.4) 55%, rgba(8, 8, 8, 0.94) 100%);
+}
+.si-film-top, .si-film-copy { position: relative; z-index: 1; }
+.si-film-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.si-brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: var(--bs-ink); }
+.si-brand .en-brand-mark { border-radius: 7px; }
+.si-home { text-decoration: none; font-family: var(--bs-mono); letter-spacing: 0.06em; text-transform: uppercase; }
+
+.si-eyebrow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--bs-ink);
+  font: 500 11px var(--bs-mono);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--bs-ink2);
+}
+.si-film h2 {
+  margin: 20px 0 26px;
+  max-width: 12ch;
+  font-family: var(--bs-sans);
+  font-size: clamp(44px, 4.6vw, 72px);
+  line-height: 0.95;
+  letter-spacing: -0.045em;
+  font-weight: 600;
+  color: var(--bs-ink);
+}
+.si-film h2 em { font-style: normal; color: var(--bs-brand); }
+.si-minutes { list-style: none; display: flex; flex-direction: column; max-width: 560px; }
+.si-minutes li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 0 10px 12px;
+  border-top: 1px solid var(--bs-rule);
+  border-left: 3px solid transparent;
+  font-size: 14px;
+}
+.si-minutes li.is-decision { border-left-color: var(--bs-brand); }
+.si-minutes-m { display: inline-flex; align-items: center; gap: 10px; }
+.si-minutes time { font: 500 12px var(--bs-mono); }
+
+/* ── Plate ── */
+.si-side { display: flex; flex-direction: column; min-width: 0; padding: 18px 18px 18px 0; }
+.si-plate { flex: 1; display: flex; flex-direction: column; }
+.si-body { flex: 1; padding-top: 22px; }
+.si-mode button { white-space: nowrap; }
+
+.si-form { display: flex; flex-direction: column; gap: 16px; max-width: 440px; }
+.si-field { display: flex; flex-direction: column; gap: 7px; }
+.si-field-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.si-lbl { font: 500 10.5px/1.2 var(--bs-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--bs-muted); }
+.si-form .bs-input { height: 42px; font-size: 15px; }
+.si-form .bs-input[aria-invalid="true"] { box-shadow: inset 0 1px 2px var(--bs-lo), 0 0 0 2px var(--bs-brand); }
+.si-google.bs-key, .si-go.bs-key { width: 100%; height: 42px; justify-content: center; font-size: 14px; }
+.si-google svg { width: 18px; height: 18px; }
+.si-or { display: flex; align-items: center; gap: 12px; }
+.si-or::after { content: ""; flex: 1; height: 1px; background: var(--bs-rule); }
+
+.si-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font: 400 12px var(--bs-sans);
+  color: var(--bs-ink2);
+  text-decoration: underline;
+  text-decoration-color: var(--bs-faint);
+  text-underline-offset: 3px;
+}
+.si-link.is-brand { font-size: inherit; color: var(--bs-brand); text-decoration-color: color-mix(in srgb, var(--bs-brand) 40%, transparent); }
+.si-lede { color: var(--bs-ink2); }
+.si-fine { font-size: 12px; line-height: 1.5; color: var(--bs-muted); }
+.si-fine a { color: var(--bs-ink); text-decoration: underline; text-decoration-color: var(--bs-faint); text-underline-offset: 3px; }
+
+.si-err {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 0 10px 12px;
+  border-left: 3px solid var(--bs-brand);
+}
+.si-err .bs-sig { color: var(--bs-brand); }
+.si-err p { font-size: 13px; color: var(--bs-ink2); }
+
+.si-sent { display: flex; flex-direction: column; gap: 14px; max-width: 440px; color: var(--bs-ink2); }
+.si-addr { font: 500 15px var(--bs-mono); color: var(--bs-ink); overflow-wrap: anywhere; }
+.si-keys { display: flex; flex-wrap: wrap; gap: 10px; }
+
+.si-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-top: 28px;
+  padding-top: 14px;
+  border-top: 1px solid var(--bs-rule);
+  font: 500 12px var(--bs-mono);
+  color: var(--bs-ink2);
+}
+.si-foot a { color: var(--bs-ink); text-decoration: underline; text-decoration-color: var(--bs-faint); text-underline-offset: 3px; }
+.si-foot b { color: var(--bs-brand); font-weight: 500; }
+
+/* Laptop: the plate needs room for the switch. */
+@media (max-width: 1199.98px) {
+  .si-page { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .si-film { padding: 24px 28px 32px; }
+  .si-eyebrow-r { display: none; }
+}
+
+/* Tablet and phone: the film becomes a band above the plate. */
+@media (max-width: 860px) {
+  .si-page { grid-template-columns: minmax(0, 1fr); }
+  .si-film { min-height: 0; padding: 16px 18px 22px; gap: 64px; }
+  .si-film-bg .brand-motion-control { display: none; }
+  .si-film h2 { font-size: 36px; margin: 14px 0 4px; }
+  .si-eyebrow-r, .si-minutes { display: none; }
+  .si-brand svg { width: 104px; height: auto; }
+  .si-side { padding: 8px; }
+  .si-plate.bs-plate { padding: 22px 18px; border-radius: 14px; }
+  .si-plate .bs-title { grid-template-columns: minmax(0, 1fr); }
+  .si-plate .bs-title h1 { font-size: 38px; }
+  .si-plate .bs-title-meta { align-items: stretch; }
+  .si-plate .bs-title-acts { justify-content: flex-start; }
+  .si-mode.bs-switch { display: flex; width: 100%; }
+  .si-mode.bs-switch button { flex: 1; }
+  .si-form, .si-sent { max-width: none; }
+}
