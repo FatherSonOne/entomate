@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
     let status = 'processed'
 
     try {
-      result = await routeEvent(event, sourceApp)
+      result = await routeEvent(event, sourceApp, config)
     } catch (handlerError) {
       status = 'failed'
       result = { error: (handlerError as Error).message }
@@ -116,7 +116,7 @@ Deno.serve(async (req) => {
 
 // ── Event Router ──
 
-async function routeEvent(event: Record<string, unknown>, sourceApp: string) {
+async function routeEvent(event: Record<string, unknown>, sourceApp: string, config: Record<string, unknown>) {
   const eventType = event.eventType as string
   const data = (event.data || {}) as Record<string, unknown>
 
@@ -146,7 +146,7 @@ async function routeEvent(event: Record<string, unknown>, sourceApp: string) {
 
     // From Pulse: export a meeting recording for AI processing
     case 'meeting.export':
-      return handleMeetingExport(data, sourceApp)
+      return handleMeetingExport(data, sourceApp, config)
 
     // From Logos Vision: CRM meeting lifecycle. We store minimal state so the
     // MIP context assembler and the briefing trigger can see what's scheduled
@@ -621,7 +621,28 @@ async function handleMeetingFeedback(data: Record<string, unknown>) {
  * downloads the audio if available, and forwards to the Entomate meetings
  * processing pipeline via internal API call.
  */
-async function handleMeetingExport(data: Record<string, unknown>, sourceApp: string) {
+/**
+ * Which Entomate org receives meetings exported by this app, and which user
+ * owns them (meetings.org_id and created_by are NOT NULL). The org comes from
+ * ecosystem_config.features.org_id for the sending app; the owner is that
+ * org's owner (audit finding 8: inserts without these always failed).
+ */
+async function resolveExportOwner(config: Record<string, unknown>) {
+  const features = (config?.features || {}) as Record<string, unknown>
+  const orgId = typeof features.org_id === 'string' ? features.org_id : null
+  if (!orgId) return { error: 'No Entomate org configured for this app (set ecosystem_config.features.org_id)' }
+  const { data: owner } = await supabase
+    .from('org_members')
+    .select('user_id')
+    .eq('org_id', orgId)
+    .eq('role', 'owner')
+    .limit(1)
+    .maybeSingle()
+  if (!owner?.user_id) return { error: `Org ${orgId} has no owner to own imported meetings` }
+  return { orgId, ownerId: owner.user_id as string }
+}
+
+async function handleMeetingExport(data: Record<string, unknown>, sourceApp: string, config: Record<string, unknown>) {
   const {
     meetingId: pulseMeetingId,
     title,
@@ -646,6 +667,9 @@ async function handleMeetingExport(data: Record<string, unknown>, sourceApp: str
     return { error: 'Either audioUrl or transcript is required' }
   }
 
+  const owner = await resolveExportOwner(config)
+  if ('error' in owner) return { error: owner.error }
+
   const meetingTitle = title || `Pulse Meeting ${new Date(recordedAt || Date.now()).toLocaleDateString()}`
   const attendeeList = Array.isArray(attendees)
     ? attendees.map(a => (typeof a === 'string' ? a : a.name)).filter(Boolean)
@@ -659,6 +683,7 @@ async function handleMeetingExport(data: Record<string, unknown>, sourceApp: str
   if (transcript && !audioUrl) {
     // Text-only path: process transcript directly via DB insert + AI
     return processTranscriptExport({
+      ...owner,
       title: meetingTitle,
       transcript,
       attendees: attendeeList,
@@ -671,6 +696,7 @@ async function handleMeetingExport(data: Record<string, unknown>, sourceApp: str
   if (audioUrl) {
     // Audio path: download audio, transcribe, then process
     return processAudioExport({
+      ...owner,
       title: meetingTitle,
       audioUrl,
       transcript,
@@ -697,6 +723,8 @@ async function getAIConfig() {
  * Saves the meeting directly to the meetings table and triggers async processing.
  */
 async function processTranscriptExport(params: {
+  orgId: string
+  ownerId: string
   title: string
   transcript: string
   attendees: string[]
@@ -712,6 +740,8 @@ async function processTranscriptExport(params: {
     .from('meetings')
     .insert({
       id: meetingId,
+      org_id: params.orgId,
+      created_by: params.ownerId,
       title: params.title,
       transcript: params.transcript,
       attendees: params.attendees,
@@ -758,6 +788,8 @@ async function processTranscriptExport(params: {
  * Downloads audio from URL, uploads to Entomate storage, and saves meeting record.
  */
 async function processAudioExport(params: {
+  orgId: string
+  ownerId: string
   title: string
   audioUrl: string
   transcript: string | null
@@ -784,6 +816,8 @@ async function processAudioExport(params: {
       // Fall back to transcript-only if we have one
       if (params.transcript) {
         return processTranscriptExport({
+          orgId: params.orgId,
+          ownerId: params.ownerId,
           title: params.title,
           transcript: params.transcript,
           attendees: params.attendees,
@@ -801,6 +835,8 @@ async function processAudioExport(params: {
     console.error('[ecosystem-inbound] Audio download error:', (downloadErr as Error).message)
     if (params.transcript) {
       return processTranscriptExport({
+        orgId: params.orgId,
+        ownerId: params.ownerId,
         title: params.title,
         transcript: params.transcript,
         attendees: params.attendees,
@@ -842,6 +878,8 @@ async function processAudioExport(params: {
     .from('meetings')
     .insert({
       id: meetingId,
+      org_id: params.orgId,
+      created_by: params.ownerId,
       title: params.title,
       transcript: params.transcript || null,
       audio_file_url: audioFileUrl,
@@ -887,19 +925,22 @@ async function processAudioExport(params: {
 
 /**
  * Fire-and-forget trigger to the Entomate backend's reprocess endpoint.
- * If ENTOMATE_BACKEND_URL is not set, the backend's own scheduler will
- * eventually pick up unprocessed meetings.
+ * Authenticates with the backend's INTERNAL_API_KEY (audit finding 8: the
+ * call used to send no auth and always got a 401). Needs the edge function
+ * secrets ENTOMATE_BACKEND_URL and ENTOMATE_INTERNAL_API_KEY; without them
+ * the meeting is stored but not summarised (no scheduler picks it up).
  */
 function triggerReprocess(meetingId: string) {
   const backendUrl = Deno.env.get('ENTOMATE_BACKEND_URL')
-  if (!backendUrl) {
-    console.log(`[ecosystem-inbound] ENTOMATE_BACKEND_URL not set, skipping reprocess trigger for ${meetingId}`)
+  const apiKey = Deno.env.get('ENTOMATE_INTERNAL_API_KEY')
+  if (!backendUrl || !apiKey) {
+    console.warn(`[ecosystem-inbound] ENTOMATE_BACKEND_URL or ENTOMATE_INTERNAL_API_KEY not set, meeting ${meetingId} will not be summarised`)
     return
   }
 
-  fetch(`${backendUrl}/api/meetings/${meetingId}/reprocess`, {
+  fetch(`${backendUrl.replace(/\/$/, '')}/api/meetings/${meetingId}/reprocess`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
     body: JSON.stringify({ source: 'pulse_export' }),
   })
     .then(resp => {

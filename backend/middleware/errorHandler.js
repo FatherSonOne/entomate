@@ -88,6 +88,16 @@ const errorHandler = (err, req, res, next) => {
     err.statusCode = 400;
   }
 
+  // Body or upload over the size limit (audit finding 12)
+  if (err.type === 'entity.too.large' || err.code === 'LIMIT_FILE_SIZE') {
+    response.error.message = err.code === 'LIMIT_FILE_SIZE'
+      ? 'Audio file is too large (25 MB max). Use the in-app recorder for long meetings.'
+      : 'Request body is too large';
+    response.error.code = 'PAYLOAD_TOO_LARGE';
+    err.statusCode = 413;
+    response.error.statusCode = 413;
+  }
+
   // Handle JWT errors
   if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
     response.error.message = 'Invalid or expired authentication token';

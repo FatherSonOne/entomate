@@ -6,7 +6,7 @@ const ai = require('../config/ai');
 const embeddingService = require('../services/embeddingService');
 const hubEventPublisher = require('../services/hubEventPublisher');
 const { getEcosystemBridge } = require('../services/ecosystemBridge');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, apiKeyAuth } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const schemas = require('../schemas/meetings');
 const log = require('../utils/log');
@@ -67,7 +67,10 @@ const MAX_SPEAKER_NAME = 120;
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 100 * 1024 * 1024 // 100MB limit
+    // Held in memory for transcription, so keep it well under the instance's
+    // RAM (audit finding 12). ~25 MB is about 30 minutes of compressed audio;
+    // longer meetings should use the browser recorder, which uploads in pieces.
+    fileSize: 25 * 1024 * 1024
   },
   fileFilter: (req, file, cb) => {
     const allowedTypes = ['audio/wav', 'audio/mp3', 'audio/mpeg', 'audio/webm', 'audio/ogg', 'audio/m4a'];
@@ -985,7 +988,27 @@ function firePostProcessing(savedMeeting, summaryData, savedActionItems, ctx = {
  * Re-run AI processing on an existing meeting (e.g., after ecosystem import).
  * Used by the ecosystem-inbound edge function after receiving a Pulse export.
  */
-router.post('/:id/reprocess', authenticate, async (req, res) => {
+// Signed-in users, or the ecosystem-inbound edge function with X-API-Key
+// (audit finding 8). A service call may reprocess any meeting, so it is
+// limited to the meeting's own org below.
+const userOrServiceAuth = (req, res, next) =>
+  (req.headers['x-api-key'] ? apiKeyAuth(req, res, next) : authenticate(req, res, next));
+
+/**
+ * Only fetch meeting audio from this project's own Supabase Storage, never
+ * an arbitrary URL stored on the row (audit findings 2 and 8: SSRF).
+ */
+function isOwnStorageUrl(url) {
+  try {
+    const target = new URL(url);
+    const own = new URL(process.env.SUPABASE_URL);
+    return target.protocol === 'https:' && target.origin === own.origin && target.pathname.startsWith('/storage/v1/');
+  } catch {
+    return false;
+  }
+}
+
+router.post('/:id/reprocess', userOrServiceAuth, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -993,8 +1016,15 @@ router.post('/:id/reprocess', authenticate, async (req, res) => {
       return res.status(503).json({ error: 'Database not configured' });
     }
 
-    const orgId = await meetingOrgOrRespond(req, res, id);
-    if (!orgId) return;
+    let orgId;
+    if (req.isServiceRequest) {
+      const { data: row } = await supabase.from('meetings').select('org_id').eq('id', id).maybeSingle();
+      orgId = row?.org_id;
+      if (!orgId) return res.status(404).json({ error: 'Meeting not found' });
+    } else {
+      orgId = await meetingOrgOrRespond(req, res, id);
+      if (!orgId) return;
+    }
 
     const { data: meeting, error } = await supabase
       .from('meetings')
@@ -1019,7 +1049,9 @@ router.post('/:id/reprocess', authenticate, async (req, res) => {
     let transcript = meeting.transcript;
 
     // Transcribe audio if we have audio but no transcript
-    if (!transcript && meeting.audio_file_url) {
+    if (!transcript && meeting.audio_file_url && !isOwnStorageUrl(meeting.audio_file_url)) {
+      log.warn('Reprocess: audio_file_url is not in this project\'s storage, not fetching', { meetingId: id });
+    } else if (!transcript && meeting.audio_file_url) {
       try {
         const audioResp = await fetch(meeting.audio_file_url);
         if (audioResp.ok) {
