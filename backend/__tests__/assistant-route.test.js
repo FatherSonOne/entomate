@@ -3,11 +3,10 @@
  *
  * Guards docs/app-dev/entomate-ai-APP-PRODUCT.md §2 / D2:
  *   - POST /api/assistant/query rejects anonymous and forged callers (401).
- *   - Tables whose RLS is org-scoped (tasks, meetings, workflows) and the
+ *   - Every org table (tasks, meetings, workflows, projects, agents) and the
  *     conversation writes go through the caller's user-JWT client, never the
- *     service-role client, so RLS is the perimeter for them.
- *   - Only projects / agents / calendar_events may still use the service
- *     client (EAI-01b moves them once their RLS is org-scoped).
+ *     service-role client, so RLS is the perimeter (EAI-01 + EAI-01b).
+ *   - Only calendar_events (no table yet) may still use the service client.
  *
  * The real authenticate middleware runs; only @supabase/supabase-js's
  * getUser is faked so no network call is made.
@@ -68,7 +67,7 @@ const app = express();
 app.use(express.json());
 app.use('/api/assistant', require('../routes/assistant'));
 
-const SERVICE_ALLOWED = ['projects', 'agents', 'calendar_events'];
+const SERVICE_ALLOWED = ['calendar_events'];
 
 beforeEach(() => { mockUserTables.length = 0; mockServiceTables.length = 0; jest.clearAllMocks(); });
 
@@ -87,7 +86,7 @@ test('forged token → 401', async () => {
 });
 
 test.each(['dashboard', 'tasks', 'meetings', 'workflows', 'automations', 'analytics', 'projects', 'agents', 'calendar'])(
-  '%s: org-RLS tables and conversation writes use the caller-JWT client only',
+  '%s: org tables and conversation writes use the caller-JWT client only',
   async (section) => {
     const res = await request(app).post('/api/assistant/query')
       .set('Authorization', 'Bearer good-token').send({ question: 'what is due', section });

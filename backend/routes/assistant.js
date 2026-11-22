@@ -18,11 +18,10 @@ const router = express.Router();
 // Each loader fetches the data relevant to a specific app section.
 // Every query is limited to the caller: org-owned tables by org_id, the rest
 // (no org_id column yet) by owner. Audit finding 3.
-// `db` is the caller's user-JWT client (EAI-01 / D2): tables whose RLS is
-// org-scoped (tasks, meetings, workflows) read through it, so RLS is the
-// perimeter and the org_id filter is a second fence. projects and agents stay
-// on the service client until their RLS is org-scoped too (EAI-01b) — their
-// current owner-only policies would hide org rows the app shows elsewhere.
+// `db` is the caller's user-JWT client (EAI-01 / D2): every org table reads
+// through it, so RLS is the perimeter and the org_id filter is a second fence.
+// projects and agents rely on the org SELECT policies from migration
+// 20261122000012 (EAI-01b). calendar_events has no table yet.
 
 const sectionLoaders = {
   async dashboard({ orgIds, db }) {
@@ -31,7 +30,7 @@ const sectionLoaders = {
         .in('org_id', orgIds).order('due_date', { ascending: true }).limit(20),
       db.from('meetings').select('id, title, summary, created_at, sentiment_label')
         .in('org_id', orgIds).order('created_at', { ascending: false }).limit(10),
-      supabase.from('projects').select('id, name, status, start_date, end_date, budget, budget_spent')
+      db.from('projects').select('id, name, status, start_date, end_date, budget, budget_spent')
         .in('org_id', orgIds).eq('status', 'active').limit(10),
     ]);
     return {
@@ -61,8 +60,8 @@ const sectionLoaders = {
     } catch { return { events: [] }; }
   },
 
-  async projects({ orgIds }) {
-    const { data } = await supabase.from('projects')
+  async projects({ orgIds, db }) {
+    const { data } = await db.from('projects')
       .select('id, name, description, status, start_date, end_date, budget, budget_spent, created_at')
       .in('org_id', orgIds)
       .order('created_at', { ascending: false }).limit(15);
@@ -95,8 +94,8 @@ const sectionLoaders = {
     return { automations };
   },
 
-  async agents({ orgIds }) {
-    const { data } = await supabase.from('agents')
+  async agents({ orgIds, db }) {
+    const { data } = await db.from('agents')
       .select('id, name, type, description, enabled, last_execution_at, created_at')
       .in('org_id', orgIds)
       .order('created_at', { ascending: false }).limit(15);
@@ -108,7 +107,7 @@ const sectionLoaders = {
     const [tasks, meetings, projects] = await Promise.allSettled([
       db.from('tasks').select('status', { count: 'exact' }).in('org_id', orgIds),
       db.from('meetings').select('id', { count: 'exact' }).in('org_id', orgIds),
-      supabase.from('projects').select('status', { count: 'exact' }).in('org_id', orgIds),
+      db.from('projects').select('status', { count: 'exact' }).in('org_id', orgIds),
     ]);
     return {
       metrics: {
