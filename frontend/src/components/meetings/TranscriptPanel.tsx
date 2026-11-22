@@ -14,10 +14,14 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Check, ChevronDown, ChevronUp, Loader2, Pencil, Search, X } from 'lucide-react'
 import {
   formatClock,
+  isGenericSpeaker,
   matchingLines,
   renameSpeaker,
   speakersOf,
+  suggestSpeakers,
+  toSuggestions,
   type RenameResult,
+  type SpeakerSuggestion,
   type TranscriptSegment,
 } from '../../services/meetingTranscriptService'
 
@@ -26,6 +30,8 @@ export interface TranscriptPanelProps {
   segments: TranscriptSegment[]
   /** Called with the server's copy after a rename, so the page can update its meeting. */
   onRenamed?: (result: RenameResult) => void
+  /** Name guesses saved with the recording (recording_job.speakerSuggestions). */
+  suggestions?: unknown
   /**
    * Jump to the line being spoken at this moment (ms from the start). For decision and
    * action-item timecodes elsewhere on the page; a new value scrolls and marks the line.
@@ -35,6 +41,8 @@ export interface TranscriptPanelProps {
   playingAtMs?: number | null
   /** Given when there is audio to play: each line's time plays from that moment. */
   onPlayFrom?: (atMs: number) => void
+  /** Given when lines can be clipped to Search notes: adds a Clip key to each line. */
+  onClip?: (line: TranscriptSegment) => void
 }
 
 /** Index of the line being spoken at `atMs`: the last one that started at or before it. */
@@ -79,7 +87,7 @@ function Highlighted({ text, query }: { text: string; query: string }): React.Re
   )
 }
 
-export function TranscriptPanel({ meetingId, segments, onRenamed, focusAtMs, playingAtMs, onPlayFrom }: TranscriptPanelProps): React.ReactElement {
+export function TranscriptPanel({ meetingId, segments, onRenamed, suggestions, focusAtMs, playingAtMs, onPlayFrom, onClip }: TranscriptPanelProps): React.ReactElement {
   const [lines, setLines] = useState<TranscriptSegment[]>(segments)
   const [query, setQuery] = useState('')
   const [current, setCurrent] = useState(0)
@@ -87,12 +95,16 @@ export function TranscriptPanel({ meetingId, segments, onRenamed, focusAtMs, pla
   const [newName, setNewName] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [guesses, setGuesses] = useState<SpeakerSuggestion[]>(() => toSuggestions(suggestions, segments))
+  const [guessing, setGuessing] = useState(false)
+  const [guessNote, setGuessNote] = useState<string | null>(null)
   const lineRefs = useRef<Array<HTMLLIElement | null>>([])
   const listRef = useRef<HTMLOListElement | null>(null)
 
   useEffect(() => setLines(segments), [segments])
 
   const speakers = useMemo(() => speakersOf(lines), [lines])
+  const unnamed = speakers.some((s) => isGenericSpeaker(s.name))
   const hits = useMemo(() => matchingLines(lines, query), [lines, query])
   const focusLine =
     typeof focusAtMs === 'number' && Number.isFinite(focusAtMs) && lines.length ? lineAt(lines, focusAtMs) : undefined
@@ -154,6 +166,29 @@ export function TranscriptPanel({ meetingId, segments, onRenamed, focusAtMs, pla
     }
     setLines(result.segments)
     setRenaming(null)
+    onRenamed?.(result)
+  }
+
+  const askForNames = async (): Promise<void> => {
+    setGuessing(true)
+    setGuessNote(null)
+    const { suggestions: found, error: reason } = await suggestSpeakers(meetingId, lines)
+    setGuessing(false)
+    setGuesses(found)
+    setGuessNote(reason ?? (found.length ? null : 'No names could be worked out from what was said. Rename speakers by hand.'))
+  }
+
+  const acceptGuess = async (g: SpeakerSuggestion): Promise<void> => {
+    setSaving(true)
+    setError(null)
+    const { result, error: reason } = await renameSpeaker(meetingId, g.speaker, g.name)
+    setSaving(false)
+    if (!result) {
+      setError(reason)
+      return
+    }
+    setLines(result.segments)
+    setGuesses((prev) => prev.filter((x) => x.speaker !== g.speaker && x.name !== g.name))
     onRenamed?.(result)
   }
 
@@ -244,6 +279,35 @@ export function TranscriptPanel({ meetingId, segments, onRenamed, focusAtMs, pla
             </li>
           ))}
         </ul>
+        {(unnamed || guesses.length > 0) && (
+          <div className="mt-2" data-testid="speaker-suggestions">
+            {guesses.length > 0 && (
+              <ul className="space-y-1.5" aria-label="Suggested speaker names">
+                {guesses.map((g) => (
+                  <li key={g.speaker} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                    <span className="text-content-secondary">{g.speaker} may be</span>
+                    <b className="text-content-primary">{g.name}</b>
+                    <span className="tabular-nums text-content-secondary">{Math.round(g.confidence * 100)}%</span>
+                    {g.evidence && <q className="min-w-0 max-w-full truncate text-content-secondary">{g.evidence}</q>}
+                    <button type="button" onClick={() => void acceptGuess(g)} disabled={saving} className="inline-flex min-h-8 items-center gap-1 rounded-full border border-line px-2.5 py-1 text-xs text-content-primary hover:border-line-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary disabled:opacity-40" aria-label={`Rename ${g.speaker} to ${g.name}`}>
+                      <Check className="h-3 w-3" aria-hidden="true" /> Use name
+                    </button>
+                    <button type="button" onClick={() => setGuesses((prev) => prev.filter((x) => x.speaker !== g.speaker))} className={ICON_BUTTON} aria-label={`Dismiss ${g.name} for ${g.speaker}`}>
+                      <X className="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {unnamed && guesses.length === 0 && (
+              <button type="button" onClick={() => void askForNames()} disabled={guessing} className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-xs text-content-primary hover:border-line-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary disabled:opacity-40">
+                {guessing && <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />}
+                {guessing ? 'Working out names' : 'Suggest names'}
+              </button>
+            )}
+            {guessNote && <p className="mt-1.5 text-xs text-content-secondary" role="status">{guessNote}</p>}
+          </div>
+        )}
         {error && (
           <p role="alert" className="mt-2 flex items-center gap-1.5 text-xs text-semantic-error">
             <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" /> {error}
@@ -262,7 +326,7 @@ export function TranscriptPanel({ meetingId, segments, onRenamed, focusAtMs, pla
             data-at-ms={line.atMs}
             aria-current={i === activeLine ? 'true' : undefined}
             data-playing={i === playingLine ? 'true' : undefined}
-            className={`grid grid-cols-[3.5rem_1fr] gap-x-3 rounded px-1.5 py-1 text-sm ${
+            className={`group grid ${onClip ? 'grid-cols-[3.5rem_1fr_auto]' : 'grid-cols-[3.5rem_1fr]'} gap-x-3 rounded px-1.5 py-1 text-sm ${
               i === activeLine ? 'ring-2 ring-accent-primary' : ''
             } ${i === playingLine ? 'bg-accent-primary-dim' : ''}`}
           >
@@ -285,6 +349,17 @@ export function TranscriptPanel({ meetingId, segments, onRenamed, focusAtMs, pla
               </span>{' '}
               <Highlighted text={line.text} query={query} />
             </p>
+            {onClip && (
+              <button
+                type="button"
+                onClick={() => onClip(line)}
+                aria-label={`Clip ${formatClock(line.atMs)} to Search notes`}
+                title="Clip to Search notes"
+                className="bs-tr-clip self-start rounded px-1.5 pt-px text-xs text-content-secondary opacity-0 hover:text-content-primary focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary group-hover:opacity-100"
+              >
+                + Notes
+              </button>
+            )}
           </li>
         ))}
       </ol>

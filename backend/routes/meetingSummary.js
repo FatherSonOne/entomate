@@ -13,13 +13,24 @@ const ai = require('../config/ai');
 const { authenticate } = require('../middleware/auth');
 const log = require('../utils/log');
 const { attachOrgIds } = require('../utils/orgContext');
+const summaryTemplates = require('../services/summaryTemplates');
+const transcriptMoments = require('../services/transcriptMoments');
 
 const router = express.Router();
 router.use(attachOrgIds); // org-owned tables below are limited to req.orgIds (audit finding 3)
 
 /**
- * POST /api/meeting-summary/:id/regenerate
- * Regenerate AI summary for a meeting (widget support)
+ * GET /api/meeting-summary/templates
+ * Summary templates the meeting page can pick from.
+ */
+router.get('/templates', authenticate, (req, res) => {
+  res.json({ success: true, templates: summaryTemplates.listTemplates() });
+});
+
+/**
+ * POST /api/meeting-summary/:id/regenerate  body: { template? }
+ * Regenerate the AI summary. A template given here is kept on the meeting,
+ * so reprocessing later uses it too.
  */
 router.post('/:id/regenerate', authenticate, async (req, res) => {
   try {
@@ -51,8 +62,21 @@ router.post('/:id/regenerate', authenticate, async (req, res) => {
 
     log.info(`[MeetingSummary] Regenerating summary for meeting: ${id}`);
 
+    const chosen = req.body?.template;
+    if (chosen != null && !summaryTemplates.isTemplateId(chosen)) {
+      return res.status(400).json({ error: 'Unknown summary template' });
+    }
+    const template = summaryTemplates.detectTemplate({
+      title: meeting.title,
+      attendees: meeting.attendees,
+      chosen: chosen || meeting.summary_template,
+    });
+
     // Regenerate summary using AI
-    const summaryData = await ai.generateSummary(meeting.transcript);
+    const summaryData = await ai.generateSummary(meeting.transcript, { addon: summaryTemplates.promptAddon(template) });
+    summaryData.template = template;
+    summaryData.sections = summaryTemplates.normalizeSections(summaryData.sections, template);
+    const segments = Array.isArray(meeting.transcript_segments) ? meeting.transcript_segments : null;
 
     // Extract next steps from action items or generate them
     let nextSteps = summaryData.nextSteps || [];
@@ -79,6 +103,9 @@ router.post('/:id/regenerate', authenticate, async (req, res) => {
         sentiment_label: summaryData.sentiment,
         sentiment_score: summaryData.sentimentScore || 0.5,
         topics: summaryData.topics || [],
+        ...summaryTemplates.summaryFields(summaryData),
+        // Timecodes must follow the new key points and decisions.
+        summary_moments: segments ? transcriptMoments.summaryMoments(segments, summaryData.keyPoints || [], summaryData.decisions || []) : null,
         updated_at: new Date().toISOString()
       })
       .in('org_id', req.orgIds)
@@ -88,6 +115,7 @@ router.post('/:id/regenerate', authenticate, async (req, res) => {
 
     if (updateError) {
       log.error('[MeetingSummary] Failed to update summary:', { error: updateError.message || updateError });
+      return res.status(500).json({ error: 'The new summary could not be saved' });
     }
 
     // Get action items
@@ -110,6 +138,8 @@ router.post('/:id/regenerate', authenticate, async (req, res) => {
         sentiment: summaryData.sentiment,
         sentimentScore: summaryData.sentimentScore,
         topics: summaryData.topics || [],
+        summaryTemplate: summaryData.template,
+        summarySections: summaryData.sections,
         actionItems: actionItems || []
       }
     });

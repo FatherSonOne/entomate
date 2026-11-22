@@ -80,7 +80,7 @@ Format the transcript clearly with each speaker turn on a new line.`
    * @param {string} transcript - Meeting transcript
    * @returns {Promise<Object>} Summary with keyPoints, decisions, sentiment
    */
-  async generateSummary(transcript) {
+  async generateSummary(transcript, options = {}) {
     if (!this.isConfigured()) {
       throw new Error('Gemini API not configured');
     }
@@ -110,7 +110,7 @@ Return JSON with this exact structure:
   "nextSteps": ["step 1", "step 2"],
   "participantCount": number or null if unclear,
   "estimatedDuration": "X minutes" or null if unclear
-}`
+}${options.addon || ''}`
           }]
         }]
       });
@@ -299,6 +299,26 @@ Return ONLY valid JSON:
       log.error('Question error:', { error: error.message || error });
       throw new Error(`Question answering failed: ${error.message}`);
     }
+  }
+
+  /**
+   * Plain text completion for the agents (priority, deadline, assignment, follow-up).
+   * @param {string|Array<{role: string, content: string}>} input - Prompt or chat messages
+   * @param {{temperature?: number}} [options]
+   * @returns {Promise<string>} Model text
+   */
+  async chat(input, options = {}) {
+    if (!this.isConfigured()) {
+      throw new Error('Gemini API not configured');
+    }
+    const messages = Array.isArray(input) ? input : [{ role: 'user', content: String(input) }];
+    const contents = messages.map((m) => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: String(m.content ?? '') }]
+    }));
+    const generationConfig = typeof options.temperature === 'number' ? { temperature: options.temperature } : undefined;
+    const response = await this.model.generateContent({ contents, generationConfig });
+    return response.response.text();
   }
 
   /**

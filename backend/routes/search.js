@@ -11,7 +11,9 @@ const askService = require('../services/askService');
 const { searchCache, suggestionCache, withCache } = require('../utils/cache');
 const { authenticate } = require('../middleware/auth');
 const log = require('../utils/log');
-const { attachOrgIds } = require('../utils/orgContext');
+const { attachOrgIds, getOrgIdForUser } = require('../utils/orgContext');
+const searchEverything = require('../services/searchEverything');
+const searchNotes = require('../services/searchNotesService');
 
 const router = express.Router();
 router.use(attachOrgIds); // org-owned tables below are limited to req.orgIds (audit finding 3)
@@ -447,6 +449,119 @@ router.delete('/conversations/:id', authenticate, async (req, res) => {
 });
 
 /**
+ * POST /api/search/everything
+ * The one engine behind the ⌘K palette and the Search page. Body:
+ * { query, types?: string[], limit?: number (per group, max 25), log?: boolean }.
+ * Returns { query, terms, groups: { meetings, decisions, action_items, tasks,
+ * projects, notes }, counts, total, engine, executionTime }.
+ */
+router.post('/everything', authenticate, async (req, res) => {
+  try {
+    const query = typeof req.body?.query === 'string' ? req.body.query.trim().slice(0, 300) : '';
+    if (!query) return res.status(400).json({ error: 'Search query is required' });
+    const types = Array.isArray(req.body.types) && req.body.types.length ? req.body.types : undefined;
+    const limit = Math.min(Math.max(parseInt(req.body.limit, 10) || 8, 1), 25);
+
+    const startTime = Date.now();
+    const result = await searchEverything.search({ query, types, limit, orgIds: req.orgIds, userId: req.user.id });
+    const engine = await addMeaningMatches(result, query, limit);
+    const executionTime = Date.now() - startTime;
+
+    // The palette searches as you type; only the page (or Enter) logs history.
+    if (req.body.log === true) await logSearch(query, 'everything', result.total, executionTime, req.user.id);
+
+    res.json({ ...result, engine, executionTime });
+  } catch (error) {
+    log.error('Error in search everything:', { error: error.message || error });
+    res.status(500).json({ error: 'Search failed' });
+  }
+});
+
+// Whether meaning (vector) search has anything to search. Cached: the nightly
+// embeddings job is the only writer.
+let embeddingsReady = { value: false, at: 0 };
+async function hasEmbeddings() {
+  if (Date.now() - embeddingsReady.at < 10 * 60 * 1000) return embeddingsReady.value;
+  let value = false;
+  try {
+    const { count, error } = await supabase.from('embeddings').select('id', { count: 'exact', head: true });
+    value = !error && (count || 0) > 0;
+  } catch (e) {
+    value = false;
+  }
+  embeddingsReady = { value, at: Date.now() };
+  return value;
+}
+
+/**
+ * When meetings are indexed, add meetings found by meaning that matching words
+ * missed. Returns the engine label the UI shows ("words" or "words+meaning").
+ */
+async function addMeaningMatches(result, query, limit) {
+  if (!supabase || !result.groups.meetings || !(await hasEmbeddings())) return 'words';
+  try {
+    const found = await embeddingService.semanticSearch(query, limit, { threshold: 0.55 });
+    if (found.searchType !== 'vector') return 'words';
+    const have = new Set(result.groups.meetings.map((m) => m.id));
+    for (const r of found.results || []) {
+      if (r.source_type !== 'meeting' || have.has(r.source_id) || !r.meeting) continue;
+      have.add(r.source_id);
+      result.groups.meetings.push({
+        type: 'meeting',
+        id: r.source_id,
+        title: r.meeting.title || 'Untitled meeting',
+        titleHits: [],
+        snippet: String(r.text_content || '').slice(0, 180),
+        snippetHits: [],
+        meta: { date: r.meeting.created_at || null, atMs: null, speaker: null, context: [], decisions: [], byMeaning: true },
+      });
+      result.counts.meetings = (result.counts.meetings || 0) + 1;
+      result.total += 1;
+    }
+    return 'words+meaning';
+  } catch (e) {
+    log.warn('Meaning search skipped:', e.message);
+    return 'words';
+  }
+}
+
+/**
+ * Notes column: GET/POST /api/search/notes, PATCH/DELETE /api/search/notes/:id.
+ * Private to the signed-in user (rules in services/searchNotesService.js).
+ */
+function notesError(res, error, what) {
+  if (error instanceof searchNotes.SearchNotesError) return res.status(error.status).json({ error: error.message });
+  log.error(`Error ${what} search note:`, { error: error.message || error });
+  return res.status(500).json({ error: `Could not ${what} the note` });
+}
+
+router.get('/notes', authenticate, async (req, res) => {
+  try {
+    res.json({ notes: await searchNotes.list(req.user.id, req.orgIds, parseInt(req.query.limit, 10) || 100) });
+  } catch (error) { notesError(res, error, 'load'); }
+});
+
+router.post('/notes', authenticate, async (req, res) => {
+  try {
+    const orgId = (req.orgIds && req.orgIds[0]) || await getOrgIdForUser(req.user.id);
+    res.status(201).json({ note: await searchNotes.create(req.user.id, orgId, req.body || {}) });
+  } catch (error) { notesError(res, error, 'save'); }
+});
+
+router.patch('/notes/:id', authenticate, async (req, res) => {
+  try {
+    res.json({ note: await searchNotes.update(req.user.id, req.orgIds, req.params.id, req.body || {}) });
+  } catch (error) { notesError(res, error, 'update'); }
+});
+
+router.delete('/notes/:id', authenticate, async (req, res) => {
+  try {
+    await searchNotes.remove(req.user.id, req.orgIds, req.params.id);
+    res.json({ success: true });
+  } catch (error) { notesError(res, error, 'delete'); }
+});
+
+/**
  * GET /api/search/history
  * Get search history
  */
@@ -585,163 +700,6 @@ router.delete('/saved/:id', authenticate, async (req, res) => {
 });
 
 /**
- * GET /api/search/suggestions
- * Get search suggestions with autocomplete and trending topics
- */
-router.get('/suggestions', authenticate, async (req, res) => {
-  try {
-    const { prefix, includeTrending = 'true' } = req.query;
-
-    if (!supabase) {
-      return res.json({ suggestions: [], trending: [] });
-    }
-
-    // Check cache first
-    const cacheKey = suggestionCache.generateKey('suggestions', req.orgIds, prefix || '', includeTrending);
-    const cached = suggestionCache.get(cacheKey);
-    if (cached) {
-      return res.json(cached);
-    }
-
-    const suggestions = [];
-    let trending = [];
-
-    // 1. Get trending searches (most popular in last 7 days)
-    if (includeTrending === 'true') {
-      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-      const { data: trendingData } = await supabase
-        .from('search_history')
-        .select('query, results_count')
-        .gte('created_at', sevenDaysAgo.toISOString())
-        .order('created_at', { ascending: false });
-
-      if (trendingData && trendingData.length > 0) {
-        // Count query frequency and filter for successful searches
-        const queryCounts = {};
-        trendingData.forEach(item => {
-          const q = item.query.toLowerCase().trim();
-          if (!queryCounts[q]) {
-            queryCounts[q] = { count: 0, hasResults: false, original: item.query };
-          }
-          queryCounts[q].count++;
-          if (item.results_count > 0) {
-            queryCounts[q].hasResults = true;
-          }
-        });
-
-        // Sort by frequency and filter out zero-result queries
-        trending = Object.entries(queryCounts)
-          .filter(([_, data]) => data.hasResults && data.count >= 1)
-          .sort((a, b) => b[1].count - a[1].count)
-          .slice(0, 5)
-          .map(([_, data]) => ({
-            type: 'trending',
-            text: data.original,
-            count: data.count
-          }));
-      }
-    }
-
-    // 2. Get recent meeting titles matching prefix
-    let meetingQuery = supabase
-      .from('meetings')
-      .select('title')
-      .in('org_id', req.orgIds)
-      .order('created_at', { ascending: false })
-      .limit(8);
-
-    if (prefix && prefix.length > 0) {
-      meetingQuery = meetingQuery.ilike('title', `%${prefix}%`);
-    }
-
-    const { data: meetings } = await meetingQuery;
-
-    if (meetings) {
-      suggestions.push(...meetings.map(m => ({
-        type: 'meeting',
-        text: m.title,
-        icon: 'mic'
-      })));
-    }
-
-    // 3. Get project names matching prefix
-    let projectQuery = supabase
-      .from('projects')
-      .select('name')
-      .in('org_id', req.orgIds)
-      .order('created_at', { ascending: false })
-      .limit(5);
-
-    if (prefix && prefix.length > 0) {
-      projectQuery = projectQuery.ilike('name', `%${prefix}%`);
-    }
-
-    const { data: projects } = await projectQuery;
-
-    if (projects) {
-      suggestions.push(...projects.map(p => ({
-        type: 'project',
-        text: p.name,
-        icon: 'folder'
-      })));
-    }
-
-    // 4. Get recent user searches matching prefix
-    let historyQuery = supabase
-      .from('search_history')
-      .select('query')
-      .order('created_at', { ascending: false })
-      .limit(20);
-
-    if (prefix && prefix.length > 0) {
-      historyQuery = historyQuery.ilike('query', `%${prefix}%`);
-    }
-
-    const { data: history } = await historyQuery;
-
-    if (history) {
-      const uniqueQueries = [...new Set(history.map(h => h.query))].slice(0, 5);
-      suggestions.push(...uniqueQueries.map(q => ({
-        type: 'recent',
-        text: q,
-        icon: 'clock'
-      })));
-    }
-
-    // 5. Filter and deduplicate
-    const seen = new Set();
-    let filtered = suggestions.filter(s => {
-      const key = s.text.toLowerCase();
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-
-    // Apply prefix filter if provided
-    if (prefix && prefix.length > 0) {
-      const lowerPrefix = prefix.toLowerCase();
-      filtered = filtered.filter(s =>
-        s.text.toLowerCase().includes(lowerPrefix)
-      );
-    }
-
-    const response = {
-      suggestions: filtered.slice(0, 8),
-      trending: trending
-    };
-
-    // Cache the response
-    suggestionCache.set(cacheKey, response, CACHE_TTL.SUGGESTIONS);
-
-    res.json(response);
-
-  } catch (error) {
-    log.error('Error getting suggestions:', { error: error.message || error });
-    res.status(500).json({ error: 'Failed to get suggestions' });
-  }
-});
-
-/**
  * GET /api/search/recent
  * Get recent searches and activity
  */
@@ -781,231 +739,23 @@ router.get('/recent', authenticate, async (req, res) => {
 });
 
 /**
- * GET /api/search/analytics
- * Get comprehensive search analytics
- */
-router.get('/analytics', authenticate, async (req, res) => {
-  try {
-    if (!supabase) {
-      return res.json({ analytics: null });
-    }
-
-    const { period = '7d' } = req.query; // '24h', '7d', '30d', 'all'
-
-    // Calculate date range
-    let startDate = null;
-    const now = new Date();
-    switch (period) {
-      case '24h':
-        startDate = new Date(now - 24 * 60 * 60 * 1000);
-        break;
-      case '7d':
-        startDate = new Date(now - 7 * 24 * 60 * 60 * 1000);
-        break;
-      case '30d':
-        startDate = new Date(now - 30 * 24 * 60 * 60 * 1000);
-        break;
-      default:
-        startDate = null;
-    }
-
-    // Base query with optional date filter, scoped to current user
-    let baseQuery = supabase.from('search_history').select('*').eq('user_id', req.user.id);
-    if (startDate) {
-      baseQuery = baseQuery.gte('created_at', startDate.toISOString());
-    }
-
-    const { data: allSearches } = await baseQuery.order('created_at', { ascending: false });
-    const searches = allSearches || [];
-
-    // Total searches
-    const totalSearches = searches.length;
-
-    // Searches by type
-    const searchesByType = {};
-    searches.forEach(s => {
-      searchesByType[s.search_type] = (searchesByType[s.search_type] || 0) + 1;
-    });
-    const byTypeArray = Object.entries(searchesByType).map(([type, count]) => ({ type, count }));
-
-    // Average execution time
-    const avgExecutionTime = searches.length > 0
-      ? Math.round(searches.reduce((sum, s) => sum + (s.execution_time || 0), 0) / searches.length)
-      : 0;
-
-    // Top queries
-    const queryCounts = {};
-    searches.forEach(s => {
-      const q = s.query.toLowerCase().trim();
-      queryCounts[q] = (queryCounts[q] || 0) + 1;
-    });
-    const topQueries = Object.entries(queryCounts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
-      .map(([query, count]) => ({ query, count }));
-
-    // Zero result queries (results_count = 0)
-    const zeroResultQueries = searches
-      .filter(s => s.results_count === 0)
-      .reduce((acc, s) => {
-        const q = s.query.toLowerCase().trim();
-        acc[q] = (acc[q] || 0) + 1;
-        return acc;
-      }, {});
-    const zeroResults = Object.entries(zeroResultQueries)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([query, count]) => ({ query, count }));
-
-    // Average results per search
-    const avgResultsPerSearch = searches.length > 0
-      ? Math.round(searches.reduce((sum, s) => sum + (s.results_count || 0), 0) / searches.length * 10) / 10
-      : 0;
-
-    // Success rate (searches with at least 1 result)
-    const successfulSearches = searches.filter(s => s.results_count > 0).length;
-    const successRate = totalSearches > 0 ? Math.round((successfulSearches / totalSearches) * 100) : 0;
-
-    // Searches over time (group by day)
-    const searchesByDay = {};
-    searches.forEach(s => {
-      const day = new Date(s.created_at).toISOString().split('T')[0];
-      searchesByDay[day] = (searchesByDay[day] || 0) + 1;
-    });
-    const dailyTrend = Object.entries(searchesByDay)
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .slice(-14) // Last 14 days
-      .map(([date, count]) => ({ date, count }));
-
-    // Searches by hour (to find peak usage times)
-    const searchesByHour = Array(24).fill(0);
-    searches.forEach(s => {
-      const hour = new Date(s.created_at).getHours();
-      searchesByHour[hour]++;
-    });
-    const peakHour = searchesByHour.indexOf(Math.max(...searchesByHour));
-
-    res.json({
-      analytics: {
-        totalSearches,
-        searchesByType: byTypeArray,
-        avgExecutionTime,
-        topQueries,
-        zeroResultQueries: zeroResults,
-        avgResultsPerSearch,
-        successRate,
-        dailyTrend,
-        peakHour,
-        period
-      }
-    });
-
-  } catch (error) {
-    log.error('Error getting analytics:', { error: error.message || error });
-    res.status(500).json({ error: 'Failed to get analytics' });
-  }
-});
-
-/**
- * POST /api/search/export
- * Export search results to CSV or JSON
- */
-router.post('/export', authenticate, async (req, res) => {
-  try {
-    const { results, format = 'csv', query = '', searchType = '' } = req.body;
-
-    if (!results || !Array.isArray(results) || results.length === 0) {
-      return res.status(400).json({ error: 'No results to export' });
-    }
-
-    const timestamp = new Date().toISOString().split('T')[0];
-    const filename = `search-results-${timestamp}`;
-
-    if (format === 'json') {
-      // Export as JSON
-      const exportData = {
-        exportedAt: new Date().toISOString(),
-        query,
-        searchType,
-        totalResults: results.length,
-        results: results.map(r => ({
-          type: r.type,
-          title: r.title,
-          preview: r.preview || '',
-          similarity: r.similarity || null,
-          date: r.metadata?.date || null,
-          status: r.metadata?.status || null,
-          sentiment: r.metadata?.sentiment || null,
-          priority: r.metadata?.priority || null
-        }))
-      };
-
-      res.setHeader('Content-Type', 'application/json');
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}.json"`);
-      return res.json(exportData);
-    }
-
-    // Export as CSV
-    const csvRows = [];
-
-    // Header row
-    csvRows.push(['Type', 'Title', 'Preview', 'Similarity', 'Date', 'Status', 'Sentiment', 'Priority'].join(','));
-
-    // Data rows
-    results.forEach(r => {
-      const row = [
-        escapeCsvField(r.type || ''),
-        escapeCsvField(r.title || ''),
-        escapeCsvField((r.preview || '').substring(0, 200)),
-        r.similarity ? Math.round(r.similarity * 100) + '%' : '',
-        r.metadata?.date ? new Date(r.metadata.date).toLocaleDateString() : '',
-        escapeCsvField(r.metadata?.status || ''),
-        escapeCsvField(r.metadata?.sentiment || ''),
-        escapeCsvField(r.metadata?.priority || '')
-      ];
-      csvRows.push(row.join(','));
-    });
-
-    const csvContent = csvRows.join('\n');
-
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}.csv"`);
-    res.send(csvContent);
-
-  } catch (error) {
-    log.error('Error exporting results:', { error: error.message || error });
-    res.status(500).json({ error: 'Export failed' });
-  }
-});
-
-/**
- * Helper: Escape CSV field
- */
-function escapeCsvField(field) {
-  if (field === null || field === undefined) return '';
-  const str = String(field);
-  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-    return `"${str.replace(/"/g, '""')}"`;
-  }
-  return str;
-}
-
-/**
  * Helper: Log search to history
  */
 async function logSearch(query, searchType, resultsCount, executionTime, userId) {
   try {
     if (!supabase) return;
 
-    await supabase
+    const { error } = await supabase
       .from('search_history')
       .insert({
         query,
         search_type: searchType,
-        results_count: resultsCount,
-        execution_time: executionTime,
+        result_count: resultsCount,
         user_id: userId
       });
+    // supabase-js returns errors instead of throwing; surface them (this insert
+    // used the wrong column names for months and nobody saw it).
+    if (error) log.warn('Could not log search:', error.message);
   } catch (error) {
     // Non-critical, don't throw
     log.warn('Could not log search:', error.message);

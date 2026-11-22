@@ -4,7 +4,7 @@ import {
   Settings as SettingsIcon, Database, Cpu, Palette, Sun, Moon, Monitor,
   Brain, ArrowLeft, Mic, Bell, Link2, RefreshCw, CheckCircle2,
   XCircle, AlertCircle, Loader2, MessageSquare, Info, Shield, CreditCard, Building2,
-  Trash2, Archive
+  Trash2, Archive, Bot
 } from 'lucide-react'
 import { integrationsApi, checkHealth, settingsApi } from '../services/api'
 import { authFetch } from '../services/authFetch'
@@ -21,6 +21,7 @@ import BillingSettings from '../components/settings/BillingSettings'
 import DataRetentionSettings from '../components/settings/DataRetentionSettings'
 import { VCButton, VCIconBox, VCBadge } from '../components/vc'
 import DeleteOrgDialog from '../components/settings/DeleteOrgDialog'
+import MeetingAgentsSettings from '../components/settings/MeetingAgentsSettings'
 
 // ── Settings Sections ──
 const SECTIONS = [
@@ -32,6 +33,7 @@ const SECTIONS = [
   { id: 'billing',    label: 'Plan & Billing', icon: CreditCard },
   { id: 'notifications', label: 'Notifications', icon: Bell },
   { id: 'integrations', label: 'Integrations', icon: Link2 },
+  { id: 'meeting-agents', label: 'Meeting agents', icon: Bot },
   { id: 'ai-learning', label: 'AI & Learning', icon: Brain },
   { id: 'system',     label: 'System Status', icon: SettingsIcon },
   { id: 'about',      label: 'About', icon: Info },
@@ -568,6 +570,13 @@ export default function Settings() {
         )}
 
         {/* ═══════ AI & LEARNING ═══════ */}
+        {activeSection === 'meeting-agents' && (
+          <>
+            <SectionHeader title="Meeting agents" subtitle="Which agents review action items when a meeting ends, and how sure they must be" />
+            <MeetingAgentsSettings />
+          </>
+        )}
+
         {activeSection === 'ai-learning' && (
           <>
             <SectionHeader title="AI & Learning" subtitle="Configure AI behavior and review learning patterns" />

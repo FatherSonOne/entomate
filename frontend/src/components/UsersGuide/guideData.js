@@ -1,7 +1,7 @@
 // ─── Entomate User Guide Data ─────────────────────────────────────────────
 // Version tracking — update these when guide content changes
 
-export const guideVersion = '1.5.0'
+export const guideVersion = '2026-11-22d'
 export const guideUpdated = 'April 12, 2026'
 
 // ─── Version key for localStorage new-feature detection ───────────────────
@@ -12,9 +12,9 @@ export const GUIDE_VERSION_KEY = 'entomate_guide_version'
 export const CATEGORIES = [
   { label: 'Start Here',         ids: ['introduction', 'getting-started', 'organizations', 'billing', 'dashboard'] },
   { label: 'Meetings & Time',    ids: ['meetings', 'meeting-details', 'calendar'] },
-  { label: 'Work Management',    ids: ['tasks', 'projects', 'goals'] },
+  { label: 'Work Management',    ids: ['tasks', 'projects'] },
   { label: 'Automation & AI',    ids: ['workflows', 'automations', 'agents', 'ento-assistant'] },
-  { label: 'Intelligence',       ids: ['search', 'analytics', 'reports'] },
+  { label: 'Intelligence',       ids: ['search', 'analytics'] },
   { label: 'Ecosystem',           ids: ['ecosystem', 'meeting-intelligence'] },
   { label: 'Configuration',      ids: ['settings', 'keyboard-shortcuts', 'troubleshooting'] },
 ]
@@ -43,7 +43,6 @@ export const guideSections = [
           'Action Items \u2014 Tasks automatically extracted from meetings, with AI-suggested assignments and deadlines.',
           'Workflows \u2014 Visual, node-based automations that connect meeting events to actions.',
           'Agents \u2014 AI bots that run continuously, handling assignment, priority, and follow-up detection.',
-          'Goals \u2014 OKR-style goal hierarchies with key results and progress tracking.',
         ],
       },
       {
@@ -80,12 +79,13 @@ export const guideSections = [
       {
         id: 'gs-navigation',
         title: 'Navigating the App',
-        description: 'The sidebar is organized into four groups.',
+        description: 'The sidebar has six numbered modules, then Tools.',
         steps: [
-          'Intelligence \u2014 Today, Meetings, Calendar, Search.',
-          'Work \u2014 Projects, Project Board, Tasks, Goals.',
-          'Automation \u2014 Workflows, Automations, AI Agents.',
-          'Output \u2014 Analytics, Reports.',
+          'Meetings \u2014 01 Today, 02 Meetings.',
+          'Work \u2014 03 Tasks, 04 Projects (switch Projects to Board view for the kanban).',
+          'Follow-through \u2014 05 Automations, 06 Insights.',
+          'Tools \u2014 Search, Workflows, Agents, Ask Entomate, User Guide. Insights (with exports) sits under Follow-through. Admins send bots from Meetings or Today.',
+          'Your calendar lives on Today: the schedule, the countdown to the next meeting, and Connect calendar.',
           'Settings and your user profile are at the bottom of the sidebar.',
         ],
         note: 'Use keyboard shortcut Ctrl+K to open the Command Palette for quick navigation.',
@@ -337,6 +337,29 @@ export const guideSections = [
           'Use Select All or Deselect All for quick selection.',
           'Bulk Delete \u2014 Remove selected meetings (with confirmation).',
           'Bulk Export \u2014 Export selected meetings as a Markdown file.',
+        ],
+      },
+      {
+        id: 'mtg-speakers',
+        title: 'Speaker names',
+        badge: 'New',
+        description: 'Recordings label voices "Speaker 1", "Speaker 2". Entomate puts real names on them where the transcript shows who spoke.',
+        steps: [
+          'After a recording, a speaker is renamed automatically only when the evidence is strong, for example they say "I\'m Priya" or are handed over to by name more than once.',
+          'Weaker guesses appear under Speakers on the Transcript tab with the words that suggest them. Press Use name to accept, or dismiss them.',
+          'On older meetings press Suggest names to get guesses. You can always rename a speaker by hand.',
+          'A rename also updates the attendee list and the owner of any action item given to that speaker, so carry-forward and Insights see the real person.',
+        ],
+      },
+      {
+        id: 'mtg-templates',
+        title: 'Summaries by meeting type',
+        badge: 'New',
+        description: 'Each summary is written for the kind of meeting it was.',
+        steps: [
+          'Entomate picks a type from the title: Stand-up, 1:1, Sales call, Client review, Interview, Planning, or General. A meeting with exactly two people counts as a 1:1.',
+          'Typed meetings get extra sections under the summary, e.g. a 1:1 shows Wins, Blockers and concerns, Feedback given, Growth and goals.',
+          'To change it, open the meeting, pick a Meeting type under the summary and press Rewrite summary. This replaces the summary, key points and decisions; the type is kept for later reprocessing.',
         ],
       },
       {
@@ -593,7 +616,7 @@ export const guideSections = [
     id: 'projects',
     title: 'Projects',
     icon: 'folder',
-    summary: 'Organize tasks, meetings, and goals into project workspaces.',
+    summary: 'Organize tasks and meetings into project workspaces.',
     steps: [
       'Navigate to Projects from the sidebar.',
       'Follow the 3-step wizard: Create \u2192 Organize \u2192 Track.',
@@ -626,56 +649,6 @@ export const guideSections = [
     tips: [
       'Use the search bar on the Projects page to filter by name.',
       'The Project Board (Kanban) view offers a drag-and-drop alternative.',
-    ],
-  },
-
-  {
-    id: 'goals',
-    title: 'Goals & OKRs',
-    icon: 'target',
-    summary: 'Create and track Objectives and Key Results at Company, Team, and Individual levels.',
-    steps: [
-      'Navigate to Goals from the sidebar.',
-      'Click New Goal and fill in the title, description, type, quarter, and optional parent goal.',
-      'View goals in Hierarchy (Company \u2192 Team \u2192 Individual) or List mode.',
-      'Click any goal to open the Detail Panel on the right.',
-    ],
-    subsections: [
-      {
-        id: 'goals-kr',
-        title: 'Key Results',
-        description: 'Measurable outcomes that define goal progress.',
-        steps: [
-          'Each goal can have multiple key results.',
-          'Update progress by entering new values in the Detail Panel.',
-          'Add new key results using the form at the bottom of the panel.',
-          'Progress percentage is calculated automatically from key results.',
-        ],
-      },
-      {
-        id: 'goals-hierarchy',
-        title: 'Goal Hierarchy',
-        steps: [
-          'Company Goals sit at the top level.',
-          'Team Goals roll up to Company Goals.',
-          'Individual Goals roll up to Team Goals.',
-          'Expand any goal to see its children in the hierarchy view.',
-        ],
-      },
-      {
-        id: 'goals-stats',
-        title: 'Stats Overview',
-        steps: [
-          'Total Goals \u2014 all goals across all levels.',
-          'Average Progress \u2014 mean completion percentage.',
-          'On Track \u2014 goals progressing as expected.',
-          'At Risk \u2014 goals behind schedule.',
-        ],
-      },
-    ],
-    tips: [
-      'Link goals to a parent to build cascading OKR trees.',
-      'Switch between Hierarchy and List view using the toggle at the top.',
     ],
   },
 
@@ -935,95 +908,41 @@ export const guideSections = [
 
   {
     id: 'analytics',
-    title: 'Analytics',
+    title: 'Insights',
     icon: 'trending',
-    badge: 'Updated',
-    summary: 'Performance metrics with Recharts visualizations, CSV export, sentiment trends, and team performance tables.',
+    badge: 'New',
+    summary: 'Is what you agree in meetings getting done, and who is behind? Follow-through, who owes what, weekly trend, agent calls and every export in one place.',
     steps: [
-      'Navigate to Analytics from the sidebar.',
-      'Select a time period: 7 days, 30 days, 90 days, or 1 year.',
-      'Browse tabs: Overview, Meetings, Tasks, AI, and Team.',
-      'Click Refresh to update data, or Export to download as CSV.',
+      'Open Insights from the sidebar (Follow-through group).',
+      'Pick a period in the title: 7, 30 or 90 days.',
+      'Read follow-through on the display: the share of action items that fell due in the period and were done by their due date. The bars show the last six weeks (crimson is under 70%).',
+      'Click an owner in Who owes what to see their open and late items, with a link to the meeting each came from.',
+      'Press Export (or a PDF / CSV key in the side column) to download a report.',
     ],
     subsections: [
       {
-        id: 'ana-overview',
-        title: 'Overview Tab',
+        id: 'ins-readouts',
+        title: 'Readouts',
         steps: [
-          'Key metric cards: Meetings Processed, Tasks Completed, Action Items, Automations Run.',
-          'Time Saved breakdown showing savings from transcription, summarization, action items, and automations.',
-          'Task Status breakdown: Completed, In Progress, Open, and Blocked.',
-          'Meeting Sentiment distribution: Positive, Neutral, and Negative.',
-          'Projects Overview: Total, Active, Completed, Planning, and total Deal Value.',
+          'Meetings captured and the decisions recorded in them.',
+          'Action items created in the period and how many are done.',
+          'Agent calls kept: owner, due date and priority changes the agents made that nobody changed back.',
         ],
       },
       {
-        id: 'ana-meetings',
-        title: 'Meetings Tab',
-        description: 'Charts and metrics focused on meeting activity.',
-        steps: [
-          'Total meetings count, total and average duration.',
-          'Average action items per meeting.',
-          'Sentiment Over Time \u2014 Area chart showing positive, neutral, and negative trends.',
-          'Meetings Over Time \u2014 Bar chart with daily meeting counts.',
-        ],
-      },
-      {
-        id: 'ana-team',
-        title: 'Team Tab',
-        description: 'A performance table for each team member.',
-        steps: [
-          'Tasks created and completed by each member.',
-          'Completion rate with color-coded badge.',
-          'High priority task count.',
-          'Average days to complete tasks.',
-        ],
-      },
-    ],
-    tips: [
-      'Check the Time Saved card to see exactly how much time AI is saving your team.',
-      'The AI tab shows transcription accuracy and action item extraction rates.',
-      'Export analytics data as CSV for use in spreadsheets or BI tools.',
-    ],
-  },
-
-  {
-    id: 'reports',
-    title: 'Reports & Exports',
-    icon: 'document',
-    summary: 'Generate PDF reports and export data as CSV.',
-    steps: [
-      'Navigate to Reports from the sidebar.',
-      'Select a report type: Meeting Recap, Goals & OKRs, or Weekly Summary.',
-      'Click Download to generate the PDF.',
-      'Use the CSV Export section to download raw data for meetings, action items, or goals.',
-    ],
-    subsections: [
-      {
-        id: 'rep-pdf',
-        title: 'PDF Reports',
-        steps: [
-          'Meeting Recap \u2014 Select a meeting from the dropdown and download a formatted PDF.',
-          'Goals & OKRs \u2014 Select a quarter and download a goals progress PDF.',
-          'Weekly Summary \u2014 Download a 7-day overview as a PDF.',
-        ],
-      },
-      {
-        id: 'rep-csv',
-        title: 'CSV Exports',
+        id: 'ins-export',
+        title: 'Export',
         badge: 'Updated',
         steps: [
-          'Meetings \u2014 Export all meeting data.',
-          'Action Items \u2014 Filter by status (All, Open, Completed, Missed) then export.',
-          'Goals \u2014 Select a quarter, then export goals and key results.',
-          'Tasks \u2014 Export all tasks with status, priority, tags, and assignee info.',
-          'Automations \u2014 Export automation execution logs with run history and timing.',
+          'PDF: Meeting recap (pick a meeting), Weekly summary (your last 7 days), Project report (pick a project). Preview a PDF in the drawer before downloading.',
+          'CSV: Meetings, Action items (all or one status), Tasks.',
+          'To email a recap, open the meeting and use Share recap.',
         ],
       },
     ],
     tips: [
-      'Use CSV exports to bring data into spreadsheets or BI tools for custom analysis.',
-      'Quick Stats cards at the top show total meetings, goals, completed goals, and avg progress.',
+      'Overdue in the title counts open items whose due date has passed, whenever they were created.',
+      'Learning effectiveness moved to Settings, under the learning panel.',
     ],
   },
 
@@ -1370,10 +1289,10 @@ export const guideSections = [
       {
         id: 'faq-no-record',
         title: 'Can I use Entomate without recording meetings?',
-        scenario: 'You want to use Tasks, Projects, Goals, Workflows, and Agents independently.',
+        scenario: 'You want to use Tasks, Projects, Workflows, and Agents independently.',
         steps: [
           'Yes \u2014 all features work independently of meeting recordings.',
-          'Create tasks, projects, and goals directly from their respective pages.',
+          'Create tasks and projects directly from their pages.',
           'Workflows and automations can be triggered by events other than meetings.',
         ],
       },
@@ -1392,8 +1311,7 @@ export const guideSections = [
         title: 'Can I export my data?',
         scenario: 'You need to get your data out of Entomate for external analysis.',
         steps: [
-          'Go to the Reports page for PDF reports and CSV data exports.',
-          'Export analytics data as CSV from the Analytics page.',
+          'Open Insights and press Export for PDF reports and CSV data exports.',
           'Bulk export meetings as Markdown from the Meetings page.',
         ],
       },

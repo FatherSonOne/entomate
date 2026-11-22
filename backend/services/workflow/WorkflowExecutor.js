@@ -70,6 +70,7 @@ class WorkflowExecutor {
       workflowId: workflow.id,
       status: 'running',
       mode,
+      triggeredBy: options.triggeredBy || (mode === 'test' ? 'test' : 'manual'),
       startedAt: new Date().toISOString(),
       inputData,
       nodeExecutions: [],
@@ -115,6 +116,7 @@ class WorkflowExecutor {
       execution.durationMs = Date.now() - new Date(execution.startedAt).getTime();
 
       await this.saveExecution(execution);
+      await this.markWorkflowRun(workflow, execution);
 
       // Track workflow run usage for billing
       if (supabaseAdmin && workflow.workspace_id) {
@@ -150,6 +152,7 @@ class WorkflowExecutor {
       execution.durationMs = Date.now() - new Date(execution.startedAt).getTime();
 
       await this.saveExecution(execution);
+      await this.markWorkflowRun(workflow, execution);
 
       // Trigger error workflow if configured
       if (workflow.settings?.errorWorkflowId) {
@@ -382,6 +385,58 @@ class WorkflowExecutor {
   }
 
   /**
+   * Stamp last_executed_at and bump execution_count after a real (non-test)
+   * run, so the Automations list can show "last run". Never throws.
+   */
+  async markWorkflowRun(workflow, execution) {
+    if (!workflow?.id || execution.mode === 'test') return;
+    try {
+      const { error } = await supabase
+        .from('workflows')
+        .update({
+          last_executed_at: execution.finishedAt || new Date().toISOString(),
+          execution_count: (workflow.execution_count || 0) + 1
+        })
+        .eq('id', workflow.id);
+      if (error) log.warn('[WorkflowExecutor] Could not stamp last run:', error.message);
+    } catch (err) {
+      log.warn('[WorkflowExecutor] Could not stamp last run:', err.message);
+    }
+    this.notifyPulse(workflow, execution).catch(() => {});
+  }
+
+  /**
+   * Forward a finished run to Pulse as automation.triggered (moved here from
+   * the old automationEngine when Automations moved onto workflows). Silent
+   * no-op unless ECOSYSTEM_PULSE_WORKSPACE_ID is set and Pulse is connected.
+   */
+  async notifyPulse(workflow, execution) {
+    const workspaceId = process.env.ECOSYSTEM_PULSE_WORKSPACE_ID;
+    if (!workspaceId) return;
+    try {
+      const { getEcosystemBridge } = require('../ecosystemBridge');
+      const bridge = await getEcosystemBridge();
+      if (!bridge.isConnected('pulse')) return;
+      const trigger = (workflow.nodes || []).find(n => n.type === 'trigger');
+      await bridge.sendEvent('pulse', {
+        eventType: 'automation.triggered',
+        entityType: 'automation',
+        entityId: workflow.id,
+        data: {
+          workspaceId,
+          automationName: workflow.name,
+          status: execution.status === 'completed' ? 'success' : 'failed',
+          triggerDescription: trigger?.subtype || execution.triggeredBy || null,
+          actionCount: (workflow.nodes || []).filter(n => n.type !== 'trigger').length,
+          error: execution.error || null,
+        },
+      });
+    } catch (err) {
+      log.warn('[WorkflowExecutor] notifyPulse failed:', err.message);
+    }
+  }
+
+  /**
    * Save execution to database
    */
   async saveExecution(execution) {
@@ -528,7 +583,8 @@ class WorkflowExecutor {
    * Generate unique ID
    */
   generateId() {
-    return `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // workflow_executions.id is a uuid column
+    return require('crypto').randomUUID();
   }
 }
 

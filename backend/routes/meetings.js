@@ -17,6 +17,8 @@ const calendarService = require('../services/calendarService');
 const meetingNotes = require('../services/meetingNotesService');
 const meetingEvents = require('../services/meetingEvents');
 const transcriptMoments = require('../services/transcriptMoments');
+const summaryTemplates = require('../services/summaryTemplates');
+const speakerNames = require('../services/speakerNames');
 
 const router = express.Router();
 
@@ -105,7 +107,7 @@ router.post('/process', authenticate, upload.single('audio'), validate(schemas.p
     const transcript = await ai.transcribeAudio(req.file.buffer, req.file.mimetype);
 
     // Step 2: Run AI pipeline (summary, action items, embedding)
-    const { summaryData, actionItems, embedding } = await runAIPipeline(transcript, title);
+    const { summaryData, actionItems, embedding } = await runAIPipeline(transcript, title, { attendees: parseAttendees(attendees) });
 
     // Step 3: Upload audio to Supabase Storage
     let audioUrl = null;
@@ -147,6 +149,7 @@ router.post('/process', authenticate, upload.single('audio'), validate(schemas.p
       sentiment_label: summaryData.sentiment,
       sentiment_score: summaryData.sentimentScore || 0.5,
       topics: summaryData.topics || [],
+      ...summaryTemplates.summaryFields(summaryData),
       attendees: parseAttendees(attendees),
       duration_minutes: durationMin || null,
       start_time: startTime,
@@ -242,7 +245,7 @@ router.post('/transcript', authenticate, validate(schemas.transcript), async (re
     log.info('Processing transcript:', title || 'Untitled Meeting');
 
     // Run AI pipeline (summary, action items, embedding)
-    const { summaryData, actionItems, embedding } = await runAIPipeline(transcript, title);
+    const { summaryData, actionItems, embedding } = await runAIPipeline(transcript, title, { attendees: parseAttendees(attendees) });
 
     // Save meeting
     const meetingId = uuidv4();
@@ -258,6 +261,7 @@ router.post('/transcript', authenticate, validate(schemas.transcript), async (re
       sentiment_label: summaryData.sentiment,
       sentiment_score: summaryData.sentimentScore || 0.5,
       topics: summaryData.topics || [],
+      ...summaryTemplates.summaryFields(summaryData),
       attendees: parseAttendees(attendees),
       duration_minutes: parseDuration(summaryData.estimatedDuration),
       start_time: now.toISOString(),
@@ -726,7 +730,7 @@ router.patch('/:id/speakers', authenticate, async (req, res) => {
 
     const { data: meeting, error } = await supabase
       .from('meetings')
-      .select('id, transcript, transcript_segments')
+      .select('id, transcript, transcript_segments, attendees, recording_job')
       .eq('id', id)
       .eq('org_id', orgId)
       .single();
@@ -746,17 +750,63 @@ router.patch('/:id/speakers', authenticate, async (req, res) => {
       .update({
         transcript_segments: renamed,
         transcript: buildTranscriptText(renamed),
+        // The attendee list drives carry-forward matching, so it follows the rename.
+        attendees: speakerNames.renameAttendees(meeting.attendees, { [from]: to }),
+        ...(Array.isArray(meeting.recording_job?.speakerSuggestions)
+          ? { recording_job: { ...meeting.recording_job, speakerSuggestions: meeting.recording_job.speakerSuggestions.filter((g) => g?.speaker !== from && g?.name !== to) } }
+          : {}),
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
       .eq('org_id', orgId)
-      .select('id, transcript, transcript_segments')
+      .select('id, transcript, transcript_segments, attendees, recording_job')
       .single();
     if (updateError || !updated) throw updateError || new Error('Speaker rename failed');
+
+    // Action items the summary gave to "Speaker 2" now belong to the real person.
+    const { error: itemsError } = await supabase
+      .from('action_items')
+      .update({ assigned_to_name: to, updated_at: new Date().toISOString() })
+      .eq('meeting_id', id)
+      .eq('org_id', orgId)
+      .eq('assigned_to_name', from);
+    if (itemsError) log.warn('Speaker rename: action item owners not updated', { meetingId: id, error: itemsError.message });
 
     res.json({ success: true, data: updated });
   } catch (error) {
     log.error('Error renaming speaker:', { error: error.message || error });
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/meetings/:id/speakers/suggest
+ * Guess real names for "Speaker N" labels from the transcript (self-introductions,
+ * being addressed by name, and an AI read with quoted evidence). Renames nothing:
+ * the page shows the guesses and a person accepts each one.
+ */
+router.post('/:id/speakers/suggest', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!supabase) return res.status(503).json({ error: 'Database not configured' });
+    const orgId = await meetingOrgOrRespond(req, res, id);
+    if (!orgId) return;
+
+    const { data: meeting, error } = await supabase
+      .from('meetings')
+      .select('id, org_id, created_by, attendees, transcript_segments')
+      .eq('id', id)
+      .eq('org_id', orgId)
+      .single();
+    if (error || !meeting) return res.status(404).json({ error: 'Meeting not found' });
+
+    const segments = Array.isArray(meeting.transcript_segments) ? meeting.transcript_segments : [];
+    const candidates = await speakerNames.loadCandidates(meeting);
+    const { applied, suggestions } = await speakerNames.suggestNames(segments, candidates);
+    // Nothing is applied here, so strong guesses are suggestions too.
+    res.json({ success: true, data: { suggestions: [...applied, ...suggestions] } });
+  } catch (error) {
+    log.error('Error suggesting speaker names:', { error: error.message || error });
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 });
@@ -842,11 +892,16 @@ router.get('/:id/recap', authenticate, async (req, res) => {
  * Used by /process, /transcript, and /:id/reprocess routes.
  *
  * @param {string} transcript - The meeting transcript text
- * @param {string} title - Meeting title (used for embedding context)
+ * @param {string} title - Meeting title (used for embedding context and template choice)
+ * @param {{ attendees?: unknown[], template?: string|null }} [opts]
  * @returns {{ summaryData, actionItems, embedding }}
  */
-async function runAIPipeline(transcript, title) {
-  const summaryData = await ai.generateSummary(transcript);
+async function runAIPipeline(transcript, title, opts = {}) {
+  // Summary template per meeting type: chosen on the meeting page, else guessed from title/attendees.
+  const template = summaryTemplates.detectTemplate({ title, attendees: opts.attendees, chosen: opts.template });
+  const summaryData = await ai.generateSummary(transcript, { addon: summaryTemplates.promptAddon(template) });
+  summaryData.template = template;
+  summaryData.sections = summaryTemplates.normalizeSections(summaryData.sections, template);
   const actionItems = await ai.extractActionItems(transcript);
 
   let embedding = null;
@@ -1121,7 +1176,7 @@ router.post('/:id/reprocess', userOrServiceAuth, async (req, res) => {
     }
 
     // Run AI pipeline
-    const { summaryData, actionItems: rawActionItems, embedding } = await runAIPipeline(transcript, meeting.title);
+    const { summaryData, actionItems: rawActionItems, embedding } = await runAIPipeline(transcript, meeting.title, { attendees: meeting.attendees, template: meeting.summary_template });
     const segments = Array.isArray(meeting.transcript_segments) ? meeting.transcript_segments : null;
     const actionItems = transcriptMoments.withActionItemMoments(segments, rawActionItems);
 
@@ -1134,6 +1189,7 @@ router.post('/:id/reprocess', userOrServiceAuth, async (req, res) => {
       sentiment_label: summaryData.sentiment,
       sentiment_score: summaryData.sentimentScore || 0.5,
       topics: summaryData.topics || [],
+      ...summaryTemplates.summaryFields(summaryData),
       duration_minutes: meeting.duration_minutes || parseDuration(summaryData.estimatedDuration),
       updated_at: new Date().toISOString(),
     };

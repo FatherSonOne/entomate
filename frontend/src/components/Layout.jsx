@@ -6,24 +6,19 @@ import {
   FolderKanban,
   CheckSquare,
   Zap,
-  Bot,
   BarChart3,
   Search,
   Settings,
   Menu,
   X,
   ChevronRight,
-  FileText,
-  Calendar,
   Command,
-  Workflow,
   Moon,
   Sun,
   User,
   LogOut,
   Home,
-  BookOpen,
-  Radio
+  BookOpen
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useOrgSafe } from '../contexts/OrgContext'
@@ -36,7 +31,6 @@ import { useToast } from './vc/ToastProvider'
 import '../styles/navigation.css'
 import VCCanvas from './vc/VCCanvas'
 import Logo from './Logo'
-import CrossAppSearch, { useCrossAppSearch } from './CrossAppSearch'
 import EntoAssistant from './EntoAssistant/EntoAssistant'
 import EntoAssistantButton from './EntoAssistant/EntoAssistantButton'
 import EntoAIProactiveChecker from './EntoAssistant/EntoAIProactiveChecker'
@@ -47,11 +41,10 @@ import { settingsApi } from '../services/api'
 // Grouped navigation structure — 4 sections
 // Items with adminOnly: true are filtered out at render time for non-admin
 // users via useOrgSafe().myRole. The backend gates the routes independently.
-// Six modules (feature audit 2026-11-22). Calendar, Workflows, Agents and
-// Reports stay reachable under "Tools" until they merge into Today,
-// Automations and Insights. Goals, Board and Search are off the sidebar:
-// Goals had no use, Board is a view of Projects, Search lives in the command
-// palette (mod+K). Their routes still work, so links don't break.
+// Six modules (feature audit 2026-11-22), plus Search and the tools that have
+// not merged yet. Calendar lives on Today (schedule + connect), Bot Launcher is
+// "Send a bot" on Meetings and Today, Board is a view inside Projects, Goals is
+// gone. Their routes still work, so old links don't break.
 const navGroups = [
   {
     label: 'Meetings',
@@ -77,11 +70,7 @@ const navGroups = [
   {
     label: 'Tools',
     items: [
-      { name: 'Calendar',     href: '/calendar',      icon: Calendar, iconKey: 'calendar'  },
-      { name: 'Workflows',    href: '/workflows',     icon: Workflow, iconKey: 'workflows' },
-      { name: 'AI Agents',    href: '/agents',        icon: Bot,      iconKey: 'agents'    },
-      { name: 'Reports',      href: '/reports',       icon: FileText, iconKey: 'reports'   },
-      { name: 'Bot Launcher', href: '/bot-launcher',  icon: Radio,    iconKey: 'bot-launcher', adminOnly: true },
+      { name: 'Search',       href: '/search',        icon: Search,   iconKey: 'search'    },
     ],
   },
 ]
@@ -96,12 +85,9 @@ const breadcrumbMap = {
   '/projects':         'Projects',
   '/project-dashboard':'Project Board',
   '/tasks':            'Tasks',
-  '/goals':            'Goals',
-  '/workflows':        'Workflows',
+  '/workflows':        'Automations',
   '/automations':      'Automations',
-  '/agents':           'AI Agents',
   '/analytics':        'Insights',
-  '/reports':          'Reports',
   '/settings':         'Settings',
   '/guide':            'User Guide',
 }
@@ -170,7 +156,6 @@ export default function Layout() {
     navigate('/sign-in')
   }
 
-  const { isOpen: crossAppSearchOpen, close: closeCrossAppSearch } = useCrossAppSearch()
   const { hasNew: guideHasNew, dismiss: dismissGuideNew, newCount: guideNewCount } = useGuideNewFeatures()
   const toast = useToast()
 
@@ -229,10 +214,6 @@ export default function Layout() {
         isOpen={shortcutsHelpOpen}
         onClose={() => setShortcutsHelpOpen(false)}
       />
-      <CrossAppSearch
-        isOpen={crossAppSearchOpen}
-        onClose={closeCrossAppSearch}
-      />
       <EntoAssistant
         isOpen={assistantOpen}
         onClose={() => setAssistantOpen(false)}
@@ -247,11 +228,7 @@ export default function Layout() {
     const groups = [
       ...benchModules,
       { label: 'Tools', items: [
-        { name: 'Calendar', href: '/calendar' },
-        { name: 'Workflows', href: '/workflows' },
-        { name: 'Agents', href: '/agents' },
-        { name: 'Reports', href: '/reports' },
-        ...(isAdmin ? [{ name: 'Bot Launcher', href: '/bot-launcher' }] : []),
+        { name: 'Search', href: '/search' },
         { name: 'Ask Entomate', onSelect: toggleAssistant, note: proactiveSuggestion ? 'NEW' : undefined, noteIsNew: proactiveSuggestion },
         { name: 'User Guide', href: '/guide', note: guideHasNew ? 'NEW' : undefined, noteIsNew: guideHasNew },
       ] },

@@ -11,10 +11,8 @@ const ORG_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const USER_A = '11111111-1111-4111-8111-111111111111';
 const TASK_A = '0000000a-0000-4000-8000-00000000000a';
 const TASK_B = '0000000b-0000-4000-8000-00000000000b';
-const GOAL_B = '000000b0-0000-4000-8000-0000000000b0';
 const PROJ_A = '00000a00-0000-4000-8000-000000000a00';
 const PROJ_B = '00000b00-0000-4000-8000-000000000b00';
-const AUTO_B = '0000b000-0000-4000-8000-00000000b000';
 
 const mockDb = {};
 function resetDb() {
@@ -23,12 +21,10 @@ function resetDb() {
     { id: TASK_A, org_id: ORG_A, title: 'mine', status: 'open' },
     { id: TASK_B, org_id: ORG_B, title: 'theirs', status: 'open' },
   ];
-  mockDb.goals = [{ id: GOAL_B, org_id: ORG_B, title: 'their goal' }];
   mockDb.projects = [
     { id: PROJ_A, org_id: ORG_A, name: 'mine' },
     { id: PROJ_B, org_id: ORG_B, name: 'theirs' },
   ];
-  mockDb.automations = [{ id: AUTO_B, org_id: ORG_B, name: 'their automation', enabled: true }];
 }
 
 function mockQuery(table) {
@@ -112,29 +108,9 @@ describe('tasks are limited to the caller\'s org', () => {
   });
 });
 
-describe('goals are limited to the caller\'s org', () => {
-  const goals = () => app('../routes/goals', '/api/goals');
 
-  test('another org\'s goal is not found', async () => {
-    const res = await request(goals()).get(`/api/goals/${GOAL_B}`);
-    expect(res.status).toBe(404);
-  });
-
-  test('another org\'s goal cannot be deleted', async () => {
-    await request(goals()).delete(`/api/goals/${GOAL_B}`);
-    expect(mockDb.goals).toHaveLength(1);
-  });
-
-  test('list hides other orgs', async () => {
-    const res = await request(goals()).get('/api/goals');
-    expect(JSON.stringify(res.body)).not.toContain(GOAL_B);
-  });
-});
-
-
-describe('projects and automations are limited to the caller\'s org', () => {
+describe('projects are limited to the caller\'s org', () => {
   const projects = () => app('../routes/projects', '/api/projects');
-  const automations = () => app('../routes/automations', '/api/automations');
 
   test('project list hides other orgs; their project is not found', async () => {
     const list = await request(projects()).get('/api/projects');
@@ -156,13 +132,6 @@ describe('projects and automations are limited to the caller\'s org', () => {
     const res = await request(projects()).post('/api/projects').send({ name: 'new one' });
     expect(res.status).toBe(201);
     expect(mockDb.projects.find((p) => p.name === 'new one').org_id).toBe(ORG_A);
-  });
-
-  test('another org\'s automation is hidden and cannot be deleted', async () => {
-    const list = await request(automations()).get('/api/automations');
-    expect(JSON.stringify(list.body)).not.toContain(AUTO_B);
-    await request(automations()).delete(`/api/automations/${AUTO_B}`);
-    expect(mockDb.automations).toHaveLength(1);
   });
 });
 

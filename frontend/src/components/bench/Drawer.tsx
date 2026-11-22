@@ -8,7 +8,7 @@ const SNAP_MS = 180
 /** Drag the sheet down further than this to dismiss it. */
 const DISMISS_PX = 90
 
-const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+const FOCUSABLE = 'a[href], button:not([disabled]):not(.bs-drawer-grip), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
 export interface DrawerProps {
   open: boolean

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Plus, Search, FolderKanban, Calendar, DollarSign, Trash2, Target, TrendingUp, Archive } from 'lucide-react'
 import { projectsApi } from '../services/api'
 import { GuideCard, PageHeader, Skeleton } from '../components/SharedUI'
@@ -8,9 +8,31 @@ import { getStatusBadge } from '../utils/badges'
 import { useConfirm } from '../components/vc/ConfirmDialog'
 import ErrorState from '../components/vc/ErrorState'
 import { ProjectCardSkeleton } from '../components/LoadingSkeletons'
+import ProjectDashboard from './ProjectDashboard'
+
+/** List / Board switch, kept in the URL (?view=board) so the Board view can be linked. */
+function ViewSwitch({ view, onChange }) {
+  return (
+    <div role="group" aria-label="Projects view" className="inline-flex gap-1">
+      {[['list', 'List'], ['board', 'Board']].map(([value, label]) => (
+        <VCButton
+          key={value}
+          variant={view === value ? 'primary' : 'ghost'}
+          aria-pressed={view === value}
+          onClick={() => onChange(value)}
+        >
+          {label}
+        </VCButton>
+      ))}
+    </div>
+  )
+}
 
 export default function Projects() {
   const confirm = useConfirm()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const view = searchParams.get('view') === 'board' ? 'board' : 'list'
+  const setView = (next) => setSearchParams(next === 'board' ? { view: 'board' } : {}, { replace: true })
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -132,12 +154,25 @@ export default function Projects() {
     </div>
   )
 
+  if (view === 'board') return (
+    <div className="animate-fade-in max-w-7xl mx-auto">
+      <PageHeader
+        title="Project Portfolio"
+        subtitle="Every project's tasks on one board, with team workload."
+        actions={<ViewSwitch view={view} onChange={setView} />}
+      />
+      <ProjectDashboard embedded />
+    </div>
+  )
+
   return (
     <div className="animate-fade-in max-w-7xl mx-auto">
       <PageHeader
         title="Project Portfolio"
         subtitle="Organize work into projects, track progress, and manage deliverables."
         actions={
+          <>
+          <ViewSwitch view={view} onChange={setView} />
           <VCButton
             variant="primary"
             onClick={() => {
@@ -149,6 +184,7 @@ export default function Projects() {
             <Plus size={16} />
             New Project
           </VCButton>
+          </>
         }
       />
 

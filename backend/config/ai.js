@@ -78,8 +78,8 @@ class AIService {
    * @param {string} transcript - Meeting transcript
    * @returns {Promise<Object>} Summary with keyPoints, decisions, sentiment
    */
-  async generateSummary(transcript) {
-    return this.provider.generateSummary(transcript);
+  async generateSummary(transcript, options = {}) {
+    return this.provider.generateSummary(transcript, options);
   }
 
   /**
@@ -137,6 +137,17 @@ class AIService {
       // Small delay for typing effect
       await new Promise(resolve => setTimeout(resolve, 20));
     }
+  }
+
+  /**
+   * Plain text completion. The agents call this (ai.chat was missing, so every
+   * agent fell back to its default with "ai.chat is not a function").
+   * @param {string|Array<{role: string, content: string}>} input
+   * @param {{temperature?: number}} [options]
+   * @returns {Promise<string>}
+   */
+  async chat(input, options = {}) {
+    return this.provider.chat(input, options);
   }
 
   /**

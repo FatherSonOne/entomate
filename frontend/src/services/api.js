@@ -286,6 +286,8 @@ export const meetingsApi = {
 
   // Rename a speaker across the transcript. Typed wrapper: services/meetingTranscriptService.ts
   renameSpeaker: (meetingId, from, to) => api.patch(`/meetings/${meetingId}/speakers`, { from, to }),
+  // Guess real names for "Speaker N" labels (renames nothing)
+  suggestSpeakers: (meetingId) => api.post(`/meetings/${meetingId}/speakers/suggest`),
 
   // Update action item status
   updateActionItem: (id, data) => api.patch(`/meetings/action-items/${id}`, data),
@@ -298,7 +300,11 @@ export const meetingsApi = {
   getMeetingSummary: (id) => api.get(`/meeting-summary/${id}`),
 
   // Regenerate AI summary
-  regenerateSummary: (id) => api.post(`/meeting-summary/${id}/regenerate`),
+  // Regenerate AI summary, optionally with a summary template (one_on_one, standup, sales, ...)
+  regenerateSummary: (id, template) => api.post(`/meeting-summary/${id}/regenerate`, template ? { template } : {}),
+
+  // Summary templates per meeting type
+  summaryTemplates: () => api.get('/meeting-summary/templates'),
 
   // Publish to Logos CRM
   publishToCRM: (id) => api.post(`/meeting-summary/${id}/publish-crm`)
@@ -380,43 +386,6 @@ export const tasksApi = {
 // ========================================
 // AUTOMATIONS API
 // ========================================
-export const automationsApi = {
-  // Create automation
-  create: (data) => api.post('/automations', data),
-
-  // List automations
-  list: (params = {}) => api.get('/automations', { params }),
-
-  // Get templates
-  getTemplates: () => api.get('/automations/templates'),
-
-  // Get automation by ID
-  get: (id) => api.get(`/automations/${id}`),
-
-  // Update automation
-  update: (id, data) => api.put(`/automations/${id}`, data),
-
-  // Delete automation
-  delete: (id) => api.delete(`/automations/${id}`),
-
-  // Toggle enabled state
-  toggle: (id, enabled) => api.post(`/automations/${id}/toggle`, { enabled }),
-
-  // Execute automation manually
-  execute: (id, triggerData) => api.post(`/automations/${id}/execute`, { triggerData }),
-
-  // Get logs
-  getLogs: (id, params = {}) => api.get(`/automations/${id}/logs`, { params }),
-
-  // Test automation (dry-run preview)
-  test: (id, sampleData = {}) => api.post(`/automations/${id}/test`, { sampleData }),
-
-  // Get scheduler status (all scheduled automations)
-  getSchedulerStatus: () => api.get('/automations/scheduler/status'),
-
-  // Schedule/reschedule an automation
-  schedule: (id) => api.post(`/automations/${id}/schedule`)
-}
 
 // ========================================
 // SEARCH API
@@ -508,11 +477,6 @@ export const searchApi = {
   // Ask follow-up question
   askFollowUp: (data) => api.post('/search/ask/follow-up', data),
 
-  // Get suggestions with autocomplete and trending
-  getSuggestions: (prefix, includeTrending = true) => api.get('/search/suggestions', {
-    params: { prefix, includeTrending: includeTrending ? 'true' : 'false' }
-  }),
-
   // Get recent activity
   getRecent: () => api.get('/search/recent'),
 
@@ -540,19 +504,11 @@ export const searchApi = {
   // Delete conversation
   deleteConversation: (id) => api.delete(`/search/conversations/${id}`),
 
-  // Get search analytics
-  getAnalytics: (period = '7d') => api.get('/search/analytics', { params: { period } }),
+  // One engine for the ⌘K palette and the Search page (services/searchEngine.ts)
+  everything: (data) => api.post('/search/everything', data),
 
-  // Export search results
-  exportResults: async (results, format = 'csv', query = '', searchType = '') => {
-    const response = await api.post('/search/export', {
-      results,
-      format,
-      query,
-      searchType
-    })
-    return response
-  }
+  // Notes column on the Search page (services/searchNotesService.ts)
+  getNotes: () => api.get('/search/notes')
 }
 
 // ========================================
@@ -561,12 +517,6 @@ export const searchApi = {
 export const dashboardApi = {
   // Get dashboard summary
   getSummary: () => api.get('/dashboard/summary'),
-
-  // Get projects with stats
-  getProjects: (params = {}) => api.get('/dashboard/projects', { params }),
-
-  // Get single project dashboard
-  getProject: (id) => api.get(`/dashboard/projects/${id}`),
 
   // Get action items
   getActionItems: (params = {}) => api.get('/dashboard/action-items', { params }),
@@ -579,9 +529,6 @@ export const dashboardApi = {
 
   // Get overdue items
   getOverdue: () => api.get('/dashboard/overdue'),
-
-  // Get AI insights
-  getInsights: () => api.get('/dashboard/insights'),
 
   // Get project-based insights (from projects + tasks tables)
   getProjectInsights: () => api.get('/dashboard/project-insights')
@@ -598,9 +545,6 @@ export const reportsApi = {
   downloadMeetingPDF: (meetingId) =>
     downloadFile(`/reports/meeting/${meetingId}/pdf`, 'meeting-recap.pdf'),
 
-  // Download goals report PDF
-  downloadGoalsPDF: (quarter) =>
-    downloadFile('/reports/goals/pdf', 'goals-report.pdf', quarter ? { quarter } : {}),
 
   // Download project report PDF
   downloadProjectPDF: (projectId) =>
@@ -618,9 +562,6 @@ export const reportsApi = {
   downloadActionItemsCSV: (params = {}) =>
     downloadFile('/reports/action-items/csv', 'action-items.csv', params),
 
-  // Download goals CSV
-  downloadGoalsCSV: (params = {}) =>
-    downloadFile('/reports/goals/csv', 'goals-export.csv', params),
 
   // Download tasks CSV
   downloadTasksCSV: (params = {}) =>
@@ -668,9 +609,6 @@ export const calendarApi = {
   syncAllActionItems: (calendarId, meetingId) =>
     api.post('/calendar/sync/action-items', { calendarId, meetingId }),
 
-  // Sync goal to calendar
-  syncGoal: (id, calendarId) =>
-    api.post(`/calendar/sync/goal/${id}`, { calendarId }),
 
   // Sync meeting to calendar
   syncMeeting: (id, calendarId) =>
@@ -717,57 +655,11 @@ export const integrationsApi = {
 // AI AGENTS API (Phase 5 - Week 7)
 // ========================================
 export const agentsApi = {
-  // List all agents
-  list: (params = {}) => api.get('/agents', { params }),
-
-  // Get agent templates
-  getTemplates: () => api.get('/agents/templates'),
-
-  // Get available built-in agents (assignment, priority, deadline)
+  // The four built-in meeting agents. The custom-agent builder was removed
+  // (feature audit 2026-11-22); which agents run is set in Settings › Meeting agents.
   getAvailable: () => api.get('/agents/available'),
 
-  // Create agent
-  create: (data) => api.post('/agents', data),
-
-  // Create from template
-  createFromTemplate: (templateId, customizations = {}) =>
-    api.post('/agents/from-template', { templateId, customizations }),
-
-  // Get agent by ID
-  get: (id) => api.get(`/agents/${id}`),
-
-  // Update agent
-  update: (id, data) => api.put(`/agents/${id}`, data),
-
-  // Delete agent
-  delete: (id) => api.delete(`/agents/${id}`),
-
-  // Toggle enabled state
-  toggle: (id) => api.post(`/agents/${id}/toggle`),
-
-  // Execute agent manually
-  execute: (id, triggerType, triggerData = {}) =>
-    api.post(`/agents/${id}/execute`, { trigger_type: triggerType, trigger_data: triggerData }),
-
-  // Get agent execution logs
-  getLogs: (id, limit = 50) => api.get(`/agents/${id}/logs`, { params: { limit } }),
-
-  // Get agent stats
-  getStats: (id) => api.get(`/agents/${id}/stats`),
-
-  // Provide feedback on execution
-  provideFeedback: (executionId, rating, notes = '') =>
-    api.post(`/agents/executions/${executionId}/feedback`, { rating, notes }),
-
-  // Get explanation for an agent execution
-  getExplanation: (executionId) =>
-    api.get(`/agents/executions/${executionId}/explanation`),
-
-  // Trigger all matching agents
-  trigger: (triggerType, data = {}) =>
-    api.post('/agents/trigger', { trigger_type: triggerType, data }),
-
-  // Run a specific built-in agent
+  // Run one agent with context
   runAgent: (agentName, context) =>
     api.post(`/agents/run/${agentName}`, context),
 
@@ -783,7 +675,7 @@ export const agentsApi = {
   applySuggestions: (actionItemId, suggestions, options = {}) =>
     api.post('/agents/apply-suggestions', { actionItemId, suggestions, options }),
 
-  // Get orchestrator logs
+  // Orchestrator logs
   getOrchestratorLogs: (limit = 20) =>
     api.get('/agents/orchestrator/logs', { params: { limit } })
 }
@@ -838,8 +730,9 @@ export const workflowsApi = {
     api.post(`/workflows/${id}/execute`, { inputData, mode }),
 
   // Test workflow (dry run)
-  test: (id, inputData = {}) =>
-    api.post(`/workflows/${id}/test`, { inputData }),
+  // Pass { lastMeeting: true } to test on the workspace's newest meeting
+  test: (id, inputData = {}, options = {}) =>
+    api.post(`/workflows/${id}/test`, { inputData, ...options }),
 
   // Toggle workflow active state
   toggle: (id, active) =>
@@ -883,7 +776,10 @@ export const workflowsApi = {
   getTemplates: () => api.get('/workflows/templates'),
 
   // Get specific template
-  getTemplate: (templateId) => api.get(`/workflows/templates/${templateId}`)
+  getTemplate: (templateId) => api.get(`/workflows/templates/${templateId}`),
+
+  // Latest runs across the org's automations (Automations › Recent runs)
+  recentRuns: (limit = 20) => api.get('/workflows/runs/recent', { params: { limit } })
 }
 
 // ========================================
@@ -998,6 +894,10 @@ export const intelligenceApi = {
 // SETTINGS API
 // ========================================
 export const settingsApi = {
+  // Meeting agents (Settings › Meeting agents): which run on meeting end, and their confidence bars
+  getMeetingAgents: (workspaceId) => api.get('/settings/meeting-agents', { params: { workspaceId } }),
+  updateMeetingAgents: (workspaceId, settings) => api.put('/settings/meeting-agents', { workspaceId, settings }),
+
   // Get current user settings
   getUser: () => api.get('/settings/user'),
 
@@ -1117,7 +1017,6 @@ const apiClient = {
   meetings: meetingsApi,
   projects: projectsApi,
   tasks: tasksApi,
-  automations: automationsApi,
   search: searchApi,
   dashboard: dashboardApi,
   reports: reportsApi,

@@ -84,7 +84,7 @@ class EmailService {
    * Send weekly summary email
    */
   async sendWeeklySummary(to, data) {
-    const { meetings, actionItems, goals, period } = data;
+    const { meetings, actionItems, period } = data;
 
     // Calculate stats
     const completedTasks = actionItems?.filter(i => i.status === 'done').length || 0;
@@ -170,22 +170,6 @@ class EmailService {
               </div>
             ` : ''}
 
-            ${goals && goals.length > 0 ? `
-              <div class="section">
-                <div class="section-title">Active Goals Progress</div>
-                ${goals.filter(g => g.status === 'active').slice(0, 3).map(g => `
-                  <div style="margin: 10px 0;">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                      <span style="font-weight: 500;">${g.title}</span>
-                      <span style="color: #6b7280;">${g.progress || 0}%</span>
-                    </div>
-                    <div style="background: #e5e7eb; height: 8px; border-radius: 4px;">
-                      <div style="background: ${g.progress >= 70 ? '#10b981' : g.progress >= 40 ? '#f59e0b' : '#ef4444'}; height: 100%; width: ${g.progress || 0}%; border-radius: 4px;"></div>
-                    </div>
-                  </div>
-                `).join('')}
-              </div>
-            ` : ''}
 
             <div style="text-align: center; margin-top: 30px;">
               <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard" class="btn">
@@ -315,80 +299,6 @@ View your dashboard: ${process.env.FRONTEND_URL || 'http://localhost:5173'}/dash
     });
   }
 
-  /**
-   * Send goal progress update email
-   */
-  async sendGoalUpdate(to, goal) {
-    const progressColor = goal.progress >= 70 ? '#10b981' : goal.progress >= 40 ? '#f59e0b' : '#ef4444';
-
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #374151; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #8b5cf6, #6d28d9); color: white; padding: 30px; border-radius: 12px 12px 0 0; }
-          .content { background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px; }
-          .progress-bar { background: #e5e7eb; height: 12px; border-radius: 6px; margin: 15px 0; }
-          .progress-fill { height: 100%; border-radius: 6px; }
-          .kr-item { padding: 10px 15px; background: #f9fafb; margin: 8px 0; border-radius: 6px; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1 style="margin: 0; font-size: 18px;">Goal Progress Update</h1>
-            <h2 style="margin: 10px 0 0; font-size: 20px;">${goal.title}</h2>
-          </div>
-
-          <div class="content">
-            <div style="text-align: center; margin-bottom: 20px;">
-              <div style="font-size: 48px; font-weight: bold; color: ${progressColor};">${goal.progress || 0}%</div>
-              <div style="color: #6b7280;">Overall Progress</div>
-            </div>
-
-            <div class="progress-bar">
-              <div class="progress-fill" style="width: ${goal.progress || 0}%; background: ${progressColor};"></div>
-            </div>
-
-            ${goal.key_results && goal.key_results.length > 0 ? `
-              <div style="margin-top: 25px;">
-                <h3 style="font-size: 14px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">Key Results</h3>
-                ${goal.key_results.map(kr => {
-                  const krProgress = kr.target > 0 ? Math.round((kr.current / kr.target) * 100) : 0;
-                  return `
-                    <div class="kr-item">
-                      <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                        <span>${kr.title}</span>
-                        <span style="font-weight: 500;">${kr.current}/${kr.target} ${kr.unit || ''}</span>
-                      </div>
-                      <div style="background: #e5e7eb; height: 6px; border-radius: 3px;">
-                        <div style="background: #3b82f6; height: 100%; width: ${krProgress}%; border-radius: 3px;"></div>
-                      </div>
-                    </div>
-                  `;
-                }).join('')}
-              </div>
-            ` : ''}
-
-            <div style="margin-top: 25px; padding: 15px; background: #f0f9ff; border-radius: 8px;">
-              <div style="font-size: 12px; color: #6b7280;">
-                Quarter: ${goal.quarter || 'N/A'} | Type: ${goal.goal_type} | Status: ${goal.status}
-              </div>
-            </div>
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
-
-    return this.sendEmail({
-      to,
-      subject: `Goal Update: ${goal.title} - ${goal.progress || 0}% Complete`,
-      html
-    });
-  }
 }
 
 module.exports = new EmailService();

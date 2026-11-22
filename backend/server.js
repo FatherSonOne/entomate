@@ -246,8 +246,8 @@ app.use('/api/projects', require('./routes/projects'));
 // Tasks
 app.use('/api/tasks', require('./routes/tasks'));
 
-// Automations
-app.use('/api/automations', require('./routes/automations'));
+// Automations run on the workflow engine (/api/workflows). /api/automations
+// and its rules engine were removed when the modules merged (2026-11-22).
 
 // Search
 app.use('/api/search', require('./routes/search'));
@@ -261,8 +261,6 @@ app.use('/api/agents', require('./routes/agents'));
 // Agent Task Intelligence (ETA, overdue, auto-assign)
 app.use('/api/agent-tasks', require('./routes/agentTasks'));
 
-// Goals & OKRs
-app.use('/api/goals', require('./routes/goals'));
 
 // Analytics
 app.use('/api/analytics', require('./routes/analytics'));

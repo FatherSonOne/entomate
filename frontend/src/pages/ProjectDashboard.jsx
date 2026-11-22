@@ -22,7 +22,8 @@ const STATUS_COLORS = {
   blocked: '#EF4444'
 }
 
-export default function ProjectDashboard() {
+/** `embedded`: shown as the Board view inside Projects, without its own header. */
+export default function ProjectDashboard({ embedded = false }) {
   const { id } = useParams()
   const [project, setProject] = useState(null)
   const [dashboardData, setDashboardData] = useState(null)
@@ -157,7 +158,7 @@ export default function ProjectDashboard() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      {!embedded && <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">
           {id && (
             <Link
@@ -188,7 +189,7 @@ export default function ProjectDashboard() {
           <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
           Refresh
         </VCButton>
-      </div>
+      </div>}
 
       {/* Tabs */}
       <div className="border-b" style={{ borderColor: 'var(--b1)' }}>

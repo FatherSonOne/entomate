@@ -955,17 +955,11 @@ router.get('/logos/deals', async (req, res) => {
 // HELPER FUNCTIONS
 // ========================================
 
-async function triggerAutomation(triggerType, data) {
-  // Call the automations trigger endpoint internally
-  try {
-    const axios = require('axios');
-    await axios.post(`http://localhost:${process.env.PORT || 3000}/api/automations/trigger`, {
-      triggerType,
-      triggerData: data
-    });
-  } catch (error) {
-    log.error('Failed to trigger automation:', error.message);
-  }
+async function triggerAutomation(triggerType) {
+  // The old rules engine (/api/automations/trigger) was retired on 2026-11-22
+  // when Automations moved onto workflows. CRM deal events have no workflow
+  // trigger yet, so the event is only logged.
+  log.info(`[Integrations] CRM event ${triggerType} received; no workflow trigger for it yet`);
 }
 
 module.exports = router;

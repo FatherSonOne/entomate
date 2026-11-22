@@ -28,7 +28,7 @@ function liveWebm(seconds) {
 
 describe('makeSeekable', () => {
   maybe('adds a duration and puts the cues before the audio', async () => {
-    const live = liveWebm(40);
+    const live = liveWebm(10);
     expect(live.includes(CUES)).toBe(false);
 
     const file = await makeSeekable(live, 'webm');

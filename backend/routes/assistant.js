@@ -72,30 +72,22 @@ const sectionLoaders = {
     return { tasks: data || [] };
   },
 
-  async goals({ orgIds }) {
-    try {
-      const { data } = await supabase.from('goals')
-        .select('id, title, description, status, progress, target_value, current_value, due_date')
-        .in('org_id', orgIds)
-        .order('due_date', { ascending: true }).limit(15);
-      return { goals: data || [] };
-    } catch { return { goals: [] }; }
-  },
 
-  async workflows({ orgIds }) {
-    const { data } = await supabase.from('workflows')
-      .select('id, name, description, status, enabled, last_run_at, created_at')
-      .in('org_id', orgIds)
-      .order('created_at', { ascending: false }).limit(15);
-    return { workflows: data || [] };
-  },
+  // Automations and workflows are one module on the workflow engine.
+  async workflows(ctx) { return sectionLoaders.automations(ctx); },
 
   async automations({ orgIds }) {
-    const { data } = await supabase.from('automations')
-      .select('id, name, description, enabled, trigger_type, last_run_at, created_at')
+    const { data } = await supabase.from('workflows')
+      .select('id, name, description, active, nodes, last_executed_at, execution_count, created_at')
       .in('org_id', orgIds)
+      .eq('is_template', false)
       .order('created_at', { ascending: false }).limit(15);
-    return { automations: data || [] };
+    const automations = (data || []).map(w => ({
+      id: w.id, name: w.name, description: w.description, enabled: !!w.active,
+      trigger_type: Array.isArray(w.nodes) ? (w.nodes.find(n => n?.type === 'trigger')?.subtype || null) : null,
+      last_run_at: w.last_executed_at, runs: w.execution_count || 0,
+    }));
+    return { automations };
   },
 
   async agents({ orgIds }) {
@@ -209,13 +201,6 @@ function buildContextBlocks(data) {
     }));
     blocks.push(`[Calendar Events (${slim.length})]\n${JSON.stringify(slim, null, 1)}`);
   }
-  if (data.goals?.length) {
-    const slim = data.goals.slice(0, 15).map(g => ({
-      id: g.id, title: g.title, status: g.status,
-      progress: g.progress, target: g.target_value, current: g.current_value,
-    }));
-    blocks.push(`[Goals (${slim.length})]\n${JSON.stringify(slim, null, 1)}`);
-  }
   if (data.workflows?.length) {
     const slim = data.workflows.slice(0, 10).map(w => ({
       id: w.id, name: w.name, status: w.status, enabled: w.enabled, lastRun: w.last_run_at,
@@ -250,7 +235,6 @@ const SECTION_LABELS = {
   projects: 'Projects',
   'project-dashboard': 'Project Board',
   tasks: 'Tasks',
-  goals: 'Goals',
   workflows: 'Workflows',
   automations: 'Automations',
   agents: 'AI Agents',
@@ -397,11 +381,6 @@ function generateFollowUps(section, question) {
       "Which project needs the most attention?",
       "Compare project budgets",
       "Show project timeline status",
-    ],
-    goals: [
-      "Which goals are at risk?",
-      "Update me on key results",
-      "How can I accelerate progress?",
     ],
     agents: [
       "What did agents do today?",

@@ -3,7 +3,7 @@
  * Sets the proactive suggestion badge on the sidebar button
  */
 import { useEffect, useRef } from 'react'
-import { tasksApi, meetingsApi, automationsApi } from '../../services/api'
+import { tasksApi, meetingsApi } from '../../services/api'
 
 const CHECK_INTERVAL = 10 * 60 * 1000 // 10 minutes
 

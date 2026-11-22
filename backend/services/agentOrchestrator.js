@@ -238,7 +238,17 @@ class AgentOrchestrator {
   /**
    * Process a meeting with all relevant agents
    */
-  async processMeetingWithAgents(meeting, actionItems) {
+  /**
+   * @param {object} [options]
+   * @param {{assignment?:boolean, priority?:boolean, deadline?:boolean}} [options.agents]
+   *   which meeting agents run (Settings › Meeting agents); all on by default
+   * @param {number} [options.assignMinConfidence] bar for passing a suggested
+   *   owner on to the Deadline agent (same bar meetingEvents applies)
+   */
+  async processMeetingWithAgents(meeting, actionItems, options = {}) {
+    const enabled = { assignment: true, priority: true, deadline: true, ...(options.agents || {}) };
+    const assignBar = options.assignMinConfidence ?? 0.7;
+    const parallelAgents = ['priority', 'deadline'].filter(a => enabled[a]);
     log.info(`Processing meeting with agents: ${meeting.id}`);
 
     const results = {
@@ -269,19 +279,21 @@ class AgentOrchestrator {
       // the Deadline agent can weigh the likely owner's workload. A suggested
       // owner counts only if it would be applied (same bar as meetingEvents).
       const aggregated = {};
-      if (context.orgId && !item.assigned_to_name && !item.assigned_to_email) {
+      if (enabled.assignment && context.orgId && !item.assigned_to_name && !item.assigned_to_email) {
         const assignment = await this.runAgent('assignment', context);
         if (assignment.success && assignment.suggestion) {
           aggregated.assignment = assignment.suggestion;
           const member = assignment.suggestion.recommendedMember;
-          if (member?.name && (assignment.suggestion.confidence ?? 0) >= 0.7) {
+          if (member?.name && (assignment.suggestion.confidence ?? 0) >= assignBar) {
             context.assignedTo = member.name;
           }
         }
       }
 
       // Priority and deadline don't depend on each other.
-      const parallel = await this.orchestrateParallel(['priority', 'deadline'], context);
+      const parallel = parallelAgents.length > 0
+        ? await this.orchestrateParallel(parallelAgents, context)
+        : { aggregated: {} };
       const suggestions = { aggregated: { ...aggregated, ...parallel.aggregated } };
 
       results.actionItems.push({

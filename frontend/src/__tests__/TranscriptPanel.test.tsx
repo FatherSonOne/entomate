@@ -2,13 +2,13 @@ import React from 'react'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { vi, describe, test, expect, beforeEach } from 'vitest'
 
-const api = vi.hoisted(() => ({ renameSpeaker: vi.fn() }))
+const api = vi.hoisted(() => ({ renameSpeaker: vi.fn(), suggestSpeakers: vi.fn() }))
 const cacheMock = vi.hoisted(() => ({ invalidate: vi.fn() }))
 vi.mock('../services/api', () => ({ meetingsApi: api }))
 vi.mock('../services/apiCache', () => ({ default: cacheMock }))
 
 import TranscriptPanel from '../components/meetings/TranscriptPanel'
-import { formatClock, toSegments, matchingLines, type TranscriptSegment } from '../services/meetingTranscriptService'
+import { formatClock, toSegments, matchingLines, toSuggestions, isGenericSpeaker, type TranscriptSegment } from '../services/meetingTranscriptService'
 
 const MEETING = 'meeting-1'
 const SEGMENTS: TranscriptSegment[] = [
@@ -113,5 +113,42 @@ describe('TranscriptPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save name' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('could not be renamed')
     expect(screen.getAllByTestId('transcript-line')[1]).toHaveTextContent('Ann Lee')
+  })
+})
+
+describe('speaker name suggestions', () => {
+  const SEGS: TranscriptSegment[] = [
+    { atMs: 0, speaker: 'Speaker 1', text: "I'm Priya" },
+    { atMs: 1000, speaker: 'Speaker 2', text: 'Hello' },
+  ]
+
+  test('toSuggestions keeps one valid guess per speaker still present', () => {
+    expect(isGenericSpeaker('Speaker 12')).toBe(true)
+    expect(isGenericSpeaker('Priya')).toBe(false)
+    expect(toSuggestions([
+      { speaker: 'Speaker 1', name: 'Priya Shah', confidence: 0.7, evidence: "I'm Priya" },
+      { speaker: 'Speaker 1', name: 'Other', confidence: 0.6 },
+      { speaker: 'Speaker 9', name: 'Ghost', confidence: 0.9 },
+      { speaker: 'Speaker 2', name: 'Bad: name', confidence: 0.9 },
+    ], SEGS)).toEqual([{ speaker: 'Speaker 1', name: 'Priya Shah', confidence: 0.7, evidence: "I'm Priya" }])
+  })
+
+  test('saved guesses can be accepted, which renames the speaker', async () => {
+    const renamed = SEGS.map((s) => (s.speaker === 'Speaker 1' ? { ...s, speaker: 'Priya Shah' } : s))
+    api.renameSpeaker.mockResolvedValue({ data: { transcript_segments: renamed, transcript: 'x' } })
+    const onRenamed = vi.fn()
+    render(<TranscriptPanel meetingId={MEETING} segments={SEGS} onRenamed={onRenamed} suggestions={[{ speaker: 'Speaker 1', name: 'Priya Shah', confidence: 0.7, evidence: "I'm Priya" }]} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Rename Speaker 1 to Priya Shah' }))
+    await waitFor(() => expect(api.renameSpeaker).toHaveBeenCalledWith(MEETING, 'Speaker 1', 'Priya Shah'))
+    await waitFor(() => expect(onRenamed).toHaveBeenCalled())
+    expect(screen.queryByRole('button', { name: 'Rename Speaker 1 to Priya Shah' })).toBeNull()
+  })
+
+  test('Suggest names asks the server and says so when nothing is found', async () => {
+    api.suggestSpeakers.mockResolvedValue({ data: { suggestions: [] } })
+    render(<TranscriptPanel meetingId={MEETING} segments={SEGS} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest names' }))
+    expect(await screen.findByRole('status')).toHaveTextContent('No names could be worked out')
+    expect(api.suggestSpeakers).toHaveBeenCalledWith(MEETING)
   })
 })

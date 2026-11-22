@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { Loader2, Send } from 'lucide-react'
-import { meetingsApi, integrationsApi, calendarApi } from '../services/api'
+import { meetingsApi, integrationsApi, calendarApi, reportsApi } from '../services/api'
 import ActionItemsList from '../components/ActionItemsList'
 import ChatChannelSelector from '../components/ChatChannelSelector'
 import { useToast } from '../components/vc/ToastProvider'
@@ -14,6 +14,7 @@ import RecordingStatus from '../components/meetings/RecordingStatus'
 import RecordingPlayer from '../components/meetings/RecordingPlayer'
 import { canPlay } from '../services/meetingRecorderService'
 import cache from '../services/apiCache'
+import { clipToNotes } from '../services/searchNotesService'
 import { formatClock, toSegments, toSummaryMoments } from '../services/meetingTranscriptService'
 import MeetingIntelligencePanel from '../components/intelligence/MeetingIntelligencePanel'
 import {
@@ -27,7 +28,19 @@ const TABS_ID = 'meeting'
 export default function MeetingDetail() {
   const { id } = useParams()
   const toast = useToast()
+
   const [meeting, setMeeting] = useState(null)
+
+  // Clip a decision or a transcript line to the Notes column on the Search page.
+  const clipToSearchNotes = useCallback(async (note) => {
+    try {
+      await clipToNotes({ origin: 'meeting', sourceType: 'meeting', sourceId: id, sourceLabel: meeting?.title || 'Meeting', ...note })
+      toast.success?.('Clipped to notes', 'Find it in the Notes column on Search.')
+    } catch {
+      toast.error?.('Could not clip', 'Notes are not available right now.')
+    }
+  }, [id, meeting?.title, toast])
+
   // Timed transcript lines; null for pasted or uploaded meetings, which keep the plain view.
   const transcriptSegments = useMemo(() => toSegments(meeting?.transcript_segments), [meeting?.transcript_segments])
   const summaryMoments = useMemo(() => toSummaryMoments(meeting?.summary_moments), [meeting?.summary_moments])
@@ -165,6 +178,66 @@ export default function MeetingDetail() {
     }
   }
 
+  // Summary templates per meeting type (audit rec 7). Rewriting replaces the
+  // summary, key points and decisions, so it only runs from the explicit key.
+  const [templates, setTemplates] = useState([])
+  const [templatePick, setTemplatePick] = useState('')
+  const [rewriting, setRewriting] = useState(false)
+  useEffect(() => {
+    meetingsApi.summaryTemplates?.()
+      .then((r) => setTemplates(Array.isArray(r?.templates) ? r.templates : []))
+      .catch(() => setTemplates([]))
+  }, [])
+  useEffect(() => { setTemplatePick(meeting?.summary_template || '') }, [meeting?.summary_template])
+  const handleRewriteSummary = async () => {
+    if (!templatePick) return
+    setRewriting(true)
+    try {
+      await meetingsApi.regenerateSummary(id, templatePick)
+      cache.invalidate(`/meetings/${id}`)
+      setMeeting(await meetingsApi.get(id))
+      toast.success('Rewritten', 'The summary was rewritten for this meeting type')
+    } catch (err) {
+      console.error('Failed to rewrite summary:', err)
+      toast.error('Error', 'The summary could not be rewritten')
+    } finally {
+      setRewriting(false)
+    }
+  }
+
+  // Recap email and PDF (moved here from the old Reports page, Insights pass 2026-11-22)
+  const [recapBusy, setRecapBusy] = useState(null)
+  const handleEmailRecap = async () => {
+    setRecapBusy('email')
+    try {
+      const { supabase } = await import('../services/supabaseClient')
+      const { data: { session } } = await supabase.auth.getSession()
+      const email = session?.user?.email
+      if (!email) {
+        toast.error('Error', 'Could not find your email address')
+        return
+      }
+      await reportsApi.sendMeetingRecap(id, email)
+      toast.success('Sent', `Recap emailed to ${email}`)
+    } catch (err) {
+      console.error('Failed to email recap:', err)
+      toast.error('Error', 'The recap email could not be sent')
+    } finally {
+      setRecapBusy(null)
+    }
+  }
+  const handleRecapPdf = async () => {
+    setRecapBusy('pdf')
+    try {
+      await reportsApi.downloadMeetingPDF(id)
+    } catch (err) {
+      console.error('Failed to download recap PDF:', err)
+      toast.error('Error', 'The recap PDF could not be made')
+    } finally {
+      setRecapBusy(null)
+    }
+  }
+
   const handlePostToChat = async () => {
     if (!selectedChannel) {
       setShareResult({ success: false, message: 'Choose a channel first.' })
@@ -286,6 +359,9 @@ export default function MeetingDetail() {
   const density = useMemo(() => speechDensity(transcriptSegments, lengthMs), [transcriptSegments, lengthMs])
   const decisions = asList(meeting?.decisions)
   const keyPoints = asList(meeting?.key_points)
+  // Extra sections from the meeting-type template; empty ones stay hidden.
+  const summarySections = (Array.isArray(meeting?.summary_sections) ? meeting.summary_sections : [])
+    .filter((sec) => sec && typeof sec.title === 'string' && Array.isArray(sec.items) && sec.items.length > 0)
   const actionItems = meeting?.actionItems || []
   const decisionMarks = transcriptSegments
     ? decisions.flatMap((label, i) => (summaryMoments.decisions[i] != null ? [{ atMs: summaryMoments.decisions[i], label: `Decision: ${label}` }] : []))
@@ -473,7 +549,39 @@ export default function MeetingDetail() {
                 ) : (
                   <p className="bs-para bs-mut">No summary yet.</p>
                 )}
+                {meeting.transcript && templates.length > 0 && !editingSummary && (
+                  <div className="bs-mtg-style">
+                    <label htmlFor="meeting-summary-style" className="bs-lbl">Meeting type</label>
+                    <select
+                      id="meeting-summary-style"
+                      className="bs-input"
+                      value={templatePick}
+                      onChange={(e) => setTemplatePick(e.target.value)}
+                      disabled={rewriting}
+                    >
+                      {!templatePick && <option value="">Not set</option>}
+                      {templates.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+                    </select>
+                    {templatePick && templatePick !== (meeting.summary_template || '') && (
+                      <Key size="sm" onClick={handleRewriteSummary} disabled={rewriting}>
+                        {rewriting && <Loader2 className="animate-spin" aria-hidden="true" />}
+                        {rewriting ? 'Rewriting' : 'Rewrite summary'}
+                      </Key>
+                    )}
+                  </div>
+                )}
               </div>
+
+              {summarySections.map((section) => (
+                <div className="bs-mtg-block" key={section.title}>
+                  <Section title={section.title} level={3} aside={String(section.items.length)} />
+                  <ul className="bs-rows">
+                    {section.items.map((item, index) => (
+                      <li key={index} className="bs-row"><span className="bs-row-text">{item}</span></li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
 
               <div className="bs-mtg-block">
                 <Section
@@ -492,6 +600,7 @@ export default function MeetingDetail() {
                           <span className="bs-tick" aria-hidden="true" />
                           <span className="bs-row-text">{decision}</span>
                           <TimecodeButton atMs={at} onJump={playMoment} label={decision} plays={playable} active={at != null && at === focusAtMs} />
+                          <Key size="sm" className="bs-mtg-clip" onClick={() => clipToSearchNotes({ kind: 'decision', body: String(decision), atMs: at ?? null })} aria-label={`Clip decision to Search notes: ${decision}`}>+ Notes</Key>
                         </li>
                       )
                     })}
@@ -638,9 +747,14 @@ export default function MeetingDetail() {
                   focusAtMs={focusAtMs}
                   playingAtMs={playable ? playingAtMs : null}
                   onPlayFrom={playable ? (atMs) => playerRef.current?.playFrom(atMs) : undefined}
-                  onRenamed={({ segments, transcript }) =>
+                  onClip={(line) => clipToSearchNotes({ kind: 'transcript', body: line.speaker ? `${line.speaker}: ${line.text}` : line.text, atMs: line.atMs })}
+                  suggestions={meeting.recording_job?.speakerSuggestions}
+                  onRenamed={({ segments, transcript }) => {
                     setMeeting(prev => ({ ...prev, transcript_segments: segments, transcript }))
-                  }
+                    // The rename also moves attendees and action item owners on the server.
+                    cache.invalidate(`/meetings/${id}`)
+                    meetingsApi.get(id).then((fresh) => { if (fresh) setMeeting(fresh) }).catch(() => {})
+                  }}
                 />
               </div>
             ) : (
@@ -690,6 +804,17 @@ export default function MeetingDetail() {
               <span className="bs-sub">{shareResult.message}</span>
             </p>
           )}
+          <div className="bs-mtg-share-field">
+            <span className="bs-lbl">Email or PDF</span>
+            <div className="bs-mtg-share-keys">
+              <Key size="sm" onClick={handleEmailRecap} disabled={recapBusy !== null}>
+                {recapBusy === 'email' ? 'Sending' : 'Email me the recap'}
+              </Key>
+              <Key size="sm" onClick={handleRecapPdf} disabled={recapBusy !== null}>
+                {recapBusy === 'pdf' ? 'Preparing' : 'Download PDF'}
+              </Key>
+            </div>
+          </div>
         </div>
       </Drawer>
     </div>

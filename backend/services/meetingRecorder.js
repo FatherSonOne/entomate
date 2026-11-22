@@ -28,6 +28,8 @@
 const { supabase } = require('../config/supabase');
 const ai = require('../config/ai');
 const geminiRecording = require('../config/geminiRecording');
+const summaryTemplates = require('./summaryTemplates');
+const speakerNames = require('./speakerNames');
 const transcriptMoments = require('./transcriptMoments');
 const playbackFile = require('./playbackFile');
 const log = require('../utils/log');
@@ -204,7 +206,7 @@ async function savePlaybackFile(meeting, audio, mimeType) {
 async function loadMeeting(meetingId) {
   const { data, error } = await supabase
     .from('meetings')
-    .select('id, org_id, title, created_by, start_time, attendees, recording_job')
+    .select('id, org_id, title, created_by, start_time, attendees, recording_job, summary_template')
     .eq('id', meetingId)
     .maybeSingle();
   if (error) throw error;
@@ -394,14 +396,31 @@ async function transcribeMeeting(meetingId) {
 
     const audio = Buffer.concat(parts);
     const text = await geminiRecording.transcribeRecording(audio, job.mimeType || 'audio/webm');
-    const segments = parseTimestampedTranscript(text);
-    const transcript = segments.length ? buildTranscriptText(segments) : String(text || '').trim();
+    let segments = parseTimestampedTranscript(text);
+    let transcript = segments.length ? buildTranscriptText(segments) : String(text || '').trim();
     if (!transcript) {
       const err = new Error('Empty transcript');
       err.userMessage = 'No speech was heard in this recording. Check that the right microphone or tab audio was shared.';
       throw err;
     }
     const playback = await savePlaybackFile(meeting, audio, job.mimeType || 'audio/webm');
+
+    // Real names for "Speaker N" before the summary, so owners and carry-forward use them.
+    // Strong evidence renames; weaker guesses wait on the meeting page as suggestions.
+    let speakerSuggestions = [];
+    if (segments.length) {
+      try {
+        const candidates = await speakerNames.loadCandidates(meeting);
+        const { apply, suggestions } = await speakerNames.suggestNames(segments, candidates);
+        if (Object.keys(apply).length) {
+          segments = speakerNames.applyNames(segments, apply);
+          transcript = buildTranscriptText(segments);
+        }
+        speakerSuggestions = suggestions;
+      } catch (err) {
+        log.warn('Recording: speaker naming failed, keeping Speaker labels', { meetingId, error: err.message });
+      }
+    }
 
     const { runAIPipeline, saveActionItems, firePostProcessing } = pipeline();
     let summaryData = EMPTY_SUMMARY;
@@ -413,7 +432,7 @@ async function transcribeMeeting(meetingId) {
       summaryError = 'AI provider not configured';
     } else {
       try {
-        ({ summaryData, actionItems, embedding } = await runAIPipeline(transcript, meeting.title));
+        ({ summaryData, actionItems, embedding } = await runAIPipeline(transcript, meeting.title, { attendees: meeting.attendees, template: meeting.summary_template }));
       } catch (err) {
         // The transcript is the valuable part; the summary can be rebuilt with Reprocess.
         summaryError = String(err?.message || err).slice(0, 500);
@@ -436,13 +455,14 @@ async function transcribeMeeting(meetingId) {
       decisions,
       summary_moments: segments.length ? transcriptMoments.summaryMoments(segments, keyPoints, decisions) : null,
       topics: summaryData.topics || [],
+      ...summaryTemplates.summaryFields(summaryData),
       sentiment_label: summaryData.sentiment || null,
       sentiment_score: summaryData.sentimentScore ?? null,
       // Names typed before recording win; otherwise the speakers Gemini heard.
       attendees: Array.isArray(meeting.attendees) && meeting.attendees.length ? meeting.attendees : speakers,
       duration_minutes: durationMs ? Math.max(1, Math.round(durationMs / 60000)) : null,
       end_time: Number.isFinite(startMs) && durationMs ? new Date(startMs + durationMs).toISOString() : now,
-      recording_job: { ...job, status: 'done', error: null, summaryError, audioKept: true, playbackFile: playback, speakers: speakers.length, lines: segments.length, updatedAt: now },
+      recording_job: { ...job, status: 'done', error: null, summaryError, speakerSuggestions, audioKept: true, playbackFile: playback, speakers: speakers.length, lines: segments.length, updatedAt: now },
       updated_at: now,
     };
     if (embedding) update.transcript_embedding = embedding;

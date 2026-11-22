@@ -83,7 +83,7 @@ class OpenAIService {
    * @param {string} transcript - Meeting transcript
    * @returns {Promise<Object>} Summary with keyPoints, decisions, sentiment
    */
-  async generateSummary(transcript) {
+  async generateSummary(transcript, options = {}) {
     if (!this.isConfigured()) {
       throw new Error('OpenAI API not configured');
     }
@@ -116,7 +116,7 @@ Return JSON with this exact structure:
   "nextSteps": ["step 1", "step 2"],
   "participantCount": number or null if unclear,
   "estimatedDuration": "X minutes" or null if unclear
-}`
+}${options.addon || ''}`
           }
         ],
         temperature: 0.3,
@@ -278,6 +278,25 @@ Return ONLY valid JSON:
       log.error('Question error:', { error: error.message || error });
       throw new Error(`Question answering failed: ${error.message}`);
     }
+  }
+
+  /**
+   * Plain text completion for the agents (priority, deadline, assignment, follow-up).
+   * @param {string|Array<{role: string, content: string}>} input - Prompt or chat messages
+   * @param {{temperature?: number}} [options]
+   * @returns {Promise<string>} Model text
+   */
+  async chat(input, options = {}) {
+    if (!this.isConfigured()) {
+      throw new Error('OpenAI API not configured');
+    }
+    const messages = Array.isArray(input) ? input : [{ role: 'user', content: String(input) }];
+    const response = await this.client.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages,
+      ...(typeof options.temperature === 'number' ? { temperature: options.temperature } : {})
+    });
+    return response.choices?.[0]?.message?.content || '';
   }
 
   /**

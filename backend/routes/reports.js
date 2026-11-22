@@ -8,6 +8,7 @@ const router = express.Router();
 const { supabase } = require('../config/supabase');
 const { authenticate } = require('../middleware/auth');
 const reportService = require('../services/reportService');
+const { buildProjectReport } = require('../services/projectReport');
 const log = require('../utils/log');
 const { attachOrgIds } = require('../utils/orgContext');
 
@@ -77,56 +78,6 @@ router.get('/meeting/:id/pdf', async (req, res) => {
 });
 
 /**
- * GET /api/reports/goals/pdf
- * Generate PDF report for all goals
- */
-router.get('/goals/pdf', async (req, res) => {
-  try {
-    const { quarter } = req.query;
-
-    if (!supabase) {
-      return res.status(503).json({ error: 'Database not configured' });
-    }
-
-    // Get goals (scoped to current user)
-    let query = supabase.from('goals').select('*').eq('owner_id', req.user.id);
-    if (quarter) {
-      query = query.eq('quarter', quarter);
-    }
-
-    const { data: goals, error } = await query.order('goal_type');
-
-    if (error) {
-      return res.status(500).json({ error: 'Failed to fetch goals' });
-    }
-
-    // Calculate stats
-    const stats = {
-      quarter: quarter || 'All Time',
-      total: goals?.length || 0,
-      averageProgress: goals?.length > 0
-        ? Math.round(goals.reduce((sum, g) => sum + (g.progress || 0), 0) / goals.length)
-        : 0,
-      onTrack: goals?.filter(g => g.progress >= 70).length || 0,
-      atRisk: goals?.filter(g => g.progress < 30 && g.status === 'active').length || 0
-    };
-
-    // Generate PDF
-    const pdfBuffer = await reportService.generateGoalsReportPDF(goals || [], stats);
-
-    const filename = `goals-report-${quarter || 'all'}-${Date.now()}.pdf`;
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.setHeader('Content-Length', pdfBuffer.length);
-
-    res.send(pdfBuffer);
-  } catch (error) {
-    log.error('Error generating goals PDF:', { error: error.message || error });
-    res.status(500).json({ error: 'Failed to generate PDF', details: error.message });
-  }
-});
-
-/**
  * GET /api/reports/project/:id/pdf
  * Generate PDF report for a project
  */
@@ -138,62 +89,43 @@ router.get('/project/:id/pdf', async (req, res) => {
       return res.status(503).json({ error: 'Database not configured' });
     }
 
-    // Get project stats (scoped to current user)
-    const { data: project, error: projectError } = await supabase
-      .from('project_statistics')
-      .select('*')
+    const { data: project } = await supabase
+      .from('projects')
+      .select('id, name')
+      .in('org_id', req.orgIds)
       .eq('id', id)
-      .eq('owner_id', req.user.id)
-      .single();
+      .maybeSingle();
 
-    if (projectError && projectError.code !== 'PGRST116') {
-      // Try fetching from meetings directly
-      const { data: meeting } = await supabase
-        .from('meetings')
-        .select('*')
-        .in('org_id', req.orgIds)
-        .eq('id', id)
-        .eq('created_by', req.user.id)
-        .single();
-
-      if (!meeting) {
-        return res.status(404).json({ error: 'Project not found' });
-      }
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' });
     }
 
-    // Get action items
-    const { data: actionItems } = await supabase
-      .from('action_items')
-      .select('*')
-      .in('org_id', req.orgIds)
-      .eq('meeting_id', id)
-      .order('status');
+    const [{ data: tasks }, { data: meetings }] = await Promise.all([
+      supabase
+        .from('tasks')
+        .select('title, description, status, assigned_to, due_date')
+        .in('org_id', req.orgIds)
+        .eq('project_id', id),
+      supabase
+        .from('meetings')
+        .select('id')
+        .in('org_id', req.orgIds)
+        .eq('project_id', id),
+    ]);
 
-    // Get team workload for this project
-    const workloadMap = new Map();
-    (actionItems || []).forEach(item => {
-      if (!item.assigned_to_name) return;
-      if (!workloadMap.has(item.assigned_to_name)) {
-        workloadMap.set(item.assigned_to_name, {
-          team_member: item.assigned_to_name,
-          total_assigned: 0,
-          completed_items: 0
-        });
-      }
-      const member = workloadMap.get(item.assigned_to_name);
-      member.total_assigned++;
-      if (item.status === 'done' || item.status === 'complete') {
-        member.completed_items++;
-      }
-    });
-    const teamWorkload = Array.from(workloadMap.values());
+    const meetingIds = (meetings || []).map((m) => m.id);
+    let actionItems = [];
+    if (meetingIds.length) {
+      const { data } = await supabase
+        .from('action_items')
+        .select('task_description, status, assigned_to_name, due_date')
+        .in('org_id', req.orgIds)
+        .in('meeting_id', meetingIds);
+      actionItems = data || [];
+    }
 
-    // Generate PDF
-    const pdfBuffer = await reportService.generateProjectReportPDF(
-      project || { title: 'Project Report', id },
-      actionItems || [],
-      teamWorkload
-    );
+    const report = buildProjectReport({ project, tasks: tasks || [], actionItems });
+    const pdfBuffer = await reportService.generateProjectReportPDF(report.project, report.items, report.teamWorkload);
 
     const filename = `project-report-${id}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
@@ -225,12 +157,11 @@ router.get('/weekly/pdf', async (req, res) => {
     // Scope all queries to current user
     const meetingIds = await getUserMeetingIds(req.user.id);
 
-    const [meetingsRes, actionItemsRes, goalsRes] = await Promise.all([
+    const [meetingsRes, actionItemsRes] = await Promise.all([
       supabase.from('meetings').select('*').eq('created_by', req.user.id).gte('created_at', weekAgoISO).order('created_at', { ascending: false }),
       meetingIds.length > 0
         ? supabase.from('action_items').select('*').in('meeting_id', meetingIds).order('created_at', { ascending: false })
-        : Promise.resolve({ data: [] }),
-      supabase.from('goals').select('*').eq('owner_id', req.user.id).eq('status', 'active')
+        : Promise.resolve({ data: [] })
     ]);
 
     const period = `${weekAgo.toLocaleDateString()} - ${new Date().toLocaleDateString()}`;
@@ -238,7 +169,6 @@ router.get('/weekly/pdf', async (req, res) => {
     const pdfBuffer = await reportService.generateWeeklySummaryPDF({
       meetings: meetingsRes.data || [],
       actionItems: actionItemsRes.data || [],
-      goals: goalsRes.data || [],
       period
     });
 
@@ -372,42 +302,6 @@ router.get('/tasks/csv', async (req, res) => {
 });
 
 /**
- * GET /api/reports/goals/csv
- * Export all goals as CSV
- */
-router.get('/goals/csv', async (req, res) => {
-  try {
-    const { quarter, type } = req.query;
-
-    if (!supabase) {
-      return res.status(503).json({ error: 'Database not configured' });
-    }
-
-    let query = supabase.from('goals').select('*').eq('owner_id', req.user.id);
-
-    if (quarter) {
-      query = query.eq('quarter', quarter);
-    }
-    if (type) {
-      query = query.eq('goal_type', type);
-    }
-
-    const { data: goals, error } = await query.order('created_at', { ascending: false });
-
-    if (error) throw error;
-
-    const csv = reportService.generateGoalsCSV(goals || []);
-
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename="goals-export-${Date.now()}.csv"`);
-    res.send(csv);
-  } catch (error) {
-    log.error('Error generating goals CSV:', { error: error.message || error });
-    res.status(500).json({ error: 'Failed to generate CSV', details: error.message });
-  }
-});
-
-/**
  * GET /api/reports/available
  * List available report types
  */
@@ -421,14 +315,6 @@ router.get('/available', (req, res) => {
         endpoint: '/api/reports/meeting/:id/pdf',
         format: 'pdf',
         params: ['id']
-      },
-      {
-        id: 'goals-report',
-        name: 'Goals & OKRs Report',
-        description: 'PDF report of all goals with progress',
-        endpoint: '/api/reports/goals/pdf',
-        format: 'pdf',
-        params: ['quarter (optional)']
       },
       {
         id: 'project-report',
@@ -461,14 +347,6 @@ router.get('/available', (req, res) => {
         endpoint: '/api/reports/action-items/csv',
         format: 'csv',
         params: ['status (optional)', 'meetingId (optional)']
-      },
-      {
-        id: 'goals-csv',
-        name: 'Goals Export',
-        description: 'CSV export of goals',
-        endpoint: '/api/reports/goals/csv',
-        format: 'csv',
-        params: ['quarter (optional)', 'type (optional)']
       },
       {
         id: 'tasks-csv',

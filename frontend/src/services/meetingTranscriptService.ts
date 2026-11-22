@@ -118,3 +118,46 @@ export async function renameSpeaker(
     return { result: null, error: reason ?? 'The speaker could not be renamed.' }
   }
 }
+
+/* ── Speaker name suggestions (audit rec 11) ─────────────────────────── */
+
+export interface SpeakerSuggestion {
+  speaker: string
+  name: string
+  /** 0-1. */
+  confidence: number
+  /** Words from the transcript that show it, when there are some. */
+  evidence: string | null
+}
+
+/** "Speaker 2" style labels that still need a real name. */
+export function isGenericSpeaker(name: string): boolean {
+  return /^speaker(\s*\d+)?$/i.test(name.trim())
+}
+
+/** Valid suggestions for speakers still in the transcript, one per speaker. */
+export function toSuggestions(raw: unknown, segments: TranscriptSegment[]): SpeakerSuggestion[] {
+  if (!Array.isArray(raw)) return []
+  const present = new Set(segments.map((s) => s.speaker))
+  const seen = new Set<string>()
+  const out: SpeakerSuggestion[] = []
+  for (const r of raw as Array<Record<string, unknown>>) {
+    const speaker = typeof r?.speaker === 'string' ? r.speaker : ''
+    const name = typeof r?.name === 'string' ? r.name.trim() : ''
+    if (!speaker || !name || !present.has(speaker) || seen.has(speaker) || /[\r\n:]/.test(name)) continue
+    seen.add(speaker)
+    const c = typeof r.confidence === 'number' ? r.confidence : 0
+    out.push({ speaker, name, confidence: Math.max(0, Math.min(1, c)), evidence: typeof r.evidence === 'string' && r.evidence ? r.evidence : null })
+  }
+  return out
+}
+
+/** Ask the server to guess names. Renames nothing. */
+export async function suggestSpeakers(meetingId: string, segments: TranscriptSegment[]): Promise<{ suggestions: SpeakerSuggestion[]; error: string | null }> {
+  try {
+    const res = (await meetingsApi.suggestSpeakers(meetingId)) as ApiEnvelope<{ suggestions?: unknown }>
+    return { suggestions: toSuggestions(res?.data?.suggestions, segments), error: null }
+  } catch {
+    return { suggestions: [], error: 'Names could not be suggested. Try again.' }
+  }
+}

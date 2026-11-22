@@ -60,16 +60,6 @@ const syncActionItems = z.object({
   params: z.object({}).passthrough()
 });
 
-const syncGoal = z.object({
-  body: z.object({
-    calendarId: z.string().optional()
-  }),
-  query: z.object({}).passthrough(),
-  params: z.object({
-    id: z.string().uuid()
-  })
-});
-
 const syncMeeting = z.object({
   body: z.object({
     calendarId: z.string().optional()
@@ -80,4 +70,4 @@ const syncMeeting = z.object({
   })
 });
 
-module.exports = { createEvent, updateEvent, syncActionItem, syncActionItems, syncGoal, syncMeeting };
+module.exports = { createEvent, updateEvent, syncActionItem, syncActionItems, syncMeeting };

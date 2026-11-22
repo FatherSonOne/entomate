@@ -8,8 +8,6 @@ import {
   projectsApi,
   dashboardApi,
   calendarApi,
-  agentsApi,
-  automationsApi,
   workflowsApi,
   assistantApi,
 } from './api'
@@ -41,14 +39,13 @@ export const SECTIONS = {
   calendar:         { label: 'Calendar',      path: '/calendar' },
   search:           { label: 'Search',        path: '/search' },
   projects:         { label: 'Projects',      path: '/projects' },
-  'project-dashboard': { label: 'Project Board', path: '/project-dashboard' },
+  'project-dashboard': { label: 'Project Board', path: '/projects?view=board' },
   tasks:            { label: 'Tasks',         path: '/tasks' },
-  goals:            { label: 'Goals',         path: '/goals' },
   workflows:        { label: 'Workflows',     path: '/workflows' },
   automations:      { label: 'Automations',   path: '/automations' },
   agents:           { label: 'AI Agents',     path: '/agents' },
-  analytics:        { label: 'Analytics',     path: '/analytics' },
-  reports:          { label: 'Reports',       path: '/reports' },
+  analytics:        { label: 'Insights',      path: '/analytics' },
+  reports:          { label: 'Export',        path: '/analytics?export=' },
   settings:         { label: 'Settings',      path: '/settings' },
   guide:            { label: 'User Guide',    path: '/guide' },
 }
@@ -94,11 +91,6 @@ const QUICK_ACTIONS = {
     { label: 'Overdue items',       query: 'What tasks are overdue and need immediate attention?' },
     { label: 'What to work on next?', query: 'Based on priorities and deadlines, what should I work on next?' },
   ],
-  goals: [
-    { label: 'Goal progress',       query: 'How am I tracking against my goals and key results?' },
-    { label: 'At-risk goals',       query: 'Which goals are at risk of not being met?' },
-    { label: 'Key results update',  query: 'Give me a status update on all my key results' },
-  ],
   workflows: [
     { label: 'Active workflows',    query: 'What workflows are currently active and how are they performing?' },
     { label: 'Recent executions',   query: 'Show me recent workflow execution results' },
@@ -141,14 +133,13 @@ const SUGGESTED_NAV = {
   dashboard:  [{ label: 'Open Tasks', to: '/tasks' }, { label: 'Check Calendar', to: '/calendar' }, { label: 'View Meetings', to: '/meetings' }],
   meetings:   [{ label: 'Open Tasks', to: '/tasks' }, { label: 'Check Calendar', to: '/calendar' }, { label: 'Go to Dashboard', to: '/dashboard' }],
   calendar:   [{ label: 'Open Meetings', to: '/meetings' }, { label: 'View Tasks', to: '/tasks' }, { label: 'Go to Dashboard', to: '/dashboard' }],
-  projects:   [{ label: 'View Tasks', to: '/tasks' }, { label: 'Check Goals', to: '/goals' }, { label: 'Go to Dashboard', to: '/dashboard' }],
+  projects:   [{ label: 'View Tasks', to: '/tasks' }, { label: 'Open Board', to: '/projects?view=board' }, { label: 'Go to Dashboard', to: '/dashboard' }],
   tasks:      [{ label: 'View Projects', to: '/projects' }, { label: 'Check Calendar', to: '/calendar' }, { label: 'Go to Dashboard', to: '/dashboard' }],
-  goals:      [{ label: 'View Tasks', to: '/tasks' }, { label: 'Check Projects', to: '/projects' }, { label: 'Go to Dashboard', to: '/dashboard' }],
   agents:     [{ label: 'View Tasks', to: '/tasks' }, { label: 'Check Automations', to: '/automations' }, { label: 'Go to Dashboard', to: '/dashboard' }],
   automations:[{ label: 'View Workflows', to: '/workflows' }, { label: 'Check Agents', to: '/agents' }, { label: 'Go to Dashboard', to: '/dashboard' }],
   workflows:  [{ label: 'Check Automations', to: '/automations' }, { label: 'View Projects', to: '/projects' }, { label: 'Go to Dashboard', to: '/dashboard' }],
-  analytics:  [{ label: 'View Reports', to: '/reports' }, { label: 'Open Tasks', to: '/tasks' }, { label: 'Go to Dashboard', to: '/dashboard' }],
-  reports:    [{ label: 'View Analytics', to: '/analytics' }, { label: 'Open Tasks', to: '/tasks' }, { label: 'Go to Dashboard', to: '/dashboard' }],
+  analytics:  [{ label: 'Export a report', to: '/analytics?export=' }, { label: 'Open Tasks', to: '/tasks' }, { label: 'Go to Dashboard', to: '/dashboard' }],
+  reports:    [{ label: 'View Insights', to: '/analytics' }, { label: 'Open Tasks', to: '/tasks' }, { label: 'Go to Dashboard', to: '/dashboard' }],
 }
 
 export function getSuggestedActions(section) {
@@ -187,22 +178,14 @@ const DATA_LOADERS = {
     const res = await tasksApi.list({ limit: 20 })
     return { tasks: res?.data?.tasks || res?.data || [] }
   },
-  goals: async () => {
-    // Goals are fetched from tasks/projects with goal type
-    const res = await tasksApi.list({ limit: 20, type: 'goal' })
-    return { goals: res?.data?.tasks || res?.data || [] }
-  },
   workflows: async () => {
     const res = await workflowsApi.list({ limit: 15 })
     return { workflows: res?.data?.workflows || res?.data || [] }
   },
+  // Automations run on the workflow engine
   automations: async () => {
-    const res = await automationsApi.list({ limit: 15 })
-    return { automations: res?.data?.automations || res?.data || [] }
-  },
-  agents: async () => {
-    const res = await agentsApi.list({ limit: 15 })
-    return { agents: res?.data?.agents || res?.data || [] }
+    const res = await workflowsApi.list({ limit: 15, template: false })
+    return { automations: res?.data || [] }
   },
   analytics: async () => {
     const res = await dashboardApi.getSummary()
@@ -259,10 +242,6 @@ export function getSectionSummary(section, data) {
         if (inProgress) parts.push(`${inProgress} in progress`)
         if (overdue) parts.push(`${overdue} overdue`)
         return parts.join(' · ') || `${t.length} tasks`
-      }
-      case 'goals': {
-        const g = data.goals || []
-        return g.length ? `${g.length} goals tracked` : 'No goals set'
       }
       case 'workflows': {
         const w = data.workflows || []

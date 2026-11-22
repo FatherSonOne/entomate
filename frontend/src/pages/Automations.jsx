@@ -1,761 +1,551 @@
-import React, { useState, useEffect } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { settingsApi, workflowsApi } from '../services/api'
+import cache from '../services/apiCache'
+import { useOrg } from '../contexts/OrgContext'
 import {
-  Zap, Plus, Play, Pause, Trash2, Clock, CheckCircle2,
-  AlertCircle, Settings, Bot, Sparkles, History, RefreshCw,
-  ChevronDown, ChevronUp, XCircle, Eye, Wrench, Calendar,
-  TrendingUp, AlertTriangle, BarChart2, FileText, MessageSquare,
-  GitBranch, Database, Globe, Layers, Presentation, UserPlus,
-  AlertOctagon, Users, Workflow, Activity
-} from 'lucide-react'
-import AnimatedIcon, { iconRegistry } from '../components/icons/AnimatedIcons'
-
-// Map icon name strings to Lucide components for workflow templates
-const ICON_MAP = {
-  'trending-up': TrendingUp,
-  'alert-triangle': AlertTriangle,
-  'bar-chart-2': BarChart2,
-  'refresh-cw': RefreshCw,
-  'alert-circle': AlertCircle,
-  'file-text': FileText,
-  'message-square': MessageSquare,
-  'calendar': Calendar,
-  'git-branch': GitBranch,
-  'database': Database,
-  'globe': Globe,
-  'layers': Layers,
-  'presentation': Presentation,
-  'user-plus': UserPlus,
-  'alert-octagon': AlertOctagon,
-  'users': Users,
-  'zap': Zap,
-  'bot': Bot,
-  'sparkles': Sparkles,
-  'settings': Settings
-}
-
-// Render icon - handles animated icon keys, Lucide icon names, and legacy React elements
-const renderTemplateIcon = (iconName, className = "w-6 h-6") => {
-  if (!iconName) return <Workflow className={className} />
-
-  // If it's already a React element (JSX), render directly
-  if (React.isValidElement(iconName)) {
-    return iconName
-  }
-
-  // Check animated icon registry first
-  if (iconRegistry[iconName]) {
-    return <AnimatedIcon name={iconName} size={24} />
-  }
-
-  // Look up Lucide icon component
-  const IconComponent = ICON_MAP[iconName]
-  if (IconComponent) {
-    return <IconComponent className={className} />
-  }
-
-  // Fallback to default
-  return <Workflow className={className} />
-}
-import { useToast } from '../components/vc/ToastProvider'
+  Cell, Drawer, GroupHead, Grid, Key, Section, Signal, Switch, TextInput, TitleRule, Toggle,
+} from '../components/bench'
 import { useConfirm } from '../components/vc/ConfirmDialog'
-import { automationsApi } from '../services/api'
-import AutomationBuilder from '../components/AutomationBuilder'
-import { GuideCard, PageHeader, Skeleton } from '../components/SharedUI'
-import { VCButton, VCBadge } from '../components/vc'
+import { useToast } from '../components/vc/ToastProvider'
 import ErrorState from '../components/vc/ErrorState'
+import {
+  RECIPES, buildFromRecipe, describe, editableField, groupAutomations, groupRuns, latestRuns, orderedNodes,
+  runSignal, status, stepWords, triggerWords, whenWords,
+} from '../services/automationsView'
+
+/**
+ * 05 Automations (Bench Swiss, direction A · Recipes). One module for what
+ * used to be Automations, Workflows and AI Agents: automations are workflows
+ * on the workflow engine, grouped with meeting-end recipes first. A row opens
+ * a drawer to fill in the blanks, test on the last meeting, or open the full
+ * builder (/workflows/:id). Meeting agents are tuned in Settings.
+ * View logic lives in services/automationsView.ts.
+ */
+
+const SHOW_OPTIONS = [
+  { value: 'all', label: 'All' },
+  { value: 'on', label: 'On' },
+  { value: 'off', label: 'Paused' },
+]
+const AGENT_ROWS = [
+  { key: 'assignment', name: 'Owner', what: 'Assigns unowned items to someone in the meeting' },
+  { key: 'priority', name: 'Priority', what: 'Raises or lowers priority' },
+  { key: 'deadline', name: 'Deadline', what: 'Fills a due date when none was said' },
+]
+
+function fresh() {
+  cache.invalidate('/workflows')
+}
+
+function Steps({ steps }) {
+  return (
+    <span className="bs-auto-chain">
+      {steps.map((s, i) => (
+        <React.Fragment key={`${i}-${s}`}>
+          {i > 0 && <span className="bs-auto-ar" aria-hidden="true">→</span>}
+          <span>{s}</span>
+        </React.Fragment>
+      ))}
+    </span>
+  )
+}
 
 export default function Automations() {
-  const toast = useToast()
+  const navigate = useNavigate()
   const confirm = useConfirm()
-  const [automations, setAutomations] = useState([])
-  const [templates, setTemplates] = useState([])
+  const toast = useToast()
+  const { org } = useOrg()
+  const [params, setParams] = useSearchParams()
+  const show = ['on', 'off'].includes(params.get('show')) ? params.get('show') : 'all'
+  const openId = params.get('a') || null
+  const recipesOpen = params.get('new') === '1'
+
+  const [rows, setRows] = useState([])
+  const [runs, setRuns] = useState([])
+  const [agents, setAgents] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [showCreate, setShowCreate] = useState(false)
-  const [showBuilder, setShowBuilder] = useState(false)
-  const [showHistory, setShowHistory] = useState(false)
-  const [executionLogs, setExecutionLogs] = useState([])
-  const [loadingLogs, setLoadingLogs] = useState(false)
-  const [selectedCategory, setSelectedCategory] = useState('all')
-  const [schedulerStatus, setSchedulerStatus] = useState([])
-  const [testingId, setTestingId] = useState(null)
-  const [testResult, setTestResult] = useState(null)
-  const [wizardStep, setWizardStep] = useState(0) // 0: Choose Template, 1: Configure, 2: Monitor
-  const [editingAutomation, setEditingAutomation] = useState(null)
+  const [busy, setBusy] = useState(null)
 
-  useEffect(() => {
-    loadData()
-  }, [])
+  const setParam = useCallback((key, value) => {
+    setParams((p) => {
+      const next = new URLSearchParams(p)
+      if (value === null || value === undefined || value === '') next.delete(key)
+      else next.set(key, value)
+      return next
+    }, { replace: true })
+  }, [setParams])
 
-  const loadData = async () => {
+  const load = useCallback(async () => {
     try {
       setError(null)
-      setLoading(true)
-      const [automationsData, templatesData] = await Promise.all([
-        automationsApi.list(),
-        automationsApi.getTemplates()
+      const [list, recent] = await Promise.all([
+        workflowsApi.list({ template: false, limit: 100 }),
+        workflowsApi.recentRuns(30).catch(() => ({ data: [] })),
       ])
-      setAutomations(automationsData.automations || [])
-      setTemplates(templatesData.templates || [])
-      if (automationsData.automations && automationsData.automations.length > 0) {
-        setWizardStep(2) // If automations exist, show monitor step
-      }
+      setRows(Array.isArray(list?.data) ? list.data : [])
+      setRuns(Array.isArray(recent?.data) ? recent.data : [])
     } catch (err) {
-      console.error('Failed to load data:', err)
-      setError(err.message || 'Failed to load automations')
+      setError(err.message || 'Could not load automations')
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  const loadExecutionLogs = async () => {
+  useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    if (!org?.id) return
+    settingsApi.getMeetingAgents(org.id).then((res) => setAgents(res.settings || null)).catch(() => setAgents(null))
+  }, [org?.id])
+
+  const described = useMemo(() => rows.map(describe), [rows])
+  const last = useMemo(() => latestRuns(runs), [runs])
+  const groups = useMemo(() => groupAutomations(described, show), [described, show])
+  const runGroups = useMemo(() => groupRuns(runs, 4), [runs])
+  const onCount = described.filter((d) => d.active).length
+  const newest = runs.find((r) => r.mode !== 'test')
+
+  const toggle = async (d, active) => {
+    setBusy(d.id)
+    setRows((rs) => rs.map((r) => (r.id === d.id ? { ...r, active } : r)))
     try {
-      setLoadingLogs(true)
-      // Load logs for all automations
-      const allLogs = []
-      for (const automation of automations.slice(0, 5)) {
-        try {
-          const logs = await automationsApi.getLogs(automation.id, { limit: 10 })
-          allLogs.push(...(logs.logs || []).map(log => ({
-            ...log,
-            automationName: automation.name
-          })))
-        } catch (e) {
-          // Skip if logs fail
-        }
-      }
-      // Sort by date
-      allLogs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-      setExecutionLogs(allLogs.slice(0, 20))
-    } catch (error) {
-      console.error('Failed to load logs:', error)
+      await workflowsApi.toggle(d.id, active)
+      fresh()
+      toast?.success?.(active ? `On: ${d.name}` : `Paused: ${d.name}`)
+    } catch (err) {
+      setRows((rs) => rs.map((r) => (r.id === d.id ? { ...r, active: !active } : r)))
+      toast?.error?.(err.message || 'Could not change it')
     } finally {
-      setLoadingLogs(false)
+      setBusy(null)
     }
   }
 
-  const handleCreateFromTemplate = async (template) => {
+  const newBlank = async () => {
     try {
-      await automationsApi.create({
-        name: template.name,
-        description: template.description,
-        triggerType: template.trigger_type || template.triggerType,
-        triggerConfig: template.trigger_config || template.triggerConfig || {},
-        actions: template.actions,
-        enabled: true
+      const res = await workflowsApi.create({
+        name: 'New automation',
+        description: '',
+        nodes: [{ id: 'trigger', type: 'trigger', subtype: 'meeting_processed', position: { x: 100, y: 100 }, config: {} }],
+        connections: [],
+        active: false,
       })
-      setShowCreate(false)
-      setWizardStep(1)
-      loadData()
-    } catch (error) {
-      console.error('Failed to create automation:', error)
+      fresh()
+      navigate(`/workflows/${res.data.id}`)
+    } catch (err) {
+      toast?.error?.(err.message || 'Could not create it')
     }
   }
 
-  const handleToggle = async (id, currentEnabled) => {
-    try {
-      await automationsApi.toggle(id, !currentEnabled)
-      setAutomations(automations.map(a =>
-        a.id === id ? { ...a, enabled: !currentEnabled } : a
-      ))
-    } catch (error) {
-      console.error('Failed to toggle automation:', error)
-    }
+  if (error && rows.length === 0) {
+    return <ErrorState message={error} onRetry={load} />
   }
 
-  const handleExecute = async (id) => {
-    try {
-      const result = await automationsApi.execute(id, {})
-      toast.success('Success', `Automation executed! ${result.success ? 'Success' : 'Failed'}`)
-      loadData()
-    } catch (error) {
-      console.error('Failed to execute automation:', error)
-    }
-  }
-
-  const handleDelete = async (id) => {
-    const ok = await confirm({ title: 'Delete?', message: 'Delete this automation?', confirmLabel: 'Delete', variant: 'danger' })
-    if (!ok) return
-
-    try {
-      await automationsApi.delete(id)
-      setAutomations(automations.filter(a => a.id !== id))
-    } catch (error) {
-      console.error('Failed to delete automation:', error)
-    }
-  }
-
-  const handleTest = async (id) => {
-    try {
-      setTestingId(id)
-      setTestResult(null)
-      const result = await automationsApi.test(id, {
-        // Sample data for testing
-        meeting: { title: 'Test Meeting', summary: 'Test summary' },
-        actionItem: { task_description: 'Test task', priority: 'medium' }
-      })
-      setTestResult({ id, ...result })
-    } catch (error) {
-      setTestResult({ id, success: false, error: error.message })
-    } finally {
-      setTestingId(null)
-    }
-  }
-
-  const handleBuilderSave = async (automationData) => {
-    try {
-      if (editingAutomation) {
-        await automationsApi.update(editingAutomation.id, automationData)
-        toast.success('Updated', `Automation "${automationData.name}" updated`)
-      } else {
-        await automationsApi.create(automationData)
-      }
-      setShowBuilder(false)
-      setEditingAutomation(null)
-      setWizardStep(1)
-      loadData()
-    } catch (error) {
-      console.error('Failed to save automation:', error)
-      toast.error('Error', 'Failed to save automation: ' + error.message)
-    }
-  }
-
-  const handleEdit = (automation) => {
-    setEditingAutomation(automation)
-    setShowBuilder(true)
-    setShowCreate(false)
-    setWizardStep(1)
-  }
-
-  const handleBuilderTest = async (automationData) => {
-    // Create a temporary automation to test
-    try {
-      const tempResult = await automationsApi.create({
-        ...automationData,
-        name: `[TEST] ${automationData.name}`,
-        enabled: false
-      })
-
-      // Test it
-      const testRes = await automationsApi.test(tempResult.automation.id, {
-        meeting: { title: 'Test Meeting', summary: 'Test summary' },
-        actionItem: { task_description: 'Test task', priority: 'medium' }
-      })
-
-      // Delete the temp automation
-      await automationsApi.delete(tempResult.automation.id)
-
-      return testRes
-    } catch (error) {
-      return { success: false, error: error.message }
-    }
-  }
-
-  const loadSchedulerStatus = async () => {
-    try {
-      const status = await automationsApi.getSchedulerStatus()
-      setSchedulerStatus(status.scheduled || [])
-    } catch (error) {
-      console.error('Failed to load scheduler status:', error)
-    }
-  }
-
-  const getTriggerIcon = (type) => {
-    switch (type) {
-      case 'meeting_ended': return <Presentation size={20} />
-      case 'meeting_processed': return <FileText size={20} />
-      case 'deal_created': return <TrendingUp size={20} />
-      case 'task_completed': return <CheckCircle2 size={20} />
-      case 'action_item_created': return <BarChart2 size={20} />
-      case 'scheduled': return <Clock size={20} />
-      default: return <Zap size={20} />
-    }
-  }
-
-  const getCategoryIcon = (category) => {
-    switch (category) {
-      case 'ai': return <Sparkles className="w-4 h-4" />
-      case 'integration': return <RefreshCw className="w-4 h-4" />
-      default: return <Zap className="w-4 h-4" />
-    }
-  }
-
-  const filteredTemplates = selectedCategory === 'all'
-    ? templates
-    : templates.filter(t => t.category === selectedCategory)
-
-  const aiTemplates = templates.filter(t => t.category === 'ai')
-  const integrationTemplates = templates.filter(t => t.category === 'integration' || !t.category)
-  const crmTemplates = templates.filter(t => t.category === 'crm')
-
-  if (error) return (
-    <div className="animate-fade-in max-w-7xl mx-auto">
-      <ErrorState message={error} onRetry={loadData} />
-    </div>
+  const meta = (
+    <>
+      <b>{onCount} on</b> · {described.length - onCount} paused
+      {newest ? <> · last run {whenWords(newest.started_at)}</> : null}
+    </>
   )
 
   return (
-    <div className="animate-fade-in max-w-7xl mx-auto">
-      <PageHeader
-        title="Workflow Automations"
-        subtitle="Build intelligent workflows with triggers, conditions, and AI-powered actions."
-        actions={
-          <div className="flex gap-2">
-            <VCButton
-              variant={showHistory ? 'primary' : 'secondary'}
-              onClick={() => { setShowHistory(!showHistory); if (!showHistory) loadExecutionLogs(); }}
-            >
-              <History size={16} />
-              History
-            </VCButton>
-            <VCButton
-              variant="secondary"
-              onClick={() => {
-                setShowCreate(!showCreate)
-                setWizardStep(0)
-              }}
-            >
-              <Plus size={16} />
-              Template
-            </VCButton>
-            <VCButton
-              variant="primary"
-              onClick={() => {
-                setShowBuilder(true)
-                setWizardStep(1)
-              }}
-            >
-              <Wrench size={16} />
-              Custom Build
-            </VCButton>
-          </div>
-        }
+    <div className="bs-auto">
+      <TitleRule
+        title="Automations"
+        meta={meta}
+        actions={(
+          <>
+            <Key onClick={() => setParam('new', '1')}>Start from a template</Key>
+            <Key variant="primary" onClick={newBlank}>New automation</Key>
+          </>
+        )}
       />
 
-      <GuideCard
-        title="Automation Workflow"
-        steps={['Choose Template', 'Configure Actions', 'Monitor Performance']}
-        activeStep={wizardStep}
-      />
-
-      {/* Execution History */}
-      {showHistory && (
-        <div className="vc mb-6 animate-fade-in">
-          <div className="p-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--b1)' }}>
-            <h3 className="font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-              <History size={20} />
-              Execution History
-            </h3>
-            <VCButton variant="ghost" size="sm" onClick={loadExecutionLogs} aria-label="Refresh">
-              <RefreshCw size={16} className={loadingLogs ? 'animate-spin' : ''} />
-            </VCButton>
+      <Grid>
+        <Cell span={8} className="bs-auto-main">
+          <div className="bs-auto-fbar">
+            <Switch label="Show" options={SHOW_OPTIONS} value={show} onChange={(v) => setParam('show', v === 'all' ? null : v)} />
           </div>
-          <div className="max-h-96 overflow-y-auto">
-            {loadingLogs ? (
-              <Skeleton className="h-20" count={3} />
-            ) : executionLogs.length === 0 ? (
-              <div className="p-8 text-center" style={{ color: 'var(--text-tertiary)' }}>No execution history yet</div>
-            ) : (
-              <div style={{ borderTop: '1px solid var(--b1)' }}>
-                {executionLogs.map((log, idx) => (
-                  <div key={idx} className="p-3 flex items-center gap-3 transition-colors hover:bg-black/20" style={{ borderBottom: '1px solid var(--b0)' }}>
-                    {log.success ? (
-                      <CheckCircle2 size={18} className="flex-shrink-0" style={{ color: 'var(--accent-secondary)' }} />
-                    ) : (
-                      <XCircle size={18} className="flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{log.automationName || 'Unknown'}</p>
-                      <p className="text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
-                        {new Date(log.created_at).toLocaleString()}
-                        {log.duration_ms && ` • ${log.duration_ms}ms`}
-                      </p>
-                    </div>
-                    {log.error_message && (
-                      <span className="text-xs truncate max-w-32" style={{ color: 'var(--accent-primary)' }}>{log.error_message}</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
-      {/* Automation Builder */}
-      {showBuilder && (
-        <div className="mb-6 animate-fade-in">
-          <AutomationBuilder
-            onSave={handleBuilderSave}
-            onCancel={() => { setShowBuilder(false); setEditingAutomation(null) }}
-            onTest={handleBuilderTest}
-            initialData={editingAutomation ? {
-              name: editingAutomation.name,
-              description: editingAutomation.description,
-              trigger_type: editingAutomation.trigger_type,
-              trigger_config: editingAutomation.trigger_config || {},
-              actions: editingAutomation.actions || []
-            } : null}
-          />
-        </div>
-      )}
+          {loading && <p className="bs-auto-empty">Loading…</p>}
 
-      {/* Scheduler Status */}
-      {schedulerStatus.length > 0 && (
-        <div className="vc mb-6 animate-fade-in">
-          <div className="p-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--b1)' }}>
-            <h3 className="font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-              <Calendar size={20} style={{ color: 'var(--accent-secondary)' }} />
-              Scheduled Automations
-            </h3>
-            <VCButton variant="ghost" size="sm" onClick={() => setSchedulerStatus([])} aria-label="Close">
-              <XCircle size={16} />
-            </VCButton>
-          </div>
-          <div>
-            {schedulerStatus.map((scheduled) => (
-              <div key={scheduled.id} className="p-3 flex items-center gap-3" style={{ borderBottom: '1px solid var(--b0)' }}>
-                <Clock size={18} className="flex-shrink-0" style={{ color: 'var(--accent-secondary)' }} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{scheduled.name}</p>
-                  <p className="text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
-                    {scheduled.cronExpression}
-                  </p>
+          {!loading && described.length === 0 && (
+            <div className="bs-auto-empty">
+              <p>No automations yet. Start with a meeting recipe: it runs every time a meeting is processed.</p>
+              <Key variant="primary" onClick={() => setParam('new', '1')}>Pick a recipe</Key>
+            </div>
+          )}
+
+          {!loading && described.length > 0 && groups.length === 0 && (
+            <p className="bs-auto-empty">Nothing {show === 'on' ? 'switched on' : 'paused'}.</p>
+          )}
+
+          {groups.map((g) => (
+            <section key={g.id} className="bs-auto-grp" aria-label={g.title}>
+              <GroupHead label={g.title} count={`${g.on} on · ${g.items.length}`} />
+              {g.note && <p className="bs-auto-note">{g.note}</p>}
+              <ul className="bs-auto-list">
+                <li className="bs-auto-row head bs-dt" aria-hidden="true">
+                  <span className="bs-lbl">On</span>
+                  <span className="bs-lbl">Automation</span>
+                  <span className="bs-lbl">Last run</span>
+                  <span className="bs-lbl">Time</span>
+                </li>
+                {g.items.map((d) => {
+                  const lr = last.get(d.id)
+                  const sig = status(d, lr)
+                  return (
+                    <li
+                      key={d.id}
+                      className={`bs-auto-row${d.active ? '' : ' off'}${openId === d.id ? ' sel' : ''}`}
+                      onClick={() => setParam('a', d.id)}
+                    >
+                      <Toggle
+                        checked={d.active}
+                        disabled={busy === d.id || d.legacy}
+                        label={`${d.active ? 'Turn off' : 'Turn on'}: ${d.name}`}
+                        onChange={(v) => toggle(d, v)}
+                      />
+                      <div className="bs-auto-body">
+                        <button type="button" className="bs-auto-title" onClick={(e) => { e.stopPropagation(); setParam('a', d.id) }}>
+                          {d.name}
+                        </button>
+                        <Steps steps={d.steps} />
+                        {sig.word === 'Failed' && lr?.error_message && (
+                          <span className="bs-why"><Signal tone="brand">Last run failed</Signal>{lr.error_message}</span>
+                        )}
+                        {d.note && <span className="bs-why bs-auto-why">{d.note}</span>}
+                      </div>
+                      <Signal tone={sig.tone}>{sig.word}</Signal>
+                      <span className="bs-auto-time bs-dt">{whenWords(lr?.started_at || null)}</span>
+                    </li>
+                  )
+                })}
+              </ul>
+            </section>
+          ))}
+        </Cell>
+
+        <Cell span={4} rule className="bs-auto-ctx">
+          <Section level={3} title="Recent runs" aside={<span className="bs-lbl">{runs.filter((r) => r.mode !== 'test').length} latest</span>} />
+          {runGroups.length === 0 && (
+            <p className="bs-auto-empty">Nothing has run yet. Runs show here after the next meeting is processed.</p>
+          )}
+          <ul className="bs-auto-runs">
+            {runGroups.map((g) => (
+              <li key={g.key} className="bs-auto-run">
+                <span className="bs-auto-run-t">{whenWords(g.at)}</span>
+                <div className="bs-auto-run-b">
+                  {g.meetingId
+                    ? <Link to={`/meetings/${g.meetingId}`} className="bs-auto-run-m">{g.title}</Link>
+                    : <span className="bs-auto-run-m">{g.title}</span>}
+                  <ul className="bs-auto-run-list">
+                    {g.runs.map((r) => {
+                      const s = runSignal(r)
+                      return (
+                        <li key={r.id}>
+                          <Signal tone={s.tone}>{s.word}</Signal>
+                          <span>{g.meetingId ? r.workflow_name : (r.error_message || r.workflow_name)}</span>
+                        </li>
+                      )
+                    })}
+                  </ul>
                 </div>
-                <div className="text-right">
-                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Next run:</p>
-                  <p className="text-sm" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
-                    {scheduled.nextRun ? new Date(scheduled.nextRun).toLocaleString() : 'N/A'}
-                  </p>
-                </div>
-              </div>
+              </li>
             ))}
-          </div>
-        </div>
-      )}
+          </ul>
 
-      {/* Create from templates */}
-      {showCreate && (
-        <div className="vc p-6 mb-6 animate-fade-in">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="font-bold text-lg" style={{ color: 'var(--text-primary)' }}>Choose a Template</h3>
-            <div className="flex gap-2 flex-wrap">
-              <VCButton
-                variant={selectedCategory === 'all' ? 'primary' : 'ghost'}
-                size="sm"
-                onClick={() => setSelectedCategory('all')}
-              >
-                All
-              </VCButton>
-              <VCButton
-                variant={selectedCategory === 'ai' ? 'primary' : 'ghost'}
-                size="sm"
-                onClick={() => setSelectedCategory('ai')}
-              >
-                <Sparkles size={14} /> AI
-              </VCButton>
-              <VCButton
-                variant={selectedCategory === 'integration' ? 'primary' : 'ghost'}
-                size="sm"
-                onClick={() => setSelectedCategory('integration')}
-              >
-                <RefreshCw size={14} /> Integration
-              </VCButton>
-              <VCButton
-                variant={selectedCategory === 'crm' ? 'primary' : 'ghost'}
-                size="sm"
-                onClick={() => setSelectedCategory('crm')}
-              >
-                <Users size={14} /> CRM
-              </VCButton>
-            </div>
-          </div>
-
-          {/* AI Agent Templates Section */}
-          {(selectedCategory === 'all' || selectedCategory === 'ai') && aiTemplates.length > 0 && (
-            <div className="mb-6">
-              <h4 className="text-sm font-bold mb-3 flex items-center gap-2" style={{ color: 'var(--accent-tertiary)' }}>
-                <Bot size={16} />
-                AI-Powered Automations
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {aiTemplates.map((template) => (
-                  <div
-                    key={template.id}
-                    className="vc p-4 cursor-pointer transition-all group"
-                    style={{ borderColor: 'var(--b1)' }}
-                    onClick={() => handleCreateFromTemplate(template)}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 rounded-md transition-colors group-hover:scale-110" style={{ background: 'rgba(255,184,0,.1)', color: 'var(--accent-tertiary)' }}>
-                        <Bot size={20} />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-bold mb-1" style={{ color: 'var(--text-primary)' }}>{template.name}</h4>
-                        <p className="text-sm mb-2" style={{ color: 'var(--text-secondary)' }}>{template.description}</p>
-                        <div className="flex items-center gap-2">
-                          <VCBadge color="amber">AI Agent</VCBadge>
-                        </div>
-                      </div>
+          <div className="bs-auto-ctx-sec">
+            <Section
+              level={3}
+              title="Meeting agents"
+              aside={<Key size="sm" onClick={() => navigate('/settings', { state: { section: 'meeting-agents' } })}>Settings</Key>}
+            />
+            <ul className="bs-auto-agents">
+              {AGENT_ROWS.map((a) => {
+                const cfg = agents?.[a.key]
+                const on = cfg ? cfg.enabled : true
+                const bar = cfg?.minConfidence
+                return (
+                  <li key={a.key} className="bs-auto-agent">
+                    <div>
+                      <b>{a.name}</b>
+                      <span className="bs-auto-agent-w">{a.what}</span>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* CRM Templates Section */}
-          {(selectedCategory === 'all' || selectedCategory === 'crm') && crmTemplates.length > 0 && (
-            <div className="mb-6">
-              <h4 className="text-sm font-bold mb-3 flex items-center gap-2" style={{ color: 'var(--accent-secondary)' }}>
-                <Users size={16} />
-                CRM Workflows
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {crmTemplates.map((template) => (
-                  <div
-                    key={template.id}
-                    className="vc p-4 cursor-pointer transition-all group"
-                    onClick={() => handleCreateFromTemplate(template)}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 rounded-md transition-colors group-hover:scale-110" style={{ background: 'rgba(0,245,212,.1)', color: 'var(--accent-secondary)' }}>
-                        {renderTemplateIcon(template.icon, "w-5 h-5")}
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-bold mb-1" style={{ color: 'var(--text-primary)' }}>{template.name}</h4>
-                        <p className="text-sm mb-2" style={{ color: 'var(--text-secondary)' }}>{template.description}</p>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <VCBadge color="mint">CRM</VCBadge>
-                          {template.isWorkflowTemplate && (
-                            <span className="text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
-                              {template.nodeCount} nodes
-                            </span>
-                          )}
-                          <span className="text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
-                            {template.actions?.length || 0} action{(template.actions?.length || 0) !== 1 ? 's' : ''}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Standard Templates Section */}
-          {(selectedCategory === 'all' || selectedCategory === 'integration') && integrationTemplates.length > 0 && (
-            <div>
-              <h4 className="text-sm font-bold mb-3 flex items-center gap-2" style={{ color: 'var(--accent-primary)' }}>
-                <RefreshCw size={16} />
-                Integration Automations
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {integrationTemplates.map((template) => (
-                  <div
-                    key={template.id}
-                    className="vc p-4 cursor-pointer transition-all group"
-                    onClick={() => handleCreateFromTemplate(template)}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 rounded-md transition-colors group-hover:scale-110" style={{ background: 'rgba(255,45,107,.1)', color: 'var(--accent-primary)' }}>
-                        {getTriggerIcon(template.trigger_type || template.triggerType)}
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-bold mb-1" style={{ color: 'var(--text-primary)' }}>{template.name}</h4>
-                        <p className="text-sm mb-2" style={{ color: 'var(--text-secondary)' }}>{template.description}</p>
-                        <div className="flex items-center gap-2">
-                          <VCBadge color="crimson">
-                            {(template.trigger_type || template.triggerType)?.replace(/_/g, ' ')}
-                          </VCBadge>
-                          <span className="text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
-                            {template.actions?.length || 0} action{(template.actions?.length || 0) !== 1 ? 's' : ''}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <VCButton variant="secondary" onClick={() => setShowCreate(false)} className="mt-4">
-            Cancel
-          </VCButton>
-        </div>
-      )}
-
-      {/* Automations list */}
-      <div className="vc">
-        <div className="p-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--b1)' }}>
-          <h2 className="font-bold" style={{ color: 'var(--text-primary)' }}>Active Automations</h2>
-          <span className="text-sm" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
-            {automations.filter(a => a.enabled).length} active / {automations.length} total
-          </span>
-        </div>
-
-        {loading ? (
-          <Skeleton className="h-24" count={4} />
-        ) : automations.length === 0 ? (
-          <div className="p-12 text-center m-4 rounded-lg" style={{ border: '2px dashed var(--b1)' }}>
-            <Zap className="w-16 h-16 mx-auto mb-4 opacity-50" style={{ color: 'var(--text-tertiary)' }} />
-            <h3 className="text-xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>No automations yet</h3>
-            <p className="mb-6" style={{ color: 'var(--text-secondary)' }}>Create your first automation from a template or build a custom workflow</p>
-            <VCButton variant="primary" onClick={() => setShowCreate(true)}>
-              <Plus size={16} />
-              Create Automation
-            </VCButton>
-          </div>
-        ) : (
-          <div>
-            {automations.map((automation) => (
-              <div key={automation.id} className="p-4 transition-colors hover:bg-black/10 group" style={{ borderBottom: '1px solid var(--b0)' }}>
-                <div className="flex items-start gap-4">
-                  <div className="p-2 rounded-md transition-colors group-hover:scale-110" style={{ background: 'rgba(255,45,107,.1)', color: 'var(--accent-primary)' }}>
-                    {getTriggerIcon(automation.trigger_type)}
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <h3 className="font-bold" style={{ color: 'var(--text-primary)' }}>{automation.name}</h3>
-                      {automation.enabled
-                        ? <VCBadge color="mint">Active</VCBadge>
-                        : <VCBadge color="neutral">Paused</VCBadge>
-                      }
-                      {automation.actions?.some(a => ['auto_assign', 'auto_prioritize', 'suggest_deadline', 'run_agent'].includes(a.type)) && (
-                        <VCBadge color="amber">
-                          <Bot size={12} /> AI
-                        </VCBadge>
-                      )}
-                    </div>
-                    {automation.description && (
-                      <p className="text-sm mb-2" style={{ color: 'var(--text-secondary)' }}>{automation.description}</p>
-                    )}
-                    <div className="flex items-center gap-4 text-xs flex-wrap" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
-                      <span className="flex items-center gap-1">
-                        <Clock size={12} />
-                        {automation.trigger_type?.replace(/_/g, ' ')}
-                      </span>
-                      <span>
-                        {automation.actions?.length || 0} action{(automation.actions?.length || 0) !== 1 ? 's' : ''}
-                      </span>
-                      {automation.execution_count > 0 && (
-                        <span className="flex items-center gap-1">
-                          <Activity size={12} />
-                          {automation.execution_count}x
-                        </span>
-                      )}
-                      {automation.last_executed_at && (
-                        <span>
-                          Last: {new Date(automation.last_executed_at).toLocaleDateString()}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <VCButton
-                      variant={automation.enabled ? 'secondary' : 'ghost'}
-                      size="sm"
-                      onClick={() => handleToggle(automation.id, automation.enabled)}
-                      title={automation.enabled ? 'Pause' : 'Resume'}
-                      aria-label={automation.enabled ? 'Pause' : 'Resume'}
-                    >
-                      {automation.enabled ? <Pause size={16} /> : <Play size={16} />}
-                    </VCButton>
-
-                    <VCButton
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleTest(automation.id)}
-                      disabled={testingId === automation.id}
-                      title="Test (dry run)"
-                      aria-label="Test automation"
-                    >
-                      {testingId === automation.id ? (
-                        <div className="spinner w-4 h-4" />
-                      ) : (
-                        <Eye size={16} />
-                      )}
-                    </VCButton>
-
-                    <VCButton
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleEdit(automation)}
-                      title="Edit"
-                      aria-label="Edit automation"
-                    >
-                      <Settings size={16} />
-                    </VCButton>
-
-                    <VCButton
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleExecute(automation.id)}
-                      title="Run now"
-                      aria-label="Run now"
-                    >
-                      <Zap size={16} />
-                    </VCButton>
-
-                    <VCButton
-                      variant="danger"
-                      size="sm"
-                      onClick={() => handleDelete(automation.id)}
-                      title="Delete"
-                      aria-label="Delete"
-                    >
-                      <Trash2 size={16} />
-                    </VCButton>
-                  </div>
+                    <Signal tone={on ? 'ai' : 'off'}>{on ? (bar ? `On · ${Math.round(bar * 100)}%` : 'On') : 'Off'}</Signal>
+                  </li>
+                )
+              })}
+              <li className="bs-auto-agent">
+                <div>
+                  <b>Follow-up</b>
+                  <span className="bs-auto-agent-w">Spots promises with no action item</span>
                 </div>
+                <Signal tone="off">As a step</Signal>
+              </li>
+            </ul>
+            <p className="bs-auto-fold">Branching, webhooks and AI steps open in the builder from any automation.</p>
+          </div>
+        </Cell>
+      </Grid>
 
-                {/* Test Result */}
-                {testResult && testResult.id === automation.id && (
-                  <div
-                    className="mt-3 p-3 rounded-lg"
-                    style={testResult.success
-                      ? { background: 'rgba(0,245,212,.1)', border: '1px solid rgba(0,245,212,.2)' }
-                      : { background: 'rgba(255,45,107,.1)', border: '1px solid rgba(255,45,107,.2)' }
-                    }
-                  >
-                    <div className="flex items-start gap-2">
-                      {testResult.success ? (
-                        <CheckCircle2 size={18} className="flex-shrink-0" style={{ color: 'var(--accent-secondary)' }} />
-                      ) : (
-                        <AlertCircle size={18} className="flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
-                      )}
-                      <div className="flex-1">
-                        <p className="font-medium text-sm" style={{ color: testResult.success ? 'var(--accent-secondary)' : 'var(--accent-primary)' }}>
-                          {testResult.success ? 'Test passed!' : 'Test failed'}
-                        </p>
-                        {testResult.error && (
-                          <p className="text-xs mt-1" style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)' }}>{testResult.error}</p>
-                        )}
-                        {testResult.actionResults && (
-                          <div className="mt-2 space-y-1">
-                            {testResult.actionResults.map((result, idx) => (
-                              <div key={idx} className="text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
-                                • {result.type}: {result.preview || 'OK'}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      <VCButton variant="ghost" size="sm" onClick={() => setTestResult(null)} aria-label="Close">
-                        <XCircle size={16} />
-                      </VCButton>
-                    </div>
-                  </div>
+      <AutomationDrawer
+        row={rows.find((r) => r.id === openId) || null}
+        open={Boolean(openId)}
+        onClose={() => setParam('a', null)}
+        onToggle={toggle}
+        onSaved={(updated) => { setRows((rs) => rs.map((r) => (r.id === updated.id ? { ...r, ...updated } : r))); fresh() }}
+        onDeleted={(id) => { setRows((rs) => rs.filter((r) => r.id !== id)); setParam('a', null); fresh() }}
+        confirm={confirm}
+        toast={toast}
+      />
+
+      <RecipesDrawer
+        open={recipesOpen}
+        onClose={() => setParam('new', null)}
+        onCreated={(row) => { setRows((rs) => [row, ...rs]); fresh(); setParam('new', null) }}
+        onBlank={() => { setParam('new', null); newBlank() }}
+        toast={toast}
+      />
+    </div>
+  )
+}
+
+/* ── Automation drawer: fill in the blanks, test, open in builder ── */
+
+function AutomationDrawer({ row, open, onClose, onToggle, onSaved, onDeleted, confirm, toast }) {
+  const navigate = useNavigate()
+  const [nodes, setNodes] = useState([])
+  const [name, setName] = useState('')
+  const [runs, setRuns] = useState([])
+  const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [test, setTest] = useState(null)
+
+  useEffect(() => {
+    if (!row) return
+    setNodes(Array.isArray(row.nodes) ? row.nodes.map((n) => ({ ...n, config: { ...(n.config || {}) } })) : [])
+    setName(row.name || '')
+    setTest(null)
+    let live = true
+    workflowsApi.getExecutions(row.id, { limit: 5 })
+      .then((res) => { if (live) setRuns(Array.isArray(res?.data) ? res.data : []) })
+      .catch(() => { if (live) setRuns([]) })
+    return () => { live = false }
+  }, [row?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!row) return <Drawer open={false} onClose={onClose} label="Automation"><span /></Drawer>
+
+  const d = describe(row)
+  const ordered = d.legacy ? nodes : orderedNodes(nodes, Array.isArray(row.connections) ? row.connections : [])
+  const dirty = name.trim() !== (row.name || '') || JSON.stringify(nodes) !== JSON.stringify(row.nodes || [])
+  const lastRun = runs.find((r) => r.mode !== 'test')
+  const sig = status(d, lastRun ? { ...lastRun, workflow_id: row.id } : null)
+
+  const setField = (id, field, value) => {
+    setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, config: { ...(n.config || {}), [field]: value } } : n)))
+  }
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      const res = await workflowsApi.update(row.id, {
+        name: name.trim() || row.name,
+        description: row.description,
+        nodes,
+        connections: row.connections || [],
+        settings: row.settings || {},
+      })
+      onSaved(res.data || { id: row.id, name: name.trim(), nodes })
+      toast?.success?.('Saved')
+    } catch (err) {
+      toast?.error?.(err.message || 'Could not save')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const runTest = async () => {
+    setTesting(true)
+    setTest(null)
+    try {
+      const res = await workflowsApi.test(row.id, {}, { lastMeeting: true })
+      setTest(res)
+    } catch (err) {
+      setTest({ success: false, error: err.message })
+    } finally {
+      setTesting(false)
+    }
+  }
+
+  const remove = async () => {
+    const ok = await confirm?.({ title: 'Delete this automation?', message: `“${row.name}” and its run history will be removed.`, confirmLabel: 'Delete', variant: 'danger' })
+    if (!ok) return
+    try {
+      await workflowsApi.delete(row.id)
+      onDeleted(row.id)
+      toast?.success?.('Deleted')
+    } catch (err) {
+      toast?.error?.(err.message || 'Could not delete')
+    }
+  }
+
+  return (
+    <Drawer
+      open={open}
+      onClose={onClose}
+      label="Automation"
+      footer={(
+        <div className="bs-auto-keys">
+          <Key onClick={runTest} disabled={testing || d.legacy || nodes.length < 2}>{testing ? 'Testing…' : 'Test on last meeting'}</Key>
+          <Key onClick={() => navigate(`/workflows/${row.id}`)}>Open in builder</Key>
+          <Key variant="primary" disabled={!dirty || saving} onClick={save}>{saving ? 'Saving…' : 'Save'}</Key>
+        </div>
+      )}
+    >
+      <div className="bs-auto-dhead">
+        <Signal tone={sig.tone}>{sig.word}</Signal>
+        <Toggle checked={d.active} disabled={d.legacy} label={`${d.active ? 'Turn off' : 'Turn on'}: ${d.name}`} onChange={(v) => onToggle(d, v)} />
+      </div>
+      <label className="bs-auto-name">
+        <span className="bs-lbl">Name</span>
+        <TextInput value={name} onChange={(e) => setName(e.target.value)} aria-label="Automation name" />
+      </label>
+      {d.note && <p className="bs-auto-note">{d.note}</p>}
+
+      <ol className="bs-auto-steps">
+        {ordered.map((n, i) => {
+          const isTrig = i === 0 && (d.legacy || n.type === 'trigger')
+          const edit = d.legacy ? null : editableField(n)
+          return (
+            <li key={n.id} className="bs-auto-step">
+              <span className={`bs-auto-w${isTrig ? ' when' : ''}`}>{isTrig ? 'When' : 'Then'}</span>
+              <div className="bs-auto-sb">
+                <b>{isTrig ? triggerWords(n) : stepWords(n)}</b>
+                {edit && (
+                  <label className="bs-auto-field">
+                    <span className="bs-lbl">{edit.label}</span>
+                    <TextInput
+                      value={String(n.config?.[edit.field] ?? '')}
+                      onChange={(e) => setField(n.id, edit.field, e.target.value)}
+                      aria-label={edit.label}
+                    />
+                  </label>
                 )}
               </div>
-            ))}
-          </div>
-        )}
+            </li>
+          )
+        })}
+      </ol>
+
+      {test && (
+        <div className="bs-auto-test" role="status">
+          <Signal tone={test.success ? 'mint' : 'brand'}>{test.success ? 'Test passed' : 'Test failed'}</Signal>
+          <p>
+            {test.success
+              ? 'Every step ran on the newest meeting. Steps that send or write were skipped, so nothing went out.'
+              : (test.error || 'A step failed.')}
+          </p>
+        </div>
+      )}
+      {!test && <p className="bs-auto-fold">A test runs every step on your newest meeting but sends nothing.</p>}
+
+      <div className="bs-auto-dsec">
+        <Section level={3} title="Runs" aside={<span className="bs-lbl">{row.execution_count || 0} total</span>} />
+        {runs.length === 0 && <p className="bs-auto-empty">No runs yet.</p>}
+        <ul className="bs-auto-runs">
+          {runs.map((r) => {
+            const s = runSignal(r)
+            return (
+              <li key={r.id} className="bs-auto-run">
+                <span className="bs-auto-run-t">{whenWords(r.started_at)}</span>
+                <div className="bs-auto-run-b">
+                  <Signal tone={s.tone}>{r.mode === 'test' ? `Test · ${s.word}` : s.word}</Signal>
+                  {r.error_message && <span className="bs-auto-agent-w">{r.error_message}</span>}
+                </div>
+              </li>
+            )
+          })}
+        </ul>
       </div>
-    </div>
+
+      <div className="bs-auto-dsec">
+        <Key size="sm" onClick={remove}>Delete automation</Key>
+      </div>
+    </Drawer>
+  )
+}
+
+/* ── Recipes drawer: switch on a meeting recipe in one step ── */
+
+function RecipesDrawer({ open, onClose, onCreated, onBlank, toast }) {
+  const [picked, setPicked] = useState(null)
+  const [value, setValue] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => { if (!open) { setPicked(null); setValue('') } }, [open])
+
+  const choose = (r) => {
+    setPicked(r.id)
+    setValue('')
+  }
+
+  const create = async (r) => {
+    if (r.blank && !value.trim()) return
+    setSaving(true)
+    try {
+      const res = await workflowsApi.create(buildFromRecipe(r, r.blank ? value : undefined))
+      onCreated(res.data)
+      toast?.success?.(`On: ${r.name}`)
+    } catch (err) {
+      toast?.error?.(err.message || 'Could not create it')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const meeting = RECIPES.filter((r) => r.group === 'meeting')
+  const other = RECIPES.filter((r) => r.group !== 'meeting')
+
+  const row = (r) => {
+    const isPicked = picked === r.id
+    return (
+      <li key={r.id} className={`bs-auto-tpl${isPicked ? ' sel' : ''}`}>
+        <div className="bs-auto-tpl-b">
+          <b>{r.name}</b>
+          <span className="bs-auto-agent-w">{r.description}</span>
+          {isPicked && r.blank && (
+            <label className="bs-auto-field">
+              <span className="bs-lbl">{r.blank.label}</span>
+              <TextInput
+                autoFocus
+                value={value}
+                placeholder={r.blank.placeholder}
+                onChange={(e) => setValue(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') create(r) }}
+                aria-label={r.blank.label}
+              />
+            </label>
+          )}
+        </div>
+        {isPicked
+          ? <Key size="sm" variant="primary" disabled={saving || (r.blank && !value.trim())} onClick={() => create(r)}>{saving ? 'Saving…' : 'Turn on'}</Key>
+          : <Key size="sm" onClick={() => (r.blank ? choose(r) : create(r))}>Use</Key>}
+      </li>
+    )
+  }
+
+  return (
+    <Drawer open={open} onClose={onClose} label="Start from a template">
+      <GroupHead label="After a meeting" count={meeting.length} />
+      <ul className="bs-auto-tpls">{meeting.map(row)}</ul>
+      <GroupHead label="On a schedule" count={other.length} />
+      <ul className="bs-auto-tpls">{other.map(row)}</ul>
+      <div className="bs-auto-dsec">
+        <Key onClick={onBlank}>Blank in the builder</Key>
+      </div>
+      <p className="bs-auto-fold">A recipe turns on as soon as you add it. CRM recipes return when your workspace connects its own CRM.</p>
+    </Drawer>
   )
 }
