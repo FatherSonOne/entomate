@@ -53,7 +53,16 @@ async function download(url, file) {
   await pipeline(Readable.fromWeb(res.body), fs.createWriteStream(file));
 }
 
-async function setJob(meetingId, job) {
+/**
+ * Merge into the meeting's job as it is now (the copy takes minutes, and a browser
+ * recording beside the bot may have stopped meanwhile). A recording still running
+ * keeps its own state until it stops; anything else is done.
+ */
+async function setJob(meetingId, patch) {
+  const { data, error: readErr } = await db().from('meetings').select('recording_job').eq('id', meetingId).maybeSingle();
+  if (readErr) throw readErr;
+  const current = data?.recording_job || {};
+  const job = { ...current, ...patch, status: current.status === 'recording' ? 'recording' : 'done' };
   const { error } = await db().from('meetings').update({ recording_job: job }).eq('id', meetingId);
   if (error) throw error;
 }
@@ -82,7 +91,7 @@ async function copyBotRecording(sessionId) {
   }
 
   // Without a saved copy, playback falls back to Recall's link (see getPlayback).
-  const base = { ...(meeting.recording_job || {}), status: 'done', source: 'bot', botSessionId: sessionId, audioKept: true, playbackFile: null, updatedAt: new Date().toISOString() };
+  const base = { source: 'bot', botSessionId: sessionId, audioKept: true, playbackFile: null, updatedAt: new Date().toISOString() };
 
   const dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'entomate-bot-'));
   try {

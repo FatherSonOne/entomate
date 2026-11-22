@@ -19,10 +19,15 @@ export const PIECE_MAX_BYTES = 10 * 1024 * 1024
 const AUDIO_BITS_PER_SECOND = 64_000
 const VIDEO_BITS_PER_SECOND = 1_500_000
 
-export type RecordingStatus = 'recording' | 'transcribing' | 'done' | 'failed'
+/** `backup`: recorded beside the bot, which writes the minutes; this audio waits in case it cannot. */
+export type RecordingStatus = 'recording' | 'transcribing' | 'backup' | 'done' | 'failed'
+/** Which engine is writing (or wrote) the minutes: the Recall bot, or this browser's recording. */
+export type RecordingSource = 'bot' | 'browser'
 
 export interface RecordingJob {
   status: RecordingStatus
+  /** Null for recordings made before the source was saved: those are browser recordings. */
+  source: RecordingSource | null
   mode: RecorderMode | null
   error: string | null
   updatedAt: string | null
@@ -42,7 +47,7 @@ export interface RecordingJob {
 export type RecordingStage = 'transcript' | 'speakers' | 'summary' | 'saving'
 const STAGES: RecordingStage[] = ['transcript', 'speakers', 'summary', 'saving']
 
-const STATUSES: RecordingStatus[] = ['recording', 'transcribing', 'done', 'failed']
+const STATUSES: RecordingStatus[] = ['recording', 'transcribing', 'backup', 'done', 'failed']
 const MODES: RecorderMode[] = ['mic', 'camera', 'tab']
 
 /** Reads `meetings.recording_job` defensively. Null for a meeting not recorded here. */
@@ -53,6 +58,7 @@ export function toRecordingJob(raw: unknown): RecordingJob | null {
   if (!status) return null
   return {
     status,
+    source: r.source === 'bot' || r.source === 'browser' ? r.source : null,
     mode: MODES.find((m) => m === r.mode) ?? null,
     error: typeof r.error === 'string' && r.error ? r.error : null,
     updatedAt: typeof r.updatedAt === 'string' ? r.updatedAt : null,
@@ -203,6 +209,55 @@ export interface StartInput {
   attendees: string
   mode: RecorderMode
   mimeType: string
+  /** Add this recording to that bot's meeting (one call, one meeting). */
+  botSessionId?: string
+  /** The person says this is a different meeting from the bot's. */
+  separate?: boolean
+}
+
+/** A bot of the person's in a call now, or about to join one. */
+export interface BotInCall {
+  sessionId: string
+  meetingId: string
+  title: string | null
+  platform: string | null
+  phase: 'live' | 'joining' | 'scheduled'
+  joinAt: string | null
+}
+
+export function toBotInCall(raw: unknown): BotInCall | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const r = raw as Record<string, unknown>
+  if (typeof r.sessionId !== 'string' || typeof r.meetingId !== 'string') return null
+  const phase = r.phase === 'live' || r.phase === 'joining' || r.phase === 'scheduled' ? r.phase : 'joining'
+  return {
+    sessionId: r.sessionId,
+    meetingId: r.meetingId,
+    title: typeof r.title === 'string' && r.title ? r.title : null,
+    platform: typeof r.platform === 'string' && r.platform ? r.platform : null,
+    phase,
+    joinAt: typeof r.joinAt === 'string' ? r.joinAt : null,
+  }
+}
+
+/** Is a bot of mine in a call right now? A failed check is "no": the server checks again on start. */
+export async function checkBotInCall(): Promise<BotInCall | null> {
+  try {
+    const res = (await recordingsApi.botCheck()) as unknown as { bot?: unknown }
+    return toBotInCall(res?.bot)
+  } catch {
+    return null
+  }
+}
+
+/** Start refused because a bot is in a call: the recorder asks which meeting this is. */
+export class BotInCallError extends Error {
+  readonly bot: BotInCall
+  constructor(message: string, bot: BotInCall) {
+    super(message)
+    this.name = 'BotInCallError'
+    this.bot = bot
+  }
 }
 
 export async function startRecording(input: StartInput): Promise<{ meetingId: string }> {
@@ -212,6 +267,9 @@ export async function startRecording(input: StartInput): Promise<{ meetingId: st
     cache.invalidate('/meetings')
     return { meetingId: res.meetingId }
   } catch (err) {
+    const data = (err as { originalError?: { response?: { data?: { code?: unknown; bot?: unknown } } } } | null)?.originalError?.response?.data
+    const bot = data?.code === 'bot_in_call' ? toBotInCall(data.bot) : null
+    if (bot) throw new BotInCallError(errorText(err, 'The bot is already in this call.'), bot)
     throw new Error(errorText(err, 'The recording could not be started.'))
   }
 }

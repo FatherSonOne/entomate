@@ -12,7 +12,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { calendarApi } from '../../services/api'
 import { useOrg } from '../../contexts/OrgContext'
-import { Key, Signal, Toggle } from '../bench'
+import { Key, Select, Signal, Toggle } from '../bench'
 
 const SCOPES = [
   { id: 'organized', label: 'Meetings I organise' },
@@ -145,17 +145,18 @@ export default function CalendarAutoJoinSettings() {
               <span className="bs-h3">Auto-join</span>
               <Signal tone={settings.enabled ? 'ai' : 'off'}>{settings.enabled ? 'On' : 'Off'}</Signal>
             </div>
-            <label className="bs-agents-bar">
-              <span className="bs-lbl">Join</span>
-              <select
-                className="bs-input bs-agents-select"
+            <div className="bs-agents-bar">
+              <span className="bs-lbl" id="aj-scope">Join</span>
+              <Select
+                className="bs-agents-select"
+                aria-labelledby="aj-scope"
+                sheetLabel="Auto-join: which meetings"
                 value={settings.scope}
                 disabled={!connected || saving || !canSend}
-                onChange={(e) => save({ scope: e.target.value })}
-              >
-                {SCOPES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-              </select>
-            </label>
+                onChange={(v) => save({ scope: v })}
+                options={SCOPES.map((s) => ({ value: s.id, label: s.label }))}
+              />
+            </div>
             {!settings.enabled && needsConsent && connected && canSend && (
               <label className="bs-aj-consent">
                 <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />

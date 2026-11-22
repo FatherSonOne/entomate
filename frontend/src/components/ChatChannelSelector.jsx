@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { Select } from './bench'
 import { Hash, Lock, MessageSquare, Loader2, AlertCircle, Check } from 'lucide-react'
 import { integrationsApi } from '../services/api'
 
@@ -99,21 +100,16 @@ export default function ChatChannelSelector({
 
       {/* Channel dropdown */}
       <div className="relative">
-        <select
+        <Select
+          label="Channel"
+          className="w-full bs-select--icon"
           value={selectedChannel || ''}
-          onChange={(e) => onChannelSelect(e.target.value)}
+          onChange={onChannelSelect}
           disabled={disabled || channels.length === 0}
-          className="input w-full pl-9 appearance-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <option value="">Select a channel...</option>
-          {channels.map((channel) => (
-            <option key={channel.id} value={channel.id}>
-              {channel.name}
-              {channel.guild ? ` (${channel.guild})` : ''}
-            </option>
-          ))}
-        </select>
-        <MessageSquare className="w-4 h-4 text-content-tertiary absolute left-3 top-1/2 -translate-y-1/2" />
+          placeholder="Select a channel…"
+          options={channels.map((channel) => ({ value: String(channel.id), label: channel.name, textValue: channel.name, hint: channel.guild || undefined }))}
+        />
+        <MessageSquare className="w-4 h-4 text-content-tertiary absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
       </div>
 
       {/* Error/warning message */}

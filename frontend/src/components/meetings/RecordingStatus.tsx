@@ -1,7 +1,8 @@
 /**
- * The state of a meeting recorded in the browser, on its meeting page: the transcript
- * being written (the page refreshes itself), a failure with a retry, or a recording whose
- * tab closed before Stop, with a way to transcribe the audio that was saved.
+ * The state of a meeting's minutes on its meeting page, whichever engine heard it (the
+ * bot or a browser recording): the minutes being written (the page refreshes itself), a
+ * failure with a retry, a recording whose tab closed before Stop, with a way to transcribe
+ * the audio that was saved, or a recording kept as a backup while the bot writes them.
  * Renders nothing for a finished recording or a meeting not recorded in the browser.
  */
 
@@ -40,12 +41,13 @@ export function RecordingStatus({ meetingId, recordingJob, onRefresh, hasSummary
   const [error, setError] = useState<string | null>(null)
   const retryable = canRetry(job)
   const writing = job?.status === 'transcribing' && !retryable
+  const waiting = writing || job?.status === 'backup'
 
   useEffect(() => {
-    if (!writing) return
+    if (!waiting) return
     const timer = window.setInterval(onRefresh, POLL_MS)
     return () => window.clearInterval(timer)
-  }, [writing, onRefresh])
+  }, [waiting, onRefresh])
 
   const summaryMissing = job?.status === 'done' && !!job.summaryError && !hasSummary
   if (!job || (job.status === 'done' && !summaryMissing)) return null
@@ -82,6 +84,17 @@ export function RecordingStatus({ meetingId, recordingJob, onRefresh, hasSummary
           <p className="bs-recstat-text">The transcript is saved, but the summary, decisions and action items could not be written.</p>
           <Key disabled={busy} onClick={() => void act(rewriteSummary)} icon={icon}>
             Write the summary
+          </Key>
+        </>
+      ) : job.status === 'backup' ? (
+        <>
+          <Signal tone="brand">Backup</Signal>
+          <p className="bs-recstat-text">
+            The bot was in this call, so it is writing the minutes. Your recording is kept here and is written up on its own
+            if the bot cannot finish.
+          </p>
+          <Key disabled={busy} onClick={() => void act(retryRecording)} icon={icon}>
+            Use my recording instead
           </Key>
         </>
       ) : job.status === 'recording' ? (

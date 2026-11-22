@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react'
+import { Select } from '../bench'
 import { Brain, ChevronDown, ChevronUp, RefreshCw, X, Check, Sliders, Loader2 } from 'lucide-react'
 import { supabase } from '../../services/supabaseClient'
 import { authFetch } from '../../services/authFetch'
@@ -82,13 +83,14 @@ function FieldInput({ field, value, onChange }) {
 
   if (field.type === 'select') {
     return (
-      <select value={value || ''} onChange={e => onChange(e.target.value)}
-        className="w-full px-3 py-2 rounded-lg border text-sm focus:outline-none" style={style}>
-        <option value="">Select...</option>
-        {(field.options || []).map(opt => (
-          <option key={opt.value} value={opt.value}>{opt.label}</option>
-        ))}
-      </select>
+      <Select
+        label={field.label}
+        className="w-full"
+        value={value || ''}
+        onChange={onChange}
+        placeholder="Select…"
+        options={(field.options || []).map(opt => ({ value: String(opt.value), label: opt.label }))}
+      />
     )
   }
 

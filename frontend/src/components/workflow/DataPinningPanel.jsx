@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useEffect } from 'react'
+import { Select } from '../bench'
 import {
   Pin, PinOff, Plus, Trash2, Upload, Download, RefreshCw,
   AlertCircle, CheckCircle2, FileJson, Copy, Edit2, Save, X
@@ -382,18 +383,14 @@ export default function DataPinningPanel({
                 <label className="block text-xs font-medium text-content-secondary mb-1">
                   Select Node
                 </label>
-                <select
+                <Select
+                  label="Select node"
+                  className="w-full"
                   value={selectedNode}
-                  onChange={(e) => setSelectedNode(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-line-default rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-                >
-                  <option value="">Choose a node...</option>
-                  {unpinnedNodes.map(node => (
-                    <option key={node.id} value={node.id}>
-                      {node.data?.label || node.id} ({node.type})
-                    </option>
-                  ))}
-                </select>
+                  onChange={setSelectedNode}
+                  placeholder="Choose a node…"
+                  options={unpinnedNodes.map(node => ({ value: String(node.id), label: node.data?.label || node.id, textValue: String(node.data?.label || node.id), hint: node.type }))}
+                />
               </div>
 
               <div>

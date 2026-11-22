@@ -4,6 +4,7 @@ import api, { meetingsApi, projectsApi, reportsApi } from '../services/api'
 import { useToast } from '../components/vc/ToastProvider'
 import {
   Cell, Display, Drawer, Grid, Key, Readout, RuledTable, Section, Signal, Switch, Tag, TitleRule,
+  Select,
 } from '../components/bench'
 import type { RuledColumn } from '../components/bench'
 import {
@@ -411,23 +412,21 @@ function ExportDrawer({ open, kind, onPick, onClose, toast }: ExportDrawerProps)
         {def?.needs && (
           <label className="bs-ins-field">
             <span className="bs-lbl">{def.needs === 'meeting' ? 'Meeting' : 'Project'}</span>
-            <select
-              className="bs-input"
+            <Select
+              label={def.needs === 'meeting' ? 'Meeting' : 'Project'}
               value={def.needs === 'meeting' ? meeting : project}
-              onChange={(e) => (def.needs === 'meeting' ? setMeeting(e.target.value) : setProject(e.target.value))}
-            >
-              <option value="">{options == null ? 'Loading' : options.length ? `Choose a ${def.needs}` : `No ${def.needs}s yet`}</option>
-              {(options ?? []).map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
-            </select>
+              onChange={(v) => (def.needs === 'meeting' ? setMeeting(v) : setProject(v))}
+              placeholder={options == null ? 'Loading' : options.length ? `Choose a ${def.needs}` : `No ${def.needs}s yet`}
+              disabled={options == null || options.length === 0}
+              options={(options ?? []).map((o) => ({ value: o.id, label: o.label }))}
+            />
           </label>
         )}
 
         {def?.kind === 'action-items-csv' && (
           <label className="bs-ins-field">
             <span className="bs-lbl">Status</span>
-            <select className="bs-input" value={status} onChange={(e) => setStatus(e.target.value)}>
-              {ACTION_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-            </select>
+            <Select label="Status" value={status} onChange={setStatus} options={ACTION_STATUSES} />
           </label>
         )}
 

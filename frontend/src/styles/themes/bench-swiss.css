@@ -1012,7 +1012,27 @@ html[data-motion="reduce"] :is(.bs-key, .bs-av) { transition-duration: 1ms !impo
     color: var(--bs-muted);
     text-decoration: none;
   }
-  .bs-dock-item[aria-current="page"] { color: var(--bs-ink); }
+  .bs-dock-item svg {
+    width: 22px;
+    height: 22px;
+    flex: none;
+    transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1);
+  }
+  .bs-dock-item:active svg { transform: scale(0.9); }
+  /* LED + word: the LED lights brand on the active tab. */
+  .bs-dock-lbl { position: relative; white-space: nowrap; }
+  /* Hangs left of the word so the word stays centred under the icon. */
+  .bs-dock-lbl .bs-led { position: absolute; left: -9px; top: 50%; width: 5px; height: 5px; margin-top: -2.5px; }
+  .bs-dock-lbl .bs-led.off { display: none; }
+  .bs-dock-item[aria-current="page"],
+  .bs-dock-item[aria-expanded="true"] { color: var(--bs-ink); }
+  .bs-dock-item:focus-visible { outline: 2px solid var(--bs-brand); outline-offset: 2px; border-radius: 10px; }
+  @media (prefers-reduced-motion: reduce) {
+    .bs-dock-item svg { transition: none; }
+    .bs-dock-item:active svg { transform: none; }
+  }
+  html[data-motion="reduce"] .bs-dock-item svg { transition: none; }
+  html[data-motion="reduce"] .bs-dock-item:active svg { transform: none; }
   .bs-dock-rec { border: 0; background: none; padding: 0; cursor: pointer; border-radius: 50%; }
   .bs-dock-rec .bs-rec { width: 56px; height: 56px; }
   /* Toasts sit above the dock */
@@ -2719,3 +2739,68 @@ html[data-style="bench-swiss"] :is(.bs-cell, .bs-tasks-split > *) { container-ty
 }
 /* Bulk bars and inline editors also rise into place. */
 .bs-tasks-bulk { animation-name: m-rise-in; }
+
+/* ── Select: the bench's dropdown (replaces every native <select>) ── */
+/* Trigger: a sunk field with the value flush left and a chevron. */
+.bs-select {
+  display: inline-flex; align-items: center; justify-content: space-between; gap: 10px;
+  text-align: left; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: box-shadow 140ms ease-out;
+}
+.bs-select:hover:not(:disabled) { box-shadow: inset 0 1px 2px var(--bs-lo), inset 0 0 0 1px var(--bs-rule); }
+.bs-select:disabled { cursor: not-allowed; }
+.bs-select-val { flex: 1; min-width: 0; display: grid; overflow: hidden; }
+/* Every label sits in one cell, so a narrow field is as wide as its widest option (as a native one is). */
+.bs-select-val > span { grid-area: 1 / 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bs-select-val > .bs-select-sizer { visibility: hidden; }
+.bs-select[data-empty] .bs-select-val { color: var(--bs-muted); }
+.bs-select-chev { flex: none; width: 12px; height: 12px; color: var(--bs-muted); transition: transform 220ms var(--bs-spring, ease-out); }
+.bs-select[data-open] .bs-select-chev { transform: rotate(180deg); color: var(--bs-ink); }
+.bs-select--sm { height: 28px; padding: 0 10px; font-size: 12.5px; gap: 8px; }
+.bs-select--sm .bs-select-chev { width: 10px; height: 10px; }
+.bs-select.bs-select--icon { padding-left: 34px; }
+
+/* Popover: a short plate under (or above) the field. Above legacy modals (z 10000). */
+.bs-select-pop {
+  position: fixed; z-index: 10050; display: flex; flex-direction: column;
+  overflow: hidden; border-radius: 12px; background: var(--bs-plate);
+  color: var(--bs-ink); font-family: var(--bs-sans); font-size: 14px; line-height: 1.4;
+  box-shadow: inset 0 1px 0 var(--bs-hi), 0 0 0 1px var(--bs-rule), 0 20px 40px -14px rgba(0, 0, 0, 0.45);
+  transform-origin: top center;
+  opacity: 0; transform: scale(0.97) translateY(-4px);
+  transition: opacity 120ms ease-in, transform 160ms var(--bs-snap, ease-in);
+}
+.bs-select-pop[data-up] { transform-origin: bottom center; transform: scale(0.97) translateY(4px); }
+.bs-select-pop[data-state="open"] { opacity: 1; transform: none; transition: opacity 160ms ease-out, transform 260ms var(--bs-spring, ease-out); }
+.bs-select-list { overflow-y: auto; overscroll-behavior: contain; padding: 6px; outline: none; }
+.bs-select-group { padding: 10px 10px 4px; }
+.bs-select-group:first-child { padding-top: 4px; }
+.bs-select-opt {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 36px;
+  padding: 8px 10px; border: 0; border-radius: 7px; background: none; cursor: pointer; text-align: left;
+  font: 500 13.5px/1.3 var(--bs-sans); color: var(--bs-ink);
+  -webkit-tap-highlight-color: transparent;
+}
+.bs-select-opt-l { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.bs-select-hint { font: 500 10.5px var(--bs-mono); letter-spacing: 0.04em; color: var(--bs-muted); white-space: nowrap; }
+.bs-select-opt[data-active], .bs-select-sheet .bs-select-opt:focus-visible { background: var(--bs-sunk); outline: none; }
+.bs-select-opt[aria-disabled="true"] { color: var(--bs-faint); cursor: default; background: none; }
+.bs-select-opt[aria-selected="true"] { font-weight: 600; }
+/* Chosen row: a crimson LED, the bench's mark for "this one". */
+.bs-select-tick { flex: none; width: 6px; height: 6px; border-radius: 50%; background: transparent; }
+.bs-select-opt[aria-selected="true"] .bs-select-tick { background: var(--bs-brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--bs-brand) 18%, transparent); }
+
+/* Phone: the list comes up as a bottom sheet with roomy rows. */
+.bs-scrim[data-layer="top"] { z-index: 10055; }
+.bs-drawer[data-layer="top"] { z-index: 10056; }
+.bs-select-sheet .bs-drawer-body { padding-left: 10px; padding-right: 10px; }
+.bs-select-sheet .bs-select-list { padding: 4px 0 0; }
+.bs-select-sheet .bs-select-opt { min-height: 48px; padding: 12px; font-size: 15px; border-radius: 10px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bs-select-pop, .bs-select-pop[data-up], .bs-select-pop[data-state="open"] { transform: none; }
+  .bs-select-chev { transition: none; }
+}
+html[data-motion="reduce"] :is(.bs-select-pop, .bs-select-pop[data-up], .bs-select-pop[data-state="open"]) { transform: none; }
+html[data-motion="reduce"] .bs-select-chev { transition: none; }

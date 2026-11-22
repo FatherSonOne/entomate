@@ -1,4 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react'
+import { Select } from '../bench'
+
+const ENVIRONMENTS = [
+  { value: 'development', label: 'Development' },
+  { value: 'staging', label: 'Staging' },
+  { value: 'production', label: 'Production' },
+]
 import { useAuth } from '../../contexts/AuthContext'
 import {
   Key, Plus, Trash2, Edit2, Copy, Eye, EyeOff, Shield, Clock,
@@ -575,30 +582,30 @@ export default function SecretsManager({
                   <label className="block text-sm font-medium text-content-secondary mb-1">
                     Environment
                   </label>
-                  <select
+                  <Select
+                    label="Environment"
+                    className="w-full"
                     value={formData.environment}
-                    onChange={(e) => setFormData({ ...formData, environment: e.target.value })}
-                    className="input w-full"
-                  >
-                    <option value="development">Development</option>
-                    <option value="staging">Staging</option>
-                    <option value="production">Production</option>
-                  </select>
+                    onChange={(v) => setFormData({ ...formData, environment: v })}
+                    options={ENVIRONMENTS}
+                  />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-content-secondary mb-1">
                     Scope
                   </label>
-                  <select
+                  <Select
+                    label="Scope"
+                    className="w-full"
                     value={formData.scope}
-                    onChange={(e) => setFormData({ ...formData, scope: e.target.value })}
-                    className="input w-full"
-                  >
-                    <option value="user">User (Private)</option>
-                    <option value="organization">Organization</option>
-                    {workflowId && <option value="workflow">This Workflow</option>}
-                  </select>
+                    onChange={(v) => setFormData({ ...formData, scope: v })}
+                    options={[
+                      { value: 'user', label: 'User (Private)' },
+                      { value: 'organization', label: 'Organization' },
+                      ...(workflowId ? [{ value: 'workflow', label: 'This Workflow' }] : []),
+                    ]}
+                  />
                 </div>
               </div>
             )}
@@ -609,17 +616,19 @@ export default function SecretsManager({
                 <label className="block text-sm font-medium text-content-secondary mb-1">
                   Value Type
                 </label>
-                <select
+                <Select
+                  label="Value type"
+                  className="w-full"
                   value={formData.valueType}
-                  onChange={(e) => setFormData({ ...formData, valueType: e.target.value })}
-                  className="input w-full"
-                >
-                  <option value="string">String</option>
-                  <option value="api_key">API Key</option>
-                  <option value="json">JSON</option>
-                  <option value="oauth_token">OAuth Token</option>
-                  <option value="certificate">Certificate</option>
-                </select>
+                  onChange={(v) => setFormData({ ...formData, valueType: v })}
+                  options={[
+                    { value: 'string', label: 'String' },
+                    { value: 'api_key', label: 'API Key' },
+                    { value: 'json', label: 'JSON' },
+                    { value: 'oauth_token', label: 'OAuth Token' },
+                    { value: 'certificate', label: 'Certificate' },
+                  ]}
+                />
               </div>
             )}
 
@@ -827,27 +836,29 @@ export default function SecretsManager({
         </div>
 
         {/* Environment filter */}
-        <select
+        <Select
+          size="sm"
+          className="w-auto"
+          label="Environment"
           value={selectedEnvironment}
-          onChange={(e) => setSelectedEnvironment(e.target.value)}
-          className="input py-2 text-sm"
-        >
-          <option value="production">Production</option>
-          <option value="staging">Staging</option>
-          <option value="development">Development</option>
-        </select>
+          onChange={setSelectedEnvironment}
+          options={[...ENVIRONMENTS].reverse()}
+        />
 
         {/* Scope filter */}
-        <select
+        <Select
+          size="sm"
+          className="w-auto"
+          label="Scope"
           value={selectedScope || ''}
-          onChange={(e) => setSelectedScope(e.target.value || null)}
-          className="input py-2 text-sm"
-        >
-          <option value="">All Scopes</option>
-          <option value="user">User</option>
-          <option value="organization">Organization</option>
-          <option value="workflow">Workflow</option>
-        </select>
+          onChange={(v) => setSelectedScope(v || null)}
+          options={[
+            { value: '', label: 'All Scopes' },
+            { value: 'user', label: 'User' },
+            { value: 'organization', label: 'Organization' },
+            { value: 'workflow', label: 'Workflow' },
+          ]}
+        />
 
         {/* Refresh */}
         <button

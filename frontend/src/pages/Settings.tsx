@@ -10,6 +10,7 @@ import { TENANT_PLAN_LABELS } from '../constants/plans'
 import { version } from '../../package.json'
 import {
   Cell, Drawer, Grid, Key, Readout, Section, Signal, Tag, TextInput, TitleRule, Toggle, applyReduceMotion,
+  Select,
 } from '../components/bench'
 import AppearanceSettings, { STYLE_SCROLL_KEY } from '../components/settings/AppearanceSettings'
 import RecordingSettings from '../components/settings/RecordingSettings'
@@ -256,9 +257,12 @@ export default function Settings(): React.ReactElement {
       ) : (
         <>
           <div className="bs-set-jump">
-            <select className="bs-input" aria-label="Jump to section" value={current} onChange={(e) => jump(e.target.value as SectionId)}>
-              {SECTIONS.map((s) => <option key={s.id} value={s.id}>{s.number} {s.title}</option>)}
-            </select>
+            <Select
+              label="Jump to section"
+              value={current}
+              onChange={(v) => jump(v as SectionId)}
+              options={SECTIONS.map((s) => ({ value: s.id, label: s.title, hint: s.number }))}
+            />
           </div>
           <Grid>
             <Cell span={8}>

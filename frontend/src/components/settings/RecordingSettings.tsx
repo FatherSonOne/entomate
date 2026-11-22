@@ -8,7 +8,7 @@ import React from 'react'
 import { useAudioDevices } from '../../hooks/useAudioDevices'
 import { usePermissions } from '../../hooks/usePermissions'
 import CalendarAutoJoinSettings from './CalendarAutoJoinSettings'
-import { Key, Signal, Toggle } from '../bench'
+import { Key, Select, Signal, Toggle } from '../bench'
 
 interface AudioDevice { deviceId: string; label: string }
 interface AudioDevicesApi {
@@ -53,15 +53,17 @@ export default function RecordingSettings({ meetingsJson, onUpdate }: RecordingS
           <span>Used when you record in the browser.{mic?.state === 'denied' && ' It’s blocked: allow it from the lock icon in the address bar, then press Check.'}</span>
         </div>
         <div className="bs-set-c">
-          <select
-            className="bs-input bs-set-select"
+          <Select
+            className="bs-set-select"
             aria-labelledby="set-mic"
+            sheetLabel="Microphone"
             value={audio.selectedInput}
-            onChange={(e) => { audio.setSelectedInput(e.target.value); onUpdate('audioInputDeviceId', e.target.value) }}
-          >
-            <option value="">System default</option>
-            {audio.audioInputs.map((d) => <option key={d.deviceId} value={d.deviceId}>{d.label || 'Microphone'}</option>)}
-          </select>
+            onChange={(v) => { audio.setSelectedInput(v); onUpdate('audioInputDeviceId', v) }}
+            options={[
+              { value: '', label: 'System default' },
+              ...audio.audioInputs.map((d) => ({ value: d.deviceId, label: d.label || 'Microphone' })),
+            ]}
+          />
           <Signal tone={micSig.tone}>{micSig.word}</Signal>
           {mic?.state === 'prompt' && <Key size="sm" onClick={() => { void requestPermission('microphone').then(() => audio.refreshDevices()) }}>Allow</Key>}
           {mic?.state === 'denied' && <Key size="sm" onClick={() => audio.refreshDevices()}>Check</Key>}
