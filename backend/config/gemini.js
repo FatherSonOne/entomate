@@ -1,17 +1,18 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const log = require('../utils/log');
 
+const EMBEDDING_MODEL = 'gemini-embedding-001';
+const EMBEDDING_DIMENSIONS = 768; // matches embeddings.embedding vector(768)
+
 class GeminiService {
   constructor() {
     this.apiKey = process.env.GEMINI_API_KEY;
     this.genAI = null;
     this.model = null;
-    this.embeddingModel = null;
 
     if (this.apiKey) {
       this.genAI = new GoogleGenerativeAI(this.apiKey);
       this.model = this.genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-      this.embeddingModel = this.genAI.getGenerativeModel({ model: 'text-embedding-004' });
     } else {
       log.warn('GEMINI_API_KEY not set in environment');
     }
@@ -214,8 +215,31 @@ Rules:
     }
 
     try {
-      const result = await this.embeddingModel.embedContent(text);
-      return result.embedding.values;
+      // text-embedding-004 was retired by Google, so every embedding call failed
+      // and the embeddings table stayed empty. gemini-embedding-001 defaults to
+      // 3072 dimensions; the embeddings.embedding column is vector(768), so ask
+      // for 768. Called over REST because SDK 0.21 predates outputDimensionality.
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${EMBEDDING_MODEL}:embedContent`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': this.apiKey },
+          body: JSON.stringify({
+            content: { parts: [{ text }] },
+            outputDimensionality: EMBEDDING_DIMENSIONS,
+          }),
+        }
+      );
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(`HTTP ${res.status} ${body.slice(0, 200)}`);
+      }
+      const data = await res.json();
+      const values = data?.embedding?.values;
+      if (!Array.isArray(values) || values.length !== EMBEDDING_DIMENSIONS) {
+        throw new Error(`unexpected embedding size ${values?.length}`);
+      }
+      return values;
     } catch (error) {
       log.error('Embedding error:', { error: error.message || error });
       throw new Error(`Embedding generation failed: ${error.message}`);

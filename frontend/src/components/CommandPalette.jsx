@@ -17,7 +17,6 @@ const commands = [
   { id: 'nav-tasks', name: 'Go to Tasks', icon: CheckSquare, action: 'navigate', path: '/tasks', category: 'Navigation' },
   { id: 'nav-automations', name: 'Go to Automations', icon: Zap, action: 'navigate', path: '/automations', category: 'Navigation' },
   { id: 'nav-agents', name: 'Go to AI Agents', icon: Bot, action: 'navigate', path: '/agents', category: 'Navigation' },
-  { id: 'nav-goals', name: 'Go to Goals', icon: Target, action: 'navigate', path: '/goals', category: 'Navigation' },
   { id: 'nav-analytics', name: 'Go to Analytics', icon: BarChart3, action: 'navigate', path: '/analytics', category: 'Navigation' },
   { id: 'nav-reports', name: 'Go to Reports', icon: FileText, action: 'navigate', path: '/reports', category: 'Navigation' },
   { id: 'nav-calendar', name: 'Go to Calendar', icon: Calendar, action: 'navigate', path: '/calendar', category: 'Navigation' },

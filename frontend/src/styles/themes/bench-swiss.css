@@ -1107,7 +1107,8 @@ html.bs-scroll-lock, html.bs-scroll-lock body { overflow: hidden; }
   flex: none;
   border-radius: 4px;
   background: var(--bs-sunk);
-  box-shadow: inset 0 1px 2px var(--bs-lo), inset 0 0 0 1px var(--bs-rule);
+  /* Faint ring (not the hairline rule) so the box reads in dark mode too. */
+  box-shadow: inset 0 1px 2px var(--bs-lo), inset 0 0 0 1.5px var(--bs-faint);
   cursor: pointer;
   display: inline-grid;
   place-content: center;
@@ -1458,4 +1459,132 @@ a.bs-today-call-what:hover, .bs-today-link:hover, .bs-today-dec-src:hover { text
   .bs-today-ro .bs-readout { padding: 12px 0 0; border-bottom: 0; }
   .bs-today-ro .bs-readout:first-child { grid-column: 1 / -1; padding: 0 0 12px; border-bottom: 1px solid var(--bs-rule2); }
   .bs-today-ro .bs-readout:not(:first-child) b { font-size: 26px; }
+}
+
+/* ── 11. Tasks module (2026-11-22) ───────────────────────────── */
+/* Desktop: urgency list (8) beside an inspector column (4) from 1200px. Below that the
+   inspector is a drawer. Lanes is the second view; on phone it is the first. */
+
+.bs-tasks-split { display: grid; grid-template-columns: minmax(0, 1fr); column-gap: 24px; }
+.bs-tasks-split.with-insp { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+.bs-tasks-insp { border-left: 1px solid var(--bs-rule); padding: 22px 0 0 23px; margin-left: -1px; min-width: 0; }
+.bs-tasks-insp > .bs-tasks-detail { position: sticky; top: 18px; }
+
+/* Filter bar */
+.bs-tasks-fbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 18px 0 4px; }
+.bs-tasks-fbar > .bs-input-wrap { flex: 1 1 220px; }
+
+/* Bulk bar */
+.bs-tasks-bulk { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 14px; padding: 10px 12px; border-radius: 10px; background: var(--bs-sunk); box-shadow: inset 0 1px 2px var(--bs-lo); }
+.bs-tasks-bulk b { margin-right: auto; font: 500 12px var(--bs-mono); color: var(--bs-ink); }
+
+/* Rows */
+.bs-tasks-row {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 96px 76px 120px;
+  gap: 16px;
+  align-items: start;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--bs-rule2);
+  cursor: pointer;
+  list-style: none;
+}
+.bs-tasks-row:not(.head):hover { background: color-mix(in srgb, var(--bs-ink) 3%, transparent); }
+.bs-tasks-row.head { padding: 14px 0 8px; border-bottom: 1px solid var(--bs-rule); cursor: default; }
+.bs-tasks-row.sel { background: color-mix(in srgb, var(--bs-brand) 6%, transparent); box-shadow: inset 2px 0 0 var(--bs-brand); }
+.bs-tasks-row > .bs-check { margin-top: 1px; }
+.bs-check.bs-tasks-pick { border-radius: 50%; }
+.bs-check.bs-tasks-pick:checked { background: var(--bs-brand); }
+.bs-tasks-main { min-width: 0; }
+.bs-tasks-title { all: unset; cursor: pointer; display: block; font-weight: 600; line-height: 1.35; color: var(--bs-ink); overflow-wrap: anywhere; }
+.bs-tasks-title:focus-visible { outline: 2px solid var(--bs-brand); outline-offset: 2px; border-radius: 2px; }
+.bs-tasks-row.done .bs-tasks-title { text-decoration: line-through; color: var(--bs-muted); }
+.bs-tasks-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 5px; font-size: 12px; color: var(--bs-ink2); min-width: 0; }
+.bs-tasks-meta .bs-mono { font-size: 11.5px; color: var(--bs-muted); }
+.bs-tasks-src { display: inline-flex; align-items: center; gap: 6px; min-width: 0; color: var(--bs-ink2); text-decoration: none; }
+.bs-tasks-src .bs-tick { align-self: auto; height: 12px; margin: 0; flex: none; }
+.bs-tasks-src-t { overflow-wrap: anywhere; }
+.bs-tasks-src:hover .bs-tasks-src-t { text-decoration: underline; text-underline-offset: 2px; }
+.bs-tasks-added { color: var(--bs-muted); }
+.bs-tasks-conf { display: inline-flex; align-items: center; gap: 6px; font: 500 11.5px var(--bs-mono); color: var(--bs-ai); }
+.bs-tasks-due { font: 500 12px var(--bs-mono); white-space: nowrap; padding-top: 2px; color: var(--bs-ink); font-variant-numeric: tabular-nums; }
+.bs-tasks-due.late, .bs-tasks-late { color: var(--bs-brand); }
+.bs-tasks-pri { font: 500 11px var(--bs-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--bs-muted); white-space: nowrap; padding-top: 3px; display: inline-block; }
+.bs-tasks-pri.hi { color: var(--bs-brand); }
+.bs-tasks-pri.hi::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: var(--bs-brand); transform: translateY(-1px); }
+.bs-tasks-grp.late .bs-group > .bs-lbl:first-child { color: var(--bs-brand); }
+.bs-tasks-ph { display: none; }
+.bs-tasks-empty { margin: 14px 0 0; font-size: 13.5px; line-height: 1.55; color: var(--bs-muted); }
+div.bs-tasks-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 18px 0; }
+div.bs-tasks-empty p { margin: 0; }
+.bs-tasks-cap { padding-top: 14px; }
+
+/* Inspector */
+.bs-tasks-dhead { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.bs-tasks-dtitle { margin: 10px 0 12px; font-size: 24px; font-weight: 600; line-height: 1.15; letter-spacing: -0.02em; color: var(--bs-ink); overflow-wrap: anywhere; }
+.bs-tasks-fields { margin: 0; }
+.bs-tasks-fields .bs-field { grid-template-columns: 84px minmax(0, 1fr); align-items: center; }
+.bs-tasks-stsw { flex-wrap: wrap; }
+.bs-tasks-stsw button { padding: 0 9px; }
+.bs-tasks-desc { margin: 14px 0 0; font-size: 14px; line-height: 1.6; color: var(--bs-ink2); white-space: pre-line; overflow-wrap: anywhere; }
+.bs-tasks-sec { margin-top: 18px; padding-top: 12px; border-top: 2px solid var(--bs-rule-ink); }
+.bs-tasks-sec + .bs-tasks-sec { border-top-width: 1px; border-top-color: var(--bs-rule); }
+.bs-tasks-sech { display: flex; justify-content: space-between; gap: 10px; }
+.bs-tasks-sech > .bs-lbl:first-child { color: var(--bs-ink); }
+.bs-tasks-srcrow { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 8px; }
+.bs-tasks-link { color: var(--bs-ink); text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
+.bs-tasks-agent { margin-top: 12px; padding: 12px 0; border-top: 1px solid var(--bs-rule2); border-bottom: 1px solid var(--bs-rule2); }
+.bs-tasks-agenth { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.bs-tasks-agent .bs-why { display: block; margin-top: 6px; font-size: 13px; line-height: 1.5; }
+.bs-tasks-sub { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 10px; align-items: start; padding: 8px 0; border-bottom: 1px solid var(--bs-rule2); font-size: 13.5px; overflow-wrap: anywhere; }
+.bs-tasks-sub .done { text-decoration: line-through; color: var(--bs-muted); }
+.bs-tasks-addsub { margin-top: 10px; }
+.bs-tasks-keys { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.bs-tasks-keys .bs-tasks-del, .bs-tasks-form .bs-tasks-keys .pri { margin-left: auto; }
+.bs-tasks-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* New task and filter drawers */
+.bs-tasks-form { display: flex; flex-direction: column; }
+.bs-tasks-fl { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; min-width: 0; }
+.bs-tasks-f2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.bs-tasks-err { margin: 6px 0 0; font-size: 12.5px; color: var(--bs-brand); }
+.bs-tasks-tagbtn { height: 26px; padding: 0 9px; border: 0; border-radius: 5px; background: var(--bs-sunk); box-shadow: inset 0 1px 1px var(--bs-lo); font: 500 11px var(--bs-mono); color: var(--bs-ink2); cursor: pointer; }
+.bs-tasks-tagbtn[aria-pressed="true"] { background: var(--bs-ink); color: var(--bs-plate); box-shadow: none; }
+
+/* Lanes */
+.bs-tasks-lanes { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); margin-top: 18px; border-top: 2px solid var(--bs-rule-ink); }
+.bs-tasks-lane { min-width: 0; padding: 0 14px 20px; border-left: 1px solid var(--bs-rule); }
+.bs-tasks-lane:first-child { padding-left: 0; border-left: 0; }
+.bs-tasks-lane:last-child { padding-right: 0; }
+.bs-tasks-lane.dropping { background: color-mix(in srgb, var(--bs-ink) 2%, transparent); }
+.bs-tasks-lh { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 12px 0 10px; border-bottom: 1px solid var(--bs-rule); }
+.bs-tasks-lh .bs-mono { font-size: 13px; color: var(--bs-muted); }
+.bs-tasks-li-list { list-style: none; margin: 0; padding: 0; }
+.bs-tasks-li { border-bottom: 1px solid var(--bs-rule2); }
+.bs-tasks-li[draggable="true"] { cursor: grab; }
+.bs-tasks-li.sel { background: color-mix(in srgb, var(--bs-brand) 6%, transparent); box-shadow: inset 2px 0 0 var(--bs-brand); }
+.bs-tasks-li.sel .bs-tasks-li-btn { padding-left: 8px; }
+.bs-tasks-li-btn { all: unset; box-sizing: border-box; display: block; width: 100%; padding: 12px 0; cursor: pointer; }
+.bs-tasks-li-btn:focus-visible { outline: 2px solid var(--bs-brand); outline-offset: -2px; }
+.bs-tasks-li:hover { background: color-mix(in srgb, var(--bs-ink) 3%, transparent); }
+.bs-tasks-li-t { display: block; font-size: 13.5px; font-weight: 600; line-height: 1.35; color: var(--bs-ink); overflow-wrap: anywhere; }
+.bs-tasks-li-m { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 6px; font: 500 11px var(--bs-mono); color: var(--bs-muted); overflow-wrap: anywhere; }
+.bs-tasks-li-m .late, .bs-tasks-li-m .hi { color: var(--bs-brand); }
+.bs-tasks-ltabs { margin-top: 14px; }
+
+@media (max-width: 767.98px) {
+  .bs-tasks-ph { display: inline-flex; }
+  .bs-tasks-row { grid-template-columns: 22px minmax(0, 1fr) auto; gap: 12px; }
+  .bs-tasks-row.head { display: none; }
+  .bs-tasks-due { font-size: 11.5px; }
+  .bs-tasks-fbar .bs-switch { flex: 1 1 100%; }
+  .bs-tasks-lanes { display: block; margin-top: 4px; border-top: 0; }
+  .bs-tasks-lane { padding: 0; border: 0; }
+  .bs-tasks-bulk { position: sticky; bottom: 96px; z-index: 5; background: var(--bs-plate); box-shadow: inset 0 0 0 1px var(--bs-rule), 0 16px 30px -12px rgba(0, 0, 0, 0.5); }
+  .bs-tasks-f2 { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 767.98px) {
+  /* Layout switch and New task share one row under the title. */
+  .bs-tasks .bs-title-acts .bs-switch { width: auto; flex: 1 1 auto; }
+  .bs-tasks .bs-title-acts { flex-wrap: nowrap; }
 }

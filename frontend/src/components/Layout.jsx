@@ -7,14 +7,12 @@ import {
   CheckSquare,
   Zap,
   Bot,
-  Target,
   BarChart3,
   Search,
   Settings,
   Menu,
   X,
   ChevronRight,
-  Kanban,
   FileText,
   Calendar,
   Command,
@@ -49,39 +47,41 @@ import { settingsApi } from '../services/api'
 // Grouped navigation structure — 4 sections
 // Items with adminOnly: true are filtered out at render time for non-admin
 // users via useOrgSafe().myRole. The backend gates the routes independently.
+// Six modules (feature audit 2026-11-22). Calendar, Workflows, Agents and
+// Reports stay reachable under "Tools" until they merge into Today,
+// Automations and Insights. Goals, Board and Search are off the sidebar:
+// Goals had no use, Board is a view of Projects, Search lives in the command
+// palette (mod+K). Their routes still work, so links don't break.
 const navGroups = [
   {
-    label: 'Intelligence',
+    label: 'Meetings',
     items: [
       { name: 'Today',        href: '/dashboard',     icon: LayoutDashboard, iconKey: 'dashboard' },
       { name: 'Meetings',     href: '/meetings',      icon: Mic,             iconKey: 'meetings'  },
-      { name: 'Bot Launcher', href: '/bot-launcher',  icon: Radio,           iconKey: 'bot-launcher', adminOnly: true },
-      { name: 'Calendar',     href: '/calendar',      icon: Calendar,        iconKey: 'calendar'  },
-      { name: 'Search',       href: '/search',        icon: Search,          iconKey: 'search'    },
     ],
   },
   {
     label: 'Work',
     items: [
-      { name: 'Projects',      href: '/projects',          icon: FolderKanban, iconKey: 'projects' },
-      { name: 'Project Board', href: '/project-dashboard', icon: Kanban,       iconKey: 'board'    },
       { name: 'Tasks',         href: '/tasks',             icon: CheckSquare,  iconKey: 'tasks'    },
-      { name: 'Goals',         href: '/goals',             icon: Target,       iconKey: 'goals'    },
+      { name: 'Projects',      href: '/projects',          icon: FolderKanban, iconKey: 'projects' },
     ],
   },
   {
-    label: 'Automation',
+    label: 'Follow-through',
     items: [
-      { name: 'Workflows',  href: '/workflows',   icon: Workflow, iconKey: 'workflows'  },
-      { name: 'Automations',href: '/automations', icon: Zap,      iconKey: 'automations'},
-      { name: 'AI Agents',  href: '/agents',      icon: Bot,      iconKey: 'agents'     },
+      { name: 'Automations',href: '/automations', icon: Zap,       iconKey: 'automations'},
+      { name: 'Insights',   href: '/analytics',   icon: BarChart3, iconKey: 'analytics' },
     ],
   },
   {
-    label: 'Output',
+    label: 'Tools',
     items: [
-      { name: 'Analytics', href: '/analytics', icon: BarChart3, iconKey: 'analytics' },
-      { name: 'Reports',   href: '/reports',   icon: FileText,  iconKey: 'reports'   },
+      { name: 'Calendar',     href: '/calendar',      icon: Calendar, iconKey: 'calendar'  },
+      { name: 'Workflows',    href: '/workflows',     icon: Workflow, iconKey: 'workflows' },
+      { name: 'AI Agents',    href: '/agents',        icon: Bot,      iconKey: 'agents'    },
+      { name: 'Reports',      href: '/reports',       icon: FileText, iconKey: 'reports'   },
+      { name: 'Bot Launcher', href: '/bot-launcher',  icon: Radio,    iconKey: 'bot-launcher', adminOnly: true },
     ],
   },
 ]
@@ -100,7 +100,7 @@ const breadcrumbMap = {
   '/workflows':        'Workflows',
   '/automations':      'Automations',
   '/agents':           'AI Agents',
-  '/analytics':        'Analytics',
+  '/analytics':        'Insights',
   '/reports':          'Reports',
   '/settings':         'Settings',
   '/guide':            'User Guide',
@@ -117,29 +117,20 @@ function getBreadcrumb(pathname) {
 }
 
 /* ── Bench Swiss navigation ──
-   Numbers are wayfinding: 01–13 for modules, 00 for Settings (in the
+   Numbers are wayfinding: 01–06 for modules, 00 for Settings (in the
    toolbar). Tools that aren't modules sit unnumbered under "Tools". */
 const benchModules = [
-  { label: 'Intelligence', items: [
+  { label: 'Meetings', items: [
     { no: '01', name: 'Today',       href: '/dashboard' },
     { no: '02', name: 'Meetings',    href: '/meetings' },
-    { no: '03', name: 'Calendar',    href: '/calendar' },
-    { no: '04', name: 'Search',      href: '/search' },
   ] },
   { label: 'Work', items: [
-    { no: '05', name: 'Projects',    href: '/projects' },
-    { no: '06', name: 'Board',       href: '/project-dashboard' },
-    { no: '07', name: 'Tasks',       href: '/tasks' },
-    { no: '08', name: 'Goals',       href: '/goals' },
+    { no: '03', name: 'Tasks',       href: '/tasks' },
+    { no: '04', name: 'Projects',    href: '/projects' },
   ] },
-  { label: 'Automation', items: [
-    { no: '09', name: 'Workflows',   href: '/workflows' },
-    { no: '10', name: 'Automations', href: '/automations' },
-    { no: '11', name: 'Agents',      href: '/agents' },
-  ] },
-  { label: 'Output', items: [
-    { no: '12', name: 'Analytics',   href: '/analytics' },
-    { no: '13', name: 'Reports',     href: '/reports' },
+  { label: 'Follow-through', items: [
+    { no: '05', name: 'Automations', href: '/automations' },
+    { no: '06', name: 'Insights',    href: '/analytics' },
   ] },
 ]
 
@@ -256,6 +247,10 @@ export default function Layout() {
     const groups = [
       ...benchModules,
       { label: 'Tools', items: [
+        { name: 'Calendar', href: '/calendar' },
+        { name: 'Workflows', href: '/workflows' },
+        { name: 'Agents', href: '/agents' },
+        { name: 'Reports', href: '/reports' },
         ...(isAdmin ? [{ name: 'Bot Launcher', href: '/bot-launcher' }] : []),
         { name: 'Ask Entomate', onSelect: toggleAssistant, note: proactiveSuggestion ? 'NEW' : undefined, noteIsNew: proactiveSuggestion },
         { name: 'User Guide', href: '/guide', note: guideHasNew ? 'NEW' : undefined, noteIsNew: guideHasNew },

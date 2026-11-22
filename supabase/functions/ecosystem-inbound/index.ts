@@ -65,6 +65,16 @@ Deno.serve(async (req) => {
     // 2. Parse event body
     const event = await req.json()
 
+    // Heartbeats (Pulse sends one every 15 min) were 96% of ecosystem_events
+    // rows. Record the latest beat on the config row instead of logging each.
+    if (event.eventType === 'heartbeat' || event.eventType === 'health.ping') {
+      await supabase
+        .from('ecosystem_config')
+        .update({ last_heartbeat: new Date().toISOString() })
+        .eq('app_name', sourceApp)
+      return jsonResponse({ success: true, pong: true, timestamp: new Date().toISOString(), app: 'entomate' })
+    }
+
     // 3. Log inbound event
     const { data: eventLog } = await supabase
       .from('ecosystem_events')
