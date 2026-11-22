@@ -7,6 +7,10 @@ import { PHONE_QUERY, useMediaQuery } from './useMediaQuery'
 const SNAP_MS = 180
 /** Drag the sheet down further than this to dismiss it. */
 const DISMISS_PX = 90
+/** Or flick it: px per ms. A quick flick closes it whatever the distance. */
+const FLICK_VELOCITY = 0.11
+/** Dragging up past the top meets friction instead of a wall. */
+const OVERDRAG_DAMPING = 0.2
 
 const FOCUSABLE = 'a[href], button:not([disabled]):not(.bs-drawer-grip), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
@@ -34,7 +38,8 @@ export interface DrawerProps {
  * Desktop: a 440px panel from the right over a scrim. Phone: the same
  * content as a bottom sheet with a grip. Springs open (460ms) and snaps
  * shut (180ms). Esc, scrim click and the Close key dismiss it; focus moves
- * in and returns on close. On phone, drag the grip down past 90px to close.
+ * in and returns on close. On phone, drag the grip down past 90px (or flick
+ * it) to close; dragging up meets friction.
  */
 export function Drawer({ open, onClose, label, children, footer, hideEscHint = false, modal: modalProp = true, className }: DrawerProps): React.ReactPortal | null {
   const isPhone = useMediaQuery(PHONE_QUERY)
@@ -45,6 +50,7 @@ export function Drawer({ open, onClose, label, children, footer, hideEscHint = f
   const panelRef = useRef<HTMLDivElement | null>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
   const dragStartRef = useRef<number | null>(null)
+  const dragStartTimeRef = useRef<number>(0)
   const labelId = useId()
 
   // Mount, then flip to "shown" on the next frames so the spring runs.
@@ -117,19 +123,22 @@ export function Drawer({ open, onClose, label, children, footer, hideEscHint = f
     if (!isPhone) return
     if ((e.target as HTMLElement).closest('button:not(.bs-drawer-grip)')) return
     dragStartRef.current = e.clientY
+    dragStartTimeRef.current = performance.now()
     setDragging(true)
     e.currentTarget.setPointerCapture(e.pointerId)
   }
   const onPointerMove = (e: React.PointerEvent<HTMLElement>): void => {
     if (dragStartRef.current == null) return
-    setDrag(Math.max(0, e.clientY - dragStartRef.current))
+    const dy = e.clientY - dragStartRef.current
+    setDrag(dy >= 0 ? dy : dy * OVERDRAG_DAMPING)
   }
   const onPointerUp = (e: React.PointerEvent<HTMLElement>): void => {
     if (dragStartRef.current == null) return
     const dy = e.clientY - dragStartRef.current
     dragStartRef.current = null
     setDragging(false)
-    if (dy > DISMISS_PX) onClose()
+    const velocity = dy / Math.max(1, performance.now() - dragStartTimeRef.current)
+    if (dy > DISMISS_PX || (dy > 8 && velocity > FLICK_VELOCITY)) onClose()
     // Let the spring carry it home (or the snap carry it away).
     requestAnimationFrame(() => setDrag(0))
   }

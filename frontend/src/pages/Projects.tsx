@@ -183,7 +183,7 @@ export default function Projects(): React.ReactElement {
               <TextInput icon={<Search aria-hidden="true" />} placeholder="Search projects" aria-label="Search projects" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
             <div className="bs-proj-pt head bs-lbl" aria-hidden="true">
-              <span>Project</span><span className="bs-dt">Ends</span><span className="bs-dt">Progress</span><span className="bs-dt bs-proj-r">Open</span><span className="bs-dt bs-proj-r">Late</span><span>Status</span>
+              <span>Project</span><span className="bs-dt bs-proj-c-end">Ends</span><span className="bs-dt bs-proj-c-prog">Progress</span><span className="bs-dt bs-proj-c-num bs-proj-r">Open</span><span className="bs-dt bs-proj-c-num bs-proj-r">Late</span><span>Status</span>
             </div>
             {loading ? <p className="bs-proj-empty">Loading projects</p> : shown.length === 0 ? (
               <div className="bs-proj-empty">
@@ -207,13 +207,13 @@ export default function Projects(): React.ReactElement {
                             {p.end_date ? `Ends ${dayShort(p.end_date)}` : 'No end date'} · {r.open} open{r.late > 0 && <> · <span className="bs-proj-late">{r.late} late</span></>}
                           </span>
                         </span>
-                        <span className="bs-dt bs-mono bs-proj-pt-end" title={endsLabel(p.end_date, now)}>{dayShort(p.end_date)}</span>
-                        <span className="bs-dt bs-proj-prog">
+                        <span className="bs-dt bs-proj-c-end bs-mono bs-proj-pt-end" title={endsLabel(p.end_date, now)}>{dayShort(p.end_date)}</span>
+                        <span className="bs-dt bs-proj-c-prog bs-proj-prog">
                           <span className="bs-mono">{r.done}/{r.total} done</span>
                           <span className="bs-proj-bar" aria-hidden="true"><i style={{ width: `${progressPct(r)}%` }} /></span>
                         </span>
-                        <span className={`bs-dt bs-num bs-proj-r${r.open ? '' : ' bs-proj-z'}`}>{r.open}</span>
-                        <span className={`bs-dt bs-num bs-proj-r${r.late ? ' bs-proj-late' : ' bs-proj-z'}`}>{r.late}</span>
+                        <span className={`bs-dt bs-proj-c-num bs-num bs-proj-r${r.open ? '' : ' bs-proj-z'}`}>{r.open}</span>
+                        <span className={`bs-dt bs-proj-c-num bs-num bs-proj-r${r.late ? ' bs-proj-late' : ' bs-proj-z'}`}>{r.late}</span>
                         <Signal tone={sig.tone}>{sig.word}</Signal>
                       </Link>
                     </li>

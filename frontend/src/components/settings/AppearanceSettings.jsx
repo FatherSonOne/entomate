@@ -14,7 +14,6 @@ import React, { useState } from 'react'
 import { useTheme, THEME_MODES, DEFAULT_DESIGN_STYLE } from '../../context/ThemeContext'
 import LogoSystemPicker from './LogoSystemPicker'
 import { Section, Switch, Toggle } from '../bench'
-import { LOGO_SYSTEMS } from '../../services/logoSystem'
 
 export const STYLE_SCROLL_KEY = 'entomate-settings-style-scroll'
 
@@ -135,7 +134,7 @@ export default function AppearanceSettings({ reduceMotion, onReduceMotion, onThe
       )}
 
       <div className="ap-gap" />
-      <Section level={3} title="Logo and loading screen" aside={`${LOGO_SYSTEMS.length} systems`} />
+      {/* Collapsible: the in-use bar always shows; the 17 cards open under it */}
       <LogoSystemPicker />
     </div>
   )

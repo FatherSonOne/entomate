@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { flushSync } from 'react-dom';
+import { applyReduceMotion } from '../components/bench/motion';
 
 const ThemeContext = createContext(null);
 
@@ -108,6 +109,8 @@ export function ThemeProvider({ children }) {
           setMode(dbMode);
           localStorage.setItem('entomate-theme-mode', dbMode);
         }
+        // Reduce motion follows the account to every device.
+        if (!cancelled && typeof res?.settings?.reduce_motion === 'boolean') applyReduceMotion(res.settings.reduce_motion);
       } catch {
         // Settings API not available (not logged in, backend down) — use localStorage
       } finally {

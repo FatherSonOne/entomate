@@ -637,6 +637,8 @@ export const integrationsApi = {
 
   // CRM
   crm: {
+    // { connected, provider, stats }: whether a CRM is set up for this server
+    status: () => api.get('/integrations/crm/status'),
     syncActionItems: (actionItemIds, syncAll) =>
       api.post('/integrations/crm/sync-action-items', { actionItemIds, syncAll }),
     createDeal: (data) => api.post('/integrations/crm/create-deal', data),

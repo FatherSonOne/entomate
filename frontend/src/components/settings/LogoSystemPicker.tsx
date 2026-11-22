@@ -5,7 +5,7 @@ import AnimatedLoadingLogo from '../AnimatedLoadingLogo'
 import EnhancedLoadingScreen from '../EnhancedLoadingScreen'
 import { Wordmark } from '../Logo'
 import {
-  LOGO_FAMILIES, logoAsset, logosInFamily, setLogo, useLogoSystem,
+  LOGO_FAMILIES, LOGO_SYSTEMS, logoAsset, logosInFamily, setLogo, useLogoSystem,
   type LogoSystem,
 } from '../../services/logoSystem'
 import '../../styles/logo-picker.css'
@@ -14,6 +14,12 @@ import '../../styles/logo-picker.css'
 const PANEL_EDGE = 400 + 18
 /** Air between the cards and the panel when it does cover them. */
 const PANEL_GAP = 20
+
+/** Whether the 17 cards are open, per browser. Closed by default: the bar says what's in use. */
+const GRID_KEY = 'entomate-logo-grid-open'
+function readGridOpen(): boolean {
+  try { return localStorage.getItem(GRID_KEY) === '1' } catch { return false }
+}
 
 /** Default identity, and the one on the landing page; noted on their cards. */
 const CARD_NOTES: Readonly<Record<string, string>> = {
@@ -54,6 +60,13 @@ export default function LogoSystemPicker(): React.ReactElement {
   const isPhone = useMediaQuery(PHONE_QUERY)
   const [preview, setPreview] = useState<boolean>(false)
   const [panel, setPanel] = useState<boolean>(false)
+  const [gridOpen, setGridOpen] = useState<boolean>(readGridOpen)
+  const toggleGrid = (): void => {
+    const next = !gridOpen
+    setGridOpen(next)
+    try { localStorage.setItem(GRID_KEY, next ? '1' : '0') } catch { /* storage blocked */ }
+    if (!next) { closedByHand.current = false; setPanel(false) }
+  }
   /** Once closed by hand, a pick no longer reopens the panel until asked. */
   const closedByHand = useRef<boolean>(false)
 
@@ -87,7 +100,17 @@ export default function LogoSystemPicker(): React.ReactElement {
   }, [docked])
 
   return (
-    <div className="lp" data-panel={docked} ref={rootRef}>
+    <div className="lp" data-panel={docked} data-open={gridOpen} ref={rootRef}>
+      <div className="bs-sec lp-head">
+        <h3 className="bs-sec-title bs-h3">
+          <button type="button" className="lp-disclose" aria-expanded={gridOpen} aria-controls="lp-grid" onClick={toggleGrid}>
+            <svg className="lp-chev" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M4 2.5 7.5 6 4 9.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            Logo and loading screen
+          </button>
+        </h3>
+        <span className="bs-sec-aside bs-lbl">{gridOpen ? `${LOGO_SYSTEMS.length} systems` : `Show all ${LOGO_SYSTEMS.length}`}</span>
+      </div>
+
       {/* Sticky: the pick's icon and wordmark at real size, and the panel key */}
       <div className="lp-bar">
         <div className="lp-bar-name">
@@ -101,7 +124,8 @@ export default function LogoSystemPicker(): React.ReactElement {
         </Key>
       </div>
 
-      <div role="radiogroup" aria-label="Logo system">
+      <div id="lp-grid" className="lp-grid">
+      <div className="lp-grid-inner" role="radiogroup" aria-label="Logo system">
         {LOGO_FAMILIES.map((family) => {
           const logos = logosInFamily(family.id)
           return (
@@ -135,6 +159,7 @@ export default function LogoSystemPicker(): React.ReactElement {
             </section>
           )
         })}
+      </div>
       </div>
 
       <Drawer open={panel} onClose={closePanel} label="Loading screen · live" modal={false} className="bs-tokens lp-panel"

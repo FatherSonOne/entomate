@@ -19,6 +19,7 @@ import {
   streamQuery,
 } from '../../services/entoAssistantService'
 import { useMediaQuery } from '../bench/useMediaQuery'
+import { usePresence, MOTION } from '../bench/motion'
 import Composer from './Composer'
 import ContextCard from './ContextCard'
 import { WelcomeOrb, orbStateFor, useSettledOrbState, AI_ORB_LABELS } from './AiOrb'
@@ -309,7 +310,9 @@ export default function EntoAssistant({ isOpen, onClose }) {
     hasAnswered: messages[messages.length - 1]?.role === 'assistant',
   }))
 
-  if (!isOpen) return null
+  // Stays mounted through its exit so the panel slides away instead of vanishing.
+  const { mounted, state: presence } = usePresence(isOpen, MOTION.base)
+  if (!mounted) return null
 
   const quickActionList = (label) => (
     <div className="la-quick-actions">
@@ -333,10 +336,11 @@ export default function EntoAssistant({ isOpen, onClose }) {
 
   const panel = (
     <div className="logos-assistant la-swiss" role="dialog" aria-modal="true" aria-label="Entomate AI Assistant">
-      <div className="la-backdrop" onClick={onClose} />
+      <div className="la-backdrop" data-state={presence} onClick={onClose} />
       <div
         ref={panelRef}
         className="la-panel"
+        data-state={presence}
         style={appliedWidth ? { width: `${appliedWidth}px` } : undefined}
       >
 

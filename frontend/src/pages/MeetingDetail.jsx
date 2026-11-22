@@ -12,6 +12,7 @@ import TimecodeButton from '../components/meetings/TimecodeButton'
 import CarryForward from '../components/meetings/CarryForward'
 import RecordingStatus from '../components/meetings/RecordingStatus'
 import RecordingPlayer from '../components/meetings/RecordingPlayer'
+import CrmSendDrawer from '../components/meetings/CrmSendDrawer'
 import { canPlay } from '../services/meetingRecorderService'
 import cache from '../services/apiCache'
 import { clipToNotes } from '../services/searchNotesService'
@@ -70,7 +71,7 @@ export default function MeetingDetail() {
   const [question, setQuestion] = useState('')
   const [askingQuestion, setAskingQuestion] = useState(false)
   const [answer, setAnswer] = useState(null)
-  const [syncing, setSyncing] = useState(false)
+  const [showCrm, setShowCrm] = useState(false)
   const [showShareModal, setShowShareModal] = useState(false)
   const [selectedChannel, setSelectedChannel] = useState('')
   const [sharing, setSharing] = useState(false)
@@ -160,23 +161,13 @@ export default function MeetingDetail() {
     }
   }
 
-  const handleSyncToCRM = async () => {
-    const actionItemIds = meeting.actionItems?.map(a => a.id) || []
-    if (actionItemIds.length === 0) {
+  // Send to CRM opens a drawer that shows exactly what goes before anything leaves.
+  const handleSyncToCRM = () => {
+    if (!meeting.actionItems?.length) {
       toast.info('Nothing to send', 'This meeting has no action items')
       return
     }
-
-    try {
-      setSyncing(true)
-      await integrationsApi.crm.syncActionItems(actionItemIds)
-      loadMeeting() // Reload to get updated sync status
-    } catch (error) {
-      console.error('Failed to sync to CRM:', error)
-      toast.error('Error', 'The action items could not be sent to the CRM')
-    } finally {
-      setSyncing(false)
-    }
+    setShowCrm(true)
   }
 
   // Summary templates per meeting type (audit rec 7). Rewriting replaces the
@@ -450,9 +441,7 @@ export default function MeetingDetail() {
       <Key onClick={openShareModal}>
         Share recap{meeting.chat_posted && <span className="bs-k">Posted</span>}
       </Key>
-      <Key variant="primary" onClick={handleSyncToCRM} disabled={syncing}>
-        {syncing && <Loader2 className="animate-spin" aria-hidden="true" />}Send actions to CRM
-      </Key>
+      <Key variant="primary" onClick={handleSyncToCRM}>Send actions to CRM</Key>
     </>
   )
 
@@ -770,6 +759,13 @@ export default function MeetingDetail() {
           </section>
         </Cell>
       </Grid>
+
+      <CrmSendDrawer
+        open={showCrm}
+        onClose={() => setShowCrm(false)}
+        items={meeting.actionItems || []}
+        onSent={refreshMeeting}
+      />
 
       {/* Share recap: a drawer on desktop, a sheet on phone */}
       <Drawer

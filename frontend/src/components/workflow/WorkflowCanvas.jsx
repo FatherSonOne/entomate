@@ -339,29 +339,6 @@ function WorkflowCanvasInner({
     }
   }, [setNodes, setEdges, markDirty])
 
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      // Ctrl/Cmd+S — Save
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault()
-        handleSave()
-      }
-      // Ctrl/Cmd+Z — Undo
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
-        e.preventDefault()
-        handleUndo()
-      }
-      // Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z — Redo
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
-        e.preventDefault()
-        handleRedo()
-      }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleSave, handleUndo, handleRedo])
-
   // Save workflow
   const handleSave = useCallback(async () => {
     setIsSaving(true)
@@ -386,6 +363,29 @@ function WorkflowCanvasInner({
       setIsSaving(false)
     }
   }, [nodes, edges, onSave])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Ctrl/Cmd+S — Save
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault()
+        handleSave()
+      }
+      // Ctrl/Cmd+Z — Undo
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault()
+        handleUndo()
+      }
+      // Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z — Redo
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+        e.preventDefault()
+        handleRedo()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleSave, handleUndo, handleRedo])
 
   // Execute workflow
   const handleExecute = useCallback(async () => {

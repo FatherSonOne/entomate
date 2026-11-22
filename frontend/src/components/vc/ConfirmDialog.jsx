@@ -2,11 +2,16 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import { createPortal } from 'react-dom'
 import { VCButton } from './index'
 import { AlertTriangle } from 'lucide-react'
+import { usePresence } from '../bench/motion'
 
 const ConfirmContext = createContext(null)
 
 export function ConfirmProvider({ children }) {
   const [state, setState] = useState(null)
+  // Keep the last dialog on screen while it animates out.
+  const [shown, setShown] = useState(null)
+  useEffect(() => { if (state) setShown(state) }, [state])
+  const { mounted, state: presence } = usePresence(Boolean(state))
 
   const confirm = useCallback(({ title, message, confirmLabel = 'Confirm', cancelLabel = 'Cancel', variant = 'danger' }) => {
     return new Promise(resolve => {
@@ -35,17 +40,17 @@ export function ConfirmProvider({ children }) {
   return (
     <ConfirmContext.Provider value={confirm}>
       {children}
-      {state && createPortal(
-        <div className="vc-confirm-overlay" onClick={handleCancel}>
-          <div className="vc vc-confirm-dialog" onClick={e => e.stopPropagation()}>
+      {mounted && shown && createPortal(
+        <div className="vc-confirm-overlay m-scrim" data-state={presence} onClick={state ? handleCancel : undefined}>
+          <div className="vc vc-confirm-dialog m-modal" data-state={presence} role="alertdialog" aria-modal="true" aria-labelledby="vc-confirm-title" onClick={e => e.stopPropagation()}>
             <div className="vc-confirm-icon">
               <AlertTriangle size={24} style={{ color: 'var(--a)' }} />
             </div>
-            <h3 className="vc-confirm-title">{state.title}</h3>
-            <p className="vc-confirm-message">{state.message}</p>
+            <h3 className="vc-confirm-title" id="vc-confirm-title">{shown.title}</h3>
+            <p className="vc-confirm-message">{shown.message}</p>
             <div className="vc-confirm-actions">
-              <VCButton variant="ghost" onClick={handleCancel}>{state.cancelLabel}</VCButton>
-              <VCButton variant={state.variant} onClick={handleConfirm}>{state.confirmLabel}</VCButton>
+              <VCButton variant="ghost" onClick={handleCancel} disabled={!state}>{shown.cancelLabel}</VCButton>
+              <VCButton variant={shown.variant} onClick={handleConfirm} disabled={!state}>{shown.confirmLabel}</VCButton>
             </div>
           </div>
         </div>,

@@ -3,6 +3,34 @@
 
 .lp { display: flex; flex-direction: column; min-width: 0; }
 
+/* Head: the whole title is the disclosure for the 17 cards */
+.lp-head .bs-sec-title { margin: 0; }
+.lp-disclose {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+}
+.lp-disclose:focus-visible { outline: 2px solid var(--bs-brand); outline-offset: 3px; border-radius: 4px; }
+.lp-chev { transition: transform 180ms cubic-bezier(0.2, 0.9, 0.3, 1.04); color: var(--bs-ink2); }
+.lp-disclose[aria-expanded="true"] .lp-chev { transform: rotate(90deg); }
+.lp-head .bs-sec-aside { cursor: default; }
+
+/* The cards snap open and shut under the bar */
+.lp-grid { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 220ms cubic-bezier(0.2, 0.9, 0.3, 1.04); }
+.lp[data-open="true"] .lp-grid { grid-template-rows: 1fr; transition-duration: 460ms; transition-timing-function: var(--bs-spring); }
+.lp-grid-inner { min-height: 0; overflow: hidden; opacity: 0; visibility: hidden; transition: opacity 160ms ease-out, visibility 0s 220ms; }
+.lp[data-open="true"] .lp-grid-inner { opacity: 1; visibility: visible; transition: opacity 160ms ease-out, visibility 0s; }
+/* Closed, the bar is a plain summary row: not sticky, no heavy rule */
+.lp[data-open="false"] .lp-bar { position: static; border-bottom-width: 1px; border-bottom-color: var(--bs-rule2); }
+@media (prefers-reduced-motion: reduce) { .lp-grid, .lp-grid-inner, .lp-chev { transition: none !important; } }
+
 /* In use: sticky bar over the grid (name, real-size marks, panel key) */
 .lp-bar {
   position: sticky;
@@ -56,7 +84,7 @@
 /* Ruled grid of preview cards */
 .lp-family { padding-top: 14px; }
 /* As many columns as fit; the clip hides the last column's right rule */
-.lp-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(210px, 100%), 1fr)); clip-path: inset(0 1px 0 0); }
+.lp-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(180px, 100%), 1fr)); clip-path: inset(0 1px 0 0); }
 .lp-card {
   position: relative;
   display: flex;
@@ -91,7 +119,8 @@
 /* Picked card: the live motion sits where the still was, at the same size */
 .lp-card-disp .en-app-loading-logo { width: 58%; height: auto; margin: 0; aspect-ratio: 1; }
 .lp-card-disp .en-app-loading-logo-art { width: 100%; height: 100%; }
-.lp-card-meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-width: 0; }
+.lp-card-meta { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 4px 8px; min-width: 0; }
+.lp-card-meta .bs-h3 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 
 @media (max-width: 640px) {
   .lp-bar { gap: 12px; }

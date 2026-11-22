@@ -12,6 +12,10 @@ import { ConfirmProvider } from './components/vc/ConfirmDialog'
 // Import main CSS (contains defaults and base styles)
 import './styles/main.css'
 
+// Shared motion tokens and primitives (every style uses them)
+import './styles/motion.css'
+import { initReduceMotion } from './components/bench/motion'
+
 // Import Void × Crimson component system
 import './styles/vc-components.css'
 
@@ -30,6 +34,9 @@ import './styles/themes/bench.css'
 import './styles/themes/minutes.css'
 import './styles/themes/bench-swiss.css'
 import './styles/design-style-picker.css'
+
+// Settings > Appearance > Reduce motion, remembered from the last visit
+initReduceMotion()
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

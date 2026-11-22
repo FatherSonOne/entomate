@@ -3,7 +3,6 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Search, Loader2 } from 'lucide-react'
 import MeetingRecorder from '../components/meetings/MeetingRecorder'
 import { meetingsApi, settingsApi } from '../services/api'
-import { useConfirm } from '../components/vc/ConfirmDialog'
 import { useToast } from '../components/vc/ToastProvider'
 import {
   TitleRule, Section, Key, Switch, Signal, Tape, RuledTable, DateStamp, TextInput,
@@ -16,6 +15,10 @@ import {
 import SendBotKey from '../components/bot/SendBotKey'
 
 const PAGE_SIZE = 20
+/** How long a delete can be undone before it reaches the server. */
+const UNDO_MS = 8000
+
+const meetingsWord = (n) => `${n} ${n === 1 ? 'meeting' : 'meetings'}`
 
 const FILTERS = [
   { value: 'all', label: 'All' },
@@ -32,7 +35,6 @@ const isThisWeek = (d) => {
 }
 
 export default function Meetings() {
-  const confirm = useConfirm()
   const toast = useToast()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -48,7 +50,8 @@ export default function Meetings() {
   const [audioInputDeviceId, setAudioInputDeviceId] = useState('')
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState(new Set())
-  const [bulkDeleting, setBulkDeleting] = useState(false)
+  // Deletes wait UNDO_MS before reaching the server: { rows, timer, toastId }
+  const pendingDelete = useRef(null)
 
   const searchTimer = useRef(null)
   const recorderRef = useRef(null)
@@ -78,7 +81,7 @@ export default function Meetings() {
       loadMeetings(searchQuery)
     }, searchQuery ? 300 : 0)
     return () => clearTimeout(searchTimer.current)
-  }, [searchQuery])
+  }, [searchQuery, filter])
 
   const loadMeetings = async (search = '') => {
     try {
@@ -86,6 +89,7 @@ export default function Meetings() {
       setError(null)
       const params = { limit: PAGE_SIZE, offset: 0 }
       if (search.trim()) params.search = search.trim()
+      if (filter !== 'all') params.status = filter
       const data = await meetingsApi.list(params)
       setMeetings(data.meetings || [])
       setTotal(data.count || (data.meetings || []).length)
@@ -103,6 +107,7 @@ export default function Meetings() {
       setLoadingMore(true)
       const params = { limit: PAGE_SIZE, offset: meetings.length }
       if (searchQuery.trim()) params.search = searchQuery.trim()
+      if (filter !== 'all') params.status = filter
       const data = await meetingsApi.list(params)
       setMeetings(prev => [...prev, ...(data.meetings || [])])
       setHasMore(data.hasMore || false)
@@ -118,20 +123,57 @@ export default function Meetings() {
     loadMeetings(searchQuery)
   }
 
-  const handleDelete = async (meeting) => {
-    const ok = await confirm({ title: 'Delete meeting', message: `Delete "${meeting.title}"? Its transcript, notes and action items go too.`, confirmLabel: 'Delete', variant: 'danger' })
-    if (!ok) return
-
-    try {
-      await meetingsApi.delete(meeting.id)
-      setMeetings(prev => prev.filter(m => m.id !== meeting.id))
-      setTotal(t => Math.max(0, t - 1))
-      toast.success('Deleted', 'Meeting removed')
-    } catch (err) {
-      console.error('Failed to delete meeting:', err)
-      toast.error('Error', 'The meeting could not be deleted')
-    }
+  // Send a pending delete to the server now. Failed rows come back with their titles named.
+  const commitDelete = async () => {
+    const pending = pendingDelete.current
+    if (!pending) return
+    pendingDelete.current = null
+    clearTimeout(pending.timer)
+    const results = await Promise.allSettled(pending.rows.map(m => meetingsApi.delete(m.id)))
+    const failed = pending.rows.filter((_, i) => results[i].status === 'rejected')
+    if (failed.length === 0) return
+    setMeetings(prev => [...prev, ...failed].sort((a, b) => meetingDate(b) - meetingDate(a)))
+    setTotal(t => t + failed.length)
+    const names = failed.slice(0, 3).map(m => `"${m.title || 'Untitled meeting'}"`).join(', ')
+    toast.error(
+      failed.length === 1 ? 'Not deleted' : `${meetingsWord(failed.length)} not deleted`,
+      `${names}${failed.length > 3 ? ` and ${failed.length - 3} more` : ''} could not be deleted. They're back in the list.`,
+    )
   }
+
+  const undoDelete = () => {
+    const pending = pendingDelete.current
+    if (!pending) return
+    pendingDelete.current = null
+    clearTimeout(pending.timer)
+    toast.dismiss(pending.toastId)
+    setMeetings(prev => [...prev, ...pending.rows].sort((a, b) => meetingDate(b) - meetingDate(a)))
+    setTotal(t => t + pending.rows.length)
+  }
+
+  // Remove rows at once; the server delete waits UNDO_MS so it can be undone.
+  const deleteWithUndo = (rows) => {
+    if (rows.length === 0) return
+    if (pendingDelete.current) commitDelete()
+    const ids = new Set(rows.map(m => m.id))
+    setMeetings(prev => prev.filter(m => !ids.has(m.id)))
+    setTotal(t => Math.max(0, t - rows.length))
+    const toastId = toast.show({
+      title: rows.length === 1 ? 'Meeting deleted' : `${meetingsWord(rows.length)} deleted`,
+      message: rows.length === 1
+        ? `"${rows[0].title || 'Untitled meeting'}" and its transcript, notes and action items.`
+        : 'With their transcripts, notes and action items.',
+      color: 'mint',
+      duration: UNDO_MS,
+      action: { label: 'Undo', onClick: undoDelete },
+    })
+    pendingDelete.current = { rows, toastId, timer: setTimeout(commitDelete, UNDO_MS) }
+  }
+
+  // Leaving the page sends any delete that is still waiting.
+  useEffect(() => () => { if (pendingDelete.current) commitDelete() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleDelete = (meeting) => deleteWithUndo([meeting])
 
   const toggleSelect = (id) => {
     setSelectedIds(prev => {
@@ -155,30 +197,10 @@ export default function Meetings() {
     setSelectedIds(new Set())
   }
 
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = () => {
     if (selectedIds.size === 0) return
-
-    const ok = await confirm({
-      title: 'Delete selected',
-      message: `Delete ${selectedIds.size} meeting(s)? Their transcripts, notes and action items go too.`,
-      confirmLabel: 'Delete all',
-      variant: 'danger'
-    })
-    if (!ok) return
-
-    try {
-      setBulkDeleting(true)
-      await Promise.all([...selectedIds].map(id => meetingsApi.delete(id)))
-      setMeetings(prev => prev.filter(m => !selectedIds.has(m.id)))
-      setTotal(t => Math.max(0, t - selectedIds.size))
-      toast.success('Deleted', `${selectedIds.size} meeting(s) removed`)
-      exitSelectionMode()
-    } catch (err) {
-      toast.error('Error', 'Some meetings could not be deleted')
-      loadMeetings(searchQuery)
-    } finally {
-      setBulkDeleting(false)
-    }
+    deleteWithUndo(meetings.filter(m => selectedIds.has(m.id)))
+    exitSelectionMode()
   }
 
   const handleBulkExport = () => {
@@ -206,7 +228,7 @@ export default function Meetings() {
     a.download = `meetings-export-${new Date().toISOString().split('T')[0]}.md`
     a.click()
     URL.revokeObjectURL(url)
-    toast.success('Exported', `${selected.length} meeting(s) exported`)
+    toast.success('Exported', `${meetingsWord(selected.length)} exported`)
   }
 
   // Title meta: totals from the server, this week's figures from the loaded rows.
@@ -313,8 +335,7 @@ export default function Meetings() {
     <>
       <Key onClick={toggleSelectAll}>{allSelected ? 'Clear all' : 'Select all'}</Key>
       <Key onClick={handleBulkExport} disabled={selectedIds.size === 0}>Export {selectedIds.size}</Key>
-      <Key variant="primary" onClick={handleBulkDelete} disabled={selectedIds.size === 0 || bulkDeleting}>
-        {bulkDeleting && <Loader2 className="animate-spin" aria-hidden="true" />}
+      <Key variant="primary" onClick={handleBulkDelete} disabled={selectedIds.size === 0}>
         Delete {selectedIds.size}
       </Key>
       <Key onClick={exitSelectionMode}>Done</Key>
@@ -381,7 +402,7 @@ export default function Meetings() {
               {searchQuery
                 ? 'Nothing matches that search.'
                 : filter !== 'all'
-                  ? 'No loaded meeting has this status.'
+                  ? 'No meeting has this status.'
                   : 'Record one in this browser, or send a bot to a call.'}
             </p>
             {!searchQuery && filter === 'all' && (

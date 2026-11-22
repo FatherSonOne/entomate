@@ -477,12 +477,20 @@ textarea.vinput { resize: vertical; min-height: 70px; }
 /* Toast stack (portal) */
 .vc-toast-stack {
   position: fixed; bottom: 20px; right: 20px; z-index: 9999;
-  display: flex; flex-direction: column-reverse; gap: 8px;
+  display: flex; flex-direction: column-reverse;
   pointer-events: none; max-width: 380px;
 }
+/* Slot: enters from below, leaves the way it came while the gap closes
+   (grid rows 1fr → 0fr), so the stack never jumps. Tokens: motion.css. */
+.vc-toast-slot {
+  display: grid; grid-template-rows: 1fr;
+  animation: vc-toast-in var(--m-base, 220ms) var(--m-ease-out, ease-out) backwards;
+  transition: grid-template-rows 200ms var(--m-ease-out, ease-out), opacity 160ms var(--m-ease-exit, ease-in), transform 200ms var(--m-ease-exit, ease-in);
+}
+.vc-toast-slot > .vc-toast-item { min-height: 0; margin-top: 8px; }
+.vc-toast-slot.is-leaving { grid-template-rows: 0fr; opacity: 0; transform: translate3d(0, var(--m-slide, 16px), 0); pointer-events: none; }
 .vc-toast-item {
   position: relative; pointer-events: auto;
-  animation: vc-toast-in 300ms cubic-bezier(.4,0,.2,1);
 }
 .vc-toast-close {
   position: absolute; top: 8px; right: 8px;
@@ -490,26 +498,39 @@ textarea.vinput { resize: vertical; min-height: 70px; }
   opacity: 0; transition: opacity 200ms;
 }
 .vc-toast-item:hover .vc-toast-close { opacity: 1; }
-@keyframes vc-toast-in { from { opacity: 0; transform: translateY(12px) scale(.95); } to { opacity: 1; transform: none; } }
+/* Toast action key (e.g. Undo): sits on the right; the toast makes room for it. */
+.vc-toast-item:has(.vc-toast-action) .vtoast { padding-right: 84px; }
+.vc-toast-action {
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  min-height: 32px; padding: 0 12px; border-radius: 7px; cursor: pointer;
+  font: 600 12px var(--font-display, inherit); color: var(--text-primary);
+  background: var(--bs-key, var(--bg-elevated)); border: 1px solid var(--bs-rule, var(--b1));
+  box-shadow: 0 2px 0 var(--bs-key-edge, transparent);
+}
+.vc-toast-action:hover { border-color: var(--text-tertiary); }
+.vc-toast-action:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+@keyframes vc-toast-in { from { opacity: 0; transform: translate3d(0, var(--m-slide, 16px), 0); } }
 
 /* Confirm dialog (portal) */
 .vc-confirm-overlay {
   position: fixed; inset: 0; z-index: 10000;
   background: rgba(0,0,0,.6); backdrop-filter: blur(4px);
   display: flex; align-items: center; justify-content: center;
-  animation: vc-fade-in 200ms ease;
+  animation: vc-fade-in var(--m-base, 200ms) var(--m-ease-out, ease-out) backwards;
 }
 .vc-confirm-dialog {
   padding: 28px; max-width: 400px; width: 90%;
   text-align: center;
-  animation: vc-scale-in 250ms cubic-bezier(.4,0,.2,1);
+  animation: vc-scale-in var(--m-base, 220ms) var(--m-ease-out, ease-out) backwards;
 }
+/* With presence (ConfirmDialog), transitions own enter and exit: motion.css .m-scrim / .m-modal. */
+.vc-confirm-overlay.m-scrim, .vc-confirm-dialog.m-modal { animation: none; }
 .vc-confirm-icon { margin-bottom: 12px; }
 .vc-confirm-title { font-family: var(--font); font-size: 16px; font-weight: 700; color: var(--t0); margin: 0 0 8px; }
 .vc-confirm-message { font-size: 13px; color: var(--t1); margin: 0 0 20px; line-height: 1.5; }
 .vc-confirm-actions { display: flex; gap: 10px; justify-content: center; }
 @keyframes vc-fade-in { from { opacity: 0; } to { opacity: 1; } }
-@keyframes vc-scale-in { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: none; } }
+@keyframes vc-scale-in { from { opacity: 0; transform: scale(var(--m-pop-scale, .97)); } to { opacity: 1; transform: none; } }
 
 /* ============================================================
    CHAT  (.vc-chat-*)
