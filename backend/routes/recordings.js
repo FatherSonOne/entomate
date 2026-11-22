@@ -7,7 +7,8 @@
  *                                             ({ salvage: true }: the tab closed; use what was saved)
  *   POST   /api/recordings/:id/retry          transcribe again after a failure
  *   DELETE /api/recordings/:id                discard an unfinished recording
- *   GET    /api/recordings/:id/playback       signed links to the saved audio pieces, in order
+ *   GET    /api/recordings/:id/playback       a signed link to the seekable copy, or to the pieces in order
+ *   DELETE /api/recordings/:id/audio          remove a finished recording's audio; keep the transcript
  *
  * Progress is read from the meeting itself (`recording_job` on GET /api/meetings/:id).
  */
@@ -101,6 +102,15 @@ router.get('/:id/playback', authenticate, async (req, res) => {
     res.json({ success: true, ...(await recorder.getPlayback({ orgId, meetingId: req.params.id })) });
   } catch (err) {
     sendError(res, err, 'playback');
+  }
+});
+
+router.delete('/:id/audio', authenticate, async (req, res) => {
+  try {
+    const orgId = await meetingNotes.assertMeetingAccess(req.user?.id, req.params.id);
+    res.json({ success: true, recordingJob: await recorder.removeAudio({ orgId, meetingId: req.params.id }) });
+  } catch (err) {
+    sendError(res, err, 'remove audio');
   }
 });
 

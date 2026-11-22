@@ -54,7 +54,7 @@ describe('a pressed timecode plays the recording', () => {
 
   test('loads and plays from the moment when the audio is not loaded yet', async () => {
     renderPage({ status: 'done', audioKept: true, durationMs: 60_000 })
-    fireEvent.click(await screen.findByRole('button', { name: /Jump to 0:22 in the transcript: Ship/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /^Play from 0:22: Ship/ }))
     expect(player.playFrom).toHaveBeenCalledTimes(1)
     expect(player.playFrom).toHaveBeenCalledWith(22_000)
   })
@@ -62,8 +62,15 @@ describe('a pressed timecode plays the recording', () => {
   test('moves loaded audio once, not twice', async () => {
     player.ready = true
     renderPage({ status: 'done', audioKept: true, durationMs: 60_000 })
-    fireEvent.click(await screen.findByRole('button', { name: /Jump to 0:22 in the transcript: Ship/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /^Play from 0:22: Ship/ }))
     expect(player.playFrom).toHaveBeenCalledTimes(1)
+  })
+
+  test('a decision mark on the tape plays from it too', async () => {
+    renderPage({ status: 'done', audioKept: true, durationMs: 60_000 })
+    expect(await screen.findByRole('group', { name: /Choose one to play from it/ })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Decision: Ship on the fourteenth' }))
+    expect(player.playFrom).toHaveBeenCalledWith(22_000)
   })
 
   test('without kept audio it only jumps the transcript', async () => {

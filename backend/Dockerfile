@@ -25,6 +25,9 @@ LABEL org.opencontainers.image.title="Entomate Backend"
 LABEL org.opencontainers.image.description="AI-powered meeting management backend"
 LABEL org.opencontainers.image.version="1.0.0"
 
+# ffmpeg makes the seekable playback copy of browser recordings (services/playbackFile.js)
+RUN apk add --no-cache ffmpeg
+
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S entomate -u 1001

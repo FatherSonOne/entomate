@@ -2,7 +2,7 @@ import React from 'react'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { vi, describe, test, expect, beforeEach, afterEach } from 'vitest'
 
-const api = vi.hoisted(() => ({ playback: vi.fn() }))
+const api = vi.hoisted(() => ({ playback: vi.fn(), removeAudio: vi.fn() }))
 const cacheMock = vi.hoisted(() => ({ invalidate: vi.fn() }))
 vi.mock('../services/api', () => ({ recordingsApi: api, meetingsApi: { renameSpeaker: vi.fn() } }))
 vi.mock('../services/apiCache', () => ({ default: cacheMock }))
@@ -22,7 +22,7 @@ const PLAYBACK = {
     { seq: 1, durationMs: 30_000, url: 'https://signed.test/1' },
   ],
 }
-const okFetch = vi.fn(async (url: string) => new Response(`audio:${url.slice(-1)}|`))
+const okFetch = vi.fn(async (url: RequestInfo | URL) => new Response(`audio:${String(url).slice(-1)}|`))
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -46,9 +46,21 @@ describe('playback service', () => {
     const { blob, durationMs } = await loadRecordingAudio(MEETING)
     expect(cacheMock.invalidate).toHaveBeenCalledWith(`/recordings/${MEETING}/playback`)
     expect(okFetch.mock.calls.map((c) => c[0])).toEqual(['https://signed.test/0', 'https://signed.test/1'])
-    expect(await blob.text()).toBe('audio:0|audio:1|')
-    expect(blob.type).toBe('audio/webm')
+    expect(await blob!.text()).toBe('audio:0|audio:1|')
+    expect(blob!.type).toBe('audio/webm')
     expect(durationMs).toBe(60_000)
+  })
+
+  test('reports the share of pieces downloaded', async () => {
+    const onProgress = vi.fn()
+    await loadRecordingAudio(MEETING, okFetch, onProgress)
+    expect(onProgress.mock.calls.map((c) => c[0])).toEqual([0.5, 1])
+  })
+
+  test('a seekable copy comes as one link to stream, with nothing downloaded', async () => {
+    api.playback.mockResolvedValueOnce({ mimeType: 'audio/webm', durationMs: 60_000, url: 'https://signed.test/playback' })
+    expect(await loadRecordingAudio(MEETING)).toEqual({ url: 'https://signed.test/playback', durationMs: 60_000 })
+    expect(okFetch).not.toHaveBeenCalled()
   })
 
   test('a piece that does not download fails the whole load', async () => {
@@ -80,6 +92,51 @@ describe('RecordingPlayer', () => {
     fireEvent.loadedMetadata(audio)
     expect(audio.currentTime).toBe(65)
     expect(play).toHaveBeenCalled()
+  })
+
+  test('streams the seekable copy, and renews its link once when it fails', async () => {
+    api.playback.mockResolvedValue({ durationMs: 60_000, url: 'https://signed.test/playback?v=1' })
+    render(<RecordingPlayer meetingId={MEETING} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Play the recording' }))
+    let audio = (await screen.findByTestId('recording-player')) as HTMLAudioElement
+    expect(audio.getAttribute('src')).toBe('https://signed.test/playback?v=1')
+    expect(URL.createObjectURL).not.toHaveBeenCalled()
+
+    api.playback.mockResolvedValue({ durationMs: 60_000, url: 'https://signed.test/playback?v=2' })
+    Object.defineProperty(audio, 'currentTime', { configurable: true, writable: true, value: 30 })
+    await act(async () => {
+      fireEvent.error(audio)
+    })
+    audio = screen.getByTestId('recording-player') as HTMLAudioElement
+    expect(audio.getAttribute('src')).toBe('https://signed.test/playback?v=2')
+
+    // A second failure before anything played again is final.
+    await act(async () => {
+      fireEvent.error(audio)
+    })
+    expect((await screen.findByRole('alert')).textContent).toContain('could not be played')
+  })
+
+  test('remove audio asks first, then removes it', async () => {
+    api.removeAudio.mockResolvedValue({ success: true })
+    const onAudioRemoved = vi.fn()
+    render(<RecordingPlayer meetingId={MEETING} onAudioRemoved={onAudioRemoved} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Remove audio' }))
+    expect(screen.getByText(/Remove the audio for good\? The transcript and notes stay\./)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Keep' }))
+    expect(api.removeAudio).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove audio' }))
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Remove audio' }))
+    })
+    expect(api.removeAudio).toHaveBeenCalledWith(MEETING)
+    expect(onAudioRemoved).toHaveBeenCalled()
+  })
+
+  test('without onAudioRemoved there is no remove control', () => {
+    render(<RecordingPlayer meetingId={MEETING} />)
+    expect(screen.queryByRole('button', { name: 'Remove audio' })).toBeNull()
   })
 
   test('a failed load says why and can be tried again', async () => {

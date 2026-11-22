@@ -60,17 +60,30 @@ export function canPlay(raw: unknown): boolean {
 interface PlaybackResponse {
   mimeType?: unknown
   durationMs?: unknown
+  url?: unknown
   pieces?: Array<{ url?: unknown }>
 }
 
+export interface RecordingAudio {
+  /** A signed link to the server's seekable copy: it streams, and it seeks at once. */
+  url?: string
+  /** Or, without that copy, the saved pieces joined in memory. */
+  blob?: Blob
+  durationMs: number
+}
+
 /**
- * The whole recording as one Blob: the saved pieces fetched by their signed links and joined
- * in order. A later piece alone does not play (only the first has the header), and a Blob
- * in memory seeks well although the recorder's WebM has no index.
- * shortcut: the whole file downloads before it plays (about 29 MB an hour); serve one indexed
- * file from the server if long meetings make that wait too long.
+ * The recording to play. Usually a signed link to the server's seekable copy. A recording
+ * without one (made before the copy existed, or when ffmpeg failed) comes as its pieces:
+ * those are fetched by their signed links and joined in order. A later piece alone does not
+ * play (only the first has the header), and a Blob in memory seeks well although the
+ * recorder's WebM has no index. `onProgress` gets the share of pieces downloaded (0 to 1).
  */
-export async function loadRecordingAudio(meetingId: string, fetcher: typeof fetch = fetch): Promise<{ blob: Blob; durationMs: number }> {
+export async function loadRecordingAudio(
+  meetingId: string,
+  fetcher: typeof fetch = fetch,
+  onProgress?: (fraction: number) => void,
+): Promise<RecordingAudio> {
   let res: PlaybackResponse
   try {
     cache.invalidate(`/recordings/${meetingId}/playback`)
@@ -78,17 +91,32 @@ export async function loadRecordingAudio(meetingId: string, fetcher: typeof fetc
   } catch (err) {
     throw new Error(errorText(err, 'The recording could not be loaded.'))
   }
+  const durationMs = typeof res?.durationMs === 'number' ? res.durationMs : 0
+  if (typeof res?.url === 'string') return { url: res.url, durationMs }
   const urls = (Array.isArray(res?.pieces) ? res.pieces : []).map((p) => p?.url)
   if (!urls.length || urls.some((u) => typeof u !== 'string')) throw new Error('The recording could not be loaded.')
+  let downloaded = 0
   const parts = await Promise.all(
     (urls as string[]).map(async (url) => {
       const r = await fetcher(url)
       if (!r.ok) throw new Error('Part of the recording could not be downloaded. Try again.')
-      return r.blob()
+      const part = await r.blob()
+      downloaded += 1
+      onProgress?.(downloaded / urls.length)
+      return part
     }),
   )
   const type = typeof res.mimeType === 'string' ? res.mimeType : 'audio/webm'
-  return { blob: new Blob(parts, { type }), durationMs: typeof res.durationMs === 'number' ? res.durationMs : 0 }
+  return { blob: new Blob(parts, { type }), durationMs }
+}
+
+/** Remove a finished recording's audio for good; the transcript and notes stay. */
+export async function removeRecordingAudio(meetingId: string): Promise<void> {
+  try {
+    await recordingsApi.removeAudio(meetingId)
+  } catch (err) {
+    throw new Error(errorText(err, 'The audio could not be removed. Try again.'))
+  }
 }
 
 /** A job still transcribing after this long has died with the server and may be retried. */
