@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { LOGO_MOTIONS, renderLogoMotion } from './logoMotion'
 import { isLogoId, logoAsset, useLogoSystem } from '../services/logoSystem'
+import { prefersReducedMotion } from './bench/motion'
 import './AnimatedLoadingLogo.css'
 
 /**
@@ -13,7 +14,7 @@ export default function AnimatedLoadingLogo({ logoId, size = 512, controls = tru
   const picked = useLogoSystem().id
   const id = isLogoId(logoId) ? logoId : picked
   const artRef = useRef(null)
-  const [playing, setPlaying] = useState(() => !window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+  const [playing, setPlaying] = useState(() => !prefersReducedMotion())
   const [manual, setManual] = useState(false)
   const [supported, setSupported] = useState(true)
   const [failed, setFailed] = useState(false)

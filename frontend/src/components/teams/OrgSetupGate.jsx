@@ -1,9 +1,11 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { useOrg } from '../../contexts/OrgContext'
 import { CreateOrgWizard } from './CreateOrgWizard'
 import { AcceptInviteBanner } from './AcceptInviteBanner'
 import DeletedOrgInterstitial from './DeletedOrgInterstitial'
 import PageLoader from '../PageLoader'
+import { BootMark } from '../BootLoader'
+import { endBoot } from '../../services/bootProgress'
 
 /**
  * OrgSetupGate — wraps protected content.
@@ -14,13 +16,18 @@ import PageLoader from '../PageLoader'
 export default function OrgSetupGate({ children }) {
   const { org, loading, pendingInvite, deletedOrg } = useOrg()
 
+  // First load with no workspace yet: the setup screens are the app, so the loader can go
+  useEffect(() => {
+    if (!loading && !org) endBoot('done')
+  }, [loading, org])
+
   if (loading) {
     return <PageLoader />
   }
 
   // User has an org — render the app
   if (org) {
-    return children
+    return <><BootMark stage="workspace" />{children}</>
   }
 
   // User has a soft-deleted org — show recovery interstitial
