@@ -67,6 +67,8 @@ services:
         sync: false  # set manually
       - key: CRM_API_KEY
         sync: false  # set manually (secret)
+      - key: CRM_ORG_ID
+        sync: false  # org id that owns CRM_API_KEY; CRM calls from other orgs are skipped
 
       # ----- Slack -----
       - key: SLACK_BOT_TOKEN

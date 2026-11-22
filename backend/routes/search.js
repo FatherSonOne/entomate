@@ -46,7 +46,7 @@ router.post('/', authenticate, async (req, res) => {
     }
 
     // Check cache first
-    const cacheKey = searchCache.generateKey('keyword', query, types, limit, filters);
+    const cacheKey = searchCache.generateKey('keyword', req.orgIds, query, types, limit, filters);
     const cached = searchCache.get(cacheKey);
     if (cached) {
       log.info(`Cache hit for keyword search: "${query}"`);
@@ -224,7 +224,7 @@ router.post('/semantic', authenticate, async (req, res) => {
     }
 
     // Check cache first
-    const cacheKey = searchCache.generateKey('semantic', query, limit, threshold);
+    const cacheKey = searchCache.generateKey('semantic', req.orgIds, query, limit, threshold);
     const cached = searchCache.get(cacheKey);
     if (cached) {
       log.info(`Cache hit for semantic search: "${query}"`);
@@ -597,7 +597,7 @@ router.get('/suggestions', authenticate, async (req, res) => {
     }
 
     // Check cache first
-    const cacheKey = suggestionCache.generateKey('suggestions', prefix || '', includeTrending);
+    const cacheKey = suggestionCache.generateKey('suggestions', req.orgIds, prefix || '', includeTrending);
     const cached = suggestionCache.get(cacheKey);
     if (cached) {
       return res.json(cached);

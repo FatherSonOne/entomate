@@ -2,7 +2,8 @@ name: Nightly jobs
 
 # Render's free plan sleeps the backend when idle, so in-process timers can
 # miss their slot (audit finding 11). This wakes the backend and starts the
-# GDPR retention sweep every day at 03:15 UTC.
+# GDPR retention sweep every day at 03:15 UTC, then embeds meetings that
+# search does not cover yet.
 #
 # Repository secrets needed (Settings > Secrets and variables > Actions):
 #   ENTOMATE_BACKEND_URL      e.g. https://entomate.onrender.com
@@ -35,3 +36,14 @@ jobs:
             sleep 30
           done
           echo "::error::Retention sweep could not be started"; exit 1
+      - name: Embed meetings missing from search
+        env:
+          BACKEND_URL: ${{ secrets.ENTOMATE_BACKEND_URL }}
+          API_KEY: ${{ secrets.ENTOMATE_INTERNAL_API_KEY }}
+        run: |
+          # The backend is awake after the retention step. Embeds meetings that
+          # search and Ask can't find yet (idempotent; skips embedded meetings).
+          code=$(curl -s -o out.json -w '%{http_code}' --max-time 90 -X POST \
+            -H "X-API-Key: $API_KEY" "${BACKEND_URL%/}/api/internal/jobs/embeddings" || true)
+          echo "HTTP $code"; cat out.json 2>/dev/null; echo
+          if [ "$code" != "202" ] && [ "$code" != "409" ]; then echo "::warning::Embedding backfill not started"; fi

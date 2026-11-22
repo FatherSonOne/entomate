@@ -16,6 +16,7 @@ router.use(apiKeyAuth);
 
 const JOBS = {
   retention: () => require('../services/retentionService').runRetentionSweep(),
+  embeddings: () => require('../services/embeddingService').backfillMissing(),
 };
 
 const running = new Set();

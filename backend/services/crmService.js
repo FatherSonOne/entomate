@@ -6,13 +6,26 @@
 
 const axios = require('axios');
 const log = require('../utils/log');
+const { requestOrgIds } = require('../utils/orgContext');
 
 class CRMService {
   constructor() {
     this.provider = process.env.CRM_PROVIDER || 'hubspot';
     this.apiKey = process.env.CRM_API_KEY;
     this.baseUrl = this.getBaseUrl();
-    this.configured = !!this.apiKey;
+    // The CRM credential is one global key, so it belongs to one org.
+    this.ownerOrgId = process.env.CRM_ORG_ID || null;
+  }
+
+  /**
+   * True only when the request being handled belongs to the org that owns
+   * CRM_API_KEY (CRM_ORG_ID). Without this, any org could write into that
+   * org's CRM (feature audit 2026-11-22, finding 8). Remove once CRM connect
+   * is per org. Outside a request (no org context) this is false.
+   */
+  get configured() {
+    if (!this.apiKey || !this.ownerOrgId) return false;
+    return requestOrgIds().includes(this.ownerOrgId);
   }
 
   getBaseUrl() {

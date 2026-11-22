@@ -7,6 +7,7 @@
 const ai = require('../config/ai');
 const { supabase } = require('../config/supabase');
 const log = require('../utils/log');
+const { requestOrgIds } = require('../utils/orgContext');
 
 class EmbeddingService {
   constructor() {
@@ -97,31 +98,32 @@ class EmbeddingService {
         return { results: [], executionTime: 0 };
       }
 
-      // Generate embedding for query
-      const queryEmbedding = await this.generateEmbedding(query);
-
-      // Try vector search first
+      // Try vector search first; any failure (embedding API down, RPC missing)
+      // falls through to keyword search instead of failing the whole request.
       try {
+        const queryEmbedding = await this.generateEmbedding(query);
+        // search_embeddings has no org filter (embeddings carry no org_id), so
+        // over-fetch and let enrichResults drop rows outside the caller's orgs.
         const { data, error } = await supabase.rpc('search_embeddings', {
           query_embedding: queryEmbedding,
-          match_count: limit,
+          match_count: limit * 5,
           similarity_threshold: filters.threshold || 0.5
         });
 
-        if (!error && data) {
+        if (!error && data && data.length > 0) {
           // Enrich results with source data
-          const enrichedResults = await this.enrichResults(data);
+          const enrichedResults = (await this.enrichResults(data)).slice(0, limit);
           const executionTime = Date.now() - startTime;
 
           log.info(`Found ${enrichedResults.length} similar items in ${executionTime}ms`);
-          return {
+          if (enrichedResults.length > 0) return {
             results: enrichedResults,
             executionTime,
             searchType: 'vector'
           };
         }
-      } catch (rpcError) {
-        log.warn('Vector search not available:', rpcError.message);
+      } catch (vectorError) {
+        log.warn('Vector search not available:', vectorError.message);
       }
 
       // Fallback to text-based search
@@ -137,12 +139,19 @@ class EmbeddingService {
    */
   async fallbackTextSearch(query, limit, filters) {
     const startTime = Date.now();
-    const searchTerm = `%${query}%`;
+    // Match on the question's content words, not the whole sentence: a question
+    // like "what did we decide about pricing?" never appears verbatim.
+    const words = this.keywords(query);
+    if (words.length === 0) return { results: [], executionTime: 0, searchType: 'text_fallback' };
+    const conditions = words
+      .flatMap(w => [`title.ilike.%${w}%`, `summary.ilike.%${w}%`, `transcript.ilike.%${w}%`])
+      .join(',');
 
     const { data: meetings, error } = await supabase
       .from('meetings')
       .select('id, title, summary, sentiment_label, created_at')
-      .or(`title.ilike.${searchTerm},summary.ilike.${searchTerm}`)
+      .or(conditions)
+      .in('org_id', requestOrgIds())
       .order('created_at', { ascending: false })
       .limit(limit);
 
@@ -164,10 +173,29 @@ class EmbeddingService {
   }
 
   /**
+   * Content words of a query for keyword matching: lower case, letters and
+   * digits only (so nothing can break the PostgREST or() filter), stop words
+   * and short words dropped, at most 6.
+   */
+  keywords(query) {
+    const STOP = new Set(['what', 'when', 'where', 'which', 'who', 'whom', 'why', 'how', 'did', 'does',
+      'about', 'with', 'from', 'that', 'this', 'there', 'their', 'have', 'were', 'was', 'will',
+      'would', 'should', 'could', 'they', 'them', 'into', 'over', 'last', 'meeting', 'meetings',
+      'tell', 'show', 'give', 'any', 'and', 'the', 'for', 'are', 'our', 'you', 'say', 'said']);
+    const seen = new Set();
+    return String(query || '')
+      .toLowerCase()
+      .split(/[^\p{L}\p{N}]+/u)
+      .filter(w => w.length >= 3 && !STOP.has(w) && !seen.has(w) && seen.add(w))
+      .slice(0, 6);
+  }
+
+  /**
    * Enrich results with source data
    */
   async enrichResults(results) {
     if (!results || results.length === 0) return [];
+    const orgIds = requestOrgIds();
 
     const enriched = await Promise.all(
       results.map(async (result) => {
@@ -176,7 +204,8 @@ class EmbeddingService {
             .from('meetings')
             .select('id, title, created_at, sentiment_label, summary')
             .eq('id', result.source_id)
-            .single();
+            .in('org_id', orgIds)
+            .maybeSingle();
 
           return {
             ...result,
@@ -187,7 +216,8 @@ class EmbeddingService {
             .from('action_items')
             .select('id, task_description, assigned_to_name, status, meeting_id')
             .eq('id', result.source_id)
-            .single();
+            .in('org_id', orgIds)
+            .maybeSingle();
 
           return {
             ...result,
@@ -281,6 +311,47 @@ class EmbeddingService {
       log.error('Error generating embeddings:', { error: error.message || error });
       return [];
     }
+  }
+
+  /**
+   * Embed meetings that have no embeddings yet (meetings saved while the
+   * embedding model was broken, or whose post-processing failed). Idempotent:
+   * a meeting with any embedding row is skipped. Run by the internal
+   * `embeddings` job.
+   * @param {number} max - most meetings to embed in one run
+   */
+  async backfillMissing(max = 50) {
+    if (!this.isReady()) return { skipped: 'ai_or_db_not_configured' };
+
+    const { data: meetings, error } = await supabase
+      .from('meetings')
+      .select('id, summary, key_points, decisions, transcript')
+      .order('created_at', { ascending: false })
+      .limit(500);
+    if (error) throw error;
+
+    const ids = (meetings || []).map(m => m.id);
+    if (ids.length === 0) return { embedded: 0, pending: 0 };
+    const { data: existing, error: exErr } = await supabase
+      .from('embeddings')
+      .select('source_id')
+      .eq('source_type', 'meeting')
+      .in('source_id', ids);
+    if (exErr) throw exErr;
+
+    const done = new Set((existing || []).map(e => e.source_id));
+    const todo = meetings.filter(m => !done.has(m.id) && (m.summary || m.transcript)).slice(0, max);
+
+    let embedded = 0;
+    for (const meeting of todo) {
+      const { data: items } = await supabase
+        .from('action_items')
+        .select('id, task_description, assigned_to_name')
+        .eq('meeting_id', meeting.id);
+      const generated = await this.generateEmbeddingsForMeeting(meeting.id, meeting, items || []);
+      if (generated.length > 0) embedded += 1;
+    }
+    return { embedded, attempted: todo.length };
   }
 
   /**
