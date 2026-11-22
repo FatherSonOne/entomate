@@ -15,6 +15,8 @@ const log = require('../utils/log');
 const { validate } = require('../middleware/validate');
 const { getOrgIdForUser } = require('../utils/orgContext');
 const schemas = require('../schemas/workflows');
+const { attachOrgIds } = require('../utils/orgContext');
+router.use(attachOrgIds); // org-owned tables below are limited to req.orgIds (audit finding 3)
 
 const workflowExecutor = new WorkflowExecutor();
 const nodeRegistry = new NodeRegistry();
@@ -34,6 +36,7 @@ router.get('/', authenticate, async (req, res) => {
     let query = supabase
       .from('workflows')
       .select('id, name, description, active, is_template, version, execution_count, last_executed_at, created_at, updated_at', { count: 'exact' })
+      .in('org_id', req.orgIds)
       .order('updated_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -126,6 +129,7 @@ router.get('/:id', authenticate, async (req, res) => {
     const { data: workflow, error } = await supabase
       .from('workflows')
       .select('*')
+      .in('org_id', req.orgIds)
       .eq('id', id)
       .single();
 
@@ -274,6 +278,7 @@ router.put('/:id', authenticate, validate(schemas.update), async (req, res) => {
     const { data: currentWorkflow } = await supabase
       .from('workflows')
       .select('*')
+      .in('org_id', req.orgIds)
       .eq('id', id)
       .single();
 
@@ -299,6 +304,7 @@ router.put('/:id', authenticate, validate(schemas.update), async (req, res) => {
     const { data: workflow, error } = await supabase
       .from('workflows')
       .update(updateData)
+      .in('org_id', req.orgIds)
       .eq('id', id)
       .select()
       .single();
@@ -340,6 +346,7 @@ router.delete('/:id', authenticate, async (req, res) => {
     const { error } = await supabase
       .from('workflows')
       .delete()
+      .in('org_id', req.orgIds)
       .eq('id', id);
 
     if (error) throw error;
@@ -372,6 +379,7 @@ router.post('/:id/execute', authenticate, aiLimiter, validate(schemas.execute), 
     const { data: workflow, error } = await supabase
       .from('workflows')
       .select('*')
+      .in('org_id', req.orgIds)
       .eq('id', id)
       .single();
 
@@ -394,6 +402,7 @@ router.post('/:id/execute', authenticate, aiLimiter, validate(schemas.execute), 
         execution_count: workflow.execution_count + 1,
         last_executed_at: new Date().toISOString()
       })
+      .in('org_id', req.orgIds)
       .eq('id', id);
 
     res.json({
@@ -424,6 +433,7 @@ router.post('/:id/test', authenticate, validate(schemas.test), async (req, res) 
     const { data: workflow, error } = await supabase
       .from('workflows')
       .select('*')
+      .in('org_id', req.orgIds)
       .eq('id', id)
       .single();
 
@@ -465,6 +475,7 @@ router.post('/:id/toggle', authenticate, validate(schemas.toggle), async (req, r
         active: active !== undefined ? active : null,
         updated_at: new Date().toISOString()
       })
+      .in('org_id', req.orgIds)
       .eq('id', id)
       .select()
       .single();
@@ -592,6 +603,7 @@ router.post('/:id/versions/:version/restore', authenticate, async (req, res) => 
         },
         updated_at: new Date().toISOString()
       })
+      .in('org_id', req.orgIds)
       .eq('id', id)
       .select()
       .single();

@@ -15,6 +15,8 @@ const { authenticate } = require('../middleware/auth');
 // Every intelligence route needs a signed-in user (audit finding 1).
 router.use(authenticate);
 const { getEcosystemBridge } = require('../services/ecosystemBridge');
+const { attachOrgIds } = require('../utils/orgContext');
+router.use(attachOrgIds); // org-owned tables below are limited to req.orgIds (audit finding 3)
 
 /**
  * GET /api/intelligence/today
@@ -442,6 +444,7 @@ router.post('/meeting-prep/:meetingId/broadcast-briefing', async (req, res) => {
       supabaseAdmin
         .from('meetings')
         .select('id, title, scheduled_at, attendees')
+        .in('org_id', req.orgIds)
         .eq('id', meetingId)
         .single(),
       supabaseAdmin

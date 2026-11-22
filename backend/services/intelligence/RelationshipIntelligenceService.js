@@ -6,6 +6,7 @@
 
 const { supabase, supabaseAdmin } = require('../../config/supabase');
 const log = require('../../utils/log');
+const { requestOrgIds } = require('../../utils/orgContext'); // audit finding 3: limit queries to the caller's orgs
 
 class RelationshipIntelligenceService {
   constructor() {
@@ -78,6 +79,7 @@ class RelationshipIntelligenceService {
       const { data: meetings } = await supabase
         .from('meetings')
         .select('id, participants, created_at, sentiment_label, sentiment_score, summary')
+        .in('org_id', requestOrgIds())
         .eq('crm_deal_id', dealId)
         .order('created_at', { ascending: false });
 
@@ -140,6 +142,7 @@ class RelationshipIntelligenceService {
       const { data: meetings } = await supabase
         .from('meetings')
         .select('*')
+        .in('org_id', requestOrgIds())
         .eq('crm_deal_id', dealId)
         .in('id', stakeholder.meetingIds);
 

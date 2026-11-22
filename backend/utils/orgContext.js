@@ -1,5 +1,8 @@
 const { supabase } = require('../config/supabase');
+const { AsyncLocalStorage } = require('async_hooks');
 const log = require('./log');
+
+const requestScope = new AsyncLocalStorage();
 
 /**
  * Org context resolution (S1c — tenancy enforcement).
@@ -100,11 +103,24 @@ async function getOrgIdsForUser(userId) {
 async function attachOrgIds(req, res, next) {
   try {
     req.orgIds = await getOrgIdsForUser(req.user?.id);
-    next();
+    // Also expose the org ids to services called from this request, without
+    // threading them through every function signature. See requestOrgIds().
+    requestScope.run({ orgIds: req.orgIds }, next);
   } catch (err) {
     log.error('[orgContext] attachOrgIds failed:', err.message);
     res.status(500).json({ error: 'Could not resolve your workspace' });
   }
+}
+
+/**
+ * Org ids of the request being handled (set by attachOrgIds). Services that
+ * are only reached from user requests add `.in('org_id', requestOrgIds())`.
+ * Outside a request this returns [] so a mis-wired caller sees no rows rather
+ * than every tenant's rows.
+ * @returns {string[]}
+ */
+function requestOrgIds() {
+  return requestScope.getStore()?.orgIds || [];
 }
 
 /** Clear the cache (tests / after a membership change). */
@@ -112,4 +128,4 @@ function _clearCache() {
   _cache.clear();
 }
 
-module.exports = { getOrgIdForUser, getOrgIdsForUser, getOrgIdForMeeting, attachOrgIds, _clearCache };
+module.exports = { getOrgIdForUser, getOrgIdsForUser, getOrgIdForMeeting, attachOrgIds, requestOrgIds, _clearCache };

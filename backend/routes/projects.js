@@ -7,11 +7,13 @@ const schemas = require('../schemas/projects');
 const log = require('../utils/log');
 const { aggregateTeamWorkload } = require('../utils/teamWorkload');
 const { getOrgIdForUser } = require('../utils/orgContext');
+const { attachOrgIds } = require('../utils/orgContext');
 
 const router = express.Router();
 
 // Require authentication for all project routes
 router.use(authenticate);
+router.use(attachOrgIds); // org-owned tables below are limited to req.orgIds (audit finding 3)
 
 /**
  * POST /api/projects
@@ -138,6 +140,7 @@ router.get('/:id', async (req, res) => {
     const { data: tasks } = await supabase
       .from('tasks')
       .select('*')
+      .in('org_id', req.orgIds)
       .eq('project_id', id)
       .order('created_at', { ascending: false });
 
@@ -145,6 +148,7 @@ router.get('/:id', async (req, res) => {
     const { data: meetings } = await supabase
       .from('meetings')
       .select('id, title, summary, created_at, sentiment_label')
+      .in('org_id', req.orgIds)
       .eq('project_id', id)
       .order('created_at', { ascending: false })
       .limit(10);
@@ -229,12 +233,14 @@ router.delete('/:id', async (req, res) => {
     await supabase
       .from('tasks')
       .delete()
+      .in('org_id', req.orgIds)
       .eq('project_id', id);
 
     // Unlink meetings (don't delete them)
     await supabase
       .from('meetings')
       .update({ project_id: null })
+      .in('org_id', req.orgIds)
       .eq('project_id', id);
 
     // Delete project
@@ -350,12 +356,14 @@ router.get('/:id/stats', async (req, res) => {
     const { data: tasks } = await supabase
       .from('tasks')
       .select('status, priority, due_date')
+      .in('org_id', req.orgIds)
       .eq('project_id', id);
 
     // Get meetings
     const { data: meetings } = await supabase
       .from('meetings')
       .select('id, sentiment_label')
+      .in('org_id', req.orgIds)
       .eq('project_id', id);
 
     // Get action items from project meetings
@@ -365,6 +373,7 @@ router.get('/:id/stats', async (req, res) => {
       const { data } = await supabase
         .from('action_items')
         .select('status, priority')
+        .in('org_id', req.orgIds)
         .in('meeting_id', meetingIds);
       actionItems = data || [];
     }
@@ -440,6 +449,7 @@ router.get('/:id/dashboard', async (req, res) => {
     const { data: tasks } = await supabase
       .from('tasks')
       .select('id, title, status, priority, due_date, assigned_to, completed_at, created_at, updated_at')
+      .in('org_id', req.orgIds)
       .eq('project_id', id)
       .order('created_at', { ascending: false });
 

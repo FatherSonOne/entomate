@@ -9,9 +9,11 @@ const { supabase } = require('../config/supabase');
 const { authenticate } = require('../middleware/auth');
 const reportService = require('../services/reportService');
 const log = require('../utils/log');
+const { attachOrgIds } = require('../utils/orgContext');
 
 // Require authentication for all report routes
 router.use(authenticate);
+router.use(attachOrgIds); // org-owned tables below are limited to req.orgIds (audit finding 3)
 
 /**
  * Helper: get meeting IDs owned by a user (for scoping action_items)
@@ -20,6 +22,7 @@ async function getUserMeetingIds(userId) {
   const { data } = await supabase
     .from('meetings')
     .select('id')
+    .in('org_id', req.orgIds)
     .eq('created_by', userId);
   return (data || []).map(m => m.id);
 }
@@ -40,6 +43,7 @@ router.get('/meeting/:id/pdf', async (req, res) => {
     const { data: meeting, error: meetingError } = await supabase
       .from('meetings')
       .select('*')
+      .in('org_id', req.orgIds)
       .eq('id', id)
       .eq('created_by', req.user.id)
       .single();
@@ -52,6 +56,7 @@ router.get('/meeting/:id/pdf', async (req, res) => {
     const { data: actionItems } = await supabase
       .from('action_items')
       .select('*')
+      .in('org_id', req.orgIds)
       .eq('meeting_id', id)
       .order('priority', { ascending: true });
 
@@ -146,6 +151,7 @@ router.get('/project/:id/pdf', async (req, res) => {
       const { data: meeting } = await supabase
         .from('meetings')
         .select('*')
+        .in('org_id', req.orgIds)
         .eq('id', id)
         .eq('created_by', req.user.id)
         .single();
@@ -159,6 +165,7 @@ router.get('/project/:id/pdf', async (req, res) => {
     const { data: actionItems } = await supabase
       .from('action_items')
       .select('*')
+      .in('org_id', req.orgIds)
       .eq('meeting_id', id)
       .order('status');
 
@@ -260,6 +267,7 @@ router.get('/meetings/csv', async (req, res) => {
     const { data: meetings, error } = await supabase
       .from('meetings')
       .select('*')
+      .in('org_id', req.orgIds)
       .eq('created_by', req.user.id)
       .order('created_at', { ascending: false });
 
@@ -333,7 +341,7 @@ router.get('/tasks/csv', async (req, res) => {
       return res.status(503).json({ error: 'Database not configured' });
     }
 
-    let query = supabase.from('tasks').select('*');
+    let query = supabase.from('tasks').select('*').in('org_id', req.orgIds);
 
     if (status && status !== 'all') {
       query = query.eq('status', status);
@@ -545,6 +553,7 @@ router.post('/send-meeting-recap', async (req, res) => {
     const { data: meeting, error: meetingError } = await supabase
       .from('meetings')
       .select('*')
+      .in('org_id', req.orgIds)
       .eq('id', meetingId)
       .eq('created_by', req.user.id)
       .single();
@@ -557,6 +566,7 @@ router.post('/send-meeting-recap', async (req, res) => {
     const { data: actionItems } = await supabase
       .from('action_items')
       .select('*')
+      .in('org_id', req.orgIds)
       .eq('meeting_id', meetingId);
 
     await emailService.sendMeetingRecap(email, meeting, actionItems || []);

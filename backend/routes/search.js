@@ -11,8 +11,10 @@ const askService = require('../services/askService');
 const { searchCache, suggestionCache, withCache } = require('../utils/cache');
 const { authenticate } = require('../middleware/auth');
 const log = require('../utils/log');
+const { attachOrgIds } = require('../utils/orgContext');
 
 const router = express.Router();
+router.use(attachOrgIds); // org-owned tables below are limited to req.orgIds (audit finding 3)
 
 // Cache TTL constants (in milliseconds)
 const CACHE_TTL = {
@@ -60,6 +62,7 @@ router.post('/', authenticate, async (req, res) => {
       let meetingQuery = supabase
         .from('meetings')
         .select('id, title, summary, sentiment_label, created_at')
+        .in('org_id', req.orgIds)
         .or(`title.ilike.${searchTerm},summary.ilike.${searchTerm},transcript.ilike.${searchTerm}`)
         .order('created_at', { ascending: false })
         .limit(Math.ceil(limit / types.length));
@@ -124,6 +127,7 @@ router.post('/', authenticate, async (req, res) => {
       let taskQuery = supabase
         .from('tasks')
         .select('id, title, description, status, priority, project_id, created_at')
+        .in('org_id', req.orgIds)
         .or(`title.ilike.${searchTerm},description.ilike.${searchTerm}`)
         .order('created_at', { ascending: false })
         .limit(Math.ceil(limit / types.length));
@@ -158,6 +162,7 @@ router.post('/', authenticate, async (req, res) => {
       const { data: actionItems } = await supabase
         .from('action_items')
         .select('id, task_description, assigned_to_name, status, priority, meeting_id, created_at')
+        .in('org_id', req.orgIds)
         .or(`task_description.ilike.${searchTerm},assigned_to_name.ilike.${searchTerm}`)
         .order('created_at', { ascending: false })
         .limit(Math.ceil(limit / types.length));
@@ -638,6 +643,7 @@ router.get('/suggestions', authenticate, async (req, res) => {
     let meetingQuery = supabase
       .from('meetings')
       .select('title')
+      .in('org_id', req.orgIds)
       .order('created_at', { ascending: false })
       .limit(8);
 
@@ -745,6 +751,7 @@ router.get('/recent', authenticate, async (req, res) => {
     const { data: meetings } = await supabase
       .from('meetings')
       .select('id, title, created_at')
+      .in('org_id', req.orgIds)
       .order('created_at', { ascending: false })
       .limit(5);
 
@@ -752,6 +759,7 @@ router.get('/recent', authenticate, async (req, res) => {
     const { data: tasks } = await supabase
       .from('tasks')
       .select('id, title, created_at')
+      .in('org_id', req.orgIds)
       .order('created_at', { ascending: false })
       .limit(5);
 

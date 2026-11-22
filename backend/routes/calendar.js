@@ -11,6 +11,8 @@ const log = require('../utils/log');
 const { authenticate } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const schemas = require('../schemas/calendar');
+const { attachOrgIds } = require('../utils/orgContext');
+router.use(attachOrgIds); // org-owned tables below are limited to req.orgIds (audit finding 3)
 
 // Initialize calendar service
 calendarService.initialize();
@@ -360,6 +362,7 @@ router.post('/sync/action-item/:id', authenticate, requireCalendar, validate(sch
     const { data: actionItem, error } = await supabase
       .from('action_items')
       .select('*')
+      .in('org_id', req.orgIds)
       .eq('id', id)
       .single();
 
@@ -402,6 +405,7 @@ router.post('/sync/action-items', authenticate, requireCalendar, validate(schema
     let query = supabase
       .from('action_items')
       .select('*')
+      .in('org_id', req.orgIds)
       .not('due_date', 'is', null)
       .not('status', 'in', '("done","complete")');
 
@@ -447,6 +451,7 @@ router.post('/sync/goal/:id', authenticate, requireCalendar, validate(schemas.sy
     const { data: goal, error } = await supabase
       .from('goals')
       .select('*')
+      .in('org_id', req.orgIds)
       .eq('id', id)
       .single();
 
@@ -490,6 +495,7 @@ router.post('/sync/meeting/:id', authenticate, requireCalendar, validate(schemas
     const { data: meeting, error } = await supabase
       .from('meetings')
       .select('*')
+      .in('org_id', req.orgIds)
       .eq('id', id)
       .single();
 
@@ -553,6 +559,7 @@ router.get('/upcoming', authenticate, async (req, res) => {
       const { data } = await supabase
         .from('action_items')
         .select('id, task_description, due_date, priority, status')
+        .in('org_id', req.orgIds)
         .not('due_date', 'is', null)
         .not('status', 'in', '("done","complete")')
         .gte('due_date', now.toISOString())
@@ -576,6 +583,7 @@ router.get('/upcoming', authenticate, async (req, res) => {
       const { data } = await supabase
         .from('goals')
         .select('id, title, target_date, goal_type, status, progress')
+        .in('org_id', req.orgIds)
         .not('target_date', 'is', null)
         .neq('status', 'completed')
         .neq('status', 'abandoned')

@@ -12,10 +12,12 @@ const crossAppSearch = require('../services/crossAppSearch');
 const logger = require('../services/logger');
 const { apiLimiter } = require('../middleware/rateLimiter');
 const { authenticate } = require('../middleware/auth');
+const { attachOrgIds } = require('../utils/orgContext');
 
 // Cross-app search reads contacts and meetings from every app, so it needs a
 // signed-in user (audit finding 1).
 router.use(authenticate);
+router.use(attachOrgIds); // the search service limits meetings/action items to these orgs
 
 /**
  * GET /api/cross-search

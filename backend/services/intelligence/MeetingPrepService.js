@@ -7,6 +7,7 @@
 const { supabase, supabaseAdmin } = require('../../config/supabase');
 const ai = require('../../config/ai');
 const log = require('../../utils/log');
+const { requestOrgIds } = require('../../utils/orgContext'); // audit finding 3: limit queries to the caller's orgs
 
 class MeetingPrepService {
   constructor() {
@@ -51,6 +52,7 @@ class MeetingPrepService {
           project_id,
           crm_deal_id
         `)
+        .in('org_id', requestOrgIds())
         .gte('start_time', now.toISOString())
         .lte('start_time', futureDate.toISOString())
         .order('start_time', { ascending: true })
@@ -92,6 +94,7 @@ class MeetingPrepService {
         const { data, error } = await supabase
           .from('meetings')
           .select('*')
+          .in('org_id', requestOrgIds())
           .eq('id', meetingId)
           .single();
 
@@ -194,6 +197,7 @@ class MeetingPrepService {
       const { data: items, error } = await supabase
         .from('action_items')
         .select('*')
+        .in('org_id', requestOrgIds())
         .eq('meeting_id', meetingId)
         .order('due_date', { ascending: true });
 
@@ -234,6 +238,7 @@ class MeetingPrepService {
       const { data: pastMeetings, error } = await supabase
         .from('meetings')
         .select('id, created_at, sentiment_label, sentiment_score, participants')
+        .in('org_id', requestOrgIds())
         .lt('created_at', meeting.created_at || new Date().toISOString())
         .not('sentiment_label', 'is', null)
         .order('created_at', { ascending: false })
@@ -268,6 +273,7 @@ class MeetingPrepService {
         const { data: dealMeetings } = await supabase
           .from('meetings')
           .select('id, created_at, title, sentiment_label')
+          .in('org_id', requestOrgIds())
           .eq('crm_deal_id', meeting.crm_deal_id)
           .neq('id', meeting.id)
           .order('created_at', { ascending: false })
@@ -281,6 +287,7 @@ class MeetingPrepService {
         const { data: projectMeetings } = await supabase
           .from('meetings')
           .select('id, created_at, title, sentiment_label')
+          .in('org_id', requestOrgIds())
           .eq('project_id', meeting.project_id)
           .neq('id', meeting.id)
           .order('created_at', { ascending: false})

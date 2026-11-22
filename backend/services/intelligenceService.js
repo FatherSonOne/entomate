@@ -12,6 +12,7 @@ const DealRiskService = require('./intelligence/DealRiskService');
 const ActionItemTrackerService = require('./intelligence/ActionItemTrackerService');
 const RelationshipIntelligenceService = require('./intelligence/RelationshipIntelligenceService');
 const log = require('../utils/log');
+const { requestOrgIds } = require('../utils/orgContext'); // audit finding 3: limit queries to the caller's orgs
 
 class IntelligenceService {
   constructor() {
@@ -151,6 +152,7 @@ class IntelligenceService {
           sentiment_score,
           participants
         `)
+        .in('org_id', requestOrgIds())
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString())
         .order('created_at', { ascending: true });
@@ -278,6 +280,7 @@ class IntelligenceService {
             title
           )
         `)
+        .in('org_id', requestOrgIds())
         .lt('due_date', now)
         .not('status', 'in', '("done","complete","completed")')
         .order('due_date', { ascending: true })
@@ -495,6 +498,7 @@ class IntelligenceService {
           status,
           meeting_id
         `)
+        .in('org_id', requestOrgIds())
         .gte('due_date', now.toISOString())
         .lte('due_date', futureDate.toISOString())
         .not('status', 'in', '("done","complete","completed")')
@@ -539,6 +543,7 @@ class IntelligenceService {
       const { data: meetings, error } = await supabase
         .from('meetings')
         .select('sentiment_label, sentiment_score')
+        .in('org_id', requestOrgIds())
         .gte('created_at', startDate.toISOString())
         .not('sentiment_label', 'is', null);
 

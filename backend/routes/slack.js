@@ -11,6 +11,8 @@ const { supabase } = require('../config/supabase');
 const logger = require('../services/logger');
 const { validate } = require('../middleware/validate');
 const schemas = require('../schemas/slack');
+const { attachOrgIds } = require('../utils/orgContext');
+router.use(attachOrgIds); // org-owned tables below are limited to req.orgIds (audit finding 3)
 
 // ========================================
 // CONNECTION & STATUS
@@ -236,6 +238,7 @@ router.post('/notify/meeting/:meetingId', authenticate, async (req, res) => {
     const { data: meeting, error: meetingError } = await supabase
       .from('meetings')
       .select('*')
+      .in('org_id', req.orgIds)
       .eq('id', meetingId)
       .single();
 
@@ -247,6 +250,7 @@ router.post('/notify/meeting/:meetingId', authenticate, async (req, res) => {
     const { data: actionItems } = await supabase
       .from('action_items')
       .select('*')
+      .in('org_id', req.orgIds)
       .eq('meeting_id', meetingId)
       .order('priority', { ascending: true });
 
@@ -266,6 +270,7 @@ router.post('/notify/meeting/:meetingId', authenticate, async (req, res) => {
           slack_notified_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
+        .in('org_id', req.orgIds)
         .eq('id', meetingId);
 
       logger.info('[Slack] Meeting summary sent', {
@@ -300,6 +305,7 @@ router.post('/notify/overdue', authenticate, async (req, res) => {
     let query = supabase
       .from('action_items')
       .select('*')
+      .in('org_id', req.orgIds)
       .lt('due_date', new Date().toISOString().split('T')[0])
       .neq('status', 'done')
       .neq('status', 'completed');

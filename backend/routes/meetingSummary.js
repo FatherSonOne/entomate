@@ -12,8 +12,10 @@ const { supabase } = require('../config/supabase');
 const ai = require('../config/ai');
 const { authenticate } = require('../middleware/auth');
 const log = require('../utils/log');
+const { attachOrgIds } = require('../utils/orgContext');
 
 const router = express.Router();
+router.use(attachOrgIds); // org-owned tables below are limited to req.orgIds (audit finding 3)
 
 /**
  * POST /api/meeting-summary/:id/regenerate
@@ -35,6 +37,7 @@ router.post('/:id/regenerate', authenticate, async (req, res) => {
     const { data: meeting, error: meetingError } = await supabase
       .from('meetings')
       .select('*')
+      .in('org_id', req.orgIds)
       .eq('id', id)
       .single();
 
@@ -58,6 +61,7 @@ router.post('/:id/regenerate', authenticate, async (req, res) => {
       const { data: highPriorityItems } = await supabase
         .from('action_items')
         .select('task_description')
+        .in('org_id', req.orgIds)
         .eq('meeting_id', id)
         .eq('priority', 'high')
         .limit(3);
@@ -77,6 +81,7 @@ router.post('/:id/regenerate', authenticate, async (req, res) => {
         topics: summaryData.topics || [],
         updated_at: new Date().toISOString()
       })
+      .in('org_id', req.orgIds)
       .eq('id', id)
       .select()
       .single();
@@ -89,6 +94,7 @@ router.post('/:id/regenerate', authenticate, async (req, res) => {
     const { data: actionItems } = await supabase
       .from('action_items')
       .select('*')
+      .in('org_id', req.orgIds)
       .eq('meeting_id', id)
       .order('priority', { ascending: false });
 
@@ -130,6 +136,7 @@ router.post('/:id/publish-crm', authenticate, async (req, res) => {
     const { data: meeting, error: meetingError } = await supabase
       .from('meetings')
       .select('*')
+      .in('org_id', req.orgIds)
       .eq('id', id)
       .single();
 
@@ -140,6 +147,7 @@ router.post('/:id/publish-crm', authenticate, async (req, res) => {
     const { data: actionItems } = await supabase
       .from('action_items')
       .select('*')
+      .in('org_id', req.orgIds)
       .eq('meeting_id', id);
 
     // Sync pending action items to CRM
@@ -201,6 +209,7 @@ router.post('/:id/publish-crm', authenticate, async (req, res) => {
             last_sync_attempt: new Date().toISOString(),
             updated_at: new Date().toISOString()
           })
+          .in('org_id', req.orgIds)
           .eq('id', item.id);
 
         results.synced++;
@@ -221,6 +230,7 @@ router.post('/:id/publish-crm', authenticate, async (req, res) => {
             last_sync_error: itemError.message,
             updated_at: new Date().toISOString()
           })
+          .in('org_id', req.orgIds)
           .eq('id', item.id);
 
         results.failed++;
@@ -270,6 +280,7 @@ router.get('/:id', authenticate, async (req, res) => {
     const { data: meeting, error: meetingError } = await supabase
       .from('meetings')
       .select('*')
+      .in('org_id', req.orgIds)
       .eq('id', id)
       .single();
 
@@ -281,6 +292,7 @@ router.get('/:id', authenticate, async (req, res) => {
     const { data: actionItems } = await supabase
       .from('action_items')
       .select('*')
+      .in('org_id', req.orgIds)
       .eq('meeting_id', id)
       .order('priority', { ascending: false });
 

@@ -5,9 +5,11 @@ const { asyncHandler } = require('../middleware/errorHandler');
 const { authenticate } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const schemas = require('../schemas/analytics');
+const { attachOrgIds } = require('../utils/orgContext');
 
 // Require authentication for all analytics routes
 router.use(authenticate);
+router.use(attachOrgIds); // org-owned tables below are limited to req.orgIds (audit finding 3)
 
 /**
  * GET /api/analytics/dashboard
@@ -33,11 +35,13 @@ router.get('/dashboard', asyncHandler(async (req, res) => {
     supabase
       .from('meetings')
       .select('*')
+      .in('org_id', req.orgIds)
       .gte('created_at', startDate.toISOString())
       .lte('created_at', endDate.toISOString()),
     supabase
       .from('tasks')
       .select('*')
+      .in('org_id', req.orgIds)
       .gte('created_at', startDate.toISOString())
       .lte('created_at', endDate.toISOString()),
     supabase
@@ -46,6 +50,7 @@ router.get('/dashboard', asyncHandler(async (req, res) => {
     supabase
       .from('action_items')
       .select('*')
+      .in('org_id', req.orgIds)
       .gte('created_at', startDate.toISOString())
       .lte('created_at', endDate.toISOString()),
     supabase
@@ -181,6 +186,7 @@ router.get('/trends', asyncHandler(async (req, res) => {
     const { data: meetings } = await supabase
       .from('meetings')
       .select('created_at, duration_minutes')
+      .in('org_id', req.orgIds)
       .gte('created_at', startDate.toISOString())
       .lte('created_at', endDate.toISOString())
       .order('created_at');
@@ -195,6 +201,7 @@ router.get('/trends', asyncHandler(async (req, res) => {
     const { data: tasks } = await supabase
       .from('tasks')
       .select('created_at, completed_at, status')
+      .in('org_id', req.orgIds)
       .gte('created_at', startDate.toISOString())
       .lte('created_at', endDate.toISOString())
       .order('created_at');
@@ -248,6 +255,7 @@ router.get('/team-performance', asyncHandler(async (req, res) => {
   const { data: tasks } = await supabase
     .from('tasks')
     .select('assigned_to, status, priority, created_at, completed_at')
+    .in('org_id', req.orgIds)
     .gte('created_at', startDate.toISOString())
     .lte('created_at', endDate.toISOString());
 
@@ -335,6 +343,7 @@ router.get('/ai-effectiveness', asyncHandler(async (req, res) => {
   const { data: meetings } = await supabase
     .from('meetings')
     .select('id, transcript, summary, key_points, action_items(id)')
+    .in('org_id', req.orgIds)
     .gte('created_at', startDate.toISOString())
     .lte('created_at', endDate.toISOString());
 
@@ -517,6 +526,7 @@ router.get('/sentiment-trends', asyncHandler(async (req, res) => {
   const { data: meetings } = await supabase
     .from('meetings')
     .select('created_at, sentiment_label, sentiment_score')
+    .in('org_id', req.orgIds)
     .gte('created_at', startDate.toISOString())
     .lte('created_at', endDate.toISOString())
     .order('created_at');

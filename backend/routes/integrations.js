@@ -10,12 +10,14 @@ const { authenticate, apiKeyAuth } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const schemas = require('../schemas/integrations');
 const log = require('../utils/log');
+const { attachOrgIds } = require('../utils/orgContext');
 
 const router = express.Router();
 
 // Every route needs a signed-in user except the CRM webhook, which is called
 // by a server and uses apiKeyAuth (X-API-Key = INTERNAL_API_KEY). Audit finding 1.
 router.use((req, res, next) => (req.path === '/webhooks/crm' ? next() : authenticate(req, res, next)));
+router.use(attachOrgIds); // org-owned tables below are limited to req.orgIds (audit finding 3)
 
 // ========================================
 // CRM INTEGRATION ENDPOINTS
@@ -37,6 +39,7 @@ router.post('/crm/sync-action-items', authenticate, validate(schemas.syncActionI
     let query = supabase
       .from('action_items')
       .select('*')
+      .in('org_id', req.orgIds)
       .eq('crm_sync_status', 'pending');
 
     if (!syncAll && actionItemIds && actionItemIds.length > 0) {
@@ -97,6 +100,7 @@ router.post('/crm/sync-action-items', authenticate, validate(schemas.syncActionI
             last_sync_attempt: new Date().toISOString(),
             updated_at: new Date().toISOString()
           })
+          .in('org_id', req.orgIds)
           .eq('id', item.id);
 
         // Log the sync
@@ -128,6 +132,7 @@ router.post('/crm/sync-action-items', authenticate, validate(schemas.syncActionI
             last_sync_error: itemError.message,
             updated_at: new Date().toISOString()
           })
+          .in('org_id', req.orgIds)
           .eq('id', item.id);
 
         results.failed++;
@@ -301,6 +306,7 @@ router.post('/chat/post-recap', authenticate, validate(schemas.postRecap), async
     const { data: meeting, error: meetingError } = await supabase
       .from('meetings')
       .select('*')
+      .in('org_id', req.orgIds)
       .eq('id', meetingId)
       .eq('org_id', orgId)
       .single();
@@ -312,6 +318,7 @@ router.post('/chat/post-recap', authenticate, validate(schemas.postRecap), async
     const { data: actionItems } = await supabase
       .from('action_items')
       .select('*')
+      .in('org_id', req.orgIds)
       .eq('meeting_id', meetingId);
 
     // Team notes only; private notes are never posted.
@@ -382,6 +389,7 @@ router.post('/chat/post-recap', authenticate, validate(schemas.postRecap), async
         posted_to_channels: updatedChannels,
         updated_at: new Date().toISOString()
       })
+      .in('org_id', req.orgIds)
       .eq('id', meetingId);
 
     res.json({
@@ -591,7 +599,7 @@ router.post('/webhooks/crm', apiKeyAuth, async (req, res) => {
           await supabase
             .from('action_items')
             .update({ status: 'done', updated_at: new Date().toISOString() })
-            .eq('crm_task_id', data.externalId);
+            .eq('crm_task_id', data.externalId); // server-to-server: matched by CRM id, no user org
         }
         break;
     }
@@ -679,7 +687,8 @@ router.get('/crm/status', async (req, res) => {
 
     const { data: items } = await supabase
       .from('action_items')
-      .select('crm_sync_status');
+      .select('crm_sync_status')
+      .in('org_id', req.orgIds);
 
     const synced = items?.filter(i => i.crm_sync_status === 'synced').length || 0;
     const failed = items?.filter(i => i.crm_sync_status === 'failed').length || 0;
@@ -714,6 +723,7 @@ router.get('/crm/sync-logs', async (req, res) => {
     const { data: logs } = await supabase
       .from('action_items')
       .select('id, task_description, crm_sync_status, last_sync_attempt, last_sync_error, crm_task_id')
+      .in('org_id', req.orgIds)
       .not('last_sync_attempt', 'is', null)
       .order('last_sync_attempt', { ascending: false })
       .limit(parseInt(limit));
@@ -809,6 +819,7 @@ router.post('/retry', authenticate, validate(schemas.retry), async (req, res) =>
           await supabase
             .from('action_items')
             .update({ crm_sync_status: 'pending' })
+            .in('org_id', req.orgIds)
             .eq('id', log.source_id);
         }
 

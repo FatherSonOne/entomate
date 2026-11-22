@@ -6,6 +6,7 @@
 
 const { supabase, supabaseAdmin } = require('../../config/supabase');
 const log = require('../../utils/log');
+const { requestOrgIds } = require('../../utils/orgContext'); // audit finding 3: limit queries to the caller's orgs
 
 class ActionItemTrackerService {
   constructor() {
@@ -74,6 +75,7 @@ class ActionItemTrackerService {
             crm_deal_id
           )
         `)
+        .in('org_id', requestOrgIds())
         .or(`assigned_to_id.eq.${userId},meeting_id.in.(SELECT id FROM meetings WHERE created_by = '${userId}')`)
         .order('due_date', { ascending: true });
 
@@ -145,6 +147,7 @@ class ActionItemTrackerService {
       const { data: lastWeekItems } = await supabase
         .from('action_items')
         .select('id, status, created_at, completed_at')
+        .in('org_id', requestOrgIds())
         .eq('assigned_to_id', userId)
         .gte('created_at', oneWeekAgo.toISOString())
         .lt('created_at', now.toISOString());
@@ -153,6 +156,7 @@ class ActionItemTrackerService {
       const { data: previousWeekItems } = await supabase
         .from('action_items')
         .select('id, status, created_at, completed_at')
+        .in('org_id', requestOrgIds())
         .eq('assigned_to_id', userId)
         .gte('created_at', twoWeeksAgo.toISOString())
         .lt('created_at', oneWeekAgo.toISOString());
@@ -256,6 +260,7 @@ class ActionItemTrackerService {
           const { data: items } = await supabase
             .from('action_items')
             .select('id, status')
+            .in('org_id', requestOrgIds())
             .eq('assigned_to_id', member.id);
 
           const rate = this.calculateCompletionRateForItems(items || []);
@@ -472,6 +477,7 @@ class ActionItemTrackerService {
       const { data: item } = await supabase
         .from('action_items')
         .select('*')
+        .in('org_id', requestOrgIds())
         .eq('id', actionItemId)
         .single();
 

@@ -7,6 +7,7 @@
 
 const { createClient } = require('@supabase/supabase-js');
 const logger = require('./logger');
+const { requestOrgIds } = require('../utils/orgContext'); // audit finding 3: limit queries to the caller's orgs
 
 // Hub client (lazy initialization)
 let hubClient = null;
@@ -234,6 +235,7 @@ async function searchMeetings(query, options = {}) {
     const { data, error } = await supabase
       .from('meetings')
       .select('id, title, summary, transcript, created_at, topics, sentiment_label')
+      .in('org_id', requestOrgIds())
       .or(`title.ilike.%${query}%,summary.ilike.%${query}%,transcript.ilike.%${query}%`)
       .order('created_at', { ascending: false })
       .limit(limit);
@@ -283,6 +285,7 @@ async function searchActionItems(query, options = {}) {
     const { data, error } = await supabase
       .from('action_items')
       .select('id, task_description, context, assigned_to_name, status, priority, due_date, meeting_id')
+      .in('org_id', requestOrgIds())
       .or(`task_description.ilike.%${query}%,context.ilike.%${query}%,assigned_to_name.ilike.%${query}%`)
       .order('created_at', { ascending: false })
       .limit(limit);

@@ -6,6 +6,7 @@
 
 const { supabase, supabaseAdmin } = require('../../config/supabase');
 const log = require('../../utils/log');
+const { requestOrgIds } = require('../../utils/orgContext'); // audit finding 3: limit queries to the caller's orgs
 
 class DealRiskService {
   constructor() {
@@ -275,6 +276,7 @@ class DealRiskService {
       const { data: meetings } = await supabase
         .from('meetings')
         .select('id, created_at')
+        .in('org_id', requestOrgIds())
         .eq('crm_deal_id', deal.id)
         .gte('created_at', thirtyDaysAgo.toISOString());
 
@@ -288,6 +290,7 @@ class DealRiskService {
       const { data: historicalMeetings } = await supabase
         .from('meetings')
         .select('id')
+        .in('org_id', requestOrgIds())
         .eq('crm_deal_id', deal.id)
         .gte('created_at', ninetyDaysAgo.toISOString())
         .lt('created_at', thirtyDaysAgo.toISOString());
@@ -316,6 +319,7 @@ class DealRiskService {
       const { data: meetings } = await supabase
         .from('meetings')
         .select('sentiment_label, sentiment_score, created_at')
+        .in('org_id', requestOrgIds())
         .eq('crm_deal_id', deal.id)
         .not('sentiment_label', 'is', null)
         .order('created_at', { ascending: false })
@@ -360,6 +364,7 @@ class DealRiskService {
       const { data: meetings } = await supabase
         .from('meetings')
         .select('id')
+        .in('org_id', requestOrgIds())
         .eq('crm_deal_id', deal.id);
 
       if (!meetings || meetings.length === 0) {
@@ -371,6 +376,7 @@ class DealRiskService {
       const { data: actionItems } = await supabase
         .from('action_items')
         .select('id, status, due_date')
+        .in('org_id', requestOrgIds())
         .in('meeting_id', meetingIds);
 
       if (!actionItems || actionItems.length === 0) {
@@ -407,6 +413,7 @@ class DealRiskService {
       const { data: meetings } = await supabase
         .from('meetings')
         .select('participants')
+        .in('org_id', requestOrgIds())
         .eq('crm_deal_id', deal.id);
 
       if (!meetings || meetings.length === 0) {

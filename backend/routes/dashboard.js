@@ -8,11 +8,13 @@ const { supabase, supabaseAdmin } = require('../config/supabase');
 const { authenticate } = require('../middleware/auth');
 const log = require('../utils/log');
 const { aggregateTeamWorkload } = require('../utils/teamWorkload');
+const { attachOrgIds } = require('../utils/orgContext');
 
 const router = express.Router();
 
 // Require authentication for all dashboard routes
 router.use(authenticate);
+router.use(attachOrgIds); // org-owned tables below are limited to req.orgIds (audit finding 3)
 
 /**
  * GET /api/dashboard/projects
@@ -102,6 +104,7 @@ router.get('/projects/:id', async (req, res) => {
     const { data: actionItems } = await supabase
       .from('action_items')
       .select('*')
+      .in('org_id', req.orgIds)
       .eq('meeting_id', id)
       .order('due_date', { ascending: true });
 
@@ -121,6 +124,7 @@ router.get('/projects/:id', async (req, res) => {
     const { data: meeting } = await supabase
       .from('meetings')
       .select('summary, key_points, decisions')
+      .in('org_id', req.orgIds)
       .eq('id', id)
       .single();
 
@@ -171,7 +175,8 @@ router.get('/action-items', async (req, res) => {
         meetings:meeting_id (
           title
         )
-      `);
+      `)
+      .in('org_id', req.orgIds);
 
     // Apply filters
     if (status !== 'all') {
@@ -252,6 +257,7 @@ router.patch('/action-items/:id', async (req, res) => {
     const { data, error } = await supabase
       .from('action_items')
       .update(updates)
+      .in('org_id', req.orgIds)
       .eq('id', id)
       .select()
       .single();
@@ -295,7 +301,8 @@ router.get('/team-workload', async (req, res) => {
       // View doesn't exist, calculate from action_items directly
       const { data: actionItems } = await supabase
         .from('action_items')
-        .select('assigned_to_name, assigned_to_email, status, priority');
+        .select('assigned_to_name, assigned_to_email, status, priority')
+        .in('org_id', req.orgIds);
 
       // Group by assignee
       const workloadMap = new Map();
@@ -377,6 +384,7 @@ router.get('/overdue', async (req, res) => {
           status,
           meeting_id
         `)
+        .in('org_id', req.orgIds)
         .lt('due_date', now)
         .not('status', 'in', '("done","complete")')
         .order('due_date', { ascending: true })
@@ -451,7 +459,8 @@ router.get('/insights', async (req, res) => {
     // Priority breakdown from action items
     const { data: actionItems } = await supabase
       .from('action_items')
-      .select('priority, status');
+      .select('priority, status')
+      .in('org_id', req.orgIds);
 
     const priorityCounts = {
       high: actionItems?.filter(i => i.priority === 'high').length || 0,
@@ -509,7 +518,8 @@ router.get('/project-insights', async (req, res) => {
     // Get all tasks
     const { data: tasks } = await supabase
       .from('tasks')
-      .select('id, project_id, status, priority, due_date, assigned_to, completed_at');
+      .select('id, project_id, status, priority, due_date, assigned_to, completed_at')
+      .in('org_id', req.orgIds);
 
     const allProjects = projects || [];
     const allTasks = tasks || [];
@@ -636,20 +646,24 @@ router.get('/summary', async (req, res) => {
     // Get counts
     const { count: meetingsCount } = await supabase
       .from('meetings')
-      .select('*', { count: 'exact', head: true });
+      .select('*', { count: 'exact', head: true })
+      .in('org_id', req.orgIds);
 
     const { count: actionItemsCount } = await supabase
       .from('action_items')
-      .select('*', { count: 'exact', head: true });
+      .select('*', { count: 'exact', head: true })
+      .in('org_id', req.orgIds);
 
     const { count: openItemsCount } = await supabase
       .from('action_items')
       .select('*', { count: 'exact', head: true })
+      .in('org_id', req.orgIds)
       .eq('status', 'open');
 
     const { count: overdueCount } = await supabase
       .from('action_items')
       .select('*', { count: 'exact', head: true })
+      .in('org_id', req.orgIds)
       .lt('due_date', new Date().toISOString())
       .neq('status', 'done');
 
