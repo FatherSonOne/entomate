@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { LOGO_MOTIONS, renderLogoMotion } from './logoMotion'
+import { CIRCUIT_FINISH, CIRCUIT_MARK_IDS, renderCircuitMark } from './circuitMarks'
 import { isLogoId, logoAsset, useLogoSystem } from '../services/logoSystem'
 import { prefersReducedMotion } from './bench/motion'
 import './AnimatedLoadingLogo.css'
@@ -18,7 +19,10 @@ export default function AnimatedLoadingLogo({ logoId, size = 512, controls = tru
   const [manual, setManual] = useState(false)
   const [supported, setSupported] = useState(true)
   const [failed, setFailed] = useState(false)
-  const markup = useMemo(() => renderLogoMotion(id, logoAsset(id, size), 6, LOGO_MOTIONS[id].name), [id, size])
+  // The circuit marks are drawn in vector; the rest animate cut-outs of their artwork
+  const markup = useMemo(() => (CIRCUIT_MARK_IDS.includes(id)
+    ? renderCircuitMark(id, CIRCUIT_FINISH, 6, LOGO_MOTIONS[id].name)
+    : renderLogoMotion(id, logoAsset(id, size), 6, LOGO_MOTIONS[id].name)), [id, size])
 
   useEffect(() => { setFailed(false) }, [id])
 
