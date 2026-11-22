@@ -2352,8 +2352,9 @@ a.bs-proj-pt:focus-visible { outline: 2px solid var(--bs-brand); outline-offset:
 .bs-set-readouts { margin-top: 22px; }
 @media (max-width: 767.98px) {
   .bs-set-find { width: 100%; }
-  .bs-set-jump { display: block; }
+  .bs-set-jump { display: block; position: sticky; top: 0; z-index: 5; margin: 14px -18px 0; padding: 8px 18px; background: var(--bs-plate); border-bottom: 1px solid var(--bs-rule2); }
   .bs-set-jump .bs-input { width: 100%; }
+  .bs-set-sec { scroll-margin-top: 72px; }
   .bs-set-row, .bs-set-danger { grid-template-columns: minmax(0, 1fr); gap: 10px; }
   .bs-set-row--tg { grid-template-columns: minmax(0, 1fr) auto; }
   .bs-set-c { justify-content: flex-start; }

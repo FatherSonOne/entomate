@@ -304,7 +304,6 @@ export default function Settings(): React.ReactElement {
                   </div>
                 </div>
 
-                <div className="bs-set-sub"><span className="bs-h3">Appearance</span></div>
                 <AppearanceSettings
                   reduceMotion={settings.reduce_motion}
                   onReduceMotion={(on: boolean) => updateSetting('reduce_motion', on)}
