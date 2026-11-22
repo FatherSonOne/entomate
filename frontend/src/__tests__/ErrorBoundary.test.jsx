@@ -1,96 +1,88 @@
 /**
- * ErrorBoundary Component Tests
+ * ErrorBoundary + ErrorScreen tests (error kinds, scopes, stale-deploy reload)
  */
 
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import ErrorBoundary from '../components/ErrorBoundary';
 
-// Component that throws an error on render
-function ThrowingComponent({ shouldThrow = true }) {
-  if (shouldThrow) {
-    throw new Error('Test error');
-  }
-  return <div>Normal content</div>;
+function Throw({ error }) {
+  throw error;
 }
 
-// Suppress console.error from React error boundary logging during tests
+const realLocation = window.location;
+let reloadMock;
+let assignMock;
+
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {});
+  sessionStorage.clear();
+  reloadMock = vi.fn();
+  assignMock = vi.fn();
+  Object.defineProperty(window, 'location', {
+    value: { reload: reloadMock, assign: assignMock, pathname: '/tasks' },
+    writable: true,
+    configurable: true,
+  });
+});
+
+afterEach(() => {
+  Object.defineProperty(window, 'location', { value: realLocation, writable: true, configurable: true });
 });
 
 describe('ErrorBoundary', () => {
-  it('should render children when no error occurs', () => {
-    render(
-      <ErrorBoundary>
-        <div>Hello World</div>
-      </ErrorBoundary>
-    );
-
+  it('renders children when nothing throws', () => {
+    render(<ErrorBoundary><div>Hello World</div></ErrorBoundary>);
     expect(screen.getByText('Hello World')).toBeInTheDocument();
   });
 
-  it('should render error UI when a child throws', () => {
-    render(
-      <ErrorBoundary>
-        <ThrowingComponent />
-      </ErrorBoundary>
-    );
-
-    expect(screen.getByText('Something went wrong')).toBeInTheDocument();
-    expect(screen.getByText(/unexpected error/i)).toBeInTheDocument();
+  it('shows the page-error screen with the error message under details', () => {
+    render(<ErrorBoundary><Throw error={new Error('Test error')} /></ErrorBoundary>);
+    expect(screen.getByRole('heading', { name: 'This page hit a problem' })).toBeInTheDocument();
+    expect(screen.getByText('Error details')).toBeInTheDocument();
+    expect(screen.getAllByText(/Test error/).length).toBeGreaterThan(0);
   });
 
-  it('should show the Reload Page button in error state', () => {
-    render(
-      <ErrorBoundary>
-        <ThrowingComponent />
-      </ErrorBoundary>
-    );
-
-    const reloadButton = screen.getByRole('button', { name: /reload page/i });
-    expect(reloadButton).toBeInTheDocument();
-  });
-
-  it('should call window.location.reload when reload button is clicked', () => {
-    // Mock window.location.reload
-    const reloadMock = vi.fn();
-    Object.defineProperty(window, 'location', {
-      value: { reload: reloadMock },
-      writable: true
-    });
-
-    render(
-      <ErrorBoundary>
-        <ThrowingComponent />
-      </ErrorBoundary>
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: /reload page/i }));
+  it('app scope: Try again reloads the window', () => {
+    render(<ErrorBoundary scope="app"><Throw error={new Error('Test error')} /></ErrorBoundary>);
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(reloadMock).toHaveBeenCalledTimes(1);
   });
 
-  it('should display error details in non-production mode', () => {
-    // process.env.NODE_ENV is 'test' by default (not 'production')
-    render(
-      <ErrorBoundary>
-        <ThrowingComponent />
-      </ErrorBoundary>
-    );
-
-    // The error message should be visible in the pre tag
-    expect(screen.getByText(/Test error/)).toBeInTheDocument();
+  it('page scope: Try again draws the page again without reloading', () => {
+    let fail = true;
+    function Flaky() {
+      if (fail) throw new Error('once');
+      return <div>Recovered</div>;
+    }
+    render(<ErrorBoundary scope="page"><Flaky /></ErrorBoundary>);
+    fail = false;
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(screen.getByText('Recovered')).toBeInTheDocument();
+    expect(reloadMock).not.toHaveBeenCalled();
   });
 
-  it('should not render error UI for non-throwing children', () => {
-    render(
-      <ErrorBoundary>
-        <ThrowingComponent shouldThrow={false} />
-      </ErrorBoundary>
+  it('page scope clears when the route (resetKey) changes', () => {
+    const { rerender } = render(
+      <ErrorBoundary scope="page" resetKey="/tasks"><Throw error={new Error('x')} /></ErrorBoundary>
     );
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    rerender(<ErrorBoundary scope="page" resetKey="/meetings"><div>Meetings</div></ErrorBoundary>);
+    expect(screen.getByText('Meetings')).toBeInTheDocument();
+  });
 
-    expect(screen.getByText('Normal content')).toBeInTheDocument();
-    expect(screen.queryByText('Something went wrong')).not.toBeInTheDocument();
+  it('signed-out errors offer Sign in', () => {
+    render(<ErrorBoundary><Throw error={Object.assign(new Error('Unauthorized'), { status: 401 })} /></ErrorBoundary>);
+    expect(screen.getByRole('heading', { name: 'Your session has ended' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    expect(assignMock).toHaveBeenCalledWith('/sign-in');
+  });
+
+  it('a stale page file reloads once quietly instead of showing the error', () => {
+    const stale = new TypeError('Failed to fetch dynamically imported module: /assets/Tasks-old.js');
+    render(<ErrorBoundary><Throw error={stale} /></ErrorBoundary>);
+    expect(reloadMock).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });

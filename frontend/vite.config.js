@@ -3,6 +3,10 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  define: {
+    // Sentry release: the commit Vercel is building (empty locally)
+    __APP_RELEASE__: JSON.stringify(process.env.VERCEL_GIT_COMMIT_SHA || ''),
+  },
   server: {
     port: 5175,
     strictPort: true,

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { authService } from '../services/authService'
+import { setMonitoringUser } from '../services/monitoring'
 
 const AuthContext = createContext(undefined)
 
@@ -23,6 +24,11 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     prevUserRef.current = user
   }, [user])
+
+  // Error reports carry the user id only (no email or name)
+  useEffect(() => {
+    setMonitoringUser(user?.id)
+  }, [user?.id])
 
   useEffect(() => {
     let isMounted = true

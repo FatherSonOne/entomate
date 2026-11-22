@@ -2,6 +2,7 @@ import React from 'react';
 import ErrorScreen from './ErrorScreen';
 import { chunkReloadPending, isChunkError, reloadForStaleChunk } from '../services/chunkReload';
 import { classifyError } from '../services/errorKinds';
+import { reportError } from '../services/monitoring';
 
 /**
  * Catches render errors and shows ErrorScreen with words for the kind of
@@ -32,6 +33,11 @@ export default class ErrorBoundary extends React.Component {
     // A page chunk from an older deploy: reload once onto the new build
     if (isChunkError(error) && reloadForStaleChunk()) return;
     console.error(`[ErrorBoundary:${this.props.scope ?? 'app'}] ${classifyError(error)}:`, error, errorInfo?.componentStack);
+    reportError(error, {
+      source: `boundary:${this.props.scope ?? 'app'}`,
+      extra: { route: window.location.pathname },
+      componentStack: errorInfo?.componentStack,
+    });
     this.setState({ componentStack: errorInfo?.componentStack });
   }
 

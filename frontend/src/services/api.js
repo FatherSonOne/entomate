@@ -2,6 +2,7 @@ import axios from 'axios'
 import { supabase } from './supabaseClient'
 import cache from './apiCache'
 import { downloadFile } from '../utils/downloadHelper'
+import { reportError } from './monitoring'
 
 // Use relative URL to leverage Vite proxy, or fall back to full URL if configured
 const API_BASE_URL = import.meta.env.VITE_API_URL || ''
@@ -206,6 +207,14 @@ api.interceptors.response.use(
     enhancedError.originalError = error
     enhancedError.status = error.response?.status
     enhancedError.isNetworkError = error.message === 'Network Error' || !error.response
+
+    // Server errors and an unreachable API go to error tracking (path only, no bodies)
+    if (navigator.onLine && (enhancedError.isNetworkError || error.response?.status >= 500)) {
+      reportError(enhancedError, {
+        source: 'api',
+        extra: { method: config?.method, path: config?.url?.split('?')[0], status: error.response?.status },
+      })
+    }
 
     return Promise.reject(enhancedError)
   }

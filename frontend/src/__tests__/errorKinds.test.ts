@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { classifyError, errorCopy, errorReport } from '../services/errorKinds'
+import { classifyError, errorCopy, errorReport, toastForError } from '../services/errorKinds'
 
 const withStatus = (status: number): Error => Object.assign(new Error('x'), { status })
 
@@ -27,5 +27,25 @@ describe('classifyError', () => {
   })
   it('puts the message in the copied report', () => {
     expect(errorReport(new Error('boom'), 'render')).toContain('Error: Error: boom')
+  })
+})
+
+describe('toastForError', () => {
+  it('names a known cause and offers its key', () => {
+    const t = toastForError('Failed to create task', Object.assign(new Error('x'), { status: 401 }))
+    expect(t.title).toBe('Your session has ended')
+    expect(t.action).toBe('sign-in')
+  })
+  it('reads the API client messages', () => {
+    expect(toastForError('Error', 'You do not have permission to perform this action.').title).toBe('You do not have access')
+    expect(toastForError('Error', 'Unable to connect to the server. Please ensure the backend is running.').title).toBe('Could not reach Entomate')
+  })
+  it('keeps a specific title for server errors and not-found', () => {
+    const t = toastForError('Failed to save notes', 'A server error occurred. Please try again later.')
+    expect(t.title).toBe('Failed to save notes')
+  })
+  it('passes unknown errors through, replacing a bare "Error" title', () => {
+    expect(toastForError('Error', 'Title is required')).toEqual({ title: 'That did not work', message: 'Title is required' })
+    expect(toastForError('Failed to create subtask', undefined).title).toBe('Failed to create subtask')
   })
 })

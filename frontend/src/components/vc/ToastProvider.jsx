@@ -2,12 +2,19 @@ import React, { createContext, useContext, useState, useCallback, useRef, useEff
 import { createPortal } from 'react-dom'
 import { VCToast } from './index'
 import { X } from 'lucide-react'
+import { ACTION_LABEL, classifyError, toastForError } from '../../services/errorKinds'
+import { breadcrumb, reportError } from '../../services/monitoring'
 
 const ToastContext = createContext(null)
 
 let toastId = 0
 /** Exit duration in ms; matches .vc-toast-item.is-leaving in vc-components.css. */
 const TOAST_EXIT_MS = 200
+
+const runErrorAction = (action) => {
+  if (action === 'reload') window.location.reload()
+  else if (action === 'sign-in') window.location.assign('/sign-in')
+}
 
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([])
@@ -68,7 +75,19 @@ export function ToastProvider({ children }) {
   const toast = {
     show: (opts) => addToast(opts),
     success: (title, message) => addToast({ title, message, color: 'mint' }),
-    error: (title, message) => addToast({ title, message, color: 'crimson' }),
+    // error(title, messageOrError): known causes (signed out, offline, no access,
+    // server down) get their own words and key; pass the Error itself for the best match.
+    error: (title, message) => {
+      const err = message instanceof Error ? message : title instanceof Error ? title : null
+      const copy = toastForError(typeof title === 'string' ? title : undefined, err ?? message)
+      breadcrumb('toast.error', `${copy.title}: ${copy.message}`)
+      // Server and network failures are reported by the API client; unknown causes from here
+      if (err && classifyError(err) === 'render') reportError(err, { source: 'toast', extra: { route: window.location.pathname } })
+      const action = copy.action && copy.action !== 'retry' && copy.action !== 'home'
+        ? { label: ACTION_LABEL[copy.action], onClick: () => runErrorAction(copy.action) }
+        : undefined
+      return addToast({ title: copy.title, message: copy.message, color: 'crimson', action, duration: action ? 8000 : 5000 })
+    },
     warning: (title, message) => addToast({ title, message, color: 'amber' }),
     info: (title, message) => addToast({ title, message, color: 'phosphor' }),
     dismiss

@@ -44,13 +44,13 @@ export function classifyError(error: unknown, online: boolean = typeof navigator
   if (isChunkError(error)) return online ? 'stale-deploy' : 'offline'
   const e = (error ?? {}) as ErrorLike
   const msg = `${e.name ?? ''} ${e.message ?? String(error ?? '')}`
-  if (!online) return 'offline'
+  if (!online || /You are offline/i.test(msg)) return 'offline'
   const status = statusOf(e)
   if (status === 401 || e.code === 'PGRST301' || /JWT expired|session (has )?expired|invalid (refresh )?token|not authenticated/i.test(msg)) return 'session'
-  if (status === 403 || e.code === '42501' || /permission denied|not authori[sz]ed|forbidden|row-level security/i.test(msg)) return 'permission'
-  if (status === 404 || e.code === 'PGRST116') return 'not-found'
-  if (status !== undefined && status >= 500) return 'server'
-  if (e.isNetworkError || /Network Error|Failed to fetch|NetworkError|Load failed|ERR_NETWORK|timeout/i.test(msg)) return 'network'
+  if (status === 403 || e.code === '42501' || /permission denied|do not have permission|not authori[sz]ed|forbidden|row-level security/i.test(msg)) return 'permission'
+  if (status === 404 || e.code === 'PGRST116' || /requested resource was not found/i.test(msg)) return 'not-found'
+  if ((status !== undefined && status >= 500) || /A server error occurred/i.test(msg)) return 'server'
+  if (e.isNetworkError || /Network Error|Failed to fetch|NetworkError|Load failed|ERR_NETWORK|timeout|Unable to connect to the server/i.test(msg)) return 'network'
   return 'render'
 }
 
@@ -132,4 +132,50 @@ export function errorReport(error: unknown, kind: ErrorKind, componentStack?: st
     e.stack ? `\nStack:\n${e.stack}` : null,
     componentStack ? `\nComponents:${componentStack}` : null,
   ].filter(Boolean).join('\n')
+}
+
+/** Not bugs: the person's connection, or a tab older than the last deploy. */
+export function isQuietKind(kind: ErrorKind): boolean {
+  return kind === 'offline' || kind === 'stale-deploy'
+}
+
+/* ── Action errors (a save, delete or send that failed on a page that is up) ── */
+
+export interface ToastCopy {
+  title: string
+  message: string
+  action?: ErrorAction
+}
+
+const ACTION_COPY: Partial<Record<ErrorKind, ToastCopy>> = {
+  'stale-deploy': { title: 'Entomate was updated', message: 'Reload to use the new version, then try again.', action: 'reload' },
+  offline: { title: 'You are offline', message: 'That did not go through. Try again once you are back online.' },
+  network: { title: 'Could not reach Entomate', message: 'The server did not answer. Try again in a moment.' },
+  session: { title: 'Your session has ended', message: 'Sign in again, then try once more. Nothing saved is lost.', action: 'sign-in' },
+  permission: { title: 'You do not have access', message: 'Your role in this workspace cannot do this. Ask a workspace admin.' },
+  'not-found': { title: 'Not found', message: 'It may have been deleted or moved. Refresh to see the latest.' },
+  server: { title: 'Something failed on our side', message: 'The server hit an error. Try again; if it keeps happening, let us know.' },
+}
+
+/** Kinds where the cause matters more than which action failed. */
+const CAUSE_FIRST: ReadonlyArray<ErrorKind> = ['stale-deploy', 'offline', 'network', 'session', 'permission']
+
+const GENERIC_TITLE = /^(error|oops|failed|something went wrong)[.!]?$/i
+
+/**
+ * Words for a toast about a failed action. `title` is what the caller wanted
+ * to say ("Failed to create task"); `error` is the Error or its message.
+ * Known causes (signed out, offline, no access) get their own words and key;
+ * anything else keeps the caller's title and the error's message.
+ */
+export function toastForError(title: string | undefined, error: unknown): ToastCopy {
+  const text = error instanceof Error ? error.message : typeof error === 'string' ? error : ''
+  const kind = classifyError(error instanceof Error ? error : new Error(text))
+  const own = title && !GENERIC_TITLE.test(title.trim()) ? title : undefined
+  const known = ACTION_COPY[kind]
+  if (known) {
+    if (CAUSE_FIRST.includes(kind) || !own) return known
+    return { title: own, message: known.message, action: known.action }
+  }
+  return { title: own ?? 'That did not work', message: text || 'Try again in a moment.' }
 }

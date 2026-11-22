@@ -18,6 +18,7 @@ import { initReduceMotion } from './components/bench/motion'
 import { installIconDraw } from './components/bench/iconDraw'
 import { initBoot } from './services/bootProgress'
 import { installChunkReload } from './services/chunkReload'
+import { initMonitoring } from './services/monitoring'
 
 // Import Void × Crimson component system
 import './styles/vc-components.css'
@@ -41,6 +42,8 @@ import './styles/design-style-picker.css'
 // Settings > Appearance > Reduce motion, remembered from the last visit
 // A tab left open across a deploy reloads onto the new build instead of erroring
 installChunkReload()
+// Sentry, when VITE_SENTRY_DSN is set (loads after first paint)
+initMonitoring()
 initReduceMotion()
 installIconDraw()
 
