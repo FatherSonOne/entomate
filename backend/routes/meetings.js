@@ -19,6 +19,7 @@ const meetingEvents = require('../services/meetingEvents');
 const transcriptMoments = require('../services/transcriptMoments');
 const summaryTemplates = require('../services/summaryTemplates');
 const speakerNames = require('../services/speakerNames');
+const actionItemNudge = require('../services/actionItemNudge');
 
 const router = express.Router();
 
@@ -593,9 +594,11 @@ router.patch('/action-items/:id', authenticate, async (req, res) => {
     const itemOrgId = await meetingOrgOrRespond(req, res, existingItem.meeting_id);
     if (!itemOrgId) return;
 
+    // completed_at feeds the follow-through rate on Insights (done by the due date).
+    const now = new Date().toISOString();
     const { data: item, error } = await supabase
       .from('action_items')
-      .update({ status, updated_at: new Date().toISOString() })
+      .update({ status, updated_at: now, completed_at: status === 'done' ? now : null })
       .eq('id', id)
       .select()
       .single();
@@ -608,6 +611,45 @@ router.patch('/action-items/:id', authenticate, async (req, res) => {
   } catch (error) {
     log.error('Error updating action item:', { error: error.message || error });
     res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/meetings/action-items/:id/nudge
+ * Email the item's owner one reminder, sent in the caller's name (Reply-To: the
+ * caller). Once per item per 24 hours. 422 when the owner has no email.
+ */
+router.post('/action-items/:id/nudge', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!supabase) return res.status(503).json({ error: 'Database not configured' });
+
+    const { data: item } = await supabase
+      .from('action_items')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    if (!item?.meeting_id) return res.status(404).json({ error: 'Action item not found' });
+    const orgId = await meetingOrgOrRespond(req, res, item.meeting_id);
+    if (!orgId) return;
+
+    const { data: meeting } = await supabase
+      .from('meetings')
+      .select('id, title')
+      .eq('id', item.meeting_id)
+      .eq('org_id', orgId)
+      .maybeSingle();
+
+    const u = req.user || {};
+    const sender = { email: u.email || null, name: [u.firstName, u.lastName].filter(Boolean).join(' ') || null };
+    const result = await actionItemNudge.sendNudge(supabase, { item, meeting, sender });
+    if (!result.ok) return res.status(result.status).json({ error: result.error, code: result.code });
+
+    log.info('Action item nudged', { itemId: id, orgId, stored: result.stored });
+    res.json({ nudgedAt: result.nudgedAt, to: result.to });
+  } catch (error) {
+    log.error('Error nudging action item:', { error: error.message || error });
+    res.status(500).json({ error: 'Could not send the reminder' });
   }
 });
 

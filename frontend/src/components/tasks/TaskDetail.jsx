@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { tasksApi } from '../../services/api'
+import { meetingsApi, tasksApi } from '../../services/api'
 import { Key, Signal, Switch, Tag, TextInput } from '../bench'
 import { useToast } from '../vc/ToastProvider'
-import { agentLabel, dueLabel, isOverdue, meetingHref, priorityWord, statusTone, statusWord, timecode } from '../../services/tasksView'
+import { agentLabel, dueLabel, isOverdue, meetingHref, nudgeState, priorityWord, statusTone, statusWord, timecode } from '../../services/tasksView'
 
 /**
  * One work item in depth: fields, the meeting it came from with its timecode, the
@@ -30,6 +30,24 @@ export default function TaskDetail({ item, now, inDrawer = false, onStatus, onEd
   const [newSub, setNewSub] = useState('')
   const [adding, setAdding] = useState(false)
   const isTask = item.kind === 'task'
+  // Nudge: email the owner one reminder in your name. Kept here so "Nudged" shows at once.
+  const [nudgedAt, setNudgedAt] = useState(item.nudgedAt || null)
+  const [nudging, setNudging] = useState(false)
+  const nudge = nudgeState({ ...item, nudgedAt }, now instanceof Date ? now : new Date())
+
+  const sendNudge = async () => {
+    try {
+      setNudging(true)
+      const res = await meetingsApi.nudgeActionItem(item.id)
+      setNudgedAt(res?.nudgedAt || new Date().toISOString())
+      toast.success('Reminder sent', `Emailed ${res?.to || item.ownerEmail}. Replies come to you.`)
+    } catch (err) {
+      const why = err?.originalError?.response?.data?.error || err?.message || 'Try again in a moment.'
+      toast.error('Reminder not sent', why)
+    } finally {
+      setNudging(false)
+    }
+  }
 
   const loadSubs = useCallback(async () => {
     if (!isTask) return
@@ -147,6 +165,12 @@ export default function TaskDetail({ item, now, inDrawer = false, onStatus, onEd
         </Key>
         {isTask && <Key onClick={onEdit}>Edit</Key>}
         {isTask && <Key onClick={onDelete} className="bs-tasks-del">Delete</Key>}
+        {nudge === 'ready' && (
+          <Key onClick={sendNudge} disabled={nudging} aria-label={`Email ${item.owner || 'the owner'} a reminder`}>
+            {nudging ? 'Sending' : 'Nudge'}
+          </Key>
+        )}
+        {nudge === 'recent' && <Signal tone="mint">Nudged</Signal>}
         {!isTask && src && <Key onClick={() => onOpenMeeting(meetingHref(src))} className="bs-tasks-del">Open meeting</Key>}
       </div>
     </div>

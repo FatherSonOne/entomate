@@ -1,0 +1,35 @@
+name: Overdue digest
+
+# One email a day to each person with overdue action items, or overdue items
+# from meetings they captured (backend/services/overdueDigest.js). Render's
+# free plan sleeps, so this wakes the backend instead of an in-process timer.
+# 12:30 UTC is 7:30 AM Eastern. The job is idempotent per person per day.
+#
+# Repository secrets: ENTOMATE_BACKEND_URL, ENTOMATE_INTERNAL_API_KEY
+
+on:
+  schedule:
+    - cron: '30 12 * * *'
+  workflow_dispatch:
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Send overdue digests
+        env:
+          BACKEND_URL: ${{ secrets.ENTOMATE_BACKEND_URL }}
+          API_KEY: ${{ secrets.ENTOMATE_INTERNAL_API_KEY }}
+        run: |
+          if [ -z "$BACKEND_URL" ] || [ -z "$API_KEY" ]; then
+            echo "::error::Set ENTOMATE_BACKEND_URL and ENTOMATE_INTERNAL_API_KEY repository secrets"; exit 1
+          fi
+          for i in 1 2 3 4 5; do
+            code=$(curl -s -o out.json -w '%{http_code}' --max-time 90 -X POST \
+              -H "X-API-Key: $API_KEY" "${BACKEND_URL%/}/api/internal/jobs/digest" || true)
+            echo "attempt $i: HTTP $code"; cat out.json 2>/dev/null; echo
+            if [ "$code" = "202" ] || [ "$code" = "409" ]; then exit 0; fi
+            sleep 30
+          done
+          echo "::error::Overdue digest could not be started"; exit 1

@@ -76,7 +76,12 @@ export default function Meetings() {
     const next = new URLSearchParams(searchParams)
     next.delete('new')
     setSearchParams(next, { replace: true })
-    requestAnimationFrame(() => recorderRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+    // Bring the recorder into view and move focus to it, so the next step
+    // (choose what to record, confirm consent, Start recording) is where the user is.
+    requestAnimationFrame(() => {
+      recorderRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      recorderRef.current?.focus({ preventScroll: true })
+    })
   }, [searchParams, setSearchParams])
 
   // Debounced server-side search (also the first load)
@@ -439,7 +444,7 @@ export default function Meetings() {
 
       {showRecorder && (
         // The panel stays open after recording: it offers the video download and a link to the meeting.
-        <section ref={recorderRef} className="bs-mtg-recorder" aria-label="New meeting">
+        <section ref={recorderRef} tabIndex={-1} className="bs-mtg-recorder" aria-label="New meeting">
           <Section title="New meeting" level={3} aside={<Signal tone="off">In this browser · no bot</Signal>} />
           <div className="bs-skin">
             <MeetingRecorder onRecorded={handleMeetingProcessed} audioInputDeviceId={audioInputDeviceId} />

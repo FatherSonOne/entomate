@@ -124,20 +124,29 @@ export default function Today() {
   }, [toast])
 
   // Before the next meeting: what was promised last time these people (or this series) met.
+  // Without a calendar there is no next meeting, so the latest meeting anchors it instead:
+  // what is still open from it and from earlier meetings with the same people or series
+  // (surface audit 2026-11-22: carry-forward should not depend on a connected calendar).
   const [carryForward, setCarryForward] = useState(null)
-  const nextKey = next ? `${next.id}|${next.at.getTime()}` : ''
+  const latestWithPeople = useMemo(() => meetings.find((m) => m.summary) || null, [meetings])
+  const anchor = useMemo(() => {
+    if (next) return { key: `next|${next.id}|${next.at.getTime()}`, title: next.title, attendees: (next.attendees || []).map((a) => ({ name: a.name || null, email: a.email || null })), startsAt: next.at.toISOString(), label: `Before ${next.title}` }
+    if (!latestWithPeople) return null
+    const attendees = (Array.isArray(latestWithPeople.attendees) ? latestWithPeople.attendees : [])
+      .map((a) => (typeof a === 'string' ? a.slice(0, 320) : a && typeof a === 'object' ? { name: a.name || a.displayName || null, email: a.email || null } : null))
+      .filter(Boolean)
+      .slice(0, 200)
+    return { key: `latest|${latestWithPeople.id}`, title: latestWithPeople.title || '', attendees, startsAt: new Date().toISOString(), label: `Still open from ${latestWithPeople.title || 'your last meeting'}` }
+  }, [next, latestWithPeople])
+  const anchorKey = anchor?.key || ''
   useEffect(() => {
-    if (!next) { setCarryForward(null); return undefined }
+    if (!anchor) { setCarryForward(null); return undefined }
     let cancelled = false
-    meetingsApi.carryForwardPreview({
-      title: next.title,
-      attendees: (next.attendees || []).map((a) => ({ name: a.name || null, email: a.email || null })),
-      startsAt: next.at.toISOString(),
-    })
+    meetingsApi.carryForwardPreview({ title: anchor.title, attendees: anchor.attendees, startsAt: anchor.startsAt })
       .then((data) => { if (!cancelled) setCarryForward(data) })
       .catch(() => { if (!cancelled) setCarryForward(null) })
     return () => { cancelled = true }
-  }, [nextKey]) // keyed on the event, not the object
+  }, [anchorKey]) // keyed on the anchor, not the object
   const now = useNow(Boolean(live || next))
 
   // Cheap to derive; recomputed each tick so buckets roll over at midnight.
@@ -175,7 +184,7 @@ export default function Today() {
     <div className="bs-title-keys">
       <Key onClick={() => setBriefOpen(true)} aria-haspopup="dialog">Briefings</Key>
       {openAssistant && <Key onClick={openAssistant}>Ask Entomate</Key>}
-      <Key variant="primary" onClick={startRecording}>Start recording</Key>
+      <Key variant="primary" onClick={startRecording}>New recording</Key>
     </div>
   )
 
@@ -349,9 +358,9 @@ export default function Today() {
         <Cell span={8}>{renderTop()}</Cell>
         <Cell span={4} className="bs-today-ro">{readouts}</Cell>
 
-        {next && carryForward && (carryForward.openCount > 0 || carryForward.doneCount > 0) && (
+        {anchor && carryForward && (carryForward.openCount > 0 || carryForward.doneCount > 0) && (
           <Cell span={8}>
-            <CarryForward data={carryForward} title={`Before ${next.title}`} limit={4} />
+            <CarryForward data={carryForward} title={anchor.label} limit={4} />
           </Cell>
         )}
 
@@ -503,7 +512,7 @@ export default function Today() {
 
       <Drawer open={keysOpen} onClose={() => setKeysOpen(false)} label="Keyboard shortcuts">
         <dl className="bs-today-keys">
-          {[['R', 'Refresh Today'], ['N', 'Start recording'], ['T', 'Open Tasks'], ['⌘K', 'Search'], ['?', 'Show these shortcuts']].map(([k, label]) => (
+          {[['R', 'Refresh Today'], ['N', 'New recording'], ['T', 'Open Tasks'], ['⌘K', 'Search'], ['?', 'Show these shortcuts']].map(([k, label]) => (
             <div key={k} className="bs-field">
               <dt><span className="bs-k">{k}</span></dt>
               <dd>{label}</dd>

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 vi.mock('../services/supabaseClient', () => ({ supabase: {} }))
 import {
   filterItems, fromActionItem, fromTask, groupByUrgency, lanes, meetingHref, normalizePriority,
-  normalizeStatus, readUrl, sortItems, summarize, taskSource, timecode, toWorkItems, writeUrl,
+  normalizeStatus, nudgeState, readUrl, sortItems, summarize, taskSource, timecode, toWorkItems, writeUrl,
   type TaskActionRow, type TaskRow,
 } from '../services/tasksView'
 
@@ -92,5 +92,23 @@ describe('tasksView', () => {
     expect(s).toEqual({ layout: 'lanes', show: 'done', sort: 'due', tag: null, item: 'task:1', lane: 'review' })
     expect(writeUrl(s)).toEqual({ view: 'lanes', show: 'done', item: 'task:1', lane: 'review' })
     expect(writeUrl(readUrl(new URLSearchParams('')))).toEqual({})
+  })
+})
+
+describe('nudgeState', () => {
+  const row: TaskActionRow = { id: 'a1', task_description: 'Send the SOW', status: 'open', assigned_to_name: 'Pat', assigned_to_email: 'pat@client.test', meeting_id: 'm1' }
+  it('is ready for an open action item whose owner has an email', () => {
+    expect(nudgeState(fromActionItem(row), NOW)).toBe('ready')
+  })
+  it('says recent within 24 hours of the last reminder', () => {
+    const recent = new Date(NOW.getTime() - 2 * 3600 * 1000).toISOString()
+    const old = new Date(NOW.getTime() - 30 * 3600 * 1000).toISOString()
+    expect(nudgeState(fromActionItem({ ...row, last_nudged_at: recent }), NOW)).toBe('recent')
+    expect(nudgeState(fromActionItem({ ...row, last_nudged_at: old }), NOW)).toBe('ready')
+  })
+  it('hides for tasks and done items, and needs an email', () => {
+    expect(nudgeState(fromActionItem({ ...row, status: 'done' }), NOW)).toBe('hidden')
+    expect(nudgeState(fromTask({ id: 't1', title: 'x', status: 'open' } as TaskRow), NOW)).toBe('hidden')
+    expect(nudgeState(fromActionItem({ ...row, assigned_to_email: null }), NOW)).toBe('no_email')
   })
 })

@@ -417,7 +417,7 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
           </span>
           <span>
             <b>Record</b>
-            <span className="bs-lbl">{modKey}M to start</span>
+            <span className="bs-lbl">{modKey}M to set up</span>
           </span>
         </button>
       </aside>

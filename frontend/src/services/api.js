@@ -305,6 +305,8 @@ export const meetingsApi = {
 
   // Update action item status
   updateActionItem: (id, data) => api.patch(`/meetings/action-items/${id}`, data),
+  // Email the owner one reminder in your name (once per item per 24 hours)
+  nudgeActionItem: (id) => api.post(`/meetings/action-items/${id}/nudge`),
 
   // ========================================
   // AI Meeting Summary Widget API (Quick Win 1)
