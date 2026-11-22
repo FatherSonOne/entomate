@@ -81,4 +81,13 @@ const autoJoin = z.object({
   params: z.object({}).passthrough()
 });
 
-module.exports = { createEvent, updateEvent, syncActionItem, syncActionItems, syncMeeting, autoJoin };
+const autoJoinOverride = z.object({
+  body: z.object({
+    eventKey: z.string().min(3).max(300),
+    decision: z.enum(['skip', 'join']).nullable()
+  }),
+  query: z.object({}).passthrough(),
+  params: z.object({}).passthrough()
+});
+
+module.exports = { createEvent, updateEvent, syncActionItem, syncActionItems, syncMeeting, autoJoin, autoJoinOverride };

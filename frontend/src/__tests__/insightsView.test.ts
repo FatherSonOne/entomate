@@ -90,7 +90,7 @@ describe('normalizeInsights', () => {
     expect(out!.actionItems).toEqual({ created: 0, done: 0 })
     expect(out!.followThrough.rate).toBeNull()
     expect(out!.agents.byAgent).toEqual([])
-    expect(out!.owners[0].items).toEqual([])
+    expect(out!.owners[0]?.items).toEqual([])
     expect(out!.weeks).toEqual([])
   })
 })

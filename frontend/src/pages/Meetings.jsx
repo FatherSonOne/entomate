@@ -15,12 +15,19 @@ import {
   actionCounts, attendeeLine, firstDecision, formatLength, groupByTime, matchesFilter,
   meetingDate, meetingLengthMs, meetingStatus, plural, isAutoTitle } from '../services/meetingView'
 import SendBotKey from '../components/bot/SendBotKey'
+import UpcomingMeetings from '../components/meetings/UpcomingMeetings'
 
 const PAGE_SIZE = 20
 /** How long a delete can be undone before it reaches the server. */
 const UNDO_MS = 8000
 
 const meetingsWord = (n) => `${n} ${n === 1 ? 'meeting' : 'meetings'}`
+
+// Past: what was recorded. Upcoming: the calendar ahead, with the bot's plan per meeting.
+const TABS = [
+  { value: 'past', label: 'Past' },
+  { value: 'upcoming', label: 'Upcoming' },
+]
 
 const FILTERS = [
   { value: 'all', label: 'All' },
@@ -51,6 +58,14 @@ export default function Meetings() {
   const [error, setError] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [filter, setFilter] = useState('all')
+  const tab = searchParams.get('tab') === 'upcoming' ? 'upcoming' : 'past'
+  const setTab = (v) => {
+    const next = new URLSearchParams(searchParams)
+    if (v === 'upcoming') next.set('tab', 'upcoming')
+    else { next.delete('tab'); next.delete('view') }
+    setSearchParams(next, { replace: true })
+  }
+  const tabSwitch = <Switch label="Past or upcoming meetings" options={TABS} value={tab} onChange={setTab} />
   const [showRecorder, setShowRecorder] = useState(searchParams.get('new') === 'true')
   const [audioInputDeviceId, setAudioInputDeviceId] = useState('')
   const [selectionMode, setSelectionMode] = useState(false)
@@ -422,6 +437,7 @@ export default function Meetings() {
     </>
   ) : (
     <>
+      {tabSwitch}
       <Switch label="Filter meetings" options={FILTERS} value={filter} onChange={setFilter} />
       <div className="bs-title-keys">
         {meetings.length > 0 && <Key onClick={startSelectionMode}>Select</Key>}
@@ -433,6 +449,19 @@ export default function Meetings() {
       </div>
     </>
   )
+
+  if (tab === 'upcoming') {
+    return (
+      <div className="bs-mtg">
+        <TitleRule
+          title="Meetings"
+          meta={<><b>Upcoming</b> · from your calendar</>}
+          actions={<>{tabSwitch}<div className="bs-title-keys"><SendBotKey variant="primary" /></div></>}
+        />
+        <UpcomingMeetings />
+      </div>
+    )
+  }
 
   return (
     <div className="bs-mtg">
