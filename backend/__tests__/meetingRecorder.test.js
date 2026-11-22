@@ -310,6 +310,18 @@ describe('recorder routes', () => {
     expect(again.status).toBe(409);
   });
 
+  test('a failed summary keeps the transcript and records why', async () => {
+    const server = app();
+    const ai = require('../config/ai');
+    ai.generateSummary.mockRejectedValueOnce(new Error('Summary generation failed: Unexpected token'));
+    const id = await startAndUpload(server, 1);
+    await request(server).post(`/api/recordings/${id}/finish`).set(as(MEMBER)).send({ pieces: 1 });
+    await settle(id);
+    expect(meeting(id).recording_job).toMatchObject({ status: 'done', summaryError: 'Summary generation failed: Unexpected token' });
+    expect(meeting(id).transcript_segments).toHaveLength(4);
+    expect(meeting(id).summary).toBeNull();
+  });
+
   test('silence is a failure that says so', async () => {
     const server = app();
     const id = await startAndUpload(server, 1);
