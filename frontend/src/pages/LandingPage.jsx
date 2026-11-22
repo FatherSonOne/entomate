@@ -86,7 +86,7 @@ export default function LandingPage() {
           <BrandMotion clip={heroClip} className="lc-hero-film" />
           <div className="lc-scrim" aria-hidden="true" />
           <div className="lc-in">
-            <div className="lc-rule lc-eyebrow"><span>01 · The Hands of the Trifecto</span><span>Meeting intelligence that executes</span></div>
+            <div className="lc-rule lc-eyebrow"><span>01 · Meeting intelligence that executes</span></div>
             <h1 id="lc-h1">Meetings end. <em>The work shouldn’t.</em></h1>
             <p className="lc-lede">
               Entomate turns every recording into a transcript, a summary, the decisions made, and action items.
@@ -193,7 +193,7 @@ export default function LandingPage() {
             <h2 id="lc-close-h">Ready to turn meetings <em>into motion?</em></h2>
             <div className="lc-ctas">
               <Link className="lc-btn is-primary" to="/sign-in?mode=signup">Start free <span aria-hidden="true">→</span></Link>
-              <a className="lc-btn" href="https://qntmecos.com" target="_blank" rel="noopener noreferrer">Meet the Trifecto</a>
+              <a className="lc-btn" href="https://qntmecos.com" target="_blank" rel="noopener noreferrer">Explore the ecosystem</a>
             </div>
             <p className="lc-where lc-mono">entomate.logosvision.org · Web</p>
           </div>

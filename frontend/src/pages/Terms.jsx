@@ -33,7 +33,7 @@ export default function Terms() {
             <p>
               These Terms of Service (<strong>“Terms”</strong>) govern your
               access to and use of Entomate (the <strong>“Service”</strong>),
-              operated by Entomate and part of the Trifecto ecosystem
+              operated by Entomate and part of a product ecosystem
               alongside Logos Vision and Pulse. By creating an account, signing
               in, or otherwise using the Service, you agree to these Terms. If
               you’re accepting on behalf of an organization, you represent

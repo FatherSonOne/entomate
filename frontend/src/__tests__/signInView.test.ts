@@ -29,3 +29,14 @@ describe('signInView', () => {
     expect(describeAuthError('signin', '').detail).toMatch(/Try again/)
   })
 })
+
+describe('signInRotation', () => {
+  it('rotates without repeating', async () => {
+    const { nextIndex, SIGNIN_TAGLINES } = await import('../services/signInRotation')
+    const n = SIGNIN_TAGLINES.length
+    expect(nextIndex(0, n, 3)).toBe(1)
+    expect(nextIndex(n - 1, n, 3)).toBe(0)
+    expect(nextIndex(-1, n, 3)).toBe(3)
+    expect(nextIndex(Number.NaN, n, 2)).toBe(2)
+  })
+})
