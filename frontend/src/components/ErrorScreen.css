@@ -1,0 +1,114 @@
+/* Error screen (2026-11-22). Bench tokens via .bs-tokens, so it reads the
+   same in every design style and outside the theme provider. */
+
+.en-err {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 48px 20px;
+  color: var(--bs-ink, var(--t0, #ededE8));
+  font-family: var(--bs-sans, system-ui, sans-serif);
+}
+
+.en-err-app {
+  min-height: 100vh;
+  min-height: 100dvh;
+  align-items: center;
+  background: var(--bs-case, var(--bg0, #0e0e0f));
+}
+
+.en-err-card {
+  width: 100%;
+  max-width: 520px;
+  padding: 28px;
+  background: var(--bs-plate, var(--bg1, #19191a));
+  border: 1px solid var(--bs-rule, rgba(255, 255, 255, 0.1));
+  border-radius: 6px;
+}
+
+.en-err-code {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--bs-mono, ui-monospace, monospace);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--bs-muted, #74746f);
+}
+
+.en-err-led {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--bs-brand, #e0004d);
+}
+.en-err-led[data-kind="stale-deploy"] { background: var(--bs-mint, #00a68f); }
+.en-err-led[data-kind="offline"],
+.en-err-led[data-kind="network"] { background: var(--bs-ai, #e09a00); }
+
+.en-err-title {
+  margin: 14px 0 8px;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+.en-err-body {
+  margin: 0 0 22px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--bs-ink2, #a8a8a2);
+}
+
+.en-err-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.en-err-details {
+  margin-top: 24px;
+  padding-top: 14px;
+  border-top: 1px solid var(--bs-rule2, rgba(255, 255, 255, 0.06));
+  font-size: 13px;
+}
+
+.en-err-details summary {
+  cursor: pointer;
+  font-family: var(--bs-mono, ui-monospace, monospace);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--bs-muted, #74746f);
+}
+.en-err-details summary:focus-visible {
+  outline: 2px solid var(--bs-brand, #e0004d);
+  outline-offset: 2px;
+}
+
+.en-err-msg {
+  margin: 12px 0 8px;
+  color: var(--bs-ink, #ededE8);
+  word-break: break-word;
+}
+
+.en-err-pre {
+  margin: 0 0 12px;
+  max-height: 220px;
+  overflow: auto;
+  padding: 12px;
+  background: var(--bs-sunk, #141415);
+  border-radius: 4px;
+  font-family: var(--bs-mono, ui-monospace, monospace);
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--bs-ink2, #a8a8a2);
+}
+
+.en-err-quiet {
+  min-height: 100vh;
+  background: var(--bs-case, var(--bg0, #0e0e0f));
+}

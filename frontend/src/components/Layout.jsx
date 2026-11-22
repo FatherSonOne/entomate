@@ -1,6 +1,7 @@
 import React, { Suspense, useState, useEffect } from 'react'
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import PageSkeleton from './PageSkeleton'
+import ErrorBoundary from './ErrorBoundary'
 import { BootMark } from './BootLoader'
 import {
   LayoutDashboard,
@@ -275,10 +276,13 @@ export default function Layout() {
         >
           <Faceplate>
             {/* Pages reach shell overlays through the outlet context (Today's Ask Entomate key). */}
-            <Suspense fallback={<PageSkeleton />}>
-              <Outlet context={{ openAssistant: () => { setAssistantOpen(true); setProactiveSuggestion(false) } }} />
-              <BootMark stage="page" />
-            </Suspense>
+            {/* A page that breaks keeps the shell; navigating away clears it */}
+            <ErrorBoundary scope="page" resetKey={location.pathname}>
+              <Suspense fallback={<PageSkeleton />}>
+                <Outlet context={{ openAssistant: () => { setAssistantOpen(true); setProactiveSuggestion(false) } }} />
+                <BootMark stage="page" />
+              </Suspense>
+            </ErrorBoundary>
           </Faceplate>
         </BenchShell>
         {overlays}
@@ -514,10 +518,12 @@ export default function Layout() {
 
         {/* Page content */}
         <main className="p-4 lg:p-6" style={{ position: 'relative', zIndex: 1 }}>
-          <Suspense fallback={<PageSkeleton />}>
-            <Outlet />
-            <BootMark stage="page" />
-          </Suspense>
+          <ErrorBoundary scope="page" resetKey={location.pathname}>
+            <Suspense fallback={<PageSkeleton />}>
+              <Outlet />
+              <BootMark stage="page" />
+            </Suspense>
+          </ErrorBoundary>
         </main>
       </div>
 

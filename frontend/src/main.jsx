@@ -49,7 +49,7 @@ initBoot()
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <ErrorBoundary>
+    <ErrorBoundary scope="app">
     <LoadingProvider>
     <AuthProvider>
       <OrgProvider>
