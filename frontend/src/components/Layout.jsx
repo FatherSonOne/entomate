@@ -31,7 +31,6 @@ import { useToast } from './vc/ToastProvider'
 import '../styles/navigation.css'
 import VCCanvas from './vc/VCCanvas'
 import Logo from './Logo'
-import CrossAppSearch, { useCrossAppSearch } from './CrossAppSearch'
 import EntoAssistant from './EntoAssistant/EntoAssistant'
 import EntoAssistantButton from './EntoAssistant/EntoAssistantButton'
 import EntoAIProactiveChecker from './EntoAssistant/EntoAIProactiveChecker'
@@ -157,7 +156,6 @@ export default function Layout() {
     navigate('/sign-in')
   }
 
-  const { isOpen: crossAppSearchOpen, close: closeCrossAppSearch } = useCrossAppSearch()
   const { hasNew: guideHasNew, dismiss: dismissGuideNew, newCount: guideNewCount } = useGuideNewFeatures()
   const toast = useToast()
 
@@ -215,10 +213,6 @@ export default function Layout() {
       <KeyboardShortcutsHelp
         isOpen={shortcutsHelpOpen}
         onClose={() => setShortcutsHelpOpen(false)}
-      />
-      <CrossAppSearch
-        isOpen={crossAppSearchOpen}
-        onClose={closeCrossAppSearch}
       />
       <EntoAssistant
         isOpen={assistantOpen}

@@ -14,6 +14,7 @@ import RecordingStatus from '../components/meetings/RecordingStatus'
 import RecordingPlayer from '../components/meetings/RecordingPlayer'
 import { canPlay } from '../services/meetingRecorderService'
 import cache from '../services/apiCache'
+import { clipToNotes } from '../services/searchNotesService'
 import { formatClock, toSegments, toSummaryMoments } from '../services/meetingTranscriptService'
 import MeetingIntelligencePanel from '../components/intelligence/MeetingIntelligencePanel'
 import {
@@ -27,7 +28,19 @@ const TABS_ID = 'meeting'
 export default function MeetingDetail() {
   const { id } = useParams()
   const toast = useToast()
+
   const [meeting, setMeeting] = useState(null)
+
+  // Clip a decision or a transcript line to the Notes column on the Search page.
+  const clipToSearchNotes = useCallback(async (note) => {
+    try {
+      await clipToNotes({ origin: 'meeting', sourceType: 'meeting', sourceId: id, sourceLabel: meeting?.title || 'Meeting', ...note })
+      toast.success?.('Clipped to notes', 'Find it in the Notes column on Search.')
+    } catch {
+      toast.error?.('Could not clip', 'Notes are not available right now.')
+    }
+  }, [id, meeting?.title, toast])
+
   // Timed transcript lines; null for pasted or uploaded meetings, which keep the plain view.
   const transcriptSegments = useMemo(() => toSegments(meeting?.transcript_segments), [meeting?.transcript_segments])
   const summaryMoments = useMemo(() => toSummaryMoments(meeting?.summary_moments), [meeting?.summary_moments])
@@ -586,6 +599,7 @@ export default function MeetingDetail() {
                           <span className="bs-tick" aria-hidden="true" />
                           <span className="bs-row-text">{decision}</span>
                           <TimecodeButton atMs={at} onJump={playMoment} label={decision} active={at != null && at === focusAtMs} />
+                          <Key size="sm" className="bs-mtg-clip" onClick={() => clipToSearchNotes({ kind: 'decision', body: String(decision), atMs: at ?? null })} aria-label={`Clip decision to Search notes: ${decision}`}>+ Notes</Key>
                         </li>
                       )
                     })}
@@ -731,6 +745,7 @@ export default function MeetingDetail() {
                   focusAtMs={focusAtMs}
                   playingAtMs={playable ? playingAtMs : null}
                   onPlayFrom={playable ? (atMs) => playerRef.current?.playFrom(atMs) : undefined}
+                  onClip={(line) => clipToSearchNotes({ kind: 'transcript', body: line.speaker ? `${line.speaker}: ${line.text}` : line.text, atMs: line.atMs })}
                   suggestions={meeting.recording_job?.speakerSuggestions}
                   onRenamed={({ segments, transcript }) => {
                     setMeeting(prev => ({ ...prev, transcript_segments: segments, transcript }))

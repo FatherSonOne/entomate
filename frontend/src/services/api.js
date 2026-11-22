@@ -475,11 +475,6 @@ export const searchApi = {
   // Ask follow-up question
   askFollowUp: (data) => api.post('/search/ask/follow-up', data),
 
-  // Get suggestions with autocomplete and trending
-  getSuggestions: (prefix, includeTrending = true) => api.get('/search/suggestions', {
-    params: { prefix, includeTrending: includeTrending ? 'true' : 'false' }
-  }),
-
   // Get recent activity
   getRecent: () => api.get('/search/recent'),
 
@@ -507,19 +502,11 @@ export const searchApi = {
   // Delete conversation
   deleteConversation: (id) => api.delete(`/search/conversations/${id}`),
 
-  // Get search analytics
-  getAnalytics: (period = '7d') => api.get('/search/analytics', { params: { period } }),
+  // One engine for the ⌘K palette and the Search page (services/searchEngine.ts)
+  everything: (data) => api.post('/search/everything', data),
 
-  // Export search results
-  exportResults: async (results, format = 'csv', query = '', searchType = '') => {
-    const response = await api.post('/search/export', {
-      results,
-      format,
-      query,
-      searchType
-    })
-    return response
-  }
+  // Notes column on the Search page (services/searchNotesService.ts)
+  getNotes: () => api.get('/search/notes')
 }
 
 // ========================================

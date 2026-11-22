@@ -41,6 +41,8 @@ export interface TranscriptPanelProps {
   playingAtMs?: number | null
   /** Given when there is audio to play: each line's time plays from that moment. */
   onPlayFrom?: (atMs: number) => void
+  /** Given when lines can be clipped to Search notes: adds a Clip key to each line. */
+  onClip?: (line: TranscriptSegment) => void
 }
 
 /** Index of the line being spoken at `atMs`: the last one that started at or before it. */
@@ -85,7 +87,7 @@ function Highlighted({ text, query }: { text: string; query: string }): React.Re
   )
 }
 
-export function TranscriptPanel({ meetingId, segments, onRenamed, suggestions, focusAtMs, playingAtMs, onPlayFrom }: TranscriptPanelProps): React.ReactElement {
+export function TranscriptPanel({ meetingId, segments, onRenamed, suggestions, focusAtMs, playingAtMs, onPlayFrom, onClip }: TranscriptPanelProps): React.ReactElement {
   const [lines, setLines] = useState<TranscriptSegment[]>(segments)
   const [query, setQuery] = useState('')
   const [current, setCurrent] = useState(0)
@@ -324,7 +326,7 @@ export function TranscriptPanel({ meetingId, segments, onRenamed, suggestions, f
             data-at-ms={line.atMs}
             aria-current={i === activeLine ? 'true' : undefined}
             data-playing={i === playingLine ? 'true' : undefined}
-            className={`grid grid-cols-[3.5rem_1fr] gap-x-3 rounded px-1.5 py-1 text-sm ${
+            className={`group grid ${onClip ? 'grid-cols-[3.5rem_1fr_auto]' : 'grid-cols-[3.5rem_1fr]'} gap-x-3 rounded px-1.5 py-1 text-sm ${
               i === activeLine ? 'ring-2 ring-accent-primary' : ''
             } ${i === playingLine ? 'bg-accent-primary-dim' : ''}`}
           >
@@ -347,6 +349,17 @@ export function TranscriptPanel({ meetingId, segments, onRenamed, suggestions, f
               </span>{' '}
               <Highlighted text={line.text} query={query} />
             </p>
+            {onClip && (
+              <button
+                type="button"
+                onClick={() => onClip(line)}
+                aria-label={`Clip ${formatClock(line.atMs)} to Search notes`}
+                title="Clip to Search notes"
+                className="bs-tr-clip self-start rounded px-1.5 pt-px text-xs text-content-secondary opacity-0 hover:text-content-primary focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary group-hover:opacity-100"
+              >
+                + Notes
+              </button>
+            )}
           </li>
         ))}
       </ol>
