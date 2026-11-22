@@ -307,6 +307,7 @@ async function launchBotSession(p) {
   const { error: updErr } = await db()
     .from('bot_sessions')
     .update({
+      live_state: { captions: Boolean(recallPayload.recording_config.realtime_endpoints) },
       status: 'launching',
       recall_bot_id: bot.id,
       started_at: new Date().toISOString()
@@ -630,8 +631,20 @@ async function setRecordingPaused(sessionId, paused) {
   if (session.status !== 'in_call') throw new Error('The bot is not in the call');
   await recallFetch(`/bot/${session.recall_bot_id}/${paused ? 'pause_recording' : 'resume_recording'}`, { method: 'POST' });
   require('./botCaptions').setPaused(sessionId, paused);
+  await saveLiveState(sessionId, { recording: !paused, pausedByYou: paused, recordingAt: new Date().toISOString() });
   log.info(paused ? 'Bot recording paused' : 'Bot recording resumed', { sessionId });
   return { sessionId, paused };
+}
+
+/** Merge into bot_sessions.live_state (recording / captions flags for the live views). */
+async function saveLiveState(sessionId, patch) {
+  const { data, error } = await db().from('bot_sessions').select('live_state').eq('id', sessionId).maybeSingle();
+  if (error) throw error;
+  const { error: updErr } = await db()
+    .from('bot_sessions')
+    .update({ live_state: { ...(data?.live_state || {}), ...patch } })
+    .eq('id', sessionId);
+  if (updErr) throw updErr;
 }
 
 const MAX_MARKS = 100;
@@ -833,6 +846,14 @@ async function handleRecallWebhook(payload) {
   // Paused / resumed from anywhere (our keys or Recall's own) shows in the live views.
   if (event === 'bot.in_call_not_recording') require('./botCaptions').setPaused(sessionId, true);
   if (event === 'bot.in_call_recording') require('./botCaptions').setPaused(sessionId, false);
+  // Saved on the row too, so "in the call, not recording" survives a restart and the
+  // live views never show REC for a bot that is not recording (e.g. a Zoom host who
+  // has not allowed recording yet).
+  if (event === 'bot.in_call_not_recording' || event === 'bot.in_call_recording') {
+    const recording = event === 'bot.in_call_recording';
+    await saveLiveState(sessionId, { recording, recordingAt: new Date().toISOString(), ...(recording ? { pausedByYou: false } : {}) })
+      .catch((err) => log.warn('Could not save the bot recording state', { sessionId, error: err.message }));
+  }
 
   if (event === 'bot.fatal' && data?.fatal_reason) {
     update.failure_reason = String(data.fatal_reason).slice(0, 500);

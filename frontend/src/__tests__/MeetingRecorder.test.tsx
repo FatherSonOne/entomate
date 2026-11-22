@@ -148,8 +148,8 @@ class FakeRecorder {
 class FakeAudioContext {
   createMediaStreamDestination(): { stream: FakeStream } { return { stream: new FakeStream([new FakeTrack('audio')]) } }
   createMediaStreamSource(): { connect: () => void; disconnect: () => void } { return { connect: () => {}, disconnect: () => {} } }
-  createAnalyser(): { fftSize: number; frequencyBinCount: number; getByteFrequencyData: () => void } {
-    return { fftSize: 0, frequencyBinCount: 8, getByteFrequencyData: () => {} }
+  createAnalyser(): { fftSize: number; frequencyBinCount: number; getByteFrequencyData: () => void; getByteTimeDomainData: (a: Uint8Array) => void } {
+    return { fftSize: 0, frequencyBinCount: 8, getByteFrequencyData: () => {}, getByteTimeDomainData: (a) => a.fill(128) }
   }
   resume(): Promise<void> { return Promise.resolve() }
   close(): Promise<void> { return Promise.resolve() }
@@ -249,6 +249,16 @@ describe('MeetingRecorder', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: /knows it is being recorded/i }))
     fireEvent.click(screen.getByRole('button', { name: /start recording/i }))
     expect(await screen.findByRole('alert')).toHaveTextContent(/No sound was shared/)
+    expect(api.start).not.toHaveBeenCalled()
+  })
+
+  test('a tab shared without its sound is refused even with the microphone on', async () => {
+    getDisplayMedia.mockResolvedValueOnce(new FakeStream([new FakeTrack('video')]))
+    renderRecorder()
+    fireEvent.click(screen.getByRole('radio', { name: /browser tab/i }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /knows it is being recorded/i }))
+    fireEvent.click(screen.getByRole('button', { name: /start recording/i }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(/only your microphone would be heard/)
     expect(api.start).not.toHaveBeenCalled()
   })
 })

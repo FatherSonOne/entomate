@@ -25,6 +25,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import useBotDebriefWatch from './bot/useBotDebriefWatch'
+import MissedBotAlert from './bot/MissedBotAlert'
 import { useOrgSafe } from '../contexts/OrgContext'
 import { useKeyboardShortcuts, getModKey } from '../hooks/useKeyboardShortcuts'
 import CommandPalette from './CommandPalette'
@@ -197,6 +198,8 @@ export default function Layout() {
   // Overlays shared by both shells
   const overlays = (
     <>
+      {/* Auto-join missed a calendar meeting: say so on every page (and re-check the calendar). */}
+      {isAdmin && <MissedBotAlert />}
       <CommandPalette
         isOpen={commandPaletteOpen}
         onClose={() => setCommandPaletteOpen(false)}

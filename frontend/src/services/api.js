@@ -602,6 +602,9 @@ export const calendarApi = {
   // Bot auto-join for calendar meetings
   getAutoJoin: () => api.get('/calendar/auto-join'),
   updateAutoJoin: (body) => api.put('/calendar/auto-join', body),
+  // Check the calendar now (throttled on the server) and read missed meetings; never cached.
+  syncAutoJoin: () => api.post('/calendar/auto-join/sync'),
+  dismissMissedBot: (key) => api.post('/calendar/auto-join/missed/dismiss', { key }),
 
   // Get user's calendars
   getCalendars: () => api.get('/calendar/calendars'),

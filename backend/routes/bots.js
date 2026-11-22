@@ -168,7 +168,18 @@ router.get('/:sessionId/captions', authenticate, authorizeOrgRole(MEMBER_ROLES, 
   try {
     const after = Math.max(0, Number(req.query.after) || 0);
     const optedOut = await optedOutFor(req.params.sessionId);
-    res.json(captions.linesAfter(req.params.sessionId, after, { optOutsHidden: optedOut.size > 0 }));
+    const out = captions.linesAfter(req.params.sessionId, after, { optOutsHidden: optedOut.size > 0 });
+    // Recording state survives a restart on the session row (bots.live_state); captions do not.
+    const { data: session } = supabaseAdmin
+      ? await supabaseAdmin.from('bot_sessions').select('live_state').eq('id', req.params.sessionId).maybeSingle()
+      : { data: null };
+    const ls = session?.live_state || {};
+    res.json({
+      ...out,
+      paused: out.paused || ls.recording === false,
+      pausedByYou: Boolean(ls.pausedByYou) && ls.recording === false,
+      captionsOn: typeof ls.captions === 'boolean' ? ls.captions : null
+    });
   } catch (err) {
     log.error('Captions read failed', { error: err.message });
     res.status(500).json({ error: 'Captions failed' });

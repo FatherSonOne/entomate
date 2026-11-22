@@ -73,7 +73,7 @@ describe('which events qualify', () => {
     ['cancelled', { status: 'cancelled' }],
     ['all_day', { start: { date: '2026-11-22' } }],
     ['started', { start: { dateTime: inMin(-10) } }],
-    ['later', { start: { dateTime: inMin(180) } }],
+    ['later', { start: { dateTime: inMin(13 * 60) } }],
     ['declined', { attendees: [{ email: 'me@acme.com', self: true, responseStatus: 'declined' }, { email: 'a@b.com' }] }],
     ['no_invitees', { attendees: [{ email: 'me@acme.com', self: true }, { email: 'room@acme.com', resource: true }] }],
     ['not_organizer', { organizer: { email: 'boss@acme.com' } }],
@@ -138,5 +138,33 @@ describe('runForUser', () => {
     const r = await aj.runForUser(row, now);
     expect(r.scheduled).toBe(0);
     expect(mockGetEvents).not.toHaveBeenCalled();
+  });
+});
+
+describe('missed meetings', () => {
+  const started = (min, over = {}) => event({ id: `ev${min}`, start: { dateTime: inMin(-min) }, ...over });
+
+  test('a qualifying call that started 3 to 60 minutes ago with no bot is missed', () => {
+    const missed = aj.missedEvents([started(10), started(1), started(90)], [], 'organized', now);
+    expect(missed).toEqual([expect.objectContaining({ title: 'Acme weekly', reason: 'no_bot', start: inMin(-10) })]);
+  });
+
+  test('a bot that got in is fine; one that failed is reported', () => {
+    const ev = started(10);
+    const key = aj.eventKey(ev);
+    expect(aj.missedEvents([ev], [{ id: 's1', calendar_event_key: key, status: 'completed' }], 'organized', now)).toEqual([]);
+    expect(aj.missedEvents([ev], [{ id: 's1', calendar_event_key: key, status: 'failed' }], 'organized', now)[0])
+      .toMatchObject({ reason: 'failed', sessionId: 's1' });
+  });
+
+  test('a call auto-join would not have taken is never missed', () => {
+    expect(aj.missedEvents([started(10, { organizer: { self: false } })], [], 'organized', now)).toEqual([]);
+    expect(aj.missedEvents([started(10, { hangoutLink: null })], [], 'all', now)).toEqual([]);
+  });
+
+  test('healthOf hides dismissed ones', () => {
+    const h = aj.healthOf({ auto_join_health: { lastRunAt: 'x', missed: [{ key: 'a' }, { key: 'b', dismissedAt: 'y' }] } });
+    expect(h).toEqual({ lastRunAt: 'x', missed: [{ key: 'a' }] });
+    expect(aj.healthOf(null)).toEqual({ lastRunAt: null, missed: [] });
   });
 });

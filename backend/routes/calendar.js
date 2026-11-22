@@ -609,11 +609,79 @@ router.get('/auto-join', authenticate, async (req, res) => {
       connected: Boolean(tokens),
       settings,
       upcoming,
-      previewError
+      previewError,
+      health: autoJoin.healthOf(data?.calendar_json)
     });
   } catch (error) {
     log.error('Error getting auto-join settings:', { error: error.message || error });
     res.status(500).json({ error: 'Failed to load auto-join settings' });
+  }
+});
+
+async function calendarJsonFor(userId) {
+  const { data, error } = await supabase.from('user_settings').select('user_id, calendar_json').eq('user_id', userId).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+/** A sync from the app runs at most this often per person; the scheduled runs cover the rest. */
+const SYNC_MIN_GAP_MS = 5 * 60 * 1000;
+
+/**
+ * GET /api/calendar/auto-join/health
+ * When auto-join last checked this person's calendar, and meetings it missed.
+ */
+router.get('/auto-join/health', authenticate, async (req, res) => {
+  try {
+    const row = await calendarJsonFor(req.user.id);
+    res.set('Cache-Control', 'no-store');
+    res.json({ enabled: autoJoin.normalizeSettings(row?.calendar_json?.auto_join).enabled, ...autoJoin.healthOf(row?.calendar_json) });
+  } catch (error) {
+    log.error('Error reading auto-join health:', { error: error.message || error });
+    res.status(500).json({ error: 'Failed to read auto-join status' });
+  }
+});
+
+/**
+ * POST /api/calendar/auto-join/sync
+ * Check this person's calendar now (the app calls it when opened), so a skipped
+ * scheduled run cannot leave a meeting without its bot. At most every 5 minutes.
+ */
+router.post('/auto-join/sync', authenticate, async (req, res) => {
+  try {
+    const row = await calendarJsonFor(req.user.id);
+    const health = autoJoin.healthOf(row?.calendar_json);
+    const enabled = autoJoin.normalizeSettings(row?.calendar_json?.auto_join).enabled;
+    const recent = health.lastRunAt && Date.now() - Date.parse(health.lastRunAt) < SYNC_MIN_GAP_MS;
+    if (!enabled || recent || !calendarService.isConfigured() || !process.env.RECALL_API_KEY) {
+      return res.json({ ran: false, enabled, ...health });
+    }
+    const result = await autoJoin.runForUser(row);
+    const after = autoJoin.healthOf((await calendarJsonFor(req.user.id))?.calendar_json);
+    res.json({ ran: true, enabled, scheduled: result.scheduled, ...after });
+  } catch (error) {
+    log.error('Error syncing auto-join:', { error: error.message || error });
+    res.status(500).json({ error: 'Failed to check your calendar' });
+  }
+});
+
+/**
+ * POST /api/calendar/auto-join/missed/dismiss  { key }
+ * Hide a missed-meeting notice.
+ */
+router.post('/auto-join/missed/dismiss', authenticate, async (req, res) => {
+  try {
+    const key = typeof req.body?.key === 'string' ? req.body.key : '';
+    const row = await calendarJsonFor(req.user.id);
+    const json = row?.calendar_json || {};
+    const h = json.auto_join_health || {};
+    const missed = (Array.isArray(h.missed) ? h.missed : []).map((m) => (m.key === key ? { ...m, dismissedAt: new Date().toISOString() } : m));
+    const { error } = await supabase.from('user_settings').update({ calendar_json: { ...json, auto_join_health: { ...h, missed } } }).eq('user_id', req.user.id);
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (error) {
+    log.error('Error dismissing missed auto-join:', { error: error.message || error });
+    res.status(500).json({ error: 'Failed to dismiss' });
   }
 });
 

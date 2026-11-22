@@ -13,6 +13,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { calendarApi } from '../../services/api'
 import { useOrg } from '../../contexts/OrgContext'
 import { Key, Select, Signal, Toggle } from '../bench'
+import { lastCheckedLabel, toHealth } from '../../services/autoJoinHealth'
 
 const SCOPES = [
   { id: 'organized', label: 'Meetings I organise' },
@@ -107,6 +108,8 @@ export default function CalendarAutoJoinSettings() {
   if (!state) return <p className="bs-agents-note">Loading…</p>
 
   const { settings, connected, configured, botsConfigured, upcoming, previewError } = state
+  const health = toHealth(state.health)
+  const lastChecked = lastCheckedLabel(health.lastRunAt)
   const needsConsent = !settings.consent_at
 
   if (!configured || !botsConfigured) {
@@ -167,6 +170,12 @@ export default function CalendarAutoJoinSettings() {
               </label>
             )}
             {!canSend && <p className="bs-agents-what">Only workspace owners and admins can send the bot.</p>}
+            {settings.enabled && (
+              <p className="bs-agents-what" data-testid="aj-last-checked">
+                {lastChecked ? `Calendar last checked ${lastChecked}.` : 'Not checked yet. It checks every few minutes and whenever you open Entomate.'}
+                {health.missed.length > 0 && ` Missed today: ${health.missed.map((m) => m.title).join(', ')}.`}
+              </p>
+            )}
           </div>
           <Toggle
             checked={settings.enabled}

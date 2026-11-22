@@ -93,3 +93,11 @@ describe('debrief steps while the minutes are written', () => {
     expect(v.debrief.steps.find((s) => s.key === 'summary').state).toBe('waiting');
   });
 });
+
+describe('recording state', () => {
+  test('the view says when the bot is in the call without recording', () => {
+    const v = buildBotView({ session: { ...base, status: 'in_call', ended_at: null, live_state: { recording: false, captions: true } }, now: NOW });
+    expect(v).toMatchObject({ phase: 'live', recording: false, captionsOn: true });
+    expect(buildBotView({ session: { ...base, status: 'in_call', ended_at: null }, now: NOW }).recording).toBeNull();
+  });
+});

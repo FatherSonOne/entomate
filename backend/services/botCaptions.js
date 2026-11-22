@@ -28,6 +28,8 @@ const OPTED_OUT = '(opted out)';
 
 /** @type {Map<string, {seq: number, lines: object[], optedOutIds: Set<string>, paused: boolean, touchedAt: number}>} */
 const calls = new Map();
+/** Captions live in this process: lines from before it started are gone, so "quiet" counts from here. */
+const WATCHING_SINCE = new Date().toISOString();
 
 function secret() {
   return process.env.SESSION_SECRET || 'entomate-dev-session-secret';
@@ -106,6 +108,7 @@ function addTranscriptEvent(sessionId, payload, optedOutEmails = new Set()) {
   const hidden = Boolean((email && optedOutEmails.has(email)) || (pid && call.optedOutIds.has(pid)));
   const name = typeof p.name === 'string' && p.name.trim() ? p.name.trim().slice(0, 80) : pid ? `Speaker ${pid}` : 'Speaker';
   call.seq += 1;
+  call.lastLineAt = new Date().toISOString();
   const line = {
     seq: call.seq,
     atMs: relMs(words[0]?.start_timestamp),
@@ -128,6 +131,8 @@ function linesAfter(sessionId, after = 0, { optOutsHidden = false } = {}) {
     lines: after > 0 ? lines : lines.slice(-60),
     seq: call?.seq || 0,
     paused: Boolean(call?.paused),
+    lastLineAt: call?.lastLineAt || null,
+    watchingSince: WATCHING_SINCE,
     optOutsHidden
   };
 }

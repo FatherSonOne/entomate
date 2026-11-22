@@ -6,7 +6,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Display, Key, Led } from '../bench'
-import { PLATFORM_LABEL, elapsedMs, formatElapsed, runTitle } from '../../services/botView'
+import { PLATFORM_LABEL, elapsedMs, formatElapsed, quietWarning, runTitle } from '../../services/botView'
 
 function useNow(active) {
   const [now, setNow] = useState(() => Date.now())
@@ -28,14 +28,20 @@ const clock = (iso) => new Date(iso).toLocaleTimeString('en-US', { hour: '2-digi
 export function BotLiveDisplay({ view, canControl, onStop, stopping, keys = null, captions = null, paused = false, compact = false, footer = null }) {
   const live = view.phase === 'live'
   const now = useNow(live)
+  // Paused by you, or in the call without recording (e.g. a Zoom host has not allowed it):
+  // never REC unless Recall says it is recording.
+  const byYou = Boolean(captions?.pausedByYou)
   const head = live
     ? paused
-      ? <><Led tone="ai" /> Paused</>
+      ? <><Led tone="ai" /> {byYou ? 'Paused' : 'Not recording'}</>
       : <><Led tone="brand" className="bs-bot-rec" /> REC</>
     : view.phase === 'scheduled'
       ? <><Led tone="off" /> Joins at {clock(view.joinAt)}</>
       : <><Led tone="ai" /> Joining</>
   const elapsed = live ? elapsedMs(view, now) : 0
+  const quiet = live && captions
+    ? quietWarning({ startedAt: view.startedAt, lastLineAt: captions.lastLineAt ?? null, watchingSince: captions.watchingSince ?? null, captionsOn: captions.captionsOn ?? view.captionsOn ?? null, paused }, now)
+    : null
   return (
     <Display className={`bs-bot-disp${compact ? ' is-compact' : ''}`}>
       <div className="bs-bot-disp-head">
@@ -45,12 +51,15 @@ export function BotLiveDisplay({ view, canControl, onStop, stopping, keys = null
       <div className={`bs-bot-clock${live && !paused ? '' : ' is-idle'}`} role="timer" aria-label={live ? `In the call for ${formatElapsed(elapsed)}` : 'Not recording yet'}>
         {formatElapsed(elapsed)}
       </div>
+      {live && !paused && quiet && (
+        <p className="bs-bot-disp-note bs-bot-err" role="alert">{quiet}</p>
+      )}
       {live && captions ? (
-        <CaptionList captions={captions} paused={paused} compact={compact} />
+        <CaptionList captions={captions} paused={paused} byYou={byYou} compact={compact} />
       ) : !compact && (
         <p className="bs-bot-disp-note">
           {live
-            ? 'The bot is in the call and recording. Minutes write themselves when it leaves.'
+            ? paused && !byYou ? NOT_RECORDING : 'The bot is in the call and recording. Minutes write themselves when it leaves.'
             : view.phase === 'scheduled'
               ? 'Your calendar sent this bot. It joins on its own.'
               : 'The bot is asking to join. Let it in from the waiting room if your meeting has one.'}
@@ -70,7 +79,9 @@ export function BotLiveDisplay({ view, canControl, onStop, stopping, keys = null
 }
 
 /** The newest caption lines, newest last; the region announces new lines politely. */
-function CaptionList({ captions, paused, compact }) {
+const NOT_RECORDING = 'The bot is in the call but not recording. On Zoom, the host may need to allow it to record.'
+
+function CaptionList({ captions, paused, byYou = true, compact }) {
   const lines = captions.lines.slice(compact ? -4 : -6)
   const boxRef = useRef(null)
   const lastSeq = lines.length ? lines[lines.length - 1].seq : 0
@@ -80,7 +91,7 @@ function CaptionList({ captions, paused, compact }) {
     <div className="bs-bot-caps" ref={boxRef} aria-live="polite" aria-label="Live captions">
       {lines.length === 0 ? (
         <p className="bs-bot-cap-empty">
-          {paused ? 'Recording is paused. Nothing is recorded or captioned until you resume.'
+          {paused ? (byYou ? 'Recording is paused. Nothing is recorded or captioned until you resume.' : NOT_RECORDING)
             : captions.available ? 'Captions appear here as people speak, a second or two behind.'
               : 'Live captions start with the next bot you send.'}
         </p>
@@ -90,7 +101,7 @@ function CaptionList({ captions, paused, compact }) {
           <span>{l.speaker && <b>{l.speaker}</b>} {l.text}</span>
         </p>
       ))}
-      {paused && lines.length > 0 && <p className="bs-bot-cap-empty">Paused. Nothing is recorded until you resume.</p>}
+      {paused && lines.length > 0 && <p className="bs-bot-cap-empty">{byYou ? 'Paused. Nothing is recorded until you resume.' : NOT_RECORDING}</p>}
     </div>
   )
 }

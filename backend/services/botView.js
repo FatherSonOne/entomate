@@ -115,6 +115,9 @@ function buildBotView({ session, meeting = null, actionItems = [], attendees = [
     endedAt: session.ended_at || null,
     launchedBy: session.consent_acknowledged_by || null,
     autoJoin: Boolean(session.calendar_event_key),
+    // From Recall's in_call_recording / in_call_not_recording; null until Recall says.
+    recording: typeof session.live_state?.recording === 'boolean' ? session.live_state.recording : null,
+    captionsOn: typeof session.live_state?.captions === 'boolean' ? session.live_state.captions : null,
     failure: phase === 'failed' ? friendlyFailure(session.failure_reason) : null,
     meetingReady: Boolean(meeting),
     marks: (Array.isArray(session.marks) ? session.marks : []).map((m) => ({

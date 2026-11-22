@@ -17,7 +17,7 @@ const POLL_MS = 2000
 
 /** Caption lines for a live session, polled every 2 s while `active`. */
 export function useBotCaptions(sessionId, active) {
-  const [state, setState] = useState({ lines: [], seq: 0, paused: false, optOutsHidden: false, available: false })
+  const [state, setState] = useState({ lines: [], seq: 0, paused: false, pausedByYou: false, lastLineAt: null, watchingSince: null, captionsOn: null, optOutsHidden: false, available: false })
   const seqRef = useRef(0)
   useEffect(() => { seqRef.current = 0; setState((s) => ({ ...s, lines: [], seq: 0 })) }, [sessionId])
   const poll = useCallback(async () => {
@@ -29,6 +29,10 @@ export function useBotCaptions(sessionId, active) {
         lines: [...s.lines, ...fresh.filter((l) => l.seq > (s.lines[s.lines.length - 1]?.seq || 0))].slice(-200),
         seq: seqRef.current,
         paused: Boolean(res?.paused),
+        pausedByYou: Boolean(res?.pausedByYou),
+        lastLineAt: typeof res?.lastLineAt === 'string' ? res.lastLineAt : null,
+        watchingSince: typeof res?.watchingSince === 'string' ? res.watchingSince : null,
+        captionsOn: typeof res?.captionsOn === 'boolean' ? res.captionsOn : null,
         optOutsHidden: Boolean(res?.optOutsHidden),
         available: s.available || seqRef.current > 0 || fresh.length > 0,
       }))
@@ -90,12 +94,13 @@ export default function BotLive({ view, canControl, onStop, stopping }) {
   const [note, setNote] = useState(null)
   const [pop, setPop] = useState(null) // { win, root }
 
-  const paused = captions.paused
+  // Not recording: paused here, or Recall reports the bot in the call without recording.
+  const paused = captions.paused || view.recording === false
   const togglePause = async () => {
     setBusy('pause')
     try {
       await (paused ? botsApi.resume(view.sessionId) : botsApi.pause(view.sessionId))
-      setCaptions((s) => ({ ...s, paused: !paused }))
+      setCaptions((s) => ({ ...s, paused: !paused, pausedByYou: !paused }))
       setNote(paused ? 'Recording again' : 'Paused. Nothing is recorded until you resume.')
     } catch {
       setNote(paused ? 'Could not resume. Try again.' : 'Could not pause. Try again.')

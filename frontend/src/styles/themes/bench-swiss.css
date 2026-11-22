@@ -1405,6 +1405,17 @@ html[data-motion="reduce"] .bs-menu-list { animation: none; }
 .bs-recstat-text { font-size: 14px; color: var(--bs-ink); }
 .bs-recstat-spin { width: 16px; height: 16px; color: var(--bs-muted); }
 .bs-recstat-err { grid-column: 1 / -1; font-size: 12.5px; color: var(--bs-brand); }
+/* Auto-join missed a meeting: pinned over every page until sent or dismissed. */
+.bs-missed-bot {
+  position: fixed; z-index: 80; right: 16px; bottom: 16px; left: 16px;
+  max-width: 560px; margin: 0 0 0 auto;
+  background: linear-gradient(color-mix(in srgb, var(--bs-brand) 6%, transparent), color-mix(in srgb, var(--bs-brand) 6%, transparent)), var(--bs-plate);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+}
+.bs-missed-bot-keys { display: flex; gap: 8px; }
+@media (max-width: 640px) {
+  .bs-missed-bot { grid-template-columns: minmax(0, 1fr); bottom: 76px; }
+}
 
 /* Transport: the meeting's display */
 .bs-transport { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 22px; align-items: center; }

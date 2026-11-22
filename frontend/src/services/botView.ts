@@ -38,6 +38,10 @@ export interface BotSessionView {
   endedAt: string | null
   launchedBy: string | null
   autoJoin: boolean
+  /** Recall says the bot is recording (true) or in the call without recording (false); null until it says. */
+  recording?: boolean | null
+  /** Live captions were set up for this bot at launch; null for bots sent before this was saved. */
+  captionsOn?: boolean | null
   failure: string | null
   meetingReady: boolean
   marks: BotMark[]
@@ -151,4 +155,33 @@ export function debriefToOpen(
     && s.endedAt != null
     && now - Date.parse(s.endedAt) < FOCUS_WINDOW_MS,
   ) || null
+}
+
+/** No captions for this long, while the bot should be hearing people, earns a warning. */
+export const QUIET_WARN_MS = 2 * 60 * 1000
+
+export interface QuietInput {
+  startedAt: string | null
+  lastLineAt: string | null
+  /** When this server started collecting captions (lines from before a restart are gone). */
+  watchingSince: string | null
+  captionsOn: boolean | null
+  paused: boolean
+}
+
+/**
+ * "The bot hears nothing": live, recording, captions on, and no caption line for two
+ * minutes. Without captions there is no way to tell, so no warning (never a false alarm).
+ */
+export function quietWarning(input: QuietInput, now = Date.now()): string | null {
+  if (input.paused) return null
+  if (input.captionsOn !== true && !input.lastLineAt) return null
+  const times = [input.startedAt, input.lastLineAt, input.watchingSince]
+    .map((t) => (t ? Date.parse(t) : NaN))
+    .filter((t) => Number.isFinite(t))
+  if (!times.length) return null
+  const quietMs = now - Math.max(...times)
+  if (quietMs < QUIET_WARN_MS) return null
+  const mins = Math.floor(quietMs / 60000)
+  return `Nothing heard for ${mins} minute${mins === 1 ? '' : 's'}. If people are talking, the bot may not be hearing the call. Check that it is still in the meeting.`
 }

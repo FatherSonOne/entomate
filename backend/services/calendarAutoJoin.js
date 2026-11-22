@@ -28,11 +28,20 @@
 const { supabaseAdmin } = require('../config/supabase');
 const log = require('../utils/log');
 
-const LOOKAHEAD_MS = 2 * 60 * 60 * 1000;
+// Twelve hours ahead: Recall holds a scheduled bot and joins at join_at on its own, so
+// one run any time in the half-day before a meeting is enough. GitHub's schedule and a
+// sleeping server both skip runs; a short lookahead turned each skip into a missed meeting.
+const LOOKAHEAD_MS = 12 * 60 * 60 * 1000;
 const GRACE_MS = 5 * 60 * 1000; // still join a meeting that started up to 5 min ago
 const ADMIN_ROLES = ['owner', 'admin'];
 const SCOPES = ['organized', 'all'];
 const LIVE_STATUSES = ['pending', 'launching'];
+/** A qualifying event that started this long ago without a bot is reported as missed. */
+const MISSED_WINDOW_MS = 60 * 60 * 1000;
+/** Allow a bot this long after the start to get in before calling it missed. */
+const MISSED_AFTER_MS = 3 * 60 * 1000;
+const FAILED_STATUSES = ['failed', 'timeout'];
+const MAX_MISSED = 10;
 
 const db = () => supabaseAdmin;
 
@@ -167,7 +176,7 @@ async function runForUser(row, now = new Date()) {
 
   const live = { ...tokens, _onRefresh: (t) => persistTokens(userId, t) };
   const events = await calendar().getEvents(live, {
-    timeMin: new Date(now.getTime() - GRACE_MS).toISOString(),
+    timeMin: new Date(now.getTime() - MISSED_WINDOW_MS).toISOString(),
     timeMax: new Date(now.getTime() + LOOKAHEAD_MS).toISOString(),
     maxResults: 50,
   });
@@ -186,7 +195,7 @@ async function runForUser(row, now = new Date()) {
     .eq('consent_acknowledged_by', userId)
     .not('calendar_event_key', 'is', null)
     .neq('status', 'stopped')
-    .gte('join_at', new Date(now.getTime() - GRACE_MS).toISOString());
+    .gte('join_at', new Date(now.getTime() - MISSED_WINDOW_MS).toISOString());
   if (error) throw error;
   const have = new Set((existing || []).map((s) => s.calendar_event_key));
 
@@ -231,7 +240,83 @@ async function runForUser(row, now = new Date()) {
       log.warn('[AutoJoin] could not withdraw bot', { sessionId: s.id, error: err.message });
     }
   }
+  await recordHealth(userId, missedEvents(events, existing || [], settings.scope, now), now, me)
+    .catch((err) => log.warn('[AutoJoin] could not save the run', { userId, error: err.message }));
   return out;
+}
+
+/**
+ * Qualifying events that started 3 to 60 minutes ago with no bot, or whose bot failed.
+ * Pure: `sessions` are this user's auto-join bot_sessions rows.
+ */
+function missedEvents(events, sessions, scope, now = new Date()) {
+  const byKey = new Map(sessions.map((s) => [s.calendar_event_key, s]));
+  const out = [];
+  for (const event of events || []) {
+    const start = startOf(event);
+    if (!start) continue;
+    const ago = now.getTime() - start.getTime();
+    if (ago < MISSED_AFTER_MS || ago > MISSED_WINDOW_MS) continue;
+    // Would auto-join have taken it, judged at its own start time?
+    if (!qualifies(event, { scope, now: start }).join) continue;
+    const key = eventKey(event);
+    const session = byKey.get(key);
+    if (session && !FAILED_STATUSES.includes(session.status)) continue;
+    out.push({ key, title: event.summary || 'Untitled event', start: start.toISOString(), reason: session ? 'failed' : 'no_bot', sessionId: session?.id || null });
+  }
+  return out;
+}
+
+/**
+ * Save when auto-join last checked this person's calendar, and any missed meetings
+ * (calendar_json.auto_join_health), so the app can show both. A newly missed meeting
+ * is also emailed once: the person is probably in that call, not looking at Entomate.
+ */
+async function recordHealth(userId, missed, now, me) {
+  const { data } = await db().from('user_settings').select('calendar_json').eq('user_id', userId).maybeSingle();
+  const json = data?.calendar_json || {};
+  const prev = json.auto_join_health || {};
+  const known = new Map((Array.isArray(prev.missed) ? prev.missed : []).map((m) => [m.key, m]));
+  const fresh = missed.filter((m) => !known.has(m.key));
+  for (const m of fresh) known.set(m.key, { ...m, notedAt: now.toISOString() });
+  const keep = [...known.values()]
+    .filter((m) => now.getTime() - Date.parse(m.start) < 24 * 60 * 60 * 1000)
+    .sort((a, b) => Date.parse(b.start) - Date.parse(a.start))
+    .slice(0, MAX_MISSED);
+  const health = { ...prev, lastRunAt: now.toISOString(), missed: keep };
+  const { error } = await db().from('user_settings').update({ calendar_json: { ...json, auto_join_health: health } }).eq('user_id', userId);
+  if (error) throw error;
+  if (fresh.length && me?.email) {
+    for (const m of fresh) {
+      await notifyMissed(me.email, m).catch((err) => log.warn('[AutoJoin] missed-bot email failed', { userId, error: err.message }));
+    }
+  }
+  return health;
+}
+
+async function notifyMissed(to, m) {
+  const email = require('./emailService');
+  const base = (process.env.FRONTEND_URL || 'https://entomate.app').replace(/\/$/, '');
+  const when = new Date(m.start).toUTCString().replace(/:00 GMT$/, ' UTC');
+  const why = m.reason === 'failed' ? 'The bot was sent but could not get in.' : 'No bot was sent.';
+  const subject = `Your bot did not join "${m.title}"`;
+  const text = `${why} "${m.title}" started ${when} and Entomate is not recording it.\n\nSend the bot now from ${base}/bot, or record it in the browser from ${base}/meetings.`;
+  const html = `<p>${escapeHtml(why)} <strong>${escapeHtml(m.title)}</strong> started ${escapeHtml(when)} and Entomate is not recording it.</p>`
+    + `<p><a href="${base}/bot">Send the bot now</a> or <a href="${base}/meetings">record it in the browser</a>.</p>`;
+  return email.sendEmail({ to, subject, html, text });
+}
+
+function escapeHtml(v) {
+  return String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+}
+
+/** Auto-join's health for the app: last check and missed meetings not yet dismissed. */
+function healthOf(calendarJson) {
+  const h = calendarJson?.auto_join_health || {};
+  return {
+    lastRunAt: typeof h.lastRunAt === 'string' ? h.lastRunAt : null,
+    missed: (Array.isArray(h.missed) ? h.missed : []).filter((m) => !m.dismissedAt),
+  };
 }
 
 /**
@@ -358,6 +443,8 @@ module.exports = {
   normalizeSettings,
   runForUser,
   runAutoJoin,
+  missedEvents,
+  healthOf,
   withdrawScheduled,
   preview,
   initialize,

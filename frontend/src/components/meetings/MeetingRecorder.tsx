@@ -21,6 +21,7 @@ import React, { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, Bot, Camera, Download, Loader2, Mic, MonitorUp, Square, Trash2 } from 'lucide-react'
 import { formatClock } from '../../services/meetingTranscriptService'
+import { SilenceWatch, levelOf, silenceMessage } from '../../services/silenceWatch'
 import LiveCaptions, { speechRecognitionCtor } from './LiveCaptions'
 import {
   BotInCallError,
@@ -116,6 +117,34 @@ function LevelMeter({ context, stream }: { context: AudioContext; stream: MediaS
   }, [context, stream])
 
   return <canvas ref={canvasRef} width={300} height={32} aria-hidden="true" className="h-8 w-full text-accent-primary" />
+}
+
+/** A loud warning while the recording hears nothing (muted mic, tab shared without sound). */
+function SilenceAlert({ context, stream, mode }: { context: AudioContext; stream: MediaStream; mode: RecorderMode }): React.ReactElement | null {
+  const [silentMs, setSilentMs] = useState(0)
+  useEffect(() => {
+    const analyser = context.createAnalyser()
+    analyser.fftSize = 1024
+    const source = context.createMediaStreamSource(stream)
+    source.connect(analyser)
+    const data = new Uint8Array(analyser.fftSize)
+    const watch = new SilenceWatch(Date.now())
+    const timer = window.setInterval(() => {
+      analyser.getByteTimeDomainData(data)
+      setSilentMs(watch.push(levelOf(data), Date.now()))
+    }, 500)
+    return () => {
+      window.clearInterval(timer)
+      source.disconnect()
+    }
+  }, [context, stream])
+  const message = silenceMessage(silentMs, mode)
+  if (!message) return null
+  return (
+    <p role="alert" data-testid="recorder-silence" className="flex items-start gap-2 rounded-lg border border-semantic-error p-2 text-sm font-medium text-semantic-error">
+      <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden="true" /> {message}
+    </p>
+  )
 }
 
 function Preview({ stream }: { stream: MediaStream }): React.ReactElement {
@@ -224,9 +253,15 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded }: MeetingRecor
         throw err
       }
     }
-    if (!streams.some((s) => s.getAudioTracks().length)) {
+    // Without the tab's sound only your microphone is heard: in a call on headphones,
+    // nobody else would be in the recording. Refuse rather than record half a meeting.
+    if (!tab.getAudioTracks().length) {
       streams.forEach((s) => s.getTracks().forEach((t) => t.stop()))
-      throw new Error('No sound was shared. Share a tab and turn on "Also share tab audio", or record your microphone too.')
+      throw new Error(
+        withMic
+          ? 'The tab was shared without its sound, so only your microphone would be heard. Share the tab again and turn on "Also share tab audio". For a call in a desktop app, use Microphone instead.'
+          : 'No sound was shared. Share a tab and turn on "Also share tab audio", or record your microphone too.',
+      )
     }
     return { streams, video: tab.getVideoTracks()[0] ?? null }
   }
@@ -550,6 +585,7 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded }: MeetingRecor
               {c && phase === 'recording' && (
                 <LevelMeter context={c.audioContext} stream={c.audioRecorder.stream} />
               )}
+              {c && phase === 'recording' && <SilenceAlert context={c.audioContext} stream={c.audioRecorder.stream} mode={mode} />}
               {c && phase === 'recording' && captions && (
                 <LiveCaptions
                   track={c.audioRecorder.stream.getAudioTracks()[0] ?? null}
