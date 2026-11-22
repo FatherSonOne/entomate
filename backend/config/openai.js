@@ -83,7 +83,7 @@ class OpenAIService {
    * @param {string} transcript - Meeting transcript
    * @returns {Promise<Object>} Summary with keyPoints, decisions, sentiment
    */
-  async generateSummary(transcript) {
+  async generateSummary(transcript, options = {}) {
     if (!this.isConfigured()) {
       throw new Error('OpenAI API not configured');
     }
@@ -116,7 +116,7 @@ Return JSON with this exact structure:
   "nextSteps": ["step 1", "step 2"],
   "participantCount": number or null if unclear,
   "estimatedDuration": "X minutes" or null if unclear
-}`
+}${options.addon || ''}`
           }
         ],
         temperature: 0.3,

@@ -1,7 +1,7 @@
 // ─── Entomate User Guide Data ─────────────────────────────────────────────
 // Version tracking — update these when guide content changes
 
-export const guideVersion = '2026-11-22b'
+export const guideVersion = '2026-11-22c'
 export const guideUpdated = 'April 12, 2026'
 
 // ─── Version key for localStorage new-feature detection ───────────────────
@@ -337,6 +337,17 @@ export const guideSections = [
           'Use Select All or Deselect All for quick selection.',
           'Bulk Delete \u2014 Remove selected meetings (with confirmation).',
           'Bulk Export \u2014 Export selected meetings as a Markdown file.',
+        ],
+      },
+      {
+        id: 'mtg-templates',
+        title: 'Summaries by meeting type',
+        badge: 'New',
+        description: 'Each summary is written for the kind of meeting it was.',
+        steps: [
+          'Entomate picks a type from the title: Stand-up, 1:1, Sales call, Client review, Interview, Planning, or General. A meeting with exactly two people counts as a 1:1.',
+          'Typed meetings get extra sections under the summary, e.g. a 1:1 shows Wins, Blockers and concerns, Feedback given, Growth and goals.',
+          'To change it, open the meeting, pick a Meeting type under the summary and press Rewrite summary. This replaces the summary, key points and decisions; the type is kept for later reprocessing.',
         ],
       },
       {

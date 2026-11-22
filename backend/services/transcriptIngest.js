@@ -24,6 +24,7 @@
 const { supabaseAdmin } = require('../config/supabase');
 const ai = require('../config/ai');
 const log = require('../utils/log');
+const summaryTemplates = require('./summaryTemplates');
 const transcriptMoments = require('./transcriptMoments');
 
 const MAX_TRANSCRIPT_BYTES = 25 * 1024 * 1024;
@@ -280,7 +281,7 @@ async function ingestBotTranscript(sessionId, { transcriptUrl } = {}) {
   let embedding = null;
   if (ai.isConfigured()) {
     try {
-      ({ summaryData, actionItems, embedding } = await runAIPipeline(transcript, title));
+      ({ summaryData, actionItems, embedding } = await runAIPipeline(transcript, title, { attendees: attendeesFromTranscript(raw) }));
     } catch (err) {
       log.warn('Transcript ingest: AI pipeline failed, saving transcript only', { sessionId, error: err.message });
     }
@@ -301,6 +302,7 @@ async function ingestBotTranscript(sessionId, { transcriptUrl } = {}) {
     decisions,
     summary_moments: transcriptMoments.summaryMoments(segments, keyPoints, decisions),
     topics: summaryData.topics || [],
+    ...summaryTemplates.summaryFields(summaryData),
     sentiment_label: summaryData.sentiment || null,
     sentiment_score: summaryData.sentimentScore ?? null,
     attendees: attendeesFromTranscript(raw),

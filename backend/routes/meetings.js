@@ -17,6 +17,7 @@ const calendarService = require('../services/calendarService');
 const meetingNotes = require('../services/meetingNotesService');
 const meetingEvents = require('../services/meetingEvents');
 const transcriptMoments = require('../services/transcriptMoments');
+const summaryTemplates = require('../services/summaryTemplates');
 
 const router = express.Router();
 
@@ -105,7 +106,7 @@ router.post('/process', authenticate, upload.single('audio'), validate(schemas.p
     const transcript = await ai.transcribeAudio(req.file.buffer, req.file.mimetype);
 
     // Step 2: Run AI pipeline (summary, action items, embedding)
-    const { summaryData, actionItems, embedding } = await runAIPipeline(transcript, title);
+    const { summaryData, actionItems, embedding } = await runAIPipeline(transcript, title, { attendees: parseAttendees(attendees) });
 
     // Step 3: Upload audio to Supabase Storage
     let audioUrl = null;
@@ -147,6 +148,7 @@ router.post('/process', authenticate, upload.single('audio'), validate(schemas.p
       sentiment_label: summaryData.sentiment,
       sentiment_score: summaryData.sentimentScore || 0.5,
       topics: summaryData.topics || [],
+      ...summaryTemplates.summaryFields(summaryData),
       attendees: parseAttendees(attendees),
       duration_minutes: durationMin || null,
       start_time: startTime,
@@ -242,7 +244,7 @@ router.post('/transcript', authenticate, validate(schemas.transcript), async (re
     log.info('Processing transcript:', title || 'Untitled Meeting');
 
     // Run AI pipeline (summary, action items, embedding)
-    const { summaryData, actionItems, embedding } = await runAIPipeline(transcript, title);
+    const { summaryData, actionItems, embedding } = await runAIPipeline(transcript, title, { attendees: parseAttendees(attendees) });
 
     // Save meeting
     const meetingId = uuidv4();
@@ -258,6 +260,7 @@ router.post('/transcript', authenticate, validate(schemas.transcript), async (re
       sentiment_label: summaryData.sentiment,
       sentiment_score: summaryData.sentimentScore || 0.5,
       topics: summaryData.topics || [],
+      ...summaryTemplates.summaryFields(summaryData),
       attendees: parseAttendees(attendees),
       duration_minutes: parseDuration(summaryData.estimatedDuration),
       start_time: now.toISOString(),
@@ -842,11 +845,16 @@ router.get('/:id/recap', authenticate, async (req, res) => {
  * Used by /process, /transcript, and /:id/reprocess routes.
  *
  * @param {string} transcript - The meeting transcript text
- * @param {string} title - Meeting title (used for embedding context)
+ * @param {string} title - Meeting title (used for embedding context and template choice)
+ * @param {{ attendees?: unknown[], template?: string|null }} [opts]
  * @returns {{ summaryData, actionItems, embedding }}
  */
-async function runAIPipeline(transcript, title) {
-  const summaryData = await ai.generateSummary(transcript);
+async function runAIPipeline(transcript, title, opts = {}) {
+  // Summary template per meeting type: chosen on the meeting page, else guessed from title/attendees.
+  const template = summaryTemplates.detectTemplate({ title, attendees: opts.attendees, chosen: opts.template });
+  const summaryData = await ai.generateSummary(transcript, { addon: summaryTemplates.promptAddon(template) });
+  summaryData.template = template;
+  summaryData.sections = summaryTemplates.normalizeSections(summaryData.sections, template);
   const actionItems = await ai.extractActionItems(transcript);
 
   let embedding = null;
@@ -1121,7 +1129,7 @@ router.post('/:id/reprocess', userOrServiceAuth, async (req, res) => {
     }
 
     // Run AI pipeline
-    const { summaryData, actionItems: rawActionItems, embedding } = await runAIPipeline(transcript, meeting.title);
+    const { summaryData, actionItems: rawActionItems, embedding } = await runAIPipeline(transcript, meeting.title, { attendees: meeting.attendees, template: meeting.summary_template });
     const segments = Array.isArray(meeting.transcript_segments) ? meeting.transcript_segments : null;
     const actionItems = transcriptMoments.withActionItemMoments(segments, rawActionItems);
 
@@ -1134,6 +1142,7 @@ router.post('/:id/reprocess', userOrServiceAuth, async (req, res) => {
       sentiment_label: summaryData.sentiment,
       sentiment_score: summaryData.sentimentScore || 0.5,
       topics: summaryData.topics || [],
+      ...summaryTemplates.summaryFields(summaryData),
       duration_minutes: meeting.duration_minutes || parseDuration(summaryData.estimatedDuration),
       updated_at: new Date().toISOString(),
     };

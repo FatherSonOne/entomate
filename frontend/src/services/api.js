@@ -296,7 +296,11 @@ export const meetingsApi = {
   getMeetingSummary: (id) => api.get(`/meeting-summary/${id}`),
 
   // Regenerate AI summary
-  regenerateSummary: (id) => api.post(`/meeting-summary/${id}/regenerate`),
+  // Regenerate AI summary, optionally with a summary template (one_on_one, standup, sales, ...)
+  regenerateSummary: (id, template) => api.post(`/meeting-summary/${id}/regenerate`, template ? { template } : {}),
+
+  // Summary templates per meeting type
+  summaryTemplates: () => api.get('/meeting-summary/templates'),
 
   // Publish to Logos CRM
   publishToCRM: (id) => api.post(`/meeting-summary/${id}/publish-crm`)

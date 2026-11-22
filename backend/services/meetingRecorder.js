@@ -25,6 +25,7 @@
 const { supabase } = require('../config/supabase');
 const ai = require('../config/ai');
 const geminiRecording = require('../config/geminiRecording');
+const summaryTemplates = require('./summaryTemplates');
 const transcriptMoments = require('./transcriptMoments');
 const log = require('../utils/log');
 
@@ -169,7 +170,7 @@ async function purgeRecordingAudio(orgId, meetingId) {
 async function loadMeeting(meetingId) {
   const { data, error } = await supabase
     .from('meetings')
-    .select('id, org_id, title, created_by, start_time, attendees, recording_job')
+    .select('id, org_id, title, created_by, start_time, attendees, recording_job, summary_template')
     .eq('id', meetingId)
     .maybeSingle();
   if (error) throw error;
@@ -376,7 +377,7 @@ async function transcribeMeeting(meetingId) {
       summaryError = 'AI provider not configured';
     } else {
       try {
-        ({ summaryData, actionItems, embedding } = await runAIPipeline(transcript, meeting.title));
+        ({ summaryData, actionItems, embedding } = await runAIPipeline(transcript, meeting.title, { attendees: meeting.attendees, template: meeting.summary_template }));
       } catch (err) {
         // The transcript is the valuable part; the summary can be rebuilt with Reprocess.
         summaryError = String(err?.message || err).slice(0, 500);
@@ -399,6 +400,7 @@ async function transcribeMeeting(meetingId) {
       decisions,
       summary_moments: segments.length ? transcriptMoments.summaryMoments(segments, keyPoints, decisions) : null,
       topics: summaryData.topics || [],
+      ...summaryTemplates.summaryFields(summaryData),
       sentiment_label: summaryData.sentiment || null,
       sentiment_score: summaryData.sentimentScore ?? null,
       // Names typed before recording win; otherwise the speakers Gemini heard.

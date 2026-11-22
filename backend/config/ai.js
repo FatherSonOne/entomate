@@ -78,8 +78,8 @@ class AIService {
    * @param {string} transcript - Meeting transcript
    * @returns {Promise<Object>} Summary with keyPoints, decisions, sentiment
    */
-  async generateSummary(transcript) {
-    return this.provider.generateSummary(transcript);
+  async generateSummary(transcript, options = {}) {
+    return this.provider.generateSummary(transcript, options);
   }
 
   /**
