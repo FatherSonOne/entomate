@@ -35,12 +35,18 @@ router.post('/crm/sync-action-items', authenticate, validate(schemas.syncActionI
       return res.status(503).json({ error: 'Database not configured' });
     }
 
+    // Never mark items "synced" when nothing was sent: with no CRM set up, say so.
+    if (!crmService.configured) {
+      return res.status(409).json({ error: 'No CRM is connected, so nothing was sent.' });
+    }
+
     // Get action items to sync
     let query = supabase
       .from('action_items')
       .select('*')
       .in('org_id', req.orgIds)
-      .eq('crm_sync_status', 'pending');
+      // failed items are retried; synced ones are never sent twice
+      .in('crm_sync_status', ['pending', 'failed']);
 
     if (!syncAll && actionItemIds && actionItemIds.length > 0) {
       query = query.in('id', actionItemIds);
@@ -69,27 +75,20 @@ router.post('/crm/sync-action-items', authenticate, validate(schemas.syncActionI
         }
 
         // Create task in CRM using the CRM service
-        let crmTaskId;
-        if (crmService.configured) {
-          const crmResult = await crmService.createTask({
-            title: item.task_description,
-            task_description: item.task_description,
-            description: item.context,
-            context: item.context,
-            assigned_to_email: item.assigned_to_email,
-            due_date: item.due_date,
-            priority: item.priority
-          });
+        const crmResult = await crmService.createTask({
+          title: item.task_description,
+          task_description: item.task_description,
+          description: item.context,
+          context: item.context,
+          assigned_to_email: item.assigned_to_email,
+          due_date: item.due_date,
+          priority: item.priority
+        });
 
-          if (!crmResult.success) {
-            throw new Error(crmResult.error || 'CRM task creation failed');
-          }
-          crmTaskId = crmResult.taskId;
-        } else {
-          // Fallback: simulate CRM task creation if not configured
-          log.info('CRM not configured, simulating task creation');
-          crmTaskId = `simulated-${uuidv4().substring(0, 8)}`;
+        if (!crmResult.success) {
+          throw new Error(crmResult.error || 'CRM task creation failed');
         }
+        const crmTaskId = crmResult.taskId;
 
         // Update action item with sync status
         await supabase

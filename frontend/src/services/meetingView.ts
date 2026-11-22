@@ -65,14 +65,19 @@ export function meetingDate(m: MeetingRow): Date {
   return Number.isNaN(d.getTime()) ? new Date(m.created_at) : d
 }
 
-/** Length in ms: the end of the last transcript line, else duration_minutes. */
+/**
+ * Length in ms: the longer of the transcript's last line and the recorded duration_minutes.
+ * The transcript alone under-reports when a bot joins late or transcription stops early,
+ * so it never wins over a longer recorded length.
+ */
 export function meetingLengthMs(m: MeetingRow, segments: TranscriptSegment[] | null = toSegments(m.transcript_segments)): number {
+  let end = 0
   if (segments && segments.length) {
     const last = segments[segments.length - 1]!
-    const end = Math.max(last.endMs ?? last.atMs, last.atMs)
-    if (end > 0) return end
+    end = Math.max(last.endMs ?? last.atMs, last.atMs)
   }
-  return typeof m.duration_minutes === 'number' && m.duration_minutes > 0 ? m.duration_minutes * 60_000 : 0
+  const recorded = typeof m.duration_minutes === 'number' && m.duration_minutes > 0 ? m.duration_minutes * 60_000 : 0
+  return Math.max(end, recorded)
 }
 
 /** 46m, 1h 05m: a length a person reads in a list. */

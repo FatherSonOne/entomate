@@ -31,7 +31,8 @@ const list = z.object({
     projectId: z.string().uuid().optional(),
     search: z.string().optional(),
     startDate: z.string().optional(),
-    endDate: z.string().optional()
+    endDate: z.string().optional(),
+    status: z.enum(['all', 'live', 'ready', 'attention']).optional()
   }).passthrough(),
   params: z.object({}).passthrough()
 });

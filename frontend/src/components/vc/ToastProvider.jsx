@@ -17,9 +17,10 @@ export function ToastProvider({ children }) {
     setToasts(prev => prev.filter(t => t.id !== id))
   }, [])
 
-  const addToast = useCallback(({ title, message, color = 'crimson', icon, duration = 4000 }) => {
+  // action: optional { label, onClick } key in the toast (e.g. Undo); pressing it closes the toast.
+  const addToast = useCallback(({ title, message, color = 'crimson', icon, duration = 4000, action }) => {
     const id = ++toastId
-    setToasts(prev => [...prev, { id, title, message, color, icon }])
+    setToasts(prev => [...prev, { id, title, message, color, icon, action }])
     if (duration > 0) {
       timersRef.current[id] = setTimeout(() => dismiss(id), duration)
     }
@@ -43,6 +44,15 @@ export function ToastProvider({ children }) {
           {toasts.map(t => (
             <div key={t.id} className="vc-toast-item">
               <VCToast title={t.title} message={t.message} color={t.color} icon={t.icon} />
+              {t.action && (
+                <button
+                  type="button"
+                  className="vc-toast-action"
+                  onClick={() => { dismiss(t.id); t.action.onClick() }}
+                >
+                  {t.action.label}
+                </button>
+              )}
               <button className="vc-toast-close" onClick={() => dismiss(t.id)} aria-label="Dismiss">
                 <X size={14} />
               </button>

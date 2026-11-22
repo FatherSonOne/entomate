@@ -329,7 +329,7 @@ router.post('/transcript', authenticate, validate(schemas.transcript), async (re
  */
 router.get('/', authenticate, validate(schemas.list), async (req, res) => {
   try {
-    const { limit = 20, offset = 0, projectId, search, startDate, endDate } = req.query;
+    const { limit = 20, offset = 0, projectId, search, startDate, endDate, status } = req.query;
 
     if (!supabase) {
       return res.json({ meetings: [], count: 0, hasMore: false });
@@ -353,6 +353,16 @@ router.get('/', authenticate, validate(schemas.list), async (req, res) => {
     if (search) {
       const sanitized = search.replace(/[%_\\]/g, '\\$&');
       query = query.or(`title.ilike.%${sanitized}%,summary.ilike.%${sanitized}%`);
+    }
+
+    // Status filter: a coarse superset of the list's status words (frontend
+    // services/meetingView.ts meetingStatus); the page applies the exact rule.
+    if (status === 'live') {
+      query = query.in('recording_job->>status', ['recording', 'transcribing']);
+    } else if (status === 'ready') {
+      query = query.or('summary.not.is.null,chat_posted.eq.true');
+    } else if (status === 'attention') {
+      query = query.or('summary.is.null,summary.eq.,recording_job->>status.in.(failed,transcribing)');
     }
 
     if (startDate) {

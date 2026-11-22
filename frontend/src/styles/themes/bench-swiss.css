@@ -1256,7 +1256,7 @@ html.bs-scroll-lock, html.bs-scroll-lock body { overflow: hidden; }
 .bs-mtg-foot { display: flex; align-items: center; gap: 10px; padding-top: 22px; }
 .bs-mtg-ask { display: flex; gap: 8px; align-items: center; }
 .bs-mtg-ask .bs-input { flex: 1; }
-.bs-mtg-answer { margin-top: 18px; padding: 14px 0 0 16px; border-left: 3px solid var(--bs-ai); display: flex; flex-direction: column; gap: 8px; }
+.bs-mtg-answer { margin-top: 18px; padding: 14px 16px; border-radius: 8px; background: color-mix(in srgb, var(--bs-ai) 9%, transparent); display: flex; flex-direction: column; gap: 8px; }
 .bs-mtg-share { display: flex; flex-direction: column; gap: 14px; padding-top: 14px; }
 .bs-mtg-share-field { display: flex; flex-direction: column; gap: 6px; }
 .bs-mtg-share-keys { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -1268,11 +1268,12 @@ html.bs-scroll-lock, html.bs-scroll-lock body { overflow: hidden; }
   gap: 8px 16px;
   align-items: center;
   margin-top: 22px;
-  padding: 12px 0 12px 14px;
-  border-left: 3px solid var(--bs-brand);
+  padding: 12px 14px;
+  border-top: 2px solid var(--bs-brand);
   border-bottom: 1px solid var(--bs-rule);
+  background: color-mix(in srgb, var(--bs-brand) 5%, transparent);
 }
-.bs-recstat[data-tone="live"] { border-left-color: var(--bs-live); }
+.bs-recstat[data-tone="live"] { border-top-color: var(--bs-live); background: color-mix(in srgb, var(--bs-live) 6%, transparent); }
 .bs-recstat-text { font-size: 14px; color: var(--bs-ink); }
 .bs-recstat-spin { width: 16px; height: 16px; color: var(--bs-muted); }
 .bs-recstat-err { grid-column: 1 / -1; font-size: 12.5px; color: var(--bs-brand); }
@@ -1342,6 +1343,7 @@ html.bs-scroll-lock, html.bs-scroll-lock body { overflow: hidden; }
 .bs-transcript [data-testid="transcript-line"] {
   grid-template-columns: 3.4rem minmax(0, 1fr);
   padding: 10px 6px 10px 0;
+  align-items: start;
   border-radius: 0;
   border-bottom: 1px solid var(--bs-rule2);
   font-size: 13.5px;
@@ -1353,13 +1355,13 @@ html.bs-scroll-lock, html.bs-scroll-lock body { overflow: hidden; }
 .bs-transcript [data-testid="transcript-line"] p > span:first-child { font-weight: 600; color: var(--bs-ink); }
 .bs-transcript [data-testid="transcript-line"][aria-current="true"] {
   --tw-ring-shadow: 0 0 #0000;
-  box-shadow: inset 3px 0 0 var(--bs-brand);
+  box-shadow: none;
   background: color-mix(in srgb, var(--bs-brand) 8%, transparent);
 }
-.bs-transcript [data-testid="transcript-line"][aria-current="true"] > span:first-child { padding-left: 11px; color: var(--bs-brand); }
+.bs-transcript [data-testid="transcript-line"][aria-current="true"] > span:first-child { color: var(--bs-brand); }
 /* A recording that can play: each line's time is a "Play from" button; the playing line is tinted. */
 .bs-transcript [data-testid="transcript-line"] > button:first-child { font-family: var(--bs-mono); font-size: 11px; color: var(--bs-muted); padding-left: 2px; }
-.bs-transcript [data-testid="transcript-line"][aria-current="true"] > button:first-child { padding-left: 11px; color: var(--bs-brand); }
+.bs-transcript [data-testid="transcript-line"][aria-current="true"] > button:first-child { color: var(--bs-brand); }
 .bs-transcript [data-testid="transcript-line"][data-playing="true"] { background: color-mix(in srgb, var(--bs-brand) 5%, transparent); }
 .bs-transcript mark { background: color-mix(in srgb, var(--bs-brand) 14%, transparent); color: var(--bs-ink); }
 
@@ -1407,7 +1409,7 @@ html.bs-scroll-lock, html.bs-scroll-lock body { overflow: hidden; }
 .bs-agentnotes details { margin-top: 6px; font-size: 12.5px; }
 .bs-agentnotes summary { gap: 7px; font: 500 10.5px var(--bs-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--bs-ink2); }
 .bs-agentnotes summary > span:first-child { width: 8px; height: 8px; border-radius: 50%; background: var(--bs-ai); box-shadow: 0 0 6px var(--bs-ai); }
-.bs-agentnotes dl { margin-top: 8px; padding-left: 14px; border-left: 2px solid var(--bs-ai); }
+.bs-agentnotes dl { margin-top: 8px; padding: 8px 12px; border-radius: 6px; background: color-mix(in srgb, var(--bs-ai) 8%, transparent); }
 .bs-agentnotes dt { color: var(--bs-ink); }
 .bs-agentnotes dt .font-mono { font-family: var(--bs-mono); color: var(--bs-ai); }
 .bs-agentnotes dd { color: var(--bs-ink2); margin: 2px 0 6px; }
@@ -1944,6 +1946,15 @@ html:not([data-style="bench-swiss"]) .bs-pal-wrap {
 .bs-mtg-clip { flex: none; opacity: 0; transition: opacity 150ms; }
 .bs-row:hover .bs-mtg-clip, .bs-mtg-clip:focus-visible { opacity: 1; }
 @media (hover: none) { .bs-mtg-clip { opacity: 1; } }
+/* Send to CRM drawer: what goes, one ruled row per action item */
+.bs-crm-list { margin-top: 4px; }
+.bs-crm-list .bs-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; }
+.bs-crm-list .bs-row-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bs-crm-task { font-size: 14px; color: var(--bs-ink); overflow-wrap: anywhere; }
+.bs-crm-meta { font: 500 11px var(--bs-mono); letter-spacing: 0.04em; color: var(--bs-muted); }
+/* A line with a clip key keeps it in a third column (not a hidden second row). */
+.bs-transcript [data-testid="transcript-line"]:has(.bs-tr-clip) { grid-template-columns: 3.4rem minmax(0, 1fr) auto; }
+.bs-transcript [data-testid="transcript-line"]:focus-within .bs-tr-clip { opacity: 1; }
 .bs-transcript .bs-tr-clip { font-family: var(--bs-mono); font-size: 10.5px; letter-spacing: 0.04em; }
 @media (hover: none) { .bs-transcript .bs-tr-clip { opacity: 1; } }
 .bs-row-dec:has(.bs-mtg-clip) { grid-template-columns: auto minmax(0, 1fr) auto auto; }
