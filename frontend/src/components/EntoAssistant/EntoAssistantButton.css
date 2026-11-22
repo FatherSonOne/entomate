@@ -1,0 +1,349 @@
+/* =========================================================================
+   Logos launcher — an instrument, not a nav row (org/AI Swiss PR 2, C).
+
+   [orb] Logos  19 WAITING            Ctrl /
+   ·········· voice field ··········  [mic]
+
+   It is the one control in the sidebar that listens and talks, so it breaks
+   the row grammar on purpose: an orb instead of a glyph, a field of dots that
+   moves with the voice, and a square mic. No box and no shadow: the dock's ink
+   rule above it is the frame. Colour appears only as STATE (patina = listening,
+   terracotta = the assistant answering) and as the accent "waiting" count.
+   ========================================================================= */
+
+.la-launcher {
+  /* The ink the dot field, the voice word and a filled mic draw with. State retints it. */
+  --la-launcher-ink: var(--cmf-text-muted, #6b7280);
+  --la-launcher-patina: #2D7F73; /* patina-deep: #3B9E8F is 2.76:1 on light */
+  --la-launcher-terracotta: #B85C38;
+
+  position: relative;
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--cmf-text, #1a1a1a);
+}
+
+/* ---- Voice states: the only place the instrument takes a colour ---- */
+
+.la-launcher[data-voice="listening"] {
+  --la-launcher-ink: var(--la-launcher-patina);
+}
+
+.la-launcher[data-voice="speaking"] {
+  --la-launcher-ink: var(--la-launcher-terracotta);
+}
+
+.la-launcher[data-voice="thinking"] {
+  --la-launcher-ink: var(--cmf-text-secondary, #45423D);
+}
+
+/* ---- Main hit area: row 1 (orb, name, word, keycap) over the field ---- */
+
+.la-launcher-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 2px;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.la-launcher-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 26px;
+  min-width: 0;
+}
+
+/* Focus takes the instrument's own ink, never the generic accent: terracotta on a
+   listening launcher would read as "answering". While a state holds, the ring is
+   that state's colour. */
+.la-launcher-main:focus-visible,
+.la-launcher-mic:focus-visible {
+  outline: 2px solid var(--cmf-text, #1a1a1a);
+  outline-offset: 2px;
+}
+
+.la-launcher[data-voice="listening"] .la-launcher-main:focus-visible,
+.la-launcher[data-voice="listening"] .la-launcher-mic:focus-visible,
+.la-launcher[data-voice="speaking"] .la-launcher-main:focus-visible,
+.la-launcher[data-voice="speaking"] .la-launcher-mic:focus-visible {
+  outline-color: var(--la-launcher-ink);
+}
+
+.la-launcher-orb {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+}
+
+/* The resting tour draws in the text colour, like LogosOrb's monochrome ink. */
+.la-launcher-tour {
+  display: block;
+  color: var(--cmf-text, #1E1B18);
+}
+
+.la-launcher-tour-svg {
+  display: block;
+  animation: la-launcher-look-in 400ms ease-out;
+}
+
+@keyframes la-launcher-look-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ---- Label, the state word, the keycap ---- */
+
+.la-btn-label {
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--cmf-text, #1a1a1a);
+  white-space: nowrap;
+  text-underline-offset: 4px;
+}
+
+/* button-states.css washes every button that has no hover of its own with an inset
+   shadow. Both controls here have one (the underline and keycap; the mic's fill),
+   so the wash stays off; the global press feedback is untouched. */
+.la-launcher-main:hover,
+.la-launcher-mic:hover {
+  box-shadow: none;
+}
+
+.la-launcher-main:hover .la-btn-label {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+}
+
+/* Panel open: where you are, in the accent. */
+.la-launcher.active .la-btn-label {
+  text-decoration: underline;
+  text-decoration-color: var(--cmf-accent, #B85C38);
+  text-decoration-thickness: 2px;
+}
+
+.la-launcher-word {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Status = a small square plus a word. */
+.la-launcher-word--voice {
+  color: var(--la-launcher-ink);
+  transition: color 200ms ease-out;
+}
+
+.la-launcher-word--voice i {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  background: currentColor;
+}
+
+/* What waits for you takes the accent. */
+.la-launcher-word--waits {
+  color: var(--cmf-accent, #B85C38);
+}
+
+/* Parked at the end of row 1, like the nav rows' keycaps sit at the row end. */
+.la-btn-shortcut {
+  flex: none;
+  margin-left: auto;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--cmf-text-muted, #6b7280);
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateX(-2px);
+  pointer-events: none;
+  transition: opacity 100ms ease-out, transform 100ms ease-out;
+}
+
+.la-launcher-main:hover .la-btn-shortcut,
+.la-launcher-main:focus-visible .la-btn-shortcut,
+.la-launcher.shortcuts-revealed .la-btn-shortcut {
+  opacity: 1;
+  transform: none;
+}
+
+/* Without a keyboard the shortcut is decoration. Gated on hover capability to
+   match the sidebar nav keycaps in global.css: an iPad with a Magic Keyboard
+   reports `hover: hover` and Ctrl+/ genuinely works there. */
+@media (hover: none) {
+  .la-btn-shortcut {
+    display: none;
+  }
+}
+
+/* ---- Row 2: the voice field ---- */
+
+.la-launcher-field {
+  display: block;
+  min-width: 0;
+  height: 36px;
+  overflow: hidden;
+  color: var(--la-launcher-ink);
+  transition: color 200ms ease-out;
+}
+
+/* The mic sits beside the field. A margin, not padding: DotMatrix sizes its canvas
+   to the field's clientWidth, which counts padding but not margin. */
+.la-launcher.has-mic:not(.collapsed) .la-launcher-field {
+  margin-right: 46px;
+}
+
+.lv-dotmatrix {
+  display: block;
+}
+
+/* ---- Mic: a square, a second control beside the field ---- */
+
+.la-launcher-mic {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: 1px solid var(--cmf-text, #1a1a1a);
+  border-radius: 2px;
+  color: var(--cmf-text, #1a1a1a);
+  cursor: pointer;
+  transition: color 160ms ease-out, background-color 120ms ease-out, border-color 160ms ease-out;
+}
+
+.la-launcher-mic:hover {
+  background: var(--cmf-surface-2, rgba(0, 0, 0, 0.05));
+}
+
+/* While the voice holds, the mic fills with its colour. */
+.la-launcher[data-voice="listening"] .la-launcher-mic,
+.la-launcher[data-voice="speaking"] .la-launcher-mic {
+  background: var(--la-launcher-ink);
+  border-color: var(--la-launcher-ink);
+  color: var(--cmf-surface, #fff);
+}
+
+/* ---- Collapsed rail: orb, count, a short field, the mic, stacked ---- */
+
+.la-launcher.collapsed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.la-launcher.collapsed .la-launcher-main {
+  align-items: center;
+  gap: 4px;
+  width: auto;
+}
+
+.la-launcher.collapsed .la-launcher-field {
+  width: 48px;
+  height: 18px;
+}
+
+.la-launcher.collapsed .la-launcher-mic {
+  position: static;
+  width: 44px;
+  height: 32px;
+}
+
+/* The proactive count under the orb. The items open inside the panel, so the
+   count never changes what a click on the launcher does. */
+.la-launcher-count {
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1;
+  /* F-054: the accent AS text. The fill accent was 4.32:1 on the light sidebar
+     (#f8f4ee) at 10.5px; the ink token clears AA in both themes. */
+  color: var(--cmf-accent-ink, #864534);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Positioning context for the dock's actions. */
+.la-launcher-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+/* =========================================================================
+   Reduced motion — the canvases handle their own still frames; here only the
+   chrome transitions go.
+   ========================================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  .la-launcher-field,
+  .la-launcher-word--voice,
+  .la-launcher-mic,
+  .la-btn-shortcut {
+    transition: none;
+  }
+}
+
+/* =========================================================================
+   Dark mode
+   #main-sidebar is an <aside>, and design-tokens.css forces every dark
+   `aside button` to the secondary text colour, with a surface background on
+   hover, both !important. The instrument restates its own inks over that, the
+   way global.css restates the pressed pin.
+   ========================================================================= */
+
+html.dark .la-launcher {
+  --la-launcher-patina: #52B5A6;
+  --la-launcher-terracotta: #D4765A;
+  color: var(--cmf-text, #e5e5e5);
+}
+
+html.dark aside .la-launcher-main,
+html.dark aside .la-launcher-main:hover {
+  background-color: transparent !important;
+}
+
+html.dark aside .la-launcher-mic {
+  color: var(--cmf-text, #e5e5e5) !important;
+}
+
+html.dark aside .la-launcher-mic:hover {
+  background-color: var(--cmf-surface-2, #1c1c1c) !important;
+}
+
+html.dark aside .la-launcher[data-voice="listening"] .la-launcher-mic,
+html.dark aside .la-launcher[data-voice="speaking"] .la-launcher-mic {
+  background-color: var(--la-launcher-ink) !important;
+  color: var(--cmf-bg, #111214) !important;
+}

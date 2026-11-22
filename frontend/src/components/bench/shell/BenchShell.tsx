@@ -25,6 +25,8 @@ export interface ShellNavItem {
   note?: string
   /** Show the note in amber (something new). */
   noteIsNew?: boolean
+  /** Phone nav sheet only: the desktop rail has a dedicated control for it. */
+  railHidden?: boolean
 }
 
 export interface ShellNavGroup {
@@ -62,6 +64,8 @@ export interface BenchShellProps {
   modKey: string
   /** Dock routes: Today, Meetings, Tasks. */
   dock: ReadonlyArray<{ name: string; href: string }>
+  /** The AI launcher, docked in the rail above Record (desktop). */
+  assistant?: React.ReactNode
   children: React.ReactNode
 }
 
@@ -265,7 +269,7 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
   const brandMark = logoAsset(useLogoSystem().id, 'small')
   const {
     groups, isActive, user, isDark, onThemeChange, onSearch, onRecord,
-    onSettings, settingsActive, menuItems, onSignOut, modKey, dock, children,
+    onSettings, settingsActive, menuItems, onSignOut, modKey, dock, assistant, children,
   } = props
   const [navOpen, setNavOpen] = useState<boolean>(false)
   const now = useClock()
@@ -281,6 +285,9 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
     )
   }
   const [d0, d1, d2] = dock
+  const railGroups = assistant
+    ? groups.map((g) => ({ ...g, items: g.items.filter((it) => !it.railHidden) }))
+    : groups
 
   return (
     <div className="bs-app">
@@ -297,8 +304,9 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
           <span className="bs-search-label">Search or ask</span>
         </Key>
         <nav className="bs-patch" aria-label="Modules">
-          <PatchPanel groups={groups} isActive={isActive} />
+          <PatchPanel groups={railGroups} isActive={isActive} />
         </nav>
+        {assistant ? <div className="la-launcher-wrap">{assistant}</div> : null}
         <button type="button" className="bs-recbox group" onClick={onRecord}>
           <span className="relative isolate inline-flex" aria-hidden="true">
             <RippleCircles className="-inset-[9px] -z-10 opacity-0 transition-opacity duration-300 [&_*]:[animation-play-state:paused] group-hover:opacity-100 group-hover:[&_*]:[animation-play-state:running] group-focus-visible:opacity-100 group-focus-visible:[&_*]:[animation-play-state:running]" />

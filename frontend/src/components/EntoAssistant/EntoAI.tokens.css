@@ -1,0 +1,94 @@
+/* =========================================================================
+   EntoAI.tokens.css — the one bridge between the ported Logos AI stylesheets
+   (EntoAI.css, EntoOrb.css, EntoAssistantButton.css, EntoAssistantSkeleton.css)
+   and Entomate's own tokens (styles/main.css). EAI-02, decision D5.
+
+   The ported files read `--cmf-*` and `--brand-secondary-*`; nothing else in
+   Entomate defines those, so they are defined here, on the assistant's own
+   roots only. Entomate's tokens already switch on `html.dark` and on the
+   palette/foundation attributes, so every alias below follows the theme with
+   no per-mode copy — except where Entomate's dark scale is too dim for text
+   (its dark --text-tertiary / --text-muted sit under 3:1 on --bg-base).
+
+   Theme fixes for the assistant go in THIS file, not in the ported CSS.
+   ========================================================================= */
+
+.logos-assistant,
+.la-launcher,
+.la-skel {
+  --cmf-bg: var(--bg-base);
+  --cmf-surface: var(--bg-surface);
+  --cmf-surface-2: var(--bg-muted);
+  --cmf-border: var(--border-default);
+  --cmf-border-strong: var(--border-strong);
+  --cmf-hover-overlay: var(--accent-primary-dim);
+
+  --cmf-text: var(--text-primary);
+  --cmf-text-secondary: var(--text-secondary);
+  --cmf-text-muted: var(--text-secondary);
+  --cmf-text-faint: var(--text-tertiary);
+
+  /* accent = fill, accent-hover = fill on hover, accent-text = glyph ON the fill,
+     accent-ink = accent-coloured text on a surface. */
+  --cmf-accent: var(--accent-primary);
+  --cmf-accent-hover: var(--accent-primary-light);
+  --cmf-accent-text: #FFFFFF;
+  --cmf-accent-ink: var(--accent-primary);
+
+  --cmf-success: var(--semantic-success);
+  --cmf-success-ink: #047857;
+  --cmf-warning-ink: #92400E;
+  --cmf-error: var(--semantic-error);
+  --cmf-error-ink: #B91C1C;
+  --cmf-error-text: var(--cmf-error-ink);
+
+  --cmf-font-body: var(--font-body, 'Space Grotesk', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
+  --cmf-font-mono: var(--font-mono, 'JetBrains Mono', 'Fira Code', monospace);
+  --font-heading: var(--font-display, 'Syne', 'Space Grotesk', sans-serif);
+
+  /* The ported "patina" secondary channel → Entomate's teal (--accent-secondary). */
+  --brand-secondary-rgb: 0, 140, 122;
+  --brand-secondary-tint-rgb: 0, 184, 158;
+  --brand-secondary-shade-rgb: 0, 110, 96;
+}
+
+html.dark .logos-assistant,
+html.dark .la-launcher,
+html.dark .la-skel {
+  --cmf-text-faint: var(--text-secondary);
+  --cmf-success-ink: #4ADE80;
+  --cmf-warning-ink: #FBBF24;
+  --cmf-error-ink: #FC90A0;
+
+  --brand-secondary-rgb: 0, 245, 212;
+  --brand-secondary-tint-rgb: 64, 255, 228;
+  --brand-secondary-shade-rgb: 0, 196, 170;
+}
+
+/* Logos AI slid the panel in with framer-motion, which Entomate does not ship.
+   Presence (data-state from usePresence, as the bench panel does since cb04542):
+   slides in on the drawer curve, leaves faster than it came. Reduced motion fades in place. */
+.logos-assistant .la-panel {
+  transform: translate3d(100%, 0, 0);
+  opacity: 0.6;
+  transition: transform var(--m-base, 220ms) var(--m-ease-exit, ease-in), opacity var(--m-base, 220ms) var(--m-ease-exit, ease-in);
+}
+.logos-assistant .la-panel[data-state="open"] {
+  transform: none;
+  opacity: 1;
+  transition: transform 420ms var(--m-ease-drawer, var(--la-ease-drawer)), opacity var(--m-fast, 160ms) var(--m-ease-out, ease-out);
+}
+.logos-assistant .la-backdrop {
+  opacity: 0;
+  transition: opacity var(--m-exit, 160ms) var(--m-ease-exit, ease-in);
+}
+.logos-assistant .la-backdrop[data-state="open"] {
+  opacity: 1;
+  transition: opacity var(--m-base, 220ms) var(--m-ease-out, ease-out);
+}
+@media (prefers-reduced-motion: reduce) {
+  .logos-assistant .la-panel { transform: none; opacity: 0; }
+  .logos-assistant .la-panel[data-state="open"] { opacity: 1; }
+}
+html[data-motion="reduce"] .logos-assistant .la-panel { transform: none; opacity: 0; }
+html[data-motion="reduce"] .logos-assistant .la-panel[data-state="open"] { opacity: 1; }

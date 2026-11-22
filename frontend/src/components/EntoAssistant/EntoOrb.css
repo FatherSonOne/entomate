@@ -1,0 +1,27 @@
+/* =========================================================================
+   EntoOrb — the canvas reads its ink from `color`, so the orb inherits the
+   surface's text colour in every palette and mode. Set `color` on a wrapper
+   to retint it; never hardcode the orb's colour in JS.
+   ========================================================================= */
+
+.lv-orb {
+  display: block;
+  color: var(--cmf-text, #1E1B18);
+  /* The glow is drawn inside the canvas; give it room to read at the edge. */
+  border-radius: 50%;
+  pointer-events: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.lv-orb-glyph {
+  display: block;
+  color: var(--cmf-text, #1E1B18);
+}
+
+html.dark .lv-orb,
+.la-dark .lv-orb,
+html.dark .lv-orb-glyph,
+.la-dark .lv-orb-glyph {
+  color: var(--cmf-text, #E5E7EB);
+}

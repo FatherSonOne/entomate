@@ -1,11 +1,15 @@
 /**
  * EntoAssistant — Context-aware AI assistant panel for Entomate
- * Portal-rendered right-side drawer with streaming chat
+ * Portal-rendered right-side drawer with streaming chat.
+ *
+ * EAI-02: the visual shell is the Logos AI panel (EntoAI.css + the ported orb, composer,
+ * context card and resize edge). The data path is unchanged: same endpoint, same
+ * sessionStorage history, same section context, quick actions and follow-ups.
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { X, Send, Loader2, AlertCircle, ArrowRight, RefreshCw, MessageSquarePlus } from 'lucide-react'
+import { X, AlertCircle, User as UserIcon } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import { useAuth } from '../../contexts/AuthContext'
 import useAssistantContext from './useAssistantContext'
@@ -14,12 +18,29 @@ import {
   getSuggestedActions,
   streamQuery,
 } from '../../services/entoAssistantService'
-import './EntoAssistant.css'
-import { EntomateMark, Wordmark } from '../Logo'
+import { useMediaQuery } from '../bench/useMediaQuery'
 import { usePresence, MOTION } from '../bench/motion'
+import Composer from './Composer'
+import ContextCard from './ContextCard'
+import { WelcomeOrb, orbStateFor, useSettledOrbState, AI_ORB_LABELS } from './AiOrb'
+import { EntoOrb, EntoOrbGlyph } from './EntoOrb'
+import { usePanelResize } from './usePanelResize'
+import { setVoiceState, pulseVoice, onVoiceRequest } from './voiceSignal'
+import { useMicLevel } from './useMicLevel'
+import './EntoAI.css'
+import './EntoAI.tokens.css'
 
 const STORAGE_KEY = 'ento-ai-history'
 const MAX_MESSAGES = 50
+/** usePanelResize is desktop-only: below this the CSS media queries own the width. */
+const RESIZE_QUERY = '(min-width: 1281px)'
+
+// A refused or missing microphone ends dictation with no word; say why (from Logos AI).
+const MIC_ERRORS = {
+  'not-allowed': 'The microphone is blocked. Allow it in your browser’s site settings, then try again.',
+  'service-not-allowed': 'The microphone is blocked. Allow it in your browser’s site settings, then try again.',
+  'audio-capture': 'No microphone found. Connect one, then try again.',
+}
 
 function loadHistory() {
   try {
@@ -45,10 +66,18 @@ export default function EntoAssistant({ isOpen, onClose }) {
   const [streamingContent, setStreamingContent] = useState('')
   const [error, setError] = useState(null)
   const [conversationId, setConversationId] = useState(null)
+  const [isListening, setIsListening] = useState(false)
 
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
   const abortRef = useRef(null)
+  const panelRef = useRef(null)
+
+  const canResize = useMediaQuery(RESIZE_QUERY)
+  const {
+    appliedWidth, minWidth: resizeMin, maxWidth: resizeMax,
+    onPointerDown: onResizePointerDown, onKeyDown: onResizeKeyDown, onDoubleClick: onResizeDoubleClick,
+  } = usePanelResize(panelRef, canResize)
 
   // Persist messages
   useEffect(() => { saveHistory(messages) }, [messages])
@@ -65,7 +94,7 @@ export default function EntoAssistant({ isOpen, onClose }) {
 
   // Cleanup on unmount
   useEffect(() => {
-    return () => { abortRef.current?.abort() }
+    return () => { abortRef.current?.abort(); setVoiceState('idle') }
   }, [])
 
   // Keyboard: Esc to close
@@ -77,6 +106,109 @@ export default function EntoAssistant({ isOpen, onClose }) {
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [isOpen, onClose])
+
+  // --- Voice input (Web Speech API), ported from Logos AI ---
+  const recognitionRef = useRef(null)
+
+  const handleVoiceInput = useCallback(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SpeechRecognition) {
+      setError('Voice input is not supported in this browser. Try Chrome or Edge.')
+      return
+    }
+
+    // Clearing the ref is the "user is done" signal: onend restarts only the current recognizer.
+    if (isListening) {
+      const current = recognitionRef.current
+      recognitionRef.current = null
+      current?.stop()
+      setIsListening(false)
+      return
+    }
+
+    const recognition = new SpeechRecognition()
+    recognition.continuous = true
+    recognition.interimResults = false
+    recognition.lang = 'en-US'
+
+    // Some Chrome builds fire onresult again for every growing phrase, so keep the draft from
+    // before dictation and REPLACE the dictated part each time (results are kept by index).
+    let draft = null
+    let phrases = []
+    recognition.onresult = (event) => {
+      for (let i = event.resultIndex ?? 0; i < event.results.length; i++) {
+        phrases[i] = event.results[i][0].transcript.trim()
+      }
+      const transcript = phrases.filter(Boolean).join(' ')
+      setInputValue(prev => {
+        if (draft === null) draft = prev
+        return draft ? `${draft} ${transcript}` : transcript
+      })
+    }
+
+    recognition.onerror = (event) => {
+      // A pause raises 'no-speech'; only a lost or refused microphone ends dictation.
+      const message = MIC_ERRORS[event?.error]
+      if (message) {
+        if (recognitionRef.current === recognition) recognitionRef.current = null
+        setIsListening(false)
+        setError(message)
+      }
+    }
+
+    // Chrome ends even a continuous session after a few seconds of silence. Keep listening
+    // until the user presses stop: start a new session on top of what is already typed.
+    recognition.onend = () => {
+      if (recognitionRef.current === recognition) {
+        draft = null
+        phrases = []
+        try {
+          recognition.start()
+          return
+        } catch { /* fall through: the recognizer refused to restart */ }
+        recognitionRef.current = null
+      }
+      setIsListening(false)
+    }
+
+    recognitionRef.current = recognition
+    recognition.start()
+    setIsListening(true)
+    // A fresh try clears an older microphone message; other errors stay.
+    setError(prev => (prev && Object.values(MIC_ERRORS).includes(prev) ? null : prev))
+  }, [isListening])
+
+  // Closing the panel ends dictation (the panel stays mounted after its first open).
+  // abort(), not stop(): nothing said after closing is transcribed.
+  useEffect(() => {
+    if (!isOpen) return
+    return () => {
+      const current = recognitionRef.current
+      recognitionRef.current = null
+      current?.abort()
+      setIsListening(false)
+    }
+  }, [isOpen])
+
+  // Sending ends dictation too, so speech after the send cannot re-type the sent draft.
+  useEffect(() => {
+    if (!isQuerying || !recognitionRef.current) return
+    const current = recognitionRef.current
+    recognitionRef.current = null
+    current.abort()
+    setIsListening(false)
+  }, [isQuerying])
+
+  // The Web Speech API never exposes audio, so a parallel capture feeds the mic level to voiceSignal.
+  useMicLevel(isListening)
+
+  // The launcher's mic asks the panel to listen as soon as it opens.
+  useEffect(() => onVoiceRequest(handleVoiceInput), [handleVoiceInput])
+
+  // The orb and the launcher's dot field read voiceSignal: listening wins, then thinking until
+  // text arrives, then speaking.
+  const voiceState = isListening ? 'listening' : !isQuerying ? 'idle' : streamingContent ? 'speaking' : 'thinking'
+  useEffect(() => { setVoiceState(voiceState) }, [voiceState])
 
   const handleSend = useCallback(async (text) => {
     const query = (text || inputValue).trim()
@@ -110,7 +242,7 @@ export default function EntoAssistant({ isOpen, onClose }) {
         },
         {
           signal: controller.signal,
-          onChunk: (chunk) => setStreamingContent(prev => prev + chunk),
+          onChunk: (chunk) => { pulseVoice(); setStreamingContent(prev => prev + chunk) },
           onCitations: (citations) => { streamedCitations = citations },
           onFollowUp: (suggestions) => { streamedFollowUp = suggestions },
           onComplete: (result) => {
@@ -166,165 +298,168 @@ export default function EntoAssistant({ isOpen, onClose }) {
   const suggestedActions = getSuggestedActions(context.section)
   const hasMessages = messages.length > 0
 
-  // Stays mounted through its exit so it slides away instead of vanishing.
+  const orbState = useSettledOrbState(orbStateFor({
+    isListening,
+    isLoading: isQuerying,
+    isTyping: Boolean(inputValue.trim()),
+    error,
+    streamingText: streamingContent,
+    toolSteps: [],
+    thoughts: [],
+    awaitingApproval: false,
+    hasAnswered: messages[messages.length - 1]?.role === 'assistant',
+  }))
+
+  // Stays mounted through its exit so the panel slides away instead of vanishing.
   const { mounted, state: presence } = usePresence(isOpen, MOTION.base)
   if (!mounted) return null
 
+  const quickActionList = (label) => (
+    <div className="la-quick-actions">
+      <span className="la-quick-actions-label">
+        {label}<span className="la-quick-actions-count">{quickActions.length}</span>
+      </span>
+      <div className="la-quick-actions-list">
+        {quickActions.map((action, i) => (
+          <button
+            key={i}
+            type="button"
+            className="la-quick-action-btn"
+            onClick={() => handleSend(action.query)}
+          >
+            {action.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+
   const panel = (
-    <>
-      <div className="ea-backdrop" data-state={presence} onClick={onClose} />
-      <div className="ea-panel" data-state={presence} role="dialog" aria-modal="true" aria-label="Entomate AI Assistant">
+    <div className="logos-assistant la-swiss" role="dialog" aria-modal="true" aria-label="Entomate AI Assistant">
+      <div className="la-backdrop" data-state={presence} onClick={onClose} />
+      <div
+        ref={panelRef}
+        className="la-panel"
+        data-state={presence}
+        style={appliedWidth ? { width: `${appliedWidth}px` } : undefined}
+      >
 
         {/* Header */}
-        <div className="ea-header">
-          <div className="ea-header-left">
-            <div className="ea-header-icon">
-              <EntomateMark size={24} alt="" />
-            </div>
-            <div>
-              <div className="ea-header-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Wordmark width={110} /><span>AI</span></div>
-              <div className="ea-header-subtitle">Ask me anything about your data</div>
+        <div className="la-header">
+          <div className="la-header-left">
+            <div className="la-header-title">
+              <h2>Entomate AI</h2>
+              <span className="la-header-mode" data-voice={voiceState}>
+                {contextLoading ? 'Loading context' : AI_ORB_LABELS[orbState]}
+              </span>
             </div>
           </div>
-          <div className="ea-header-actions">
+          <div className="la-header-right">
             {hasMessages && (
-              <button className="ea-new-chat-btn" onClick={handleNewChat} title="New chat">
-                <MessageSquarePlus className="w-3.5 h-3.5" />
-                <span>New Chat</span>
+              <button type="button" className="la-header-action-btn la-header-history-btn" onClick={handleNewChat} title="New chat">
+                <span className="la-header-action-label">New chat</span>
               </button>
             )}
-            <button className="ea-header-btn" onClick={onClose} title="Close (Esc)">
-              <X className="w-4 h-4" />
+            <button type="button" className="la-close-btn" onClick={onClose} title="Close (Esc)" aria-label="Close assistant">
+              <X size={18} />
             </button>
           </div>
         </div>
 
-        {/* Context chip bar */}
-        <div className="ea-context-bar">
-          <span className="ea-context-chip">
-            <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'currentColor', opacity: 0.6 }} />
-            {sectionLabel}
-          </span>
-          {sectionSummary && <span className="ea-context-summary">{sectionSummary}</span>}
-          {contextLoading && <Loader2 className="w-3 h-3 animate-spin" style={{ color: 'var(--text-muted)' }} />}
-        </div>
+        {hasMessages && (
+          <ContextCard variant="bar" sectionLabel={sectionLabel} sectionSummary={sectionSummary} context={context.data || {}} />
+        )}
 
         {/* Messages area */}
-        <div className="ea-messages" role="log" aria-live="polite">
+        <div className="la-messages" role="log" aria-live="polite" aria-busy={isQuerying || undefined}>
 
           {/* Error banner — always visible at top, dismissible */}
           {error && (
-            <div className="ea-error">
-              <AlertCircle className="w-4 h-4" style={{ flexShrink: 0 }} />
-              <span style={{ flex: 1 }}>{error}</span>
-              <button
-                onClick={() => setError(null)}
-                style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 2 }}
-                title="Dismiss"
-              >
-                <X className="w-3 h-3" />
+            <div className="la-error">
+              <AlertCircle size={16} />
+              <span>{error}</span>
+              <button type="button" className="la-retry-btn" onClick={() => setError(null)} title="Dismiss">
+                <X size={13} />
+                Dismiss
               </button>
             </div>
           )}
 
           {!hasMessages && !isQuerying ? (
             /* Welcome state */
-            <div className="ea-welcome">
-              <div className="ea-welcome-icon">
-                <EntomateMark size={40} alt="" />
+            <div className="la-welcome">
+              <div className="la-welcome-icon la-welcome-hero">
+                <WelcomeOrb state={orbState} />
               </div>
-              <div className="ea-welcome-title">Hi, I'm Entomate AI</div>
-              <div className="ea-welcome-desc">
-                I'm context-aware and know which section you're in.
-                Ask me anything — or use a quick action below.
+              <div className="la-welcome-head">
+                <div className="la-welcome-headings">
+                  <h3 className="la-welcome-title">Hi, I'm Entomate AI</h3>
+                  <p className="la-welcome-tagline">
+                    I'm context-aware and know which section you're in.
+                    Ask me anything — or use a quick action below.
+                  </p>
+                </div>
               </div>
-              <div className="ea-quick-actions">
-                {quickActions.map((action, i) => (
-                  <button
-                    key={i}
-                    className="ea-quick-btn"
-                    onClick={() => handleSend(action.query)}
-                  >
-                    {action.label}
-                  </button>
-                ))}
-              </div>
+              <ContextCard variant="hero" sectionLabel={sectionLabel} sectionSummary={sectionSummary} context={context.data || {}} />
+              {quickActionList('Try asking')}
             </div>
           ) : (
             <>
               {messages.map((msg, idx) => (
-                <div key={idx} className={`ea-msg ea-msg--${msg.role}`}>
-                  <div className="ea-msg-bubble">
+                <article key={idx} className={`la-message la-message-${msg.role}`} aria-label={msg.role === 'user' ? 'Request' : 'Entomate AI answer'}>
+                  <div className="la-message-avatar">
+                    {msg.role === 'user' ? <UserIcon size={16} /> : <EntoOrbGlyph size={20} />}
+                  </div>
+                  <div className="la-message-content">
+                    <div className="la-message-kicker" aria-hidden="true">
+                      <span>{msg.role === 'user' ? 'Request' : 'Entomate AI'}</span>
+                    </div>
                     {msg.role === 'assistant' ? (
-                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      <div className="la-markdown">
+                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      </div>
                     ) : (
                       <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{msg.content}</p>
                     )}
 
                     {/* Follow-up suggestions */}
                     {msg.followUp?.length > 0 && (
-                      <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                      <div className="la-suggested-list">
                         {msg.followUp.map((q, qi) => (
-                          <button
-                            key={qi}
-                            className="ea-quick-btn"
-                            style={{ fontSize: 11, padding: '3px 10px' }}
-                            onClick={() => handleSend(q)}
-                          >
+                          <button key={qi} type="button" className="la-suggested-btn" onClick={() => handleSend(q)}>
                             {q}
                           </button>
                         ))}
                       </div>
                     )}
                   </div>
-                </div>
+                </article>
               ))}
 
-              {/* Streaming content */}
-              {isQuerying && streamingContent && (
-                <div className="ea-msg ea-msg--assistant">
-                  <div className="ea-msg-bubble">
-                    <ReactMarkdown>{streamingContent}</ReactMarkdown>
-                    <span className="ea-cursor" />
+              {/* Streaming / thinking */}
+              {isQuerying && (
+                <div className="la-message la-message-assistant la-message-loading">
+                  <div className="la-message-avatar">
+                    <EntoOrb size={20} />
+                  </div>
+                  <div className="la-message-content">
+                    <div className="la-message-kicker" aria-hidden="true">
+                      <span>Entomate AI</span>
+                    </div>
+                    <div className={`la-markdown${streamingContent ? ' la-streaming' : ''}`}>
+                      {streamingContent ? <ReactMarkdown>{streamingContent}</ReactMarkdown> : <p>Thinking…</p>}
+                    </div>
                   </div>
                 </div>
               )}
 
-              {/* Loading spinner */}
-              {isQuerying && !streamingContent && (
-                <div className="ea-loading">
-                  <div className="ea-loading-spinner" />
-                  <span className="ea-loading-text">Thinking...</span>
-                </div>
-              )}
-
               {/* Suggested navigation — show after last assistant message */}
-              {!isQuerying && hasMessages && messages[messages.length - 1]?.role === 'assistant' && (
-                <div className="ea-suggested">
-                  {suggestedActions.map((action, i) => (
-                    <button
-                      key={i}
-                      className="ea-suggested-btn"
-                      onClick={() => handleNavigate(action.to)}
-                    >
-                      {action.label}
-                      <ArrowRight className="w-3 h-3" style={{ marginLeft: 3, opacity: 0.6 }} />
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Quick actions — always available at bottom of conversation */}
-              {!isQuerying && hasMessages && (
-                <div className="ea-quick-actions-inline">
-                  <span className="ea-quick-actions-label">Quick actions</span>
-                  <div className="ea-quick-actions">
-                    {quickActions.map((action, i) => (
-                      <button
-                        key={i}
-                        className="ea-quick-btn"
-                        onClick={() => handleSend(action.query)}
-                      >
+              {!isQuerying && hasMessages && messages[messages.length - 1]?.role === 'assistant' && suggestedActions.length > 0 && (
+                <div className="la-suggested-actions">
+                  <span className="la-suggested-label">Navigate to</span>
+                  <div className="la-suggested-list">
+                    {suggestedActions.map((action, i) => (
+                      <button key={i} type="button" className="la-suggested-btn" onClick={() => handleNavigate(action.to)}>
                         {action.label}
                       </button>
                     ))}
@@ -332,37 +467,46 @@ export default function EntoAssistant({ isOpen, onClose }) {
                 </div>
               )}
 
+              {/* Quick actions — always available at bottom of conversation */}
+              {!isQuerying && hasMessages && quickActionList('Quick actions')}
+
               <div ref={messagesEndRef} />
             </>
           )}
         </div>
 
         {/* Input area */}
-        <div className="ea-input-area">
-          <div className="ea-input-row">
-            <input
-              ref={inputRef}
-              className="ea-input"
-              placeholder="Ask anything about your data..."
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              disabled={isQuerying}
-              aria-label="Message Entomate AI"
-            />
-            <button
-              className="ea-send-btn"
-              onClick={() => handleSend()}
-              disabled={isQuerying || !inputValue.trim()}
-              aria-label="Send message"
-            >
-              {isQuerying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-            </button>
-          </div>
-          <div className="ea-input-hint">Enter to send · Esc to close</div>
-        </div>
+        <Composer
+          inputRef={inputRef}
+          value={inputValue}
+          onChange={setInputValue}
+          onKeyDown={handleKeyDown}
+          placeholder="Ask anything about your data..."
+          disabled={isQuerying}
+          isListening={isListening}
+          onVoiceInput={handleVoiceInput}
+          onSend={() => handleSend()}
+          orbState={orbState}
+        />
+
+        {canResize && (
+          <div
+            className="la-resize-handle"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize assistant panel"
+            aria-valuenow={appliedWidth ?? panelRef.current?.offsetWidth ?? resizeMin}
+            aria-valuemin={resizeMin}
+            aria-valuemax={resizeMax}
+            tabIndex={0}
+            onPointerDown={onResizePointerDown}
+            onKeyDown={onResizeKeyDown}
+            onDoubleClick={onResizeDoubleClick}
+            title="Drag to resize · double-click to reset"
+          />
+        )}
       </div>
-    </>
+    </div>
   )
 
   return createPortal(panel, document.body)

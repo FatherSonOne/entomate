@@ -66,7 +66,7 @@
 | D1 | **The agent loop lives in Express** (`backend/routes/entoAi.js`), not in a new Supabase edge function. | Entomate's AI already runs in the backend with its keys and provider config. One AI perimeter, not two. |
 | D2 | **Every tool runs through a per-request, user-JWT Supabase client** (anon key + the caller's `Authorization` header). Never the service-role client. | RLS (`org_id IN get_my_org_ids()`) becomes the perimeter by construction, so the §2 bug class cannot come back. LV gets the same guarantee by running executors client-side under user RLS. |
 | D3 | **Gemini function calling via the installed `@google/generative-ai`.** OpenAI stays as the plain-chat fallback only. | The LV loop, tool schemas and prompts are Gemini-shaped. Porting them to a second tool format doubles the work. Upgrading to `@google/genai` is out of scope. |
-| D4 | **Port TSX → JSX mechanically** (`esbuild --loader=tsx --jsx=preserve` strips types), then hand-fix imports. | Entomate's frontend is plain JS. One language per app. Type stripping is cheap and does not change behaviour. |
+| D4 | ~~Port TSX → JSX mechanically~~ **CORRECTED 2026-11-22 (EAI-02 pre-flight): port TSX as TSX.** | The premise was false: the frontend has `tsconfig.json` (`strict`, `noUncheckedIndexedAccess`), `typescript` and 93 TS/TSX files. Vite compiles TSX natively. The cost is the stricter index rule: ported code needs narrowed reads (`!` at the declaration, `Vec3` tuples), never `@ts-nocheck`. |
 | D5 | **Visual port keeps LV's tokens and maps them** through one bridge file (`EntoAI.tokens.css`): `--la-*` and `--cmf-*` → Held Light / Void Crimson tokens. | The 3,703-line CSS ports unchanged. Theme fixes go in one place. |
 | D6 | **Writes are proposed, confirmed in the UI, then executed by the backend** under the user client (D2). Sensitive verbs need a typed confirm, as in LV. Write tools ship behind `ENTO_AI_WRITE_TOOLS=false`. | Same propose → confirm → execute → undo spine as LV. The flag lets the read agent ship first. |
 | D7 | **Cross-app rule: an agent can only PROPOSE in the other app. The owning app's user confirms in the owning app.** | No agent gets write authority over another product's data. This is the safety line for §5. |
@@ -105,7 +105,8 @@ Each phase is one or more `/app-dev sweep` sessions. Lines are rough ported + ne
 |---|---|---|---|---|
 | **P0** | EAI-01 | ✅ **DONE 2026-11-22** — `aiLimiter`; org-RLS loaders + conversation writes through the user client (D2). See §2. | S | anon → 401 ✔; org A reads 0 org B rows ✔ |
 | **P0** | EAI-01b | ✅ **DONE 2026-11-22** (migration applied by `supabase db query --linked -f`, no ledger row) — migration `20261122000012_projects_agents_org_select.sql` adds `projects_org_select` / `agents_org_select`; assistant `projects` + `agents` loaders move to the user client. Ship order: apply the migration FIRST, then push the route. | S | Self-aborting probe: org-A owner 0 → 5 projects, 0 → 1 agent, org B 0; org-B owner sees its 4, org A 0; 0 policies left after abort ✔ |
-| **P1** | EAI-02 | **Visual shell port** — panel, launcher, `LogosOrb` → Ento orb, `DotMatrix`, `ThreadRail`, `Composer`, `ContextCard`, skeleton, `usePanelResize`, full CSS + token bridge (D5). Wired to the existing `/api/assistant/query` so behaviour is unchanged. | L (~7,000 ported) | **Needs Frank's approval — replaces EntoAssistant (§8)**. Playwright: both themes, desktop + phone |
+| **P1** | EAI-02a | **Re-skin in place** (Frank picked the split, 2026-11-22). `EntoAssistant.jsx` keeps every line of its data path; its markup takes the LV panel classes, `EntoOrb`, `AiOrb`/`WelcomeOrb` (+ vendored `ui/thinking-orbs.tsx`), `DotMatrix`, `Composer`, `ContextCard`, skeleton, `usePanelResize`, the full 6,121-line CSS unchanged (`EntoAI.css`) + `EntoAI.tokens.css` (D5). Panel lazy-loaded behind the skeleton. **Launcher = exact port of LV `LogosAssistantButton`** (Frank, 2026-11-22, reversing "keep `EntomateMark`"): tour orb, dot field, "N waiting", square mic; docked in the bench-swiss rail above Record (the "Ask Entomate" row stays in the phone nav sheet). **Voice dictation pulled forward from EAI-06** (Web Speech + `useMicLevel`, LV's code) because the mic is part of the copy. No new dependency (`framer-motion` replaced by `landing/useReducedMotion` + CSS keyframes). | L (~9,000 ported, ~400 hand-written) | Playwright: both themes, desktop + phone |
+| **P1** | EAI-02b | **Full LV panel** (`LogosAssistant.tsx`, 2,021 lines) replaces the re-skinned shell once P3–P4 give it tools, proposals and threads to render. `ThreadRail` moves with P2. | L | After EAI-04 + EAI-05 |
 | **P2** | EAI-03 | Real streaming (Gemini `generateContentStream`) + `ento_ai_threads` table (user + org RLS, `tenant_organizations` FK) replacing localStorage history. | M (~600) | Thread survives reload and a second device; RLS probe |
 | **P3** | EAI-04 | Function-calling loop in `routes/entoAi.js` + the ≈10 read tools (§4) + tool-call chips in the panel. | L (~1,500) | Each tool answers a real question on demo data; cross-org probe returns nothing |
 | **P4** | EAI-05 | Write spine: `ento_ai_action_log` migration, propose/confirm/undo, `ProposalCard`, `useProposals`, ≈10 write verbs behind the flag (D6). | L (~2,500) | Self-aborting DB probe + Playwright confirm → undo on a test org |
@@ -133,7 +134,25 @@ Each phase is one or more `/app-dev sweep` sessions. Lines are rough ported + ne
 
 ---
 
+## 7b. Findings outside this row (EAI-02a walk, 2026-11-22)
+
+| # | Finding | Evidence | Owner |
+|---|---|---|---|
+| X1 | **Creating a project fails for every user.** `POST /api/projects` writes `owner_id = req.user.id`; `projects_owner_id_fkey` → `public.users`, which has **0 rows for 5 auth users** and no writer (no trigger, no app insert). All 9 existing projects have `owner_id NULL`. `action_items_assigned_to_id_fkey`, `goals_owner_id_fkey` and 3 more FKs share the target. | Local backend on `origin/main` against prod DB: `500 … violates foreign key constraint "projects_owner_id_fkey"`. | Projects module — Frank to route |
+| X2 | **`gemini-2.5-flash` returns 404 "no longer available to new users"** for the key in `backend/.env`; the model is hard-coded in `config/gemini.js` and `config/geminiRecording.js`. Production (Render, its own key) not measured. | Local `/api/assistant/query` → 404 from `generativelanguage.googleapis.com`. | AI config — needs a prod probe |
+
 ## 8. Before/After — replacing EntoAssistant (approval required for P1)
+
+**Pre-flight re-derivation (EAI-02, `origin/main` `4397d94`):**
+
+| Inherited claim | Verdict |
+|---|---|
+| Peer has uncommitted EntoAssistant/Logo.jsx edits to coordinate with | **Void.** `EntoAssistant.jsx` and `EntoAssistantButton.jsx` in `F:\entomate` are byte-identical to origin (`1ee429c`). Its dirty `Logo.jsx` is OLDER than origin (lacks `4560da7`); committing it would revert the logo-system picker. |
+| P1 ≈ 7,000 lines; CSS 3,703; panel 1,542 | **Wrong.** P1 subset 10,720; CSS 6,121; panel 2,021; 38 files. |
+| P1 is a visual shell wired to `/api/assistant/query` | **Mechanism swapped.** `LogosAssistant.tsx` is the logic hub (`useAssistantChat`, proposals, plans, pipeline, voice, share, 23 LV-only imports, `framer-motion`). Row split into EAI-02a / EAI-02b (§6). |
+| D4 (strip TSX) | **Refuted** — see §3. |
+| History in localStorage | sessionStorage (50 messages). |
+| Launcher in `nl-footer` | True for the legacy shell only. The default `bench-swiss` shell opens the assistant from the "Ask Entomate" nav entry, which EAI-02a does not change. |
 
 **Exists now:** right drawer at 420px with backdrop + slide-in; sidebar launcher in `Layout.jsx` (`nl-footer`); `mod+/`; section-aware context loading; section quick actions and follow-up suggestions; localStorage history; proactive badge (overdue tasks, meetings within the hour, 10-minute poll); SSE with a fallback to `searchApi.askStream`; uncommitted logo-mark swap to `EntomateMark` (a peer's in-flight work — must be preserved, not overwritten).
 
