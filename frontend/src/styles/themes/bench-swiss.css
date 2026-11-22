@@ -599,6 +599,42 @@ html[data-style="bench-swiss"] :focus-visible { outline: 2px solid var(--bs-bran
 .bs-crumb b { color: var(--bs-ink); font-weight: 500; }
 .bs-title-acts { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 
+/* Breadcrumbs (detail pages): first row of the title rule, the way back */
+.bs-title-crumbs { grid-column: 1 / -1; margin-bottom: -4px; min-width: 0; }
+.bs-crumbs ol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font: 500 11px var(--bs-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--bs-muted);
+}
+.bs-crumbs li { display: inline-flex; align-items: center; min-width: 0; }
+.bs-crumbs-link {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  min-height: 24px;
+  color: var(--bs-ink);
+  text-decoration: none;
+  border-radius: 2px;
+}
+.bs-crumbs-link:hover .bs-crumbs-label { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.bs-crumbs-back { display: none; margin-right: 8px; }
+.bs-crumbs-sep { margin: 0 10px; color: var(--bs-faint); }
+.bs-crumbs-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 30ch; }
+.bs-crumbs-here .bs-crumbs-label { max-width: 44ch; }
+@media (max-width: 767.98px) {
+  .bs-crumbs li:not(.bs-crumbs-up) { display: none; }
+  .bs-crumbs-up .bs-crumbs-sep { display: none; }
+  .bs-crumbs-back { display: inline; }
+  .bs-crumbs-link { min-height: 32px; }
+}
+
 /* 12-col grid */
 .bs-g12 { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: 24px; row-gap: 0; }
 .bs-cell { padding-top: 22px; min-width: 0; }
@@ -1193,8 +1229,6 @@ html.bs-scroll-lock, html.bs-scroll-lock body { overflow: hidden; }
 .bs-mtg-recorder .bs-skin { padding-top: 14px; max-width: 760px; }
 
 /* Detail */
-.bs-crumb-link { color: inherit; text-decoration: none; }
-.bs-crumb-link:hover b { text-decoration: underline; text-underline-offset: 3px; }
 .bs-title-edit { min-width: 0; }
 .bs-title-input {
   width: 100%;

@@ -5,6 +5,7 @@
 export { Faceplate, Grid, Cell } from './Faceplate'
 export type { CellSpan } from './Faceplate'
 export { TitleRule } from './TitleRule'
+export { Breadcrumbs } from './Breadcrumbs'
 export { Section, GroupHead } from './Section'
 export { Key } from './Key'
 export type { KeyVariant, KeySize } from './Key'

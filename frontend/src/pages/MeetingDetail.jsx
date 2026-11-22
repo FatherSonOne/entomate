@@ -19,7 +19,7 @@ import { formatClock, toSegments, toSummaryMoments } from '../services/meetingTr
 import MeetingIntelligencePanel from '../components/intelligence/MeetingIntelligencePanel'
 import { BotDebrief, BotMeetingPending } from '../components/bot/BotDebrief'
 import {
-  TitleRule, Section, Key, Signal, Tag, Display, Tape, Grid, Cell, Tabs, TabPanel, Drawer,
+  TitleRule, Breadcrumbs, Section, Key, Signal, Tag, Display, Tape, Grid, Cell, Tabs, TabPanel, Drawer,
   TextInput, TextArea,
 } from '../components/bench'
 import { asList, meetingDate, meetingLengthMs, formatLength, speechDensity } from '../services/meetingView'
@@ -407,8 +407,6 @@ export default function MeetingDetail() {
   const people = asList(meeting.attendees)
   const meta = (
     <>
-      <Link to="/meetings" className="bs-crumb-link"><b>Meetings</b></Link>
-      {' / '}
       {date.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short', year: date.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' })}
       {' · '}
       {date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}
@@ -468,7 +466,7 @@ export default function MeetingDetail() {
 
   return (
     <div className="bs-mtg bs-mtg-detail">
-      <TitleRule title={title} meta={meta} actions={actions} />
+      <TitleRule title={title} crumbs={<Breadcrumbs current={meeting.title || 'Untitled meeting'} />} meta={meta} actions={actions} />
 
       {(searchParams.get('debrief') || meeting.recording_job?.source === 'bot') && (
         <BotDebrief meetingId={meeting.id} forced={Boolean(searchParams.get('debrief'))} onOpenTab={setTab} onMinutesReady={refreshMeeting} onJump={playMoment} plays={playable} />

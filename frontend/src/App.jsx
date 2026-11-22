@@ -4,6 +4,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import OrgSetupGate from './components/teams/OrgSetupGate'
 import Layout from './components/Layout'
 import PageLoader from './components/PageLoader'
+import NavTrailRecorder from './components/NavTrailRecorder'
 
 // Lazy-loaded pages (code splitting)
 const Dashboard = React.lazy(() => import('./pages/Dashboard'))
@@ -32,6 +33,7 @@ const NotFound = React.lazy(() => import('./pages/NotFound'))
 export default function App() {
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <NavTrailRecorder />
       <Suspense fallback={<PageLoader />}>
         <Routes>
           {/* Public routes */}
