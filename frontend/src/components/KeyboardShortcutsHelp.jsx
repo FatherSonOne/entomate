@@ -1,41 +1,34 @@
 import React from 'react'
-import { X, Command, Search, Mic, FolderKanban, CheckSquare, HelpCircle, Sparkles } from 'lucide-react'
+import { X, Command, Search, Mic, HelpCircle, Sparkles } from 'lucide-react'
 import { useKeyboardShortcuts, getModKey } from '../hooks/useKeyboardShortcuts'
 
+// Only keys that are registered somewhere (Layout, Tasks, Search, the palette).
+// Keep in step with SHORTCUTS in components/UsersGuide/guideData.js.
 const shortcutGroups = [
   {
     title: 'General',
     shortcuts: [
-      { keys: ['mod', 'K'], description: 'Open command palette', icon: Command },
-      { keys: ['mod', '/'], description: 'Toggle Entomate AI', icon: Sparkles },
+      { keys: ['mod', 'K'], description: 'Open the palette: search, ask, go to a page', icon: Command },
+      { keys: ['mod', '/'], description: 'Ask Entomate', icon: Sparkles },
       { keys: ['mod', '?'], description: 'Show keyboard shortcuts', icon: HelpCircle },
-      { keys: ['Esc'], description: 'Close dialogs/modals' },
+      { keys: ['mod', 'M'], description: 'New meeting', icon: Mic },
+      { keys: ['mod', ','], description: 'Settings' },
+      { keys: ['Esc'], description: 'Close a drawer or dialog' },
     ]
   },
   {
-    title: 'Navigation',
+    title: 'On a page',
     shortcuts: [
-      { keys: ['G', 'then', 'D'], description: 'Go to Today' },
-      { keys: ['G', 'then', 'M'], description: 'Go to Meetings' },
-      { keys: ['G', 'then', 'P'], description: 'Go to Projects' },
-      { keys: ['G', 'then', 'T'], description: 'Go to Tasks' },
-      { keys: ['G', 'then', 'S'], description: 'Go to Search' },
+      { keys: ['/'], description: 'Search on Tasks, Search and the User Guide', icon: Search },
+      { keys: ['N'], description: 'New task, on Tasks' },
     ]
   },
   {
-    title: 'Actions',
+    title: 'In the palette',
     shortcuts: [
-      { keys: ['mod', 'M'], description: 'New Meeting', icon: Mic },
-      { keys: ['mod', 'P'], description: 'New Project', icon: FolderKanban },
-      { keys: ['mod', 'T'], description: 'New Task', icon: CheckSquare },
-    ]
-  },
-  {
-    title: 'Search Page',
-    shortcuts: [
-      { keys: ['mod', 'Enter'], description: 'Submit search' },
-      { keys: ['Tab'], description: 'Switch search type' },
-      { keys: ['mod', 'S'], description: 'Save current search' },
+      { keys: ['Tab'], description: 'Ask about what you typed' },
+      { keys: ['mod', 'S'], description: 'Keep a result in Notes' },
+      { keys: ['mod', 'Enter'], description: 'Open the query in Search' },
     ]
   }
 ]

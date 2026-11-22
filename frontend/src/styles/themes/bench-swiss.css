@@ -1911,3 +1911,87 @@ html:not([data-style="bench-swiss"]) .bs-pal-wrap {
 @media (hover: none) { .bs-transcript .bs-tr-clip { opacity: 1; } }
 .bs-row-dec:has(.bs-mtg-clip) { grid-template-columns: auto minmax(0, 1fr) auto auto; }
 .bs-pal-in input:focus, .bs-pal-in input:focus-visible { outline: none; box-shadow: none; border: 0; }
+
+/* ── 15. User Guide (2026-11-22) ─────────────────────────────── */
+/* Direction A · Manual: the section (8) beside the contents (4), grouped like
+   the rail. Subsections are always open; steps are a plain ruled list. */
+
+.bs-guide-search { width: 300px; max-width: 100%; }
+.bs-guide-search .bs-input { -webkit-appearance: none; appearance: none; }
+.bs-guide-eyebrow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.bs-guide-h { margin: 10px 0 0; font-size: 34px; line-height: 1.05; letter-spacing: -0.03em; font-weight: 600; color: var(--bs-ink); overflow-wrap: anywhere; }
+.bs-guide-sum { margin: 10px 0 0; max-width: 60ch; font-size: 17px; line-height: 1.55; color: var(--bs-ink2); }
+.bs-guide-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; }
+.bs-guide-acts a.bs-key { text-decoration: none; }
+.bs-guide-blk { margin-top: 30px; scroll-margin-top: 16px; }
+.bs-guide-desc { margin: 8px 0 2px; max-width: 66ch; font-size: 13.5px; color: var(--bs-ink2); }
+
+.bs-guide-steps, .bs-guide-bul { list-style: none; margin: 0; padding: 0; }
+.bs-guide-steps { counter-reset: bs-step; }
+.bs-guide-steps li, .bs-guide-bul li { display: grid; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--bs-rule2); max-width: 72ch; font-size: 14.5px; line-height: 1.5; color: var(--bs-ink); overflow-wrap: anywhere; }
+.bs-guide-steps li { grid-template-columns: 34px minmax(0, 1fr); }
+.bs-guide-steps li::before { counter-increment: bs-step; content: counter(bs-step); font: 500 12px var(--bs-mono); color: var(--bs-muted); padding-top: 2px; }
+.bs-guide-bul li { grid-template-columns: 18px minmax(0, 1fr); font-size: 14px; }
+.bs-guide-bul li::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--bs-faint); margin-top: 8px; }
+.bs-guide-steps li.is-hit, .bs-guide-bul li.is-hit { background: color-mix(in srgb, var(--bs-brand) 5%, transparent); }
+.bs-guide-note { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: baseline; margin: 0; padding: 10px 0; border-bottom: 1px solid var(--bs-rule2); font-size: 13.5px; color: var(--bs-ink2); }
+.bs-guide-q { scroll-margin-top: 16px; }
+.bs-guide-qt { margin: 14px 0 0; font-size: 14.5px; font-weight: 600; color: var(--bs-ink); }
+
+.bs-guide-pn { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; margin-top: 36px; border-top: 2px solid var(--bs-rule-ink); }
+.bs-guide-pn button { all: unset; box-sizing: border-box; cursor: pointer; display: flex; flex-direction: column; gap: 4px; padding: 14px 0; min-width: 0; }
+.bs-guide-pn button.is-next { align-items: flex-end; text-align: right; }
+.bs-guide-pn b { font-size: 15px; font-weight: 600; color: var(--bs-ink); }
+.bs-guide-pn button:focus-visible { outline: 2px solid var(--bs-brand); outline-offset: 2px; border-radius: 4px; }
+
+/* Contents column (and the phone sheet) */
+.bs-guide-side { position: sticky; top: 12px; }
+.bs-guide-tg { display: block; padding: 16px 0 6px; border-bottom: 1px solid var(--bs-rule); }
+.bs-guide-toc > div:first-child .bs-guide-tg { padding-top: 2px; }
+.bs-guide-ti { all: unset; box-sizing: border-box; cursor: pointer; width: 100%; display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 7px 8px 7px 0; border-bottom: 1px solid var(--bs-rule2); font-size: 13.5px; color: var(--bs-ink2); }
+.bs-guide-ti:hover { color: var(--bs-ink); }
+.bs-guide-ti:focus-visible { outline: 2px solid var(--bs-brand); outline-offset: -2px; border-radius: 6px; }
+.bs-guide-ti[aria-current="page"] { margin: 2px 0; padding-left: 8px; border-radius: 7px; border-bottom-color: transparent; background: var(--bs-key); color: var(--bs-ink); font-weight: 600; box-shadow: inset 0 1px 0 var(--bs-hi), 0 2px 0 var(--bs-key-edge); }
+.bs-guide-n { font: 500 10.5px var(--bs-mono); color: var(--bs-faint); }
+.bs-guide-ti[aria-current="page"] .bs-guide-n { color: var(--bs-brand); }
+.bs-guide-tt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bs-guide-upd { font-size: 9.5px; }
+.bs-guide-upd .bs-led { width: 6px; height: 6px; }
+.bs-guide-newrow { margin-top: 18px; border-top: 1px solid var(--bs-rule); }
+.bs-guide-onpage { padding: 4px 0 8px 32px; border-bottom: 1px solid var(--bs-rule2); }
+.bs-guide-onpage button { all: unset; box-sizing: border-box; cursor: pointer; display: block; padding: 4px 0; font-size: 12.5px; color: var(--bs-muted); }
+.bs-guide-onpage button:hover { color: var(--bs-ink); }
+.bs-guide-onpage button:focus-visible { outline: 2px solid var(--bs-brand); outline-offset: 2px; }
+.bs-guide-keys { margin-top: 30px; }
+.bs-guide-link { all: unset; cursor: pointer; color: var(--bs-muted); }
+.bs-guide-link:hover { color: var(--bs-ink); }
+
+/* Key map: keycaps beside what they do */
+.bs-guide-keymap { display: grid; grid-template-columns: 96px minmax(0, 1fr); margin: 0; }
+.bs-guide-keymap dt, .bs-guide-keymap dd { margin: 0; padding: 10px 0; border-bottom: 1px solid var(--bs-rule2); font-size: 13.5px; color: var(--bs-ink); }
+.bs-guide-keymap dt { display: flex; gap: 4px; align-items: flex-start; }
+.bs-guide-keymap kbd { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 5px; background: var(--bs-key); color: var(--bs-ink); font: 500 11px var(--bs-mono); box-shadow: inset 0 1px 0 var(--bs-hi), 0 0 0 1px var(--bs-rule), 0 1.5px 0 var(--bs-key-edge); }
+
+/* Search results and What's new */
+.bs-guide-results, .bs-guide-news { list-style: none; margin: 0; padding: 0; }
+.bs-guide-results button { all: unset; box-sizing: border-box; cursor: pointer; width: 100%; display: flex; flex-direction: column; gap: 4px; padding: 14px 0; border-bottom: 1px solid var(--bs-rule2); }
+.bs-guide-results button:hover { background: color-mix(in srgb, var(--bs-ink) 3%, transparent); }
+.bs-guide-results button:focus-visible, .bs-guide-news button:focus-visible { outline: 2px solid var(--bs-brand); outline-offset: 2px; }
+.bs-guide-snip { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; padding-top: 4px; font-size: 13.5px; line-height: 1.5; color: var(--bs-ink2); overflow-wrap: anywhere; }
+.bs-guide-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 26px 0; border-bottom: 1px solid var(--bs-rule2); }
+.bs-guide-empty p { margin: 0; }
+.bs-guide-news { margin-top: 22px; border-top: 1px solid var(--bs-rule); }
+.bs-guide-news button { all: unset; box-sizing: border-box; cursor: pointer; width: 100%; display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--bs-rule2); font-size: 13.5px; }
+.bs-guide-news button > span:first-child { font-size: 11.5px; padding-top: 2px; }
+.bs-guide-news b { display: block; font-size: 14px; color: var(--bs-ink); }
+
+@media (max-width: 767.98px) {
+  .bs-guide-search { width: 100%; flex: 1 1 100%; }
+  .bs-guide-h { font-size: 28px; }
+  .bs-guide-sum { font-size: 15.5px; }
+  .bs-guide-pn { gap: 12px; }
+  .bs-guide-snip { grid-template-columns: minmax(0, 1fr); }
+  .bs-guide-snip > span:first-child { display: none; }
+  .bs-guide-keymap { grid-template-columns: 84px minmax(0, 1fr); }
+  .bs-guide-tt { white-space: normal; }
+}

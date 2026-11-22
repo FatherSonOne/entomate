@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -26,8 +26,7 @@ import { useKeyboardShortcuts, getModKey } from '../hooks/useKeyboardShortcuts'
 import CommandPalette from './CommandPalette'
 import KeyboardShortcutsHelp from './KeyboardShortcutsHelp'
 import { useTheme } from '../context/ThemeContext'
-import { useGuideNewFeatures } from './UsersGuide/UsersGuide'
-import { useToast } from './vc/ToastProvider'
+import { useGuideNewFeatures } from './UsersGuide/useGuideNewFeatures'
 import '../styles/navigation.css'
 import VCCanvas from './vc/VCCanvas'
 import Logo from './Logo'
@@ -156,24 +155,7 @@ export default function Layout() {
     navigate('/sign-in')
   }
 
-  const { hasNew: guideHasNew, dismiss: dismissGuideNew, newCount: guideNewCount } = useGuideNewFeatures()
-  const toast = useToast()
-
-  // Show toast when guide has new/updated sections
-  const guideToastShown = useRef(false)
-  useEffect(() => {
-    if (guideHasNew && !guideToastShown.current) {
-      guideToastShown.current = true
-      setTimeout(() => {
-        toast.show({
-          title: 'User Guide Updated',
-          message: `${guideNewCount} sections have new or updated content.`,
-          color: 'amber',
-          duration: 6000,
-        })
-      }, 2000)
-    }
-  }, [guideHasNew, guideNewCount, toast])
+  const { hasNew: guideHasNew, dismiss: dismissGuideNew } = useGuideNewFeatures()
 
   const isActive = (href) => location.pathname.startsWith(href)
   const breadcrumb = getBreadcrumb(location.pathname)

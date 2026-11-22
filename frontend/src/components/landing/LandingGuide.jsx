@@ -1,7 +1,6 @@
 import React, { useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { guideSections, CATEGORIES, guideVersion, guideUpdated } from '../UsersGuide/guideData'
-import AnimatedIcon from '../icons/AnimatedIcons'
 
 /**
  * Public User Guide section of the landing page (section 07).
@@ -100,13 +99,7 @@ export default function LandingGuide() {
                           onClick={() => toggleSection(sectionId)}
                           aria-expanded={isOpen}
                         >
-                          <span className="guide-entry-icon" aria-hidden="true"><AnimatedIcon name={section.icon} size={18} /></span>
                           <span className="guide-entry-title">{section.title}</span>
-                          {section.badge && (
-                            <span className={`guide-badge guide-badge--${section.badge === 'New' ? 'new' : 'updated'}`}>
-                              {section.badge}
-                            </span>
-                          )}
                           <span className={`guide-chevron${isOpen ? ' is-open' : ''}`}>&rsaquo;</span>
                         </button>
 
