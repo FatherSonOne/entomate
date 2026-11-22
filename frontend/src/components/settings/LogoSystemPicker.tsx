@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Display, Drawer, GroupHead, Key, PHONE_QUERY, Signal, useMediaQuery } from '../bench'
 import AnimatedLoadingLogo from '../AnimatedLoadingLogo'
@@ -9,6 +9,11 @@ import {
   type LogoSystem,
 } from '../../services/logoSystem'
 import '../../styles/logo-picker.css'
+
+/** The side panel: 400px wide, 18px from the viewport edge (bench-swiss.css). */
+const PANEL_EDGE = 400 + 18
+/** Air between the cards and the panel when it does cover them. */
+const PANEL_GAP = 20
 
 /** Default identity, and the one on the landing page; noted on their cards. */
 const CARD_NOTES: Readonly<Record<string, string>> = {
@@ -65,8 +70,24 @@ export default function LogoSystemPicker(): React.ReactElement {
   }, [preview])
   const docked = panel && !isPhone
 
+  // Measure how far the docked panel covers this column and pad only that much,
+  // so the cards keep every column that still fits beside it.
+  const rootRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = rootRef.current
+    if (!el || !docked) return undefined
+    const measure = (): void => {
+      const panelLeft = window.innerWidth - PANEL_EDGE
+      const overlap = Math.max(0, Math.ceil(el.getBoundingClientRect().right - panelLeft + PANEL_GAP))
+      el.style.setProperty('--lp-overlap', `${overlap}px`)
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => { window.removeEventListener('resize', measure); el.style.removeProperty('--lp-overlap') }
+  }, [docked])
+
   return (
-    <div className="lp" data-panel={docked}>
+    <div className="lp" data-panel={docked} ref={rootRef}>
       {/* Sticky: the pick's icon and wordmark at real size, and the panel key */}
       <div className="lp-bar">
         <div className="lp-bar-name">

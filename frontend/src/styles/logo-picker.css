@@ -31,11 +31,8 @@
 .lp-corner--r { right: 16px; }
 /* Leave room for the docked panel so no card hides under it */
 @media (min-width: 768px) {
-  .lp[data-panel="true"] { padding-right: 404px; transition: padding-right 460ms var(--bs-spring); }
-  .lp[data-panel="true"] .lp-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .lp[data-panel="true"] .lp-card:nth-child(3n) { border-right: 1px solid var(--bs-rule2); }
-  .lp[data-panel="true"] .lp-card:nth-child(2n) { border-right: 0; }
-  .lp[data-panel="true"] .lp-proof--compact figure:nth-child(3) { display: none; }
+  /* --lp-overlap is measured: how far the panel actually covers this column (often 0) */
+  .lp[data-panel="true"] { padding-right: var(--lp-overlap, 0px); transition: padding-right 460ms var(--bs-spring); }
 }
 
 /* Size proof: app icon, menu and toolbar lockups at real size */
@@ -58,7 +55,8 @@
 
 /* Ruled grid of preview cards */
 .lp-family { padding-top: 14px; }
-.lp-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+/* As many columns as fit; the clip hides the last column's right rule */
+.lp-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(210px, 100%), 1fr)); clip-path: inset(0 1px 0 0); }
 .lp-card {
   position: relative;
   display: flex;
@@ -75,7 +73,6 @@
   cursor: pointer;
   min-width: 0;
 }
-.lp-card:nth-child(3n) { border-right: 0; }
 .lp-card[aria-checked="true"] { background: color-mix(in srgb, var(--bs-brand) 5%, transparent); }
 .lp-card[aria-checked="true"]::before {
   content: "";
@@ -101,8 +98,6 @@
   .lp-proof--compact figure:nth-child(n+2) { display: none; }
   .lp-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .lp-card { padding: 12px 10px 14px; }
-  .lp-card:nth-child(3n) { border-right: 1px solid var(--bs-rule2); }
-  .lp-card:nth-child(2n) { border-right: 0; }
   .lp-card .lp-lockup svg { width: 64px; height: auto; }
   .lp-card .lp-lockup img { width: 18px; height: 18px; }
   .lp-card-meta { flex-wrap: wrap; }
