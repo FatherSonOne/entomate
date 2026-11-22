@@ -212,19 +212,20 @@ function orFilter(columns, words) {
 }
 
 /**
- * @param {{ query: string, types?: string[], limit?: number, orgIds: string[], userId: string }} opts
+ * @param {{ query: string, types?: string[], limit?: number, orgIds: string[], userId: string, db?: object }} opts
+ *   `db` defaults to the service client; Entomate AI passes the caller's user-JWT client (D2).
  */
-async function search({ query, types = TYPES, limit = 8, orgIds, userId }) {
+async function search({ query, types = TYPES, limit = 8, orgIds, userId, db = supabase }) {
   const words = terms(query);
   const want = new Set(types.filter((t) => TYPES.includes(t)));
   const empty = { query, terms: words, groups: {}, total: 0 };
-  if (!supabase || !words.length || !Array.isArray(orgIds) || !orgIds.length) return empty;
+  if (!db || !words.length || !Array.isArray(orgIds) || !orgIds.length) return empty;
 
   const jobs = [];
   const groups = {};
 
   if (want.has('meetings') || want.has('decisions')) {
-    jobs.push(supabase
+    jobs.push(db
       .from('meetings')
       .select('id, title, summary, transcript, transcript_segments, decisions, summary_moments, created_at')
       .in('org_id', orgIds)
@@ -245,7 +246,7 @@ async function search({ query, types = TYPES, limit = 8, orgIds, userId }) {
   }
 
   if (want.has('action_items')) {
-    jobs.push(supabase
+    jobs.push(db
       .from('action_items')
       .select('id, task_description, context, assigned_to_name, status, priority, due_date, meeting_id, transcript_at_ms, agent_notes, created_at, meetings(title)')
       .in('org_id', orgIds)
@@ -269,7 +270,7 @@ async function search({ query, types = TYPES, limit = 8, orgIds, userId }) {
   }
 
   if (want.has('tasks')) {
-    jobs.push(supabase
+    jobs.push(db
       .from('tasks')
       .select('id, title, description, status, priority, due_date, project_id, created_at, projects(name)')
       .in('org_id', orgIds)
@@ -290,7 +291,7 @@ async function search({ query, types = TYPES, limit = 8, orgIds, userId }) {
   }
 
   if (want.has('projects')) {
-    jobs.push(supabase
+    jobs.push(db
       .from('projects')
       .select('id, name, description, status, created_at')
       .in('org_id', orgIds)
@@ -309,7 +310,7 @@ async function search({ query, types = TYPES, limit = 8, orgIds, userId }) {
   if (want.has('notes') && userId) {
     const notes = [];
     jobs.push(Promise.all([
-      supabase
+      db
         .from('search_notes')
         .select('id, kind, body, source_type, source_id, source_label, at_ms, created_at')
         .eq('user_id', userId)
@@ -317,7 +318,7 @@ async function search({ query, types = TYPES, limit = 8, orgIds, userId }) {
         .or(orFilter(['body', 'source_label'], words))
         .order('created_at', { ascending: false })
         .limit(30),
-      supabase
+      db
         .from('meeting_notes')
         .select('id, meeting_id, author_id, body, visibility, created_at, meetings(title)')
         .in('org_id', orgIds)

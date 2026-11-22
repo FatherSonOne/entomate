@@ -1054,6 +1054,68 @@ export const assistantApi = {
   },
 }
 
+/**
+ * Entomate AI agent loop (EAI-04): POST /api/ento-ai/query as SSE.
+ * Rejects (so the caller can fall back to assistantApi) when the request fails
+ * before the stream starts; after `start`, failures go to onError.
+ */
+export const entoAiApi = {
+  queryStream: async (data, callbacks = {}) => {
+    const { signal, onStart, onToolEvent, onAnswering, onChunk, onFollowUp, onComplete, onError } = callbacks
+    const streamUrl = API_BASE_URL ? `${API_BASE_URL}/api/ento-ai/query` : '/api/ento-ai/query'
+    const { data: { session } } = await supabase.auth.getSession()
+    const response = await fetch(streamUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': session?.access_token ? `Bearer ${session.access_token}` : '' },
+      body: JSON.stringify(data),
+      signal,
+    })
+    if (!response.ok || !response.body) {
+      const err = new Error(`Entomate AI query failed: ${response.status}`)
+      err.status = response.status
+      throw err
+    }
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let started = false
+    let finished = false
+    const handle = (event) => {
+      switch (event.type) {
+        case 'start': started = true; onStart?.(event); break
+        case 'tool_start': case 'tool_end': onToolEvent?.(event); break
+        case 'answering': onAnswering?.(); break
+        case 'chunk': onChunk?.(event.content); break
+        case 'followUp': onFollowUp?.(event.suggestions); break
+        case 'complete': finished = true; onComplete?.(event); break
+        case 'error': finished = true; onError?.(new Error(event.message)); break
+      }
+    }
+    try {
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        // An event can be split across reads: keep the unfinished tail for the next one.
+        buffer += decoder.decode(value, { stream: true })
+        const parts = buffer.split('\n\n')
+        buffer = parts.pop()
+        for (const part of parts) {
+          const line = part.split('\n').find(l => l.startsWith('data: '))
+          if (!line) continue
+          try { handle(JSON.parse(line.slice(6))) } catch { /* not JSON: skip */ }
+        }
+      }
+    } catch (err) {
+      if (!started || err?.name === 'AbortError') throw err
+      finished = true
+      onError?.(err)
+    }
+    if (!started) throw new Error('Entomate AI stream ended before it started')
+    if (!finished) onError?.(new Error('The answer was cut off. Please try again.'))
+  },
+}
+
 // Create default export with all APIs
 const apiClient = {
   // Base axios instance
@@ -1075,7 +1137,8 @@ const apiClient = {
   learning: learningApi,
   intelligence: intelligenceApi,
   settings: settingsApi,
-  assistant: assistantApi
+  assistant: assistantApi,
+  entoAi: entoAiApi
 }
 
 export default apiClient

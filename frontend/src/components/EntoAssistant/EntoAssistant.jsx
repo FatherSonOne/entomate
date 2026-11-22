@@ -22,6 +22,7 @@ import { EntoOrb, EntoOrbGlyph } from './EntoOrb'
 import { usePanelResize } from './usePanelResize'
 import { setVoiceState, pulseVoice, onVoiceRequest } from './voiceSignal'
 import { useMicLevel } from './useMicLevel'
+import { AgentPipeline, ToolsUsed, applyToolEvent } from './AgentPipeline'
 import './EntoAI.css'
 import './EntoAI.tokens.css'
 
@@ -78,6 +79,9 @@ export default function EntoAssistant({ isOpen, onClose }) {
   const [inputValue, setInputValue] = useState('')
   const [isQuerying, setIsQuerying] = useState(false)
   const [streamingContent, setStreamingContent] = useState('')
+  // EAI-04: live tool steps from /api/ento-ai/query, and whether the answer is being written.
+  const [toolSteps, setToolSteps] = useState([])
+  const [answering, setAnswering] = useState(false)
   const [error, setError] = useState(null)
   const [conversationId, setConversationId] = useState(null)
   const [isListening, setIsListening] = useState(false)
@@ -108,6 +112,7 @@ export default function EntoAssistant({ isOpen, onClose }) {
     abortRef.current?.abort()
     setIsQuerying(false)
     setStreamingContent('')
+    setToolSteps([])
     setParked(current)
     setMessages([])
     setConversationId(null)
@@ -261,6 +266,8 @@ export default function EntoAssistant({ isOpen, onClose }) {
 
     setIsQuerying(true)
     setStreamingContent('')
+    setToolSteps([])
+    setAnswering(false)
 
     let streamedCitations = []
     let streamedFollowUp = []
@@ -275,6 +282,8 @@ export default function EntoAssistant({ isOpen, onClose }) {
         },
         {
           signal: controller.signal,
+          onToolEvent: (event) => setToolSteps(prev => applyToolEvent(prev, event)),
+          onAnswering: () => setAnswering(true),
           onChunk: (chunk) => { pulseVoice(); setStreamingContent(prev => prev + chunk) },
           onCitations: (citations) => { streamedCitations = citations },
           onFollowUp: (suggestions) => { streamedFollowUp = suggestions },
@@ -285,17 +294,20 @@ export default function EntoAssistant({ isOpen, onClose }) {
               content: result.answer,
               citations: streamedCitations,
               followUp: streamedFollowUp,
+              tools: Array.isArray(result.tools) ? result.tools : [],
               confidence: result.confidence,
               ts: Date.now(),
               section,
             }])
             setStreamingContent('')
+            setToolSteps([])
             setIsQuerying(false)
           },
           onError: (err) => {
             setError(err?.message || 'Failed to get a response. Please try again.')
             setIsQuerying(false)
             setStreamingContent('')
+            setToolSteps([])
           },
         }
       )
@@ -304,6 +316,7 @@ export default function EntoAssistant({ isOpen, onClose }) {
       setError('Failed to connect. Is the backend running?')
       setIsQuerying(false)
       setStreamingContent('')
+      setToolSteps([])
     }
   }, [inputValue, isQuerying, context, section, user, conversationId])
 
@@ -319,6 +332,7 @@ export default function EntoAssistant({ isOpen, onClose }) {
     setMessages([])
     setConversationId(null)
     setStreamingContent('')
+    setToolSteps([])
     setIsQuerying(false)
     setError(null)
     setParked([])
@@ -341,7 +355,7 @@ export default function EntoAssistant({ isOpen, onClose }) {
     isTyping: Boolean(inputValue.trim()),
     error,
     streamingText: streamingContent,
-    toolSteps: [],
+    toolSteps,
     thoughts: [],
     awaitingApproval: false,
     hasAnswered: messages[messages.length - 1]?.role === 'assistant',
@@ -442,9 +456,12 @@ export default function EntoAssistant({ isOpen, onClose }) {
                       <span>{msg.role === 'user' ? 'Request' : 'Entomate AI'}</span>
                     </div>
                     {msg.role === 'assistant' ? (
-                      <div className="la-markdown">
-                        <ReactMarkdown>{msg.content}</ReactMarkdown>
-                      </div>
+                      <>
+                        <div className="la-markdown">
+                          <ReactMarkdown>{msg.content}</ReactMarkdown>
+                        </div>
+                        {msg.tools?.length > 0 && <ToolsUsed calls={msg.tools} />}
+                      </>
                     ) : (
                       <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{msg.content}</p>
                     )}
@@ -473,9 +490,13 @@ export default function EntoAssistant({ isOpen, onClose }) {
                     <div className="la-message-kicker" aria-hidden="true">
                       <span>Entomate AI</span>
                     </div>
-                    <div className={`la-markdown${streamingContent ? ' la-streaming' : ''}`}>
-                      {streamingContent ? <ReactMarkdown>{streamingContent}</ReactMarkdown> : <p>Thinking…</p>}
-                    </div>
+                    {streamingContent ? (
+                      <div className="la-markdown la-streaming">
+                        <ReactMarkdown>{streamingContent}</ReactMarkdown>
+                      </div>
+                    ) : (
+                      <AgentPipeline steps={toolSteps} answering={answering} />
+                    )}
                   </div>
                 </div>
               )}

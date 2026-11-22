@@ -320,6 +320,9 @@ app.use('/api/settings', require('./routes/settings'));
 // AI Assistant (context-aware streaming)
 app.use('/api/assistant', require('./routes/assistant'));
 
+// Entomate AI agent loop with read tools (EAI-04)
+app.use('/api/ento-ai', require('./routes/entoAi'));
+
 // Meeting bot fleet (admin) + bot status callbacks
 app.use('/api/admin/bots', require('./routes/bots'));
 

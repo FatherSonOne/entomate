@@ -6169,3 +6169,33 @@ html.dark .la-sheet-handle-bar {
 .logos-assistant.la-swiss .la-welcome-brief .la-welcome-help {
   margin-top: 12px;
 }
+
+/* ============================================================================
+   Entomate additions — EAI-04 tool chips under a finished answer (AgentPipeline.tsx ToolsUsed)
+   ============================================================================ */
+.la-tools-used {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding: 0;
+}
+.la-tool-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--cmf-border, rgba(30, 27, 24, 0.12));
+  background: var(--cmf-surface-2, transparent);
+  color: var(--cmf-text-secondary, #4A4540);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.la-tool-chip-count {
+  color: var(--cmf-text-muted, #6B6560);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+}
+.la-tool-chip.is-failed .la-tool-chip-count { color: var(--cmf-error-ink, #DC2626); }

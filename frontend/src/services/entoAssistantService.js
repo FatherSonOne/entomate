@@ -10,6 +10,7 @@ import {
   calendarApi,
   workflowsApi,
   assistantApi,
+  entoAiApi,
 } from './api'
 
 // ── Cache ──────────────────────────────────────────────
@@ -332,11 +333,33 @@ export function getSectionSummary(section, data) {
   }
 }
 
-// ── Streaming query via dedicated backend endpoint ─────
+// ── Streaming query ────────────────────────────────────
+// First the agent loop with read tools (EAI-04, /api/ento-ai/query). If that
+// endpoint fails before its stream starts (not deployed yet, 503, network), the
+// question goes to the section-context assistant below, unchanged.
+export async function streamQuery(userQuery, context, callbacks) {
+  try {
+    await entoAiApi.queryStream(
+      { question: userQuery, section: context.section, conversationId: context.conversationId },
+      callbacks
+    )
+    return
+  } catch (err) {
+    if (err?.name === 'AbortError') throw err
+    // A rate limit applies to the fallback too: say so instead of failing twice.
+    if (err?.status === 429) {
+      callbacks.onError?.(new Error('Too many questions in a short time. Wait a minute, then ask again.'))
+      return
+    }
+    console.warn('[EntoAI] Tool endpoint unavailable, using the assistant endpoint:', err?.message)
+  }
+  return streamAssistantQuery(userQuery, context, callbacks)
+}
+
 // The backend handles: data loading, prompt building, and AI streaming
 // The frontend only sends: question, section, conversationId
 // Falls back to searchApi.askStream if dedicated endpoint is unavailable
-export async function streamQuery(userQuery, context, callbacks) {
+async function streamAssistantQuery(userQuery, context, callbacks) {
   const { signal, onChunk, onCitations, onFollowUp, onComplete, onError } = callbacks
 
   try {

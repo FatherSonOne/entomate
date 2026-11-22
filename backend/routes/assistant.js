@@ -30,7 +30,7 @@ const sectionLoaders = {
         .in('org_id', orgIds).order('due_date', { ascending: true }).limit(20),
       db.from('meetings').select('id, title, summary, created_at, sentiment_label')
         .in('org_id', orgIds).order('created_at', { ascending: false }).limit(10),
-      db.from('projects').select('id, name, status, start_date, end_date, budget, budget_spent')
+      db.from('projects').select('id, name, status, start_date, end_date, deal_value')
         .in('org_id', orgIds).eq('status', 'active').limit(10),
     ]);
     return {
@@ -62,7 +62,7 @@ const sectionLoaders = {
 
   async projects({ orgIds, db }) {
     const { data } = await db.from('projects')
-      .select('id, name, description, status, start_date, end_date, budget, budget_spent, created_at')
+      .select('id, name, description, status, start_date, end_date, deal_value, created_at')
       .in('org_id', orgIds)
       .order('created_at', { ascending: false }).limit(15);
     return { projects: data || [] };
@@ -187,7 +187,7 @@ function buildContextBlocks(data) {
   if (data.projects?.length) {
     const slim = data.projects.slice(0, 15).map(p => ({
       id: p.id, name: p.name, status: p.status,
-      budget: p.budget, budgetSpent: p.budget_spent,
+      dealValue: p.deal_value,
       startDate: p.start_date, endDate: p.end_date,
     }));
     blocks.push(`[Projects (${slim.length})]\n${JSON.stringify(slim, null, 1)}`);
@@ -415,5 +415,9 @@ function generateFollowUps(section, question) {
   const candidates = sectionFollowUps[section] || sectionFollowUps.dashboard;
   return candidates.filter(f => !q.includes(f.toLowerCase().substring(0, 20))).slice(0, 3);
 }
+
+// Shared with routes/entoAi.js (EAI-04).
+router.generateFollowUps = generateFollowUps;
+router.SECTION_LABELS = SECTION_LABELS;
 
 module.exports = router;
