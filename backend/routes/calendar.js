@@ -52,6 +52,8 @@ router.get('/status', async (req, res) => {
   res.json({
     configured: isConfigured,
     connected: hasTokens,
+    // Shown so a redirect_uri_mismatch can be checked against Google Cloud.
+    redirectUri: calendarService.redirectUri(),
     message: isConfigured
       ? (hasTokens ? 'Connected to Google Calendar' : 'Not connected - authorization required')
       : 'Google Calendar not configured - add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET'

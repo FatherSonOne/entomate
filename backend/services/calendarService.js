@@ -22,7 +22,7 @@ class CalendarService {
 
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    const redirectUri = process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/api/calendar/callback';
+    const redirectUri = this.redirectUri();
 
     if (!clientId || !clientSecret) {
       log.info('Google Calendar not configured - missing credentials');
@@ -32,6 +32,18 @@ class CalendarService {
     this.oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
     this.initialized = true;
     log.info('Google Calendar service initialized');
+  }
+
+  /**
+   * Where Google sends the user back. GOOGLE_REDIRECT_URI if set (trimmed),
+   * else this service's own address: Render sets RENDER_EXTERNAL_URL, and
+   * BACKEND_URL works elsewhere. localhost only for local development.
+   */
+  redirectUri() {
+    const explicit = (process.env.GOOGLE_REDIRECT_URI || '').trim();
+    if (explicit) return explicit;
+    const base = (process.env.RENDER_EXTERNAL_URL || process.env.BACKEND_URL || '').trim().replace(/\/+$/, '');
+    return base ? `${base}/api/calendar/callback` : 'http://localhost:3000/api/calendar/callback';
   }
 
   /**
@@ -85,7 +97,7 @@ class CalendarService {
     const auth = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,
-      process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/api/calendar/callback'
+      this.redirectUri()
     );
     auth.setCredentials(tokens);
 
