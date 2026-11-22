@@ -673,7 +673,13 @@ router.put('/auto-join', authenticate, validate(schemas.autoJoin), async (req, r
     if (error) throw error;
 
     let withdrawn = 0;
-    if (!enabled) withdrawn = await autoJoin.withdrawScheduled(req.user.id);
+    if (!enabled) {
+      // The setting is saved; a failed withdraw must not report it as failed.
+      withdrawn = await autoJoin.withdrawScheduled(req.user.id).catch((err) => {
+        log.warn('Auto-join withdraw failed:', err.message);
+        return 0;
+      });
+    }
 
     res.json({ settings: autoJoin.normalizeSettings(next), withdrawn });
   } catch (error) {
