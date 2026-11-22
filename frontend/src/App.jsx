@@ -17,7 +17,6 @@ const Insights = React.lazy(() => import('./pages/Insights'))
 const Search = React.lazy(() => import('./pages/Search'))
 const Settings = React.lazy(() => import('./pages/Settings'))
 const BotLauncher = React.lazy(() => import('./pages/BotLauncher'))
-const ProjectDashboard = React.lazy(() => import('./pages/ProjectDashboard'))
 const Calendar = React.lazy(() => import('./pages/Calendar'))
 const WorkflowBuilder = React.lazy(() => import('./pages/WorkflowBuilder'))
 const UsersGuide = React.lazy(() => import('./components/UsersGuide/UsersGuide'))
@@ -51,8 +50,8 @@ export default function App() {
             <Route path="meetings/:id" element={<MeetingDetail />} />
             <Route path="projects" element={<Projects />} />
             <Route path="projects/:id" element={<ProjectDetail />} />
-            <Route path="projects/:id/dashboard" element={<ProjectDashboard />} />
-            <Route path="project-dashboard" element={<Navigate to="/projects?view=board" replace />} />
+            <Route path="projects/:id/dashboard" element={<Navigate to=".." relative="path" replace />} />
+            <Route path="project-dashboard" element={<Navigate to="/tasks?view=lanes" replace />} />
             <Route path="tasks" element={<Tasks />} />
             <Route path="automations" element={<Automations />} />
             {/* Workflows and Agents merged into Automations (2026-11-22). The builder stays at /workflows/:id. */}

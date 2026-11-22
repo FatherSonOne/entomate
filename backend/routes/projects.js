@@ -8,6 +8,7 @@ const log = require('../utils/log');
 const { aggregateTeamWorkload } = require('../utils/teamWorkload');
 const { getOrgIdForUser } = require('../utils/orgContext');
 const { attachOrgIds } = require('../utils/orgContext');
+const { summarizeProjects, rollup, isDone } = require('../services/projectRollup');
 
 const router = express.Router();
 
@@ -104,8 +105,29 @@ router.get('/', validate(schemas.list), async (req, res) => {
 
     if (error) throw error;
 
+    // Roll each project's tasks, linked meetings and their action items into counts,
+    // so the list can show progress and late work (Projects Slate pass).
+    const ids = (projects || []).map((p) => p.id);
+    let summary = { projects: projects || [], needsYou: [], lateTotal: 0 };
+    if (ids.length) {
+      const [{ data: tasks }, { data: meetings }] = await Promise.all([
+        supabase.from('tasks').select('id, project_id, title, status, due_date, assigned_to, parent_task_id')
+          .in('org_id', req.orgIds).in('project_id', ids),
+        supabase.from('meetings').select('id, project_id, title, start_time, created_at, decisions')
+          .in('org_id', req.orgIds).in('project_id', ids),
+      ]);
+      const meetingIds = (meetings || []).map((m) => m.id);
+      const { data: actions } = meetingIds.length
+        ? await supabase.from('action_items').select('id, meeting_id, task_description, status, due_date, assigned_to_name')
+          .in('org_id', req.orgIds).in('meeting_id', meetingIds)
+        : { data: [] };
+      summary = summarizeProjects(projects, tasks || [], meetings || [], actions || []);
+    }
+
     res.json({
-      projects: projects || [],
+      projects: summary.projects,
+      needsYou: summary.needsYou,
+      lateTotal: summary.lateTotal,
       count: count || 0,
       hasMore: (projects?.length || 0) === parseInt(limit)
     });
@@ -147,20 +169,31 @@ router.get('/:id', async (req, res) => {
       .eq('project_id', id)
       .order('created_at', { ascending: false });
 
-    // Get related meetings
+    // Linked meetings with their decisions and timecodes
     const { data: meetings } = await supabase
       .from('meetings')
-      .select('id, title, summary, created_at, sentiment_label')
+      .select('id, title, summary, created_at, start_time, duration_minutes, decisions, summary_moments, sentiment_label')
       .in('org_id', req.orgIds)
       .eq('project_id', id)
       .order('created_at', { ascending: false })
-      .limit(10);
+      .limit(50);
 
-    // Calculate project stats
+    // Action items those meetings produced: they belong to the project too
+    const meetingIds = (meetings || []).map((m) => m.id);
+    const { data: actionItems } = meetingIds.length
+      ? await supabase
+        .from('action_items')
+        .select('*, meetings:meeting_id ( title )')
+        .in('org_id', req.orgIds)
+        .in('meeting_id', meetingIds)
+        .order('due_date', { ascending: true, nullsFirst: false })
+      : { data: [] };
+
+    // Legacy rows say todo / completed (see tasksView.normalizeStatus)
     const stats = {
       totalTasks: tasks?.length || 0,
-      completedTasks: tasks?.filter(t => t.status === 'done').length || 0,
-      openTasks: tasks?.filter(t => t.status === 'open').length || 0,
+      completedTasks: tasks?.filter(t => isDone(t.status)).length || 0,
+      openTasks: tasks?.filter(t => t.status === 'open' || t.status === 'todo').length || 0,
       inProgressTasks: tasks?.filter(t => t.status === 'in_progress').length || 0,
       totalMeetings: meetings?.length || 0
     };
@@ -169,6 +202,8 @@ router.get('/:id', async (req, res) => {
       ...project,
       tasks: tasks || [],
       meetings: meetings || [],
+      actionItems: actionItems || [],
+      rollup: rollup(tasks || [], meetings || [], actionItems || []),
       stats
     });
 
