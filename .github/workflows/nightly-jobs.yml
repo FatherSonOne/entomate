@@ -13,6 +13,12 @@ on:
   schedule:
     - cron: '15 3 * * *'
   workflow_dispatch:
+    inputs:
+      job:
+        description: Which job to run (a manual run can skip the retention sweep)
+        type: choice
+        options: [all, embeddings, retention]
+        default: all
 
 jobs:
   retention:
@@ -20,6 +26,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Start retention sweep
+        if: github.event_name != 'workflow_dispatch' || inputs.job != 'embeddings'
         env:
           BACKEND_URL: ${{ secrets.ENTOMATE_BACKEND_URL }}
           API_KEY: ${{ secrets.ENTOMATE_INTERNAL_API_KEY }}
@@ -37,13 +44,19 @@ jobs:
           done
           echo "::error::Retention sweep could not be started"; exit 1
       - name: Embed meetings missing from search
+        if: github.event_name != 'workflow_dispatch' || inputs.job != 'retention'
         env:
           BACKEND_URL: ${{ secrets.ENTOMATE_BACKEND_URL }}
           API_KEY: ${{ secrets.ENTOMATE_INTERNAL_API_KEY }}
         run: |
-          # The backend is awake after the retention step. Embeds meetings that
-          # search and Ask can't find yet (idempotent; skips embedded meetings).
-          code=$(curl -s -o out.json -w '%{http_code}' --max-time 90 -X POST \
-            -H "X-API-Key: $API_KEY" "${BACKEND_URL%/}/api/internal/jobs/embeddings" || true)
-          echo "HTTP $code"; cat out.json 2>/dev/null; echo
-          if [ "$code" != "202" ] && [ "$code" != "409" ]; then echo "::warning::Embedding backfill not started"; fi
+          # Embeds meetings that search and Ask can't find yet (idempotent;
+          # skips embedded meetings). Retries while a cold backend wakes, for
+          # runs that skip the retention step.
+          for i in 1 2 3 4 5; do
+            code=$(curl -s -o out.json -w '%{http_code}' --max-time 90 -X POST \
+              -H "X-API-Key: $API_KEY" "${BACKEND_URL%/}/api/internal/jobs/embeddings" || true)
+            echo "attempt $i: HTTP $code"; cat out.json 2>/dev/null; echo
+            if [ "$code" = "202" ] || [ "$code" = "409" ]; then exit 0; fi
+            sleep 30
+          done
+          echo "::warning::Embedding backfill not started"
