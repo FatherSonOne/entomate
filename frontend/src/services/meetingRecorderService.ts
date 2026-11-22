@@ -100,7 +100,9 @@ export async function loadRecordingAudio(
     (urls as string[]).map(async (url) => {
       const r = await fetcher(url)
       if (!r.ok) throw new Error('Part of the recording could not be downloaded. Try again.')
-      const part = await r.blob()
+      // Bytes, not a Blob: a Blob from fetch and the page's Blob can be
+      // different classes (jsdom), and new Blob() would stringify it.
+      const part = await r.arrayBuffer()
       downloaded += 1
       onProgress?.(downloaded / urls.length)
       return part
