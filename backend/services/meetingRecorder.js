@@ -368,11 +368,16 @@ async function transcribeMeeting(meetingId) {
     let summaryData = EMPTY_SUMMARY;
     let actionItems = [];
     let embedding = null;
-    if (ai.isConfigured()) {
+    // Saved on the job so a missing summary can be diagnosed from the database.
+    let summaryError = null;
+    if (!ai.isConfigured()) {
+      summaryError = 'AI provider not configured';
+    } else {
       try {
         ({ summaryData, actionItems, embedding } = await runAIPipeline(transcript, meeting.title));
       } catch (err) {
         // The transcript is the valuable part; the summary can be rebuilt with Reprocess.
+        summaryError = String(err?.message || err).slice(0, 500);
         log.warn('Recording: AI pipeline failed, saving transcript only', { meetingId, error: err.message });
       }
     }
@@ -398,7 +403,7 @@ async function transcribeMeeting(meetingId) {
       attendees: Array.isArray(meeting.attendees) && meeting.attendees.length ? meeting.attendees : speakers,
       duration_minutes: durationMs ? Math.max(1, Math.round(durationMs / 60000)) : null,
       end_time: Number.isFinite(startMs) && durationMs ? new Date(startMs + durationMs).toISOString() : now,
-      recording_job: { ...job, status: 'done', error: null, speakers: speakers.length, lines: segments.length, updatedAt: now },
+      recording_job: { ...job, status: 'done', error: null, summaryError, speakers: speakers.length, lines: segments.length, updatedAt: now },
       updated_at: now,
     };
     if (embedding) update.transcript_embedding = embedding;

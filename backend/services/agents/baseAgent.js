@@ -4,6 +4,8 @@
  * Week 7: Automations & Basic Agents
  */
 
+const log = require('../../utils/log');
+
 class BaseAgent {
   constructor(name, description) {
     this.name = name;

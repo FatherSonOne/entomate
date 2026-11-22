@@ -9,6 +9,7 @@ const { aiLimiter } = require('../middleware/rateLimiter');
 const explanationAnalytics = require('../services/explainability/ExplanationAnalytics');
 const { getEcosystemBridge } = require('../services/ecosystemBridge');
 const log = require('../utils/log');
+const { getOrgIdForUser } = require('../utils/orgContext');
 const { validate } = require('../middleware/validate');
 const schemas = require('../schemas/agents');
 const agentTemplates = require('../services/agentTemplates');
@@ -445,7 +446,8 @@ router.get('/available', authenticate, (req, res) => {
  */
 router.post('/run/:agentName', authenticate, aiLimiter, validate(schemas.run), asyncHandler(async (req, res) => {
   const { agentName } = req.params;
-  const context = req.body;
+  // orgId is always derived server-side; a client-supplied one is ignored
+  const context = { ...req.body, orgId: await getOrgIdForUser(req.user?.id) };
 
   const agent = getAgent(agentName);
   if (!agent) {
@@ -477,9 +479,10 @@ router.post('/orchestrate', authenticate, aiLimiter, validate(schemas.orchestrat
     });
   }
 
+  const scopedContext = { ...(context || {}), orgId: await getOrgIdForUser(req.user?.id) };
   const result = parallel
-    ? await agentOrchestrator.orchestrateParallel(agents, context || {})
-    : await agentOrchestrator.orchestrate(agents, context || {});
+    ? await agentOrchestrator.orchestrateParallel(agents, scopedContext)
+    : await agentOrchestrator.orchestrate(agents, scopedContext);
 
   res.json({
     success: true,
@@ -501,7 +504,10 @@ router.post('/process-meeting', authenticate, aiLimiter, validate(schemas.proces
     });
   }
 
-  const result = await agentOrchestrator.processMeetingWithAgents(meeting, actionItems);
+  const result = await agentOrchestrator.processMeetingWithAgents(
+    { ...meeting, org_id: await getOrgIdForUser(req.user?.id) },
+    actionItems
+  );
 
   res.json({
     success: true,

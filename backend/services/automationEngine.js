@@ -655,7 +655,8 @@ class AutomationEngine {
         priority: data.priority,
         meetingTitle: data.meeting_title,
         team: config.team || data.team || [],
-        actionItemId: data.action_item_id || data.id
+        actionItemId: data.action_item_id || data.id,
+        orgId: data.org_id || null
       };
 
       const result = await agentOrchestrator.runAgent('assignment', context);
