@@ -249,57 +249,13 @@ class SchedulerService {
    * Check for overdue items and send alerts
    */
   async checkOverdueItems() {
-    if (!supabase) {
-      log.info('Database not configured, skipping overdue check');
-      return;
-    }
-
-    if (!emailService.isConfigured()) {
-      log.info('Email service not configured, skipping overdue check');
-      return;
-    }
-
+    // Superseded by the daily overdue digest (services/overdueDigest.js): one email
+    // per person, only Entomate users, honours the Settings switch and runs once a day.
     try {
-      const now = new Date().toISOString();
-
-      // Get overdue items
-      const { data: overdueItems } = await supabase
-        .from('action_items')
-        .select('*')
-        .lt('due_date', now)
-        .not('status', 'in', '("done","complete","completed","cancelled")')
-        .order('due_date', { ascending: true });
-
-      if (!overdueItems || overdueItems.length === 0) {
-        log.info('No overdue items found');
-        return;
-      }
-
-      log.info(`Found ${overdueItems.length} overdue items`);
-
-      // Group by assignee email
-      const byAssignee = new Map();
-      overdueItems.forEach(item => {
-        const email = item.assigned_to_email;
-        if (email) {
-          if (!byAssignee.has(email)) {
-            byAssignee.set(email, []);
-          }
-          byAssignee.get(email).push(item);
-        }
-      });
-
-      // Send alerts to assignees
-      for (const [email, items] of byAssignee) {
-        try {
-          await this.sendOverdueAlert(email, items);
-          log.info(`Overdue alert sent to ${email} for ${items.length} items`);
-        } catch (error) {
-          log.error(`Failed to send overdue alert to ${email}:`, { error: error.message || error });
-        }
-      }
+      const result = await require('./overdueDigest').runOverdueDigest();
+      log.info('Overdue digest finished', { result });
     } catch (error) {
-      log.error('Failed to run overdue check job:', { error: error.message || error });
+      log.error('Failed to run overdue digest:', { error: error.message || error });
     }
   }
 

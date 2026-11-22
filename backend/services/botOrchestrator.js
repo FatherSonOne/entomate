@@ -31,6 +31,11 @@ const consentEmail = require('./consentEmailService');
 
 const RECALL_API_BASE = process.env.RECALL_API_BASE || 'https://us-west-2.recall.ai/api/v1';
 const DEFAULT_BOT_NAME = 'Meet Mate';
+// Deepgram Nova-3 language for bot transcripts. 'multi' follows the speakers
+// across English, Spanish, French, German, Hindi, Russian, Portuguese, Japanese,
+// Italian and Dutch, including switches mid-call (surface audit 2026-11-22, gap 2).
+// BOT_TRANSCRIPT_LANGUAGE pins one language (e.g. 'en') if a workspace needs it.
+const BOT_TRANSCRIPT_LANGUAGE = (process.env.BOT_TRANSCRIPT_LANGUAGE || 'multi').trim() || 'multi';
 
 // Casual, neutral disclosure posted to chat when the bot joins. Per-workspace
 // override lives at tenant_organizations.settings.bot_announcement_message;
@@ -282,7 +287,7 @@ async function launchBotSession(p) {
         provider: {
           deepgram_streaming: {
             model: 'nova-3',
-            language: 'en',
+            language: BOT_TRANSCRIPT_LANGUAGE,
             diarize: true
           }
         }
@@ -316,21 +321,30 @@ async function launchBotSession(p) {
   let bot;
   try {
     // Recall's API rejects trailing slashes on these endpoints (returns
-    // auth_failed misleadingly on POST /bot/).
-    try {
-      bot = await recallFetch('/bot', {
-        method: 'POST',
-        body: JSON.stringify(recallPayload)
-      });
-    } catch (err) {
-      // Live captions are extra: if Recall refuses the realtime endpoint, send the bot without it.
-      if (!recallPayload.recording_config.realtime_endpoints || !/\b400\b/.test(err.message)) throw err;
-      log.warn('Recall refused realtime captions; launching without them', { sessionId, error: err.message });
-      delete recallPayload.recording_config.realtime_endpoints;
-      bot = await recallFetch('/bot', {
-        method: 'POST',
-        body: JSON.stringify(recallPayload)
-      });
+    // auth_failed misleadingly on POST /bot/). Two settings are optional, and a
+    // 400 that names one of them drops it and tries again: the multilingual
+    // transcript language (falls back to English, the old proven setting) and
+    // live captions.
+    for (let attempt = 0; ; attempt++) {
+      try {
+        bot = await recallFetch('/bot', {
+          method: 'POST',
+          body: JSON.stringify(recallPayload)
+        });
+        break;
+      } catch (err) {
+        if (attempt >= 2 || !/\b400\b/.test(err.message)) throw err;
+        const deepgram = recallPayload.recording_config.transcript.provider.deepgram_streaming;
+        if (deepgram.language !== 'en' && /language|multi/i.test(err.message)) {
+          log.warn('Recall refused the transcript language; launching in English', { sessionId, language: deepgram.language, error: err.message });
+          deepgram.language = 'en';
+        } else if (recallPayload.recording_config.realtime_endpoints) {
+          log.warn('Recall refused realtime captions; launching without them', { sessionId, error: err.message });
+          delete recallPayload.recording_config.realtime_endpoints;
+        } else {
+          throw err;
+        }
+      }
     }
   } catch (err) {
     await db()

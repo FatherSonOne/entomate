@@ -12,15 +12,19 @@ export const CIRCUIT_MARK_IDS = ['circuit-e', 'circuit-spire', 'catalyst-core', 
 export const CIRCUIT_FINISHES = ['engraved', 'machined', 'drafted']
 
 const EASE = { io: '.65 0 .35 1', out: '.16 1 .3 1', in: '.7 0 .84 0', lin: '0 0 1 1' }
-const BG = '#060606'
-const INK = '#E9E9E4'
-const MUT = '#6E6E69'
-const CRIMSON = '#FF2D6B'
+/* Engraved and Machined are neutral with a crimson live point. Drafted carries
+   the original marks' warm colour as flat ink: vermilion line, copper weight,
+   oxblood construction, cream cores, amber for what is live. */
+const PALETTES = {
+  neutral: { BG: '#060606', INK: '#E9E9E4', MUT: '#6E6E69', CRIMSON: '#FF2D6B', COPPER: '#E9E9E4', DEEP: '#060606', CREAM: '#E9E9E4' },
+  drafted: { BG: '#060606', INK: '#E8573C', MUT: '#6E2B21', CRIMSON: '#FFB347', COPPER: '#D98C5F', DEEP: '#2B0B07', CREAM: '#F6D8B7' },
+}
 
 let instance = 0
 
 export function renderCircuitMark(id, finish = 'engraved', duration = 6, title = id) {
   const uid = `en-cm-${id}-${finish}-${++instance}`
+  const { BG, INK, MUT, CRIMSON, COPPER, DEEP, CREAM } = PALETTES[finish] || PALETTES.neutral
   const D = duration
   const defs = []
 
@@ -79,18 +83,18 @@ export function renderCircuitMark(id, finish = 'engraved', duration = 6, title =
       guide: () => '',
     },
     drafted: {
-      body: (x, y, w, h, r = 6) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${r}" fill="${BG}" stroke="${INK}" stroke-width="2.5"/><line x1="${x + 14}" y1="${y + h / 2}" x2="${x + w - 14}" y2="${y + h / 2}" stroke="${MUT}" stroke-width="1.2" stroke-dasharray="10 8"/>`,
+      body: (x, y, w, h, r = 6) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${r}" fill="${DEEP}" stroke="${INK}" stroke-width="2.5"/><line x1="${x + 14}" y1="${y + h / 2}" x2="${x + w - 14}" y2="${y + h / 2}" stroke="${COPPER}" stroke-width="1.6" stroke-dasharray="10 8"/>`,
       trace: (d, extra = '', inner = '') => `<path d="${d}" fill="none" stroke="${INK}" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"${extra}>${inner}</path>`,
-      heavy: (d, extra = '', inner = '') => `<path d="${d}" fill="none" stroke="${INK}" stroke-width="4.5" stroke-linecap="square" stroke-linejoin="miter"${extra}>${inner}</path>`,
-      node: (cx, cy, r, core) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${BG}" stroke="${INK}" stroke-width="2.5"/><path d="M${cx - r - 14} ${cy}H${cx + r + 14}M${cx} ${cy - r - 14}V${cy + r + 14}" stroke="${MUT}" stroke-width="1.2"/>${core}`,
-      coreFill: INK,
-      pad: (cx, cy, r = 8) => `<rect x="${cx - r}" y="${cy - r}" width="${2 * r}" height="${2 * r}" fill="${BG}" stroke="${INK}" stroke-width="2.5"/>`,
+      heavy: (d, extra = '', inner = '') => `<path d="${d}" fill="none" stroke="${COPPER}" stroke-width="4.5" stroke-linecap="square" stroke-linejoin="miter"${extra}>${inner}</path>`,
+      node: (cx, cy, r, core) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${DEEP}" stroke="${INK}" stroke-width="2.5"/><path d="M${cx - r - 14} ${cy}H${cx + r + 14}M${cx} ${cy - r - 14}V${cy + r + 14}" stroke="${MUT}" stroke-width="1.2"/>${core}`,
+      coreFill: CREAM,
+      pad: (cx, cy, r = 8) => `<rect x="${cx - r}" y="${cy - r}" width="${2 * r}" height="${2 * r}" fill="${BG}" stroke="${COPPER}" stroke-width="2.5"/>`,
       ring: (cx, cy, r, kind) => kind === 'dash'
-        ? `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${MUT}" stroke-width="1.5" stroke-dasharray="6 9"/>`
-        : kind === 'fine' ? `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${MUT}" stroke-width="1.2"/>`
+        ? `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${COPPER}" stroke-width="1.8" stroke-dasharray="6 9"/>`
+        : kind === 'fine' ? `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${MUT}" stroke-width="1.4"/>`
           : `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${INK}" stroke-width="2.5"/>`,
-      band: (cx, cy, r, w) => `<circle cx="${cx}" cy="${cy}" r="${r + w / 2}" fill="none" stroke="${INK}" stroke-width="2.5"/><circle cx="${cx}" cy="${cy}" r="${r - w / 2}" fill="none" stroke="${INK}" stroke-width="2.5"/>`,
-      guide: (d) => `<path d="${d}" fill="none" stroke="${MUT}" stroke-width="1" stroke-dasharray="4 7" opacity=".8"/>`,
+      band: (cx, cy, r, w) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${DEEP}" stroke-width="${w}"/><circle cx="${cx}" cy="${cy}" r="${r + w / 2}" fill="none" stroke="${INK}" stroke-width="2.5"/><circle cx="${cx}" cy="${cy}" r="${r - w / 2}" fill="none" stroke="${COPPER}" stroke-width="2"/>`,
+      guide: (d) => `<path d="${d}" fill="none" stroke="${MUT}" stroke-width="1" stroke-dasharray="4 7" opacity=".9"/>`,
     },
   }[finish]
 
@@ -199,4 +203,4 @@ export function renderCircuitStill(id, finish = 'engraved') {
 }
 
 /** The finish the app ships. */
-export const CIRCUIT_FINISH = 'engraved'
+export const CIRCUIT_FINISH = 'drafted'

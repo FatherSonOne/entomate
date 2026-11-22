@@ -18,6 +18,7 @@ const JOBS = {
   retention: () => require('../services/retentionService').runRetentionSweep(),
   embeddings: () => require('../services/embeddingService').backfillMissing(),
   autojoin: () => require('../services/calendarAutoJoin').runAutoJoin(),
+  digest: () => require('../services/overdueDigest').runOverdueDigest(),
 };
 
 const running = new Set();

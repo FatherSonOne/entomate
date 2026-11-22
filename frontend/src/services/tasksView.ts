@@ -40,6 +40,8 @@ export interface TaskActionRow extends ActionItemRow {
   transcript_at_ms?: number | null
   created_at?: string | null
   context?: string | null
+  assigned_to_email?: string | null
+  last_nudged_at?: string | null
 }
 
 // ── The work item ───────────────────────────────────────────────
@@ -66,6 +68,9 @@ export interface WorkItem {
   priority: WorkPriority
   due: string | null
   owner: string | null
+  /** Action items only: where a Nudge reminder goes, and when the last one went. */
+  ownerEmail?: string | null
+  nudgedAt?: string | null
   tags: string[]
   projectId: string | null
   source: MeetingSource | null
@@ -183,6 +188,8 @@ export function fromActionItem(row: TaskActionRow): WorkItem {
     priority: normalizePriority(row.priority),
     due: row.due_date || null,
     owner: row.assigned_to_name?.trim() || null,
+    ownerEmail: row.assigned_to_email?.trim() || null,
+    nudgedAt: row.last_nudged_at || null,
     tags: [],
     projectId: null,
     source: row.meeting_id
@@ -407,4 +414,16 @@ export function writeUrl(s: TasksUrlState): Record<string, string> {
   if (s.item) out.item = s.item
   if (s.lane !== 'open') out.lane = s.lane
   return out
+}
+
+const NUDGE_WINDOW_MS = 24 * 60 * 60 * 1000
+
+/**
+ * Nudge key state for an action item: hidden for tasks and done items, "Nudged"
+ * within 24 hours of the last reminder, otherwise ready when the owner has an email.
+ */
+export function nudgeState(item: WorkItem, now: Date = new Date()): 'hidden' | 'no_email' | 'recent' | 'ready' {
+  if (item.kind !== 'action' || item.status === 'done') return 'hidden'
+  if (item.nudgedAt && now.getTime() - Date.parse(item.nudgedAt) < NUDGE_WINDOW_MS) return 'recent'
+  return item.ownerEmail ? 'ready' : 'no_email'
 }
