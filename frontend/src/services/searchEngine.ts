@@ -143,10 +143,15 @@ export function resultHref(r: SearchResult): string {
   }
 }
 
+/** A due date ("2026-11-17") is a local day; new Date() alone reads it as UTC midnight. */
+function toDate(v: string): Date {
+  return /^\d{4}-\d{2}-\d{2}$/.test(v) ? new Date(`${v}T00:00:00`) : new Date(v)
+}
+
 /** Short day for meta lines: "Wed 12 Nov" (adds the year when not this year). */
 export function shortDate(iso: string | null | undefined, now: Date = new Date()): string {
   if (!iso) return ''
-  const d = new Date(iso)
+  const d = toDate(iso)
   if (Number.isNaN(d.getTime())) return ''
   const opts: Intl.DateTimeFormatOptions = { weekday: 'short', day: 'numeric', month: 'short' }
   if (d.getFullYear() !== now.getFullYear()) opts.year = 'numeric'
@@ -159,7 +164,7 @@ export function statusSignal(r: SearchResult, now: Date = new Date()): { tone: '
   if (r.type === 'project') return s ? { tone: s === 'active' ? 'live' : 'off', word: titleCase(s) } : null
   if (r.type !== 'action_item' && r.type !== 'task') return null
   if (s === 'done' || s === 'completed') return { tone: 'mint', word: 'Done' }
-  const due = r.meta.dueDate ? new Date(r.meta.dueDate) : null
+  const due = r.meta.dueDate ? toDate(r.meta.dueDate) : null
   if (due && !Number.isNaN(due.getTime()) && endOfDay(due) < now.getTime()) return { tone: 'brand', word: 'Late' }
   if (s === 'in_progress') return { tone: 'live', word: 'In progress' }
   if (s === 'blocked') return { tone: 'brand', word: 'Blocked' }
