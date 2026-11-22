@@ -59,6 +59,9 @@ function makeSupabaseMock() {
     maybeSingle: jest.fn(() => Promise.resolve(nextTerminal())),
     single:      jest.fn(() => Promise.resolve(nextTerminal())),
 
+    // RPCs (get_org_bot_hours). Default: no data, so no bot-hour limit.
+    rpc:         jest.fn(() => Promise.resolve({ data: null, error: null })),
+
     // Auth admin (for organizer email lookup)
     auth: {
       admin: {
@@ -553,5 +556,79 @@ describe('launchBotSession — live captions', () => {
     global.fetch.mockResolvedValueOnce(ok({ id: 'recall-3' }));
     await launch();
     expect(JSON.parse(botPosts()[0][1].body).recording_config.realtime_endpoints).toBeUndefined();
+  });
+});
+
+describe('launchBotSession — bot-hour limit', () => {
+  let originalFetch;
+  const env = { ...process.env };
+  const ok = (json) => ({ ok: true, status: 201, headers: new Map([['content-type', 'application/json']]), json: () => Promise.resolve(json), text: () => Promise.resolve('') });
+  const hours = (over) => ({
+    plan: 'solo', included_hours: 15, used_hours: 15, pack_hours: 0, remaining_hours: 0,
+    limited: true, resets_at: '2026-12-01T00:00:00+00:00', ...over
+  });
+  const launch = () => orchestrator.launchBotSession({
+    workspaceId: 'org-1', meetingId: 'm-1', meetingUrl: 'https://meet.google.com/abc-defg-hij', platform: 'meet'
+  });
+  const recallPosts = () => global.fetch.mock.calls.filter(([url]) => /\/bot$/.test(url));
+
+  beforeEach(() => {
+    mockSupabase.__reset();
+    mockSupabase.rpc.mockReset();
+    mockSupabase.rpc.mockResolvedValue({ data: null, error: null });
+    originalFetch = global.fetch;
+    global.fetch = jest.fn().mockResolvedValue(ok({ id: 'recall-h' }));
+    process.env.RECALL_API_KEY = 'test-key';
+  });
+  afterEach(() => {
+    global.fetch = originalFetch;
+    process.env = { ...env };
+  });
+
+  test('reads the hours of the launching org', async () => {
+    await launch();
+    expect(mockSupabase.rpc).toHaveBeenCalledWith('get_org_bot_hours', { p_org_id: 'org-1' });
+  });
+
+  test('no hours left: refuses before any row or Recall call, with a clear message', async () => {
+    mockSupabase.rpc.mockResolvedValue({ data: hours(), error: null });
+    const err = await launch().catch((e) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect(err.code).toBe('bot_hours_exhausted');
+    expect(err.message).toBe(
+      'No bot hours left. Your Solo plan includes 15 bot hours a month, and this workspace has used them all, ' +
+      'with no extra hours left. Add a 10-hour pack ($10), or wait until December 1, 2026, when the hours reset.'
+    );
+    expect(err.botHours).toMatchObject({ plan: 'solo', remaining_hours: 0 });
+    expect(mockSupabase.insert).not.toHaveBeenCalled();
+    expect(recallPosts()).toHaveLength(0);
+  });
+
+  test('Team message names the shared 75-hour pool', async () => {
+    mockSupabase.rpc.mockResolvedValue({ data: hours({ plan: 'team', included_hours: 75, used_hours: 80 }), error: null });
+    const err = await launch().catch((e) => e);
+    expect(err.message).toMatch(/^No bot hours left\. Your Team plan includes 75 shared bot hours a month/);
+  });
+
+  test('hours left (plan or pack): launches', async () => {
+    mockSupabase.rpc.mockResolvedValue({ data: hours({ used_hours: 20, pack_hours: 0.5, remaining_hours: 0.5 }), error: null });
+    const res = await launch();
+    expect(res.recallBotId).toBe('recall-h');
+    expect(mockSupabase.insert).toHaveBeenCalledTimes(1);
+  });
+
+  test('plan with no limit (legacy plans): launches', async () => {
+    mockSupabase.rpc.mockResolvedValue({ data: hours({ plan: 'pro', included_hours: null, remaining_hours: null, limited: false }), error: null });
+    const res = await launch();
+    expect(res.recallBotId).toBe('recall-h');
+  });
+
+  test('a failed hours read is logged and the launch goes ahead', async () => {
+    const log = require('../utils/log');
+    log.warn.mockClear();
+    mockSupabase.rpc.mockResolvedValue({ data: null, error: { message: 'connection reset' } });
+    const res = await launch();
+    expect(res.recallBotId).toBe('recall-h');
+    expect(log.warn).toHaveBeenCalledWith('Bot-hour check failed; launching anyway', expect.objectContaining({ orgId: 'org-1' }));
   });
 });

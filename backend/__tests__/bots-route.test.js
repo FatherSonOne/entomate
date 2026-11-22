@@ -190,6 +190,26 @@ describe('POST /api/admin/bots/launch — consent gate', () => {
     const callArgs = orchestrator.launchBotSession.mock.calls[0][0];
     expect(callArgs.participantEmails).toEqual([]);
   });
+
+  test('no bot hours left -> 402 with the orchestrator message', async () => {
+    const orchestrator = require('../services/botOrchestrator');
+    const err = Object.assign(new Error('No bot hours left. Your Solo plan includes 15 bot hours a month.'), {
+      code: 'bot_hours_exhausted',
+      botHours: { plan: 'solo', remaining_hours: 0 }
+    });
+    orchestrator.launchBotSession.mockRejectedValueOnce(err);
+
+    const res = await request(app)
+      .post('/api/admin/bots/launch')
+      .send({ ...VALID_BODY, consentAcknowledged: true });
+
+    expect(res.status).toBe(402);
+    expect(res.body).toEqual({
+      error: 'bot_hours_exhausted',
+      message: 'No bot hours left. Your Solo plan includes 15 bot hours a month.',
+      hours: { plan: 'solo', remaining_hours: 0 }
+    });
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────

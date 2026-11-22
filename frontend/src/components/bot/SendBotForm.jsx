@@ -59,6 +59,7 @@ const CONSENT = {
 /** Plain words for a failed launch (the raw Recall message stays in the logs). */
 function launchError(err) {
   const msg = String(err?.response?.data?.message || err?.message || '')
+  if (err?.response?.data?.error === 'bot_hours_exhausted') return msg
   if (/consent/i.test(msg)) return 'Tick the consent line first.'
   if (/403|forbidden|insufficient role/i.test(msg)) return 'Only owners and admins can send the bot.'
   if (/invalid.*url|meeting_url/i.test(msg)) return 'That meeting link did not work. Copy it again from the invite.'

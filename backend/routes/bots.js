@@ -242,6 +242,9 @@ router.post('/launch', authenticate, authorizeOrgRole(ADMIN_ROLES, orgFromBody),
     });
     res.status(201).json(result);
   } catch (err) {
+    if (err.code === 'bot_hours_exhausted') {
+      return res.status(402).json({ error: 'bot_hours_exhausted', message: err.message, hours: err.botHours });
+    }
     log.error('Bot launch failed', { error: err.message });
     res.status(400).json({ error: 'Bot launch failed', message: err.message });
   }

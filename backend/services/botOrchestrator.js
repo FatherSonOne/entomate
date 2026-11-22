@@ -121,6 +121,40 @@ const db = () => {
   return supabaseAdmin;
 };
 
+const PLAN_LABELS = { solo: 'Solo', team: 'Team' };
+
+/** The message shown when an org has no bot hours left. */
+function botHoursMessage(hours) {
+  const plan = PLAN_LABELS[hours.plan] || hours.plan;
+  const shared = hours.plan === 'team' ? ' shared' : '';
+  const resets = new Date(hours.resets_at).toLocaleDateString('en-US', {
+    month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC'
+  });
+  return `No bot hours left. Your ${plan} plan includes ${Number(hours.included_hours)}${shared} bot hours a month, ` +
+    `and this workspace has used them all, with no extra hours left. ` +
+    `Add a 10-hour pack ($10), or wait until ${resets}, when the hours reset.`;
+}
+
+/**
+ * Refuse a launch when the org's plan has a bot-hour limit and no hours are
+ * left (plan hours this month plus pack hours). Usage comes from
+ * get_org_bot_hours (migration 20261122000015_bot_hour_limits.sql). A failed
+ * read is logged and the launch goes ahead: a database error must not stop
+ * every bot.
+ */
+async function assertBotHoursLeft(orgId) {
+  const { data, error } = await db().rpc('get_org_bot_hours', { p_org_id: orgId });
+  if (error) {
+    log.warn('Bot-hour check failed; launching anyway', { orgId, error: error.message });
+    return;
+  }
+  if (!data || !data.limited || Number(data.remaining_hours) > 0) return;
+  const err = new Error(botHoursMessage(data));
+  err.code = 'bot_hours_exhausted';
+  err.botHours = data;
+  throw err;
+}
+
 function authHeaders() {
   const token = process.env.RECALL_API_KEY;
   if (!token) throw new Error('RECALL_API_KEY is not set');
@@ -193,6 +227,8 @@ async function launchBotSession(p) {
   if (!['meet', 'zoom', 'teams'].includes(platform)) {
     throw new Error(`Unsupported platform: ${platform}`);
   }
+
+  await assertBotHoursLeft(workspaceId);
 
   const sessionId = crypto.randomUUID();
   const announcementMessage = await resolveAnnouncementMessage(
