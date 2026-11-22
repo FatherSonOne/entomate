@@ -1,0 +1,37 @@
+name: Nightly jobs
+
+# Render's free plan sleeps the backend when idle, so in-process timers can
+# miss their slot (audit finding 11). This wakes the backend and starts the
+# GDPR retention sweep every day at 03:15 UTC.
+#
+# Repository secrets needed (Settings > Secrets and variables > Actions):
+#   ENTOMATE_BACKEND_URL      e.g. https://entomate.onrender.com
+#   ENTOMATE_INTERNAL_API_KEY same value as the backend's INTERNAL_API_KEY
+
+on:
+  schedule:
+    - cron: '15 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  retention:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Start retention sweep
+        env:
+          BACKEND_URL: ${{ secrets.ENTOMATE_BACKEND_URL }}
+          API_KEY: ${{ secrets.ENTOMATE_INTERNAL_API_KEY }}
+        run: |
+          if [ -z "$BACKEND_URL" ] || [ -z "$API_KEY" ]; then
+            echo "::error::Set ENTOMATE_BACKEND_URL and ENTOMATE_INTERNAL_API_KEY repository secrets"; exit 1
+          fi
+          # First call may hit a cold start; retry while the service wakes.
+          for i in 1 2 3 4 5; do
+            code=$(curl -s -o out.json -w '%{http_code}' --max-time 90 -X POST \
+              -H "X-API-Key: $API_KEY" "${BACKEND_URL%/}/api/internal/jobs/retention" || true)
+            echo "attempt $i: HTTP $code"; cat out.json 2>/dev/null; echo
+            if [ "$code" = "202" ] || [ "$code" = "409" ]; then exit 0; fi
+            sleep 30
+          done
+          echo "::error::Retention sweep could not be started"; exit 1
