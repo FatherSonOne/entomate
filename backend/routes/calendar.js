@@ -104,8 +104,9 @@ router.get('/callback', async (req, res) => {
       saveTokensToDB(req.session.userId, tokens);
     }
 
-    // Redirect to frontend
-    const returnUrl = state || '/calendar';
+    // Redirect to frontend. state is attacker-controllable, so accept only a
+    // same-site path (not //host or a host suffix like .evil.com).
+    const returnUrl = typeof state === 'string' && /^\/(?!\/)[A-Za-z0-9/_\-?=&.]*$/.test(state) ? state : '/calendar';
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     res.redirect(`${frontendUrl}${returnUrl}?connected=true`);
   } catch (error) {

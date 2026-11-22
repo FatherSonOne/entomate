@@ -258,21 +258,16 @@ router.post('/:id/auto-assign', async (req, res) => {
       return res.json({ success: false, reason: 'All team members excluded' });
     }
 
-    // Get workload for each member
-    const membersWithWorkload = [];
-    for (const user of eligible) {
-      const { count } = await supabase
-        .from('tasks')
-        .select('*', { count: 'exact', head: true })
-        .in('org_id', req.orgIds)
-        .eq('assigned_to', user.id)
-        .in('status', ['open', 'in_progress']);
-
-      membersWithWorkload.push({
-        ...user,
-        openTaskCount: count || 0
-      });
-    }
+    // Open-task count per member in one query, counted here (audit finding 17).
+    const { data: openTasks } = await supabase
+      .from('tasks')
+      .select('assigned_to')
+      .in('org_id', req.orgIds)
+      .in('assigned_to', eligible.map((u) => u.id))
+      .in('status', ['open', 'in_progress']);
+    const openCounts = {};
+    for (const t of openTasks || []) openCounts[t.assigned_to] = (openCounts[t.assigned_to] || 0) + 1;
+    const membersWithWorkload = eligible.map((user) => ({ ...user, openTaskCount: openCounts[user.id] || 0 }));
 
     // Sort by workload (lowest first)
     membersWithWorkload.sort((a, b) => a.openTaskCount - b.openTaskCount);

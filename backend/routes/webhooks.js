@@ -6,6 +6,7 @@
 
 const express = require('express');
 const crypto = require('crypto');
+const { authenticate } = require('../middleware/auth');
 const router = express.Router();
 const { supabase } = require('../config/supabase');
 const WorkflowExecutor = require('../services/workflow/WorkflowExecutor');
@@ -106,14 +107,21 @@ router.all('/:webhookIdentifier', async (req, res) => {
       webhookId: webhook.id
     };
 
-    // Update webhook stats
-    await supabase
-      .from('webhooks')
-      .update({
-        trigger_count: webhook.trigger_count + 1,
-        last_triggered_at: new Date().toISOString()
-      })
-      .eq('id', webhook.id);
+    // Update webhook stats. Compare-and-set so two hits at once cannot both
+    // write the same count (audit finding 18); retry a few times on a clash.
+    let seen = webhook.trigger_count || 0;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const { data: bumped } = await supabase
+        .from('webhooks')
+        .update({ trigger_count: seen + 1, last_triggered_at: new Date().toISOString() })
+        .eq('id', webhook.id)
+        .eq('trigger_count', seen)
+        .select('id');
+      if (bumped && bumped.length) break;
+      const { data: fresh } = await supabase.from('webhooks').select('trigger_count').eq('id', webhook.id).maybeSingle();
+      if (!fresh) break;
+      seen = fresh.trigger_count || 0;
+    }
 
     // Execute workflow based on response mode
     if (webhook.response_mode === 'immediate') {
@@ -318,8 +326,12 @@ function sanitizeHeaders(headers) {
 /**
  * Test endpoint to verify webhook setup
  */
-router.get('/test/:webhookIdentifier', async (req, res) => {
+router.get('/test/:webhookIdentifier', authenticate, async (req, res) => {
   const { webhookIdentifier } = req.params;
+  // Interpolated into a PostgREST .or() filter below, so allow only path characters.
+  if (!/^[A-Za-z0-9/_-]{1,200}$/.test(webhookIdentifier)) {
+    return res.status(400).json({ found: false, message: 'Invalid webhook identifier' });
+  }
 
   try {
     let query = supabase
