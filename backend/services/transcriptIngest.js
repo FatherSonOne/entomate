@@ -369,7 +369,15 @@ async function purgeSessionTranscript(sessionId) {
     .maybeSingle();
   if (sessionErr) throw sessionErr;
   if (!session?.meeting_id || !session.org_id) return { purged: false };
+  return purgeMeetingTranscript(session.org_id, session.meeting_id);
+}
 
+/**
+ * Remove one meeting's transcript: the flat text, timed lines, timecodes, transcript
+ * embedding and search chunks. Summary, decisions and action items stay. Idempotent.
+ * Used for bot sessions (above) and for browser recordings (retention sweep).
+ */
+async function purgeMeetingTranscript(orgId, meetingId) {
   const { data: meeting, error: meetingErr } = await db()
     .from('meetings')
     .update({
@@ -379,8 +387,8 @@ async function purgeSessionTranscript(sessionId) {
       transcript_embedding: null,
       updated_at: new Date().toISOString(),
     })
-    .eq('id', session.meeting_id)
-    .eq('org_id', session.org_id)
+    .eq('id', meetingId)
+    .eq('org_id', orgId)
     .select('id')
     .maybeSingle();
   if (meetingErr) throw meetingErr;
@@ -405,6 +413,7 @@ async function purgeSessionTranscript(sessionId) {
 }
 
 module.exports = {
+  purgeMeetingTranscript,
   ingestBotTranscript,
   purgeSessionTranscript,
   parseRecallTranscript,
