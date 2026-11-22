@@ -88,6 +88,8 @@ Format the transcript clearly with each speaker turn on a new line.`
       log.info('Generating summary...');
 
       const response = await this.model.generateContent({
+        // JSON mode: Gemini otherwise sometimes returns malformed JSON (a stray item broke a live summary).
+        generationConfig: { responseMimeType: 'application/json', temperature: 0.2 },
         contents: [{
           role: 'user',
           parts: [{
@@ -147,6 +149,8 @@ Return JSON with this exact structure:
       const today = new Date().toISOString().split('T')[0];
 
       const response = await this.model.generateContent({
+        // JSON mode: Gemini otherwise sometimes returns malformed JSON (a stray item broke a live summary).
+        generationConfig: { responseMimeType: 'application/json', temperature: 0.2 },
         contents: [{
           role: 'user',
           parts: [{

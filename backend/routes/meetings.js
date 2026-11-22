@@ -1060,6 +1060,11 @@ router.post('/:id/reprocess', authenticate, async (req, res) => {
       updateData.transcript_embedding = embedding;
     }
 
+    // A browser recording whose first summary failed: the summary exists now.
+    if (meeting.recording_job?.summaryError) {
+      updateData.recording_job = { ...meeting.recording_job, summaryError: null };
+    }
+
     await supabase.from('meetings').update(updateData).eq('id', id);
 
     // Save action items

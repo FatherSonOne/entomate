@@ -263,6 +263,8 @@ export const meetingsApi = {
 
   // Ask question about meeting
   ask: (id, question) => api.post(`/meetings/${id}/ask`, { question }),
+  // Re-run the summary, decisions and action items from the saved transcript.
+  reprocess: (id) => api.post(`/meetings/${id}/reprocess`),
 
   // Get formatted recap
   getRecap: (id) => api.get(`/meetings/${id}/recap`),

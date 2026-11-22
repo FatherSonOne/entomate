@@ -7,7 +7,7 @@
  * speaker turns, and fills the meeting in; `recording_job` on the meeting says how far it is.
  */
 
-import { recordingsApi } from './api'
+import { meetingsApi, recordingsApi } from './api'
 import cache from './apiCache'
 
 export type RecorderMode = 'mic' | 'camera' | 'tab'
@@ -27,6 +27,8 @@ export interface RecordingJob {
   error: string | null
   updatedAt: string | null
   speakers: number | null
+  /** The transcript was saved but the summary step failed, with this reason. */
+  summaryError: string | null
 }
 
 const STATUSES: RecordingStatus[] = ['recording', 'transcribing', 'done', 'failed']
@@ -44,6 +46,7 @@ export function toRecordingJob(raw: unknown): RecordingJob | null {
     error: typeof r.error === 'string' && r.error ? r.error : null,
     updatedAt: typeof r.updatedAt === 'string' ? r.updatedAt : null,
     speakers: typeof r.speakers === 'number' ? r.speakers : null,
+    summaryError: typeof r.summaryError === 'string' && r.summaryError ? r.summaryError : null,
   }
 }
 
@@ -142,6 +145,16 @@ export async function salvageRecording(meetingId: string): Promise<void> {
     cache.invalidate(`/meetings/${meetingId}`)
   } catch (err) {
     throw new Error(errorText(err, 'The saved audio could not be sent for a transcript.'))
+  }
+}
+
+/** Write the summary again from the saved transcript (the audio is gone by then). */
+export async function rewriteSummary(meetingId: string): Promise<void> {
+  try {
+    await meetingsApi.reprocess(meetingId)
+    cache.invalidate(`/meetings/${meetingId}`)
+  } catch (err) {
+    throw new Error(errorText(err, 'The summary could not be written.'))
   }
 }
 
