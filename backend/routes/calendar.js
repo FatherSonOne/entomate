@@ -13,6 +13,7 @@ const { validate } = require('../middleware/validate');
 const schemas = require('../schemas/calendar');
 const { attachOrgIds } = require('../utils/orgContext');
 const autoJoin = require('../services/calendarAutoJoin');
+const { createState, verifyState } = require('../utils/oauthState');
 router.use(attachOrgIds); // org-owned tables below are limited to req.orgIds (audit finding 3)
 
 // Initialize calendar service
@@ -61,7 +62,7 @@ router.get('/status', async (req, res) => {
  * GET /api/calendar/auth
  * Get OAuth authorization URL
  */
-router.get('/auth', (req, res) => {
+router.get('/auth', authenticate, (req, res) => {
   try {
     if (!calendarService.isConfigured()) {
       return res.status(503).json({
@@ -70,7 +71,8 @@ router.get('/auth', (req, res) => {
       });
     }
 
-    const state = req.query.returnUrl || '/calendar';
+    // Signed: the callback learns who is connecting from this, not a cookie.
+    const state = createState({ userId: req.user.id, returnUrl: req.query.returnUrl });
     const authUrl = calendarService.getAuthUrl(state);
 
     res.json({ authUrl });
@@ -99,15 +101,17 @@ router.get('/callback', async (req, res) => {
     }
     req.session.calendarTokens = tokens;
 
-    // Also persist to DB if we can identify the user (session or cookie may carry user ID)
-    // The frontend will also trigger a save on the next authenticated request via requireCalendar
-    if (req.session?.userId) {
-      saveTokensToDB(req.session.userId, tokens);
+    // Save for the user named in the signed state. Without a valid state the
+    // tokens stay in the session only (old flow).
+    const verified = verifyState(state);
+    if (verified) {
+      await saveTokensToDB(verified.userId, tokens);
+    } else {
+      log.warn('Calendar OAuth callback without a valid state; tokens not saved to the account');
     }
 
-    // Redirect to frontend. state is attacker-controllable, so accept only a
-    // same-site path (not //host or a host suffix like .evil.com).
-    const returnUrl = typeof state === 'string' && /^\/(?!\/)[A-Za-z0-9/_\-?=&.]*$/.test(state) ? state : '/calendar';
+    // Redirect to frontend (the return path was checked when the state was made).
+    const returnUrl = verified ? verified.returnUrl : '/calendar';
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     res.redirect(`${frontendUrl}${returnUrl}?connected=true`);
   } catch (error) {
@@ -190,10 +194,10 @@ const getTokens = async (req) => {
  * Persist calendar tokens to user_settings DB (non-blocking)
  */
 const saveTokensToDB = (userId, tokens) => {
-  if (!supabase || !userId || !tokens) return;
+  if (!supabase || !userId || !tokens) return Promise.resolve();
   const { _onRefresh, ...clean } = tokens;
   // Keep other calendar settings (auto_join) when the tokens change.
-  supabase
+  return supabase
     .from('user_settings')
     .select('calendar_json')
     .eq('user_id', userId)
