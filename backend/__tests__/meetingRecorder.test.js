@@ -518,3 +518,117 @@ describe('retention for browser recordings', () => {
     expect(total.totals.deleted).toBe(1);
   });
 });
+
+describe('beside the bot (one call, one meeting)', () => {
+  const SESSION = '00000000-0000-4000-8000-0000000000c1';
+  const BOT_MEETING = '00000000-0000-4000-8000-0000000000d1';
+  const startBody = { title: '', mode: 'tab', mimeType: 'audio/webm', consentAcknowledged: true };
+  const botSession = (patch = {}) => ({
+    id: SESSION, org_id: ORG_A, meeting_id: BOT_MEETING, title: 'Weekly sync', platform: 'meet',
+    status: 'in_call', join_at: null, started_at: new Date().toISOString(), ended_at: null,
+    created_at: new Date().toISOString(), consent_acknowledged_by: MEMBER, ...patch,
+  });
+
+  async function uploadPiece(server, id, seq = 0) {
+    const put = await request(server).put(`/api/recordings/${id}/pieces/${seq}?durationMs=30000`).set(as(MEMBER)).set('Content-Type', 'audio/webm').send(Buffer.from(`piece-${seq}|`));
+    expect(put.status).toBe(204);
+  }
+
+  test('bot-check finds my bot in a call, but not someone else\'s or a finished one', async () => {
+    const server = app();
+    mockDb.bot_sessions = [
+      botSession(),
+      botSession({ id: 'other-user', consent_acknowledged_by: OUTSIDER, org_id: ORG_B }),
+      botSession({ id: 'done', status: 'completed' }),
+    ];
+    const res = await request(server).get('/api/recordings/bot-check').set(as(MEMBER));
+    expect(res.status).toBe(200);
+    expect(res.body.bot).toMatchObject({ sessionId: SESSION, meetingId: BOT_MEETING, title: 'Weekly sync', phase: 'live' });
+
+    mockDb.bot_sessions = [botSession({ status: 'pending', join_at: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(), started_at: null })];
+    const later = await request(server).get('/api/recordings/bot-check').set(as(MEMBER));
+    expect(later.body.bot).toBeNull(); // a bot three hours out is not this call
+  });
+
+  test('start refuses with the bot until I choose; "same call" records into the bot\'s meeting', async () => {
+    const server = app();
+    mockDb.bot_sessions = [botSession()];
+    const blind = await request(server).post('/api/recordings').set(as(MEMBER)).send(startBody);
+    expect(blind.status).toBe(409);
+    expect(blind.body).toMatchObject({ code: 'bot_in_call', bot: { sessionId: SESSION } });
+    expect(mockDb.meetings).toHaveLength(0);
+
+    const same = await request(server).post('/api/recordings').set(as(MEMBER)).send({ ...startBody, botSessionId: SESSION });
+    expect(same.status).toBe(201);
+    expect(same.body.meetingId).toBe(BOT_MEETING);
+    expect(meeting(BOT_MEETING)).toMatchObject({ title: 'Weekly sync', recording_job: { status: 'recording', botSessionId: SESSION } });
+
+    const twice = await request(server).post('/api/recordings').set(as(MEMBER)).send({ ...startBody, botSessionId: SESSION });
+    expect(twice.status).toBe(409);
+
+    const separate = await request(server).post('/api/recordings').set(as(MEMBER)).send({ ...startBody, separate: true });
+    expect(separate.status).toBe(201);
+    expect(separate.body.meetingId).not.toBe(BOT_MEETING);
+  });
+
+  test('stopping beside a working bot keeps the audio as a backup and writes nothing', async () => {
+    const server = app();
+    mockDb.bot_sessions = [botSession()];
+    await request(server).post('/api/recordings').set(as(MEMBER)).send({ ...startBody, botSessionId: SESSION });
+    await uploadPiece(server, BOT_MEETING);
+    const fin = await request(server).post(`/api/recordings/${BOT_MEETING}/finish`).set(as(MEMBER)).send({ pieces: 1 });
+    expect(fin.body.status).toBe('backup');
+    await settle(BOT_MEETING);
+    expect(geminiRecording.transcribeRecording).not.toHaveBeenCalled();
+    expect(meeting(BOT_MEETING).recording_job).toMatchObject({ status: 'backup', pieces: 1 });
+    expect(mockDb.action_items).toHaveLength(0);
+
+    // The bot fails: the backup takes over and writes the one set of minutes.
+    mockDb.bot_sessions[0].status = 'failed';
+    expect((await recorder.botCouldNotDeliver({ sessionId: SESSION })).status).toBe('transcribing');
+    await settle(BOT_MEETING);
+    expect(meeting(BOT_MEETING).recording_job).toMatchObject({ status: 'done', source: 'browser' });
+    expect(mockDb.action_items).toHaveLength(1);
+    expect(mockDb.meetings).toHaveLength(1);
+
+    // A second "could not deliver" (a repeated webhook) does nothing.
+    expect((await recorder.botCouldNotDeliver({ sessionId: SESSION })).status).toBe('skipped');
+  });
+
+  test('stopping after the bot already wrote the minutes just keeps the audio', async () => {
+    const server = app();
+    mockDb.bot_sessions = [botSession()];
+    await request(server).post('/api/recordings').set(as(MEMBER)).send({ ...startBody, botSessionId: SESSION });
+    await uploadPiece(server, BOT_MEETING);
+    meeting(BOT_MEETING).transcript_segments = [{ atMs: 0, speaker: 'Ann', text: 'Hi' }];
+    const fin = await request(server).post(`/api/recordings/${BOT_MEETING}/finish`).set(as(MEMBER)).send({ pieces: 1 });
+    expect(fin.body.status).toBe('done');
+    expect(geminiRecording.transcribeRecording).not.toHaveBeenCalled();
+  });
+
+  test('stopping beside a bot that failed transcribes the recording at once; a backup can be used on request', async () => {
+    const server = app();
+    mockDb.bot_sessions = [botSession()];
+    await request(server).post('/api/recordings').set(as(MEMBER)).send({ ...startBody, botSessionId: SESSION });
+    await uploadPiece(server, BOT_MEETING);
+    mockDb.bot_sessions[0].status = 'timeout';
+    const fin = await request(server).post(`/api/recordings/${BOT_MEETING}/finish`).set(as(MEMBER)).send({ pieces: 1 });
+    expect(fin.body.status).toBe('transcribing');
+    await settle(BOT_MEETING);
+    expect(meeting(BOT_MEETING).recording_job.status).toBe('done');
+
+    expect(await recorder._internal.botHandOff('nope', 'missing-session')).toBe('record');
+  });
+
+  test('"use my recording instead" writes a backup up now', async () => {
+    const server = app();
+    mockDb.bot_sessions = [botSession()];
+    await request(server).post('/api/recordings').set(as(MEMBER)).send({ ...startBody, botSessionId: SESSION });
+    await uploadPiece(server, BOT_MEETING);
+    await request(server).post(`/api/recordings/${BOT_MEETING}/finish`).set(as(MEMBER)).send({ pieces: 1 });
+    const use = await request(server).post(`/api/recordings/${BOT_MEETING}/retry`).set(as(MEMBER)).send();
+    expect(use.status).toBe(202);
+    await settle(BOT_MEETING);
+    expect(meeting(BOT_MEETING).recording_job).toMatchObject({ status: 'done', source: 'browser' });
+  });
+});

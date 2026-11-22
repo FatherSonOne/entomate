@@ -16,6 +16,9 @@ const TRANSCRIPT_RATE = 0.1
 /** Which loader step each server stage belongs to (0 = recording saved). */
 const STEP_OF: Record<RecordingStage, number> = { transcript: 1, speakers: 2, summary: 2, saving: 3 }
 
+/** The bot's transcript already exists when its run starts; reading it back is quick. */
+const BOT_TRANSCRIPT_RATE = 0.01
+
 const STEPS: ReadonlyArray<Pick<BotStep, 'key' | 'label'>> = [
   { key: 'left', label: 'Recording saved' },
   { key: 'transcript', label: 'Transcript' },
@@ -23,11 +26,11 @@ const STEPS: ReadonlyArray<Pick<BotStep, 'key' | 'label'>> = [
   { key: 'actions', label: 'Action items' },
 ]
 
-export function recordingSteps(stage: RecordingStage | null): BotStep[] {
+export function recordingSteps(stage: RecordingStage | null, bot = false): BotStep[] {
   const at = stage ? STEP_OF[stage] : 1
   return STEPS.map((s, i) => {
     const state: StepState = i < at ? 'done' : i === at ? 'working' : 'waiting'
-    return { ...s, state, value: '' }
+    return { ...s, label: bot && s.key === 'left' ? 'Left the call' : s.label, state, value: '' }
   })
 }
 
@@ -35,15 +38,17 @@ export function recordingSource(job: RecordingJob, title: string | null | undefi
   const names = Array.isArray(attendees)
     ? attendees.map((a) => (typeof a === 'string' ? a : (a as { name?: unknown } | null)?.name)).filter((n): n is string => typeof n === 'string' && n.trim() !== '')
     : []
+  // The same stages whichever engine heard the call (backend services/meetingFinish.js).
+  const bot = job.source === 'bot'
   return {
-    title: title || 'Recording',
+    title: title || (bot ? 'Bot meeting' : 'Recording'),
     endedAt: job.finishedAt ?? job.updatedAt,
     durationMs: job.durationMs,
-    steps: recordingSteps(job.stage),
-    headline: 'Recording stopped · writing the minutes',
-    sinceLabel: 'since you stopped',
+    steps: recordingSteps(job.stage, bot),
+    headline: bot ? 'The bot left · writing the minutes' : 'Recording stopped · writing the minutes',
+    sinceLabel: bot ? 'since it left' : 'since you stopped',
     speakers: names.slice(0, 6),
-    transcriptRate: TRANSCRIPT_RATE,
+    transcriptRate: bot ? BOT_TRANSCRIPT_RATE : TRANSCRIPT_RATE,
     stepStartedAt: job.stage ? job.stageAt : null,
   }
 }

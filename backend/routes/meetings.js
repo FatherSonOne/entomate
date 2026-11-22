@@ -358,7 +358,7 @@ router.get('/', authenticate, validate(schemas.list), async (req, res) => {
     // Status filter: a coarse superset of the list's status words (frontend
     // services/meetingView.ts meetingStatus); the page applies the exact rule.
     if (status === 'live') {
-      query = query.in('recording_job->>status', ['recording', 'transcribing']);
+      query = query.in('recording_job->>status', ['recording', 'transcribing', 'backup']);
     } else if (status === 'ready') {
       query = query.or('summary.not.is.null,chat_posted.eq.true');
     } else if (status === 'attention') {

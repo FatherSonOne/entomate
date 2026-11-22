@@ -1,7 +1,11 @@
 /**
  * In-browser meeting recorder API. See services/meetingRecorder.js for the flow.
  *
+ *   GET    /api/recordings/bot-check          a bot of yours in a call now, if any (record beside it)
  *   POST   /api/recordings                    start: makes the meeting, returns its id
+ *                                             ({ botSessionId }: add to that bot's meeting;
+ *                                              { separate: true }: a different meeting; else 409
+ *                                              with code 'bot_in_call' when a bot is in a call)
  *   PUT    /api/recordings/:id/pieces/:seq    one 30-second piece of audio (raw body)
  *   POST   /api/recordings/:id/finish         all pieces sent: transcribe in the background
  *                                             ({ salvage: true }: the tab closed; use what was saved)
@@ -31,6 +35,8 @@ function sendError(res, err, what) {
   if (err instanceof recorder.RecorderError || err instanceof meetingNotes.NotesError) {
     const body = { error: err.status === 401 ? 'Unauthorized' : err.message };
     if (Array.isArray(err.missing)) body.missing = err.missing;
+    if (err.code) body.code = err.code;
+    if (err.bot) body.bot = err.bot;
     return res.status(err.status).json(body);
   }
   if (err?.type === 'entity.too.large') return res.status(413).json({ error: 'The piece is too large.' });
@@ -38,16 +44,32 @@ function sendError(res, err, what) {
   return res.status(500).json({ error: 'Internal server error' });
 }
 
+router.get('/bot-check', authenticate, async (req, res) => {
+  try {
+    if (!supabase) return res.status(503).json({ error: 'Database not configured' });
+    const orgId = await getOrgIdForUser(req.user?.id);
+    const bots = orgId ? await recorder.botsInCall({ orgId, userId: req.user.id }) : [];
+    res.set('Cache-Control', 'no-store');
+    res.json({ success: true, bot: bots[0] || null });
+  } catch (err) {
+    sendError(res, err, 'bot check');
+  }
+});
+
 router.post('/', authenticate, async (req, res) => {
   try {
     if (!supabase) return res.status(503).json({ error: 'Database not configured' });
-    const { title, attendees, mode, mimeType, consentAcknowledged } = req.body || {};
+    const { title, attendees, mode, mimeType, consentAcknowledged, botSessionId, separate } = req.body || {};
     if (consentAcknowledged !== true) {
       return res.status(400).json({ error: 'Confirm that everyone in the meeting knows it is being recorded.' });
     }
     const orgId = await getOrgIdForUser(req.user?.id);
     if (!orgId) return res.status(403).json({ error: 'Join or create a workspace before recording.' });
-    const result = await recorder.startRecording({ userId: req.user.id, orgId, title, attendees, mode, mimeType });
+    const result = await recorder.startRecording({
+      userId: req.user.id, orgId, title, attendees, mode, mimeType,
+      botSessionId: typeof botSessionId === 'string' && botSessionId ? botSessionId : null,
+      separate: separate === true,
+    });
     res.status(201).json({ success: true, ...result });
   } catch (err) {
     sendError(res, err, 'start');
