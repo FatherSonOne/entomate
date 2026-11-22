@@ -84,11 +84,14 @@ app.use(cors({
 // req.rawBody so signature-verifying routes (e.g. Recall webhook HMAC) can
 // run HMAC-SHA256 over the exact bytes Recall signed. Without this, body
 // parsing destroys the byte-for-byte input and verification always fails.
-app.use(express.json({
-  limit: '50mb',
-  verify: (req, _res, buf) => { req.rawBody = buf; }
-}));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+// Audit finding 12: 1 MB everywhere by default, so one large post cannot
+// exhaust memory. Meeting and ecosystem routes carry transcripts and get
+// 10 MB. express.json skips a body that is already parsed, so the larger
+// route parser must come first.
+const keepRawBody = (req, _res, buf) => { req.rawBody = buf; };
+app.use(['/api/meetings', '/api/ecosystem'], express.json({ limit: '10mb', verify: keepRawBody }));
+app.use(express.json({ limit: '1mb', verify: keepRawBody }));
+app.use(express.urlencoded({ limit: '1mb', extended: true }));
 
 // Cookie and session (for calendar OAuth)
 app.use(cookieParser());
@@ -309,6 +312,9 @@ app.use('/api/templates', require('./routes/templates'));
 
 // Ecosystem Bridge (Pulse + Logos Vision cross-app communication)
 app.use('/api/ecosystem', require('./routes/ecosystem'));
+
+// Internal job triggers for an external scheduler (audit finding 11)
+app.use('/api/internal', require('./routes/internalJobs'));
 
 // User & Workspace Settings
 app.use('/api/settings', require('./routes/settings'));
