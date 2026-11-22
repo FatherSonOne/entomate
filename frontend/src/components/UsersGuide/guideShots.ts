@@ -13,6 +13,11 @@ export interface GuideShot {
 }
 
 export const GUIDE_SHOTS: Readonly<Record<string, GuideShot>> = {
+  'getting-started': {
+    caption: 'Sign in with Google or with your email to open your workspace.',
+    alt: 'The Entomate sign-in page with a Welcome Back card offering Continue with Google and Sign in with Email.',
+    w: 1200, h: 750,
+  },
   dashboard: {
     caption: 'Today opens on your latest meeting, with overdue action items and agent calls beside it.',
     alt: 'The Today screen showing the Bluepine renewal prep meeting, counts for the week, an Action items table and an Agents list.',
@@ -102,6 +107,11 @@ export const GUIDE_SHOTS: Readonly<Record<string, GuideShot>> = {
     caption: 'Appearance sets the theme, reduced motion, design style and palette for this browser.',
     alt: 'The Appearance section of Settings with Light, Dark and System theme buttons, a Reduce motion switch, design styles and palettes.',
     w: 1200, h: 920,
+  },
+  organizations: {
+    caption: 'Workspace in Settings lists your team and roles, with Invite to add people.',
+    alt: 'The Workspace section of Settings showing the Quantum Ecosystems workspace, a Team list with Owner and Admin roles, and data and privacy options.',
+    w: 1200, h: 902,
   },
   'keyboard-shortcuts': {
     caption: 'Press the question mark key on any page to see the shortcuts that work there.',
