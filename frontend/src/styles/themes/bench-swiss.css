@@ -1032,5 +1032,347 @@ html.bs-scroll-lock, html.bs-scroll-lock body { overflow: hidden; }
   .bs-drawer-foot { padding: 12px 18px calc(18px + env(safe-area-inset-bottom)); }
 }
 
+/* ── 8. Primitives added by the Meetings pass (2026-11-22) ──── */
+
+/* Tabs: plain sans labels on a hairline; the active one is underlined in ink. */
+.bs-tabs {
+  display: flex;
+  gap: 26px;
+  border-bottom: 1px solid var(--bs-rule);
+}
+.bs-tabs [role="tab"] {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 12px 0 11px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font: 500 14px/1 var(--bs-sans);
+  color: var(--bs-muted);
+  white-space: nowrap;
+  transition: color 150ms;
+}
+.bs-tabs [role="tab"]::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: -1px;
+  height: 2px;
+  background: var(--bs-rule-ink);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 180ms var(--bs-snap);
+}
+.bs-tabs [role="tab"]:hover { color: var(--bs-ink2); }
+.bs-tabs [role="tab"][aria-selected="true"] { color: var(--bs-ink); font-weight: 600; }
+.bs-tabs [role="tab"][aria-selected="true"]::after { transform: scaleX(1); transition: transform 460ms var(--bs-spring); }
+.bs-tabs-n { font: 500 11px var(--bs-mono); color: var(--bs-muted); font-variant-numeric: tabular-nums; }
+.bs-tabpanel:focus-visible { outline-offset: 6px; }
+
+/* Date stamp: first column of an index list */
+.bs-date { display: flex; flex-direction: column; gap: 3px; line-height: 1; }
+.bs-date b { font: 500 26px/0.9 var(--bs-mono); letter-spacing: -0.04em; color: var(--bs-ink); font-variant-numeric: tabular-nums; }
+.bs-date span { font: 500 10px var(--bs-mono); letter-spacing: 0.1em; color: var(--bs-muted); }
+
+/* Text field */
+.bs-input {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--bs-sunk);
+  box-shadow: inset 0 1px 2px var(--bs-lo), inset 0 0 0 1px var(--bs-rule2);
+  font: 400 14px var(--bs-sans);
+  color: var(--bs-ink);
+}
+.bs-input::placeholder { color: var(--bs-muted); }
+.bs-input:focus-visible { outline: 2px solid var(--bs-brand); outline-offset: 1px; }
+.bs-input:disabled { opacity: 0.6; }
+.bs-textarea { height: auto; min-height: 96px; padding: 10px 12px; line-height: 1.6; resize: vertical; }
+.bs-input-wrap { position: relative; display: block; min-width: 0; }
+.bs-input-wrap .bs-input { padding-left: 36px; }
+.bs-input-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); display: flex; color: var(--bs-muted); pointer-events: none; }
+.bs-input-icon svg { width: 15px; height: 15px; }
+
+/* Checkbox: a small sunk square that fills with ink */
+.bs-check {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  flex: none;
+  border-radius: 4px;
+  background: var(--bs-sunk);
+  box-shadow: inset 0 1px 2px var(--bs-lo), inset 0 0 0 1px var(--bs-rule);
+  cursor: pointer;
+  display: inline-grid;
+  place-content: center;
+  transition: background 80ms;
+}
+.bs-check::after { content: ""; width: 9px; height: 5px; border: solid var(--bs-plate); border-width: 0 0 2px 2px; transform: rotate(-45deg) translate(1px, -1px); opacity: 0; }
+.bs-check:checked { background: var(--bs-ink); box-shadow: none; }
+.bs-check:checked::after { opacity: 1; }
+
+/* Ruled table: group heads inside one table */
+.bs-tbl .bs-tbl-group th { padding: 22px 0 0; border-bottom: 0; font: inherit; letter-spacing: normal; text-transform: none; }
+.bs-tbl-group-in { display: flex; justify-content: space-between; gap: 12px; padding-bottom: 8px; border-bottom: 2px solid var(--bs-rule-ink); }
+.bs-tbl-group-in > .bs-lbl:first-child { color: var(--bs-ink); }
+.bs-tbl tbody tr:has(.bs-check:checked) td { background: color-mix(in srgb, var(--bs-brand) 6%, transparent); }
+
+/* Ruled rows: decisions, key points, action items */
+.bs-rows { list-style: none; margin: 0; padding: 0; }
+.bs-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--bs-rule2);
+}
+.bs-row-text { min-width: 0; overflow-wrap: anywhere; font-size: 14px; line-height: 1.55; color: var(--bs-ink); }
+.bs-row-dec .bs-row-text { font-weight: 600; }
+.bs-row-dash { font: 500 12px/1.9 var(--bs-mono); color: var(--bs-faint); }
+.bs-row > .bs-key.tc { margin-top: 1px; }
+
+/* Long-form reading: 16/26 at 62ch */
+.bs-para { font-size: 16px; line-height: 1.625; max-width: 62ch; color: var(--bs-ink); white-space: pre-line; overflow-wrap: anywhere; }
+
+/* Tape meter (speech density) and playhead */
+.bs-tape-bars { position: absolute; inset: 3px 0; display: flex; align-items: center; gap: 1px; }
+.bs-tape-bars i { flex: 1 1 0; min-width: 0; border-radius: 1px; background: var(--bs-faint); opacity: 0.7; }
+.bs-tape-bars i.p { background: var(--bs-ink2); opacity: 1; }
+.bs-tape-head { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--bs-ink); transition: left 240ms var(--bs-spring); pointer-events: none; }
+
+/* ── 9. Meetings module ──────────────────────────────────────── */
+
+.bs-title-keys { display: flex; flex-wrap: wrap; gap: 8px; }
+.bs-title-acts { align-items: center; }
+
+/* Index list */
+.bs-mtg-search { display: flex; gap: 8px; align-items: center; padding-top: 22px; max-width: 560px; }
+.bs-mtg-search .bs-input-wrap { flex: 1; }
+.bs-mtg-list { padding-top: 6px; }
+.bs-mtg .bs-tbl td { vertical-align: middle; }
+.bs-mtg .bs-tbl .r { padding-right: 22px; }
+.bs-mtg .bs-tbl td.bs-mtg-date { width: 64px; }
+.bs-mtg .bs-tbl td.bs-mtg-sel { width: 30px; }
+.bs-mtg .bs-tbl td.bs-mtg-tape { width: 24%; min-width: 140px; }
+.bs-mtg .bs-tbl td.bs-mtg-status { width: 128px; }
+.bs-mtg .bs-tbl td.bs-mtg-del { width: 1%; padding-right: 0; }
+.bs-mtg .bs-tbl td.bs-mtg-del .bs-key { opacity: 0; transition: opacity 150ms; }
+.bs-mtg .bs-tbl tr:hover td.bs-mtg-del .bs-key,
+.bs-mtg .bs-tbl tr:focus-within td.bs-mtg-del .bs-key { opacity: 1; }
+@media (hover: none) { .bs-mtg .bs-tbl td.bs-mtg-del .bs-key { opacity: 1; } }
+.bs-mtg-name { min-width: 0; }
+.bs-mtg-link { display: block; color: var(--bs-ink); text-decoration: none; overflow-wrap: anywhere; }
+.bs-mtg-link:hover { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.bs-mtg-sub { margin-top: 2px; font-size: 12.5px; color: var(--bs-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bs-mtg-sub .bs-mono { font-size: 11.5px; }
+.bs-mtg-more { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 18px; }
+.bs-mtg-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 40px 0 12px; }
+.bs-mtg-empty .bs-h3 { max-width: 46ch; }
+.bs-mtg-recorder { padding-top: 22px; }
+.bs-mtg-recorder .bs-skin { padding-top: 14px; max-width: 760px; }
+
+/* Detail */
+.bs-crumb-link { color: inherit; text-decoration: none; }
+.bs-crumb-link:hover b { text-decoration: underline; text-underline-offset: 3px; }
+.bs-title-edit { min-width: 0; }
+.bs-title-input {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px dashed var(--bs-rule);
+  background: none;
+  padding: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+}
+.bs-title-input:focus-visible { outline: none; border-bottom-color: var(--bs-brand); }
+.bs-mtg-status-row:empty { display: none; }
+.bs-mtg-block { padding-top: 22px; }
+.bs-mtg-block > .bs-sec + * { margin-top: 12px; }
+.bs-mtg-block > .bs-sec + .bs-rows { margin-top: 0; }
+.bs-mtg-none { padding: 14px 0; font-size: 13.5px; color: var(--bs-muted); }
+.bs-mtg-edit { display: flex; flex-direction: column; gap: 8px; }
+.bs-mtg-edit-keys { display: flex; gap: 8px; justify-content: flex-end; }
+.bs-mtg-foot { display: flex; align-items: center; gap: 10px; padding-top: 22px; }
+.bs-mtg-ask { display: flex; gap: 8px; align-items: center; }
+.bs-mtg-ask .bs-input { flex: 1; }
+.bs-mtg-answer { margin-top: 18px; padding: 14px 0 0 16px; border-left: 3px solid var(--bs-ai); display: flex; flex-direction: column; gap: 8px; }
+.bs-mtg-share { display: flex; flex-direction: column; gap: 14px; padding-top: 14px; }
+.bs-mtg-share-field { display: flex; flex-direction: column; gap: 6px; }
+
+/* Recording state banner: a ruled strip, not a card */
+.bs-recstat {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px 16px;
+  align-items: center;
+  margin-top: 22px;
+  padding: 12px 0 12px 14px;
+  border-left: 3px solid var(--bs-brand);
+  border-bottom: 1px solid var(--bs-rule);
+}
+.bs-recstat[data-tone="live"] { border-left-color: var(--bs-live); }
+.bs-recstat-text { font-size: 14px; color: var(--bs-ink); }
+.bs-recstat-spin { width: 16px; height: 16px; color: var(--bs-muted); }
+.bs-recstat-err { grid-column: 1 / -1; font-size: 12.5px; color: var(--bs-brand); }
+
+/* Transport: the meeting's display */
+.bs-transport { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 22px; align-items: center; }
+.bs-transport-reel {
+  width: 58px; height: 58px; border-radius: 50%;
+  background: radial-gradient(circle, #3a3a3c 0 5px, #121213 6px 14px, #2a2a2c 15px 16px, #121213 17px);
+  box-shadow: inset 0 0 0 1px #000, 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+.bs-transport-main { min-width: 0; display: flex; flex-direction: column; gap: 9px; }
+.bs-transport-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.bs-transport-head .bs-lbl { color: var(--bs-d-mut); }
+.bs-transport-key { display: inline-block; width: 7px; height: 7px; border-radius: 1px; vertical-align: 0; }
+.bs-transport-key.d { background: var(--bs-d-brand); }
+.bs-transport-key.a { background: var(--bs-d-ai); }
+.bs-transport-clock { font: 500 12px var(--bs-mono); color: var(--bs-d-mut); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.bs-transport-clock b { font-weight: 500; color: var(--bs-d-live); }
+.bs-transport .bs-tape { height: 56px; background: #0a0a0b; box-shadow: inset 0 1px 3px #000; }
+.bs-transport .bs-tape-bars i { background: #4a4a48; opacity: 1; }
+.bs-transport .bs-tape-bars i.p { background: var(--bs-d-ink); }
+.bs-transport .bs-tape-head { background: var(--bs-d-brand); box-shadow: 0 0 6px var(--bs-d-brand); }
+.bs-transport .bs-tape-mk { top: 0; bottom: 0; }
+.bs-transport .bs-tape-mk.a { top: 60%; }
+.bs-transport button.bs-tape-mk { width: 10px; transform: translateX(-5px); padding: 0 4px; }
+.bs-transport-keys { display: flex; gap: 6px; }
+.bs-transport-media audio { width: 100%; height: 34px; color-scheme: dark; }
+
+/* Transcript column */
+.bs-mtg-transcript { position: sticky; top: 12px; }
+.bs-transcript-plain { margin-top: 12px; max-height: 70vh; overflow-y: auto; }
+.bs-transcript-plain pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 400 13px/1.65 var(--bs-sans); color: var(--bs-ink2); }
+
+/* TranscriptPanel restyled from outside (its markup belongs to the transcript work). */
+.bs-transcript { padding-top: 12px; }
+.bs-transcript [data-testid="transcript-panel"] input[type="text"] {
+  height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--bs-sunk);
+  box-shadow: inset 0 1px 2px var(--bs-lo), inset 0 0 0 1px var(--bs-rule2);
+  font-family: var(--bs-sans);
+  color: var(--bs-ink);
+}
+.bs-transcript [data-testid="transcript-panel"] input[type="text"]:focus-visible { outline: 2px solid var(--bs-brand); outline-offset: 1px; box-shadow: none; --tw-ring-shadow: 0 0 #0000; }
+.bs-transcript [data-testid="transcript-panel"] h3 { font: 500 10.5px var(--bs-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--bs-muted); }
+.bs-transcript [data-testid="transcript-panel"] ul button {
+  min-height: 26px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--bs-sunk);
+  box-shadow: inset 0 1px 1px var(--bs-lo);
+  font-family: var(--bs-sans);
+  color: var(--bs-ink);
+}
+.bs-transcript [data-testid="transcript-panel"] ul button .tabular-nums { font-family: var(--bs-mono); font-size: 10.5px; }
+.bs-transcript ol[aria-label="Transcript"] {
+  max-height: min(70vh, 640px);
+  margin-top: 4px;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  border-top: 1px solid var(--bs-rule);
+}
+.bs-transcript ol[aria-label="Transcript"] > li + li { margin-top: 0; }
+.bs-transcript [data-testid="transcript-line"] {
+  grid-template-columns: 3.4rem minmax(0, 1fr);
+  padding: 10px 6px 10px 0;
+  border-radius: 0;
+  border-bottom: 1px solid var(--bs-rule2);
+  font-size: 13.5px;
+  line-height: 1.55;
+  transition: background 150ms;
+}
+.bs-transcript [data-testid="transcript-line"] > span:first-child { font-family: var(--bs-mono); font-size: 11px; color: var(--bs-muted); padding-left: 2px; }
+.bs-transcript [data-testid="transcript-line"] p { color: var(--bs-ink2); overflow-wrap: anywhere; }
+.bs-transcript [data-testid="transcript-line"] p > span:first-child { font-weight: 600; color: var(--bs-ink); }
+.bs-transcript [data-testid="transcript-line"][aria-current="true"] {
+  --tw-ring-shadow: 0 0 #0000;
+  box-shadow: inset 3px 0 0 var(--bs-brand);
+  background: color-mix(in srgb, var(--bs-brand) 8%, transparent);
+}
+.bs-transcript [data-testid="transcript-line"][aria-current="true"] > span:first-child { padding-left: 11px; color: var(--bs-brand); }
+.bs-transcript mark { background: color-mix(in srgb, var(--bs-brand) 14%, transparent); color: var(--bs-ink); }
+
+/* Legacy components inside the plate (recorder, notes, channel picker) */
+.bs-skin :is(section.rounded-xl, .vc) { border: 0; background: none; padding: 0; border-radius: 0; box-shadow: none; }
+.bs-skin :is(input[type="text"], input:not([type]), input[type="email"], textarea, select):not(.bs-input) {
+  border: 0;
+  border-radius: 8px;
+  background: var(--bs-sunk);
+  box-shadow: inset 0 1px 2px var(--bs-lo), inset 0 0 0 1px var(--bs-rule2);
+  color: var(--bs-ink);
+  font-family: var(--bs-sans);
+}
+.bs-skin :is(input, textarea, select):focus-visible { outline: 2px solid var(--bs-brand); outline-offset: 1px; --tw-ring-shadow: 0 0 #0000; }
+.bs-skin legend, .bs-skin label.block, .bs-skin label.mb-1 { font: 500 10.5px var(--bs-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--bs-muted); }
+.bs-skin fieldset label:has(input[type="radio"]) {
+  border: 0;
+  border-radius: 8px;
+  background: var(--bs-key);
+  box-shadow: inset 0 1px 0 var(--bs-hi), 0 0 0 1px var(--bs-rule), 0 2px 0 var(--bs-key-edge);
+  transition: transform 80ms, box-shadow 80ms;
+}
+.bs-skin fieldset label:has(input[type="radio"]:checked) {
+  transform: translateY(2px);
+  background: var(--bs-sunk);
+  box-shadow: inset 0 1px 2px var(--bs-lo), inset 0 0 0 1px var(--bs-brand);
+}
+.bs-skin .font-mono { font-family: var(--bs-mono); }
+.bs-skin .rounded-full.border { border: 0; border-radius: 4px; background: var(--bs-sunk); box-shadow: inset 0 1px 1px var(--bs-lo); }
+
+/* Action items */
+.bs-actions-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.bs-actions-err { padding-top: 10px; }
+.bs-actions .bs-group { padding-top: 18px; }
+.bs-action { grid-template-columns: 22px minmax(0, 1fr) auto; }
+.bs-action-check { display: flex; padding-top: 2px; color: var(--bs-muted); }
+.bs-action-check svg { width: 16px; height: 16px; }
+.bs-action-title { font-weight: 600; }
+.bs-action[data-done="true"] .bs-action-title { text-decoration: line-through; text-decoration-thickness: 1px; color: var(--bs-muted); }
+.bs-action-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin-top: 4px; font-size: 12.5px; color: var(--bs-ink2); }
+.bs-action-meta .bs-mono { font-size: 11.5px; }
+.bs-action-keys { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bs-tabs [role="tab"]::after, .bs-tape-head { transition-duration: 1ms !important; }
+}
+
+@media (max-width: 1199.98px) {
+  .bs-mtg .bs-tbl td.bs-mtg-tape { width: 18%; }
+}
+
+@media (max-width: 767.98px) {
+  .bs-tabs { gap: 0; }
+  .bs-tabs [role="tab"] { flex: 1 1 0; min-width: 0; justify-content: center; padding: 12px 2px 11px; font-size: 13px; }
+  .bs-mtg-search { max-width: none; }
+  .bs-mtg .bs-tbl td.bs-mtg-date { width: 52px; }
+  .bs-mtg .bs-tbl td.bs-mtg-status { width: auto; text-align: right; padding-right: 0; }
+  .bs-mtg .bs-tbl th:last-child { text-align: right; }
+  .bs-date b { font-size: 22px; }
+  .bs-mtg-sub { white-space: normal; }
+  .bs-transport { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .bs-transport .bs-tape { height: 44px; }
+  .bs-transport-keys { justify-content: space-between; }
+  .bs-transport-keys .bs-key { flex: 1; justify-content: center; }
+  .bs-recstat { grid-template-columns: minmax(0, 1fr); }
+  .bs-mtg-transcript { position: static; padding-top: 10px; }
+  .bs-transcript ol[aria-label="Transcript"] { max-height: 60vh; }
+  .bs-action { grid-template-columns: 22px minmax(0, 1fr); }
+  .bs-action-keys { grid-column: 2; justify-content: flex-start; }
+  .bs-row { gap: 10px; }
+}
+
 /* Page slot under the toolbar */
 .bs-page-wrap { flex: 1; display: flex; flex-direction: column; min-width: 0; }
