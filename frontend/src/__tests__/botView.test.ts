@@ -8,7 +8,7 @@ const NOW = Date.parse('2026-11-22T16:00:00Z')
 const run = (over: Partial<BotSessionView>): BotSessionView => ({
   sessionId: 's1', meetingId: 'm1', title: null, platform: 'meet', status: 'completed', phase: 'ready',
   joinAt: null, startedAt: '2026-11-22T15:00:00Z', endedAt: '2026-11-22T15:24:00Z', launchedBy: 'u1',
-  autoJoin: false, failure: null, meetingReady: true, debrief: null, ...over,
+  autoJoin: false, failure: null, meetingReady: true, marks: [], debrief: null, ...over,
 })
 
 describe('botView', () => {

@@ -40,7 +40,25 @@ export interface BotSessionView {
   autoJoin: boolean
   failure: string | null
   meetingReady: boolean
+  marks: BotMark[]
   debrief: BotDebrief | null
+}
+
+export interface BotMark {
+  id: string
+  atMs: number | null
+  quote: string | null
+  speaker: string | null
+  note: string | null
+}
+
+export interface CaptionLine {
+  seq: number
+  atMs: number | null
+  endMs: number | null
+  speaker: string | null
+  text: string
+  hidden: boolean
 }
 
 export const PLATFORM_LABEL: Record<BotSessionView['platform'], string> = {

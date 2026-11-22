@@ -18,7 +18,7 @@ import {
   TitleRule, Section, Key, Signal, Grid, Cell, Readout, useMediaQuery, PHONE_QUERY,
 } from '../components/bench'
 import SendBotForm from '../components/bot/SendBotForm'
-import { BotLiveDisplay } from '../components/bot/BotDisplays'
+import BotLive from '../components/bot/BotLive'
 import {
   BOT_LAUNCHED_EVENT, isActive, markSeen, meetingPath, phaseSignal, runTitle,
 } from '../services/botView'
@@ -137,7 +137,7 @@ export default function Bot() {
           <Cell span={8}>
             {live ? (
               <>
-                <BotLiveDisplay view={live} canControl onStop={stop} stopping={stopping} />
+                <BotLive view={live} canControl onStop={stop} stopping={stopping} />
                 {stopError && <p className="bs-bot-note bs-bot-err" role="alert">{stopError}</p>}
                 <p className="bs-bot-note bs-bot-after">
                   When the bot leaves, this opens the meeting with what it caught.{' '}

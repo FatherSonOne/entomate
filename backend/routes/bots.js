@@ -17,6 +17,7 @@ const { authenticate, authorizeOrgRole } = require('../middleware/auth');
 const { supabaseAdmin } = require('../config/supabase');
 const orchestrator = require('../services/botOrchestrator');
 const { buildBotView } = require('../services/botView');
+const captions = require('../services/botCaptions');
 const log = require('../utils/log');
 
 const router = express.Router();
@@ -120,6 +121,81 @@ router.get('/meeting/:meetingId', authenticate, authorizeOrgRole(MEMBER_ROLES, o
   } catch (err) {
     log.error('Bot meeting view failed', { meetingId: req.params.meetingId, error: err.message });
     res.status(500).json({ error: 'Bot view failed', message: err.message });
+  }
+});
+
+/** Lower-case emails of invitees who opted out, cached for a minute per session. */
+const optOutCache = new Map();
+async function optedOutFor(sessionId) {
+  const hit = optOutCache.get(sessionId);
+  if (hit && Date.now() - hit.at < 60 * 1000) return hit.emails;
+  const { data, error } = await supabaseAdmin
+    .from('bot_session_attendees')
+    .select('email, opted_out_at')
+    .eq('session_id', sessionId);
+  // Unknown opt-outs: drop the caption rather than risk showing someone who opted out.
+  if (error) throw error;
+  const emails = new Set((data || []).filter((r) => r.opted_out_at && r.email).map((r) => String(r.email).trim().toLowerCase()));
+  optOutCache.set(sessionId, { at: Date.now(), emails });
+  if (optOutCache.size > 500) optOutCache.delete(optOutCache.keys().next().value);
+  return emails;
+}
+
+/**
+ * POST /api/admin/bots/realtime/:sessionId?token=<t> — Recall's real-time
+ * transcript events (transcript.data) for live captions. Accepted with the
+ * per-session token from the launch URL, or with Recall's workspace-secret
+ * signature when RECALL_WORKSPACE_SECRET is set.
+ */
+router.post('/realtime/:sessionId', async (req, res) => {
+  const { sessionId } = req.params;
+  const ok = captions.verifyToken(sessionId, req.query?.token)
+    || captions.verifyWorkspaceSignature(req.headers, req.rawBody);
+  if (!ok) return res.status(401).json({ error: 'Invalid realtime token' });
+  try {
+    if (req.body?.event === 'transcript.data') {
+      captions.addTranscriptEvent(sessionId, req.body, await optedOutFor(sessionId));
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    log.warn('Realtime caption event failed', { sessionId, error: err.message });
+    res.json({ ok: false });
+  }
+});
+
+/** GET /api/admin/bots/:sessionId/captions?after=<seq> — live caption lines since `after`. */
+router.get('/:sessionId/captions', authenticate, authorizeOrgRole(MEMBER_ROLES, orgFromSession), async (req, res) => {
+  try {
+    const after = Math.max(0, Number(req.query.after) || 0);
+    const optedOut = await optedOutFor(req.params.sessionId);
+    res.json(captions.linesAfter(req.params.sessionId, after, { optOutsHidden: optedOut.size > 0 }));
+  } catch (err) {
+    log.error('Captions read failed', { error: err.message });
+    res.status(500).json({ error: 'Captions failed' });
+  }
+});
+
+/** POST /api/admin/bots/:sessionId/pause and /resume — pause or resume the recording. */
+for (const action of ['pause', 'resume']) {
+  router.post(`/:sessionId/${action}`, authenticate, authorizeOrgRole(ADMIN_ROLES, orgFromSession), async (req, res) => {
+    try {
+      res.json(await orchestrator.setRecordingPaused(req.params.sessionId, action === 'pause'));
+    } catch (err) {
+      log.warn(`Bot ${action} failed`, { sessionId: req.params.sessionId, error: err.message });
+      res.status(400).json({ error: `Bot ${action} failed`, message: err.message });
+    }
+  });
+}
+
+/** POST /api/admin/bots/:sessionId/marks — mark the current moment. Body: { note? }. */
+router.post('/:sessionId/marks', authenticate, authorizeOrgRole(ADMIN_ROLES, orgFromSession), async (req, res) => {
+  try {
+    const mark = await orchestrator.addMark(req.params.sessionId, { note: req.body?.note, byUserId: req.user.id });
+    res.status(201).json({ mark });
+  } catch (err) {
+    const unavailable = err.message === 'marks_unavailable';
+    log.warn('Bot mark failed', { sessionId: req.params.sessionId, error: err.message });
+    res.status(unavailable ? 503 : 400).json({ error: unavailable ? 'marks_unavailable' : 'Mark failed', message: err.message });
   }
 });
 

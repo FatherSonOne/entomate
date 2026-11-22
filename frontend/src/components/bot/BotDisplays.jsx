@@ -3,7 +3,7 @@
  * One Display per screen: a page shows one or the other, never both.
  */
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Display, Key, Led } from '../bench'
 import { PLATFORM_LABEL, elapsedMs, formatElapsed, runTitle } from '../../services/botView'
@@ -20,40 +20,78 @@ function useNow(active) {
 
 const clock = (iso) => new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
 
-/** REC + timer while live; "Joining" or "Joins at 15:00" before. */
-export function BotLiveDisplay({ view, canControl, onStop, stopping, extraKeys = null }) {
+/**
+ * REC + timer and live captions while live; "Joining" or "Joins at 15:00"
+ * before. Presentational: keys come in as `keys`, captions as `captions`.
+ * `compact` is the pop-out window's layout.
+ */
+export function BotLiveDisplay({ view, canControl, onStop, stopping, keys = null, captions = null, paused = false, compact = false, footer = null }) {
   const live = view.phase === 'live'
   const now = useNow(live)
   const head = live
-    ? <><Led tone="brand" className="bs-bot-rec" /> REC</>
+    ? paused
+      ? <><Led tone="ai" /> Paused</>
+      : <><Led tone="brand" className="bs-bot-rec" /> REC</>
     : view.phase === 'scheduled'
       ? <><Led tone="off" /> Joins at {clock(view.joinAt)}</>
       : <><Led tone="ai" /> Joining</>
+  const elapsed = live ? elapsedMs(view, now) : 0
   return (
-    <Display className="bs-bot-disp" aria-live="polite">
+    <Display className={`bs-bot-disp${compact ? ' is-compact' : ''}`}>
       <div className="bs-bot-disp-head">
-        <span className={`bs-lbl bs-bot-disp-state${live ? ' is-rec' : ''}`}>{head} · {runTitle(view)}</span>
-        <span className="bs-lbl">{PLATFORM_LABEL[view.platform]}</span>
+        <span className={`bs-lbl bs-bot-disp-state${live && !paused ? ' is-rec' : paused ? ' is-ai' : ''}`}>{head}{!compact && <> · {runTitle(view)}</>}</span>
+        <span className="bs-lbl">{compact ? runTitle(view) : PLATFORM_LABEL[view.platform]}</span>
       </div>
-      <div className={`bs-bot-clock${live ? '' : ' is-idle'}`} role="timer" aria-label={live ? `Recording for ${formatElapsed(elapsedMs(view, now))}` : 'Not recording yet'}>
-        {formatElapsed(live ? elapsedMs(view, now) : 0)}
+      <div className={`bs-bot-clock${live && !paused ? '' : ' is-idle'}`} role="timer" aria-label={live ? `In the call for ${formatElapsed(elapsed)}` : 'Not recording yet'}>
+        {formatElapsed(elapsed)}
       </div>
-      <p className="bs-bot-disp-note">
-        {live
-          ? 'The bot is in the call and recording. Minutes write themselves when it leaves.'
-          : view.phase === 'scheduled'
-            ? 'Your calendar sent this bot. It joins on its own.'
-            : 'The bot is asking to join. Let it in from the waiting room if your meeting has one.'}
-      </p>
+      {live && captions ? (
+        <CaptionList captions={captions} paused={paused} compact={compact} />
+      ) : !compact && (
+        <p className="bs-bot-disp-note">
+          {live
+            ? 'The bot is in the call and recording. Minutes write themselves when it leaves.'
+            : view.phase === 'scheduled'
+              ? 'Your calendar sent this bot. It joins on its own.'
+              : 'The bot is asking to join. Let it in from the waiting room if your meeting has one.'}
+        </p>
+      )}
       {canControl && (
         <div className="bs-bot-keys">
-          {extraKeys}
+          {live && keys}
           <Key size="sm" onDisplay onClick={onStop} disabled={stopping} className="bs-bot-stop">
-            {stopping && <Loader2 className="animate-spin" aria-hidden="true" />}{view.phase === 'scheduled' ? 'Cancel bot' : 'Stop bot'}
+            {stopping && <Loader2 className="animate-spin" aria-hidden="true" />}{view.phase === 'scheduled' ? 'Cancel bot' : 'Stop'}
           </Key>
         </div>
       )}
+      {footer}
     </Display>
+  )
+}
+
+/** The newest caption lines, newest last; the region announces new lines politely. */
+function CaptionList({ captions, paused, compact }) {
+  const lines = captions.lines.slice(compact ? -4 : -6)
+  const boxRef = useRef(null)
+  const lastSeq = lines.length ? lines[lines.length - 1].seq : 0
+  // Keep the newest line in view inside the box (never scroll the page).
+  useEffect(() => { if (boxRef.current) boxRef.current.scrollTop = boxRef.current.scrollHeight }, [lastSeq])
+  return (
+    <div className="bs-bot-caps" ref={boxRef} aria-live="polite" aria-label="Live captions">
+      {lines.length === 0 ? (
+        <p className="bs-bot-cap-empty">
+          {paused ? 'Recording is paused. Nothing is recorded or captioned until you resume.'
+            : captions.available ? 'Captions appear here as people speak, a second or two behind.'
+              : 'Live captions start with the next bot you send.'}
+        </p>
+      ) : lines.map((l) => (
+        <p key={l.seq} className={`bs-bot-cap${l.hidden ? ' is-hidden' : ''}`}>
+          <span className="bs-bot-cap-t">{l.atMs != null ? formatElapsed(l.atMs) : ''}</span>
+          <span>{l.speaker && <b>{l.speaker}</b>} {l.text}</span>
+        </p>
+      ))}
+      {paused && lines.length > 0 && <p className="bs-bot-cap-empty">Paused. Nothing is recorded until you resume.</p>}
+    </div>
   )
 }
 

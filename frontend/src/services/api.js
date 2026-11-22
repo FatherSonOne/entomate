@@ -947,6 +947,16 @@ export const botsApi = {
     return api.get('/admin/bots/recent', { params: { workspaceId, limit } })
   },
 
+  // Live captions since `after` (a line seq): { lines, seq, paused, optOutsHidden }.
+  captions: (sessionId, after) => {
+    cache.invalidate(`/admin/bots/${sessionId}/captions`)
+    return api.get(`/admin/bots/${sessionId}/captions`, { params: { after } })
+  },
+  pause: (sessionId) => api.post(`/admin/bots/${sessionId}/pause`),
+  resume: (sessionId) => api.post(`/admin/bots/${sessionId}/resume`),
+  // Mark the current moment: { mark }. 503 marks_unavailable until the marks column exists.
+  mark: (sessionId, note) => api.post(`/admin/bots/${sessionId}/marks`, { note }),
+
   // The bot run behind one meeting: { session, canControl }. 404 when there is none.
   forMeeting: (meetingId) => {
     cache.invalidate(`/admin/bots/meeting/${meetingId}`)

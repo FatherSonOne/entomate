@@ -471,7 +471,7 @@ export default function MeetingDetail() {
       <TitleRule title={title} meta={meta} actions={actions} />
 
       {(searchParams.get('debrief') || meeting.recording_job?.source === 'bot') && (
-        <BotDebrief meetingId={meeting.id} forced={Boolean(searchParams.get('debrief'))} onOpenTab={setTab} onMinutesReady={refreshMeeting} />
+        <BotDebrief meetingId={meeting.id} forced={Boolean(searchParams.get('debrief'))} onOpenTab={setTab} onMinutesReady={refreshMeeting} onJump={playMoment} plays={playable} />
       )}
 
       <div className="bs-mtg-status-row">

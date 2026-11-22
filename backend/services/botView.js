@@ -117,6 +117,9 @@ function buildBotView({ session, meeting = null, actionItems = [], attendees = [
     autoJoin: Boolean(session.calendar_event_key),
     failure: phase === 'failed' ? friendlyFailure(session.failure_reason) : null,
     meetingReady: Boolean(meeting),
+    marks: (Array.isArray(session.marks) ? session.marks : []).map((m) => ({
+      id: m.id, atMs: typeof m.atMs === 'number' ? m.atMs : null, quote: m.quote || null, speaker: m.speaker || null, note: m.note || null
+    })),
     debrief: phase === 'live' || phase === 'joining' || phase === 'scheduled' ? null : {
       steps: pipeline(session, meeting, actionItems),
       durationMs: durationMs(session, meeting),

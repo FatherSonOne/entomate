@@ -15,7 +15,9 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { botsApi } from '../../services/api'
 import { Key, Signal, TitleRule } from '../bench'
-import { BotLiveDisplay, BotPipelineDisplay } from './BotDisplays'
+import { BotPipelineDisplay } from './BotDisplays'
+import TimecodeButton from '../meetings/TimecodeButton'
+import BotLive from './BotLive'
 import { formatElapsed, isActive, markSeen, phaseSignal, runTitle } from '../../services/botView'
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -46,7 +48,7 @@ export function useBotSession(meetingId, { poll } = {}) {
   return { ...state, reload: load }
 }
 
-export function BotDebrief({ meetingId, forced, onOpenTab, onMinutesReady }) {
+export function BotDebrief({ meetingId, forced, onOpenTab, onMinutesReady, onJump, plays = false }) {
   const { view } = useBotSession(meetingId, {
     poll: (v) => (v && v.phase === 'processing' ? 5000 : 0),
   })
@@ -104,6 +106,22 @@ export function BotDebrief({ meetingId, forced, onOpenTab, onMinutesReady }) {
           </li>
         )}
       </ul>
+      {view.marks?.length > 0 && (
+        <div className="bs-bot-marks">
+          <span className="bs-lbl">Marked in the call · {view.marks.length}</span>
+          <ul>
+            {view.marks.map((m) => (
+              <li key={m.id}>
+                <span className="bs-bot-mark-main">
+                  {m.quote ? <>“{m.quote}”</> : m.note || 'Marked moment'}
+                  {m.speaker && <span className="bs-bot-mark-who">{m.speaker}</span>}
+                </span>
+                {onJump && m.atMs != null && <TimecodeButton atMs={m.atMs} onJump={onJump} plays={plays} label={`Play the marked moment`} />}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </section>
   )
 }
@@ -151,7 +169,7 @@ export function BotMeetingPending({ meetingId, onReady, notFound }) {
       <TitleRule title={runTitle(view)} meta={meta} />
       <div className="bs-cell">
         {isActive(view.phase) || view.phase === 'scheduled'
-          ? <BotLiveDisplay view={view} canControl={canControl} onStop={stop} stopping={stopping} />
+          ? <BotLive view={view} canControl={canControl} onStop={stop} stopping={stopping} />
           : view.phase === 'processing'
             ? <BotPipelineDisplay view={view} />
             : (

@@ -105,6 +105,17 @@ async function resolveAnnouncementMessage(workspaceId, organizerName) {
   return renderAnnouncement(DEFAULT_ANNOUNCEMENT_TEMPLATE, organizerName);
 }
 
+/**
+ * Where Recall posts live captions for a session: the backend's public URL
+ * plus a per-session token. Null when no public URL is configured.
+ */
+function realtimeUrl(sessionId) {
+  const base = (process.env.RECALL_REALTIME_BASE_URL || process.env.RENDER_EXTERNAL_URL || process.env.BACKEND_URL || '').trim().replace(/\/+$/, '');
+  if (!/^https:\/\//.test(base)) return null;
+  const token = require('./botCaptions').captionToken(sessionId);
+  return `${base}/api/admin/bots/realtime/${sessionId}?token=${encodeURIComponent(token)}`;
+}
+
 const db = () => {
   if (!supabaseAdmin) throw new Error('SUPABASE_SERVICE_KEY is not set');
   return supabaseAdmin;
@@ -234,7 +245,13 @@ async function launchBotSession(p) {
             diarize: true
           }
         }
-      }
+      },
+      // Live captions (services/botCaptions.js): Recall posts each finished
+      // utterance to our realtime endpoint while the bot records. Left out
+      // when the backend's public URL is unknown, so a launch never fails over it.
+      ...(realtimeUrl(sessionId) ? {
+        realtime_endpoints: [{ type: 'webhook', url: realtimeUrl(sessionId), events: ['transcript.data'] }]
+      } : {})
     },
     // P1.7 in-meeting consent announcement. Recall posts this on join.
     // If Recall rejects the field shape (it has shifted before — the
@@ -588,6 +605,56 @@ async function stopBotSession(sessionId, reason = 'manual_stop') {
   return { sessionId, recallBotId: session.recall_bot_id, recallStatus };
 }
 
+/**
+ * Pause or resume the recording (the bot stays in the call). While paused
+ * nothing is recorded or transcribed; Recall reports in_call_not_recording.
+ */
+async function setRecordingPaused(sessionId, paused) {
+  const { data: session, error } = await db()
+    .from('bot_sessions')
+    .select('recall_bot_id, status')
+    .eq('id', sessionId)
+    .single();
+  if (error || !session?.recall_bot_id) throw new Error(`Session not found: ${sessionId}`);
+  if (session.status !== 'in_call') throw new Error('The bot is not in the call');
+  await recallFetch(`/bot/${session.recall_bot_id}/${paused ? 'pause_recording' : 'resume_recording'}`, { method: 'POST' });
+  require('./botCaptions').setPaused(sessionId, paused);
+  log.info(paused ? 'Bot recording paused' : 'Bot recording resumed', { sessionId });
+  return { sessionId, paused };
+}
+
+const MAX_MARKS = 100;
+
+/**
+ * Mark a moment while the bot is in the call. Stored on bot_sessions.marks
+ * with the transcript time (from the latest live caption) and the words
+ * around it, so the debrief can list and play them.
+ */
+async function addMark(sessionId, { note, byUserId } = {}) {
+  const captions = require('./botCaptions');
+  const { data: session, error } = await db()
+    .from('bot_sessions')
+    .select('id, status, marks')
+    .eq('id', sessionId)
+    .single();
+  if (error) throw new Error(/marks/.test(error.message) ? 'marks_unavailable' : error.message);
+  if (session.status !== 'in_call') throw new Error('The bot is not in the call');
+  const last = captions.latestLine(sessionId);
+  const mark = {
+    id: crypto.randomUUID(),
+    atMs: captions.latestAtMs(sessionId),
+    at: new Date().toISOString(),
+    quote: last && !last.hidden ? last.text.slice(0, 280) : null,
+    speaker: last && !last.hidden ? last.speaker : null,
+    note: typeof note === 'string' && note.trim() ? note.trim().slice(0, 280) : null,
+    by: byUserId || null
+  };
+  const marks = [...(Array.isArray(session.marks) ? session.marks : []), mark].slice(-MAX_MARKS);
+  const { error: updErr } = await db().from('bot_sessions').update({ marks }).eq('id', sessionId);
+  if (updErr) throw new Error(updErr.message);
+  return mark;
+}
+
 async function listActiveSessions(orgId) {
   let query = db()
     .from('bot_sessions')
@@ -752,6 +819,10 @@ async function handleRecallWebhook(payload) {
     }
   }
 
+  // Paused / resumed from anywhere (our keys or Recall's own) shows in the live views.
+  if (event === 'bot.in_call_not_recording') require('./botCaptions').setPaused(sessionId, true);
+  if (event === 'bot.in_call_recording') require('./botCaptions').setPaused(sessionId, false);
+
   if (event === 'bot.fatal' && data?.fatal_reason) {
     update.failure_reason = String(data.fatal_reason).slice(0, 500);
   }
@@ -829,6 +900,8 @@ async function ingestSessionTranscript(sessionId) {
 module.exports = {
   launchBotSession,
   stopBotSession,
+  setRecordingPaused,
+  addMark,
   listActiveSessions,
   getRecallBotState,
   handleRecallWebhook,
@@ -838,6 +911,7 @@ module.exports = {
   _internal: {
     mapRecallStatus,
     mapRecallEvent,
+    realtimeUrl,
     recallFetch,
     latestRecallStatusCode,
     resolveSessionFromPayload,

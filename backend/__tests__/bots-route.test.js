@@ -241,3 +241,42 @@ describe('POST /api/admin/bots/recall-webhook — signature gate', () => {
     expect(res.status).toBe(401);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────
+// /realtime/:sessionId — live captions from Recall
+// ─────────────────────────────────────────────────────────────────────────
+
+describe('POST /api/admin/bots/realtime/:sessionId', () => {
+  const captions = require('../services/botCaptions');
+  let app;
+  beforeAll(() => { app = makeApp(); });
+  beforeEach(() => {
+    captions._internal.calls.clear();
+    // No invitees opted out. (If opt-outs can't be read, the caption is dropped rather than shown.)
+    require('../config/supabase').supabaseAdmin.from.mockImplementation(() => ({
+      select: () => ({ eq: () => Promise.resolve({ data: [], error: null }) })
+    }));
+  });
+
+  const body = {
+    event: 'transcript.data',
+    data: { data: { words: [{ text: 'Hello', start_timestamp: { relative: 1 } }], participant: { id: 1, name: 'Dana' } } }
+  };
+
+  test('rejects a post without the session token', async () => {
+    const res = await request(app).post('/api/admin/bots/realtime/s1').send(body);
+    expect(res.status).toBe(401);
+    expect(captions.linesAfter('s1', 0).lines).toEqual([]);
+  });
+
+  test('rejects another session\'s token', async () => {
+    const res = await request(app).post(`/api/admin/bots/realtime/s1?token=${captions.captionToken('s2')}`).send(body);
+    expect(res.status).toBe(401);
+  });
+
+  test('stores the caption with the right token', async () => {
+    const res = await request(app).post(`/api/admin/bots/realtime/s1?token=${encodeURIComponent(captions.captionToken('s1'))}`).send(body);
+    expect(res.status).toBe(200);
+    expect(captions.linesAfter('s1', 0).lines.map((l) => l.text)).toEqual(['Hello']);
+  });
+});

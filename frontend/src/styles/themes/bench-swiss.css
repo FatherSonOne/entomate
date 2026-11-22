@@ -2212,3 +2212,30 @@ a.bs-proj-pt:focus-visible { outline: 2px solid var(--bs-brand); outline-offset:
   .bs-bot-went { grid-template-columns: minmax(0, 1fr); }
   .bs-bot-went li { border-bottom: 1px solid var(--bs-rule2); }
 }
+
+/* Bot live captions, pop-out and marks (part 2) */
+.bs-bot-caps { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--bs-d-rule); max-height: 216px; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 2px; }
+.bs-bot-cap { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 12px; margin: 0; padding: 6px 0; font-size: 14px; line-height: 1.5; color: var(--bs-d-ink); overflow-wrap: anywhere; }
+.bs-bot-cap b { font-weight: 600; margin-right: 4px; }
+.bs-bot-cap.is-hidden span:last-child { font-style: italic; color: var(--bs-d-mut); }
+.bs-bot-cap-t { font: 500 11px/1.9 var(--bs-mono); color: var(--bs-d-mut); font-variant-numeric: tabular-nums; }
+.bs-bot-cap-empty { margin: 4px 0; font-size: 13px; line-height: 1.5; color: var(--bs-d-mut); }
+.bs-bot-live-note { color: var(--bs-d-live); }
+.bs-bot-disp.is-compact { border-radius: 10px; padding: 14px 16px; }
+.bs-bot-disp.is-compact .bs-bot-clock { margin-top: 8px; font-size: 44px; }
+.bs-bot-disp.is-compact .bs-bot-caps { max-height: none; flex: 1; }
+.bs-bot-disp.is-compact .bs-bot-cap { grid-template-columns: 44px minmax(0, 1fr); font-size: 13px; }
+
+.bs-bot-popbody { margin: 0; background: var(--bs-case); color: var(--bs-ink); font-family: 'Instrument Sans', system-ui, sans-serif; }
+.bs-bot-pop { display: flex; flex-direction: column; gap: 10px; min-height: 100vh; box-sizing: border-box; padding: 10px; }
+.bs-bot-pop > .bs-bot-disp { flex: 1; display: flex; flex-direction: column; }
+.bs-bot-pop-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 0 4px 2px; }
+.bs-bot-pop-done { justify-content: center; align-items: flex-start; padding: 24px; gap: 12px; }
+
+.bs-bot-marks { padding: 14px 0 0; border-bottom: 1px solid var(--bs-rule2); }
+.bs-bot-marks ul { list-style: none; margin: 6px 0 0; padding: 0; }
+.bs-bot-marks li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: baseline; padding: 10px 0 10px 12px; border-top: 1px solid var(--bs-rule2); box-shadow: inset 3px 0 0 var(--bs-rule-ink); font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+.bs-bot-mark-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bs-bot-mark-who { font: 500 11px var(--bs-mono); color: var(--bs-muted); }
+.bs-bot-pop-foot .bs-linkbtn { font: 500 10.5px var(--bs-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--bs-ink2); }
+.bs-key.bs-bot-stop { color: var(--bs-d-brand); }
