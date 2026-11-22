@@ -294,7 +294,8 @@ router.post('/ask', authenticate, async (req, res) => {
 
     const answer = await askService.answerQuestion(question, {
       conversationId,
-      meetingIds
+      meetingIds,
+      userId: req.user.id
     });
 
     res.json(answer);
@@ -334,6 +335,7 @@ router.post('/ask/stream', authenticate, async (req, res) => {
     await askService.answerQuestionStreaming(question, {
       conversationId,
       meetingIds,
+      userId: req.user.id,
       onChunk: (chunk) => {
         res.write(`data: ${JSON.stringify({ type: 'chunk', content: chunk })}\n\n`);
       },
@@ -380,7 +382,7 @@ router.post('/ask/follow-up', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'Question is required' });
     }
 
-    const answer = await askService.answerQuestion(question, { conversationId });
+    const answer = await askService.answerQuestion(question, { conversationId, userId: req.user.id });
 
     res.json(answer);
 
@@ -398,7 +400,7 @@ router.get('/conversations', authenticate, async (req, res) => {
   try {
     const { limit = 20 } = req.query;
 
-    const conversations = await askService.listConversations(parseInt(limit));
+    const conversations = await askService.listConversations(parseInt(limit), req.user.id);
 
     res.json({ conversations });
 
@@ -416,7 +418,7 @@ router.get('/conversations/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
 
-    const messages = await askService.getConversation(id);
+    const messages = await askService.getConversation(id, req.user.id);
 
     res.json({ messages });
 
@@ -434,7 +436,7 @@ router.delete('/conversations/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
 
-    await askService.deleteConversation(id);
+    await askService.deleteConversation(id, req.user.id);
 
     res.json({ success: true });
 

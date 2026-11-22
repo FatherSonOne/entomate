@@ -260,10 +260,19 @@ router.get('/team-performance', asyncHandler(async (req, res) => {
     .gte('created_at', startDate.toISOString())
     .lte('created_at', endDate.toISOString());
 
-  // Get users
-  const { data: users } = await supabase
-    .from('users')
-    .select('id, full_name, email');
+  // Get users, limited to members of the caller's orgs (audit finding 3).
+  // users has no org_id: one person can be in several orgs, so org_members decides.
+  const { data: orgMembers } = await supabase
+    .from('org_members')
+    .select('user_id')
+    .in('org_id', req.orgIds);
+  const memberIds = [...new Set((orgMembers || []).map((m) => m.user_id))];
+  const { data: users } = memberIds.length
+    ? await supabase
+      .from('users')
+      .select('id, full_name, email')
+      .in('id', memberIds)
+    : { data: [] };
 
   // Calculate metrics per user
   const userMetrics = {};

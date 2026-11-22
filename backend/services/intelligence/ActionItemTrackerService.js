@@ -241,10 +241,19 @@ class ActionItemTrackerService {
       }
 
       // Get team members
-      const { data: teamMembers } = await supabase
-        .from('users')
-        .select('id, full_name')
-        .eq('team_id', user.team_id);
+      // Only people who share an org with the caller (audit finding 3).
+      const { data: orgMembers } = await supabase
+        .from('org_members')
+        .select('user_id')
+        .in('org_id', requestOrgIds());
+      const memberIds = [...new Set((orgMembers || []).map((m) => m.user_id))];
+      const { data: teamMembers } = memberIds.length
+        ? await supabase
+          .from('users')
+          .select('id, full_name')
+          .eq('team_id', user.team_id)
+          .in('id', memberIds)
+        : { data: [] };
 
       if (!teamMembers || teamMembers.length === 0) {
         return {

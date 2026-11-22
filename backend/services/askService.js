@@ -8,6 +8,7 @@ const ai = require('../config/ai');
 const { supabase } = require('../config/supabase');
 const embeddingService = require('./embeddingService');
 const log = require('../utils/log');
+const { requestOrgIds } = require('../utils/orgContext'); // audit finding 3: meetings limited to the caller's orgs
 
 class AskService {
   constructor() {
@@ -28,7 +29,8 @@ class AskService {
   async answerQuestion(question, options = {}) {
     try {
       log.info(`Answering: "${question}"`);
-      const { conversationId, meetingIds } = options;
+      const { meetingIds, userId } = options;
+      const conversationId = await this.ownedConversationId(options.conversationId, userId);
 
       if (!ai.isConfigured()) {
         throw new Error('AI service not configured');
@@ -42,6 +44,7 @@ class AskService {
         const { data } = await supabase
           .from('meetings')
           .select('id, title, summary, transcript, key_points, decisions, created_at, sentiment_label')
+          .in('org_id', requestOrgIds())
           .in('id', meetingIds);
         relevantMeetings = data || [];
       } else {
@@ -58,6 +61,7 @@ class AskService {
             const { data } = await supabase
               .from('meetings')
               .select('id, title, summary, transcript, key_points, decisions, created_at, sentiment_label')
+              .in('org_id', requestOrgIds())
               .in('id', meetingIdList);
 
             relevantMeetings = data || [];
@@ -69,6 +73,7 @@ class AskService {
           const { data: recentMeetings } = await supabase
             .from('meetings')
             .select('id, title, summary, transcript, key_points, decisions, created_at, sentiment_label')
+            .in('org_id', requestOrgIds())
             .order('created_at', { ascending: false })
             .limit(this.maxContextMeetings);
 
@@ -171,6 +176,7 @@ ${transcript ? `Transcript excerpt: ${transcript}...` : ''}
             const { data: newConv } = await supabase
               .from('conversations')
               .insert({
+                user_id: userId,
                 started_at: new Date(),
                 title: question.substring(0, 100)
               })
@@ -278,11 +284,27 @@ ${transcript ? `Transcript excerpt: ${transcript}...` : ''}
   }
 
   /**
+   * Returns conversationId only if that conversation belongs to userId,
+   * otherwise null (audit finding 3: conversations are private to their owner).
+   */
+  async ownedConversationId(conversationId, userId) {
+    if (!conversationId || !userId || !supabase) return null;
+    const { data } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('id', conversationId)
+      .eq('user_id', userId)
+      .maybeSingle();
+    return data?.id || null;
+  }
+
+  /**
    * Get conversation history
    */
-  async getConversation(conversationId) {
+  async getConversation(conversationId, userId) {
     try {
       if (!supabase) return [];
+      if (!(await this.ownedConversationId(conversationId, userId))) return [];
 
       const { data: messages } = await supabase
         .from('conversation_messages')
@@ -300,13 +322,14 @@ ${transcript ? `Transcript excerpt: ${transcript}...` : ''}
   /**
    * List recent conversations
    */
-  async listConversations(limit = 20) {
+  async listConversations(limit = 20, userId) {
     try {
       if (!supabase) return [];
 
       const { data: conversations } = await supabase
         .from('conversations')
         .select('*')
+        .eq('user_id', userId)
         .order('started_at', { ascending: false })
         .limit(limit);
 
@@ -320,9 +343,10 @@ ${transcript ? `Transcript excerpt: ${transcript}...` : ''}
   /**
    * Delete a conversation
    */
-  async deleteConversation(conversationId) {
+  async deleteConversation(conversationId, userId) {
     try {
       if (!supabase) return;
+      if (!(await this.ownedConversationId(conversationId, userId))) return;
 
       // Delete messages first
       await supabase
@@ -346,7 +370,8 @@ ${transcript ? `Transcript excerpt: ${transcript}...` : ''}
    * Answer a question with streaming response
    */
   async answerQuestionStreaming(question, options = {}) {
-    const { conversationId, meetingIds, onChunk, onCitations, onFollowUp, onComplete, onError } = options;
+    const { meetingIds, userId, onChunk, onCitations, onFollowUp, onComplete, onError } = options;
+    const conversationId = await this.ownedConversationId(options.conversationId, userId);
 
     try {
       log.info(`Streaming answer for: "${question}"`);
@@ -362,6 +387,7 @@ ${transcript ? `Transcript excerpt: ${transcript}...` : ''}
         const { data } = await supabase
           .from('meetings')
           .select('id, title, summary, transcript, key_points, decisions, created_at, sentiment_label')
+          .in('org_id', requestOrgIds())
           .in('id', meetingIds);
         relevantMeetings = data || [];
       } else {
@@ -376,6 +402,7 @@ ${transcript ? `Transcript excerpt: ${transcript}...` : ''}
             const { data } = await supabase
               .from('meetings')
               .select('id, title, summary, transcript, key_points, decisions, created_at, sentiment_label')
+              .in('org_id', requestOrgIds())
               .in('id', meetingIdList);
             relevantMeetings = data || [];
           }
@@ -385,6 +412,7 @@ ${transcript ? `Transcript excerpt: ${transcript}...` : ''}
           const { data: recentMeetings } = await supabase
             .from('meetings')
             .select('id, title, summary, transcript, key_points, decisions, created_at, sentiment_label')
+            .in('org_id', requestOrgIds())
             .order('created_at', { ascending: false })
             .limit(this.maxContextMeetings);
 
@@ -504,6 +532,7 @@ ${transcript ? `Transcript excerpt: ${transcript}...` : ''}
             const { data: newConv } = await supabase
               .from('conversations')
               .insert({
+                user_id: userId,
                 started_at: new Date(),
                 title: question.substring(0, 100)
               })

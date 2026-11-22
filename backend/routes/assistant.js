@@ -7,6 +7,7 @@ const express = require('express');
 const { supabase } = require('../config/supabase');
 const ai = require('../config/ai');
 const log = require('../utils/log');
+const askService = require('../services/askService');
 const { authenticate } = require('../middleware/auth');
 const { getOrgIdsForUser } = require('../utils/orgContext');
 
@@ -319,13 +320,14 @@ router.post('/query', authenticate, async (req, res) => {
     }
 
     // 6. Save to conversation history
-    let newConversationId = conversationId;
+    // Only append to a conversation the caller owns (audit finding 3).
+    let newConversationId = await askService.ownedConversationId(conversationId, req.user?.id);
     if (supabase) {
       try {
-        if (!conversationId) {
+        if (!newConversationId) {
           const { data: newConv } = await supabase
             .from('conversations')
-            .insert({ started_at: new Date(), title: `[AI] ${question.substring(0, 80)}` })
+            .insert({ user_id: req.user?.id, started_at: new Date(), title: `[AI] ${question.substring(0, 80)}` })
             .select().single();
           if (newConv) newConversationId = newConv.id;
         }
