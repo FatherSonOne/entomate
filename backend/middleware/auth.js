@@ -46,8 +46,6 @@ const authenticate = async (req, res, next) => {
       email: user.email || null,
       firstName: user.user_metadata?.full_name?.split(' ')[0] || user.user_metadata?.name?.split(' ')[0] || null,
       lastName: user.user_metadata?.full_name?.split(' ').slice(1).join(' ') || null,
-      role: user.user_metadata?.role || 'member',
-      teamId: user.user_metadata?.team_id || 'default',
       avatar_url: user.user_metadata?.avatar_url || user.user_metadata?.picture || null
     };
 
@@ -70,7 +68,7 @@ const optionalAuth = async (req, res, next) => {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      req.user = { id: 'anonymous', email: null, role: 'guest', teamId: 'default' };
+      req.user = { id: 'anonymous', email: null };
       return next();
     }
 
@@ -80,7 +78,7 @@ const optionalAuth = async (req, res, next) => {
       const { data: { user }, error } = await supabase.auth.getUser(token);
 
       if (error || !user) {
-        req.user = { id: 'anonymous', email: null, role: 'guest', teamId: 'default' };
+        req.user = { id: 'anonymous', email: null };
         return next();
       }
 
@@ -89,20 +87,18 @@ const optionalAuth = async (req, res, next) => {
         email: user.email || null,
         firstName: user.user_metadata?.full_name?.split(' ')[0] || user.user_metadata?.name?.split(' ')[0] || null,
         lastName: user.user_metadata?.full_name?.split(' ').slice(1).join(' ') || null,
-        role: user.user_metadata?.role || 'member',
-        teamId: user.user_metadata?.team_id || 'default',
         avatar_url: user.user_metadata?.avatar_url || user.user_metadata?.picture || null
       };
       req.authVerified = true;
     } catch (error) {
       // Token invalid or expired, treat as anonymous
       log.debug('Optional auth failed:', error.message);
-      req.user = { id: 'anonymous', email: null, role: 'guest', teamId: 'default' };
+      req.user = { id: 'anonymous', email: null };
     }
 
     next();
   } catch (error) {
-    req.user = { id: 'anonymous', email: null, role: 'guest', teamId: 'default' };
+    req.user = { id: 'anonymous', email: null };
     next();
   }
 };
@@ -181,67 +177,6 @@ const authorizeOrgRole = (allowedRoles, resolveOrgId) => {
 };
 
 /**
- * Role-based Authorization (legacy — reads user_metadata.role).
- *
- * Note: `user_metadata.role` is never populated by the app, so this only
- * accepts users whose metadata has been manually set. Prefer
- * `authorizeOrgRole` for any new code that gates on org-level permissions.
- *
- * @param {string[]} allowedRoles - Array of allowed roles
- */
-const authorize = (allowedRoles) => {
-  return (req, res, next) => {
-    if (!req.user) {
-      return res.status(401).json({
-        error: 'Unauthorized',
-        message: 'Authentication required'
-      });
-    }
-
-    if (!allowedRoles.includes(req.user.role)) {
-      return res.status(403).json({
-        error: 'Forbidden',
-        message: 'Insufficient permissions'
-      });
-    }
-
-    next();
-  };
-};
-
-/**
- * Team Access Check
- * Ensures user can only access their team's resources
- */
-const teamAccess = async (req, res, next) => {
-  try {
-    const resourceTeamId = req.params.teamId || req.body.teamId || req.query.teamId;
-
-    if (!resourceTeamId) {
-      return next();
-    }
-
-    if (req.user.role === 'admin') {
-      return next();
-    }
-
-    if (req.user.teamId !== resourceTeamId) {
-      return res.status(403).json({
-        error: 'Forbidden',
-        message: 'Access denied to this team resource'
-      });
-    }
-
-    next();
-  } catch (error) {
-    return res.status(500).json({
-      error: 'Authorization check failed',
-      message: error.message
-    });
-  }
-};
-
-/**
  * API Key Authentication
  * For service-to-service communication.
  *
@@ -274,8 +209,6 @@ const apiKeyAuth = (req, res, next) => {
 module.exports = {
   authenticate,
   optionalAuth,
-  authorize,
   authorizeOrgRole,
-  teamAccess,
   apiKeyAuth
 };

@@ -2,6 +2,30 @@ const express = require('express');
 const { authenticate, authorizeOrgRole } = require('../middleware/auth');
 const { supabaseAdmin } = require('../config/supabase');
 const log = require('../utils/log');
+const { getOrgIdForUser } = require('../utils/orgContext');
+
+/**
+ * Write one row to public.audit_log (the table that exists; the old code
+ * wrote to a missing audit_logs table, so nothing was ever recorded).
+ * The org comes from org_members, never from user-editable metadata
+ * (audit finding 15).
+ */
+async function writeAudit({ orgId, userId, action, resourceType, resourceId, changed }) {
+  try {
+    const { error } = await supabaseAdmin.from('audit_log').insert({
+      organization_id: orgId || null,
+      user_id: userId || null,
+      app_name: 'entomate',
+      action,
+      resource_type: resourceType,
+      resource_id: resourceId || null,
+      new_values: { changed: changed || [] },
+    });
+    if (error) log.warn('[Settings] Audit log failed:', error.message);
+  } catch (auditErr) {
+    log.warn('[Settings] Audit log failed:', auditErr.message);
+  }
+}
 
 const router = express.Router();
 
@@ -125,19 +149,14 @@ router.put('/user', authenticate, async (req, res) => {
       return res.status(500).json({ error: 'Failed to update settings' });
     }
 
-    // Audit log
-    try {
-      await supabaseAdmin.from('audit_logs').insert({
-        workspace_id: req.user.teamId || 'default',
-        actor_user_id: userId,
-        action: 'settings.user.update',
-        entity_type: 'user_settings',
-        entity_id: userId,
-        metadata: { changed: Object.keys(req.body || {}) }
-      });
-    } catch (auditErr) {
-      log.warn('[Settings] Audit log failed:', auditErr.message);
-    }
+    await writeAudit({
+      orgId: await getOrgIdForUser(userId),
+      userId,
+      action: 'settings.user.update',
+      resourceType: 'user_settings',
+      resourceId: userId,
+      changed: Object.keys(req.body || {}),
+    });
 
     res.json({ success: true, settings: data });
   } catch (error) {
@@ -216,19 +235,14 @@ router.put('/workspace', authenticate, authorizeOrgRole(ADMIN_ROLES, orgFromBody
       return res.status(500).json({ error: 'Failed to update workspace settings' });
     }
 
-    // Audit log
-    try {
-      await supabaseAdmin.from('audit_logs').insert({
-        workspace_id: workspaceId,
-        actor_user_id: req.user.id,
-        action: 'settings.workspace.update',
-        entity_type: 'workspace_settings',
-        entity_id: workspaceId,
-        metadata: { changed: Object.keys(req.body || {}) }
-      });
-    } catch (auditErr) {
-      log.warn('[Settings] Audit log failed:', auditErr.message);
-    }
+    await writeAudit({
+      orgId: workspaceId,
+      userId: req.user.id,
+      action: 'settings.workspace.update',
+      resourceType: 'workspace_settings',
+      resourceId: workspaceId,
+      changed: Object.keys(req.body || {}),
+    });
 
     res.json({ success: true, settings: data });
   } catch (error) {
@@ -251,9 +265,9 @@ router.get('/audit-logs', authenticate, authorizeOrgRole(ADMIN_ROLES, orgFromQue
     const limit = Math.min(Number(req.query.limit) || 100, 500);
 
     const { data, error } = await supabaseAdmin
-      .from('audit_logs')
+      .from('audit_log')
       .select('*')
-      .eq('workspace_id', workspaceId)
+      .eq('organization_id', workspaceId)
       .order('created_at', { ascending: false })
       .limit(limit);
 
@@ -261,7 +275,18 @@ router.get('/audit-logs', authenticate, authorizeOrgRole(ADMIN_ROLES, orgFromQue
       return res.status(500).json({ error: 'Failed to fetch audit logs' });
     }
 
-    res.json({ success: true, logs: data || [] });
+    // Keep the response shape the client has always been promised.
+    const logs = (data || []).map((r) => ({
+      id: r.id,
+      workspace_id: r.organization_id,
+      actor_user_id: r.user_id,
+      action: r.action,
+      entity_type: r.resource_type,
+      entity_id: r.resource_id,
+      metadata: r.new_values,
+      created_at: r.created_at,
+    }));
+    res.json({ success: true, logs });
   } catch (error) {
     log.error('[Settings] GET /audit-logs error:', error.message);
     res.status(500).json({ error: 'Internal server error' });

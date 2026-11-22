@@ -5,6 +5,7 @@
  */
 
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 const { supabase } = require('../config/supabase');
 const WorkflowExecutor = require('../services/workflow/WorkflowExecutor');
@@ -190,7 +191,21 @@ router.all('/:webhookIdentifier', async (req, res) => {
 });
 
 /**
- * Validate webhook authentication
+ * Constant-time string compare. False when either side is missing or empty,
+ * so a webhook with no configured secret never matches (audit finding 10).
+ */
+function safeEqual(actual, expected) {
+  if (typeof actual !== 'string' || typeof expected !== 'string' || !actual || !expected) return false;
+  const a = crypto.createHash('sha256').update(actual).digest();
+  const b = crypto.createHash('sha256').update(expected).digest();
+  return crypto.timingSafeEqual(a, b) && actual.length === expected.length;
+}
+
+const HMAC_ALGORITHMS = new Set(['sha256', 'sha1', 'sha512']);
+
+/**
+ * Validate webhook authentication. Fails closed: an unknown or unsupported
+ * type is rejected (audit finding 10).
  */
 async function validateAuthentication(authConfig, req) {
   if (!authConfig || authConfig.type === 'none') {
@@ -198,102 +213,89 @@ async function validateAuthentication(authConfig, req) {
   }
 
   switch (authConfig.type) {
-    case 'header':
-      // Check for required header
+    case 'header': {
       const headerName = authConfig.name?.toLowerCase();
-      const expectedValue = authConfig.value;
-      const actualValue = req.headers[headerName];
-
-      if (!actualValue || actualValue !== expectedValue) {
+      const actualValue = headerName ? req.headers[headerName] : undefined;
+      if (!safeEqual(actualValue, authConfig.value)) {
         return { valid: false, error: 'Invalid authentication header' };
       }
       return { valid: true };
+    }
 
-    case 'basic':
-      // Basic authentication
+    case 'basic': {
       const authHeader = req.headers.authorization;
       if (!authHeader || !authHeader.startsWith('Basic ')) {
         return { valid: false, error: 'Basic authentication required' };
       }
-
-      const base64Credentials = authHeader.split(' ')[1];
-      const credentials = Buffer.from(base64Credentials, 'base64').toString('utf8');
-      const [username, password] = credentials.split(':');
-
-      if (username !== authConfig.username || password !== authConfig.password) {
+      const credentials = Buffer.from(authHeader.slice(6), 'base64').toString('utf8');
+      const sep = credentials.indexOf(':');
+      const username = sep >= 0 ? credentials.slice(0, sep) : credentials;
+      const password = sep >= 0 ? credentials.slice(sep + 1) : '';
+      // Evaluate both so timing does not reveal which half was wrong.
+      const userOk = safeEqual(username, authConfig.username);
+      const passOk = safeEqual(password, authConfig.password);
+      if (!userOk || !passOk) {
         return { valid: false, error: 'Invalid credentials' };
       }
       return { valid: true };
+    }
 
-    case 'bearer':
-      // Bearer token
+    case 'bearer': {
       const bearerHeader = req.headers.authorization;
       if (!bearerHeader || !bearerHeader.startsWith('Bearer ')) {
         return { valid: false, error: 'Bearer token required' };
       }
-
-      const token = bearerHeader.split(' ')[1];
-      if (token !== authConfig.token) {
+      if (!safeEqual(bearerHeader.slice(7), authConfig.token)) {
         return { valid: false, error: 'Invalid token' };
       }
       return { valid: true };
+    }
 
-    case 'api_key':
-      // API key (header or query)
+    case 'api_key': {
       const keyLocation = authConfig.in || 'header';
       const keyName = authConfig.name || 'X-API-Key';
       let apiKey;
-
       if (keyLocation === 'header') {
         apiKey = req.headers[keyName.toLowerCase()];
       } else if (keyLocation === 'query') {
         apiKey = req.query[keyName];
       }
-
-      if (!apiKey || apiKey !== authConfig.value) {
+      if (!safeEqual(apiKey, authConfig.value)) {
         return { valid: false, error: 'Invalid API key' };
       }
       return { valid: true };
+    }
 
-    case 'jwt':
-      // JWT validation (simplified)
-      const jwtHeader = req.headers.authorization;
-      if (!jwtHeader || !jwtHeader.startsWith('Bearer ')) {
-        return { valid: false, error: 'JWT token required' };
-      }
-
-      try {
-        const jwt = require('jsonwebtoken');
-        const jwtToken = jwtHeader.split(' ')[1];
-        jwt.verify(jwtToken, authConfig.secret);
-        return { valid: true };
-      } catch (err) {
-        return { valid: false, error: 'Invalid JWT token' };
-      }
-
-    case 'hmac':
-      // HMAC signature validation
-      const signatureHeader = req.headers[authConfig.signatureHeader?.toLowerCase() || 'x-signature'];
+    case 'hmac': {
+      // HMAC over the exact bytes that were sent (req.rawBody from server.js),
+      // not a re-serialised body, so GitHub/Stripe-style signatures match.
+      const headerName = (authConfig.signatureHeader || 'x-signature').toLowerCase();
+      const signatureHeader = req.headers[headerName];
       if (!signatureHeader) {
         return { valid: false, error: 'Signature header required' };
       }
-
-      const crypto = require('crypto');
-      const body = JSON.stringify(req.body);
-      const expectedSignature = crypto
-        .createHmac(authConfig.algorithm || 'sha256', authConfig.secret)
-        .update(body)
-        .digest('hex');
-
-      // Handle different signature formats
-      const actualSig = signatureHeader.replace(/^sha256=/, '');
-      if (actualSig !== expectedSignature) {
+      const algorithm = (authConfig.algorithm || 'sha256').toLowerCase();
+      if (!HMAC_ALGORITHMS.has(algorithm) || !authConfig.secret) {
+        return { valid: false, error: 'Webhook signature is not configured correctly' };
+      }
+      const raw = Buffer.isBuffer(req.rawBody) ? req.rawBody : Buffer.from(JSON.stringify(req.body ?? {}));
+      const mac = crypto.createHmac(algorithm, authConfig.secret).update(raw);
+      const digest = mac.digest();
+      const sent = String(signatureHeader).trim().replace(/^(sha1|sha256|sha512)=/i, '');
+      const ok = safeEqual(sent.toLowerCase(), digest.toString('hex')) || safeEqual(sent, digest.toString('base64'));
+      if (!ok) {
         return { valid: false, error: 'Invalid signature' };
       }
       return { valid: true };
+    }
+
+    case 'jwt':
+      // Not supported (no JWT library is installed); rejected rather than
+      // pretending to check. Use hmac or bearer instead.
+      return { valid: false, error: 'JWT webhook authentication is not supported; use hmac or bearer' };
 
     default:
-      return { valid: true };
+      return { valid: false, error: 'Unknown webhook authentication type' };
   }
 }
 
@@ -363,3 +365,5 @@ router.get('/test/:webhookIdentifier', async (req, res) => {
 });
 
 module.exports = router;
+
+module.exports._validateAuthentication = validateAuthentication; // for tests

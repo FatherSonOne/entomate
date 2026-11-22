@@ -59,8 +59,15 @@ class SecretsVault {
   initialize() {
     const masterKey = process.env.SECRETS_MASTER_KEY;
 
+    if (!masterKey && process.env.NODE_ENV === 'production') {
+      // Audit finding 9: never fall back to JWT_SECRET or a key that is in the
+      // repo in production. The vault stays locked (encrypt/decrypt throw)
+      // until SECRETS_MASTER_KEY is set; the rest of the server keeps running.
+      throw new Error('[SecretsVault] SECRETS_MASTER_KEY is required in production');
+    }
+
     if (!masterKey) {
-      log.warn('[SecretsVault] SECRETS_MASTER_KEY not set - using derived key (NOT FOR PRODUCTION)');
+      log.warn('[SecretsVault] SECRETS_MASTER_KEY not set - using derived key (development only)');
       // Derive a key from JWT_SECRET as fallback (for development only)
       const fallbackSource = process.env.JWT_SECRET || 'development-fallback-key';
       this.encryptionKey = crypto
@@ -845,7 +852,11 @@ class SecretsVault {
 const secretsVault = new SecretsVault();
 
 // Initialize on module load
-secretsVault.initialize();
+try {
+  secretsVault.initialize();
+} catch (err) {
+  log.error(err.message + ' - stored secrets cannot be read or written until it is set');
+}
 
 module.exports = secretsVault;
 module.exports.SecretsVault = SecretsVault;

@@ -43,6 +43,8 @@ services:
       # ----- Required in production (server.js:90 throws if unset) -----
       - key: SESSION_SECRET
         sync: false  # set manually (secret) — generate with: openssl rand -hex 32
+      - key: SECRETS_MASTER_KEY
+        sync: false  # set manually (secret) — openssl rand -hex 32. Secrets vault is locked without it. Never rotate without re-encrypting stored secrets.
 
       # ----- Auth (Clerk) -----
       - key: CLERK_SECRET_KEY
