@@ -26,6 +26,7 @@ const { supabase } = require('../config/supabase');
 const ai = require('../config/ai');
 const geminiRecording = require('../config/geminiRecording');
 const summaryTemplates = require('./summaryTemplates');
+const speakerNames = require('./speakerNames');
 const transcriptMoments = require('./transcriptMoments');
 const log = require('../utils/log');
 
@@ -359,12 +360,29 @@ async function transcribeMeeting(meetingId) {
     }
 
     const text = await geminiRecording.transcribeRecording(Buffer.concat(parts), job.mimeType || 'audio/webm');
-    const segments = parseTimestampedTranscript(text);
-    const transcript = segments.length ? buildTranscriptText(segments) : String(text || '').trim();
+    let segments = parseTimestampedTranscript(text);
+    let transcript = segments.length ? buildTranscriptText(segments) : String(text || '').trim();
     if (!transcript) {
       const err = new Error('Empty transcript');
       err.userMessage = 'No speech was heard in this recording. Check that the right microphone or tab audio was shared.';
       throw err;
+    }
+
+    // Real names for "Speaker N" before the summary, so owners and carry-forward use them.
+    // Strong evidence renames; weaker guesses wait on the meeting page as suggestions.
+    let speakerSuggestions = [];
+    if (segments.length) {
+      try {
+        const candidates = await speakerNames.loadCandidates(meeting);
+        const { apply, suggestions } = await speakerNames.suggestNames(segments, candidates);
+        if (Object.keys(apply).length) {
+          segments = speakerNames.applyNames(segments, apply);
+          transcript = buildTranscriptText(segments);
+        }
+        speakerSuggestions = suggestions;
+      } catch (err) {
+        log.warn('Recording: speaker naming failed, keeping Speaker labels', { meetingId, error: err.message });
+      }
     }
 
     const { runAIPipeline, saveActionItems, firePostProcessing } = pipeline();
@@ -407,7 +425,7 @@ async function transcribeMeeting(meetingId) {
       attendees: Array.isArray(meeting.attendees) && meeting.attendees.length ? meeting.attendees : speakers,
       duration_minutes: durationMs ? Math.max(1, Math.round(durationMs / 60000)) : null,
       end_time: Number.isFinite(startMs) && durationMs ? new Date(startMs + durationMs).toISOString() : now,
-      recording_job: { ...job, status: 'done', error: null, summaryError, audioKept: true, speakers: speakers.length, lines: segments.length, updatedAt: now },
+      recording_job: { ...job, status: 'done', error: null, summaryError, speakerSuggestions, audioKept: true, speakers: speakers.length, lines: segments.length, updatedAt: now },
       updated_at: now,
     };
     if (embedding) update.transcript_embedding = embedding;

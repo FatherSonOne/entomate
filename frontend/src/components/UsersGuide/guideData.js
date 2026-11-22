@@ -1,7 +1,7 @@
 // ─── Entomate User Guide Data ─────────────────────────────────────────────
 // Version tracking — update these when guide content changes
 
-export const guideVersion = '2026-11-22c'
+export const guideVersion = '2026-11-22d'
 export const guideUpdated = 'April 12, 2026'
 
 // ─── Version key for localStorage new-feature detection ───────────────────
@@ -337,6 +337,18 @@ export const guideSections = [
           'Use Select All or Deselect All for quick selection.',
           'Bulk Delete \u2014 Remove selected meetings (with confirmation).',
           'Bulk Export \u2014 Export selected meetings as a Markdown file.',
+        ],
+      },
+      {
+        id: 'mtg-speakers',
+        title: 'Speaker names',
+        badge: 'New',
+        description: 'Recordings label voices "Speaker 1", "Speaker 2". Entomate puts real names on them where the transcript shows who spoke.',
+        steps: [
+          'After a recording, a speaker is renamed automatically only when the evidence is strong, for example they say "I\'m Priya" or are handed over to by name more than once.',
+          'Weaker guesses appear under Speakers on the Transcript tab with the words that suggest them. Press Use name to accept, or dismiss them.',
+          'On older meetings press Suggest names to get guesses. You can always rename a speaker by hand.',
+          'A rename also updates the attendee list and the owner of any action item given to that speaker, so carry-forward and Insights see the real person.',
         ],
       },
       {

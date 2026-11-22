@@ -731,9 +731,13 @@ export default function MeetingDetail() {
                   focusAtMs={focusAtMs}
                   playingAtMs={playable ? playingAtMs : null}
                   onPlayFrom={playable ? (atMs) => playerRef.current?.playFrom(atMs) : undefined}
-                  onRenamed={({ segments, transcript }) =>
+                  suggestions={meeting.recording_job?.speakerSuggestions}
+                  onRenamed={({ segments, transcript }) => {
                     setMeeting(prev => ({ ...prev, transcript_segments: segments, transcript }))
-                  }
+                    // The rename also moves attendees and action item owners on the server.
+                    cache.invalidate(`/meetings/${id}`)
+                    meetingsApi.get(id).then((fresh) => { if (fresh) setMeeting(fresh) }).catch(() => {})
+                  }}
                 />
               </div>
             ) : (

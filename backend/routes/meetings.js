@@ -18,6 +18,7 @@ const meetingNotes = require('../services/meetingNotesService');
 const meetingEvents = require('../services/meetingEvents');
 const transcriptMoments = require('../services/transcriptMoments');
 const summaryTemplates = require('../services/summaryTemplates');
+const speakerNames = require('../services/speakerNames');
 
 const router = express.Router();
 
@@ -729,7 +730,7 @@ router.patch('/:id/speakers', authenticate, async (req, res) => {
 
     const { data: meeting, error } = await supabase
       .from('meetings')
-      .select('id, transcript, transcript_segments')
+      .select('id, transcript, transcript_segments, attendees, recording_job')
       .eq('id', id)
       .eq('org_id', orgId)
       .single();
@@ -749,17 +750,63 @@ router.patch('/:id/speakers', authenticate, async (req, res) => {
       .update({
         transcript_segments: renamed,
         transcript: buildTranscriptText(renamed),
+        // The attendee list drives carry-forward matching, so it follows the rename.
+        attendees: speakerNames.renameAttendees(meeting.attendees, { [from]: to }),
+        ...(Array.isArray(meeting.recording_job?.speakerSuggestions)
+          ? { recording_job: { ...meeting.recording_job, speakerSuggestions: meeting.recording_job.speakerSuggestions.filter((g) => g?.speaker !== from && g?.name !== to) } }
+          : {}),
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
       .eq('org_id', orgId)
-      .select('id, transcript, transcript_segments')
+      .select('id, transcript, transcript_segments, attendees, recording_job')
       .single();
     if (updateError || !updated) throw updateError || new Error('Speaker rename failed');
+
+    // Action items the summary gave to "Speaker 2" now belong to the real person.
+    const { error: itemsError } = await supabase
+      .from('action_items')
+      .update({ assigned_to_name: to, updated_at: new Date().toISOString() })
+      .eq('meeting_id', id)
+      .eq('org_id', orgId)
+      .eq('assigned_to_name', from);
+    if (itemsError) log.warn('Speaker rename: action item owners not updated', { meetingId: id, error: itemsError.message });
 
     res.json({ success: true, data: updated });
   } catch (error) {
     log.error('Error renaming speaker:', { error: error.message || error });
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/meetings/:id/speakers/suggest
+ * Guess real names for "Speaker N" labels from the transcript (self-introductions,
+ * being addressed by name, and an AI read with quoted evidence). Renames nothing:
+ * the page shows the guesses and a person accepts each one.
+ */
+router.post('/:id/speakers/suggest', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!supabase) return res.status(503).json({ error: 'Database not configured' });
+    const orgId = await meetingOrgOrRespond(req, res, id);
+    if (!orgId) return;
+
+    const { data: meeting, error } = await supabase
+      .from('meetings')
+      .select('id, org_id, created_by, attendees, transcript_segments')
+      .eq('id', id)
+      .eq('org_id', orgId)
+      .single();
+    if (error || !meeting) return res.status(404).json({ error: 'Meeting not found' });
+
+    const segments = Array.isArray(meeting.transcript_segments) ? meeting.transcript_segments : [];
+    const candidates = await speakerNames.loadCandidates(meeting);
+    const { applied, suggestions } = await speakerNames.suggestNames(segments, candidates);
+    // Nothing is applied here, so strong guesses are suggestions too.
+    res.json({ success: true, data: { suggestions: [...applied, ...suggestions] } });
+  } catch (error) {
+    log.error('Error suggesting speaker names:', { error: error.message || error });
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 });
