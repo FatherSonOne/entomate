@@ -1,773 +1,701 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Search } from 'lucide-react'
+import { dashboardApi, tasksApi } from '../services/api'
 import {
-  Plus, Search, CheckSquare, Clock, AlertCircle, Trash2, Circle, CheckCircle2,
-  LayoutList, Kanban, ChevronLeft, ChevronRight, Edit3, ArrowUpDown, ArrowUp, ArrowDown,
-  X, CheckCheck
-} from 'lucide-react'
-import { tasksApi } from '../services/api'
-import { PageHeader, Skeleton } from '../components/SharedUI'
-import { VCButton, VCBadge } from '../components/vc'
+  Drawer, GroupHead, Key, PHONE_QUERY, Signal, Switch, Tabs, Tag, TextArea, TextInput, TitleRule, useMediaQuery,
+} from '../components/bench'
 import { useConfirm } from '../components/vc/ConfirmDialog'
 import { useToast } from '../components/vc/ToastProvider'
 import ErrorState from '../components/vc/ErrorState'
-import KanbanBoard from '../components/KanbanBoard'
 import TaskEditModal from '../components/TaskEditModal'
+import {
+  STATUSES, agentLabel, allTags, dueLabel, filterItems, groupByUrgency, isOverdue, laneWord, lanes, meetingHref,
+  priorityWord, readUrl, sortItems, statusTone, statusWord, summarize, timecode, toWorkItems, writeUrl,
+} from '../services/tasksView'
 
-const PAGE_SIZE = 25
+/**
+ * 07 Tasks (Bench Swiss, picked mix): one work list of the tasks people add and
+ * the action items meetings produce. Desktop: grouped by urgency with an
+ * inspector column (a drawer below 1200px); Lanes is the second view. Phone:
+ * Lanes first, one status per tab, with the urgency list behind List.
+ * View logic lives in services/tasksView.ts.
+ */
 
-const STATUS_LABELS = {
-  all: 'All',
-  open: 'Open',
-  in_progress: 'In Progress',
-  review: 'Review',
-  done: 'Done',
-  blocked: 'Blocked'
+const LOAD_LIMIT = 200
+const WIDE_QUERY = '(min-width: 1200px)'
+
+const SHOW_OPTIONS = [
+  { value: 'open', label: 'Open' },
+  { value: 'meetings', label: <><span className="bs-dt">From meetings</span><span className="bs-tasks-ph">Meetings</span></> },
+  { value: 'done', label: 'Done' },
+  { value: 'all', label: 'All' },
+]
+const SOURCE_OPTIONS = [{ value: 'all', label: 'All' }, { value: 'meetings', label: <><span className="bs-dt">From meetings</span><span className="bs-tasks-ph">Meetings</span></> }]
+const LAYOUT_OPTIONS = [{ value: 'list', label: 'List' }, { value: 'lanes', label: 'Lanes' }]
+const SORT_OPTIONS = [
+  { value: 'due', label: 'Due' },
+  { value: 'priority', label: 'Priority' },
+  { value: 'created', label: 'Created' },
+  { value: 'title', label: 'Title' },
+]
+const STATUS_EDIT = [
+  { value: 'open', label: 'Open' },
+  { value: 'in_progress', label: 'Doing' },
+  { value: 'review', label: 'Review' },
+  { value: 'blocked', label: 'Blocked' },
+]
+const PRIORITY_OPTIONS = [{ value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }]
+const EMPTY_NEW = { title: '', description: '', priority: 'medium', dueDate: '', assignedTo: '', tags: '' }
+
+function Priority({ p }) {
+  return <span className={`bs-tasks-pri${p === 'high' ? ' hi' : ''}`}>{priorityWord(p)}</span>
 }
 
-const SORT_OPTIONS = [
-  { value: 'created_at', label: 'Created' },
-  { value: 'due_date', label: 'Due Date' },
-  { value: 'priority', label: 'Priority' },
-  { value: 'status', label: 'Status' },
-  { value: 'title', label: 'Title' }
-]
+function SourceLine({ item }) {
+  if (!item.source) return <span className="bs-mono bs-tasks-added">Added by hand</span>
+  return (
+    <Link to={meetingHref(item.source)} className="bs-tasks-src" onClick={(e) => e.stopPropagation()}>
+      <span className="bs-tick" aria-hidden="true" />
+      <span className="bs-tasks-src-t">{item.source.title || 'Meeting'}</span>
+      {item.source.atMs != null && <span className="bs-mono"> · {timecode(item.source.atMs)}</span>}
+    </Link>
+  )
+}
 
 export default function Tasks() {
   const confirm = useConfirm()
   const toast = useToast()
-  const [tasks, setTasks] = useState([])
+  const navigate = useNavigate()
+  const isPhone = useMediaQuery(PHONE_QUERY)
+  const isWide = useMediaQuery(WIDE_QUERY)
+  const [params, setParams] = useSearchParams()
+  const url = useMemo(() => readUrl(params), [params])
+  const layout = url.layout ?? (isPhone ? 'lanes' : 'list')
+
+  const [taskRows, setTaskRows] = useState([])
+  const [actionRows, setActionRows] = useState([])
+  const [taskTotal, setTaskTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
-  const [tagFilter, setTagFilter] = useState(null)
-  const [showCreate, setShowCreate] = useState(false)
-  const [newTask, setNewTask] = useState({ title: '', description: '', priority: 'medium', dueDate: '', tags: '' })
+  const [search, setSearch] = useState('')
+  const [picking, setPicking] = useState(false)
+  const [picked, setPicked] = useState(() => new Set())
+  const [drawer, setDrawer] = useState(null) // 'new' | 'filter' | null
+  const [newTask, setNewTask] = useState(EMPTY_NEW)
+  const [newError, setNewError] = useState('')
   const [creating, setCreating] = useState(false)
-  const [formErrors, setFormErrors] = useState({})
-  const [viewMode, setViewMode] = useState('list')
-  const [page, setPage] = useState(0)
-  const [hasMore, setHasMore] = useState(false)
-  const [totalCount, setTotalCount] = useState(0)
-  const [editingTask, setEditingTask] = useState(null)
-  const [sortBy, setSortBy] = useState('created_at')
-  const [sortDir, setSortDir] = useState('desc')
-  const [selectedIds, setSelectedIds] = useState(new Set())
-  const [bulkAction, setBulkAction] = useState(false)
-  const searchTimerRef = useRef(null)
+  const [editing, setEditing] = useState(null)
+  const [dragKey, setDragKey] = useState(null)
+  const searchRef = useRef(null)
 
-  // Debounce search input
-  useEffect(() => {
-    if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
-    searchTimerRef.current = setTimeout(() => {
-      setDebouncedSearch(searchQuery)
-      setPage(0)
-    }, 300)
-    return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current) }
-  }, [searchQuery])
+  const setUrl = useCallback((patch) => {
+    setParams(writeUrl({ ...readUrl(params), ...patch }), { replace: true })
+  }, [params, setParams])
 
-  useEffect(() => {
-    if (viewMode === 'list') loadTasks()
-  }, [statusFilter, debouncedSearch, page, viewMode, sortBy, sortDir])
-
-  const loadTasks = async () => {
+  const load = useCallback(async () => {
     try {
       setError(null)
-      setLoading(true)
-      const params = { limit: PAGE_SIZE, offset: page * PAGE_SIZE, sortBy, sortDir }
-      if (statusFilter !== 'all') params.status = statusFilter
-      if (debouncedSearch) params.search = debouncedSearch
-      const data = await tasksApi.list(params)
-      setTasks(data.tasks || [])
-      setHasMore(data.hasMore || false)
-      setTotalCount(data.count || 0)
-      setSelectedIds(new Set())
+      const [t, a] = await Promise.all([
+        tasksApi.list({ limit: LOAD_LIMIT, sortBy: 'due_date', sortDir: 'asc' }),
+        dashboardApi.getActionItems({ status: 'all', sort: 'due_date', limit: LOAD_LIMIT }).catch(() => ({ actionItems: [] })),
+      ])
+      setTaskRows(t.tasks || [])
+      setTaskTotal(t.count || 0)
+      setActionRows(a.actionItems || a.data?.actionItems || [])
     } catch (err) {
-      console.error('Failed to load tasks:', err)
+      console.error('[Tasks] load error:', err)
       setError(err.message || 'Failed to load tasks')
     } finally {
       setLoading(false)
     }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  // Keys: / searches, N opens a new task.
+  useEffect(() => {
+    const onKey = (e) => {
+      const t = e.target
+      if (e.metaKey || e.ctrlKey || e.altKey || (t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)))) return
+      if (e.key === '/') { e.preventDefault(); searchRef.current?.focus() }
+      if (e.key === 'n' || e.key === 'N') { e.preventDefault(); setDrawer('new') }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  const items = useMemo(() => toWorkItems(taskRows, actionRows), [taskRows, actionRows])
+  const now = new Date()
+  const summary = summarize(items, now)
+  const tags = useMemo(() => allTags(items), [items])
+  const shown = useMemo(
+    () => sortItems(filterItems(items, { show: url.show, search, tag: url.tag }), url.sort),
+    [items, url.show, url.sort, url.tag, search]
+  )
+  // Lanes show every status, so only the search, source and tag filters apply there.
+  const laneItems = useMemo(
+    () => sortItems(filterItems(items, { show: url.show === 'meetings' ? 'meetings' : 'all', search, tag: url.tag }), url.sort),
+    [items, url.show, url.sort, url.tag, search]
+  )
+  const groups = groupByUrgency(shown, now)
+  const byLane = lanes(laneItems)
+  const selected = items.find((i) => i.key === url.item) ?? null
+  const inlineInspector = isWide && layout === 'list'
+  const inspected = inlineInspector ? (selected ?? shown[0] ?? null) : selected
+
+  // ── Writes (business logic unchanged: same endpoints as before) ──
+  const patchLocal = (item, status) => {
+    if (item.kind === 'task') setTaskRows((rows) => rows.map((r) => (r.id === item.id ? { ...r, status } : r)))
+    else setActionRows((rows) => rows.map((r) => (r.id === item.id ? { ...r, status } : r)))
   }
 
-  // Collect all unique tags from loaded tasks for filtering
-  const allTags = useMemo(() => {
-    const tagSet = new Set()
-    tasks.forEach(t => (t.tags || []).forEach(tag => tagSet.add(tag)))
-    return [...tagSet].sort()
-  }, [tasks])
+  const setStatus = async (item, status) => {
+    if (item.status === status) return
+    patchLocal(item, status)
+    try {
+      if (item.kind === 'task') {
+        if (status === 'done') await tasksApi.complete(item.id)
+        else if (item.status === 'done' && status === 'open') await tasksApi.reopen(item.id)
+        else await tasksApi.update(item.id, { status })
+      } else {
+        await dashboardApi.updateActionItemStatus(item.id, status)
+      }
+    } catch (err) {
+      console.error('[Tasks] status error:', err)
+      toast.error('Error', `Couldn't mark it ${statusWord(status).toLowerCase()}`)
+      load()
+    }
+  }
 
-  // Filter by tag (client-side, on loaded page)
-  const displayedTasks = tagFilter
-    ? tasks.filter(t => (t.tags || []).includes(tagFilter))
-    : tasks
+  const toggleDone = (item) => setStatus(item, item.status === 'done' ? 'open' : 'done')
 
-  const validate = () => {
-    const errs = {}
-    if (!newTask.title?.trim()) errs.title = 'Title is required'
-    if (newTask.dueDate && isNaN(new Date(newTask.dueDate).getTime())) errs.dueDate = 'Invalid date format'
-    setFormErrors(errs)
-    return Object.keys(errs).length === 0
+  const handleDelete = async (item) => {
+    if (item.kind !== 'task') return
+    const ok = await confirm({ title: 'Delete task', message: `Delete "${item.title}"?`, confirmLabel: 'Delete', variant: 'danger' })
+    if (!ok) return
+    try {
+      await tasksApi.delete(item.id)
+      setTaskRows((rows) => rows.filter((r) => r.id !== item.id))
+      if (url.item === item.key) setUrl({ item: null })
+      toast.success('Deleted', 'Task deleted')
+    } catch (err) {
+      console.error('[Tasks] delete error:', err)
+      toast.error('Error', 'Failed to delete task')
+    }
+  }
+
+  const pickedItems = items.filter((i) => picked.has(i.key))
+  const togglePick = (key) => setPicked((prev) => {
+    const next = new Set(prev)
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    return next
+  })
+  const stopPicking = () => { setPicking(false); setPicked(new Set()) }
+
+  const handleBulkStatus = async (status) => {
+    if (pickedItems.length === 0) return
+    const ok = await confirm({ title: 'Bulk update', message: `Mark ${pickedItems.length} as "${statusWord(status)}"?`, confirmLabel: 'Update', variant: 'primary' })
+    if (!ok) return
+    try {
+      const taskIds = pickedItems.filter((i) => i.kind === 'task').map((i) => i.id)
+      if (taskIds.length) await tasksApi.bulkUpdateStatus(taskIds, status)
+      for (const i of pickedItems.filter((x) => x.kind === 'action')) await dashboardApi.updateActionItemStatus(i.id, status)
+      toast.success('Updated', `${pickedItems.length} updated to ${statusWord(status)}`)
+      stopPicking()
+      load()
+    } catch (err) {
+      console.error('[Tasks] bulk status error:', err)
+      toast.error('Error', 'Bulk update failed')
+      load()
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    const del = pickedItems.filter((i) => i.kind === 'task')
+    if (del.length === 0) {
+      toast.error('Nothing to delete', 'Action items stay with their meeting. Mark them done instead.')
+      return
+    }
+    const skipped = pickedItems.length - del.length
+    const ok = await confirm({
+      title: 'Delete tasks',
+      message: `Delete ${del.length} task(s)? This cannot be undone.${skipped ? ` ${skipped} action item(s) stay with their meeting.` : ''}`,
+      confirmLabel: 'Delete all',
+      variant: 'danger',
+    })
+    if (!ok) return
+    try {
+      let deleted = 0
+      for (const i of del) { await tasksApi.delete(i.id); deleted++ }
+      toast.success('Deleted', `${deleted} task(s) deleted`)
+      stopPicking()
+      load()
+    } catch (err) {
+      console.error('[Tasks] bulk delete error:', err)
+      toast.error('Error', 'Some tasks could not be deleted')
+      load()
+    }
   }
 
   const handleCreate = async (e) => {
     e.preventDefault()
-    if (!validate()) return
-
+    if (!newTask.title.trim()) { setNewError('Title is required'); return }
+    if (newTask.dueDate && Number.isNaN(new Date(newTask.dueDate).getTime())) { setNewError('Invalid date'); return }
     try {
       setCreating(true)
-      const payload = {
-        title: newTask.title,
+      await tasksApi.create({
+        title: newTask.title.trim(),
         priority: newTask.priority,
         dueDate: newTask.dueDate || undefined,
         description: newTask.description || undefined,
-        tags: newTask.tags ? newTask.tags.split(',').map(t => t.trim()).filter(Boolean) : undefined
-      }
-      await tasksApi.create(payload)
-      setNewTask({ title: '', description: '', priority: 'medium', dueDate: '', tags: '' })
-      setShowCreate(false)
-      loadTasks()
-      toast.success('Created', 'Task created successfully')
-    } catch (error) {
-      console.error('Failed to create task:', error)
-      toast.error('Error', error.message || 'Failed to create task')
+        assignedTo: newTask.assignedTo || undefined,
+        tags: newTask.tags ? newTask.tags.split(',').map((t) => t.trim()).filter(Boolean) : undefined,
+      })
+      setNewTask(EMPTY_NEW)
+      setNewError('')
+      setDrawer(null)
+      load()
+      toast.success('Created', 'Task created')
+    } catch (err) {
+      console.error('[Tasks] create error:', err)
+      toast.error('Error', err.message || 'Failed to create task')
     } finally {
       setCreating(false)
     }
   }
 
-  const handleComplete = async (id) => {
-    try {
-      await tasksApi.complete(id)
-      loadTasks()
-    } catch (error) {
-      console.error('Failed to complete task:', error)
-      toast.error('Error', 'Failed to complete task')
-    }
+  const openItem = (item) => {
+    if (picking) { togglePick(item.key); return }
+    setUrl({ item: item.key })
   }
 
-  const handleReopen = async (id) => {
-    try {
-      await tasksApi.reopen(id)
-      loadTasks()
-    } catch (error) {
-      console.error('Failed to reopen task:', error)
-      toast.error('Error', 'Failed to reopen task')
-    }
+  // ── Drag between lanes (desktop) ──
+  const onDrop = (status) => (e) => {
+    e.preventDefault()
+    const item = items.find((i) => i.key === dragKey)
+    setDragKey(null)
+    if (item) setStatus(item, status)
   }
 
-  const handleDelete = async (id) => {
-    const ok = await confirm({ title: 'Delete Task', message: 'Delete this task?', confirmLabel: 'Delete', variant: 'danger' })
-    if (!ok) return
+  if (error) return <ErrorState message={error} onRetry={load} />
 
-    try {
-      await tasksApi.delete(id)
-      setTasks(tasks.filter(t => t.id !== id))
-      toast.success('Deleted', 'Task deleted')
-    } catch (error) {
-      console.error('Failed to delete task:', error)
-      toast.error('Error', 'Failed to delete task')
-    }
+  const meta = (
+    <span>
+      <b>{summary.open} open</b>
+      {summary.overdue > 0 && <> · <span className="bs-tasks-late">{summary.overdue} overdue</span></>}
+      {' · '}{summary.fromMeetings} from meetings
+      {summary.agentCalls > 0 && <> · {summary.agentCalls} agent {summary.agentCalls === 1 ? 'call' : 'calls'}</>}
+    </span>
+  )
+
+  const actions = (
+    <>
+      <Switch label="Layout" options={LAYOUT_OPTIONS} value={layout} onChange={(v) => setUrl({ layout: v })} />
+      {layout === 'list' && (
+        <Key onClick={() => (picking ? stopPicking() : setPicking(true))} aria-pressed={picking}>{picking ? 'Done selecting' : 'Select'}</Key>
+      )}
+      <Key variant="primary" kbd={isPhone ? undefined : 'N'} onClick={() => setDrawer('new')}>New task</Key>
+    </>
+  )
+
+  const filterBar = (
+    <div className="bs-tasks-fbar">
+      <TextInput
+        ref={searchRef}
+        icon={<Search aria-hidden="true" />}
+        placeholder="Search tasks"
+        aria-label="Search tasks"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="bs-tasks-search"
+      />
+      {layout === 'lanes' ? (
+        <Switch label="Source" options={SOURCE_OPTIONS} value={url.show === 'meetings' ? 'meetings' : 'all'} onChange={(v) => setUrl({ show: v === 'meetings' ? 'meetings' : 'open' })} />
+      ) : (
+        <Switch label="Show" options={SHOW_OPTIONS} value={url.show} onChange={(v) => setUrl({ show: v })} />
+      )}
+      <Key size="sm" onClick={() => setDrawer('filter')} aria-label="Filter and sort">
+        {url.tag ? `Tag: ${url.tag}` : 'Filter · sort'}
+      </Key>
+    </div>
+  )
+
+  const row = (item) => {
+    const isSel = inlineInspector && inspected?.key === item.key && !picking
+    const isPicked = picked.has(item.key)
+    return (
+      <li
+        key={item.key}
+        className={`bs-tasks-row${isSel || isPicked ? ' sel' : ''}${item.status === 'done' ? ' done' : ''}`}
+        onClick={() => openItem(item)}
+      >
+        <input
+          type="checkbox"
+          className={`bs-check${picking ? ' bs-tasks-pick' : ''}`}
+          checked={picking ? isPicked : item.status === 'done'}
+          onChange={() => (picking ? togglePick(item.key) : toggleDone(item))}
+          onClick={(e) => e.stopPropagation()}
+          aria-label={picking ? `Select ${item.title}` : item.status === 'done' ? `Reopen ${item.title}` : `Complete ${item.title}`}
+        />
+        <div className="bs-tasks-main">
+          <button type="button" className="bs-tasks-title" onClick={(e) => { e.stopPropagation(); openItem(item) }}>{item.title}</button>
+          <div className="bs-tasks-meta">
+            <SourceLine item={item} />
+            {item.owner && <span>{item.owner}</span>}
+            {item.agent?.confidence != null && (
+              <span className="bs-tasks-conf" title={`${agentLabel(item.agent)}: ${item.agent.reason}`}>
+                <span className="bs-led ai" aria-hidden="true" />{item.agent.confidence}%
+              </span>
+            )}
+            <span className="bs-tasks-ph"><Signal tone={statusTone(item.status)}>{statusWord(item.status)}</Signal></span>
+          </div>
+        </div>
+        <span className={`bs-tasks-due${isOverdue(item, now) ? ' late' : ''}`}>{dueLabel(item.due, now)}</span>
+        <span className="bs-dt"><Priority p={item.priority} /></span>
+        <span className="bs-dt"><Signal tone={statusTone(item.status)}>{statusWord(item.status)}</Signal></span>
+      </li>
+    )
   }
 
-  // Bulk operations
-  const toggleSelect = (id) => {
-    setSelectedIds(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
+  const listView = (
+    <div className="bs-tasks-list">
+      {filterBar}
+      {picking && (
+        <div className="bs-tasks-bulk" role="toolbar" aria-label="Bulk actions">
+          <b>{picked.size} selected</b>
+          <Key size="sm" onClick={() => handleBulkStatus('done')} disabled={!picked.size}>Mark done</Key>
+          <Key size="sm" onClick={() => handleBulkStatus('in_progress')} disabled={!picked.size}>In progress</Key>
+          <Key size="sm" onClick={() => handleBulkStatus('blocked')} disabled={!picked.size}>Blocked</Key>
+          <Key size="sm" onClick={handleBulkDelete} disabled={!picked.size}>Delete</Key>
+          <Key size="sm" onClick={stopPicking}>Cancel</Key>
+        </div>
+      )}
+      <div className="bs-tasks-row head bs-lbl" aria-hidden="true">
+        <span />
+        <span>Task · source</span>
+        <span>Due</span>
+        <span className="bs-dt">Priority</span>
+        <span className="bs-dt">Status</span>
+      </div>
+      {loading ? (
+        <p className="bs-tasks-empty">Loading tasks</p>
+      ) : groups.length === 0 ? (
+        <div className="bs-tasks-empty">
+          <p>{search || url.tag || url.show !== 'open' ? 'Nothing matches these filters.' : 'No open tasks. Action items from your meetings land here too.'}</p>
+          <Key variant="primary" onClick={() => setDrawer('new')}>New task</Key>
+        </div>
+      ) : (
+        groups.map((g) => (
+          <section key={g.key} className={`bs-tasks-grp${g.key === 'overdue' ? ' late' : ''}`} aria-label={g.label}>
+            <GroupHead label={g.label} count={g.items.length} />
+            <ul className="bs-rows">{g.items.map(row)}</ul>
+          </section>
+        ))
+      )}
+      {!loading && taskTotal > LOAD_LIMIT && (
+        <p className="bs-lbl bs-tasks-cap">Showing the first {LOAD_LIMIT} of {taskTotal} tasks · search to narrow</p>
+      )}
+    </div>
+  )
 
-  const toggleSelectAll = () => {
-    if (selectedIds.size === displayedTasks.length) {
-      setSelectedIds(new Set())
-    } else {
-      setSelectedIds(new Set(displayedTasks.map(t => t.id)))
-    }
-  }
-
-  const handleBulkStatus = async (status) => {
-    if (selectedIds.size === 0) return
-    const ok = await confirm({
-      title: 'Bulk Update',
-      message: `Mark ${selectedIds.size} task(s) as "${status}"?`,
-      confirmLabel: 'Update',
-      variant: 'primary'
-    })
-    if (!ok) return
-
-    try {
-      await tasksApi.bulkUpdateStatus([...selectedIds], status)
-      toast.success('Updated', `${selectedIds.size} task(s) updated to ${status}`)
-      setSelectedIds(new Set())
-      loadTasks()
-    } catch (error) {
-      console.error('Bulk status update failed:', error)
-      toast.error('Error', 'Bulk update failed')
-    }
-  }
-
-  const handleBulkDelete = async () => {
-    if (selectedIds.size === 0) return
-    const ok = await confirm({
-      title: 'Delete Tasks',
-      message: `Delete ${selectedIds.size} task(s)? This cannot be undone.`,
-      confirmLabel: 'Delete All',
-      variant: 'danger'
-    })
-    if (!ok) return
-
-    try {
-      let deleted = 0
-      for (const id of selectedIds) {
-        await tasksApi.delete(id)
-        deleted++
-      }
-      toast.success('Deleted', `${deleted} task(s) deleted`)
-      setSelectedIds(new Set())
-      loadTasks()
-    } catch (error) {
-      console.error('Bulk delete failed:', error)
-      toast.error('Error', 'Some tasks could not be deleted')
-      loadTasks()
-    }
-  }
-
-  const handleSort = (field) => {
-    if (sortBy === field) {
-      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
-    } else {
-      setSortBy(field)
-      setSortDir(field === 'title' ? 'asc' : 'desc')
-    }
-    setPage(0)
-  }
-
-  const isOverdue = (dueDate) => {
-    if (!dueDate) return false
-    return new Date(dueDate) < new Date()
-  }
-
-  const getPriorityBadge = (priority) => {
-    switch (priority) {
-      case 'high':   return <VCBadge color="crimson">{priority}</VCBadge>
-      case 'medium': return <VCBadge color="amber">{priority}</VCBadge>
-      case 'low':    return <VCBadge color="mint">{priority}</VCBadge>
-      default:       return <VCBadge color="neutral">{priority}</VCBadge>
-    }
-  }
-
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'done':        return <VCBadge color="mint">Done</VCBadge>
-      case 'in_progress': return <VCBadge color="amber">In Progress</VCBadge>
-      case 'review':      return <VCBadge color="phosphor">Review</VCBadge>
-      case 'blocked':     return <VCBadge color="crimson">Blocked</VCBadge>
-      case 'open':        return <VCBadge color="neutral">Open</VCBadge>
-      default:            return <VCBadge color="neutral">{status}</VCBadge>
-    }
-  }
-
-  const SortIcon = ({ field }) => {
-    if (sortBy !== field) return <ArrowUpDown size={12} style={{ opacity: 0.3 }} />
-    return sortDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
-  }
-
-  if (error) return (
-    <div className="animate-fade-in max-w-7xl mx-auto">
-      <ErrorState message={error} onRetry={loadTasks} />
+  const lanesView = (
+    <div className="bs-tasks-lanes-wrap">
+      {filterBar}
+      {isPhone && (
+        <Tabs
+          label="Status"
+          idBase="task-lanes"
+          value={url.lane}
+          onChange={(v) => setUrl({ lane: v })}
+          items={STATUSES.map((s) => ({ value: s, label: laneWord(s), count: byLane[s].length }))}
+          className="bs-tasks-ltabs"
+        />
+      )}
+      <div className="bs-tasks-lanes">
+        {STATUSES.filter((s) => !isPhone || s === url.lane).map((s) => (
+          <section
+            key={s}
+            className={`bs-tasks-lane${dragKey ? ' dropping' : ''}`}
+            aria-label={isPhone ? undefined : statusWord(s)}
+            onDragOver={(e) => { if (dragKey) e.preventDefault() }}
+            onDrop={onDrop(s)}
+            id={isPhone ? `task-lanes-panel-${s}` : undefined}
+            role={isPhone ? 'tabpanel' : undefined}
+            aria-labelledby={isPhone ? `task-lanes-tab-${s}` : undefined}
+          >
+            {!isPhone && (
+              <div className="bs-tasks-lh">
+                <Signal tone={statusTone(s)}>{statusWord(s)}</Signal>
+                <span className="bs-mono">{byLane[s].length}</span>
+              </div>
+            )}
+            <ul className="bs-tasks-li-list">
+              {byLane[s].map((item) => (
+                <li
+                  key={item.key}
+                  className={`bs-tasks-li${selected?.key === item.key ? ' sel' : ''}`}
+                  draggable={!isPhone}
+                  onDragStart={(e) => { setDragKey(item.key); e.dataTransfer.effectAllowed = 'move' }}
+                  onDragEnd={() => setDragKey(null)}
+                >
+                  <button type="button" className="bs-tasks-li-btn" onClick={() => openItem(item)}>
+                    <span className="bs-tasks-li-t">{item.title}</span>
+                    <span className="bs-tasks-li-m">
+                      <span className={isOverdue(item, now) ? 'late' : ''}>{item.due ? dueLabel(item.due, now) : 'No date'}</span>
+                      {item.priority === 'high' && <span className="hi">High</span>}
+                      {item.source && (
+                        <span>{item.source.title || 'Meeting'}{item.source.atMs != null ? ` · ${timecode(item.source.atMs)}` : ''}</span>
+                      )}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            {loading && <p className="bs-tasks-empty">Loading</p>}
+            {!loading && byLane[s].length === 0 && <p className="bs-tasks-empty">Nothing here.</p>}
+          </section>
+        ))}
+      </div>
     </div>
   )
 
   return (
-    <div className="animate-fade-in max-w-7xl mx-auto">
-      <PageHeader
-        title="Task Management"
-        subtitle="Create, prioritize, and track all your tasks in one place."
-        actions={
-          <VCButton
-            variant="primary"
-            onClick={() => {
-              setShowCreate(!showCreate)
-              setFormErrors({})
-            }}
-          >
-            <Plus size={16} />
-            New Task
-          </VCButton>
-        }
-      />
-
-      {/* Create form */}
-      {showCreate && (
-        <div className="vc p-6 mb-6 animate-fade-in">
-          <h3
-            className="font-bold text-lg mb-4"
-            style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
-          >
-            Create New Task
-          </h3>
-          <form onSubmit={handleCreate} className="space-y-4">
-            <div>
-              <label className="label">Task Title</label>
-              <input
-                type="text"
-                className="input"
-                placeholder="What needs to be done?"
-                value={newTask.title}
-                onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-                required
-              />
-              {formErrors.title && <span style={{ color: 'var(--c)', fontSize: 12, marginTop: 2, display: 'block' }}>{formErrors.title}</span>}
-            </div>
-            <div>
-              <label className="label">Description</label>
-              <textarea
-                className="input"
-                placeholder="Add details about this task..."
-                value={newTask.description}
-                onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
-                rows={3}
-                style={{ resize: 'vertical', minHeight: 60 }}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="label">Priority</label>
-                <select
-                  className="input"
-                  value={newTask.priority}
-                  onChange={(e) => setNewTask({ ...newTask, priority: e.target.value })}
-                >
-                  <option value="high">High</option>
-                  <option value="medium">Medium</option>
-                  <option value="low">Low</option>
-                </select>
-              </div>
-              <div>
-                <label className="label">Due Date</label>
-                <input
-                  type="date"
-                  className="input"
-                  value={newTask.dueDate}
-                  onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
+    <div className="bs-tasks">
+      <TitleRule title="Tasks" meta={meta} actions={actions} />
+      {layout === 'lanes' ? lanesView : (
+        <div className={`bs-tasks-split${inlineInspector ? ' with-insp' : ''}`}>
+          {listView}
+          {inlineInspector && (
+            <aside className="bs-tasks-insp" aria-label="Selected task">
+              {inspected ? (
+                <TaskDetail
+                  key={inspected.key}
+                  item={inspected}
+                  now={now}
+                  onStatus={setStatus}
+                  onEdit={() => setEditing(taskRows.find((t) => t.id === inspected.id) ?? null)}
+                  onDelete={() => handleDelete(inspected)}
+                  onOpenMeeting={(href) => navigate(href)}
                 />
-                {formErrors.dueDate && <span style={{ color: 'var(--c)', fontSize: 12, marginTop: 2, display: 'block' }}>{formErrors.dueDate}</span>}
-              </div>
-            </div>
-            <div>
-              <label className="label">Tags</label>
-              <input
-                type="text"
-                className="input"
-                placeholder="Comma-separated tags (e.g. urgent, design, backend)"
-                value={newTask.tags}
-                onChange={(e) => setNewTask({ ...newTask, tags: e.target.value })}
-              />
-            </div>
-
-            <div className="flex gap-3">
-              <VCButton type="submit" variant="primary" disabled={creating}>
-                {creating ? 'Creating...' : 'Create Task'}
-              </VCButton>
-              <VCButton
-                type="button"
-                variant="secondary"
-                onClick={() => setShowCreate(false)}
-              >
-                Cancel
-              </VCButton>
-            </div>
-          </form>
+              ) : (
+                <p className="bs-tasks-empty">Pick a task to see its details and the meeting it came from.</p>
+              )}
+            </aside>
+          )}
         </div>
       )}
 
-      {/* Filters + View Toggle */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-4">
-        <div className="relative flex-1">
-          <Search
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
-            style={{ color: 'var(--text-tertiary)' }}
+      <Drawer open={!inlineInspector && Boolean(selected)} onClose={() => setUrl({ item: null })} label={selected?.kind === 'action' ? 'Action item' : 'Task'}>
+        {selected && (
+          <TaskDetail
+            key={selected.key}
+            item={selected}
+            now={now}
+            inDrawer
+            onStatus={setStatus}
+            onEdit={() => setEditing(taskRows.find((t) => t.id === selected.id) ?? null)}
+            onDelete={() => handleDelete(selected)}
+            onOpenMeeting={(href) => navigate(href)}
           />
-          <input
-            type="text"
-            placeholder="Search tasks..."
-            className="input pl-10"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+        )}
+      </Drawer>
+
+      <Drawer open={drawer === 'new'} onClose={() => setDrawer(null)} label="New task">
+        <form className="bs-tasks-form" onSubmit={handleCreate} noValidate>
+          <label className="bs-tasks-fl">
+            <span className="bs-lbl">Title</span>
+            <TextInput autoFocus value={newTask.title} placeholder="What needs to be done?" aria-invalid={Boolean(newError) || undefined}
+              onChange={(e) => { setNewTask({ ...newTask, title: e.target.value }); setNewError('') }} />
+          </label>
+          {newError && <p className="bs-tasks-err" role="alert">{newError}</p>}
+          <label className="bs-tasks-fl">
+            <span className="bs-lbl">Details</span>
+            <TextArea rows={3} value={newTask.description} placeholder="Add details" onChange={(e) => setNewTask({ ...newTask, description: e.target.value })} />
+          </label>
+          <div className="bs-tasks-fl">
+            <span className="bs-lbl">Priority</span>
+            <Switch label="Priority" options={PRIORITY_OPTIONS} value={newTask.priority} onChange={(v) => setNewTask({ ...newTask, priority: v })} />
+          </div>
+          <div className="bs-tasks-f2">
+            <label className="bs-tasks-fl">
+              <span className="bs-lbl">Due</span>
+              <TextInput type="date" value={newTask.dueDate} onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })} />
+            </label>
+            <label className="bs-tasks-fl">
+              <span className="bs-lbl">Owner</span>
+              <TextInput value={newTask.assignedTo} placeholder="Name" onChange={(e) => setNewTask({ ...newTask, assignedTo: e.target.value })} />
+            </label>
+          </div>
+          <label className="bs-tasks-fl">
+            <span className="bs-lbl">Tags</span>
+            <TextInput value={newTask.tags} placeholder="design, backend" onChange={(e) => setNewTask({ ...newTask, tags: e.target.value })} />
+          </label>
+          <div className="bs-tasks-keys">
+            <Key onClick={() => setDrawer(null)}>Cancel</Key>
+            <Key type="submit" variant="primary" disabled={creating}>{creating ? 'Creating' : 'Create task'}</Key>
+          </div>
+        </form>
+      </Drawer>
+
+      <Drawer open={drawer === 'filter'} onClose={() => setDrawer(null)} label="Filter and sort">
+        <div className="bs-tasks-fl">
+          <span className="bs-lbl">Sort</span>
+          <Switch label="Sort" options={SORT_OPTIONS} value={url.sort} onChange={(v) => setUrl({ sort: v })} />
         </div>
-        <div className="flex gap-2 items-center">
-          {/* Sort dropdown */}
-          {viewMode === 'list' && (
-            <select
-              className="input"
-              value={sortBy}
-              onChange={(e) => handleSort(e.target.value)}
-              style={{ fontSize: 13, padding: '6px 10px', width: 'auto', minWidth: 120 }}
-            >
-              {SORT_OPTIONS.map(opt => (
-                <option key={opt.value} value={opt.value}>
-                  Sort: {opt.label} {sortBy === opt.value ? (sortDir === 'asc' ? '\u2191' : '\u2193') : ''}
-                </option>
+        <div className="bs-tasks-fl">
+          <span className="bs-lbl">Tag</span>
+          {tags.length === 0 ? <p className="bs-tasks-empty">No tags yet.</p> : (
+            <div className="bs-tasks-tags">
+              {tags.map((t) => (
+                <button key={t} type="button" className="bs-tasks-tagbtn" aria-pressed={url.tag === t} onClick={() => setUrl({ tag: url.tag === t ? null : t })}>{t}</button>
               ))}
-            </select>
-          )}
-
-          <div className="flex border rounded-lg overflow-hidden" style={{ borderColor: 'var(--b1)' }}>
-            <button
-              onClick={() => setViewMode('list')}
-              className="p-2 transition-colors"
-              style={{
-                background: viewMode === 'list' ? 'var(--accent-primary)' : 'transparent',
-                color: viewMode === 'list' ? '#fff' : 'var(--text-tertiary)'
-              }}
-              title="List view"
-            >
-              <LayoutList size={16} />
-            </button>
-            <button
-              onClick={() => setViewMode('kanban')}
-              className="p-2 transition-colors"
-              style={{
-                background: viewMode === 'kanban' ? 'var(--accent-primary)' : 'transparent',
-                color: viewMode === 'kanban' ? '#fff' : 'var(--text-tertiary)'
-              }}
-              title="Board view"
-            >
-              <Kanban size={16} />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Status filters (list view only) */}
-      {viewMode === 'list' && (
-        <div className="flex gap-2 flex-wrap mb-4">
-          {Object.entries(STATUS_LABELS).map(([value, label]) => (
-            <VCButton
-              key={value}
-              onClick={() => { setStatusFilter(value); setPage(0) }}
-              variant={statusFilter === value ? 'primary' : 'ghost'}
-              size="sm"
-            >
-              {label}
-            </VCButton>
-          ))}
-        </div>
-      )}
-
-      {/* Tag filter chips */}
-      {viewMode === 'list' && allTags.length > 0 && (
-        <div className="flex gap-1.5 flex-wrap mb-4 items-center">
-          <span className="text-xs mr-1" style={{ color: 'var(--text-tertiary)' }}>Tags:</span>
-          {allTags.map(tag => (
-            <button
-              key={tag}
-              onClick={() => setTagFilter(tagFilter === tag ? null : tag)}
-              className="px-2 py-0.5 rounded-full text-xs transition-colors"
-              style={{
-                background: tagFilter === tag ? 'var(--accent-primary)' : 'var(--b1)',
-                color: tagFilter === tag ? '#fff' : 'var(--text-secondary)',
-                border: '1px solid',
-                borderColor: tagFilter === tag ? 'var(--accent-primary)' : 'var(--b1)'
-              }}
-            >
-              {tag}
-            </button>
-          ))}
-          {tagFilter && (
-            <button
-              onClick={() => setTagFilter(null)}
-              className="text-xs flex items-center gap-1 px-1.5 py-0.5"
-              style={{ color: 'var(--text-tertiary)' }}
-            >
-              <X size={12} /> Clear
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Bulk action bar */}
-      {selectedIds.size > 0 && (
-        <div
-          className="flex items-center gap-3 p-3 rounded-lg mb-4 animate-fade-in"
-          style={{ background: 'rgba(255,45,107,.08)', border: '1px solid rgba(255,45,107,.2)' }}
-        >
-          <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-            {selectedIds.size} selected
-          </span>
-          <div className="flex gap-2 ml-auto">
-            <VCButton size="sm" variant="ghost" onClick={() => handleBulkStatus('done')}>
-              <CheckCheck size={14} /> Mark Done
-            </VCButton>
-            <VCButton size="sm" variant="ghost" onClick={() => handleBulkStatus('in_progress')}>
-              In Progress
-            </VCButton>
-            <VCButton size="sm" variant="ghost" onClick={() => handleBulkStatus('blocked')}>
-              Blocked
-            </VCButton>
-            <VCButton size="sm" variant="danger" onClick={handleBulkDelete}>
-              <Trash2 size={14} /> Delete
-            </VCButton>
-            <VCButton size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
-              <X size={14} /> Cancel
-            </VCButton>
-          </div>
-        </div>
-      )}
-
-      {/* Kanban View */}
-      {viewMode === 'kanban' ? (
-        <KanbanBoard onTaskUpdate={loadTasks} />
-      ) : (
-        <>
-          {/* Tasks list */}
-          <div className="vc">
-            {loading ? (
-              <Skeleton className="h-16" count={8} />
-            ) : displayedTasks.length === 0 ? (
-              <div
-                className="p-12 text-center border-dashed border-2 m-4 rounded-lg"
-                style={{ borderColor: 'var(--b1)' }}
-              >
-                <CheckSquare className="w-16 h-16 mx-auto mb-4 opacity-50" style={{ color: 'var(--text-tertiary)' }} />
-                <h3
-                  className="text-xl font-bold mb-2"
-                  style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
-                >
-                  No tasks found
-                </h3>
-                <p className="mb-6" style={{ color: 'var(--text-secondary)' }}>
-                  {debouncedSearch || statusFilter !== 'all' || tagFilter
-                    ? 'Try adjusting your filters'
-                    : 'Create your first task to get started'
-                  }
-                </p>
-                <VCButton
-                  variant="primary"
-                  onClick={() => setShowCreate(true)}
-                >
-                  <Plus size={16} />
-                  Create Task
-                </VCButton>
-              </div>
-            ) : (
-              <>
-                {/* Column header with select-all */}
-                <div
-                  className="px-4 py-2 flex items-center gap-4 text-xs border-b"
-                  style={{ color: 'var(--text-tertiary)', borderColor: 'var(--b1)', fontFamily: 'var(--font-mono)' }}
-                >
-                  <button
-                    onClick={toggleSelectAll}
-                    className="w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 transition-colors"
-                    style={{
-                      borderColor: selectedIds.size > 0 ? 'var(--accent-primary)' : 'var(--text-tertiary)',
-                      background: selectedIds.size === displayedTasks.length && displayedTasks.length > 0 ? 'var(--accent-primary)' : 'transparent',
-                      color: selectedIds.size === displayedTasks.length && displayedTasks.length > 0 ? '#fff' : 'var(--text-tertiary)'
-                    }}
-                    title="Select all"
-                  >
-                    {selectedIds.size === displayedTasks.length && displayedTasks.length > 0 && <CheckCircle2 size={12} />}
-                  </button>
-                  <span className="w-6" /> {/* spacer for complete button */}
-                  <button onClick={() => handleSort('title')} className="flex items-center gap-1 flex-1 hover:opacity-80">
-                    Task <SortIcon field="title" />
-                  </button>
-                  <button onClick={() => handleSort('priority')} className="flex items-center gap-1 hover:opacity-80" style={{ width: 80 }}>
-                    Priority <SortIcon field="priority" />
-                  </button>
-                  <button onClick={() => handleSort('status')} className="flex items-center gap-1 hover:opacity-80" style={{ width: 90 }}>
-                    Status <SortIcon field="status" />
-                  </button>
-                  <span style={{ width: 64 }} />
-                </div>
-
-                <div className="divide-y" style={{ borderColor: 'var(--b1)' }}>
-                  {displayedTasks.map((task) => (
-                    <div
-                      key={task.id}
-                      className={`p-4 flex items-center gap-4 transition-colors group ${
-                        task.status === 'done' ? 'opacity-60' : ''
-                      } ${selectedIds.has(task.id) ? '' : ''}`}
-                      style={selectedIds.has(task.id) ? { background: 'rgba(255,45,107,.04)' } : {}}
-                      onMouseEnter={e => { if (!selectedIds.has(task.id)) e.currentTarget.style.background = 'var(--bg-elevated)' }}
-                      onMouseLeave={e => { if (!selectedIds.has(task.id)) e.currentTarget.style.background = '' }}
-                    >
-                      {/* Checkbox */}
-                      <button
-                        onClick={() => toggleSelect(task.id)}
-                        className="w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 transition-colors"
-                        style={{
-                          borderColor: selectedIds.has(task.id) ? 'var(--accent-primary)' : 'var(--text-tertiary)',
-                          background: selectedIds.has(task.id) ? 'var(--accent-primary)' : 'transparent',
-                          color: '#fff'
-                        }}
-                      >
-                        {selectedIds.has(task.id) && <CheckCircle2 size={12} />}
-                      </button>
-
-                      {/* Complete toggle */}
-                      <button
-                        onClick={() => task.status === 'done' ? handleReopen(task.id) : handleComplete(task.id)}
-                        className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                          task.status === 'done' ? 'text-white' : ''
-                        }`}
-                        style={task.status === 'done'
-                          ? { background: 'var(--m)', borderColor: 'var(--m)' }
-                          : { borderColor: 'var(--text-tertiary)' }
-                        }
-                        aria-label={task.status === 'done' ? 'Reopen task' : 'Complete task'}
-                      >
-                        {task.status === 'done' ? (
-                          <CheckCircle2 size={16} />
-                        ) : (
-                          <Circle size={16} className="opacity-0 group-hover:opacity-100" />
-                        )}
-                      </button>
-
-                      {/* Task content */}
-                      <div
-                        className="flex-1 min-w-0 cursor-pointer"
-                        onClick={() => setEditingTask(task)}
-                      >
-                        <div className="flex items-center gap-2 mb-1">
-                          <p
-                            className={`font-medium ${task.status === 'done' ? 'line-through' : ''}`}
-                            style={{ color: task.status === 'done' ? 'var(--text-tertiary)' : 'var(--text-primary)' }}
-                          >
-                            {task.title}
-                          </p>
-                          {task.due_date && isOverdue(task.due_date) && task.status !== 'done' && (
-                            <AlertCircle size={16} style={{ color: 'var(--accent-primary)' }} />
-                          )}
-                        </div>
-                        <div
-                          className="flex items-center gap-3 text-xs"
-                          style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}
-                        >
-                          {task.due_date && (
-                            <span
-                              className="flex items-center gap-1"
-                              style={isOverdue(task.due_date) && task.status !== 'done'
-                                ? { color: 'var(--accent-primary)' }
-                                : {}
-                              }
-                            >
-                              <Clock size={12} />
-                              {new Date(task.due_date).toLocaleDateString()}
-                            </span>
-                          )}
-                          {task.tags && task.tags.length > 0 && (
-                            <span className="flex items-center gap-1">
-                              {task.tags.slice(0, 3).map((tag, i) => (
-                                <span
-                                  key={i}
-                                  className="px-1.5 py-0.5 rounded text-xs cursor-pointer"
-                                  style={{
-                                    background: tagFilter === tag ? 'var(--accent-primary)' : 'var(--b1)',
-                                    color: tagFilter === tag ? '#fff' : 'var(--text-secondary)'
-                                  }}
-                                  onClick={(e) => { e.stopPropagation(); setTagFilter(tagFilter === tag ? null : tag) }}
-                                >
-                                  {tag}
-                                </span>
-                              ))}
-                              {task.tags.length > 3 && (
-                                <span style={{ color: 'var(--text-tertiary)' }}>+{task.tags.length - 3}</span>
-                              )}
-                            </span>
-                          )}
-                          {task.project_id && (
-                            <Link
-                              to={`/projects/${task.project_id}`}
-                              style={{ color: 'var(--accent-primary)' }}
-                              className="hover:underline"
-                              onClick={e => e.stopPropagation()}
-                            >
-                              View Project
-                            </Link>
-                          )}
-                        </div>
-                      </div>
-
-                      {getPriorityBadge(task.priority)}
-                      {getStatusBadge(task.status)}
-
-                      <button
-                        onClick={() => setEditingTask(task)}
-                        className="p-2 opacity-0 group-hover:opacity-100 transition-all rounded"
-                        style={{ color: 'var(--text-tertiary)' }}
-                        title="Edit task"
-                        aria-label="Edit task"
-                      >
-                        <Edit3 size={16} />
-                      </button>
-
-                      <VCButton
-                        variant="danger"
-                        size="sm"
-                        onClick={() => handleDelete(task.id)}
-                        className="p-2 opacity-0 group-hover:opacity-100 transition-all"
-                        title="Delete task"
-                        aria-label="Delete task"
-                      >
-                        <Trash2 size={16} />
-                      </VCButton>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Pagination */}
-          {!loading && tasks.length > 0 && (
-            <div className="flex items-center justify-between mt-4 px-2">
-              <span className="text-sm" style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
-                {totalCount > 0 ? `${page * PAGE_SIZE + 1}-${Math.min((page + 1) * PAGE_SIZE, totalCount)} of ${totalCount}` : ''}
-              </span>
-              <div className="flex gap-2">
-                <VCButton
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setPage(p => Math.max(0, p - 1))}
-                  disabled={page === 0}
-                >
-                  <ChevronLeft size={16} />
-                  Prev
-                </VCButton>
-                <VCButton
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setPage(p => p + 1)}
-                  disabled={!hasMore}
-                >
-                  Next
-                  <ChevronRight size={16} />
-                </VCButton>
-              </div>
             </div>
           )}
-        </>
+        </div>
+        <div className="bs-tasks-keys">
+          <Key onClick={() => setUrl({ tag: null, sort: 'due' })}>Clear</Key>
+          <Key variant="primary" onClick={() => setDrawer(null)}>Show {layout === 'lanes' ? laneItems.length : shown.length}</Key>
+        </div>
+      </Drawer>
+
+      {editing && (
+        <div className="bs-skin">
+          <TaskEditModal task={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load() }} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** The inspector: fields, the meeting it came from, the agent's call, subtasks. Column on wide screens, drawer below. */
+function TaskDetail({ item, now, inDrawer = false, onStatus, onEdit, onDelete, onOpenMeeting }) {
+  const toast = useToast()
+  const [subtasks, setSubtasks] = useState([])
+  const [subLoading, setSubLoading] = useState(false)
+  const [newSub, setNewSub] = useState('')
+  const [adding, setAdding] = useState(false)
+  const isTask = item.kind === 'task'
+
+  const loadSubs = useCallback(async () => {
+    if (!isTask) return
+    try {
+      setSubLoading(true)
+      const data = await tasksApi.get(item.id)
+      setSubtasks(data.subtasks || [])
+    } catch (err) {
+      console.debug('[Tasks] subtasks fetch failed:', err.message)
+    } finally {
+      setSubLoading(false)
+    }
+  }, [isTask, item.id])
+
+  useEffect(() => { loadSubs() }, [loadSubs])
+
+  const addSub = async (e) => {
+    e.preventDefault()
+    if (!newSub.trim()) return
+    try {
+      setAdding(true)
+      await tasksApi.create({ title: newSub.trim(), parentTaskId: item.id, priority: item.priority })
+      setNewSub('')
+      loadSubs()
+    } catch (err) {
+      console.error('[Tasks] add subtask error:', err)
+      toast.error('Error', 'Failed to create subtask')
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  const toggleSub = async (s) => {
+    const done = s.status === 'done' || s.status === 'completed'
+    try {
+      if (done) await tasksApi.reopen(s.id)
+      else await tasksApi.complete(s.id)
+      loadSubs()
+    } catch (err) {
+      toast.error('Error', 'Failed to update subtask')
+    }
+  }
+
+  const subDone = subtasks.filter((s) => s.status === 'done' || s.status === 'completed').length
+  const src = item.source
+
+  return (
+    <div className="bs-tasks-detail">
+      <div className="bs-tasks-dhead">
+        <span className="bs-lbl">{inDrawer ? (item.source ? 'From a meeting' : 'Added by hand') : item.kind === 'action' ? 'Action item · from a meeting' : 'Task'}</span>
+        <Signal tone={statusTone(item.status)}>{statusWord(item.status)}</Signal>
+      </div>
+      <h2 className="bs-tasks-dtitle">{item.title}</h2>
+
+      <dl className="bs-tasks-fields">
+        {item.status !== 'done' && (
+          <div className="bs-field">
+            <dt className="bs-lbl">Status</dt>
+            <dd><Switch label="Status" className="bs-tasks-stsw" options={STATUS_EDIT} value={item.status} onChange={(v) => onStatus(item, v)} /></dd>
+          </div>
+        )}
+        <div className="bs-field"><dt className="bs-lbl">Owner</dt><dd>{item.owner || <span className="bs-mut">Nobody yet</span>}{item.agent?.kind === 'assignment' && <> <Signal tone="ai">Agent pick</Signal></>}</dd></div>
+        <div className="bs-field"><dt className="bs-lbl">Due</dt><dd className={`bs-mono${isOverdue(item, now) ? ' bs-tasks-late' : ''}`}>{item.due ? dueLabel(item.due, now) : 'No date'}{isOverdue(item, now) ? ' · overdue' : ''}</dd></div>
+        <div className="bs-field"><dt className="bs-lbl">Priority</dt><dd><Priority p={item.priority} /></dd></div>
+        {item.projectId && <div className="bs-field"><dt className="bs-lbl">Project</dt><dd><Link to={`/projects/${item.projectId}`} className="bs-tasks-link">View project</Link></dd></div>}
+        {item.tags.length > 0 && <div className="bs-field"><dt className="bs-lbl">Tags</dt><dd className="bs-tasks-tags">{item.tags.map((t) => <Tag key={t}>{t}</Tag>)}</dd></div>}
+      </dl>
+
+      {item.description && <p className="bs-tasks-desc">{item.description}</p>}
+
+      {src && (
+        <section className="bs-tasks-sec" aria-label="Source meeting">
+          <div className="bs-tasks-sech"><span className="bs-lbl">Source meeting</span></div>
+          <div className="bs-tasks-srcrow">
+            <Link to={meetingHref(src)} className="bs-h3 bs-tasks-link">{src.title || 'Open the meeting'}</Link>
+            {src.atMs != null && <Key size="tc" onClick={() => onOpenMeeting(meetingHref(src))} aria-label={`Play from ${timecode(src.atMs)}`}>▶ {timecode(src.atMs)}</Key>}
+          </div>
+          {item.agent && (
+            <div className="bs-tasks-agent">
+              <div className="bs-tasks-agenth">
+                <Signal tone="ai">{agentLabel(item.agent)}</Signal>
+                {item.agent.confidence != null && <Tag tone="ai">{item.agent.confidence}%</Tag>}
+              </div>
+              <p className="bs-why">{item.agent.reason}</p>
+            </div>
+          )}
+        </section>
       )}
 
-      {/* Edit Modal */}
-      {editingTask && (
-        <TaskEditModal
-          task={editingTask}
-          onClose={() => setEditingTask(null)}
-          onSaved={() => {
-            setEditingTask(null)
-            loadTasks()
-          }}
-        />
+      {isTask && (
+        <section className="bs-tasks-sec" aria-label="Subtasks">
+          <div className="bs-tasks-sech"><span className="bs-lbl">Subtasks</span><span className="bs-lbl">{subLoading ? '…' : `${subDone} of ${subtasks.length}`}</span></div>
+          {subtasks.length > 0 && (
+            <ul className="bs-rows">
+              {subtasks.map((s) => {
+                const done = s.status === 'done' || s.status === 'completed'
+                return (
+                  <li key={s.id} className="bs-tasks-sub">
+                    <input type="checkbox" className="bs-check" checked={done} onChange={() => toggleSub(s)} aria-label={`${done ? 'Reopen' : 'Complete'} ${s.title}`} />
+                    <span className={done ? 'done' : ''}>{s.title}</span>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+          <form onSubmit={addSub} className="bs-tasks-addsub">
+            <TextInput value={newSub} onChange={(e) => setNewSub(e.target.value)} placeholder="Add a subtask" aria-label="Add a subtask" disabled={adding} />
+          </form>
+        </section>
       )}
+
+      <div className="bs-tasks-keys">
+        <Key variant={inDrawer ? 'primary' : 'plain'} onClick={() => onStatus(item, item.status === 'done' ? 'open' : 'done')}>
+          {item.status === 'done' ? 'Reopen' : 'Mark done'}
+        </Key>
+        {isTask && <Key onClick={onEdit}>Edit</Key>}
+        {isTask && <Key onClick={onDelete} className="bs-tasks-del">Delete</Key>}
+        {!isTask && src && <Key onClick={() => onOpenMeeting(meetingHref(src))} className="bs-tasks-del">Open meeting</Key>}
+      </div>
     </div>
   )
 }
