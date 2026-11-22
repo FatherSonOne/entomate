@@ -409,6 +409,8 @@ html[data-style="bench-swiss"] :focus-visible { outline: 2px solid var(--bs-bran
 html[data-motion="reduce"] .bs-rec,
 html[data-motion="reduce"] :is(.bs-recbox, .bs-dock-rec)[data-pressed="true"] .bs-rec { transition-duration: 1ms; }
 html[data-motion="reduce"] :is(.bs-recbox, .bs-dock-rec)[data-pressed="true"] .bs-rec { transform: translateY(2px); }
+/* In-app Reduce motion: the Record ripple rings show but stay still. */
+html[data-motion="reduce"] :is(.bs-recbox, .bs-dock-rec) .animate-ripple { animation: none; }
 
 /* Main column: toolbar on the case, then the faceplate */
 .bs-main { padding: 12px 18px 18px 0; min-width: 0; display: flex; flex-direction: column; }

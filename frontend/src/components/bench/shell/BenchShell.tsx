@@ -269,9 +269,13 @@ function ProfileMenu({ user, items, onSignOut, onSettings, modKey }: {
 
 /** Shortest visible press, so a quick tap still reads as going down. */
 const MIN_PRESS_MS = 90
+/** Ripple rings keep breathing this long after release (about half a cycle). */
+const RIPPLE_TAIL_MS = 1100
 
 interface PressProps {
   'data-pressed': 'true' | undefined
+  /** Ripple rings on: from press until RIPPLE_TAIL_MS after release. */
+  'data-lit': 'true' | undefined
   onPointerDown: (e: React.PointerEvent) => void
   onPointerUp: () => void
   onPointerCancel: () => void
@@ -288,22 +292,32 @@ interface PressProps {
  */
 function usePress(): PressProps {
   const [pressed, setPressed] = useState<boolean>(false)
+  const [lit, setLit] = useState<boolean>(false)
   const downAt = useRef<number>(0)
   const timer = useRef<number | undefined>(undefined)
-  useEffect(() => () => window.clearTimeout(timer.current), [])
+  const litTimer = useRef<number | undefined>(undefined)
+  useEffect(() => () => {
+    window.clearTimeout(timer.current)
+    window.clearTimeout(litTimer.current)
+  }, [])
   const down = (): void => {
     window.clearTimeout(timer.current)
+    window.clearTimeout(litTimer.current)
     downAt.current = performance.now()
     setPressed(true)
+    setLit(true)
   }
   const up = (): void => {
     const left = MIN_PRESS_MS - (performance.now() - downAt.current)
     window.clearTimeout(timer.current)
     if (left > 0) timer.current = window.setTimeout(() => setPressed(false), left)
     else setPressed(false)
+    window.clearTimeout(litTimer.current)
+    litTimer.current = window.setTimeout(() => setLit(false), Math.max(left, 0) + RIPPLE_TAIL_MS)
   }
   return {
     'data-pressed': pressed ? 'true' : undefined,
+    'data-lit': lit ? 'true' : undefined,
     onPointerDown: (e) => {
       if (e.button !== 0) return
       down()
@@ -398,7 +412,7 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
         {assistant ? <div className="la-launcher-wrap">{assistant}</div> : null}
         <button type="button" className="bs-recbox group" onClick={onRecord} {...railPress}>
           <span className="relative isolate inline-flex" aria-hidden="true">
-            <RippleCircles className="-inset-[9px] -z-10 opacity-0 transition-opacity duration-300 [&_*]:[animation-play-state:paused] group-hover:opacity-100 group-hover:[&_*]:[animation-play-state:running] group-focus-visible:opacity-100 group-focus-visible:[&_*]:[animation-play-state:running]" />
+            <RippleCircles className="-inset-[9px] -z-10 opacity-0 transition-opacity duration-300 [&_*]:[animation-play-state:paused] group-hover:opacity-100 group-hover:[&_*]:[animation-play-state:running] group-focus-visible:opacity-100 group-focus-visible:[&_*]:[animation-play-state:running] group-data-[lit=true]:opacity-100 group-data-[lit=true]:[&_*]:[animation-play-state:running]" />
             <span className="bs-rec" />
           </span>
           <span>
@@ -442,8 +456,12 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
       <nav className="bs-dock" aria-label="Quick navigation" ref={dockRef}>
         {d0 && dockItem(d0)}
         {d1 && dockItem(d1)}
-        <button type="button" className="bs-dock-rec" onClick={onRecord} aria-label="Record a meeting" {...dockPress}>
-          <span className="bs-rec" aria-hidden="true" />
+        <button type="button" className="bs-dock-rec group" onClick={onRecord} aria-label="Record a meeting" {...dockPress}>
+          {/* The rail's hover ripple, here on press: touch has no hover. */}
+          <span className="relative isolate inline-flex" aria-hidden="true">
+            <RippleCircles className="-inset-[9px] -z-10 opacity-0 transition-opacity duration-300 [&_*]:[animation-play-state:paused] group-focus-visible:opacity-100 group-focus-visible:[&_*]:[animation-play-state:running] group-data-[lit=true]:opacity-100 group-data-[lit=true]:[&_*]:[animation-play-state:running]" />
+            <span className="bs-rec" />
+          </span>
         </button>
         {d2 && dockItem(d2)}
         <button type="button" className="bs-dock-item" onClick={() => setNavOpen(true)} aria-haspopup="dialog" aria-expanded={navOpen}>
