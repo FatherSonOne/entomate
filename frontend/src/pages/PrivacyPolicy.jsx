@@ -333,8 +333,9 @@ export default function PrivacyPolicy() {
             <p>
               Recordings and transcripts are retained per your workspace’s
               policy. Default retention is described in §6 (Data Retention).
-              Per-workspace retention overrides (30 / 90 / 365 days) and
-              automated deletion are coming in a future release.
+              A workspace can set its retention to 30, 90 or 365 days in
+              Settings. A daily job deletes recordings and transcripts that
+              are older than that setting.
             </p>
           </section>
 
