@@ -124,7 +124,7 @@
   /* Text */
   --text-primary:   #F8F0F2;
   --text-secondary: #968890;
-  --text-tertiary:  #585055;
+  --text-tertiary:  #7A6E74; /* lifted from #585055 for WCAG AA on labels (Bench Swiss, 2026-11-22) */
   --text-muted:     #383035;
 
   /* Borders */

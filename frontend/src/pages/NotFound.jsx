@@ -45,7 +45,7 @@ export default function NotFound() {
           className="vc-btn vc-btn-primary"
           style={{ padding: '0.5rem 1.5rem' }}
         >
-          Go to Dashboard
+          Go to Today
         </button>
       </div>
     </div>

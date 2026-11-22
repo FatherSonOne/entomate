@@ -15,7 +15,7 @@ const shortcutGroups = [
   {
     title: 'Navigation',
     shortcuts: [
-      { keys: ['G', 'then', 'D'], description: 'Go to Dashboard' },
+      { keys: ['G', 'then', 'D'], description: 'Go to Today' },
       { keys: ['G', 'then', 'M'], description: 'Go to Meetings' },
       { keys: ['G', 'then', 'P'], description: 'Go to Projects' },
       { keys: ['G', 'then', 'T'], description: 'Go to Tasks' },

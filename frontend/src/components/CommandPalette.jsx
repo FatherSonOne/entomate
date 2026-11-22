@@ -10,7 +10,7 @@ import { VCButton } from './vc'
 
 const commands = [
   // Navigation
-  { id: 'nav-dashboard', name: 'Go to Dashboard', icon: LayoutDashboard, action: 'navigate', path: '/dashboard', category: 'Navigation' },
+  { id: 'nav-dashboard', name: 'Go to Today', icon: LayoutDashboard, action: 'navigate', path: '/dashboard', category: 'Navigation' },
   { id: 'nav-meetings', name: 'Go to Meetings', icon: Mic, action: 'navigate', path: '/meetings', category: 'Navigation' },
   { id: 'nav-projects', name: 'Go to Projects', icon: FolderKanban, action: 'navigate', path: '/projects', category: 'Navigation' },
   { id: 'nav-board', name: 'Go to Project Board', icon: Kanban, action: 'navigate', path: '/project-dashboard', category: 'Navigation' },

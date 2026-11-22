@@ -23,11 +23,12 @@ import './styles/animated-icons.css'
 import './styles/themes/held-light.css'
 
 // Design styles — each scoped to html[data-style="..."], picked in
-// Settings → Appearance. Orbital is the default (see ThemeContext).
+// Settings → Appearance. Bench Swiss is the default (see ThemeContext).
 import './styles/themes/orbital.css'
 import './styles/themes/folio.css'
 import './styles/themes/bench.css'
 import './styles/themes/minutes.css'
+import './styles/themes/bench-swiss.css'
 import './styles/design-style-picker.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(

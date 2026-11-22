@@ -42,6 +42,9 @@ import CrossAppSearch, { useCrossAppSearch } from './CrossAppSearch'
 import EntoAssistant from './EntoAssistant/EntoAssistant'
 import EntoAssistantButton from './EntoAssistant/EntoAssistantButton'
 import EntoAIProactiveChecker from './EntoAssistant/EntoAIProactiveChecker'
+import { BenchShell } from './bench/shell/BenchShell'
+import { Faceplate } from './bench'
+import { settingsApi } from '../services/api'
 
 // Grouped navigation structure — 4 sections
 // Items with adminOnly: true are filtered out at render time for non-admin
@@ -50,7 +53,7 @@ const navGroups = [
   {
     label: 'Intelligence',
     items: [
-      { name: 'Dashboard',    href: '/dashboard',     icon: LayoutDashboard, iconKey: 'dashboard' },
+      { name: 'Today',        href: '/dashboard',     icon: LayoutDashboard, iconKey: 'dashboard' },
       { name: 'Meetings',     href: '/meetings',      icon: Mic,             iconKey: 'meetings'  },
       { name: 'Bot Launcher', href: '/bot-launcher',  icon: Radio,           iconKey: 'bot-launcher', adminOnly: true },
       { name: 'Calendar',     href: '/calendar',      icon: Calendar,        iconKey: 'calendar'  },
@@ -85,7 +88,7 @@ const navGroups = [
 
 // Breadcrumb label map
 const breadcrumbMap = {
-  '/dashboard':        'Dashboard',
+  '/dashboard':        'Today',
   '/meetings':         'Meetings',
   '/bot-launcher':     'Bot Launcher',
   '/calendar':         'Calendar',
@@ -113,6 +116,51 @@ function getBreadcrumb(pathname) {
   return null
 }
 
+/* ── Bench Swiss navigation ──
+   Numbers are wayfinding: 01–13 for modules, 00 for Settings (in the
+   toolbar). Tools that aren't modules sit unnumbered under "Tools". */
+const benchModules = [
+  { label: 'Intelligence', items: [
+    { no: '01', name: 'Today',       href: '/dashboard' },
+    { no: '02', name: 'Meetings',    href: '/meetings' },
+    { no: '03', name: 'Calendar',    href: '/calendar' },
+    { no: '04', name: 'Search',      href: '/search' },
+  ] },
+  { label: 'Work', items: [
+    { no: '05', name: 'Projects',    href: '/projects' },
+    { no: '06', name: 'Board',       href: '/project-dashboard' },
+    { no: '07', name: 'Tasks',       href: '/tasks' },
+    { no: '08', name: 'Goals',       href: '/goals' },
+  ] },
+  { label: 'Automation', items: [
+    { no: '09', name: 'Workflows',   href: '/workflows' },
+    { no: '10', name: 'Automations', href: '/automations' },
+    { no: '11', name: 'Agents',      href: '/agents' },
+  ] },
+  { label: 'Output', items: [
+    { no: '12', name: 'Analytics',   href: '/analytics' },
+    { no: '13', name: 'Reports',     href: '/reports' },
+  ] },
+]
+
+const benchDock = [
+  { name: 'Today',    href: '/dashboard' },
+  { name: 'Meetings', href: '/meetings' },
+  { name: 'Tasks',    href: '/tasks' },
+]
+
+// Browser tab: "02 Meetings · Entomate" (the number lives in the tab and nav, never the title).
+function getDocumentTitle(pathname) {
+  for (const group of benchModules) {
+    for (const item of group.items) {
+      if (pathname === item.href || pathname.startsWith(item.href + '/')) return `${item.no} ${item.name} · Entomate`
+    }
+  }
+  if (pathname.startsWith('/settings')) return '00 Settings · Entomate'
+  const crumb = getBreadcrumb(pathname)
+  return crumb ? `${crumb} · Entomate` : 'Entomate'
+}
+
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
@@ -121,7 +169,7 @@ export default function Layout() {
   const [proactiveSuggestion, setProactiveSuggestion] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
-  const { isDark, toggleMode, isHeldLight } = useTheme()
+  const { isDark, toggleMode, setThemeMode, isHeldLight, isBenchSwiss } = useTheme()
   const { user, signOut } = useAuth()
   const orgCtx = useOrgSafe()
   const isAdmin = orgCtx?.myRole === 'owner' || orgCtx?.myRole === 'admin'
@@ -160,7 +208,100 @@ export default function Layout() {
     'mod+?': () => setShortcutsHelpOpen(true),
     'mod+/': () => { setAssistantOpen(prev => !prev); setProactiveSuggestion(false) },
     'mod+m': () => navigate('/meetings?new=true'),
+    'mod+,': () => navigate('/settings'),
   })
+
+  useEffect(() => {
+    document.title = getDocumentTitle(location.pathname)
+  }, [location.pathname])
+
+  // Opening the guide clears its NEW note (the legacy sidebar does this on click).
+  const onGuide = location.pathname.startsWith('/guide')
+  useEffect(() => {
+    if (isBenchSwiss && onGuide && guideHasNew) dismissGuideNew()
+  }, [isBenchSwiss, onGuide, guideHasNew, dismissGuideNew])
+
+  const toggleAssistant = () => { setAssistantOpen(prev => !prev); setProactiveSuggestion(false) }
+
+  // Overlays shared by both shells
+  const overlays = (
+    <>
+      <CommandPalette
+        isOpen={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+        onShowShortcuts={() => {
+          setCommandPaletteOpen(false)
+          setShortcutsHelpOpen(true)
+        }}
+      />
+      <KeyboardShortcutsHelp
+        isOpen={shortcutsHelpOpen}
+        onClose={() => setShortcutsHelpOpen(false)}
+      />
+      <CrossAppSearch
+        isOpen={crossAppSearchOpen}
+        onClose={closeCrossAppSearch}
+      />
+      <EntoAssistant
+        isOpen={assistantOpen}
+        onClose={() => setAssistantOpen(false)}
+      />
+      <EntoAIProactiveChecker onProactiveChange={setProactiveSuggestion} />
+    </>
+  )
+
+  /* ── Bench Swiss shell (default style) ── */
+  if (isBenchSwiss) {
+    const goSettings = (section) => navigate('/settings', section ? { state: { section } } : undefined)
+    const groups = [
+      ...benchModules,
+      { label: 'Tools', items: [
+        ...(isAdmin ? [{ name: 'Bot Launcher', href: '/bot-launcher' }] : []),
+        { name: 'Ask Entomate', onSelect: toggleAssistant, note: proactiveSuggestion ? 'NEW' : undefined, noteIsNew: proactiveSuggestion },
+        { name: 'User Guide', href: '/guide', note: guideHasNew ? 'NEW' : undefined, noteIsNew: guideHasNew },
+      ] },
+    ]
+    const role = orgCtx?.myRole ? orgCtx.myRole.charAt(0).toUpperCase() + orgCtx.myRole.slice(1) : 'Member'
+    const workspace = orgCtx?.org?.name
+    const shellUser = {
+      name: user?.name || user?.email || 'Workspace',
+      detail: workspace ? `${role} · ${workspace}` : (user?.email || role),
+      avatarUrl: user?.avatar_url || null,
+    }
+    const changeTheme = (next) => {
+      setThemeMode(next)
+      settingsApi.updateUser({ theme_mode: next }).catch(() => { /* saved locally; DB sync is best-effort */ })
+    }
+    return (
+      <>
+        <BenchShell
+          groups={groups}
+          isActive={isActive}
+          user={shellUser}
+          isDark={isDark}
+          onThemeChange={changeTheme}
+          onSearch={() => setCommandPaletteOpen(true)}
+          onRecord={() => navigate('/meetings?new=true')}
+          onSettings={() => goSettings()}
+          settingsActive={isActive('/settings')}
+          menuItems={[
+            { label: 'Profile', onSelect: () => goSettings('organization') },
+            { label: 'Workspace and team', onSelect: () => goSettings('permissions') },
+            { label: 'Connected calendars', onSelect: () => goSettings('integrations') },
+            { label: 'Keyboard shortcuts', onSelect: () => setShortcutsHelpOpen(true), kbd: '?' },
+          ]}
+          onSignOut={handleSignOut}
+          modKey={getModKey()}
+          dock={benchDock}
+        >
+          <Faceplate>
+            <Outlet />
+          </Faceplate>
+        </BenchShell>
+        {overlays}
+      </>
+    )
+  }
 
   return (
     <div className="app-shell min-h-screen transition-colors duration-300 hover-glow trans-slow">
@@ -393,36 +534,7 @@ export default function Layout() {
         </main>
       </div>
 
-      {/* Command Palette */}
-      <CommandPalette
-        isOpen={commandPaletteOpen}
-        onClose={() => setCommandPaletteOpen(false)}
-        onShowShortcuts={() => {
-          setCommandPaletteOpen(false)
-          setShortcutsHelpOpen(true)
-        }}
-      />
-
-      {/* Keyboard Shortcuts Help */}
-      <KeyboardShortcutsHelp
-        isOpen={shortcutsHelpOpen}
-        onClose={() => setShortcutsHelpOpen(false)}
-      />
-
-      {/* Cross-App Search (Cmd/Ctrl+K) */}
-      <CrossAppSearch
-        isOpen={crossAppSearchOpen}
-        onClose={closeCrossAppSearch}
-      />
-
-      {/* Entomate AI Assistant */}
-      <EntoAssistant
-        isOpen={assistantOpen}
-        onClose={() => setAssistantOpen(false)}
-      />
-
-      {/* Proactive suggestion checker (headless) */}
-      <EntoAIProactiveChecker onProactiveChange={setProactiveSuggestion} />
+      {overlays}
     </div>
   )
 }

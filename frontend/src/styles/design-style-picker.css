@@ -29,3 +29,6 @@
 .design-style-swatch--minutes::after { left: 10px; top: 24px; width: 8px; height: 8px; background: #CC0044; }
 .design-style-swatch--classic { background: radial-gradient(120px 60px at 85% 0%, rgba(255, 45, 107, 0.35), transparent 70%), #101010; }
 .design-style-swatch--classic::before { left: 10px; bottom: 10px; width: 60%; height: 22px; border-radius: 10px; background: #181818; border: 1px solid rgba(248,240,242,.1); }
+.design-style-swatch--bench-swiss { background: #D9D8D2; }
+.design-style-swatch--bench-swiss::before { left: 10px; top: 10px; bottom: 10px; width: 22%; background: repeating-linear-gradient(180deg, transparent 0 7px, rgba(0,0,0,.13) 7px 8px); }
+.design-style-swatch--bench-swiss::after { left: 32%; right: 10px; top: 10px; bottom: 10px; border-radius: 6px; background: linear-gradient(#161615, #161615) 10px 14px / 45% 2px no-repeat, radial-gradient(circle, #E0004D 3px, transparent 3.5px) calc(100% - 10px) 9px / 8px 8px no-repeat, #ECEBE6; }

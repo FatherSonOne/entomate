@@ -32,24 +32,52 @@ function resolveFoundation() {
 
 /* ── Design styles (2026-11-21) ──
    Each style is a CSS layer on top of the foundation, scoped under
-   <html data-style="...">. Orbital is the default. "classic" writes no
-   attribute and shows the Held Light foundation on its own. The choice
-   is per browser (localStorage), like the theme mode fallback.
+   <html data-style="...">. Bench Swiss is the default (approved
+   2026-11-21) and is the only style with its own shell (see Layout).
+   "classic" writes no attribute and shows the Held Light foundation on
+   its own. The choice is per browser (localStorage), like the theme
+   mode fallback.
      localStorage.setItem('entomate-style', 'folio');  // pick one
      localStorage.removeItem('entomate-style');       // back to default */
 export const DESIGN_STYLES = [
+  { id: 'bench-swiss', label: 'Bench Swiss', blurb: 'The main system. A ruled faceplate, keys, LEDs and a patch-panel rail.' },
   { id: 'orbital', label: 'Orbital', blurb: 'Dark instrument from the Relay Orbits mark. Teal and crimson, rounded panels.' },
   { id: 'folio', label: 'Folio', blurb: 'Warm editorial paper. Serif headings, quiet margins.' },
   { id: 'bench', label: 'Bench', blurb: 'Tactile hardware. Raised modules, keys and status lights.' },
   { id: 'minutes', label: 'Minutes', blurb: 'Swiss information design. Hairline rules and square corners.' },
   { id: 'classic', label: 'Classic', blurb: 'The previous Held Light look, with soft crimson panels.' },
 ];
-export const DEFAULT_DESIGN_STYLE = 'orbital';
+export const DEFAULT_DESIGN_STYLE = 'bench-swiss';
 const STYLE_KEY = 'entomate-style';
 const STYLE_IDS = DESIGN_STYLES.map((s) => s.id);
 
+/* ── Bench Swiss palette ──
+   Draft 1 Neutral is current; Void Crimson is the alternative. Written
+   as <html data-palette="void-crimson"> only when the alternative is on. */
+export const BENCH_PALETTES = [
+  { id: 'neutral', label: 'Neutral' },
+  { id: 'void-crimson', label: 'Void Crimson' },
+];
+const PALETTE_KEY = 'entomate-palette';
+const PALETTE_IDS = BENCH_PALETTES.map((p) => p.id);
+
+function resolvePalette() {
+  if (typeof localStorage === 'undefined') return 'neutral';
+  const saved = localStorage.getItem(PALETTE_KEY);
+  return PALETTE_IDS.includes(saved) ? saved : 'neutral';
+}
+
+// Bumped when the default style changes, so a pick made while trying the
+// earlier styles doesn't hide the new default. Rev 2 = Bench Swiss.
+const STYLE_REV_KEY = 'entomate-style-rev';
+const STYLE_REV = '2';
+
 function resolveDesignStyle() {
   if (typeof localStorage === 'undefined') return DEFAULT_DESIGN_STYLE;
+  if (localStorage.getItem(STYLE_REV_KEY) !== STYLE_REV) {
+    localStorage.removeItem(STYLE_KEY);
+    localStorage.setItem(STYLE_REV_KEY, STYLE_REV);
+  }
   const saved = localStorage.getItem(STYLE_KEY);
   return STYLE_IDS.includes(saved) ? saved : DEFAULT_DESIGN_STYLE;
 }
@@ -63,6 +91,7 @@ export function ThemeProvider({ children }) {
   const [dbLoaded, setDbLoaded] = useState(false);
   const [foundation, setFoundation] = useState(resolveFoundation);
   const [designStyle, setDesignStyle] = useState(resolveDesignStyle);
+  const [palette, setPaletteState] = useState(resolvePalette);
 
   // On mount, try to load theme from DB (async, non-blocking).
   // If DB has a value, override localStorage. Otherwise keep localStorage value.
@@ -130,8 +159,20 @@ export function ThemeProvider({ children }) {
       root.removeAttribute('data-style');
     }
 
+    if (palette === 'void-crimson') {
+      root.setAttribute('data-palette', palette);
+    } else {
+      root.removeAttribute('data-palette');
+    }
+
     localStorage.setItem('entomate-theme-mode', mode);
-  }, [resolvedMode, mode, foundation, designStyle]);
+  }, [resolvedMode, mode, foundation, designStyle, palette]);
+
+  const choosePalette = useCallback((id) => {
+    if (!PALETTE_IDS.includes(id)) return;
+    localStorage.setItem(PALETTE_KEY, id);
+    setPaletteState(id);
+  }, []);
 
   const chooseDesignStyle = useCallback((id) => {
     if (!STYLE_IDS.includes(id)) return;
@@ -169,7 +210,11 @@ export function ThemeProvider({ children }) {
     toggleFoundation,
     designStyle,
     designStyles: DESIGN_STYLES,
-    setDesignStyle: chooseDesignStyle
+    setDesignStyle: chooseDesignStyle,
+    isBenchSwiss: designStyle === 'bench-swiss',
+    palette,
+    palettes: BENCH_PALETTES,
+    setPalette: choosePalette
   };
 
   return (

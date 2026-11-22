@@ -74,7 +74,7 @@ export const guideSections = [
       'A branded loading screen tracks your session setup progress.',
       'If this is your first time, you will be guided through organization setup.',
       'If you have a team invitation, accept it from the banner that appears.',
-      'Once your organization is ready, you land on the Dashboard.',
+      'Once your organization is ready, you land on Today.',
     ],
     subsections: [
       {
@@ -82,7 +82,7 @@ export const guideSections = [
         title: 'Navigating the App',
         description: 'The sidebar is organized into four groups.',
         steps: [
-          'Intelligence \u2014 Dashboard, Meetings, Calendar, Search.',
+          'Intelligence \u2014 Today, Meetings, Calendar, Search.',
           'Work \u2014 Projects, Project Board, Tasks, Goals.',
           'Automation \u2014 Workflows, Automations, AI Agents.',
           'Output \u2014 Analytics, Reports.',
@@ -127,7 +127,7 @@ export const guideSections = [
         steps: [
           'A highlighted banner shows your invited role and the expiration date.',
           'Click Accept Invitation to join immediately.',
-          'You land on the Dashboard with full team access.',
+          'You land on Today with full team access.',
         ],
       },
       {
@@ -201,12 +201,12 @@ export const guideSections = [
 
   {
     id: 'dashboard',
-    title: 'Dashboard',
+    title: 'Today',
     icon: 'bar-chart',
     badge: 'Updated',
     summary: 'Your home screen with real-time intelligence, new widgets, quick actions, and system status.',
     steps: [
-      'Navigate to Dashboard from the sidebar (it\'s your landing page after sign-in).',
+      'Navigate to Today from the sidebar (it\'s your landing page after sign-in).',
       'Review the ring gauges showing Meetings, Tasks, Projects, and Automations counts.',
       'Check the Intelligence Briefing card for a system snapshot.',
       'Monitor the new Overdue Alert Banner, Team Workload, and Insights panels.',
@@ -216,7 +216,7 @@ export const guideSections = [
       {
         id: 'dash-gauges',
         title: 'Ring Gauges',
-        description: 'Four interactive metric rings at the top of the Dashboard.',
+        description: 'Four interactive metric rings at the top of Today.',
         steps: [
           'Each ring shows a count for Meetings, Tasks, Projects, or Automations.',
           'Click any ring to navigate directly to that section.',
@@ -260,13 +260,13 @@ export const guideSections = [
         steps: [
           'Lists all running automations with status badges.',
           'Active and Paused statuses shown.',
-          'Monitor automation health without leaving the Dashboard.',
+          'Monitor automation health without leaving Today.',
         ],
       },
       {
         id: 'dash-quick',
         title: 'Quick Actions',
-        description: 'A docked toolbar at the bottom of the Dashboard for instant access.',
+        description: 'A docked toolbar at the bottom of Today for instant access.',
         steps: [
           'Start Meeting \u2014 Opens the meeting recorder.',
           'New Task \u2014 Creates a task instantly.',
@@ -278,7 +278,7 @@ export const guideSections = [
       {
         id: 'dash-intelligence',
         title: 'Intelligence Dashboard',
-        description: 'AI-generated insights embedded in the Dashboard.',
+        description: 'AI-generated insights embedded in Today.',
         steps: [
           'Action item status cards show outstanding work.',
           'Stakeholder cards highlight key people from your meetings.',
@@ -361,7 +361,7 @@ export const guideSections = [
       },
     ],
     tips: [
-      'You can also start a meeting directly from the Dashboard using the Quick Actions bar.',
+      'You can also start a meeting directly from Today using the Quick Actions bar.',
       'Your preferred microphone is remembered between sessions. Set it in Settings > Audio & Recording.',
     ],
   },
@@ -1275,7 +1275,7 @@ export const guideSections = [
     steps: [
       'Press Ctrl+? to show the keyboard shortcuts help overlay at any time.',
       'General: Ctrl+K (Command Palette), Ctrl+/ (Toggle Ento AI Assistant), Escape (close dialogs).',
-      'Navigation: G then D (Dashboard), G then M (Meetings), G then P (Projects), G then T (Tasks), G then S (Search).',
+      'Navigation: G then D (Today), G then M (Meetings), G then P (Projects), G then T (Tasks), G then S (Search).',
       'Actions: Ctrl+M (New Meeting), Ctrl+P (New Project), Ctrl+T (New Task).',
       'Search: Ctrl+Enter (submit), Tab (switch type), Ctrl+S (save search).',
     ],

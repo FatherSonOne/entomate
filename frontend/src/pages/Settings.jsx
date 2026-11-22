@@ -68,7 +68,7 @@ export default function Settings() {
   const [deleteDialogMode, setDeleteDialogMode] = useState(null) // 'soft' | 'hard' | null
   const [deleteLoading, setDeleteLoading] = useState(false)
 
-  const { mode, setThemeMode, designStyle, designStyles, setDesignStyle } = useTheme()
+  const { mode, setThemeMode, designStyle, designStyles, setDesignStyle, palette, palettes, setPalette } = useTheme()
 
   // Load user settings from DB — merge over defaults so nothing is ever null
   useEffect(() => {
@@ -472,6 +472,21 @@ export default function Settings() {
                   })}
                 </div>
               </div>
+
+              {/* Bench Swiss palette (2026-11-22): Draft 1 Neutral now, Void Crimson kept as the alternative */}
+              {designStyle === 'bench-swiss' && (
+                <div className="px-5 pb-5">
+                  <span id="bench-palette-label" className="text-sm font-medium block mb-1 text-content-primary">Bench Swiss palette</span>
+                  <span className="text-xs block mb-3 text-content-tertiary">Neutral is the current palette. Void Crimson brings back the brand tones and type.</span>
+                  <div className="bs-switch" role="group" aria-labelledby="bench-palette-label">
+                    {palettes.map((p) => (
+                      <button key={p.id} type="button" aria-pressed={palette === p.id} onClick={() => setPalette(p.id)}>
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </>
         )}
