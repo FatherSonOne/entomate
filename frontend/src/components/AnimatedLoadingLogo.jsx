@@ -7,8 +7,9 @@ import './AnimatedLoadingLogo.css'
  * The animated mark of a logo system. Uses the system picked in
  * Settings > Appearance unless `logoId` is given (the picker's previews).
  * `size` picks the artwork resolution: 512 for small stages, 1024 full screen.
+ * `controls={false}` drops the Pause key (previews inside another control).
  */
-export default function AnimatedLoadingLogo({ logoId, size = 512 }) {
+export default function AnimatedLoadingLogo({ logoId, size = 512, controls = true }) {
   const picked = useLogoSystem().id
   const id = isLogoId(logoId) ? logoId : picked
   const artRef = useRef(null)
@@ -71,7 +72,7 @@ export default function AnimatedLoadingLogo({ logoId, size = 512 }) {
         <div className="en-app-loading-logo-art" ref={artRef} aria-hidden="true"
           dangerouslySetInnerHTML={{ __html: markup }} />
       )}
-      {supported && !failed && (
+      {controls && supported && !failed && (
         <button className="en-app-loading-motion-control" type="button"
           aria-label={playing ? 'Pause loading animation' : 'Play loading animation'}
           onClick={() => {
