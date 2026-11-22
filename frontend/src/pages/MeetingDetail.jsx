@@ -32,7 +32,7 @@ export default function MeetingDetail() {
   const summaryMoments = useMemo(() => toSummaryMoments(meeting?.summary_moments), [meeting?.summary_moments])
   // Timecodes next to decisions, key points and action items jump the transcript here.
   const [focusAtMs, setFocusAtMs] = useState(null)
-  // A browser recording's audio, played under the tape; timecodes move it once it is loaded.
+  // A browser recording's audio, played under the tape; a pressed timecode loads and plays it.
   const playerRef = useRef(null)
   const [playingAtMs, setPlayingAtMs] = useState(null)
   const playable = canPlay(meeting?.recording_job)
@@ -45,6 +45,11 @@ export default function MeetingDetail() {
       el.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
   }, [])
+  // A ▶ timecode the user pressed: also loads the recording if needed, then plays from there.
+  const playMoment = useCallback((atMs) => {
+    if (playable && !playerRef.current?.isReady()) playerRef.current?.playFrom(atMs)
+    jumpToTranscript(atMs)
+  }, [playable, jumpToTranscript])
   const [tab, setTab] = useState('minutes')
   const [loading, setLoading] = useState(true)
   const [question, setQuestion] = useState('')
@@ -472,7 +477,7 @@ export default function MeetingDetail() {
                         <li key={index} className="bs-row bs-row-dec">
                           <span className="bs-tick" aria-hidden="true" />
                           <span className="bs-row-text">{decision}</span>
-                          <TimecodeButton atMs={at} onJump={jumpToTranscript} label={decision} active={at != null && at === focusAtMs} />
+                          <TimecodeButton atMs={at} onJump={playMoment} label={decision} active={at != null && at === focusAtMs} />
                         </li>
                       )
                     })}
@@ -506,7 +511,7 @@ export default function MeetingDetail() {
                           <li key={index} className="bs-row">
                             <span className="bs-row-dash" aria-hidden="true">—</span>
                             <span className="bs-row-text">{point}</span>
-                            <TimecodeButton atMs={at} onJump={jumpToTranscript} label={point} active={at != null && at === focusAtMs} />
+                            <TimecodeButton atMs={at} onJump={playMoment} label={point} active={at != null && at === focusAtMs} />
                           </li>
                         )
                       })}
@@ -531,7 +536,7 @@ export default function MeetingDetail() {
                   items={actionItems}
                   meetingId={id}
                   onUpdate={loadMeeting}
-                  onJumpToTranscript={transcriptSegments ? jumpToTranscript : undefined}
+                  onJumpToTranscript={transcriptSegments ? playMoment : undefined}
                   focusAtMs={focusAtMs}
                 />
               </div>
