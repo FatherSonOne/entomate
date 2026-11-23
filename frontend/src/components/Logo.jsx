@@ -1,6 +1,6 @@
 import React from 'react'
 import './Logo.css'
-import { DEFAULT_LOGO, useLogoSystem } from '../services/logoSystem'
+import { DEFAULT_LOGO, logoAsset, useLogoSystem } from '../services/logoSystem'
 
 // The default identity (Relay Orbits). The mark shown follows the logo system
 // picked in Settings > Appearance (services/logoSystem.ts).
@@ -10,6 +10,11 @@ const LETTERS = [{"d":"M42 45H5C5 18 44 18 44 44M5 45C5 73 31 75 43 62","transfo
 
 export function EntomateMark({ size = 36, alt = 'Entomate', style = undefined, className = '' }) {
   const { id } = useLogoSystem()
+  // Up to 64px the tight crop reads best; it sits in a dark well in light mode (Logo.css).
+  if (size <= 64) {
+    return <img className={`en-brand-mark ${className}`} src={logoAsset(id, 'small')} width={size} height={size}
+      alt={alt} aria-hidden={alt === '' ? true : undefined} decoding="async" style={style} data-brand-mark="" />
+  }
   return <img className={`en-brand-mark ${className}`} src={`/brand/${id}-128.webp`}
     srcSet={`/brand/${id}-128.webp 128w, /brand/${id}-256.webp 256w, /brand/${id}-512.webp 512w`}
     sizes={`${size}px`} width={size} height={size} alt={alt} aria-hidden={alt === '' ? true : undefined}

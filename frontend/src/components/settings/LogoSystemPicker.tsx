@@ -36,11 +36,11 @@ function SizeProof({ logo, compact = false }: { logo: LogoSystem; compact?: bool
         <figcaption className="bs-lbl">App icon</figcaption>
       </figure>
       <figure>
-        <span className="lp-lockup lp-lockup--28"><img src={logoAsset(logo.id, 'small')} alt="" width={28} height={28} /><Wordmark width={96} /></span>
+        <span className="lp-lockup lp-lockup--28"><img src={logoAsset(logo.id, 'small')} alt="" width={28} height={28} data-brand-mark="" /><Wordmark width={96} /></span>
         <figcaption className="bs-lbl">Menu · 28</figcaption>
       </figure>
       <figure>
-        <span className="lp-lockup lp-lockup--22"><img src={logoAsset(logo.id, 'small')} alt="" width={22} height={22} /><Wordmark width={76} /></span>
+        <span className="lp-lockup lp-lockup--22"><img src={logoAsset(logo.id, 'small')} alt="" width={22} height={22} data-brand-mark="" /><Wordmark width={76} /></span>
         <figcaption className="bs-lbl">Toolbar · 22</figcaption>
       </figure>
     </div>
@@ -148,7 +148,7 @@ export default function LogoSystemPicker(): React.ReactElement {
                         {on ? <Signal tone="brand">In use</Signal> : CARD_NOTES[logo.id] && <span className="bs-lbl">{CARD_NOTES[logo.id]}</span>}
                       </span>
                       <span className="lp-lockup lp-lockup--22" aria-hidden="true">
-                        <img src={logoAsset(logo.id, 'small')} alt="" width={22} height={22} loading="lazy" />
+                        <img src={logoAsset(logo.id, 'small')} alt="" width={22} height={22} loading="lazy" data-brand-mark="" />
                         <Wordmark width={86} />
                       </span>
                       <span className="bs-lbl">Loading · {logo.motion}</span>
