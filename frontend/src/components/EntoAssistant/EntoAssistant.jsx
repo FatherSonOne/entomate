@@ -21,6 +21,7 @@ import { WelcomeOrb, orbStateFor, useSettledOrbState, AI_ORB_LABELS } from './Ai
 import { EntoOrb, EntoOrbGlyph } from './EntoOrb'
 import { usePanelResize } from './usePanelResize'
 import { setVoiceState, pulseVoice, onVoiceRequest } from './voiceSignal'
+import { onThreadRequest, onThreadsDeleted } from './threadSignal'
 import { useMicLevel } from './useMicLevel'
 import { AgentPipeline, ToolsUsed, applyToolEvent } from './AgentPipeline'
 import ProposalCard from './ProposalCard'
@@ -139,6 +140,8 @@ export default function EntoAssistant({ isOpen, onClose, signals = [], signalTot
   messagesRef.current = messages
   const threadIdRef = useRef(threadId)
   threadIdRef.current = threadId
+  // Set once the history page has asked for a conversation (EAI-02c slice 4).
+  const pageAskedRef = useRef(false)
   useEffect(() => {
     if (!isOpen) return
     if (!threadLoaded) {
@@ -152,8 +155,9 @@ export default function EntoAssistant({ isOpen, onClose, signals = [], signalTot
         .then(({ thread, saved }) => {
           if (cancelled) return
           setThreadLoaded(true)
-          // A question asked while the read was in flight starts its own thread.
-          if (!thread || messagesRef.current.length) return
+          // A question asked while the read was in flight starts its own thread, and a
+          // conversation the history page asked for wins over the newest one.
+          if (!thread || messagesRef.current.length || pageAskedRef.current) return
           if (!saved.length) return
           if (isStale(saved, section)) {
             setParked({ id: thread.id, messages: saved })
@@ -481,9 +485,13 @@ export default function EntoAssistant({ isOpen, onClose, signals = [], signalTot
     handleNewChat()
   }
 
-  const handleSelectThread = async (id) => {
+  // fromPage: the history page asked (EAI-02c slice 4). The rail is closed then, so a failure
+  // shows in the panel's own banner; and it always re-reads, because opening the panel may
+  // have just set this same conversation aside as stale.
+  const handleSelectThread = async (id, fromPage = false) => {
+    const fail = fromPage ? setError : setRailError
     setRailError(null)
-    if (id === threadIdRef.current) { setRailOpen(false); return }
+    if (!fromPage && id === threadIdRef.current) { setRailOpen(false); return }
     try {
       const body = await entoAiApi.threads.get(id)
       const saved = await withFreshProposals(Array.isArray(body?.thread?.messages) ? body.thread.messages : [])
@@ -492,7 +500,7 @@ export default function EntoAssistant({ isOpen, onClose, signals = [], signalTot
       setMessages(saved)
       setThreadId(id)
     } catch (err) {
-      setRailError(err?.status === 404
+      fail(err?.status === 404
         ? 'That conversation is gone. It may have been deleted on another device.'
         : 'That conversation could not be opened. Try again.')
     }
@@ -513,6 +521,27 @@ export default function EntoAssistant({ isOpen, onClose, signals = [], signalTot
     if (parked?.id === id) setParked(null)
     if (id === threadIdRef.current) handleNewChat()
   }
+
+  // EAI-02c slice 4: the history page opens a conversation here (or a new one) and reports
+  // what it deleted. One subscription, through a ref, so it always calls this render's handlers.
+  const pageBridgeRef = useRef(null)
+  pageBridgeRef.current = {
+    open: (id) => {
+      pageAskedRef.current = true
+      return id ? handleSelectThread(id, true) : handleNewThread()
+    },
+    deleted: (ids) => {
+      const gone = new Set(ids)
+      setThreads(prev => prev.filter(t => !gone.has(t.id)))
+      if (parked && gone.has(parked.id)) setParked(null)
+      if (gone.has(threadIdRef.current)) handleNewChat()
+    },
+  }
+  useEffect(() => {
+    const offRequest = onThreadRequest(({ id }) => { pageBridgeRef.current.open(id) })
+    const offDeleted = onThreadsDeleted((ids) => pageBridgeRef.current.deleted(ids))
+    return () => { offRequest(); offDeleted() }
+  }, [])
 
   // Until this page's data arrives the questions are not shown, so they never flip from
   // the regular set to the "nothing here yet" set in front of you.
@@ -556,6 +585,7 @@ export default function EntoAssistant({ isOpen, onClose, signals = [], signalTot
           onSelect={handleSelectThread}
           onDelete={handleDeleteThread}
           onNew={handleNewThread}
+          onViewAll={() => { setRailOpen(false); navigate('/assistant/history'); onClose() }}
         />
 
         {/* Header */}

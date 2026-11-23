@@ -21,6 +21,7 @@ const Settings = React.lazy(() => import('./pages/Settings'))
 const Bot = React.lazy(() => import('./pages/Bot'))
 const WorkflowBuilder = React.lazy(() => import('./pages/WorkflowBuilder'))
 const UsersGuide = React.lazy(() => import('./components/UsersGuide/UsersGuide'))
+const EntoAiHistoryPage = React.lazy(() => import('./components/EntoAssistant/history/EntoAiHistoryPage'))
 const SignIn = React.lazy(() => import('./pages/SignIn'))
 const AuthCallback = React.lazy(() => import('./pages/AuthCallback'))
 const ResetPassword = React.lazy(() => import('./pages/ResetPassword'))
@@ -80,6 +81,8 @@ export default function App() {
             <Route path="bot" element={<Bot />} />
             <Route path="bot-launcher" element={<Navigate to="/bot" replace />} />
             <Route path="guide" element={<UsersGuide />} />
+            {/* Ask Entomate: every saved conversation, the rail's "View all" (EAI-02c slice 4). */}
+            <Route path="assistant/history" element={<EntoAiHistoryPage />} />
           </Route>
 
           {/* Workflow builder - full screen, outside Layout */}

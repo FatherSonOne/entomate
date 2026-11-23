@@ -1,7 +1,7 @@
 // ─── Entomate User Guide Data ─────────────────────────────────────────────
 // Version tracking — update these when guide content changes
 
-export const guideVersion = '2026-11-23b'
+export const guideVersion = '2026-11-23c'
 export const guideUpdated = '2026-11-23'
 
 // ─── Version key for localStorage new-feature detection ───────────────────
@@ -22,6 +22,7 @@ export const CATEGORIES = [
 // Add a line here (and bump guideVersion) whenever a section changes.
 
 export const GUIDE_CHANGES = [
+  { date: '2026-11-23', section: 'ento-assistant', text: 'History in Ask Entomate: View all conversations opens a page with every chat, search and delete.' },
   { date: '2026-11-23', section: 'meeting-details', text: 'Follow-up tab: an email to the people who were there, sent on its own 20 minutes after the meeting unless you edit or stop it.' },
   { date: '2026-11-23', section: 'upcoming', text: 'Upcoming in Meetings replaces Calendar: 60 days, a month calendar and Skip or Join per meeting.' },
   { date: '2026-11-23', section: 'dashboard', text: 'Today rewritten for the current page: action items, agents, decisions and schedule.' },
@@ -583,6 +584,7 @@ export const guideSections = [
       'While it works you see what it is checking: meetings, tasks, projects, the calendar. The answer streams in.',
       'Your conversation is kept, so it is still there after a reload or on another device.',
       'Press New chat to start fresh.',
+      'Press History to see your recent conversations. View all conversations opens a page with every one: search their titles and messages, open one, or delete one or many.',
     ],
     subsections: [
       {

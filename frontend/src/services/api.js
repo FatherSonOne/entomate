@@ -1191,6 +1191,15 @@ export const entoAiApi = {
     list: () => entoAiAction('GET', '', undefined, 'threads'),
     get: (id) => entoAiAction('GET', `/${id}`, undefined, 'threads'),
     remove: (id) => entoAiAction('DELETE', `/${id}`, undefined, 'threads'),
+    // EAI-02c slice 4, the history page: → { threads: [{ id, title, created_at, updated_at,
+    // message_count, snippet }], total }, 50 a page, titles + message text.
+    search: (query = '', offset = 0) => {
+      const params = new URLSearchParams()
+      if (query.trim()) params.set('q', query.trim())
+      if (offset > 0) params.set('offset', String(offset))
+      const qs = params.toString()
+      return entoAiAction('GET', `/search${qs ? `?${qs}` : ''}`, undefined, 'threads')
+    },
   },
 }
 

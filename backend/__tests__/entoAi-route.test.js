@@ -524,3 +524,49 @@ describe('record links (EAI-02c slice 3)', () => {
     expect(recordLinksForAnswer(many.map((l) => l.label).join(' '), many)).toHaveLength(20);
   });
 });
+
+describe('history page search (EAI-02c slice 4)', () => {
+  const THREAD = '99999999-2222-4333-8444-555555555555';
+  const as = (req) => req.set('Authorization', 'Bearer good-token');
+  const rpcCalls = () => mockUserQueries.filter((q) => q.rpc === 'ento_ai_search_threads');
+
+  test('anonymous → 401, nothing read', async () => {
+    expect((await request(app).get('/api/ento-ai/threads/search?q=plan')).status).toBe(401);
+    expect(mockUserQueries).toEqual([]);
+  });
+
+  test('reads through the RPC on the user client with the org fence, trimmed query and page', async () => {
+    mockResults['rpc:ento_ai_search_threads'] = {
+      data: [{ id: THREAD, title: 'Q1 plan', created_at: 'c', updated_at: 'u', message_count: '4', snippet: 'the plan', total_count: '61' }],
+      error: null,
+    };
+    const res = await as(request(app).get('/api/ento-ai/threads/search?q=%20plan%20&offset=50'));
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      threads: [{ id: THREAD, title: 'Q1 plan', created_at: 'c', updated_at: 'u', message_count: 4, snippet: 'the plan' }],
+      total: 61,
+    });
+    expect(createUserClient).toHaveBeenCalledWith('good-token');
+    expect(rpcCalls()).toEqual([{ rpc: 'ento_ai_search_threads', args: { p_org_ids: ['org-a'], p_query: 'plan', p_limit: 50, p_offset: 50 } }]);
+    expect(mockServiceQueries).toEqual([]);
+  });
+
+  test('no query lists everything (p_query null); a bad offset reads the first page', async () => {
+    mockResults['rpc:ento_ai_search_threads'] = { data: [], error: null };
+    const res = await as(request(app).get('/api/ento-ai/threads/search?offset=-7'));
+    expect(res.body).toEqual({ threads: [], total: 0 });
+    expect(rpcCalls()[0].args).toEqual({ p_org_ids: ['org-a'], p_query: null, p_limit: 50, p_offset: 0 });
+  });
+
+  test('a caller in no org gets an empty page and the RPC is never called', async () => {
+    require('../utils/orgContext').getOrgIdsForUser.mockResolvedValueOnce([]);
+    const res = await as(request(app).get('/api/ento-ai/threads/search?q=x'));
+    expect(res.body).toEqual({ threads: [], total: 0 });
+    expect(rpcCalls()).toEqual([]);
+  });
+
+  test('a failed read is a 502, never an empty list', async () => {
+    mockResults['rpc:ento_ai_search_threads'] = { data: null, error: { message: 'boom' } };
+    expect((await as(request(app).get('/api/ento-ai/threads/search'))).status).toBe(502);
+  });
+});

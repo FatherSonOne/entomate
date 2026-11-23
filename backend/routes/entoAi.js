@@ -5,6 +5,8 @@
  * POST /api/ento-ai/query  { question, section?, threadId? }  → SSE
  * GET  /api/ento-ai/threads/latest  → { thread: { id, title, messages, updated_at } | null }
  * GET  /api/ento-ai/threads  → { threads: [{ id, title, updated_at }] }  (newest 20, EAI-02b)
+ * GET  /api/ento-ai/threads/search?q=&offset=  → { threads: [{ id, title, created_at, updated_at, message_count, snippet }], total }
+ *      (history page, EAI-02c slice 4: 50 a page, titles + message text)
  * GET  /api/ento-ai/threads/:id  → { thread }   DELETE /api/ento-ai/threads/:id → { ok }  (404 when not theirs)
  * EAI-05, only while ENTO_AI_WRITE_TOOLS=true (404 otherwise):
  *   GET   /api/ento-ai/actions?ids=a,b     → { proposals }
@@ -351,6 +353,31 @@ router.get('/threads', authenticate, threadRoute(async (db, orgIds) => {
     .limit(THREAD_LIST_LIMIT);
   if (error) throw new Error(error.message);
   return { threads: data || [] };
+}));
+
+// History page (EAI-02c slice 4). PostgREST cannot search the text inside `messages` or count
+// them, so this reads through ento_ai_search_threads() — SECURITY INVOKER, so the same policy
+// decides — with the org fence passed in. Registered before /threads/:id, which would 400 it.
+const HISTORY_PAGE_SIZE = 50;
+const MAX_SEARCH = 200;
+
+router.get('/threads/search', authenticate, threadRoute(async (db, orgIds, req) => {
+  const query = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, MAX_SEARCH) : '';
+  const offset = Math.max(0, Math.min(Number.parseInt(req.query.offset, 10) || 0, 100000));
+  if (!orgIds.length) return { threads: [], total: 0 };
+  const { data, error } = await db.rpc('ento_ai_search_threads', {
+    p_org_ids: orgIds,
+    p_query: query || null,
+    p_limit: HISTORY_PAGE_SIZE,
+    p_offset: offset,
+  });
+  if (error) throw new Error(error.message);
+  const rows = Array.isArray(data) ? data : [];
+  return {
+    threads: rows.map(({ total_count: _total, ...row }) => ({ ...row, message_count: Number(row.message_count) || 0 })),
+    // Past the last page there are no rows to carry the count; offset is then the floor.
+    total: rows.length ? Number(rows[0].total_count) || rows.length : offset,
+  };
 }));
 
 router.get('/threads/:id', authenticate, threadRoute(async (db, orgIds, req) => {

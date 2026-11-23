@@ -9,8 +9,8 @@ import './ThreadRail.css'
  * a rail wide enough to read titles crushed the context card and truncated the composer.
  * Overlaying costs one extra tap to dismiss and keeps every other surface at full width.
  *
- * Not ported: pinning (ento_ai_threads has no pinned_at) and "View all transcripts"
- * (Entomate has no history page). The panel lists the newest 20.
+ * Not ported: pinning (ento_ai_threads has no pinned_at). The panel lists the newest 20;
+ * "View all conversations" opens the history page with the rest (EAI-02c slice 4).
  */
 
 export interface ThreadSummary {
@@ -30,6 +30,8 @@ interface ThreadRailProps {
   onSelect: (id: string) => void
   onDelete: (id: string) => void
   onNew: () => void
+  /** Opens the full history page. Omitted, the link is not shown. */
+  onViewAll?: () => void
 }
 
 /** "Just now", "5 minutes ago", "3 hours ago", "2 days ago", then "Mar 15" / "Mar 15, 2025". */
@@ -60,6 +62,7 @@ export const ThreadRail: React.FC<ThreadRailProps> = ({
   onSelect,
   onDelete,
   onNew,
+  onViewAll,
 }) => {
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
 
@@ -196,6 +199,13 @@ export const ThreadRail: React.FC<ThreadRailProps> = ({
             })
           )}
         </div>
+
+        {/* Under the list, outside its scroll, so it is always in reach. */}
+        {onViewAll && threads.length > 0 && (
+          <button type="button" className="la-rail-view-all" onClick={onViewAll}>
+            View all conversations
+          </button>
+        )}
       </div>
     </>
   )

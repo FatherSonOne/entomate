@@ -96,6 +96,7 @@ const breadcrumbMap = {
   '/analytics':        'Insights',
   '/settings':         'Settings',
   '/guide':            'User Guide',
+  '/assistant/history': 'AI conversations',
 }
 
 function getBreadcrumb(pathname) {
