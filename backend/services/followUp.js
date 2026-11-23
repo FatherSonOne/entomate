@@ -258,7 +258,7 @@ async function fromCalendar(meeting, ownerId, calendarJson, botKey) {
 async function loadMeeting(meetingId) {
   const { data: meeting, error } = await db()
     .from('meetings')
-    .select('id, org_id, title, summary, decisions, attendees, start_time, end_time, duration_minutes, created_at, created_by, user_id')
+    .select('id, org_id, title, summary, decisions, attendees, start_time, end_time, duration_minutes, created_at, created_by')
     .eq('id', meetingId)
     .maybeSingle();
   if (error) throw error;
