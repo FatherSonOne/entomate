@@ -25,6 +25,7 @@ import { useMicLevel } from './useMicLevel'
 import { AgentPipeline, ToolsUsed, applyToolEvent } from './AgentPipeline'
 import ProposalCard from './ProposalCard'
 import PlanCard, { groupProposals } from './PlanCard'
+import ThreadRail from './ThreadRail'
 import { useProposals } from './useProposals'
 import { useNavigate } from 'react-router-dom'
 import { entoAiApi } from '../../services/api'
@@ -97,6 +98,11 @@ export default function EntoAssistant({ isOpen, onClose, signals = [], signalTot
   // Used only by the /api/assistant/query fallback, which keeps its own conversations table.
   const [conversationId, setConversationId] = useState(null)
   const [isListening, setIsListening] = useState(false)
+  // EAI-02b: the History rail. The list is read each time the rail opens, so it is never stale.
+  const [railOpen, setRailOpen] = useState(false)
+  const [threads, setThreads] = useState([])
+  const [threadsLoading, setThreadsLoading] = useState(false)
+  const [railError, setRailError] = useState(null)
 
   // EAI-05: confirm / dismiss / edit / undo for the cards under an answer. The proposals
   // stay on their message; this patches one in place with the state the server reports.
@@ -168,6 +174,24 @@ export default function EntoAssistant({ isOpen, onClose, signals = [], signalTot
     setThreadId(null)
     setConversationId(null)
   }, [isOpen]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!isOpen) { setRailOpen(false); return }
+    if (!railOpen) return
+    let cancelled = false
+    setThreadsLoading(true)
+    setRailError(null)
+    entoAiApi.threads.list()
+      .then((body) => { if (!cancelled) setThreads(Array.isArray(body?.threads) ? body.threads : []) })
+      .catch(() => {
+        if (cancelled) return
+        // Never the list from the last open: it may hold a conversation deleted since.
+        setThreads([])
+        setRailError('Your conversations could not be loaded. Close this list and open it again to retry.')
+      })
+      .finally(() => { if (!cancelled) setThreadsLoading(false) })
+    return () => { cancelled = true }
+  }, [isOpen, railOpen])
 
   // Auto-scroll
   useEffect(() => {
@@ -405,6 +429,46 @@ export default function EntoAssistant({ isOpen, onClose, signals = [], signalTot
     setParked(null)
   }
 
+  // EAI-02b History rail (ported from Logos AI). Every rail action lands you in another
+  // conversation, so it closes the rail; a delete keeps it open, since you may prune several.
+  const handleNewThread = () => {
+    setRailOpen(false)
+    handleNewChat()
+  }
+
+  const handleSelectThread = async (id) => {
+    setRailError(null)
+    if (id === threadIdRef.current) { setRailOpen(false); return }
+    try {
+      const body = await entoAiApi.threads.get(id)
+      const saved = await withFreshProposals(Array.isArray(body?.thread?.messages) ? body.thread.messages : [])
+      setRailOpen(false)
+      handleNewChat()
+      setMessages(saved)
+      setThreadId(id)
+    } catch (err) {
+      setRailError(err?.status === 404
+        ? 'That conversation is gone. It may have been deleted on another device.'
+        : 'That conversation could not be opened. Try again.')
+    }
+  }
+
+  const handleDeleteThread = async (id) => {
+    setRailError(null)
+    try {
+      await entoAiApi.threads.remove(id)
+    } catch (err) {
+      // 404: already gone (another device), so the row goes either way.
+      if (err?.status !== 404) {
+        setRailError('That conversation could not be deleted. Try again.')
+        return
+      }
+    }
+    setThreads(prev => prev.filter(t => t.id !== id))
+    if (parked?.id === id) setParked(null)
+    if (id === threadIdRef.current) handleNewChat()
+  }
+
   // Until this page's data arrives the questions are not shown, so they never flip from
   // the regular set to the "nothing here yet" set in front of you.
   const starter = getStarter(section, contextReady ? context.data : undefined)
@@ -437,6 +501,18 @@ export default function EntoAssistant({ isOpen, onClose, signals = [], signalTot
         style={appliedWidth ? { width: `${appliedWidth}px` } : undefined}
       >
 
+        <ThreadRail
+          open={railOpen}
+          threads={threads}
+          activeThreadId={threadId}
+          loading={threadsLoading}
+          error={railError}
+          onClose={() => setRailOpen(false)}
+          onSelect={handleSelectThread}
+          onDelete={handleDeleteThread}
+          onNew={handleNewThread}
+        />
+
         {/* Header */}
         <div className="la-header">
           <div className="la-header-left">
@@ -448,6 +524,18 @@ export default function EntoAssistant({ isOpen, onClose, signals = [], signalTot
             </div>
           </div>
           <div className="la-header-right">
+            {/* Outside the hasMessages gate (as in LV): after "New chat" the panel is empty but
+                the history is not, and the rail is the only way back to it. */}
+            <button
+              type="button"
+              className="la-header-action-btn la-header-history-btn"
+              onClick={() => setRailOpen(open => !open)}
+              title="Conversation history"
+              aria-label="Conversation history"
+              aria-expanded={railOpen}
+            >
+              <span className="la-header-action-label">History</span>
+            </button>
             {hasMessages && (
               <button type="button" className="la-header-action-btn la-header-history-btn" onClick={handleNewChat} title="New chat">
                 <span className="la-header-action-label">New chat</span>

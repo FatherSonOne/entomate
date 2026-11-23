@@ -1184,6 +1184,14 @@ export const entoAiApi = {
     if (!response.ok) throw new Error(`Entomate AI signals read failed: ${response.status}`)
     return response.json()
   },
+
+  // EAI-02b: the History rail. list → { threads: [{ id, title, updated_at }] } (newest 20);
+  // get → { thread: { id, title, messages, updated_at } }; remove → { ok }. Each throws when not ok.
+  threads: {
+    list: () => entoAiAction('GET', '', undefined, 'threads'),
+    get: (id) => entoAiAction('GET', `/${id}`, undefined, 'threads'),
+    remove: (id) => entoAiAction('DELETE', `/${id}`, undefined, 'threads'),
+  },
 }
 
 /** Plain fetch for /api/ento-ai/actions (and /plans): never the axios GET cache or its retries (a confirm must not repeat). */
