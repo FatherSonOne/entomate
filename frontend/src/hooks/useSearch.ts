@@ -40,8 +40,7 @@ export function useSearch(query: string, opts: UseSearchOptions = {}): UseSearch
 
   useEffect(() => {
     const q = query.trim()
-    if (!enabled) return undefined
-    if (q.length < 2) {
+    if (!enabled || q.length < 2) {
       seq.current += 1
       setData(null)
       setLoading(false)
@@ -50,6 +49,8 @@ export function useSearch(query: string, opts: UseSearchOptions = {}): UseSearch
       return undefined
     }
     const id = ++seq.current
+    setData(null)
+    setError(null)
     setLoading(true)
     const t = window.setTimeout(() => {
       searchEverything(q, { limit, log })
@@ -67,10 +68,10 @@ export function useSearch(query: string, opts: UseSearchOptions = {}): UseSearch
           if (id === seq.current) setLoading(false)
         })
     }, debounceMs)
-    return () => window.clearTimeout(t)
+    return () => { window.clearTimeout(t); seq.current += 1 }
   }, [query, debounceMs, limit, log, enabled])
 
-  return { data, loading, error, settledQuery }
+  return { data: enabled && data?.query === query.trim() ? data : null, loading, error, settledQuery }
 }
 
 /** Recent searches from history. `reloadKey` refetches (after a logged search). */

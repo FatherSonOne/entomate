@@ -21,6 +21,7 @@ export interface ContextLine {
 }
 
 export interface ResultMeta {
+  spellingMatch?: boolean
   date?: string | null
   atMs?: number | null
   speaker?: string | null
@@ -216,6 +217,7 @@ export function metaLine(r: SearchResult, now: Date = new Date()): string {
       parts.push(shortDate(m.date, now))
       break
   }
+  if (m.spellingMatch) parts.push('closest spelling')
   return parts.filter(Boolean).join(' · ')
 }
 
@@ -249,34 +251,67 @@ export interface Command {
   keywords?: string
   shortcut?: string
   state?: Record<string, string>
+  adminOnly?: boolean
 }
 
 export const COMMANDS: ReadonlyArray<Command> = [
-  { id: 'go-today', label: 'Go to Today', hint: 'Page', path: '/dashboard', keywords: 'dashboard home' },
-  { id: 'go-meetings', label: 'Go to Meetings', hint: 'Page', path: '/meetings', keywords: 'recordings calls' },
-  { id: 'go-tasks', label: 'Go to Tasks', hint: 'Page', path: '/tasks', keywords: 'action items todo' },
-  { id: 'go-projects', label: 'Go to Projects', hint: 'Page', path: '/projects', keywords: 'board' },
-  { id: 'go-automations', label: 'Go to Automations', hint: 'Page', path: '/automations', keywords: 'workflows recipes' },
-  { id: 'go-insights', label: 'Go to Insights', hint: 'Page', path: '/analytics', keywords: 'analytics reports follow-through' },
-  { id: 'go-search', label: 'Go to Search', hint: 'Page', path: '/search', keywords: 'notes find' },
-  { id: 'go-settings', label: 'Go to Settings', hint: 'Page', path: '/settings', keywords: 'preferences account' },
+  { id: 'go-today', label: 'Go to Today', hint: 'Page', path: '/dashboard', keywords: 'dashboard home', shortcut: 'mod+1' },
+  { id: 'go-meetings', label: 'Go to Meetings', hint: 'Page', path: '/meetings', keywords: 'recordings calls', shortcut: 'mod+2' },
+  { id: 'go-tasks', label: 'Go to Tasks', hint: 'Page', path: '/tasks', keywords: 'action items todo', shortcut: 'mod+3' },
+  { id: 'go-projects', label: 'Go to Projects', hint: 'Page', path: '/projects', keywords: 'board', shortcut: 'mod+4' },
+  { id: 'go-automations', label: 'Go to Automations', hint: 'Page', path: '/automations', keywords: 'workflows recipes', shortcut: 'mod+5' },
+  { id: 'go-insights', label: 'Go to Insights', hint: 'Page', path: '/analytics', keywords: 'analytics reports follow-through', shortcut: 'mod+6' },
+  { id: 'go-search', label: 'Go to Search', hint: 'Page', path: '/search', keywords: 'find everything', shortcut: 'mod+7' },
+  { id: 'go-guide', label: 'User Guide', hint: 'Help', path: '/guide', keywords: 'users guide manual help', shortcut: 'mod+8' },
+  { id: 'go-bot', label: 'Go to Bot', hint: 'Page', path: '/bot', keywords: 'launcher recording join', shortcut: 'mod+9', adminOnly: true },
+  { id: 'go-notes', label: 'Your notes', hint: 'Page', path: '/search?notes=1', keywords: 'clips notebook saved', shortcut: 'mod+0' },
+  { id: 'go-docs', label: 'Documentation', hint: 'Help', path: '/guide', keywords: 'reference instructions help docs' },
+  { id: 'go-settings', label: 'Go to Settings', hint: 'Page', path: '/settings', keywords: 'preferences account', shortcut: 'mod+,' },
   { id: 'go-agents', label: 'Meeting agents', hint: 'Settings', path: '/settings', keywords: 'agents ai', state: { section: 'meeting-agents' } },
-  { id: 'new-meeting', label: 'New meeting', hint: 'Action', path: '/meetings?new=true', keywords: 'record start', shortcut: '⌘M' },
+  { id: 'new-meeting', label: 'New meeting', hint: 'Action', path: '/meetings?new=true', keywords: 'record start', shortcut: 'mod+m' },
   { id: 'new-task', label: 'New task', hint: 'Action', path: '/tasks?new=true', keywords: 'add todo' },
-  { id: 'new-project', label: 'New project', hint: 'Action', path: '/projects?new=true', keywords: 'add' },
+  { id: 'new-project', label: 'New project', hint: 'Action', path: '/projects?dr=new', keywords: 'add' },
+  { id: 'new-automation', label: 'Browse automation recipes', hint: 'Action', path: '/automations?new=1', keywords: 'new create workflow template' },
+  { id: 'new-note', label: 'Write a note', hint: 'Action', path: '/search?notes=1', keywords: 'new add create notes' },
+  { id: 'ai-history', label: 'AI conversations', hint: 'Page', path: '/assistant/history', keywords: 'assistant history chat' },
   { id: 'export', label: 'Export a report', hint: 'Action', path: '/analytics?export=', keywords: 'pdf csv download' },
 ]
 
-/** Commands whose label or keywords contain every word of the query. Empty query: the first few. */
-export function matchCommands(query: string, limit = 4): Command[] {
-  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
-  if (!words.length) return COMMANDS.slice(0, limit)
-  return COMMANDS
-    .filter((c) => {
-      const hay = `${c.label} ${c.keywords || ''} ${c.hint}`.toLowerCase()
-      return words.every((w) => hay.includes(w))
-    })
-    .slice(0, limit)
+/** Bounded edit distance, including adjacent transpositions ("proejcts"). */
+function distance(a: string, b: string): number {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array<number>(b.length).fill(0)])
+  for (let j = 0; j <= b.length; j++) d[0]![j] = j
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) {
+    d[i]![j] = Math.min(d[i - 1]![j]! + 1, d[i]![j - 1]! + 1, d[i - 1]![j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1))
+    if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i]![j] = Math.min(d[i]![j]!, d[i - 2]![j - 2]! + 1)
+  }
+  return d[a.length]![b.length]!
+}
+
+/** Shared ranking: exact labels, prefixes, keywords, then close spelling. */
+export function matchCommands(query: string, limit = 4, isAdmin = false): Command[] {
+  const q = query.replace(/^>/, '').trim().toLowerCase().slice(0, 120)
+  const words = q.split(/\s+/).filter(Boolean)
+  const visible = COMMANDS.filter((c) => !c.adminOnly || isAdmin)
+  if (!words.length) return visible.slice(0, limit)
+  return visible.map((command) => {
+    const label = command.label.toLowerCase().replace(/^go to /, '')
+    const tokens = `${label} ${command.keywords || ''} ${command.hint}`.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)
+    let score = label === q ? 100 : label.startsWith(q) ? 60 : 0
+    for (const word of words) {
+      const best = Math.max(...tokens.map((token) => {
+        if (token === word) return 30
+        if (token.startsWith(word)) return 20
+        if (token.includes(word)) return 12
+        if (word.length < 3 || Math.abs(word.length - token.length) > 2) return 0
+        const edits = distance(word, token)
+        return edits <= (word.length >= 6 ? 2 : 1) ? 8 - edits : 0
+      }))
+      if (!best) return { command, score: -1 }
+      score += best
+    }
+    return { command, score }
+  }).filter((r) => r.score >= 0).sort((a, b) => b.score - a.score).slice(0, limit).map((r) => r.command)
 }
 
 // ── Recent searches (from GET /api/search/history) ──

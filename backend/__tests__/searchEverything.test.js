@@ -1,7 +1,64 @@
-const { terms, hitRanges, snippet, findSegmentHit, matchMeeting, orFilter, agentCall } = require('../services/searchEverything');
+const { search, terms, hitRanges, snippet, findSegmentHit, matchMeeting, orFilter, agentCall } = require('../services/searchEverything');
 const { cleanInput, SearchNotesError } = require('../services/searchNotesService');
 
 describe('searchEverything helpers', () => {
+  test('meeting name typos preserve the actual title and rank below exact words', () => {
+    const fuzzy = matchMeeting({ id: 'm1', title: 'Pricing pilot' }, ['pricnig']).meeting;
+    expect(fuzzy.title).toBe('Pricing pilot');
+    expect(fuzzy.meta.spellingMatch).toBe(true);
+    expect(fuzzy.titleHits).toEqual([]);
+    expect(fuzzy.score).toBeLessThan(matchMeeting({ id: 'm2', title: 'Pricnig pilot' }, ['pricnig']).meeting.score);
+    expect(matchMeeting({ id: 'm1', title: 'Pricing pilot' }, ['zzzzzzzz']).meeting).toBeNull();
+  });
+
+  test('spelling fallbacks retain org and private-note boundaries and cap their scans', async () => {
+    const calls = [];
+    const fixtures = {
+      action_items: [{ id: 'own-action', org_id: 'org-a', task_description: 'Pricing' }, { id: 'other-action', org_id: 'org-b', task_description: 'Pricing' }],
+      tasks: [{ id: 'own-task', org_id: 'org-a', title: 'Pricing' }, { id: 'other-task', org_id: 'org-b', title: 'Pricing' }],
+      projects: [{ id: 'own-project', org_id: 'org-a', name: 'Pricing' }],
+      search_notes: [{ id: 'mine', org_id: 'org-a', user_id: 'me', body: 'Pricing' }, { id: 'private', org_id: 'org-a', user_id: 'other', body: 'Pricing' }],
+      meeting_notes: [{ id: 'team', org_id: 'org-a', author_id: 'other', body: 'Pricing', visibility: 'team' }, { id: 'hidden', org_id: 'org-a', author_id: 'other', body: 'Pricing', visibility: 'private' }],
+    };
+    const db = { from(table) {
+      let data = fixtures[table];
+      let exact = false;
+      const call = { table, scope: false, limit: null };
+      calls.push(call);
+      const builder = {
+        select() { return this; }, order() { return this; },
+        in(field, values) { data = data.filter(row => values.includes(row[field])); if (field === 'org_id') call.scope = true; return this; },
+        eq(field, value) { data = data.filter(row => row[field] === value); return this; },
+        or() { exact = true; return this; },
+        limit(value) { call.limit = value; return this; },
+        then(resolve) { return Promise.resolve({ data: exact ? [] : data, error: null }).then(resolve); },
+      };
+      return builder;
+    } };
+    const r = await search({ query: 'pricnig', types: ['action_items', 'tasks', 'projects', 'notes'], orgIds: ['org-a'], userId: 'me', db });
+    expect(r.groups.action_items.map(x => x.id)).toEqual(['own-action']);
+    expect(r.groups.tasks.map(x => x.id)).toEqual(['own-task']);
+    expect(r.groups.projects.map(x => x.id)).toEqual(['own-project']);
+    expect(r.groups.notes.map(x => x.id).sort()).toEqual(['mine', 'team']);
+    expect(calls.every(c => c.scope && c.limit <= 100)).toBe(true);
+    expect(calls).toHaveLength(10);
+  });
+
+  test('exact records keep the original query budget; an empty org scope performs no reads', async () => {
+    const from = jest.fn(() => {
+      const builder = {
+        select() { return this; }, in() { return this; }, order() { return this; }, or() { return this; }, limit() { return this; },
+        then(resolve) { return Promise.resolve({ data: [{ id: 't1', title: 'Pricing plan' }], error: null }).then(resolve); },
+      };
+      return builder;
+    });
+    const r = await search({ query: 'pricing', types: ['tasks'], orgIds: ['org-a'], userId: 'me', db: { from } });
+    expect(r.groups.tasks[0].meta.spellingMatch).toBe(false);
+    expect(from).toHaveBeenCalledTimes(1);
+    from.mockClear();
+    expect((await search({ query: 'pricnig', orgIds: [], userId: 'me', db: { from } })).total).toBe(0);
+    expect(from).not.toHaveBeenCalled();
+  });
   test('terms drops stop words and punctuation, keeps order, dedupes', () => {
     expect(terms('What did we decide about pricing? Pricing!')).toEqual(['decide', 'pricing']);
     expect(terms('  ')).toEqual([]);

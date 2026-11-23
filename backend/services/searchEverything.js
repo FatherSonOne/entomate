@@ -69,6 +69,34 @@ function termHits(text, words) {
   return words.reduce((n, w) => n + (lower.includes(w) ? 1 : 0), 0);
 }
 
+/** Close spelling is a fallback only; exact words always score higher. */
+function closeSpelling(a, b) {
+  if (a.length < 4 || a.length > 40 || b.length > 40) return false;
+  const max = a.length >= 6 ? 2 : 1;
+  if (Math.abs(a.length - b.length) > max) return false;
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 0; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) {
+    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+  }
+  return d[a.length][b.length] <= max;
+}
+
+function closeHits(text, words) {
+  const tokens = String(text || '').toLowerCase().slice(0, 2000).split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+  return words.reduce((n, w) => n + (tokens.some(t => closeSpelling(w, t)) ? 0.25 : 0), 0);
+}
+
+/** Reuse the caller's scoped query; never scan another workspace or change clients. */
+async function searchRows(makeQuery, fields, words, limit) {
+  const exact = await makeQuery().or(orFilter(fields, words)).limit(limit);
+  if (exact.error || exact.data?.length || !words.some(w => w.length >= 4 && w.length <= 40)) return exact;
+  const fallback = await makeQuery().limit(100);
+  if (fallback.error) return fallback;
+  return { ...fallback, data: (fallback.data || []).filter(row => fields.some(field => closeHits(row[field], words) > 0)) };
+}
+
 /**
  * A short window of text around the first hit, with hit ranges relative to
  * the returned text. Ellipses mark cut ends.
@@ -138,7 +166,7 @@ function matchMeeting(m, words) {
 
   const decisionResults = [];
   decisions.forEach((d, i) => {
-    if (!d || !termHits(d, words)) return;
+    if (!d || !(termHits(d, words) || closeHits(d, words))) return;
     const at = Number.isFinite(decisionMs[i]) ? decisionMs[i] : null;
     decisionResults.push({
       type: 'decision',
@@ -147,12 +175,12 @@ function matchMeeting(m, words) {
       titleHits: hitRanges(d, words),
       snippet: '',
       snippetHits: [],
-      meta: { meetingId: m.id, meetingTitle: title, date, atMs: at },
-      score: termHits(d, words) * 10,
+      meta: { meetingId: m.id, meetingTitle: title, date, atMs: at, spellingMatch: !termHits(d, words) },
+      score: (termHits(d, words) || closeHits(d, words)) * 10,
     });
   });
 
-  const titleScore = termHits(title, words);
+  const titleScore = termHits(title, words) || closeHits(title, words);
   const seg = findSegmentHit(m.transcript_segments, words);
   const summaryScore = termHits(m.summary, words);
   const transcriptScore = seg ? 0 : termHits(m.transcript, words);
@@ -179,6 +207,7 @@ function matchMeeting(m, words) {
         speaker: seg ? seg.speaker : null,
         context: seg ? seg.context : [],
         decisions: decisions.filter(Boolean).slice(0, 5),
+        spellingMatch: !termHits(title, words) && titleScore > 0 && !seg && !summaryScore && !transcriptScore,
       },
       score: total,
     },
@@ -188,6 +217,9 @@ function matchMeeting(m, words) {
 
 function textResult(type, id, title, body, words, meta) {
   const snip = body ? snippet(body, words) : { text: '', hits: [] };
+  const titleScore = termHits(title, words);
+  const bodyScore = termHits(body, words);
+  const closeScore = (titleScore ? 0 : closeHits(title, words)) * 3 + (bodyScore ? 0 : closeHits(body, words));
   return {
     type,
     id,
@@ -195,8 +227,8 @@ function textResult(type, id, title, body, words, meta) {
     titleHits: hitRanges(title, words),
     snippet: snip.text,
     snippetHits: snip.hits,
-    meta,
-    score: termHits(title, words) * 3 + termHits(body, words),
+    meta: { ...meta, spellingMatch: !titleScore && !bodyScore && closeScore > 0 },
+    score: titleScore * 3 + bodyScore + closeScore,
   };
 }
 
@@ -246,13 +278,11 @@ async function search({ query, types = TYPES, limit = 8, orgIds, userId, db = su
   }
 
   if (want.has('action_items')) {
-    jobs.push(db
+    jobs.push(searchRows(() => db
       .from('action_items')
       .select('id, task_description, context, assigned_to_name, status, priority, due_date, meeting_id, transcript_at_ms, agent_notes, created_at, meetings(title)')
       .in('org_id', orgIds)
-      .or(orFilter(['task_description', 'assigned_to_name', 'context'], words))
-      .order('created_at', { ascending: false })
-      .limit(50)
+      .order('created_at', { ascending: false }), ['task_description', 'assigned_to_name', 'context'], words, 50)
       .then(({ data, error }) => {
         if (error) throw error;
         groups.action_items = (data || []).map((a) => textResult('action_item', a.id, a.task_description, a.context, words, {
@@ -270,13 +300,11 @@ async function search({ query, types = TYPES, limit = 8, orgIds, userId, db = su
   }
 
   if (want.has('tasks')) {
-    jobs.push(db
+    jobs.push(searchRows(() => db
       .from('tasks')
       .select('id, title, description, status, priority, due_date, project_id, created_at, projects(name)')
       .in('org_id', orgIds)
-      .or(orFilter(['title', 'description'], words))
-      .order('created_at', { ascending: false })
-      .limit(50)
+      .order('created_at', { ascending: false }), ['title', 'description'], words, 50)
       .then(({ data, error }) => {
         if (error) throw error;
         groups.tasks = (data || []).map((t) => textResult('task', t.id, t.title, t.description, words, {
@@ -291,13 +319,11 @@ async function search({ query, types = TYPES, limit = 8, orgIds, userId, db = su
   }
 
   if (want.has('projects')) {
-    jobs.push(db
+    jobs.push(searchRows(() => db
       .from('projects')
       .select('id, name, description, status, created_at')
       .in('org_id', orgIds)
-      .or(orFilter(['name', 'description'], words))
-      .order('created_at', { ascending: false })
-      .limit(30)
+      .order('created_at', { ascending: false }), ['name', 'description'], words, 30)
       .then(({ data, error }) => {
         if (error) throw error;
         groups.projects = (data || []).map((p) => textResult('project', p.id, p.name, p.description, words, {
@@ -310,21 +336,17 @@ async function search({ query, types = TYPES, limit = 8, orgIds, userId, db = su
   if (want.has('notes') && userId) {
     const notes = [];
     jobs.push(Promise.all([
-      db
+      searchRows(() => db
         .from('search_notes')
         .select('id, kind, body, source_type, source_id, source_label, at_ms, created_at')
         .eq('user_id', userId)
         .in('org_id', orgIds)
-        .or(orFilter(['body', 'source_label'], words))
-        .order('created_at', { ascending: false })
-        .limit(30),
-      db
+        .order('created_at', { ascending: false }), ['body', 'source_label'], words, 30),
+      searchRows(() => db
         .from('meeting_notes')
         .select('id, meeting_id, author_id, body, visibility, created_at, meetings(title)')
         .in('org_id', orgIds)
-        .or(orFilter(['body'], words))
-        .order('created_at', { ascending: false })
-        .limit(30),
+        .order('created_at', { ascending: false }), ['body'], words, 30),
     ]).then(([clips, mnotes]) => {
       // A missing table (clips not migrated yet) must not sink the whole search.
       if (clips.error) log.warn('[searchEverything] search_notes:', clips.error.message);

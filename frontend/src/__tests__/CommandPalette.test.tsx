@@ -50,12 +50,39 @@ describe('CommandPalette', () => {
     expect(screen.getByText('Go to Today')).toBeTruthy()
   })
 
+  test('command mode completes a typo and Enter opens the best destination without searching records', async () => {
+    const { input } = setup()
+    fireEvent.change(input, { target: { value: '>proejcts' } })
+    expect(screen.getAllByRole('option')[0]?.textContent).toContain('Go to Projects')
+    fireEvent.keyDown(input, { key: 'ArrowRight' })
+    expect(input).toHaveValue('>Projects')
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(screen.getByTestId('where')).toHaveTextContent('/projects')
+    expect(http.post).not.toHaveBeenCalled()
+  })
+
+  test('toolbar input remains mounted after close; outside pointer dismisses it', async () => {
+    function Toolbar() {
+      const [open, setOpen] = React.useState(false)
+      return <><button>Outside</button><CommandPalette toolbar isOpen={open} onOpen={() => setOpen(true)} onClose={() => setOpen(false)} /></>
+    }
+    render(<MemoryRouter><Toolbar /></MemoryRouter>)
+    const input = screen.getByRole('combobox')
+    expect(input).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.focus(input)
+    expect(input).toHaveAttribute('aria-expanded', 'true')
+    fireEvent.pointerDown(screen.getByText('Outside'))
+    expect(input).toHaveAttribute('aria-expanded', 'false')
+    await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull())
+    expect(input).toBeInTheDocument()
+  })
+
   test('searches the shared engine and groups results with the moment', async () => {
     const { input } = setup()
     fireEvent.change(input, { target: { value: 'pricing' } })
     expect((await screen.findAllByText('▶ 14:55')).length).toBeGreaterThan(0)
     expect(http.post).toHaveBeenCalledWith('/search/everything', expect.objectContaining({ query: 'pricing', log: false }))
-    expect(screen.getByText('Acme', { exact: false })).toBeTruthy()
+    expect(screen.getAllByRole('option')[0]).toHaveTextContent('Acme pricing call')
     expect(screen.getByText(/Ask Entomate about/)).toBeTruthy()
   })
 
@@ -63,7 +90,6 @@ describe('CommandPalette', () => {
     const { input, onClose } = setup()
     fireEvent.change(input, { target: { value: 'pricing' } })
     await screen.findAllByText('▶ 14:55')
-    fireEvent.keyDown(input, { key: 'ArrowDown' }) // past the Ask row
     fireEvent.keyDown(input, { key: 'Enter' })
     await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/meetings/m1?t=895000'))
     expect(onClose).toHaveBeenCalled()
@@ -83,7 +109,6 @@ describe('CommandPalette', () => {
     const { input } = setup()
     fireEvent.change(input, { target: { value: 'pricing' } })
     await screen.findAllByText('▶ 14:55')
-    fireEvent.keyDown(input, { key: 'ArrowDown' })
     fireEvent.keyDown(input, { key: 's', metaKey: true })
     await waitFor(() => expect(http.post).toHaveBeenCalledWith('/search/notes', expect.objectContaining({ kind: 'transcript', sourceId: 'm1', origin: 'palette', atMs: 895000 })))
     expect(await screen.findByText(/Clipped to Notes/)).toBeTruthy()

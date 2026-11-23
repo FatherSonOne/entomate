@@ -28,11 +28,13 @@ import useBotDebriefWatch from './bot/useBotDebriefWatch'
 import MissedBotAlert from './bot/MissedBotAlert'
 import { useOrgSafe } from '../contexts/OrgContext'
 import { useKeyboardShortcuts, getModKey } from '../hooks/useKeyboardShortcuts'
+import { useNavigationShortcuts, navigationShortcut, shortcutLabel } from '../hooks/useNavigationShortcuts'
 import CommandPalette from './CommandPalette'
 import KeyboardShortcutsHelp from './KeyboardShortcutsHelp'
 import { useTheme } from '../context/ThemeContext'
 import { useGuideNewFeatures } from './UsersGuide/useGuideNewFeatures'
 import '../styles/navigation.css'
+import '../styles/command-search.css'
 import VCCanvas from './vc/VCCanvas'
 import Logo from './Logo'
 import EntoAssistantSkeleton from './EntoAssistant/EntoAssistantSkeleton'
@@ -170,6 +172,7 @@ export default function Layout() {
   const { user, signOut } = useAuth()
   const orgCtx = useOrgSafe()
   const isAdmin = orgCtx?.myRole === 'owner' || orgCtx?.myRole === 'admin'
+  const shortcutsHeld = useNavigationShortcuts(navigate, isAdmin, !commandPaletteOpen && !shortcutsHelpOpen)
   // When a bot's call ends, the app moves to its debrief (bot Slate pass).
   useBotDebriefWatch({ orgId: orgCtx?.org?.id, userId: user?.id || null, enabled: isAdmin })
 
@@ -185,7 +188,7 @@ export default function Layout() {
 
   // Global keyboard shortcuts
   useKeyboardShortcuts({
-    'mod+k': () => setCommandPaletteOpen(true),
+    'mod+k': { callback: () => setCommandPaletteOpen(prev => !prev), allowInInput: true },
     'mod+?': () => setShortcutsHelpOpen(true),
     'mod+/': () => setAssistantOpen(prev => !prev),
     'mod+m': () => navigate('/meetings?new=true'),
@@ -211,14 +214,15 @@ export default function Layout() {
     <>
       {/* Auto-join missed a calendar meeting: say so on every page (and re-check the calendar). */}
       {isAdmin && <MissedBotAlert />}
-      <CommandPalette
+      {!isBenchSwiss && <CommandPalette
         isOpen={commandPaletteOpen}
+        isAdmin={isAdmin}
         onClose={() => setCommandPaletteOpen(false)}
         onShowShortcuts={() => {
           setCommandPaletteOpen(false)
           setShortcutsHelpOpen(true)
         }}
-      />
+      />}
       <KeyboardShortcutsHelp
         isOpen={shortcutsHelpOpen}
         onClose={() => setShortcutsHelpOpen(false)}
@@ -269,6 +273,10 @@ export default function Layout() {
           isDark={isDark}
           onThemeChange={changeTheme}
           onSearch={() => setCommandPaletteOpen(true)}
+          shortcutsHeld={shortcutsHeld}
+          commandSearch={<CommandPalette toolbar isOpen={commandPaletteOpen} isAdmin={isAdmin}
+            onOpen={() => setCommandPaletteOpen(true)} onClose={() => setCommandPaletteOpen(false)}
+            onShowShortcuts={() => { setCommandPaletteOpen(false); setShortcutsHelpOpen(true) }} />}
           onRecord={() => navigate('/meetings?new=true')}
           onSettings={() => goSettings()}
           settingsActive={isActive('/settings')}
@@ -307,7 +315,7 @@ export default function Layout() {
   }
 
   return (
-    <div className="app-shell min-h-screen transition-colors duration-300 hover-glow trans-slow">
+    <div className="app-shell min-h-screen transition-colors duration-300 hover-glow trans-slow" data-shortcuts-held={shortcutsHeld || undefined}>
       {/* Ambient background — Held Light: static crimson bloom (CSS, no rAF).
           Legacy: the animated neural canvas. */}
       {isHeldLight
@@ -365,6 +373,7 @@ export default function Layout() {
                           <Icon className="w-4 h-4" />
                         </span>
                         <span>{item.name}</span>
+                        <kbd className="bs-nav-peek">{shortcutLabel(navigationShortcut(item.href))}</kbd>
                       </NavLink>
                     )
                   })}
@@ -404,6 +413,7 @@ export default function Layout() {
                 )}
               </span>
               <span>User Guide</span>
+              <kbd className="bs-nav-peek">{shortcutLabel('mod+8')}</kbd>
               {guideHasNew && (
                 <span style={{
                   fontSize: 9,
@@ -429,6 +439,7 @@ export default function Layout() {
                 <Settings className="w-4 h-4" />
               </span>
               <span>Settings</span>
+              <kbd className="bs-nav-peek">{shortcutLabel('mod+,')}</kbd>
             </NavLink>
 
             <div className="nl-avatar-card">
