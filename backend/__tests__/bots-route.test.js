@@ -218,7 +218,9 @@ describe('POST /api/admin/bots/launch — consent gate', () => {
 
 describe('POST /api/admin/bots/recall-webhook — signature gate', () => {
   let app;
-  beforeAll(() => { app = makeApp(); });
+  // The route loads svix lazily. Load it here first, so a cold load under a busy
+  // full run is not charged to the 5 s timeout of the first signature test.
+  beforeAll(() => { app = makeApp(); require('svix'); }, 30000);
 
   const ORIGINAL_SECRET = process.env.RECALL_WEBHOOK_SIGNING_SECRET;
   afterEach(() => {

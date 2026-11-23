@@ -48,6 +48,8 @@ function renderPage(recordingJob) {
 describe('a pressed timecode plays the recording', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // jsdom has no matchMedia; jumpToTranscript asks it whether this is a phone. Desktop here.
+    window.matchMedia = window.matchMedia || ((q) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {} }))
     player.ready = false
     Element.prototype.scrollIntoView = vi.fn()
   })

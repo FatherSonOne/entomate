@@ -2,6 +2,14 @@ import React from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { classifyError, errorCopy } from '../../services/errorKinds';
 
+/**
+ * @param {{
+ *   message?: string | null,
+ *   error?: unknown,
+ *   onRetry?: () => unknown,
+ *   icon?: React.ElementType,
+ * }} props
+ */
 export default function ErrorState({ message, error, onRetry, icon: Icon = AlertTriangle }) {
   // Name the cause when it is known (offline, signed out, no access...)
   const kind = classifyError(error ?? new Error(message || ''));
