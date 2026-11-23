@@ -8,7 +8,7 @@
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { X, AlertCircle, User as UserIcon } from 'lucide-react'
+import { X, AlertCircle, User as UserIcon, Copy, Check, Share2 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import { useAuth } from '../../contexts/AuthContext'
 import useAssistantContext from './useAssistantContext'
@@ -27,6 +27,9 @@ import ProposalCard from './ProposalCard'
 import PlanCard, { groupProposals } from './PlanCard'
 import ThreadRail from './ThreadRail'
 import { welcomeGreeting } from './welcomeGreeting'
+import AnswerSharePanel from './AnswerSharePanel'
+import { printAnswer } from './printAnswer'
+import { answerTitle } from './answerText'
 import { useProposals } from './useProposals'
 import { useNavigate } from 'react-router-dom'
 import { entoAiApi } from '../../services/api'
@@ -104,6 +107,9 @@ export default function EntoAssistant({ isOpen, onClose, signals = [], signalTot
   const [threads, setThreads] = useState([])
   const [threadsLoading, setThreadsLoading] = useState(false)
   const [railError, setRailError] = useState(null)
+  // EAI-02c: the answer whose Share panel is open, and the one just copied (`idx:ts` keys).
+  const [shareFor, setShareFor] = useState(null)
+  const [copiedKey, setCopiedKey] = useState(null)
 
   // EAI-05: confirm / dismiss / edit / undo for the cards under an answer. The proposals
   // stay on their message; this patches one in place with the state the server reports.
@@ -429,6 +435,34 @@ export default function EntoAssistant({ isOpen, onClose, signals = [], signalTot
     setIsQuerying(false)
     setError(null)
     setParked(null)
+    setShareFor(null)
+  }
+
+  // EAI-02c: the action row under an answer (Copy, Share), ported from Logos AI.
+  const handleCopyMessage = (key, content) => {
+    navigator.clipboard.writeText(content).then(() => {
+      setCopiedKey(key)
+      setTimeout(() => setCopiedKey((k) => (k === key ? null : k)), 2000)
+    }, () => setError('Could not copy. Select the answer and copy it instead.'))
+  }
+
+  const handlePrintAnswer = (key, idx) => {
+    const msg = messages[idx]
+    const body = document.querySelector(`[data-answer-key="${key}"]`)
+    if (!msg || !body) return false
+    const prev = messages[idx - 1]
+    const question = prev?.role === 'user' ? prev.content : undefined
+    const title = answerTitle(question, msg.content)
+    // A title taken from the answer's leading heading is not printed twice.
+    const copy = body.cloneNode(true)
+    const lead = copy.firstElementChild
+    if (lead && /^H[1-6]$/.test(lead.tagName) && lead.textContent.trim() === title) lead.remove()
+    return printAnswer({
+      title,
+      question,
+      bodyHtml: copy.innerHTML,
+      printedAt: new Date().toLocaleString(),
+    })
   }
 
   const handleResume = () => {
@@ -641,7 +675,7 @@ export default function EntoAssistant({ isOpen, onClose, signals = [], signalTot
                     </div>
                     {msg.role === 'assistant' ? (
                       <>
-                        <div className="la-markdown">
+                        <div className="la-markdown" data-answer-key={`${idx}:${msg.ts}`}>
                           <ReactMarkdown>{msg.content}</ReactMarkdown>
                         </div>
                         {msg.tools?.length > 0 && <ToolsUsed calls={msg.tools} />}
@@ -683,6 +717,39 @@ export default function EntoAssistant({ isOpen, onClose, signals = [], signalTot
                               />
                             )))}
                           </div>
+                        )}
+                        {/* EAI-02c: LV's action row, Copy and Share. LV's Good / Poor / Tasks are
+                            not ported here. */}
+                        <div className="la-message-actions">
+                          <div className="la-message-actions-left">
+                            <button
+                              type="button"
+                              className={`la-action-btn ${copiedKey === `${idx}:${msg.ts}` ? 'la-action-btn-active' : ''}`}
+                              onClick={() => handleCopyMessage(`${idx}:${msg.ts}`, msg.content)}
+                              title="Copy response"
+                              aria-label="Copy response"
+                            >
+                              {copiedKey === `${idx}:${msg.ts}` ? <Check size={13} /> : <Copy size={13} />}
+                              <span className="la-action-btn-label">{copiedKey === `${idx}:${msg.ts}` ? 'Copied' : 'Copy'}</span>
+                            </button>
+                            <button
+                              type="button"
+                              className={`la-action-btn la-action-btn-share ${shareFor === `${idx}:${msg.ts}` ? 'la-action-btn-active' : ''}`}
+                              onClick={() => setShareFor((prev) => (prev === `${idx}:${msg.ts}` ? null : `${idx}:${msg.ts}`))}
+                              title="Share, print or save this answer"
+                              aria-label="Share, print or save this answer"
+                              aria-expanded={shareFor === `${idx}:${msg.ts}`}
+                            >
+                              <Share2 size={13} />
+                              <span className="la-action-btn-label">Share</span>
+                            </button>
+                          </div>
+                        </div>
+                        {shareFor === `${idx}:${msg.ts}` && (
+                          <AnswerSharePanel
+                            answer={msg.content}
+                            onPrint={() => handlePrintAnswer(`${idx}:${msg.ts}`, idx)}
+                          />
                         )}
                       </>
                     ) : (
