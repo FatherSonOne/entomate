@@ -1096,6 +1096,11 @@ export const entoAiApi = {
     if (!response.ok || !response.body) {
       const err = new Error(`Entomate AI query failed: ${response.status}`)
       err.status = response.status
+      // EAI-07: a 429 is either the rate limit or the org's monthly AI quota (code 'ai_quota').
+      if (response.status === 429) {
+        const body = await response.json().catch(() => null)
+        if (body?.code === 'ai_quota') { err.code = body.code; err.quotaMessage = body.error }
+      }
       throw err
     }
 

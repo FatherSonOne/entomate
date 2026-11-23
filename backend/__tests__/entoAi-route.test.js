@@ -83,7 +83,13 @@ jest.mock('../config/gemini', () => ({
           mockSent.push(JSON.parse(JSON.stringify(contents)));
           const step = mockScript.shift() || { text: 'fallback answer' };
           async function* stream() {
-            for (const parts of mockChunks(step)) yield { candidates: [{ content: { role: 'model', parts } }] };
+            const chunks = mockChunks(step);
+            // { usage }: the last chunk carries the call's totals; earlier chunks a partial count, as Gemini sends.
+            for (const [i, parts] of chunks.entries()) {
+              const usageMetadata = !step.usage ? null
+                : i === chunks.length - 1 ? step.usage : { promptTokenCount: step.usage.promptTokenCount };
+              yield { candidates: [{ content: { role: 'model', parts } }], ...(usageMetadata ? { usageMetadata } : {}) };
+            }
           }
           // The SDK's aggregate promise; the route must not depend on it.
           return { stream: stream(), response: Promise.reject(new Error('aggregate not used')) };
@@ -97,6 +103,8 @@ jest.mock('../middleware/rateLimiter', () => ({ aiLimiter: (req, res, next) => n
 jest.mock('../utils/orgContext',() => ({ getOrgIdsForUser: jest.fn(async () => ['org-a']) }));
 jest.mock('../utils/log', () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() }));
 jest.mock('../services/calendarService', () => ({ isConfigured: () => false, getEvents: jest.fn() }));
+// EAI-07 metering reads billing tables on the service client; it has its own test (aiUsage.test.js).
+jest.mock('../services/aiUsage', () => ({ meterAi: jest.fn((req, res, next) => next()), addUsage: jest.fn() }));
 
 const express = require('express');
 const request = require('supertest');
@@ -201,6 +209,19 @@ test('rounds are capped at 5, then the model is asked for the answer', async () 
   expect(ev.filter((e) => e.type === 'tool_start')).toHaveLength(5);
   expect(ev.at(-1)).toMatchObject({ type: 'complete', answer: 'Done looking.' });
   expect(mockSent.at(-1).at(-1).parts[0].text).toMatch(/Do not call any more tools/);
+});
+
+test('EAI-07: the route is metered and each model turn reports its usageMetadata', async () => {
+  const { meterAi, addUsage } = require('../services/aiUsage');
+  const first = { promptTokenCount: 900, candidatesTokenCount: 20, thoughtsTokenCount: 30 };
+  const second = { promptTokenCount: 1500, candidatesTokenCount: 120 };
+  mockScript.push({ calls: [{ name: 'list_tasks', args: {} }], usage: first });
+  mockScript.push({ chunks: [{ text: 'You have ' }, { text: 'none.' }], usage: second });
+  const res = await request(app).post('/api/ento-ai/query')
+    .set('Authorization', 'Bearer good-token').send({ question: 'tasks?' });
+  expect(events(res.text).at(-1).type).toBe('complete');
+  expect(meterAi).toHaveBeenCalledTimes(1);
+  expect(addUsage.mock.calls).toEqual([[first], [second]]);
 });
 
 test('a model error after start ends the stream with an error event', async () => {

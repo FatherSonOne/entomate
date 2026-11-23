@@ -164,6 +164,8 @@ jest.mock('../config/gemini', () => ({
 jest.mock('../middleware/rateLimiter', () => ({ aiLimiter: (req, res, next) => next() }));
 jest.mock('../utils/orgContext', () => ({ getOrgIdsForUser: jest.fn(async (uid) => mockDb.members[uid] || []) }));
 jest.mock('../utils/log', () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() }));
+// EAI-07 metering reads billing tables on the service client; it has its own test (aiUsage.test.js).
+jest.mock('../services/aiUsage', () => ({ meterAi: jest.fn((req, res, next) => next()), addUsage: jest.fn() }));
 jest.mock('../services/calendarService', () => ({ isConfigured: () => false, getEvents: jest.fn() }));
 
 const express = require('express');
