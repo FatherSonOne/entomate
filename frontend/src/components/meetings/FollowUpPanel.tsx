@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { meetingsApi } from '../../services/api'
 import cache from '../../services/apiCache'
 import { useToast } from '../vc/ToastProvider'
@@ -59,19 +59,38 @@ export function useFollowUp(meetingId: string, ready: boolean): FollowUpState {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [busy, setBusy] = useState<FollowUpState['busy']>(null)
   const path = `/meetings/${meetingId}/follow-up`
+  const scope = useRef({ meetingId, ready, active: false, read: 0 })
+  const isCurrent = useCallback((s: typeof scope.current) => s.active && scope.current === s, [])
+
+  // Retire the previous meeting before paint, including its pending callbacks.
+  useLayoutEffect(() => {
+    const current = { meetingId, ready, active: true, read: 0 }
+    scope.current = current
+    setData(null)
+    setLoadError(null)
+    setLoading(false)
+    setBusy(null)
+    return () => { current.active = false }
+  }, [meetingId, ready])
 
   const load = useCallback(async (quiet = false) => {
+    const current = scope.current
+    if (!isCurrent(current) || current.meetingId !== meetingId || !current.ready) return
+    const request = ++current.read
+    const latest = (): boolean => isCurrent(current) && current.read === request
     if (!quiet) setLoading(true)
     try {
       cache.invalidate(path)
-      setData(normalizeFollowUp(await meetingsApi.followUp(meetingId)))
+      const reply = await meetingsApi.followUp(meetingId)
+      if (!latest()) return
+      setData(normalizeFollowUp(reply))
       setLoadError(null)
     } catch (err) {
-      setLoadError(errorText(err))
+      if (latest()) setLoadError(errorText(err))
     } finally {
-      if (!quiet) setLoading(false)
+      if (latest()) setLoading(false)
     }
-  }, [meetingId, path])
+  }, [meetingId, path, isCurrent])
 
   const retry = useCallback(() => load(), [load])
 
@@ -87,34 +106,41 @@ export function useFollowUp(meetingId: string, ready: boolean): FollowUpState {
   }, [sendAt, load])
 
   const run = useCallback(async (kind: NonNullable<FollowUpState['busy']>, call: () => Promise<unknown>, done?: string) => {
+    const current = scope.current
+    if (!isCurrent(current) || current.meetingId !== meetingId || !current.ready) return
     setBusy(kind)
     try {
       const reply = await call()
+      if (!isCurrent(current)) return
       cache.invalidate(path)
       setData(normalizeFollowUp(reply))
       if (done) toast.success(done)
     } catch (err) {
+      if (!isCurrent(current)) return
       toast.error(kind === 'send' ? 'Not sent' : 'Not saved', errorText(err))
       load(true)
     } finally {
-      setBusy(null)
+      if (isCurrent(current)) setBusy(null)
     }
-  }, [path, toast, load])
+  }, [meetingId, path, toast, load, isCurrent])
 
   const save = useCallback((patch: FollowUpPatch) => run('save', () => meetingsApi.saveFollowUp(meetingId, patch)), [run, meetingId])
   const send = useCallback(() => run('send', () => meetingsApi.sendFollowUp(meetingId), 'Follow-up sent'), [run, meetingId])
   const stop = useCallback(() => run('stop', () => meetingsApi.stopFollowUp(meetingId), 'Stopped. It will not go out on its own.'), [run, meetingId])
   const setAutoSend = useCallback(async (enabled: boolean) => {
+    const current = scope.current
+    if (!isCurrent(current) || current.meetingId !== meetingId || !current.ready) return
     setBusy('auto')
     try {
       await meetingsApi.setFollowUpAutoSend(enabled)
+      if (!isCurrent(current)) return
       setData((d) => (d ? { ...d, autoSend: enabled } : d))
     } catch (err) {
-      toast.error('Not saved', errorText(err))
+      if (isCurrent(current)) toast.error('Not saved', errorText(err))
     } finally {
-      setBusy(null)
+      if (isCurrent(current)) setBusy(null)
     }
-  }, [toast])
+  }, [meetingId, toast, isCurrent])
 
   return { data, loading, loadError, retry, busy, save, send, stop, setAutoSend }
 }

@@ -1,4 +1,4 @@
-# Meeting follow-up loader - FU-01 / FU-02
+# Meeting follow-up loader - FU-01 / FU-02 / FU-03
 
 ## Problem and confirmed cause
 
@@ -45,8 +45,23 @@ Validation:
 - Release acceptance uses `F:/entomate-command-deps/verify-fu02.cjs`; its results and desktop/phone screenshots are written to `F:/entomate-command-deps/fu02-live-verification.json` and `fu02-{desktop,phone}-{error,recovered}.png`. The browser locally injects GET failures, retries against the real endpoint, checks pending-button disabling and recovery without a reload, and asserts the historical unscheduled draft is unchanged. Follow-up writes are blocked during verification; no send or auto-send control is exercised.
 - The required code-only graphify update runs locally. Existing graph artifacts and unrelated work are excluded from scoped publication; the stale, dirty `F:/entomate` checkout is preserved.
 
+## FU-03 - isolate pending requests by meeting
+
+Confirmed: the hook retained the previous meeting's draft/error/busy state and accepted asynchronous results after navigation. A browser-local delayed GET against the deployed FU-02 renderer reproduced the previous meeting's subject appearing while the current meeting was still loading. Twelve regression cases also failed against the original hook before the fix.
+
+The hook now retires its previous request scope on meeting/readiness changes and unmount. A layout effect clears the old draft, read error and busy/loading state before paint; a per-scope read sequence accepts only the newest read. Retired successes, errors and finalizers cannot replace the active meeting or finish its loading state. StrictMode effect replay creates a fresh scope. Retained callbacks do not start requests after unmount or while minutes are unavailable.
+
+Save/send/stop/auto-send keep the same API calls and arguments. Their late responses and notifications are ignored after navigation, and an old finalizer cannot unlock a new meeting's operation. This does not cancel a mutation already requested by the user. The existing scheduled refresh timing, API contracts, backend, schema and mail controls are unchanged.
+
+Validation:
+
+- Fourteen isolation regressions cover old/new meeting result order, state clearing, readiness changes, overlapping reads, unmount, StrictMode replay, pending scheduled refresh and late mutation success/failure. All mutation tests use mocks; no email is sent.
+- All 33 focused follow-up tests and all 437 frontend tests pass; the full runner exits 0. TypeScript, the production build and scoped `git diff --check` pass. Existing build warnings remain documented under FU-02.
+- Browser acceptance: `F:/entomate-command-deps/verify-fu03.cjs` injects delayed successes/failures into the deployed app and navigates between meeting routes without reloading. The second meeting and its draft are browser-local fixtures, avoiding any server-side draft creation. Desktop checks an old success while the new read is pending; phone checks an old error after the new draft loads. Results: `F:/entomate-command-deps/fu03-live-verification.json`; screenshots: `fu03-desktop-{pending,settled}.png` and `fu03-phone-settled.png`. The historical real draft is checked unchanged before/after, and follow-up writes are blocked.
+- Impact: the existing `MeetingDetail` caller and `FollowUpState` interface remain compatible; tests are extended in `FollowUpPanel.test.tsx`; there are no new dependencies, configuration, API or schema changes. This document records the change. The required code-only graphify update stays local and is excluded from scoped publication.
+
 ## Next recommended sweep
 
-Review `useFollowUp` request isolation when navigating between meetings while a load is still pending. Keep this separate from FU-02's read-error recovery.
+Review pending read-versus-save ordering within the same meeting: a read started before an edit can still finish after that edit. Keep this separate from FU-03's meeting/navigation isolation.
 
 Technique: validate database projections against the deployed schema as well as testing pure helpers. A valid draft renderer cannot protect a loader that fails before it reads the meeting.
