@@ -24,6 +24,7 @@ import { setVoiceState, pulseVoice, onVoiceRequest } from './voiceSignal'
 import { useMicLevel } from './useMicLevel'
 import { AgentPipeline, ToolsUsed, applyToolEvent } from './AgentPipeline'
 import ProposalCard from './ProposalCard'
+import PlanCard, { groupProposals } from './PlanCard'
 import { useProposals } from './useProposals'
 import { useNavigate } from 'react-router-dom'
 import { entoAiApi } from '../../services/api'
@@ -75,7 +76,7 @@ async function withFreshProposals(messages) {
   }
 }
 
-export default function EntoAssistant({ isOpen, onClose }) {
+export default function EntoAssistant({ isOpen, onClose, signals = [], signalTotal = 0 }) {
   const { user } = useAuth()
   const { context, section, sectionSummary, sectionLabel, isLoading: contextLoading, isReady: contextReady } = useAssistantContext(isOpen)
 
@@ -499,6 +500,27 @@ export default function EntoAssistant({ isOpen, onClose }) {
                   ))}
                 </div>
               </div>
+              {/* EAI-06: server signals (an overdue task, a meeting about to start). Each one asks
+                  about it, so the answer can propose the fix on the confirm → undo spine. */}
+              {signals.length > 0 && (
+                <div className="la-quick-actions" data-testid="ento-signals">
+                  <span className="la-quick-actions-label">
+                    Needs attention<span className="la-quick-actions-count la-quick-actions-count-due">{Math.max(signalTotal, signals.length)}</span>
+                  </span>
+                  <div className="la-quick-actions-list">
+                    {signals.map((sig) => (
+                      <button
+                        key={sig.id}
+                        type="button"
+                        className="la-quick-action-btn la-quick-action-proactive"
+                        onClick={() => handleSend(sig.query)}
+                      >
+                        {sig.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               {parked?.messages.length > 0 && (
                 <button type="button" className="la-welcome-help" onClick={handleResume}>
                   Back to your last chat
@@ -524,30 +546,41 @@ export default function EntoAssistant({ isOpen, onClose }) {
                         {msg.tools?.length > 0 && <ToolsUsed calls={msg.tools} />}
                         {msg.proposals?.length > 0 && (
                           <div className="la-proposals">
-                            {msg.proposals.map((p) => (
+                            {groupProposals(msg.proposals).map((g) => (g.kind === 'plan' ? (
+                              <PlanCard
+                                key={g.planId}
+                                steps={g.steps}
+                                isWorking={proposalUi.resolvingPlanId === g.planId}
+                                error={proposalUi.planErrors[g.planId] || null}
+                                onConfirm={() => proposalUi.handleConfirmPlan(idx, g.planId)}
+                                onDismiss={() => proposalUi.handleRejectPlan(idx, g.planId)}
+                                onUndo={() => proposalUi.handleUndoPlan(idx, g.planId)}
+                                onViewStep={proposalUi.handleView}
+                              />
+                            ) : (
                               <ProposalCard
-                                key={p.id}
-                                proposal={p}
-                                isResolving={proposalUi.resolvingId === p.id}
-                                isEditing={proposalUi.editingId === p.id}
+                                key={g.proposal.id}
+                                proposal={g.proposal}
+                                isResolving={proposalUi.resolvingId === g.proposal.id}
+                                isEditing={proposalUi.editingId === g.proposal.id}
                                 editDraft={proposalUi.editDraft}
-                                editError={proposalUi.editingId === p.id ? proposalUi.editError : null}
-                                onStartEdit={() => proposalUi.handleStartEdit(p)}
+                                editError={proposalUi.editingId === g.proposal.id ? proposalUi.editError : null}
+                                onStartEdit={() => proposalUi.handleStartEdit(g.proposal)}
                                 onEditField={proposalUi.handleEditField}
-                                onSaveEdit={() => proposalUi.handleSaveEdit(idx, p)}
+                                onSaveEdit={() => proposalUi.handleSaveEdit(idx, g.proposal)}
                                 onCancelEdit={proposalUi.handleCancelEdit}
-                                isConfirming={proposalUi.confirmingId === p.id}
+                                isConfirming={proposalUi.confirmingId === g.proposal.id}
                                 confirmText={proposalUi.confirmText}
-                                confirmError={proposalUi.confirmingId === p.id ? proposalUi.confirmError : null}
+                                confirmError={proposalUi.confirmingId === g.proposal.id ? proposalUi.confirmError : null}
                                 onConfirmTextChange={proposalUi.handleConfirmTextChange}
                                 onCancelConfirm={proposalUi.handleCancelConfirm}
-                                actionError={proposalUi.actionErrors[p.id] || null}
-                                onConfirm={() => proposalUi.handleConfirm(idx, p)}
-                                onReject={() => proposalUi.handleReject(idx, p)}
-                                onUndo={() => proposalUi.handleUndo(idx, p)}
-                                onView={() => proposalUi.handleView(p)}
+                                actionError={proposalUi.actionErrors[g.proposal.id] || null}
+                                onConfirm={() => proposalUi.handleConfirm(idx, g.proposal)}
+                                onReject={() => proposalUi.handleReject(idx, g.proposal)}
+                                onUndo={() => proposalUi.handleUndo(idx, g.proposal)}
+                                onView={() => proposalUi.handleView(g.proposal)}
                               />
-                            ))}
+                            )))}
                           </div>
                         )}
                       </>

@@ -1147,11 +1147,31 @@ export const entoAiApi = {
     undo: (id) => entoAiAction('POST', `/${id}/undo`, {}),
     edit: (id, patch) => entoAiAction('PATCH', `/${id}`, patch),
   },
+
+  // EAI-06: a plan is confirmed, dismissed and undone as a whole; each resolves to
+  // { ok, proposals (every step, in order), error?, failedStep? }.
+  plans: {
+    confirm: (planId) => entoAiAction('POST', `/${planId}/confirm`, {}, 'plans'),
+    reject: (planId) => entoAiAction('POST', `/${planId}/reject`, {}, 'plans'),
+    undo: (planId) => entoAiAction('POST', `/${planId}/undo`, {}, 'plans'),
+  },
+
+  // EAI-06: what needs the user now ({ signals, total }). Plain fetch: the axios GET cache
+  // would keep showing a task the user has just finished.
+  signals: async () => {
+    const url = API_BASE_URL ? `${API_BASE_URL}/api/ento-ai/signals` : '/api/ento-ai/signals'
+    const { data: { session } } = await supabase.auth.getSession()
+    const response = await fetch(url, {
+      headers: { 'Authorization': session?.access_token ? `Bearer ${session.access_token}` : '' },
+    })
+    if (!response.ok) throw new Error(`Entomate AI signals read failed: ${response.status}`)
+    return response.json()
+  },
 }
 
-/** Plain fetch for /api/ento-ai/actions: never the axios GET cache or its retries (a confirm must not repeat). */
-async function entoAiAction(method, path, body) {
-  const base = API_BASE_URL ? `${API_BASE_URL}/api/ento-ai/actions` : '/api/ento-ai/actions'
+/** Plain fetch for /api/ento-ai/actions (and /plans): never the axios GET cache or its retries (a confirm must not repeat). */
+async function entoAiAction(method, path, body, root = 'actions') {
+  const base = API_BASE_URL ? `${API_BASE_URL}/api/ento-ai/${root}` : `/api/ento-ai/${root}`
   const { data: { session } } = await supabase.auth.getSession()
   const response = await fetch(base + path, {
     method,
@@ -1163,7 +1183,7 @@ async function entoAiAction(method, path, body) {
   })
   let data = null
   try { data = await response.json() } catch { /* empty or not JSON */ }
-  if (!response.ok && !data?.proposal) {
+  if (!response.ok && !data?.proposal && !data?.proposals) {
     const err = new Error(data?.error || `Entomate AI action failed: ${response.status}`)
     err.status = response.status
     throw err

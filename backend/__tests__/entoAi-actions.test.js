@@ -31,7 +31,8 @@ jest.mock('@supabase/supabase-js', () => ({
 }));
 
 // ── In-memory PostgREST with RLS ─────────────────────────────────────
-const mockDb = { tables: {}, members: {}, clock: 0, queries: [] };
+// failOn(table, q) → an error message makes that one query fail (EAI-06 mid-plan failures).
+const mockDb = { tables: {}, members: {}, clock: 0, queries: [], failOn: null };
 const mockTick = () => new Date(Date.UTC(2026, 10, 22, 12, 0, 0, mockDb.clock++)).toISOString();
 const NEXT = { proposed: ['confirmed', 'rejected'], confirmed: ['executed', 'failed'], executed: ['undone'] };
 
@@ -67,21 +68,34 @@ function mockClient(uid) {
       const rowsOf = () => (mockDb.tables[table] = mockDb.tables[table] || []);
       // 'col->>key' reads a jsonb key as text, as PostgREST does.
       const val = (r, k) => { const [c, f] = k.split('->>'); if (!f) return r[c]; const o = r[c]; return o && o[f] != null ? String(o[f]) : null; };
-      const match = (r) => q.filters.every(([k, op, v]) => (op === 'eq' ? val(r, k) === v : v.includes(val(r, k))));
+      const OPS = {
+        eq: (a, v) => a === v,
+        in: (a, v) => v.includes(a),
+        notIn: (a, v) => !v.includes(a),
+        lt: (a, v) => a != null && a < v,
+        gte: (a, v) => a != null && a >= v,
+      };
+      const match = (r) => q.filters.every(([k, op, v]) => OPS[op](val(r, k), v));
       const run = () => {
         const all = rowsOf();
+        const failed = mockDb.failOn && mockDb.failOn(table, q);
+        if (failed) return { data: null, error: { message: failed } };
         let out = [];
         if (q.op === 'insert') {
+          // An array is one statement: every row lands, or none does.
           const defaults = table === 'ento_ai_action_log' ? { status: 'proposed', result: null, undo: null } : {};
-          const row = { id: require('crypto').randomUUID(), created_at: mockTick(), updated_at: mockTick(), ...defaults, ...q.value };
-          if (!mockPolicy(table, uid, 'insert', row)) return { data: null, error: { message: 'new row violates row-level security policy' } };
-          const bad = mockTrigger(table, null, row);
-          if (bad) return { data: null, error: { message: bad } };
-          all.push(row);
-          out = [row];
+          const made = (Array.isArray(q.value) ? q.value : [q.value])
+            .map((v) => ({ id: require('crypto').randomUUID(), created_at: mockTick(), updated_at: mockTick(), ...defaults, ...v }));
+          for (const row of made) {
+            if (!mockPolicy(table, uid, 'insert', row)) return { data: null, error: { message: 'new row violates row-level security policy' } };
+            const bad = mockTrigger(table, null, row);
+            if (bad) return { data: null, error: { message: bad } };
+          }
+          all.push(...made);
+          out = made;
         } else {
           const seen = all.filter((r) => mockPolicy(table, uid, q.op === 'select' ? 'select' : q.op, r) && mockPolicy(table, uid, 'select', r) && match(r));
-          if (q.op === 'select') out = seen;
+          if (q.op === 'select') out = q.order ? [...seen].sort((x, y) => (x[q.order[0]] > y[q.order[0]] ? 1 : -1) * (q.order[1] ? 1 : -1)) : seen;
           if (q.op === 'update') {
             for (const r of seen) {
               const next = { ...r, ...q.value };
@@ -108,6 +122,10 @@ function mockClient(uid) {
         delete() { q.op = 'delete'; return b; },
         eq(k, v) { q.filters.push([k, 'eq', v]); return b; },
         in(k, v) { q.filters.push([k, 'in', v]); return b; },
+        not(k, op, list) { q.filters.push([k, 'notIn', list.slice(1, -1).split(',').map((x) => x.replace(/"/g, ''))]); return b; },
+        lt(k, v) { q.filters.push([k, 'lt', v]); return b; },
+        gte(k, v) { q.filters.push([k, 'gte', v]); return b; },
+        order(k, o) { q.order = [k, o?.ascending !== false]; return b; },
         maybeSingle() { q.single = true; return b; },
         limit() { return b; },
         // One macrotask per query, like a network round trip, so two requests can interleave.
@@ -180,6 +198,7 @@ beforeEach(() => {
   mockScript.length = 0;
   mockModelParams.length = 0;
   mockDb.queries.length = 0;
+  mockDb.failOn = null;
   mockDb.members = { 'user-a': ['org-a'], 'user-b': ['org-a', 'org-b'] };
   mockDb.tables = {
     projects: [
@@ -474,4 +493,193 @@ test('a bad action id is a 400, never a query', async () => {
   const before = mockDb.queries.length;
   expect((await act('post', '/not-a-uuid/confirm', {})).status).toBe(400);
   expect(mockDb.queries.length).toBe(before);
+});
+
+// ── EAI-06: multi-step plans ─────────────────────────────────────────
+const plan = (method, path, token = 'token-a') => request(app)[method](`/api/ento-ai/plans${path}`).set('Authorization', `Bearer ${token}`).send({});
+const PROJECT_AND_TASKS = {
+  steps: [
+    { tool: 'create_project', name: 'Q1 launch' },
+    { tool: 'create_task', title: 'Book the venue', arg_bindings: { projectId: '{{step0.result.projectId}}' } },
+    { tool: 'create_task', title: 'Draft the invite', dueDate: '2026-12-01', arg_bindings: { projectId: '{{step0.result.projectId}}' } },
+  ],
+};
+
+/** Asks once with a scripted propose_plan call; returns the steps the route emitted. */
+async function proposePlanVia(args) {
+  mockScript.push({ calls: [{ name: 'propose_plan', args }] }, { text: 'Planned. It waits for your Confirm plan.' });
+  const ev = sse((await ask('set it up')).text);
+  return { ev, steps: ev.filter((e) => e.type === 'proposal').map((e) => e.proposal) };
+}
+
+describe('EAI-06 plans', () => {
+  test('flag off: no propose_plan for the model, and the plan endpoints are 404', async () => {
+    process.env.ENTO_AI_WRITE_TOOLS = 'false';
+    mockScript.push({ text: 'hi' });
+    await ask('hi');
+    expect(mockModelParams[0].tools[0].functionDeclarations.map((d) => d.name)).not.toContain('propose_plan');
+    for (const path of ['/x/confirm', '/x/reject', '/x/undo']) expect((await plan('post', path)).status).toBe(404);
+  });
+
+  test('propose_plan records every step under one plan_id and creates nothing', async () => {
+    const { ev, steps } = await proposePlanVia(PROJECT_AND_TASKS);
+    expect(steps).toHaveLength(3);
+    expect(new Set(steps.map((s) => s.planId)).size).toBe(1);
+    expect(steps.map((s) => [s.stepOrder, s.toolName, s.status])).toEqual([
+      [0, 'create_project', 'proposed'], [1, 'create_task', 'proposed'], [2, 'create_task', 'proposed'],
+    ]);
+    expect(steps[1].summary).toBe('Create task "Book the venue" · in the new project');
+    expect(rows('ento_ai_action_log')[1].arg_bindings).toEqual({ projectId: '{{step0.result.projectId}}' });
+    expect(rows('projects')).toHaveLength(2);
+    expect(rows('tasks')).toHaveLength(2);
+    expect(ev.at(-1).tools).toEqual([]); // a plan is cards, not a chip
+  });
+
+  test('a step cannot be confirmed, dismissed, edited or undone on its own', async () => {
+    const { steps } = await proposePlanVia(PROJECT_AND_TASKS);
+    for (const [method, path] of [['post', '/confirm'], ['post', '/reject'], ['post', '/undo'], ['patch', '']]) {
+      const res = await act(method, `/${steps[1].id}${path}`, method === 'patch' ? { title: 'x' } : {});
+      expect(res.status).toBe(409);
+    }
+    expect(rows('tasks')).toHaveLength(2);
+  });
+
+  test('Confirm plan runs the steps in order and fills the binding; Undo plan reverses all of it', async () => {
+    const { steps } = await proposePlanVia(PROJECT_AND_TASKS);
+    const res = await plan('post', `/${steps[0].planId}/confirm`);
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(res.body.proposals.map((p) => p.status)).toEqual(['executed', 'executed', 'executed']);
+    const project = rows('projects').find((p) => p.name === 'Q1 launch');
+    const made = rows('tasks').filter((t) => ['Book the venue', 'Draft the invite'].includes(t.title));
+    expect(made).toHaveLength(2);
+    for (const t of made) expect(t).toMatchObject({ project_id: project.id, org_id: 'org-a' });
+
+    expect((await plan('post', `/${steps[0].planId}/confirm`)).status).toBe(409); // not twice
+
+    const undone = await plan('post', `/${steps[0].planId}/undo`);
+    expect(undone.body.ok).toBe(true);
+    expect(undone.body.proposals.map((p) => p.status)).toEqual(['undone', 'undone', 'undone']);
+    expect(rows('projects')).toHaveLength(2);
+    expect(rows('tasks')).toHaveLength(2);
+  });
+
+  test('a plan of three updates undoes in reverse, including two changes to the same task', async () => {
+    const { steps } = await proposePlanVia({ steps: [
+      { tool: 'update_task', taskId: TASK_A, priority: 'high' },
+      { tool: 'update_task', taskId: TASK_A, dueDate: '2026-12-05' },
+      { tool: 'assign_task', taskId: TASK_A, assignedTo: 'Sam' },
+    ] });
+    expect((await plan('post', `/${steps[0].planId}/confirm`)).body.ok).toBe(true);
+    expect(rows('tasks').find((t) => t.id === TASK_A)).toMatchObject({ priority: 'high', due_date: '2026-12-05', assigned_to: 'Sam' });
+    const undone = await plan('post', `/${steps[0].planId}/undo`);
+    expect(undone.body).toMatchObject({ ok: true });
+    expect(rows('tasks').find((t) => t.id === TASK_A)).toMatchObject({ priority: 'medium', due_date: null, assigned_to: null });
+  });
+
+  test('a step that fails stops the plan; done steps stay done and Undo plan reverses them', async () => {
+    const { steps } = await proposePlanVia(PROJECT_AND_TASKS);
+    mockDb.failOn = (table, q) => (table === 'tasks' && q.op === 'insert' && q.value.title === 'Draft the invite' ? 'insert failed' : null);
+    const res = await plan('post', `/${steps[0].planId}/confirm`);
+    expect(res.body).toMatchObject({ ok: false, failedStep: 3 });
+    expect(res.body.error).toMatch(/Step 3 stopped the plan/);
+    expect(res.body.proposals.map((p) => p.status)).toEqual(['executed', 'executed', 'failed']);
+    mockDb.failOn = null;
+    const undone = await plan('post', `/${steps[0].planId}/undo`);
+    expect(undone.body.proposals.map((p) => p.status)).toEqual(['undone', 'undone', 'failed']);
+    expect(rows('projects')).toHaveLength(2);
+    expect(rows('tasks')).toHaveLength(2);
+  });
+
+  test('a step that is no longer valid stops the plan before anything runs', async () => {
+    const { steps } = await proposePlanVia({ steps: [
+      { tool: 'create_task', title: 'First' },
+      { tool: 'update_task', taskId: TASK_A, status: 'done' },
+    ] });
+    mockDb.tables.tasks = mockDb.tables.tasks.filter((t) => t.id !== TASK_A);
+    const res = await plan('post', `/${steps[0].planId}/confirm`);
+    expect(res.status).toBe(422);
+    expect(rows('tasks').filter((t) => t.title === 'First')).toHaveLength(0);
+    expect(rows('ento_ai_action_log').map((r) => r.status)).toEqual(['proposed', 'proposed']);
+  });
+
+  test('two tabs confirming at once run each step once', async () => {
+    const { steps } = await proposePlanVia(PROJECT_AND_TASKS);
+    const [a, b] = await Promise.all([plan('post', `/${steps[0].planId}/confirm`), plan('post', `/${steps[0].planId}/confirm`)]);
+    expect([a.body.ok, b.body.ok].filter(Boolean)).toHaveLength(1);
+    expect(rows('projects').filter((p) => p.name === 'Q1 launch')).toHaveLength(1);
+    expect(rows('tasks').filter((t) => t.title === 'Book the venue')).toHaveLength(1);
+  });
+
+  test('Dismiss rejects every step and writes nothing else', async () => {
+    const { steps } = await proposePlanVia(PROJECT_AND_TASKS);
+    const res = await plan('post', `/${steps[0].planId}/reject`);
+    expect(res.body.proposals.map((p) => p.status)).toEqual(['rejected', 'rejected', 'rejected']);
+    expect((await plan('post', `/${steps[0].planId}/confirm`)).status).toBe(409);
+    expect(rows('projects')).toHaveLength(2);
+  });
+
+  test('another user cannot see or run the plan', async () => {
+    const { steps } = await proposePlanVia(PROJECT_AND_TASKS);
+    expect((await plan('post', `/${steps[0].planId}/confirm`, 'token-b')).status).toBe(404);
+    expect(rows('projects')).toHaveLength(2);
+  });
+
+  test.each([
+    ['one step', { steps: [{ tool: 'create_task', title: 'Only' }] }, /at least 2 steps/],
+    ['an unknown tool', { steps: [{ tool: 'send_email' }, { tool: 'create_task', title: 'x' }] }, /unknown tool/],
+    ['a binding to a later step', { steps: [{ tool: 'create_task', title: 'x', arg_bindings: { projectId: '{{step1.result.projectId}}' } }, { tool: 'create_project', name: 'P' }] }, /runs before it/],
+    ['a binding from the wrong tool', { steps: [{ tool: 'create_task', title: 'a' }, { tool: 'create_task', title: 'b', arg_bindings: { projectId: '{{step0.result.projectId}}' } }] }, /create_project step/],
+    ['a key that cannot be bound', { steps: [{ tool: 'create_project', name: 'P' }, { tool: 'update_task', taskId: TASK_A, status: 'done', arg_bindings: { taskId: '{{step0.result.projectId}}' } }] }, /cannot come from an earlier step/],
+    ['a step in another org', { steps: [{ tool: 'create_task', title: 'a' }, { tool: 'update_task', taskId: TASK_B, status: 'done' }] }, /No task with that id/],
+  ])('refuses %s, and writes no row', async (_name, args, message) => {
+    const { ev, steps } = await proposePlanVia(args);
+    expect(steps).toHaveLength(0);
+    expect(ev.find((e) => e.type === 'tool_end').tools).toEqual([{ name: 'propose_plan', ok: false, count: 0 }]);
+    expect(rows('ento_ai_action_log')).toEqual([]);
+    const direct = await require('../services/entoAi/actionLog').proposePlan(args, { db: mockClient('user-a'), orgIds: ['org-a'], userId: 'user-a' });
+    expect(direct).toMatchObject({ ok: false, response: { error: expect.stringMatching(message) } });
+  });
+
+  test('resolveBindings refuses a step that produced no value', () => {
+    const { resolveBindings } = require('../services/entoAi/actionLog');
+    expect(resolveBindings({ title: 'a' }, { projectId: '{{step0.result.projectId}}' }, { 0: { projectId: 'p1' } })).toEqual({ title: 'a', projectId: 'p1' });
+    expect(() => resolveBindings({}, { projectId: '{{step0.result.projectId}}' }, {})).toThrow(/did not produce/);
+  });
+});
+
+// ── EAI-06: proactive signals ────────────────────────────────────────
+describe('EAI-06 signals', () => {
+  const signals = (token = 'token-a') => request(app).get('/api/ento-ai/signals').set('Authorization', `Bearer ${token}`);
+  const day = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+
+  test('an overdue open task and a meeting within the hour are signals; done, future and other-org records are not', async () => {
+    process.env.ENTO_AI_WRITE_TOOLS = 'false'; // read-only, so it answers whatever the flag says
+    mockDb.tables.tasks.push(
+      { id: 'late', org_id: 'org-a', title: 'Send the deck', status: 'open', due_date: day(-3) },
+      { id: 'done', org_id: 'org-a', title: 'Old', status: 'done', due_date: day(-3) },
+      { id: 'future', org_id: 'org-a', title: 'Later', status: 'open', due_date: day(2) },
+      { id: 'other', org_id: 'org-b', title: 'Not yours', status: 'open', due_date: day(-3) },
+    );
+    mockDb.tables.meetings.push({ id: 'soon', org_id: 'org-a', title: 'Client call', start_time: new Date(Date.now() + 20 * 60000).toISOString() });
+    const res = await signals();
+    expect(res.status).toBe(200);
+    expect(res.body.total).toBe(2);
+    expect(res.body.signals.map((s) => s.id)).toEqual(['meeting:soon', 'task:late']);
+    expect(res.body.signals[1]).toMatchObject({ kind: 'overdue_task', label: '"Send the deck" is 3 days overdue' });
+    expect(res.body.signals[1].query).toMatch(/Send the deck/);
+    // RLS alone hides 'other' here, so check the second fence on the queries themselves.
+    const reads = mockDb.queries.filter((x) => ['tasks', 'meetings', 'action_items'].includes(x.q.table));
+    expect(reads).toHaveLength(3);
+    for (const { q } of reads) expect(q.filters.some(([k, op]) => k === 'org_id' && op === 'in')).toBe(true);
+  });
+
+  test('a failed read is a 502, never an empty list', async () => {
+    mockDb.failOn = (table) => (table === 'tasks' ? 'boom' : null);
+    expect((await signals()).status).toBe(502);
+  });
+
+  test('anonymous → 401', async () => {
+    expect((await request(app).get('/api/ento-ai/signals')).status).toBe(401);
+  });
 });

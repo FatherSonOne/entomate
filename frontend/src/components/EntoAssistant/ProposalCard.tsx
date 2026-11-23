@@ -35,6 +35,9 @@ export interface EntoProposal {
   editable: EditableField[]
   confirmToken: string | null
   view: { path: string; label: string } | null
+  /** EAI-06: set on a plan's steps; PlanCard renders them as one card. */
+  planId?: string | null
+  stepOrder?: number | null
 }
 
 /** Case, outer spaces and inner runs of spaces do not count (the server applies the same rule). */

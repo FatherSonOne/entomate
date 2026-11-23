@@ -585,7 +585,9 @@ export const guideSections = [
         id: 'ento-proactive',
         title: 'Heads-ups',
         steps: [
-          'When something needs you, such as overdue tasks or a meeting within the hour, Ask Entomate shows a marker. No pop-ups.',
+          'When something needs you, such as an overdue task or action item, or a meeting within the hour, the Ask Entomate button says how many are waiting. No pop-ups.',
+          'Open it to see them under Needs attention. Press one and Ask Entomate helps you deal with it.',
+          'A heads-up goes away by itself when the task is done or its date moves.',
         ],
       },
     ],

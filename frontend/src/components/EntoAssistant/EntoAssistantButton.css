@@ -166,7 +166,15 @@
 
 /* What waits for you takes the accent. */
 .la-launcher-word--waits {
+  flex: none;
   color: var(--cmf-accent, #B85C38);
+}
+
+/* "Ask Entomate" is longer than Logos AI's label: in the 210px rail, "N waiting" fits only
+   when the shortcut hint gives back its width. The shortcut stays listed in the keyboard
+   shortcuts help and the User Guide. */
+.la-launcher-word--waits ~ .la-btn-shortcut {
+  display: none;
 }
 
 /* Parked at the end of row 1, like the nav rows' keycaps sit at the row end. */
