@@ -25,7 +25,7 @@ export interface UseSearchResult {
   data: SearchResponse | null
   loading: boolean
   error: string | null
-  /** Query the current data belongs to. */
+  /** Latest query to settle, successfully or with an error. */
   settledQuery: string
 }
 
@@ -62,6 +62,7 @@ export function useSearch(query: string, opts: UseSearchOptions = {}): UseSearch
         })
         .catch((e: unknown) => {
           if (id !== seq.current) return
+          setSettledQuery(q)
           setError(e instanceof Error ? e.message : 'Search failed')
         })
         .finally(() => {
@@ -71,7 +72,16 @@ export function useSearch(query: string, opts: UseSearchOptions = {}): UseSearch
     return () => { window.clearTimeout(t); seq.current += 1 }
   }, [query, debounceMs, limit, log, enabled])
 
-  return { data: enabled && data?.query === query.trim() ? data : null, loading, error, settledQuery }
+  const current = enabled && query.trim().length >= 2
+  const settled = settledQuery === query.trim()
+  return {
+    data: current && data?.query === query.trim() ? data : null,
+    // A keystroke renders before useEffect marks the request loading. Include
+    // that first render so Enter cannot run a transient Ask row during debounce.
+    loading: current && (loading || !settled),
+    error: current && settled ? error : null,
+    settledQuery,
+  }
 }
 
 /** Recent searches from history. `reloadKey` refetches (after a logged search). */
