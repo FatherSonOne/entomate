@@ -4,6 +4,8 @@
  *
  * POST /api/ento-ai/query  { question, section?, threadId? }  → SSE
  * GET  /api/ento-ai/threads/latest  → { thread: { id, title, messages, updated_at } | null }
+ * GET  /api/ento-ai/threads  → { threads: [{ id, title, updated_at }] }  (newest 20, EAI-02b)
+ * GET  /api/ento-ai/threads/:id  → { thread }   DELETE /api/ento-ai/threads/:id → { ok }  (404 when not theirs)
  * EAI-05, only while ENTO_AI_WRITE_TOOLS=true (404 otherwise):
  *   GET   /api/ento-ai/actions?ids=a,b     → { proposals }
  *   POST  /api/ento-ai/actions/:id/confirm { confirmationText? } → { ok, proposal, error? }
@@ -40,7 +42,7 @@ const log = require('../utils/log');
 const { authenticate } = require('../middleware/auth');
 const { aiLimiter } = require('../middleware/rateLimiter');
 const { getOrgIdsForUser } = require('../utils/orgContext');
-const { declarations, runTool, ToolInputError } = require('../services/entoAi/tools');
+const { declarations, runTool, ToolInputError, uuidArg } = require('../services/entoAi/tools');
 const { VERBS, writeDeclarations, PLAN_TOOL } = require('../services/entoAi/writeTools');
 const actionLog = require('../services/entoAi/actionLog');
 const { signalsFor } = require('../services/entoAi/signals');
@@ -312,6 +314,65 @@ router.get('/threads/latest', authenticate, async (req, res) => {
     res.status(502).json({ error: 'Could not load the conversation' });
   }
 });
+
+// -- EAI-02b History rail ----------------------------------------------
+// Same perimeter as /threads/latest: the caller's JWT client, so RLS (owner AND org member)
+// decides; the org filter is the second fence. Another user's thread reads as not found (404).
+const THREAD_LIST_LIMIT = 20;
+
+function threadRoute(handler) {
+  return async (req, res) => {
+    if (req.params.id !== undefined) {
+      try { uuidArg(req.params.id, 'thread id'); } catch (error) { return res.status(400).json({ error: error.message }); }
+    }
+    const db = createUserClient(req.headers.authorization.split(' ')[1]);
+    if (!db) return res.status(503).json({ error: 'Database not configured' });
+    try {
+      const orgIds = await getOrgIdsForUser(req.user.id);
+      const out = await handler(db, Array.isArray(orgIds) ? orgIds : [], req);
+      if (!out) return res.status(404).json({ error: 'Conversation not found' });
+      res.json(out);
+    } catch (error) {
+      log.error(`[EntoAI] Thread error: ${error.message || error}`);
+      res.status(502).json({ error: 'Could not reach your conversations' });
+    }
+  };
+}
+
+router.get('/threads', authenticate, threadRoute(async (db, orgIds) => {
+  if (!orgIds.length) return { threads: [] };
+  const { data, error } = await db.from('ento_ai_threads')
+    .select('id, title, updated_at')
+    .in('org_id', orgIds)
+    .order('updated_at', { ascending: false })
+    .limit(THREAD_LIST_LIMIT);
+  if (error) throw new Error(error.message);
+  return { threads: data || [] };
+}));
+
+router.get('/threads/:id', authenticate, threadRoute(async (db, orgIds, req) => {
+  if (!orgIds.length) return null;
+  const { data, error } = await db.from('ento_ai_threads')
+    .select('id, title, messages, updated_at')
+    .eq('id', req.params.id)
+    .in('org_id', orgIds)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? { thread: data } : null;
+}));
+
+// .select() returns the deleted rows, so a thread RLS hid (or that is already gone) is a 404,
+// not a silent success.
+router.delete('/threads/:id', authenticate, threadRoute(async (db, orgIds, req) => {
+  if (!orgIds.length) return null;
+  const { data, error } = await db.from('ento_ai_threads')
+    .delete()
+    .eq('id', req.params.id)
+    .in('org_id', orgIds)
+    .select('id');
+  if (error) throw new Error(error.message);
+  return data && data.length ? { ok: true } : null;
+}));
 
 // -- EAI-05 write spine ------------------------------------------------
 // Everything runs under the caller's JWT client (D2); RLS (owner AND org member) and the

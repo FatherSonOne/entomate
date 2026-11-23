@@ -332,6 +332,71 @@ describe('threads (EAI-03)', () => {
   });
 });
 
+describe('History rail (EAI-02b)', () => {
+  const THREAD = '99999999-2222-4333-8444-555555555555';
+  const as = (req) => req.set('Authorization', 'Bearer good-token');
+  const callsOf = (table) => mockUserQueries.find((q) => q.table === table)?.calls || [];
+
+  test.each([
+    ['get', '/api/ento-ai/threads'],
+    ['get', `/api/ento-ai/threads/${THREAD}`],
+    ['delete', `/api/ento-ai/threads/${THREAD}`],
+  ])('anonymous %s %s → 401, nothing read', async (method, path) => {
+    expect((await request(app)[method](path)).status).toBe(401);
+    expect(mockUserQueries).toEqual([]);
+  });
+
+  test('GET /threads lists the newest 20 (no messages) on the user client with the org fence', async () => {
+    mockResults.ento_ai_threads = { data: [{ id: THREAD, title: 'Q1 plan', updated_at: 'now' }], error: null };
+    const res = await as(request(app).get('/api/ento-ai/threads'));
+    expect(res.status).toBe(200);
+    expect(res.body.threads).toEqual([{ id: THREAD, title: 'Q1 plan', updated_at: 'now' }]);
+    expect(callsOf('ento_ai_threads')).toEqual([
+      ['select', ['id, title, updated_at']],
+      ['in', ['org_id', ['org-a']]],
+      ['order', ['updated_at', { ascending: false }]],
+      ['limit', [20]],
+    ]);
+    expect(mockServiceQueries).toEqual([]);
+  });
+
+  test('GET /threads/:id reads that thread with the fence; one the caller cannot see is 404', async () => {
+    mockResults.ento_ai_threads = { data: { id: THREAD, title: 't', messages: [{ role: 'user', content: 'hi' }], updated_at: 'now' }, error: null };
+    const res = await as(request(app).get(`/api/ento-ai/threads/${THREAD}`));
+    expect(res.status).toBe(200);
+    expect(res.body.thread.messages).toHaveLength(1);
+    expect(callsOf('ento_ai_threads')).toEqual(expect.arrayContaining([['eq', ['id', THREAD]], ['in', ['org_id', ['org-a']]]]));
+
+    mockResults.ento_ai_threads = { data: null, error: null }; // RLS hid it
+    expect((await as(request(app).get(`/api/ento-ai/threads/${THREAD}`))).status).toBe(404);
+  });
+
+  test('DELETE /threads/:id deletes with the fence and reports a row RLS hid as 404, not success', async () => {
+    mockResults.ento_ai_threads = { data: [{ id: THREAD }], error: null };
+    const res = await as(request(app).delete(`/api/ento-ai/threads/${THREAD}`));
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(callsOf('ento_ai_threads')).toEqual([
+      ['delete', []], ['eq', ['id', THREAD]], ['in', ['org_id', ['org-a']]], ['select', ['id']],
+    ]);
+
+    mockUserQueries.length = 0;
+    mockResults.ento_ai_threads = { data: [], error: null };
+    expect((await as(request(app).delete(`/api/ento-ai/threads/${THREAD}`))).status).toBe(404);
+  });
+
+  test.each([['get'], ['delete']])('%s with an id that is not a uuid → 400, never queried', async (method) => {
+    expect((await as(request(app)[method]('/api/ento-ai/threads/not-a-uuid'))).status).toBe(400);
+    expect(mockUserQueries).toEqual([]);
+  });
+
+  test('a failed read or delete is a 502, never an empty list or a success', async () => {
+    mockResults.ento_ai_threads = { data: null, error: { message: 'boom' } };
+    expect((await as(request(app).get('/api/ento-ai/threads'))).status).toBe(502);
+    expect((await as(request(app).delete(`/api/ento-ai/threads/${THREAD}`))).status).toBe(502);
+  });
+});
+
 describe('tools', () => {
   test('every declared tool has a label and an object schema', () => {
     expect(declarations).toHaveLength(9);

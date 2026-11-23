@@ -1,0 +1,521 @@
+/* U2b — conversation history rail.
+   Lives inside `.la-panel` (already `position: relative`), so it needs no stacking context of
+   its own and cannot escape the panel. Colours come from the panel's inherited token scope:
+   `--cmf-*` are theme-aware in design-tokens.css, so dark mode needs no override rules here. */
+
+.la-rail-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  background: rgba(0, 0, 0, 0.28);
+  animation: la-rail-scrim-in 180ms var(--la-ease-out) both;
+}
+
+.la-rail {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 5;
+  width: min(292px, 82%);
+  display: flex;
+  flex-direction: column;
+  background: var(--cmf-bg);
+  border-right: 1px solid var(--cmf-border);
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.14);
+  animation: la-rail-in 240ms var(--la-ease-drawer) both;
+}
+
+@keyframes la-rail-scrim-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes la-rail-in {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .la-rail,
+  .la-rail-scrim {
+    animation-duration: 1ms;
+  }
+}
+
+/* --- Header --- */
+
+.la-rail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 14px 12px 10px 16px;
+  border-bottom: 1px solid var(--cmf-border);
+}
+
+.la-rail-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--cmf-text);
+}
+
+.la-rail-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--cmf-text-muted);
+  cursor: pointer;
+  transition: background 140ms var(--la-ease-out), color 140ms var(--la-ease-out);
+}
+
+.la-rail-close:hover {
+  background: var(--cmf-surface-2);
+  color: var(--cmf-text);
+}
+
+/* --- New conversation --- */
+
+.la-rail-new {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 12px 4px;
+  padding: 9px 12px;
+  border: 1px solid var(--la-secondary-muted);
+  border-radius: 9px;
+  background: var(--la-secondary-subtle);
+  color: var(--la-secondary-dark);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 140ms var(--la-ease-out), border-color 140ms var(--la-ease-out);
+}
+
+.la-rail-new:hover {
+  background: var(--la-secondary-muted);
+  border-color: var(--la-secondary);
+}
+
+/* --- List --- */
+
+.la-rail-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px 8px 12px;
+}
+
+.la-rail-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 28px 20px;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--cmf-text-faint);
+}
+
+.la-rail-item {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  border-radius: 9px;
+  transition: background 140ms var(--la-ease-out);
+}
+
+.la-rail-item:hover {
+  background: var(--cmf-surface-2);
+}
+
+/* 1px, not 2px: DESIGN.md bans a coloured left accent stripe above 1px. An
+   inset shadow rather than a real border-left, so the indicator costs no layout
+   — a border would shift every row's content 1px on activation. The ban is on
+   the visual weight of the stripe, not on the property used to draw it, which
+   is exactly why the 2px version survived here: a `border-left` grep never
+   found it. */
+.la-rail-item-active {
+  background: var(--la-secondary-subtle);
+  box-shadow: inset 1px 0 0 var(--la-secondary);
+}
+
+.la-rail-item-active:hover {
+  background: var(--la-secondary-muted);
+}
+
+.la-rail-item-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 6px 9px 10px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.la-rail-item-title {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--cmf-text);
+  /* One line, clipped. A wrapping title turns a scannable list into a wall of prose. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.la-rail-item-time {
+  font-size: 10.5px;
+  color: var(--cmf-text-faint);
+}
+
+/* The delete affordance stays invisible until the row is hovered or focused — it is
+   destructive, and a trash can on every row reads as clutter at a glance. Keyboard users get
+   it via :focus-within, so it is never unreachable without a pointer. */
+.la-rail-item-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  border: none;
+  border-radius: 0 9px 9px 0;
+  background: transparent;
+  color: var(--cmf-text-faint);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 140ms var(--la-ease-out), color 140ms var(--la-ease-out);
+}
+
+.la-rail-item:hover .la-rail-item-delete,
+.la-rail-item:focus-within .la-rail-item-delete {
+  opacity: 1;
+}
+
+.la-rail-item-delete:hover {
+  color: #C0553F;
+}
+
+.la-rail-confirm {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-right: 4px;
+}
+
+.la-rail-confirm-yes {
+  padding: 4px 7px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(192, 85, 63, 0.14);
+  color: #C0553F;
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.la-rail-confirm-yes:hover {
+  background: rgba(192, 85, 63, 0.22);
+}
+
+.la-rail-confirm-no {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--cmf-text-muted);
+  cursor: pointer;
+}
+
+.la-rail-confirm-no:hover {
+  background: var(--cmf-surface-2);
+}
+
+/* --- Dark mode ---
+   Only the two SATURATED colours need a dark variant; everything else is a `--cmf-*` token and
+   flips on its own. Both of these are the DARK end of their ramp, chosen for contrast against a
+   light surface — left alone they land at roughly 3.9:1 and 3.3:1 on the near-black panel,
+   under the 4.5:1 bar. The light ends clear 7:1. */
+
+html.dark .la-rail-new,
+.la-dark .la-rail-new {
+  color: var(--la-secondary-light);
+}
+
+html.dark .la-rail-item-delete:hover,
+.la-dark .la-rail-item-delete:hover,
+html.dark .la-rail-confirm-yes,
+.la-dark .la-rail-confirm-yes {
+  color: #E08A72;
+}
+
+html.dark .la-rail-scrim,
+.la-dark .la-rail-scrim {
+  /* A 28% black veil is nearly invisible over a near-black panel — the rail would read as
+     floating over nothing rather than over the conversation it covers. */
+  background: rgba(0, 0, 0, 0.5);
+}
+
+/* Touch has no hover, so the delete affordance would never appear. Show it always, and give
+   every control the 44px target the tablet pass standardised on. */
+@media (hover: none) {
+  .la-rail-item-delete {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 768px) {
+  .la-rail-item-main {
+    min-height: 44px;
+  }
+
+  .la-rail-item-delete {
+    width: 44px;
+  }
+
+  .la-rail-new {
+    min-height: 44px;
+  }
+}
+
+/* ============================================================================
+   SWISS TRANSCRIPT — PR 4: the history rail as "Transcripts" (Frank, 2026-11-10)
+   The rail takes the panel's full width under its header, so there is no scrim
+   to click past: the close button, the History toggle and Escape close it.
+   Threads are numbered ruled rows; the open one says "Open" with an 8px accent
+   square. Select, new, delete and its confirm keep their markup and behaviour.
+   ============================================================================ */
+.la-rail-item-state {
+  display: none;
+}
+.logos-assistant.la-swiss .la-rail-scrim {
+  display: none;
+}
+.logos-assistant.la-swiss .la-rail {
+  /* The Swiss header is 52px and stays above the rail (z-index 20 over 5). */
+  top: 52px;
+  right: 0;
+  width: auto;
+  padding: 0 16px 0 24px;
+  border-right: 0;
+  background: var(--cmf-bg, #FFFBF7);
+  box-shadow: none;
+  counter-reset: la-sw-rail;
+}
+.logos-assistant.la-swiss.la-sheet .la-rail {
+  /* The 18px grip sits above the header on the sheet. */
+  top: 70px;
+  padding: 0 12px 0 16px;
+}
+.logos-assistant.la-swiss .la-rail-header {
+  align-items: flex-end;
+  padding: 18px 0 12px;
+  border-bottom: 2px solid var(--la-sw-rule);
+}
+.logos-assistant.la-swiss .la-rail-title {
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--la-sw-ink);
+}
+.logos-assistant.la-swiss .la-rail-close {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--la-sw-hair);
+  border-radius: 2px;
+  color: var(--la-sw-sec);
+}
+.logos-assistant.la-swiss .la-rail-close:hover {
+  border-color: var(--la-sw-rule);
+  background: transparent;
+  color: var(--la-sw-ink);
+}
+.logos-assistant.la-swiss .la-rail-new {
+  align-self: flex-start;
+  gap: 6px;
+  min-height: 32px;
+  margin: 14px 0 8px;
+  padding: 0 12px;
+  border: 1px solid var(--la-sw-rule);
+  border-radius: 2px;
+  background: transparent;
+  font-size: 12px;
+  color: var(--la-sw-ink);
+}
+.logos-assistant.la-swiss .la-rail-new:hover {
+  border-color: var(--la-sw-rule);
+  background: var(--la-sw-hover);
+}
+.logos-assistant.la-swiss .la-rail-list {
+  padding: 0 0 16px;
+  border-top: 1px solid var(--la-sw-hair);
+}
+.logos-assistant.la-swiss .la-rail-empty {
+  align-items: flex-start;
+  padding: 16px 0;
+  text-align: left;
+  color: var(--la-sw-muted);
+}
+.logos-assistant.la-swiss .la-rail-item {
+  align-items: stretch;
+  gap: 0;
+  border-bottom: 1px solid var(--la-sw-hair);
+  border-radius: 0;
+  counter-increment: la-sw-rail;
+}
+.logos-assistant.la-swiss .la-rail-item::before {
+  content: counter(la-sw-rail, decimal-leading-zero);
+  flex: none;
+  width: 40px;
+  padding-top: 13px;
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--la-sw-muted);
+}
+.logos-assistant.la-swiss .la-rail-item:hover {
+  background: var(--la-sw-hover);
+}
+.logos-assistant.la-swiss .la-rail-item-active {
+  background: transparent;
+  box-shadow: none;
+}
+.logos-assistant.la-swiss .la-rail-item-active:hover {
+  background: var(--la-sw-hover);
+}
+.logos-assistant.la-swiss .la-rail-item-active::before {
+  color: var(--la-sw-ink);
+}
+.logos-assistant.la-swiss .la-rail-item-main {
+  gap: 3px;
+  padding: 11px 8px 11px 0;
+}
+.logos-assistant.la-swiss .la-rail-item-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--la-sw-ink);
+}
+.logos-assistant.la-swiss .la-rail-item-time {
+  font-size: 11.5px;
+  color: var(--la-sw-muted);
+}
+.logos-assistant.la-swiss .la-rail-item-state {
+  display: inline-flex;
+  flex: none;
+  align-self: center;
+  align-items: center;
+  gap: 6px;
+  padding-right: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--la-sw-accent-ink);
+}
+.logos-assistant.la-swiss .la-rail-item-state::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  background: var(--la-sw-accent);
+}
+.logos-assistant.la-swiss .la-rail-item-delete {
+  width: 32px;
+  border-radius: 0;
+  color: var(--la-sw-muted);
+}
+.logos-assistant.la-swiss .la-rail-item-delete:hover {
+  color: var(--cmf-error-ink, #B42318);
+}
+.logos-assistant.la-swiss .la-rail-confirm {
+  gap: 4px;
+  padding-right: 0;
+}
+.logos-assistant.la-swiss .la-rail-confirm-yes {
+  min-height: 28px;
+  padding: 0 9px;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  background: transparent;
+  font-size: 11.5px;
+  color: var(--cmf-error-ink, #B42318);
+}
+.logos-assistant.la-swiss .la-rail-confirm-yes:hover {
+  background: var(--la-sw-hover);
+}
+.logos-assistant.la-swiss .la-rail-confirm-no {
+  width: 28px;
+  height: 28px;
+  border-radius: 2px;
+}
+.logos-assistant.la-swiss .la-rail-confirm-no:hover {
+  background: var(--la-sw-hover);
+}
+
+/* Touch widths keep the 44px targets the tablet pass set. */
+@media (max-width: 768px) {
+  .logos-assistant.la-swiss .la-rail-new {
+    min-height: 44px;
+  }
+  .logos-assistant.la-swiss .la-rail-item-delete {
+    width: 44px;
+  }
+  .logos-assistant.la-swiss .la-rail-item::before {
+    padding-top: 15px;
+  }
+  .logos-assistant.la-swiss .la-rail-confirm-yes {
+    min-height: 44px;
+  }
+  .logos-assistant.la-swiss .la-rail-confirm-no {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+/* ============================================================================
+   "View all transcripts" (2026-11-21, option A): the panel lists the newest 20,
+   so the link to the full history page sits under the list, outside its scroll,
+   always in reach. A text link, not a button box: it is navigation.
+   ============================================================================ */
+.la-rail-view-all {
+  flex: none;
+  align-self: flex-start;
+  min-height: 44px;
+  margin: 0 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--cmf-accent-ink, var(--cmf-accent));
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+  cursor: pointer;
+}
+.la-rail-view-all:hover {
+  text-decoration-thickness: 2px;
+}
+.la-rail-view-all:active {
+  opacity: 0.8;
+}
+.la-rail-view-all:focus-visible {
+  outline: 2px solid var(--cmf-accent);
+  outline-offset: 2px;
+}
+.logos-assistant.la-swiss .la-rail-view-all {
+  margin: 0;
+  color: var(--la-sw-accent-ink);
+}
