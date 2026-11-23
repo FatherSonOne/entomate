@@ -101,6 +101,8 @@ const VERBS = {
     undo: 'delete',
     table: 'tasks',
     noun: 'task',
+    // EAI-06: in a plan, a task can go into a project an earlier create_project step makes.
+    bindable: { projectId: { from: 'create_project', key: 'projectId' } },
     editable: [
       { key: 'title', label: 'Title', type: 'text' },
       { key: 'dueDate', label: 'Due date', type: 'date' },
@@ -556,6 +558,56 @@ const VERBS = {
   },
 };
 
-const writeDeclarations = Object.entries(VERBS).map(([name, v]) => ({ name, ...v.declaration }));
+const PLAN_TOOL = 'propose_plan';
+const MAX_PLAN_STEPS = 8;
 
-module.exports = { VERBS, writeDeclarations, findRow };
+/**
+ * EAI-06: one declaration for a multi-step plan. Gemini needs explicit properties, so a
+ * step carries `tool` plus the union of every verb's arguments (as Logos AI's propose_plan
+ * does); each verb's prepare() still validates its own. Two verbs that share an argument
+ * name with different enums (status) get the union of the values.
+ */
+function planDeclaration() {
+  const props = {};
+  for (const v of Object.values(VERBS)) {
+    for (const [key, schema] of Object.entries(v.declaration.parameters.properties)) {
+      const seen = props[key];
+      if (seen?.enum && schema.enum) props[key] = { ...seen, enum: [...new Set([...seen.enum, ...schema.enum])], description: undefined };
+      else if (!seen) props[key] = schema;
+    }
+  }
+  for (const p of Object.values(props)) if (p.description === undefined) delete p.description;
+  return {
+    name: PLAN_TOOL,
+    description: `Propose a MULTI-STEP plan: 2 to ${MAX_PLAN_STEPS} of the write actions above that belong together, run in order and confirmed once. Classic cases: (a) a new project and its first tasks: a create_project step, then create_task steps whose arg_bindings.projectId is "{{step0.result.projectId}}"; (b) several changes the user asked for at once, such as moving three overdue tasks to a new date. Nothing runs until the user confirms the whole plan. For ONE action, call that action's tool instead.`,
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        steps: {
+          type: SchemaType.ARRAY,
+          description: 'The steps, in the order they run. Each names one write tool and that tool\'s arguments.',
+          items: {
+            type: SchemaType.OBJECT,
+            properties: {
+              tool: enumOf(Object.keys(VERBS), 'The write tool this step runs.'),
+              ...props,
+              arg_bindings: {
+                type: SchemaType.OBJECT,
+                description: 'Arguments taken from an earlier step\'s result when the plan runs.',
+                properties: {
+                  projectId: { ...STR, description: 'On a create_task step: "{{stepN.result.projectId}}" for the project an earlier create_project step N makes.' },
+                },
+              },
+            },
+            required: ['tool'],
+          },
+        },
+      },
+      required: ['steps'],
+    },
+  };
+}
+
+const writeDeclarations = [...Object.entries(VERBS).map(([name, v]) => ({ name, ...v.declaration })), planDeclaration()];
+
+module.exports = { VERBS, writeDeclarations, findRow, PLAN_TOOL, MAX_PLAN_STEPS };

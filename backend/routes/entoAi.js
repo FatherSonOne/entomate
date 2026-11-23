@@ -10,6 +10,8 @@
  *   POST  /api/ento-ai/actions/:id/reject  → { ok, proposal }
  *   POST  /api/ento-ai/actions/:id/undo    → { ok, proposal, error? }
  *   PATCH /api/ento-ai/actions/:id         { field: value } → { ok, proposal }
+ *   POST  /api/ento-ai/plans/:planId/confirm|reject|undo → { ok, proposals, error? }  (EAI-06)
+ * GET  /api/ento-ai/signals  → { signals, total }  (EAI-06, always on)
  *
  * Gemini decides which read tools to call (services/entoAi/tools.js); the
  * backend runs them with the caller's user-JWT client (D2), feeds the results
@@ -39,8 +41,9 @@ const { authenticate } = require('../middleware/auth');
 const { aiLimiter } = require('../middleware/rateLimiter');
 const { getOrgIdsForUser } = require('../utils/orgContext');
 const { declarations, runTool, ToolInputError } = require('../services/entoAi/tools');
-const { VERBS, writeDeclarations } = require('../services/entoAi/writeTools');
+const { VERBS, writeDeclarations, PLAN_TOOL } = require('../services/entoAi/writeTools');
 const actionLog = require('../services/entoAi/actionLog');
+const { signalsFor } = require('../services/entoAi/signals');
 const { generateFollowUps, SECTION_LABELS } = require('./assistant');
 
 const router = express.Router();
@@ -59,7 +62,7 @@ const writesEnabled = () => process.env.ENTO_AI_WRITE_TOOLS === 'true';
 
 const READ_ONLY_RULE = 'You can only read. If the user asks you to create, change or send something, say that you cannot do that yet and tell them where in Entomate to do it. You may write a draft (an email, an agenda) as text in your answer.';
 const WRITE_RULE = `You can propose changes with your write tools (create or update tasks, action items and projects, assign tasks, add meeting notes). A write tool never changes anything by itself: it puts a card in the panel, and the change happens only when the user presses Confirm. After proposing, say in one line what you proposed and that it waits for their Confirm. Never say it is done.
-Look records up first so you pass real ids. Propose only what the user asked for, one card per change. You cannot send email or messages, or schedule meetings; say so, and you may write a draft as text in your answer.`;
+Look records up first so you pass real ids. Propose only what the user asked for, one card per change. When the user asks for several changes that belong together (a new project and its tasks, or the same change to several records), use propose_plan so they confirm once. You cannot send email or messages, or schedule meetings; say so, and you may write a draft as text in your answer.`;
 
 function systemInstruction(sectionLabel, userName, writes = false) {
   const now = new Date();
@@ -161,18 +164,20 @@ async function runAgent({ model, history, question, ctx, emit }) {
     if (!wanted.length) break;
     emit({ type: 'tool_start', turn, tools: wanted.map((c) => c.name) });
     // A write name is a proposal only while the flag is on; otherwise runTool reports it unknown.
-    const outs = await Promise.all(wanted.map((c) => (
-      ctx.writes && VERBS[c.name] ? actionLog.propose(c.name, c.args, ctx) : runTool(c.name, c.args, ctx)
-    )));
+    const outs = await Promise.all(wanted.map((c) => {
+      if (ctx.writes && c.name === PLAN_TOOL) return actionLog.proposePlan(c.args, ctx);
+      return ctx.writes && VERBS[c.name] ? actionLog.propose(c.name, c.args, ctx) : runTool(c.name, c.args, ctx);
+    }));
     emit({ type: 'tool_end', turn, tools: outs.map(({ name, ok, count }) => ({ name, ok, count })) });
     for (const o of outs) {
-      if (o.proposal) {
-        proposals.push(o.proposal);
-        emit({ type: 'proposal', proposal: o.proposal });
+      // A plan arrives as its steps; the panel groups them into one card by planId.
+      for (const p of o.proposals || (o.proposal ? [o.proposal] : [])) {
+        proposals.push(p);
+        emit({ type: 'proposal', proposal: p });
       }
     }
     // Chips name what was read; a proposal shows as its own card instead.
-    calls.push(...outs.filter((o) => !o.proposal).map(({ name, ok, count }) => ({ turn, name, ok, count })));
+    calls.push(...outs.filter((o) => !o.proposal && !o.proposals).map(({ name, ok, count }) => ({ turn, name, ok, count })));
     contents.push({
       role: 'user',
       parts: outs.map((o, i) => ({
@@ -345,6 +350,22 @@ router.post('/actions/:id/confirm', authenticate, actionRoute((ctx, req) => (
 router.post('/actions/:id/reject', authenticate, actionRoute((ctx, req) => actionLog.reject(ctx, req.params.id)));
 router.post('/actions/:id/undo', authenticate, actionRoute((ctx, req) => actionLog.undo(ctx, req.params.id)));
 router.patch('/actions/:id', authenticate, actionRoute((ctx, req) => actionLog.edit(ctx, req.params.id, req.body)));
+// EAI-06: a plan is confirmed, dismissed and undone as a whole. Each answers { ok, proposals, error? }.
+router.post('/plans/:planId/confirm', authenticate, actionRoute((ctx, req) => actionLog.confirmPlan(ctx, req.params.planId)));
+router.post('/plans/:planId/reject', authenticate, actionRoute((ctx, req) => actionLog.rejectPlan(ctx, req.params.planId)));
+router.post('/plans/:planId/undo', authenticate, actionRoute((ctx, req) => actionLog.undoPlan(ctx, req.params.planId)));
+
+/** EAI-06: what needs the user now (services/entoAi/signals.js). Read-only, so not behind the write flag. */
+router.get('/signals', authenticate, async (req, res) => {
+  try {
+    const ctx = await actionCtx(req);
+    if (!ctx) return res.status(503).json({ error: 'Database not configured' });
+    res.json(await signalsFor(ctx));
+  } catch (error) {
+    log.error(`[EntoAI] Signals error: ${error.message || error}`);
+    res.status(502).json({ error: 'Could not check what needs you' });
+  }
+});
 
 router._runAgent = runAgent;
 router._systemInstruction = systemInstruction;

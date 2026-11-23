@@ -1,7 +1,7 @@
 // ─── Entomate User Guide Data ─────────────────────────────────────────────
 // Version tracking — update these when guide content changes
 
-export const guideVersion = '2026-11-23a'
+export const guideVersion = '2026-11-23b'
 export const guideUpdated = '2026-11-23'
 
 // ─── Version key for localStorage new-feature detection ───────────────────
@@ -22,6 +22,7 @@ export const CATEGORIES = [
 // Add a line here (and bump guideVersion) whenever a section changes.
 
 export const GUIDE_CHANGES = [
+  { date: '2026-11-23', section: 'meeting-details', text: 'Follow-up tab: an email to the people who were there, sent on its own 20 minutes after the meeting unless you edit or stop it.' },
   { date: '2026-11-23', section: 'upcoming', text: 'Upcoming in Meetings replaces Calendar: 60 days, a month calendar and Skip or Join per meeting.' },
   { date: '2026-11-23', section: 'dashboard', text: 'Today rewritten for the current page: action items, agents, decisions and schedule.' },
   { date: '2026-11-23', section: 'settings', text: 'Settings is six sections: You, Appearance, Recording, Meeting agents, Connections, Workspace.' },
@@ -348,10 +349,22 @@ export const guideSections = [
         ],
       },
       {
+        id: 'md-follow-up',
+        title: 'Follow-up email',
+        steps: [
+          'Open the Follow-up tab. When the minutes are ready, Entomate drafts an email to the people who were there: an opening line, what was decided, who is on what, and the next meeting with the same people.',
+          'People come from the calendar invite, the bot\u2019s invitees and the owners of action items. Remove anyone with \u00d7, or type an email to add one.',
+          'Click the subject, the opening or the sign-off to change them. The amber line marks the opening Entomate wrote.',
+          'Sending: the agent sends it 20 minutes after the meeting ends. Editing it holds it for you; press Stop to keep it from going out. Send now sends it at once.',
+          'Replies go to you, and Send me a copy puts a copy in your inbox. Private notes are never included.',
+          'To stop follow-ups going out on their own, turn off Send on their own in the Follow-up tab.',
+        ],
+      },
+      {
         id: 'md-share',
         title: 'Share recap',
         steps: [
-          'Press Share recap. Post it to a chat channel, Email me the recap, or Download PDF.',
+          'Press Share recap. Post it to a chat channel, or Download PDF. Email the people who were there opens the Follow-up tab.',
           'Send to CRM pushes the action items to Logos Vision.',
           'More actions \u203a Add to calendar puts the meeting and its summary on your Google Calendar.',
         ],
@@ -585,7 +598,9 @@ export const guideSections = [
         id: 'ento-proactive',
         title: 'Heads-ups',
         steps: [
-          'When something needs you, such as overdue tasks or a meeting within the hour, Ask Entomate shows a marker. No pop-ups.',
+          'When something needs you, such as an overdue task or action item, or a meeting within the hour, the Ask Entomate button says how many are waiting. No pop-ups.',
+          'Open it to see them under Needs attention. Press one and Ask Entomate helps you deal with it.',
+          'A heads-up goes away by itself when the task is done or its date moves.',
         ],
       },
     ],
@@ -658,7 +673,7 @@ export const guideSections = [
         steps: [
           'PDF: Meeting recap (pick a meeting), Weekly summary (your last 7 days), Project report (pick a project). Preview a PDF in the drawer before downloading.',
           'CSV: Meetings, Action items (all or one status), Tasks.',
-          'To email a recap, open the meeting and use Share recap.',
+          'To email a recap to the people who were there, open the meeting\u2019s Follow-up tab.',
         ],
       },
     ],

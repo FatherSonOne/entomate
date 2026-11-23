@@ -75,4 +75,40 @@ const carryForwardPreview = z.object({
   params: z.object({}).passthrough()
 });
 
-module.exports = { process, transcript, list, update, ask, carryForwardPreview };
+const followUpParams = z.object({ id: z.string().uuid() });
+
+const followUpUpdate = z.object({
+  body: z.object({
+    recipients: z.array(z.object({
+      name: z.string().max(120).optional().nullable(),
+      email: z.string().email().max(320),
+      source: z.enum(['invite', 'owner', 'added']).optional(),
+    })).max(20).optional(),
+    subject: z.string().max(200).optional(),
+    opening: z.string().max(2000).optional(),
+    signoff: z.string().max(300).optional(),
+    include: z.object({
+      decisions: z.boolean().optional(),
+      items: z.boolean().optional(),
+      next: z.boolean().optional(),
+      summary: z.boolean().optional(),
+      copy: z.boolean().optional(),
+    }).optional(),
+  }),
+  query: z.object({}).passthrough(),
+  params: followUpParams,
+});
+
+const followUpAction = z.object({
+  body: z.object({}).passthrough(),
+  query: z.object({}).passthrough(),
+  params: followUpParams,
+});
+
+const followUpAutoSend = z.object({
+  body: z.object({ enabled: z.boolean() }),
+  query: z.object({}).passthrough(),
+  params: z.object({}).passthrough(),
+});
+
+module.exports = { process, transcript, list, update, ask, carryForwardPreview, followUpUpdate, followUpAction, followUpAutoSend };
