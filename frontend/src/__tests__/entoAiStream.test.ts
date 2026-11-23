@@ -83,6 +83,17 @@ describe('streamQuery fallback', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(onError.mock.calls[0]![0].message).toMatch(/Wait a minute/)
   })
+
+  test('EAI-07: a monthly-quota 429 shows the server message, not the rate-limit one, and does not fall back', async () => {
+    const quota = { code: 'ai_quota', used: 100, limit: 100, error: 'Your workspace has used all 100 AI questions for this month. The count starts again on the 1st.' }
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify(quota), { status: 429 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { streamQuery } = await import('../services/entoAssistantService')
+    const onError = vi.fn()
+    await streamQuery('q', { section: 'tasks' }, { onError })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(onError.mock.calls[0]![0].message).toBe(quota.error)
+  })
 })
 
 describe('EAI-03', () => {

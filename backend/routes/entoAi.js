@@ -49,6 +49,7 @@ const { VERBS, writeDeclarations, PLAN_TOOL } = require('../services/entoAi/writ
 const actionLog = require('../services/entoAi/actionLog');
 const { signalsFor } = require('../services/entoAi/signals');
 const { generateFollowUps, SECTION_LABELS } = require('./assistant');
+const { meterAi, addUsage } = require('../services/aiUsage');
 
 const router = express.Router();
 
@@ -140,7 +141,10 @@ async function runAgent({ model, history, question, ctx, emit }) {
     const parts = [];
     const wanted = [];
     let text = '';
+    let usage = null;
     for await (const chunk of stream) {
+      // Each chunk may carry usageMetadata; the last one holds the call's totals.
+      if (chunk.usageMetadata) usage = chunk.usageMetadata;
       for (const part of chunk.candidates?.[0]?.content?.parts || []) {
         parts.push(part);
         if (part.functionCall) {
@@ -154,6 +158,7 @@ async function runAgent({ model, history, question, ctx, emit }) {
         }
       }
     }
+    addUsage(usage);
     if (parts.length) contents.push({ role: 'model', parts });
     if (wanted.length && text) emit({ type: 'chunk_reset' });
     return { wanted, text: wanted.length ? '' : text.trim() };
@@ -228,7 +233,7 @@ async function saveThread(db, { threadId, orgId, question, messages }) {
   return data;
 }
 
-router.post('/query', authenticate, aiLimiter, async (req, res) => {
+router.post('/query', authenticate, aiLimiter, meterAi, async (req, res) => {
   const question = typeof req.body?.question === 'string' ? req.body.question.trim().slice(0, MAX_QUESTION) : '';
   if (!question) return res.status(400).json({ error: 'Question is required' });
   if (!gemini.isConfigured() || !gemini.genAI) return res.status(503).json({ error: 'AI tools not configured' });

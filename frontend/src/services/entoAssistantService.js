@@ -370,7 +370,9 @@ export async function streamQuery(userQuery, context, callbacks) {
     if (err?.name === 'AbortError') throw err
     // A rate limit applies to the fallback too: say so instead of failing twice.
     if (err?.status === 429) {
-      callbacks.onError?.(new Error('Too many questions in a short time. Wait a minute, then ask again.'))
+      callbacks.onError?.(new Error(err.code === 'ai_quota' && err.quotaMessage
+        ? err.quotaMessage
+        : 'Too many questions in a short time. Wait a minute, then ask again.'))
       return
     }
     console.warn('[EntoAI] Tool endpoint unavailable, using the assistant endpoint:', err?.message)

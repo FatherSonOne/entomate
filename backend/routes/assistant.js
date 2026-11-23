@@ -11,6 +11,7 @@ const askService = require('../services/askService');
 const { authenticate } = require('../middleware/auth');
 const { aiLimiter } = require('../middleware/rateLimiter');
 const { getOrgIdsForUser } = require('../utils/orgContext');
+const { meterAi } = require('../services/aiUsage');
 
 const router = express.Router();
 
@@ -252,7 +253,7 @@ const SECTION_LABELS = {
  *
  * Body: { question, section, conversationId? }
  */
-router.post('/query', authenticate, aiLimiter, async (req, res) => {
+router.post('/query', authenticate, aiLimiter, meterAi, async (req, res) => {
   try {
     const { question, section = 'dashboard', conversationId } = req.body;
 

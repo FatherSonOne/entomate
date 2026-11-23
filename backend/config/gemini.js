@@ -1,5 +1,6 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const log = require('../utils/log');
+const { addUsage } = require('../services/aiUsage');
 
 const EMBEDDING_MODEL = 'gemini-embedding-001';
 const EMBEDDING_DIMENSIONS = 768; // matches embeddings.embedding vector(768)
@@ -284,6 +285,8 @@ Return ONLY valid JSON:
         }]
       });
 
+      // EAI-07: counted for the org when called inside a metered route; a no-op elsewhere.
+      addUsage(response.response.usageMetadata);
       const text = response.response.text();
       let jsonText = text;
       const jsonMatch = text.match(/\{[\s\S]*\}/);

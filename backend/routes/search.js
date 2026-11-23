@@ -12,6 +12,7 @@ const { searchCache, suggestionCache, withCache } = require('../utils/cache');
 const { authenticate } = require('../middleware/auth');
 const log = require('../utils/log');
 const { attachOrgIds, getOrgIdForUser } = require('../utils/orgContext');
+const { meterAi } = require('../services/aiUsage');
 const searchEverything = require('../services/searchEverything');
 const searchNotes = require('../services/searchNotesService');
 
@@ -282,7 +283,7 @@ router.post('/semantic', authenticate, async (req, res) => {
  * POST /api/search/ask
  * Ask AI a question about meetings
  */
-router.post('/ask', authenticate, async (req, res) => {
+router.post('/ask', authenticate, meterAi, async (req, res) => {
   try {
     const { question, conversationId, meetingIds } = req.body;
 
@@ -312,7 +313,7 @@ router.post('/ask', authenticate, async (req, res) => {
  * POST /api/search/ask/stream
  * Ask AI a question with streaming response (SSE)
  */
-router.post('/ask/stream', authenticate, async (req, res) => {
+router.post('/ask/stream', authenticate, meterAi, async (req, res) => {
   try {
     const { question, conversationId, meetingIds } = req.body;
 
@@ -372,7 +373,7 @@ router.post('/ask/stream', authenticate, async (req, res) => {
  * POST /api/search/ask/follow-up
  * Ask follow-up question in existing conversation
  */
-router.post('/ask/follow-up', authenticate, async (req, res) => {
+router.post('/ask/follow-up', authenticate, meterAi, async (req, res) => {
   try {
     const { question, conversationId } = req.body;
 
