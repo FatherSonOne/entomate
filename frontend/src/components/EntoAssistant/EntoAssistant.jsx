@@ -399,6 +399,8 @@ export default function EntoAssistant({ isOpen, onClose, signals = [], signalTot
               // EAI-05: the writes this answer proposed. Nothing changed until a card is confirmed.
               proposals: Array.isArray(result.proposals) ? result.proposals : streamedProposals,
               recordLinks: Array.isArray(result.recordLinks) ? result.recordLinks : [],
+              // Set when the main path failed and an older one answered (see noteFallback).
+              fallback: result.fallback || undefined,
               confidence: result.confidence,
               ts: Date.now(),
               section,
@@ -718,6 +720,11 @@ export default function EntoAssistant({ isOpen, onClose, signals = [], signalTot
                         </div>
                         {/* EAI-02c: the meetings and projects the answer names, as buttons that open them. */}
                         <AnswerRecordLinks links={msg.recordLinks} onOpen={(path) => { navigate(path); onClose() }} />
+                        {msg.fallback && (
+                          <p className="la-answer-fallback" role="note">
+                            Answered with limited access to your records: the full assistant was unavailable, so there are no record links or actions. Ask again in a moment for a full answer.
+                          </p>
+                        )}
                         {msg.tools?.length > 0 && <ToolsUsed calls={msg.tools} />}
                         {msg.proposals?.length > 0 && (
                           <div className="la-proposals">

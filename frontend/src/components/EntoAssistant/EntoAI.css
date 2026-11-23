@@ -1168,6 +1168,14 @@ html.dark .la-record-link:hover,
 
 /* PR-2333: the records an answer names, as a row of the same record-link buttons under it.
    Colours come from .la-record-link above, so light and dark need nothing extra here. */
+/* Under an answer from a fallback path: it says why there are no record links or actions. */
+.la-answer-fallback {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--cmf-text-secondary, #6b7280);
+}
+
 .la-answer-records {
   display: flex;
   flex-wrap: wrap;

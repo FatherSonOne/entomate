@@ -12,6 +12,8 @@ import {
   assistantApi,
   entoAiApi,
 } from './api'
+import { reportError } from './monitoring'
+import { classifyError } from './errorKinds'
 
 // ── Cache ──────────────────────────────────────────────
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
@@ -336,6 +338,23 @@ export function getSectionSummary(section, data) {
   }
 }
 
+// ── Fallback reporting ─────────────────────────────────
+// Answers still arrive when a path breaks, so a broken path could hide behind them. Each switch
+// goes to Sentry (unless the user is signed out or offline, where no path can help), and the
+// answer carries `fallback` so the panel can say it is a limited answer. Sent as a new error
+// with the status in `extra`, because reportError drops 4xx and an undeployed route is a 404.
+function noteFallback(from, to, err, callbacks) {
+  const kind = classifyError(err)
+  if (kind !== 'session' && kind !== 'offline') {
+    reportError(new Error(`Ask Entomate fell back from ${from} to the ${to} path`), {
+      source: 'ask-entomate:fallback',
+      extra: { from, to, status: err?.status, cause: kind },
+    })
+  }
+  // The search path runs inside the assistant path's callbacks: the first label set wins.
+  return { ...callbacks, onComplete: (result) => callbacks.onComplete?.({ ...result, fallback: result?.fallback || to }) }
+}
+
 // ── Streaming query ────────────────────────────────────
 // First the agent loop with read tools (EAI-04, /api/ento-ai/query). If that
 // endpoint fails before its stream starts (not deployed yet, 503, network), the
@@ -355,8 +374,8 @@ export async function streamQuery(userQuery, context, callbacks) {
       return
     }
     console.warn('[EntoAI] Tool endpoint unavailable, using the assistant endpoint:', err?.message)
+    return streamAssistantQuery(userQuery, context, noteFallback('/api/ento-ai/query', 'assistant', err, callbacks))
   }
-  return streamAssistantQuery(userQuery, context, callbacks)
 }
 
 // The backend handles: data loading, prompt building, and AI streaming
@@ -388,7 +407,7 @@ async function streamAssistantQuery(userQuery, context, callbacks) {
           if (!streamQuery._useFallback) {
             streamQuery._useFallback = true
             console.warn('[EntoAI] Dedicated endpoint failed, trying fallback:', err?.message)
-            streamQueryFallback(userQuery, context, callbacks)
+            streamQueryFallback(userQuery, context, noteFallback('/api/assistant/query', 'search', err, callbacks))
           } else {
             if (onError) onError(err)
           }
@@ -400,7 +419,7 @@ async function streamAssistantQuery(userQuery, context, callbacks) {
     // Network error — use fallback
     console.warn('[EntoAI] Dedicated endpoint unavailable, using fallback')
     streamQuery._useFallback = true
-    return streamQueryFallback(userQuery, context, callbacks)
+    return streamQueryFallback(userQuery, context, noteFallback('/api/assistant/query', 'search', err, callbacks))
   }
 }
 

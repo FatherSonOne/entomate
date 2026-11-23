@@ -111,4 +111,25 @@ describe('record buttons in the panel', () => {
     fireEvent.click(within(group).getByRole('button', { name: 'Open Website relaunch' }))
     await waitFor(() => expect(screen.getByTestId('where').textContent).toBe(`/projects/${P1}`))
   })
+  const NOTE = /Answered with limited access to your records/
+  const answerWith = (extra: Record<string, unknown>) => {
+    svc.streamQuery.mockImplementation(async (_q: string, _ctx: unknown, cb: { onComplete: (r: unknown) => void }) => {
+      cb.onComplete({ answer: 'Two tasks are due.', threadId: T.id, tools: [], proposals: [], recordLinks: [], ...extra })
+    })
+    renderPanel()
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'what is due?' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
+  }
+
+  test('an answer from a fallback path says it is limited', async () => {
+    answerWith({ fallback: 'assistant' })
+    await screen.findByText('Two tasks are due.')
+    expect(screen.getByRole('note').textContent).toMatch(NOTE)
+  })
+
+  test('an answer from the main path has no fallback note', async () => {
+    answerWith({})
+    await screen.findByText('Two tasks are due.')
+    expect(screen.queryByText(NOTE)).toBeNull()
+  })
 })
