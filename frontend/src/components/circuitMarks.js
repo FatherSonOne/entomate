@@ -85,7 +85,7 @@ const dir = (deg) => [Math.cos((deg * Math.PI) / 180), Math.sin((deg * Math.PI) 
 const leftOf = (deg) => { const [x, y] = dir(deg); return [y, -x] }
 
 /** Build the mesh for a pose. `curl` bends each finger joint toward the centre (degrees). */
-function handMesh(curl = 8) {
+function handMesh(curl = 8, thumbBend = -curl * 0.6) {
   const { T0, T1, H0, W0, W1, C0, C1 } = PALM
   const palm = [
     [K[0], K[1], C0], [K[1], K[2], C0], [K[2], K[3], C0], [K[3], K[4], C0], [K[4], T0, C0],
@@ -95,7 +95,7 @@ function handMesh(curl = 8) {
   const fingers = FINGERS.map((f) => {
     const [L, R] = f.base
     const w0 = dist(L, R) / 2
-    const bend = f.thumb ? -curl * 0.6 : curl
+    const bend = f.thumb ? thumbBend : curl
     let c = mid(L, R)
     const rows = [[L, R]]
     const taper = [0.86, 0.7, 0.5]
@@ -129,6 +129,19 @@ function edgesOf(tris) {
   const seen = new Map()
   tris.forEach((t) => [[t[0], t[1]], [t[1], t[2]], [t[2], t[0]]].forEach(([p, q]) => { const k = edgeKey(p, q); if (!seen.has(k)) seen.set(k, [p, q]) }))
   return [...seen.values()]
+}
+/** Unique edges as [tri, i, j] index triples, so poses that share a topology share an edge order. */
+function edgeIndex(tris) {
+  const ids = new Map()
+  const id = (p) => { if (!ids.has(p)) ids.set(p, ids.size); return ids.get(p) }
+  const seen = new Set()
+  const out = []
+  tris.forEach((t, ti) => [[0, 1], [1, 2], [2, 0]].forEach(([i, j]) => {
+    const a = id(t[i]); const b = id(t[j])
+    const k = a < b ? `${a}|${b}` : `${b}|${a}`
+    if (!seen.has(k)) { seen.add(k); out.push([ti, i, j]) }
+  }))
+  return out
 }
 const centroid = (t) => [(t[0][0] + t[1][0] + t[2][0]) / 3, (t[0][1] + t[1][1] + t[2][1]) / 3]
 
@@ -243,6 +256,71 @@ export function renderCircuitMark(id, finish = CIRCUIT_FINISH, duration = 6, tit
       + place(500, 500, S, eMoving(0.04, 0.42, 0.82))
   } else {
     const wire = id === 'circuit-spire'
+    if (!wire) {
+      // Holding hands (Node Hands, Facet Hands): the hands rise closed, open
+      // palms up and cradle the Circuit E, breathe while it holds, then close
+      // over it. One topology, three poses; every point morphs between them.
+      const facetsOnly = id === 'routed-signal'
+      const POSES = { S: handMesh(62, 46), O: handMesh(4, -22), B: handMesh(10, -14) }
+      const KEYS = [[0, 'S'], [0.06, 'S'], [0.3, 'O', 'out'], [0.5, 'O'], [0.62, 'B'], [0.74, 'O'], [0.84, 'O'], [0.95, 'S', 'in'], [1, 'S']]
+      const morph = (attr, get) => a(attr, KEYS.map(([t, k, e]) => [t, get(POSES[k]), e]))
+      const morphT = (get) => at('translate', KEYS.map(([t, k, e]) => [t, get(POSES[k]), e]))
+      const P = POSES.O
+      const HOLD = { x: 352, y: 900, r: -12, s: 1.3 }
+      const handT = `translate(${HOLD.x} ${HOLD.y}) rotate(${HOLD.r}) scale(${HOLD.s}) translate(-140 -540)`
+      const both = (inner) => `<g transform="${handT}">${inner('L')}</g><g transform="translate(1000 0) scale(-1 1)"><g transform="${handT}">${inner('R')}</g></g>`
+      const quad = (m, fi) => { const n = m.fingers[fi].nail; return [n[0][0], n[0][1], n[0][2], n[1][2]] }
+      const shade = (i) => [C.LINE, C.MID, C.DEEP, C.MID, C.SHADE, C.DEEP][i % 6]
+
+      const hand = (side, animated) => {
+        const sh = side === 'R' ? 0.015 : 0
+        const appear = (s, inner) => (animated ? fade(visible(s, 0.97, 0.05, 0.03), inner) : inner)
+        let out = P.cuff.map((t, i) => appear(0.02 + sh, `<polygon points="${pts(t)}" fill="${i ? C.LINE : C.DEEP}" stroke="${facetsOnly ? C.SEAM : 'none'}" stroke-width="2"/>`)).join('')
+        if (facetsOnly) {
+          const poly = (t, fill, s, get) => appear(s, `<polygon points="${pts(t)}" fill="${fill}" stroke="${C.SEAM}" stroke-width="2.4" stroke-linejoin="round">${animated && get ? morph('points', (m) => pts(get(m))) : ''}</polygon>`)
+          out += P.palm.map((t, i) => poly(t, shade(i), 0.04 + sh + (1 - centroid(t)[1] / 560) * 0.08)).join('')
+          P.fingers.forEach((f, fi) => {
+            out += f.tris.map((t, ti) => poly(t, shade(ti + fi), 0.1 + sh + fi * 0.015 + ti * 0.01, (m) => m.fingers[fi].tris[ti])).join('')
+            out += poly(quad(P, fi), C.AMBER, 0.16 + sh + fi * 0.015, (m) => quad(m, fi))
+          })
+          // lit fingertips once the hands are open
+          out += P.fingers.map((f, fi) => {
+            const glow = `<circle cx="0" cy="0" r="46" fill="url(#${uid}-amber)"/>`
+            if (!animated) return `<g transform="translate(${f1(f.tip[0])} ${f1(f.tip[1])})">${glow}</g>`
+            return `<g>${morphT((m) => `${f1(m.fingers[fi].tip[0])} ${f1(m.fingers[fi].tip[1])}`)}${fade(visible(0.26 + fi * 0.02, 0.84, 0.06, 0.08), glow)}</g>`
+          }).join('')
+        } else {
+          const edge = (tris, get, s) => edgeIndex(tris).map(([ti, i, j], k, all) => {
+            const d = segD([tris[ti][i], tris[ti][j]])
+            if (!animated) return line(d, 4.5, '', '', C.LINE, false)
+            const t0 = s + 0.1 * (k / Math.max(1, all.length - 1))
+            const inner = a('stroke-dashoffset', drawF(t0, 0.05, 0.9, 0.06)) + (get ? morph('d', (m) => { const tt = get(m); return segD([tt[ti][i], tt[ti][j]]) }) : '')
+            return line(d, 4.5, drawAttrs(), inner, C.LINE, false)
+          }).join('')
+          out += edge(P.palm, null, 0.03 + sh)
+          P.fingers.forEach((f, fi) => { out += edge(f.all, (m) => m.fingers[fi].all, 0.08 + sh + fi * 0.015) })
+          // fingertip nodes and their links, lit as the hands open
+          const tipAt = (m, fi) => m.fingers[fi].tip
+          const links = [[0, 1], [1, 2], [2, 3], [3, 4], [0, 2], [1, 3]]
+          out += links.map(([i, j], li) => {
+            const d = segD([tipAt(P, i), tipAt(P, j)])
+            if (!animated) return `<path d="${d}" fill="none" stroke="${C.PEACH}" stroke-opacity=".55" stroke-width="2"/>`
+            return `<path d="${d}" fill="none" stroke="${C.PEACH}" stroke-opacity=".55" stroke-width="2"${drawAttrs()}>${a('stroke-dashoffset', drawF(0.34 + li * 0.02, 0.06, 0.82, 0.05))}${morph('d', (m) => segD([tipAt(m, i), tipAt(m, j)]))}</path>`
+          }).join('')
+          out += P.fingers.map((f, fi) => {
+            const lit = `<circle r="40" fill="url(#${uid}-amber)"/><circle r="13" fill="${C.AMBER}"/><circle cx="-3" cy="-3" r="5" fill="${C.HOT}"/>`
+            if (!animated) return `<g transform="translate(${f1(f.tip[0])} ${f1(f.tip[1])})">${lit}</g>`
+            const s = 0.26 + fi * 0.02
+            return `<g>${morphT((m) => `${f1(tipAt(m, fi)[0])} ${f1(tipAt(m, fi)[1])}`)}${popAt(0, 0, s, 0.84, lit, 0.04)}${flash(0, 0, 13, 60, s + 0.01, 0.1, 3)}</g>`
+          }).join('')
+        }
+        return animated ? moveBy(once([[0, '0 60'], [0.02 + sh, '0 60'], [0.2, '0 0', 'out'], [0.9, '0 0'], [1, '0 30', 'in']]), out) : out
+      }
+      const E_AT = { x: 500, y: 412, s: 1.1 }
+      const cradle = `<ellipse cx="500" cy="470" rx="240" ry="200" fill="url(#${uid}-glow)"/>`
+      still = cradle + both((side) => hand(side, false)) + place(E_AT.x, E_AT.y, E_AT.s, eStill())
+      moving = fade(visible(0.3, 0.84, 0.12, 0.1), cradle) + both((side) => hand(side, true)) + place(E_AT.x, E_AT.y, E_AT.s, eMoving(0.32, 0.26, 0.8))
+    } else {
     const nodes = id === 'catalyst-core'
     const facets = id === 'routed-signal'
     const mesh = handMesh(wire ? 16 : 6)
@@ -347,6 +425,7 @@ export function renderCircuitMark(id, finish = CIRCUIT_FINISH, duration = 6, tit
     moving = pair(pose.tx, pose.ty, pose.scale, pose.rot, (side) => drawHand(side, true))
       + (wire ? crown(true) : '')
       + place(eAt.x, eAt.y, eAt.s, eMoving(wire ? 0.5 : 0.44, 0.24, 0.84))
+    }
   }
 
   const css = '.mark-static{display:none}.motion-still .mark-static{display:inline}.motion-still .motion-layer{display:none}'
