@@ -19,6 +19,7 @@ const request = require('supertest');
 const PUBLIC = {
   'health.js': ['GET /', 'GET /live', 'GET /ready', 'GET /status', 'GET /metrics'], // probes
   'assistant.js': ['GET /health'],
+  'billing.js': ['POST /webhook'], // Stripe-Signature checked in the handler
   'bots.js': ['POST /recall-webhook'], // Svix signature checked in the handler
   'calendar.js': ['GET /status', 'GET /auth', 'GET /callback'], // Google OAuth flow
   'consent.js': ['GET /opt-out/:token', 'POST /opt-out/:token'], // emailed opt-out links

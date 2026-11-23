@@ -88,3 +88,10 @@ services:
         value: https://us-west-2.recall.ai/api/v1  # co-located with Render oregon + Supabase us-west-2
       - key: RECALL_WEBHOOK_SIGNING_SECRET
         sync: false  # Svix whsec_... secret from Recall dashboard > Webhooks. Without it every bot status webhook is rejected (GET /health/status shows recall: error).
+
+      # ----- Billing (Stripe) -----
+      # Prices are found by lookup key; create them with backend/scripts/stripe-bootstrap-prices.js.
+      - key: STRIPE_SECRET_KEY
+        sync: false  # set manually (secret) — sk_live_... (or sk_test_... for a test deploy)
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false  # whsec_... of the endpoint https://<svc>.onrender.com/api/billing/webhook

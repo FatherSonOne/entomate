@@ -317,6 +317,9 @@ app.use('/api/internal', require('./routes/internalJobs'));
 // User & Workspace Settings
 app.use('/api/settings', require('./routes/settings'));
 
+// Stripe Checkout + Stripe webhook (billing rebuild, Phase 3)
+app.use('/api/billing', require('./routes/billing'));
+
 // AI Assistant (context-aware streaming)
 app.use('/api/assistant', require('./routes/assistant'));
 
