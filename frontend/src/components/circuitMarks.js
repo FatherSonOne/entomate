@@ -5,8 +5,8 @@
 //
 //   circuit-e      Circuit E      the E alone, exactly as the reference
 //   circuit-spire  Circuit Crown  wireframe hands cup a circuit crown over the E
-//   catalyst-core  Node Hands     anime line-art hands holding the E, linked fingertip nodes
-//   routed-signal  Cradle Hands   anime cel-shaded hands holding the E, amber fingertips
+//   catalyst-core  Node Hands     direct port of the wire hands with linked fingertip nodes
+//   routed-signal  Facet Hands    direct port of the solid low-poly hands (three bars, not four)
 //
 // The ids are the original four circuit marks', kept so a saved pick still
 // resolves; the names shown in the app come from services/logoSystem.ts.
@@ -145,7 +145,7 @@ function edgeIndex(tris) {
 }
 const centroid = (t) => [(t[0][0] + t[1][0] + t[2][0]) / 3, (t[0][1] + t[1][1] + t[2][1]) / 3]
 
-export function renderCircuitMark(id, finish = CIRCUIT_FINISH, duration = 6, title = id) {
+export function renderCircuitMark(id, finish = CIRCUIT_FINISH, duration = 6, title = id, artUrl = '') {
   const uid = `en-cm-${id}-${++instance}`
   const D = duration
   const defs = []
@@ -257,134 +257,49 @@ export function renderCircuitMark(id, finish = CIRCUIT_FINISH, duration = 6, tit
   } else {
     const wire = id === 'circuit-spire'
     if (!wire) {
-      // Anime-style holding hands (Node Hands, Cradle Hands), 2026-11-23.
-      // Smooth capsule fingers with cel shading and ink lines, built from
-      // centrelines so every pose shares one path structure and can morph:
-      // the hands rise closed (fingers folded into a fist), open palms up,
-      // cradle the Circuit E on their thumbs, breathe, then close over it.
-      const lineArt = id === 'catalyst-core'
-      const INK = '#16030A'
-      const SKIN = lineArt ? '#2A0610' : C.MID
-      const SKIN_SHADE = lineArt ? '#1A030A' : C.SHADE
-      const SKIN_LIGHT = lineArt ? C.LINE : '#FF7A92'
-      const STROKE = lineArt ? C.LINE : INK
-      const v = (p) => `${f1(p[0])} ${f1(p[1])}`
-      /** Catmull-Rom through pts, as cubic segments (no leading M). */
-      const curve = (P) => {
-        let d = ''
-        for (let i = 0; i < P.length - 1; i++) {
-          const p0 = P[Math.max(0, i - 1)]; const p1 = P[i]; const p2 = P[i + 1]; const p3 = P[Math.min(P.length - 1, i + 2)]
-          const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6]
-          const c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6]
-          d += `C${v(c1)} ${v(c2)} ${v(p2)}`
+      // Direct ports of Frankie's two hand references (2026-11-23): the art
+      // itself, with its E (and the stray text) taken out and the three bars
+      // redrawn in vector so they can build. Node Hands is the wire hands with
+      // linked fingertip nodes; Facet Hands is the solid low-poly hands (its
+      // four bars become three). Each hand moves as one piece: it rises turned
+      // in, opens out to the reference pose, sways, and the fingertips glow.
+      const art = artUrl || `/brand/${id}-art.webp`
+      const SPEC = id === 'catalyst-core'
+        ? {
+          bars: [[432.6, 374.4, 137.2], [432.6, 460.5, 137.2], [432.6, 546.5, 137.2]], h: 37.2,
+          colors: ['#F63559', '#E82F51', '#BD1C36'],
+          tips: [[147, 200], [263, 147], [360, 219], [395, 368], [626, 368], [661, 219], [758, 147], [876, 200]], glow: 40,
+          wrist: [[332, 895], [668, 895]],
         }
-        return d
-      }
-      /* Finger rigs in the hand's own units (palm faces out, thumb toward the centre). */
-      const RIG = [
-        { base: [82, 292], hw: 20, ang: -98, len: [64, 42, 32] },
-        { base: [119, 272], hw: 21.5, ang: -93, len: [82, 54, 38] },
-        { base: [158, 268], hw: 22, ang: -88, len: [88, 58, 40] },
-        { base: [195, 282], hw: 20.5, ang: -83, len: [80, 52, 36] },
-        { base: [212, 438], hw: 27, ang: -48, len: [62, 44, 32], thumb: true },
-      ]
-      const POSE = {
-        S: { k: 0.3, curl: 0, thumb: { ang: -168, k: 0.9, curl: 0 } }, // fist
-        O: { k: 1, curl: 4, thumb: { ang: -52, k: 1, curl: -6 } }, // open, palms out
-        B: { k: 0.97, curl: 9, thumb: { ang: -48, k: 1, curl: -2 } }, // breath
-      }
-      /** Centre line, half widths and the shapes of one finger in one pose. */
-      const finger = (r, pose) => {
-        const p = r.thumb ? pose.thumb : pose
-        const ang0 = r.thumb ? p.ang : r.ang
-        const k = p.k
-        const curl = p.curl
-        const tap = r.thumb ? [1, 0.82, 0.72, 0.64] : [1, 0.93, 0.86, 0.8]
-        const cs = [r.base]
-        const as = [ang0]
-        let c = r.base
-        r.len.forEach((len, i) => {
-          const a2 = ang0 + curl * (i + 1)
-          c = add(c, mul(dir(ang0 + curl * (i + 0.5)), len * k))
-          cs.push(c); as.push(a2)
-        })
-        const hw = tap.map((t) => r.hw * t)
-        const off = (i, s) => add(cs[i], mul(leftOf(as[i]), hw[i] * s))
-        const Ls = cs.map((_, i) => off(i, 1))
-        const Rs = cs.map((_, i) => off(i, -1))
-        const n = cs.length - 1
-        const fwd = dir(as[n])
-        const tipCtl = (p0, s) => add(p0, mul(fwd, hw[n] * 1.33 * s))
-        const outline = `M${v(Ls[0])}${curve(Ls)}C${v(tipCtl(Ls[n], 1))} ${v(tipCtl(Rs[n], 1))} ${v(Rs[n])}${curve([...Rs].reverse())}Z`
-        // ink line: the sides and tip from the first knuckle up (open path)
-        const ink = `M${v(Ls[1])}${curve(Ls.slice(1))}C${v(tipCtl(Ls[n], 1))} ${v(tipCtl(Rs[n], 1))} ${v(Rs[n])}${curve(Rs.slice(1).reverse())}`
-        // cel shadow: the far third of the finger
-        const Ms = cs.map((_, i) => off(i, -0.25))
-        const shadow = `M${v(Ms[0])}${curve(Ms)}C${v(tipCtl(Ms[n], 0.9))} ${v(tipCtl(Rs[n], 0.9))} ${v(Rs[n])}${curve([...Rs].reverse())}Z`
-        // highlight: a stroke just inside the near edge
-        const Hs = cs.slice(1).map((_, j) => off(j + 1, 0.5))
-        const light = `M${v(Hs[0])}${curve(Hs)}`
-        // fingertip: a small nail near the tip
-        const nb = add(cs[n], mul(fwd, -hw[n] * 1.2)); const nt = add(cs[n], mul(fwd, hw[n] * 0.55))
-        const nl = leftOf(as[n]); const nw = hw[n] * 0.55
-        const nail = `M${v(add(nb, mul(nl, nw)))}L${v(add(nt, mul(nl, nw)))}C${v(add(nt, add(mul(nl, nw), mul(fwd, nw * 1.2))))} ${v(add(nt, add(mul(nl, -nw), mul(fwd, nw * 1.2))))} ${v(add(nt, mul(nl, -nw)))}L${v(add(nb, mul(nl, -nw)))}Z`
-        return { outline, ink, shadow, light, nail, tip: add(cs[n], mul(fwd, hw[n] * 0.4)) }
-      }
-      const SHAPES = Object.fromEntries(Object.entries(POSE).map(([key, pose]) => [key, RIG.map((r) => finger(r, pose))]))
-      const KEYS = [[0, 'S'], [0.07, 'S'], [0.3, 'O', 'out'], [0.5, 'O'], [0.62, 'B'], [0.74, 'O'], [0.84, 'O'], [0.95, 'S', 'in'], [1, 'S']]
-      const morphD = (fi, part) => a('d', KEYS.map(([t, key, e]) => [t, SHAPES[key][fi][part], e]))
-      const morphTip = (fi) => at('translate', KEYS.map(([t, key, e]) => [t, v(SHAPES[key][fi].tip), e]))
-      const PALM_D = `M66 300${curve([[66, 300], [60, 360], [62, 440], [80, 510], [98, 552]])}L100 700L190 700L192 552${curve([[192, 552], [210, 500], [222, 440], [218, 360], [214, 296]])}${curve([[214, 296], [160, 266], [104, 272], [66, 300]])}Z`
-      const PALM_SHADE = `M160 300${curve([[160, 300], [210, 320], [220, 420], [204, 500], [192, 552]])}L190 700L152 700${curve([[152, 700], [160, 560], [178, 470], [174, 380], [160, 300]])}Z`
-      const CREASES = 'M72 382Q120 364 172 390M84 446Q126 428 180 452'
-      const HOLD = { x: 338, y: 900, r: -9, s: 1.18 }
-      const handT = `translate(${HOLD.x} ${HOLD.y}) rotate(${HOLD.r}) scale(${HOLD.s}) translate(-140 -540)`
-      defs.push(`<linearGradient id="${uid}-arm" x1="0" y1="0" x2="0" y2="1"><stop offset=".55" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>`,
-        `<mask id="${uid}-fade" maskUnits="userSpaceOnUse" x="-200" y="0" width="700" height="760"><rect x="-200" y="0" width="700" height="700" fill="url(#${uid}-arm)"/></mask>`)
-
-      const hand = (side, animated) => {
-        const S0 = SHAPES.O
-        const path = (fi, part, attrs) => `<path d="${S0[fi][part]}" ${attrs}>${animated ? morphD(fi, part) : ''}</path>`
-        const order = [0, 1, 2, 3, 4]
-        // silhouette ink behind everything, then fills
-        let out = `<g data-halo="1" opacity=".55" filter="url(#${uid}-soft)"><path d="${PALM_D}" fill="${C.HALO}"/>${order.map((fi) => path(fi, 'outline', `fill="${C.HALO}"`)).join('')}</g>`
-        out += `<path d="${PALM_D}" fill="none" stroke="${STROKE}" stroke-width="${lineArt ? 5 : 8}" stroke-linejoin="round"/>${order.map((fi) => path(fi, 'outline', `fill="none" stroke="${STROKE}" stroke-width="${lineArt ? 5 : 8}" stroke-linejoin="round"`)).join('')}`
-        out += `<path d="${PALM_D}" fill="${SKIN}"/>`
-        if (!lineArt) out += `<path d="${PALM_SHADE}" fill="${SKIN_SHADE}" opacity=".55"/>`
-        out += `<path d="${CREASES}" fill="none" stroke="${lineArt ? C.LINE : INK}" stroke-opacity="${lineArt ? 0.55 : 0.45}" stroke-width="3" stroke-linecap="round"/>`
-        order.forEach((fi) => {
-          out += path(fi, 'outline', `fill="${SKIN}"`)
-          if (!lineArt) out += path(fi, 'shadow', `fill="${SKIN_SHADE}" opacity=".6"`)
-          out += path(fi, 'ink', `fill="none" stroke="${STROKE}" stroke-width="${lineArt ? 4.5 : 3.5}" stroke-linecap="round" stroke-linejoin="round"`)
-          out += path(fi, 'light', `fill="none" stroke="${SKIN_LIGHT}" stroke-opacity="${lineArt ? 0.35 : 0.7}" stroke-width="3.5" stroke-linecap="round"`)
-          if (!lineArt) out += path(fi, 'nail', `fill="${C.AMBER}" stroke="${INK}" stroke-width="2"`)
-        })
-        // lit fingertips once the hands open
-        out += order.map((fi) => {
-          const lit = lineArt
-            ? `<circle r="40" fill="url(#${uid}-amber)"/><circle r="12" fill="${C.AMBER}"/><circle cx="-3" cy="-3" r="4.5" fill="${C.HOT}"/>`
-            : `<circle r="38" fill="url(#${uid}-amber)"/>`
-          if (!animated) return `<g transform="translate(${v(S0[fi].tip)})">${lit}</g>`
-          const s = 0.27 + fi * 0.02
-          return `<g>${morphTip(fi)}${popAt(0, 0, s, 0.84, lit, 0.05)}${lineArt ? flash(0, 0, 12, 56, s + 0.01, 0.1, 3) : ''}</g>`
-        }).join('')
-        if (lineArt) {
-          const links = [[0, 1], [1, 2], [2, 3], [3, 4], [0, 2], [1, 3]]
-          const ld = (key, i, j) => `M${v(SHAPES[key][i].tip)}L${v(SHAPES[key][j].tip)}`
-          out += links.map(([i, j], li) => (animated
-            ? `<path d="${ld('O', i, j)}" fill="none" stroke="${C.PEACH}" stroke-opacity=".55" stroke-width="2"${drawAttrs()}>${a('stroke-dashoffset', drawF(0.36 + li * 0.02, 0.06, 0.82, 0.05))}${a('d', KEYS.map(([t, key, e]) => [t, ld(key, i, j), e]))}</path>`
-            : `<path d="${ld('O', i, j)}" fill="none" stroke="${C.PEACH}" stroke-opacity=".55" stroke-width="2"/>`)).join('')
+        : {
+          bars: [[403.3, 336.7, 200], [403.3, 455, 180], [403.3, 573.3, 200]], h: 40,
+          colors: ['#F22B54', '#F02C55', '#EF2C56'],
+          tips: [[200, 242], [275, 212], [337, 253], [377, 320], [78, 445], [622, 320], [662, 253], [725, 212], [800, 242], [922, 445]], glow: 52,
+          wrist: [[217, 812], [790, 812]],
         }
-        out = `<g mask="url(#${uid}-fade)">${out}</g>`
-        if (!animated) return out
-        return fade(once([[0, 0], [0.02, 0], [0.08, 1, 'out'], [0.95, 1], [0.99, 0, 'in'], [1, 0]]),
-          moveBy(once([[0, '0 70'], [0.02, '0 70'], [0.22, '0 0', 'out'], [0.9, '0 0'], [1, '0 30', 'in']]), out))
+      defs.push(`<clipPath id="${uid}-hl"><rect x="0" y="0" width="500" height="1000"/></clipPath><clipPath id="${uid}-hr"><rect x="500" y="0" width="500" height="1000"/></clipPath>`)
+      const img = `<image href="${art}" x="0" y="0" width="1000" height="1000" preserveAspectRatio="xMidYMid meet"/>`
+      const bar = ([x, y, w], i) => `<rect data-halo="1" x="${x}" y="${y}" width="${w}" height="${SPEC.h}" fill="${C.HALO}" opacity=".45" filter="url(#${uid}-soft)"/><rect x="${x}" y="${y}" width="${w}" height="${SPEC.h}" fill="${SPEC.colors[i]}"/>`
+      const barsStill = SPEC.bars.map(bar).join('')
+      const half = (side) => {
+        const [wx, wy] = SPEC.wrist[side === 'L' ? 0 : 1]
+        const sgn = side === 'L' ? 1 : -1
+        const piece = `<g clip-path="url(#${uid}-h${side === 'L' ? 'l' : 'r'})">${img}</g>`
+        // turned in and low, then opens out to the reference pose and sways
+        const turn = rotateAt(wx, wy, once([[0, 14 * sgn], [0.02, 14 * sgn], [0.3, 0, 'out'], [0.5, 0], [0.62, -2 * sgn], [0.74, 1 * sgn], [0.84, 0], [0.95, 10 * sgn, 'in'], [1, 14 * sgn]]), piece)
+        return moveBy(once([[0, '0 70'], [0.02, '0 70'], [0.24, '0 0', 'out'], [0.9, '0 0'], [1, '0 40', 'in']]), turn)
       }
-      const both = (animated) => `<g transform="${handT}">${hand('L', animated)}</g><g transform="translate(1000 0) scale(-1 1)"><g transform="${handT}">${hand('R', animated)}</g></g>`
-      const E_AT = { x: 500, y: 445, s: 1.02 }
-      const cradle = `<ellipse cx="500" cy="470" rx="240" ry="200" fill="url(#${uid}-glow)"/>`
-      still = cradle + both(false) + place(E_AT.x, E_AT.y, E_AT.s, eStill())
-      moving = fade(visible(0.3, 0.84, 0.12, 0.1), cradle) + both(true) + place(E_AT.x, E_AT.y, E_AT.s, eMoving(0.32, 0.26, 0.8))
+      const tipGlow = ([x, y], i) => `<circle cx="${x}" cy="${y}" r="${SPEC.glow}" fill="url(#${uid}-amber)" opacity="0">${a('opacity', once([[0, 0], [0.24 + (i % 5) * 0.025, 0], [0.3 + (i % 5) * 0.025, 1, 'out'], [0.5, 0.55], [0.62, 1], [0.74, 0.6], [0.86, 0.9], [0.94, 0, 'in'], [1, 0]]))}</circle>`
+      const barsMoving = SPEC.bars.map(([x, y, w], i) => {
+        const t = 0.32 + i * 0.07
+        const o = 0.8 + i * 0.02
+        const clip = `${uid}-pb${i}`
+        defs.push(`<clipPath id="${clip}"><rect x="${x - 20}" y="${y - 30}" width="0" height="${SPEC.h + 60}">${a('width', once([[0, 0], [t, 0], [t + 0.07, w + 40, 'out'], [o, w + 40], [o + 0.08, 0, 'in'], [1, 0]]))}</rect></clipPath>`)
+        return strike(t + 0.07, `<g clip-path="url(#${clip})">${bar([x, y, w], i)}</g>`) + flash(x, y + SPEC.h / 2, 6, 60, t, 0.1, 3)
+      }).join('')
+      const fadeAll = (inner) => fade(once([[0, 0], [0.02, 0], [0.1, 1, 'out'], [0.93, 1], [0.99, 0, 'in'], [1, 0]]), inner)
+      still = img + barsStill
+      moving = fadeAll(half('L') + half('R') + SPEC.tips.map(tipGlow).join('')) + barsMoving
     } else {
     const nodes = id === 'catalyst-core'
     const facets = id === 'routed-signal'
@@ -499,6 +414,6 @@ export function renderCircuitMark(id, finish = CIRCUIT_FINISH, duration = 6, tit
 }
 
 /** The still mark only, cropped back to the art (no loader inset), for exporting icons and cards. */
-export function renderCircuitStill(id, finish = CIRCUIT_FINISH) {
-  return renderCircuitMark(id, finish, 6, id).replace('viewBox="0 0 1000 1000" class="logo-loop"', `viewBox="${ICON_BOX}" class="logo-loop motion-still"`)
+export function renderCircuitStill(id, finish = CIRCUIT_FINISH, artUrl = '') {
+  return renderCircuitMark(id, finish, 6, id, artUrl).replace('viewBox="0 0 1000 1000" class="logo-loop"', `viewBox="${ICON_BOX}" class="logo-loop motion-still"`)
 }
