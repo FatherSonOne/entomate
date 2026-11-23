@@ -1271,9 +1271,17 @@ html[data-motion="reduce"] :is(.bs-key, .bs-av) { transition-duration: 1ms !impo
 .bs-title-keys { display: flex; flex-wrap: wrap; gap: 8px; }
 .bs-title-acts { align-items: center; }
 
-/* Index list */
-.bs-mtg-search { display: flex; gap: 8px; align-items: center; padding-top: 22px; max-width: 560px; }
-.bs-mtg-search .bs-input-wrap { flex: 1; }
+/* Past | Upcoming: its own row in the title, fixed width, so it holds still across views. */
+.bs-mtg .bs-title-meta { min-width: 0; }
+.bs-mtg .bs-title-meta > .bs-crumb { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bs-mtg-tabs { flex: 0 0 100%; display: flex; justify-content: flex-end; }
+.bs-mtg-tabs .bs-switch { display: flex; width: 240px; }
+.bs-mtg-tabs .bs-switch button { flex: 1 1 0; }
+
+/* Index list: search, then the status filter */
+.bs-mtg-search { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-top: 22px; }
+.bs-mtg-search .bs-input-wrap { flex: 1 1 260px; max-width: 560px; }
+.bs-mtg-search .bs-switch { margin-left: auto; }
 .bs-mtg-list { padding-top: 6px; }
 .bs-mtg .bs-tbl td { vertical-align: middle; }
 .bs-mtg .bs-tbl .r { padding-right: 22px; }
@@ -1691,7 +1699,11 @@ html[data-motion="reduce"] :is(.bs-tabs [role="tab"]::after, .bs-tape-head) { tr
 @media (max-width: 767.98px) {
   .bs-tabs { gap: 0; }
   .bs-tabs [role="tab"] { flex: 1 1 0; min-width: 0; justify-content: center; padding: 12px 2px 11px; font-size: 13px; }
-  .bs-mtg-search { max-width: none; }
+  .bs-mtg-search .bs-input-wrap { max-width: none; }
+  .bs-mtg-search .bs-switch { margin-left: 0; }
+  .bs-mtg .bs-title-acts { align-self: stretch; }
+  .bs-mtg-tabs { justify-content: stretch; }
+  .bs-mtg-tabs .bs-switch { width: 100%; }
   .bs-mtg .bs-tbl td.bs-mtg-date { width: 52px; }
   .bs-mtg .bs-tbl td.bs-mtg-status { width: auto; text-align: right; padding-right: 0; }
   .bs-mtg .bs-tbl th:last-child { text-align: right; }

@@ -65,7 +65,12 @@ export default function Meetings() {
     else { next.delete('tab'); next.delete('view') }
     setSearchParams(next, { replace: true })
   }
-  const tabSwitch = <Switch label="Past or upcoming meetings" options={TABS} value={tab} onChange={setTab} />
+  // Same slot, same width in both views, so switching never moves it.
+  const tabSwitch = (
+    <div className="bs-mtg-tabs">
+      <Switch label="Past or upcoming meetings" options={TABS} value={tab} onChange={setTab} />
+    </div>
+  )
   const [showRecorder, setShowRecorder] = useState(searchParams.get('new') === 'true')
   const [audioInputDeviceId, setAudioInputDeviceId] = useState('')
   const [selectionMode, setSelectionMode] = useState(false)
@@ -438,7 +443,6 @@ export default function Meetings() {
   ) : (
     <>
       {tabSwitch}
-      <Switch label="Filter meetings" options={FILTERS} value={filter} onChange={setFilter} />
       <div className="bs-title-keys">
         {meetings.length > 0 && <Key onClick={startSelectionMode}>Select</Key>}
         {/* Sending the bot is the main way in; while the recorder is open its Start key is the one primary key. */}
@@ -491,6 +495,7 @@ export default function Meetings() {
           onChange={(e) => setSearchQuery(e.target.value)}
         />
         {searchQuery && <Key onClick={() => setSearchQuery('')}>Clear</Key>}
+        <Switch label="Filter meetings" options={FILTERS} value={filter} onChange={setFilter} />
       </div>
 
       <div className="bs-mtg-list" aria-busy={loading || undefined}>
