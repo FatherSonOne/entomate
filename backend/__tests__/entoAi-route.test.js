@@ -454,3 +454,73 @@ describe('tools', () => {
     expect(mockServiceQueries).toEqual([]);
   });
 });
+
+describe('record links (EAI-02c slice 3)', () => {
+  const { recordLinksOf, recordLinksForAnswer } = require('../services/entoAi/tools');
+  const M1 = 'aaaaaaaa-1111-4111-8111-111111111111';
+  const M2 = 'aaaaaaaa-2222-4222-8222-222222222222';
+  const P1 = 'bbbbbbbb-1111-4111-8111-111111111111';
+
+  test('complete carries the meetings and projects the answer names; the message saves them', async () => {
+    mockResults.meetings = { data: [{ id: M1, title: 'Budget review' }, { id: M2, title: 'Standup' }], count: 2, error: null };
+    mockResults.projects = { data: [{ id: P1, name: 'Website relaunch' }], count: 1, error: null };
+    mockResults.tasks = { data: [{ id: ID, title: 'Ship it', status: 'todo' }], count: 1, error: null };
+    mockScript.push(
+      { calls: [{ name: 'search_meetings', args: {} }, { name: 'list_projects', args: {} }, { name: 'list_tasks', args: {} }] },
+      { text: 'The **budget review** covered the Website relaunch. Ship it is still open.' },
+    );
+    const res = await request(app).post('/api/ento-ai/query')
+      .set('Authorization', 'Bearer good-token').send({ question: 'what happened?' });
+    const links = [
+      { kind: 'meeting', id: M1, label: 'Budget review' },
+      { kind: 'project', id: P1, label: 'Website relaunch' },
+    ];
+    // Standup is not named; the task has no detail page.
+    expect(events(res.text).at(-1).recordLinks).toEqual(links);
+    expect(mockUserQueries.find((q) => q.rpc).args.p_messages[1].recordLinks).toEqual(links);
+  });
+
+  test('no tool call → recordLinks is an empty list on complete', async () => {
+    mockScript.push({ text: 'Hello.' });
+    const res = await request(app).post('/api/ento-ai/query')
+      .set('Authorization', 'Bearer good-token').send({ question: 'hi' });
+    expect(events(res.text).at(-1).recordLinks).toEqual([]);
+  });
+
+  test('a failed read adds no links', async () => {
+    mockResults.meetings = { data: null, error: { message: 'boom' } };
+    mockScript.push({ calls: [{ name: 'search_meetings', args: {} }] }, { text: 'Budget review failed to load.' });
+    const res = await request(app).post('/api/ento-ai/query')
+      .set('Authorization', 'Bearer good-token').send({ question: 'x' });
+    expect(events(res.text).at(-1).recordLinks).toEqual([]);
+  });
+
+  test('recordLinksOf reads every result shape and drops a non-uuid id or empty label', () => {
+    expect(recordLinksOf({ meeting: { id: M1, title: 'Kickoff', actionItems: [{ meetingId: M1, meetingTitle: 'Kickoff' }] } }))
+      .toEqual([{ kind: 'meeting', id: M1, label: 'Kickoff' }, { kind: 'meeting', id: M1, label: 'Kickoff' }]);
+    expect(recordLinksOf({ project: { id: P1, name: 'Site', meetings: [{ id: M2, title: 'Sync' }] } }))
+      .toEqual([{ kind: 'meeting', id: M2, label: 'Sync' }, { kind: 'project', id: P1, label: 'Site' }]);
+    expect(recordLinksOf({ actionItemsDue: [{ meetingId: M2, meetingTitle: ' Sync ' }] }))
+      .toEqual([{ kind: 'meeting', id: M2, label: 'Sync' }]);
+    expect(recordLinksOf({ groups: {
+      meetings: [{ type: 'meeting', id: M1, title: 'Kickoff' }],
+      tasks: [{ type: 'task', id: ID, title: 'Ship it' }],
+      decisions: [{ type: 'decision', id: ID, title: 'Go', meetingId: M2, meetingTitle: 'Sync' }],
+      projects: [{ type: 'project', id: P1, title: 'Site' }],
+    } })).toEqual([
+      { kind: 'meeting', id: M1, label: 'Kickoff' },
+      { kind: 'meeting', id: M2, label: 'Sync' },
+      { kind: 'project', id: P1, label: 'Site' },
+    ]);
+    expect(recordLinksOf({ meetings: [{ id: 'not-a-uuid', title: 'X' }, { id: M1, title: '  ' }, { id: M1 }] })).toEqual([]);
+    expect(recordLinksOf(null)).toEqual([]);
+  });
+
+  test('recordLinksForAnswer keeps named records once, case-blind, at most 20', () => {
+    const k = { kind: 'meeting', id: M1, label: 'Kickoff' };
+    expect(recordLinksForAnswer('The KICKOFF ran long.', [k, { ...k }, { kind: 'project', id: P1, label: 'Site' }])).toEqual([k]);
+    expect(recordLinksForAnswer('', [k])).toEqual([]);
+    const many = Array.from({ length: 25 }, (_, i) => ({ kind: 'project', id: `bbbbbbbb-1111-4111-8111-${String(i).padStart(12, '0')}`, label: `P${i}` }));
+    expect(recordLinksForAnswer(many.map((l) => l.label).join(' '), many)).toHaveLength(20);
+  });
+});

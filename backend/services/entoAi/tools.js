@@ -530,6 +530,53 @@ function resultCount(out) {
     .reduce((n, k) => n + (Array.isArray(out[k]) ? out[k].length : 0), 0);
 }
 
+const RECORD_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const MAX_RECORD_LINKS = 20;
+
+/**
+ * EAI-02c (LV PR-2333): the meetings and projects a read returned, as { kind, id, label } for
+ * the record buttons under the answer. Tasks and action items have no detail page, so only
+ * the meeting an item came from is kept.
+ */
+function recordLinksOf(out) {
+  const links = [];
+  const add = (kind, id, label) => {
+    if (typeof id === 'string' && RECORD_ID.test(id) && typeof label === 'string' && label.trim()) {
+      links.push({ kind, id, label: label.trim().slice(0, 120) });
+    }
+  };
+  const fromItems = (list) => {
+    for (const x of Array.isArray(list) ? list : []) add('meeting', x.meetingId, x.meetingTitle);
+  };
+  if (!out || typeof out !== 'object') return links;
+  for (const m of [...(out.meetings || []), ...(out.project?.meetings || [])]) add('meeting', m.id, m.title);
+  for (const p of out.projects || []) add('project', p.id, p.name);
+  if (out.meeting) { add('meeting', out.meeting.id, out.meeting.title); fromItems(out.meeting.actionItems); }
+  if (out.project) add('project', out.project.id, out.project.name);
+  fromItems(out.actionItems);
+  fromItems(out.actionItemsDue);
+  for (const list of Object.values(out.groups || {})) {
+    for (const x of Array.isArray(list) ? list : []) {
+      if (x.type === 'meeting' || x.type === 'project') add(x.type, x.id, x.title);
+      add('meeting', x.meetingId, x.meetingTitle);
+    }
+  }
+  return links;
+}
+
+/** The records the answer names, one per record, at most 20 (LV `recordLinksForAnswer`). */
+function recordLinksForAnswer(answer, links) {
+  if (!answer) return [];
+  const lower = answer.toLowerCase();
+  const out = [];
+  for (const l of links) {
+    if (out.length >= MAX_RECORD_LINKS) break;
+    if (out.some((o) => o.kind === l.kind && o.id === l.id)) continue;
+    if (lower.includes(l.label.toLowerCase())) out.push(l);
+  }
+  return out;
+}
+
 const declarations = Object.entries(TOOLS).map(([name, t]) => ({ name, ...t.declaration }));
 
 /**
@@ -554,4 +601,4 @@ async function runTool(name, args, ctx, timeoutMs = 10000) {
   }
 }
 
-module.exports = { TOOLS, declarations, runTool, resultCount, CLOSED, ToolInputError, uuidArg, dateArg, trunc };
+module.exports = { TOOLS, declarations, runTool, resultCount, recordLinksOf, recordLinksForAnswer, CLOSED, ToolInputError, uuidArg, dateArg, trunc };

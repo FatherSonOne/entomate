@@ -28,6 +28,7 @@ import PlanCard, { groupProposals } from './PlanCard'
 import ThreadRail from './ThreadRail'
 import { welcomeGreeting } from './welcomeGreeting'
 import AnswerSharePanel from './AnswerSharePanel'
+import AnswerRecordLinks from './AnswerRecordLinks'
 import { printAnswer } from './printAnswer'
 import { answerTitle } from './answerText'
 import { useProposals } from './useProposals'
@@ -393,6 +394,7 @@ export default function EntoAssistant({ isOpen, onClose, signals = [], signalTot
               tools: Array.isArray(result.tools) ? result.tools : [],
               // EAI-05: the writes this answer proposed. Nothing changed until a card is confirmed.
               proposals: Array.isArray(result.proposals) ? result.proposals : streamedProposals,
+              recordLinks: Array.isArray(result.recordLinks) ? result.recordLinks : [],
               confidence: result.confidence,
               ts: Date.now(),
               section,
@@ -678,6 +680,8 @@ export default function EntoAssistant({ isOpen, onClose, signals = [], signalTot
                         <div className="la-markdown" data-answer-key={`${idx}:${msg.ts}`}>
                           <ReactMarkdown>{msg.content}</ReactMarkdown>
                         </div>
+                        {/* EAI-02c: the meetings and projects the answer names, as buttons that open them. */}
+                        <AnswerRecordLinks links={msg.recordLinks} onOpen={(path) => { navigate(path); onClose() }} />
                         {msg.tools?.length > 0 && <ToolsUsed calls={msg.tools} />}
                         {msg.proposals?.length > 0 && (
                           <div className="la-proposals">

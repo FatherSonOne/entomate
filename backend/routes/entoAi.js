@@ -42,7 +42,7 @@ const log = require('../utils/log');
 const { authenticate } = require('../middleware/auth');
 const { aiLimiter } = require('../middleware/rateLimiter');
 const { getOrgIdsForUser } = require('../utils/orgContext');
-const { declarations, runTool, ToolInputError, uuidArg } = require('../services/entoAi/tools');
+const { declarations, runTool, recordLinksOf, recordLinksForAnswer, ToolInputError, uuidArg } = require('../services/entoAi/tools');
 const { VERBS, writeDeclarations, PLAN_TOOL } = require('../services/entoAi/writeTools');
 const actionLog = require('../services/entoAi/actionLog');
 const { signalsFor } = require('../services/entoAi/signals');
@@ -160,6 +160,7 @@ async function runAgent({ model, history, question, ctx, emit }) {
   let round = await ask();
   const calls = [];
   const proposals = [];
+  const records = [];
 
   for (let turn = 1; turn <= MAX_ROUNDS; turn += 1) {
     const { wanted } = round;
@@ -180,6 +181,7 @@ async function runAgent({ model, history, question, ctx, emit }) {
     }
     // Chips name what was read; a proposal shows as its own card instead.
     calls.push(...outs.filter((o) => !o.proposal && !o.proposals).map(({ name, ok, count }) => ({ turn, name, ok, count })));
+    for (const o of outs) if (!o.proposal && !o.proposals) records.push(...recordLinksOf(o.response));
     contents.push({
       role: 'user',
       parts: outs.map((o, i) => ({
@@ -201,7 +203,7 @@ async function runAgent({ model, history, question, ctx, emit }) {
     emit({ type: 'answering' });
     emit({ type: 'chunk', content: answer });
   }
-  return { answer, calls, proposals };
+  return { answer, calls, proposals, recordLinks: recordLinksForAnswer(answer, records) };
 }
 
 /**
@@ -260,7 +262,7 @@ router.post('/query', authenticate, aiLimiter, async (req, res) => {
     sse(res, { type: 'start', section: sectionLabel, timestamp: Date.now() });
 
     log.info(`[EntoAI] Query in ${sectionLabel}: "${question.substring(0, 80)}"`);
-    const { answer, calls, proposals } = await runAgent({
+    const { answer, calls, proposals, recordLinks } = await runAgent({
       model,
       history,
       question,
@@ -280,10 +282,11 @@ router.post('/query', authenticate, aiLimiter, async (req, res) => {
       messages: [
         { role: 'user', content: question, ts: askedAt, section },
         // Proposals are saved as they were proposed; the panel refreshes their status on reload.
-        { role: 'assistant', content: answer, tools, followUp, ...(proposals.length ? { proposals } : {}), ts: Date.now(), section },
+        { role: 'assistant', content: answer, tools, followUp, ...(proposals.length ? { proposals } : {}), ...(recordLinks.length ? { recordLinks } : {}), ts: Date.now(), section },
       ],
     });
-    sse(res, { type: 'complete', answer, threadId, tools: calls, proposals });
+    // EAI-02c: the meetings and projects the answer names, for the record buttons under it.
+    sse(res, { type: 'complete', answer, threadId, tools: calls, proposals, recordLinks });
     res.end();
   } catch (error) {
     log.error(`[EntoAI] Query error: ${error.message || error}`);

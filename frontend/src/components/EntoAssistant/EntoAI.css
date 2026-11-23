@@ -1173,6 +1173,8 @@ html.dark .la-record-link:hover,
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 8px;
+  /* Entomate: the row sits outside .la-markdown, so match the answer's size, not the page's 16px. */
+  font-size: 13px;
 }
 
 .la-answer-records .la-record-link {
