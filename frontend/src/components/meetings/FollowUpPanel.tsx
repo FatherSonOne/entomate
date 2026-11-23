@@ -32,6 +32,8 @@ interface FollowUpPatch {
 export interface FollowUpState {
   data: FollowUpData | null
   loading: boolean
+  loadError: string | null
+  retry: () => Promise<void>
   busy: 'save' | 'send' | 'stop' | 'auto' | null
   save: (patch: FollowUpPatch) => Promise<void>
   send: () => Promise<void>
@@ -54,6 +56,7 @@ export function useFollowUp(meetingId: string, ready: boolean): FollowUpState {
   const toast = useToast() as ToastApi
   const [data, setData] = useState<FollowUpData | null>(null)
   const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [busy, setBusy] = useState<FollowUpState['busy']>(null)
   const path = `/meetings/${meetingId}/follow-up`
 
@@ -62,12 +65,15 @@ export function useFollowUp(meetingId: string, ready: boolean): FollowUpState {
     try {
       cache.invalidate(path)
       setData(normalizeFollowUp(await meetingsApi.followUp(meetingId)))
-    } catch {
-      if (!quiet) setData(null)
+      setLoadError(null)
+    } catch (err) {
+      setLoadError(errorText(err))
     } finally {
       if (!quiet) setLoading(false)
     }
   }, [meetingId, path])
+
+  const retry = useCallback(() => load(), [load])
 
   useEffect(() => { if (ready) load() }, [ready, load])
 
@@ -110,7 +116,7 @@ export function useFollowUp(meetingId: string, ready: boolean): FollowUpState {
     }
   }, [toast])
 
-  return { data, loading, busy, save, send, stop, setAutoSend }
+  return { data, loading, loadError, retry, busy, save, send, stop, setAutoSend }
 }
 
 /** A field that saves on blur when its text changed. */
@@ -196,14 +202,25 @@ function ToLine({ state, editable }: { state: FollowUpState; editable: boolean }
 /** The letter: To, Subject, the opening (an agent wrote it), Decided, Who is on what, Next, sign-off. */
 export function FollowUpLetter({ state }: { state: FollowUpState }): React.ReactElement {
   const data = state.data
-  if (state.loading && !data) return <p className="bs-sub bs-fu-wait">Drafting the follow-up…</p>
-  if (!data) return <p className="bs-sub bs-fu-wait">The follow-up could not be loaded. Reload the page to try again.</p>
+  const loadStatus = state.loadError ? (
+    <div className="bs-fu-wait" role="alert" aria-busy={state.loading}>
+      <p className="bs-sub">{data?.row ? 'The follow-up could not be refreshed. Showing the last loaded draft.' : 'The follow-up could not be loaded.'}</p>
+      <p className="bs-sub">{state.loadError}</p>
+      <Key size="sm" onClick={state.retry} disabled={state.loading || state.busy !== null}>
+        {state.loading ? 'Retrying…' : 'Retry'}
+      </Key>
+    </div>
+  ) : null
+  if (!data?.row && loadStatus) return loadStatus
+  if (!data) return <p className="bs-sub bs-fu-wait">Drafting the follow-up…</p>
   const row = data.row
   if (!row) return <p className="bs-sub bs-fu-wait">The follow-up is drafted as soon as the minutes are ready.</p>
   const editable = canEdit(data)
   const p = data.parts
   const inc = row.include
   return (
+    <>
+      {loadStatus}
     <article className="bs-fu-paper" aria-label="Follow-up email">
       <div className="bs-fu-hdr">
         <span className="bs-lbl">To</span>
@@ -240,6 +257,7 @@ export function FollowUpLetter({ state }: { state: FollowUpState }): React.React
         <p className="bs-fu-foot">Sent by Entomate. Replies go to you. Private notes are never included.</p>
       </div>
     </article>
+    </>
   )
 }
 
