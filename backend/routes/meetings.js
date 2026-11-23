@@ -1359,6 +1359,108 @@ function formatRecapFallback(meeting, actionItems) {
   return message;
 }
 
+// ── Follow-up email (Slate pick C "Letter", 2026-11-23) ──
+// One drafted email per meeting, sent on its own 20 minutes after the meeting
+// unless someone edits or stops it. See services/followUp.js.
+
+const followUp = require('../services/followUp');
+
+/** What the Follow-up tab needs, in one shape. */
+async function followUpPayload(req, result, orgId) {
+  const { row, parts } = result;
+  return {
+    followUp: row,
+    parts,
+    autoSend: await followUp.autoSendFor(req.user.id),
+    mailReady: require('../services/mailer').isConfigured(),
+    canSend: await followUp.canSend(req.user.id, row, orgId),
+  };
+}
+
+/** GET /api/meetings/follow-up/auto-send — the caller's own switch. */
+router.get('/follow-up/auto-send', authenticate, async (req, res) => {
+  try {
+    res.json({ enabled: await followUp.autoSendFor(req.user.id) });
+  } catch (error) {
+    log.error('Error reading follow-up auto-send:', { error: error.message || error });
+    res.status(500).json({ error: 'Could not read the setting' });
+  }
+});
+
+/** PUT /api/meetings/follow-up/auto-send { enabled } */
+router.put('/follow-up/auto-send', authenticate, validate(schemas.followUpAutoSend), async (req, res) => {
+  try {
+    res.json({ enabled: await followUp.setAutoSend(req.user.id, req.body.enabled) });
+  } catch (error) {
+    log.error('Error saving follow-up auto-send:', { error: error.message || error });
+    res.status(500).json({ error: 'Could not save the setting' });
+  }
+});
+
+/** GET /api/meetings/:id/follow-up — the draft, written on first ask. */
+router.get('/:id/follow-up', authenticate, validate(schemas.followUpAction), async (req, res) => {
+  try {
+    if (!supabase) return res.status(503).json({ error: 'Database not configured' });
+    const orgId = await meetingOrgOrRespond(req, res, req.params.id);
+    if (!orgId) return;
+    const result = await followUp.getOrCreate(req.params.id, { userId: req.user.id });
+    if (!result) return res.status(404).json({ error: 'Meeting not found' });
+    res.json(await followUpPayload(req, result, orgId));
+  } catch (error) {
+    log.error('Error loading follow-up:', { error: error.message || error });
+    res.status(500).json({ error: 'Could not load the follow-up' });
+  }
+});
+
+/** PUT /api/meetings/:id/follow-up — save edits; a scheduled one waits for Send now. */
+router.put('/:id/follow-up', authenticate, validate(schemas.followUpUpdate), async (req, res) => {
+  try {
+    if (!supabase) return res.status(503).json({ error: 'Database not configured' });
+    const orgId = await meetingOrgOrRespond(req, res, req.params.id);
+    if (!orgId) return;
+    const out = await followUp.update(req.params.id, req.body);
+    if (out.error === 'not_found') return res.status(404).json({ error: 'No follow-up for this meeting yet' });
+    if (out.error === 'locked') return res.status(409).json({ error: 'It has already gone out.', status: out.status });
+    const result = await followUp.getOrCreate(req.params.id, { userId: req.user.id });
+    res.json(await followUpPayload(req, { ...result, row: out.row }, orgId));
+  } catch (error) {
+    log.error('Error saving follow-up:', { error: error.message || error });
+    res.status(500).json({ error: 'Could not save the follow-up' });
+  }
+});
+
+/** Send or stop: the person it is sent for, or a workspace owner/admin. */
+function followUpAction(action) {
+  return async (req, res) => {
+    try {
+      if (!supabase) return res.status(503).json({ error: 'Database not configured' });
+      const orgId = await meetingOrgOrRespond(req, res, req.params.id);
+      if (!orgId) return;
+      const current = await followUp.getOrCreate(req.params.id, { userId: req.user.id });
+      if (!current) return res.status(404).json({ error: 'Meeting not found' });
+      if (!current.row) return res.status(409).json({ error: 'Nothing to send until the minutes are ready.' });
+      if (!(await followUp.canSend(req.user.id, current.row, orgId))) {
+        return res.status(403).json({ error: `Only the person it is sent for, or a workspace admin, can ${action} it.` });
+      }
+      if (action === 'send') {
+        const out = await followUp.send(req.params.id);
+        if (out.error) return res.status(out.status || 502).json({ error: out.error });
+        log.info('Follow-up sent', { meetingId: req.params.id, orgId });
+        return res.json(await followUpPayload(req, { ...current, row: out.row }, orgId));
+      }
+      const row = await followUp.stop(req.params.id);
+      if (!row) return res.status(409).json({ error: 'It has already gone out.' });
+      res.json(await followUpPayload(req, { ...current, row }, orgId));
+    } catch (error) {
+      log.error(`Error on follow-up ${action}:`, { error: error.message || error });
+      res.status(500).json({ error: `Could not ${action} the follow-up` });
+    }
+  };
+}
+
+router.post('/:id/follow-up/send', authenticate, validate(schemas.followUpAction), followUpAction('send'));
+router.post('/:id/follow-up/stop', authenticate, validate(schemas.followUpAction), followUpAction('stop'));
+
 module.exports = router;
 
 // Shared with services/transcriptIngest.js, which turns finished bot sessions into meetings.

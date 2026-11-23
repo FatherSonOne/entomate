@@ -271,9 +271,18 @@ One meeting: its minutes, transcript, notes and action items, with the recording
 
 1. If you met the same people before, From earlier meetings lists what is still open from those meetings, and what got done.
 
+### Follow-up email
+
+1. Open the Follow-up tab. When the minutes are ready, Entomate drafts an email to the people who were there: an opening line, what was decided, who is on what, and the next meeting with the same people.
+2. People come from the calendar invite, the bot’s invitees and the owners of action items. Remove anyone with ×, or type an email to add one.
+3. Click the subject, the opening or the sign-off to change them. The amber line marks the opening Entomate wrote.
+4. Sending: the agent sends it 20 minutes after the meeting ends. Editing it holds it for you; press Stop to keep it from going out. Send now sends it at once.
+5. Replies go to you, and Send me a copy puts a copy in your inbox. Private notes are never included.
+6. To stop follow-ups going out on their own, turn off Send on their own in the Follow-up tab.
+
 ### Share recap
 
-1. Press Share recap. Post it to a chat channel, Email me the recap, or Download PDF.
+1. Press Share recap. Post it to a chat channel, or Download PDF. Email the people who were there opens the Follow-up tab.
 2. Send to CRM pushes the action items to Logos Vision.
 3. More actions › Add to calendar puts the meeting and its summary on your Google Calendar.
 
@@ -477,7 +486,7 @@ Is what you agree in meetings getting done, and who is behind? Follow-through, w
 
 1. PDF: Meeting recap (pick a meeting), Weekly summary (your last 7 days), Project report (pick a project). Preview a PDF in the drawer before downloading.
 2. CSV: Meetings, Action items (all or one status), Tasks.
-3. To email a recap, open the meeting and use Share recap.
+3. To email a recap to the people who were there, open the meeting’s Follow-up tab.
 
 **Tip:** Overdue in the title counts open items whose due date has passed, whenever they were created.
 
@@ -771,6 +780,7 @@ Common issues, fixes, and frequently asked questions.
 
 ## 20. What's new
 
+- **November 23, 2026** (Meeting Details): Follow-up tab: an email to the people who were there, sent on its own 20 minutes after the meeting unless you edit or stop it.
 - **November 23, 2026** (Upcoming meetings): Upcoming in Meetings replaces Calendar: 60 days, a month calendar and Skip or Join per meeting.
 - **November 23, 2026** (Today): Today rewritten for the current page: action items, agents, decisions and schedule.
 - **November 23, 2026** (Settings): Settings is six sections: You, Appearance, Recording, Meeting agents, Connections, Workspace.

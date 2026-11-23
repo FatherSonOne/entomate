@@ -1405,6 +1405,113 @@ html[data-motion="reduce"] .bs-menu-list { animation: none; }
 .bs-mtg-share-field { display: flex; flex-direction: column; gap: 6px; }
 .bs-mtg-share-keys { display: flex; flex-wrap: wrap; gap: 8px; }
 
+/* Follow-up tab (Slate C "Letter", 2026-11-23): the email drawn as a letter on
+   a raised sheet, edited in place. The Sending block is sunk; amber when an
+   agent will send it, with the time in mono. */
+.bs-fu-tabword { margin-left: 8px; }
+.bs-fu-wait { padding-top: 22px; }
+.bs-fu-paper {
+  margin-top: 18px;
+  padding: 26px 30px;
+  border-radius: 10px;
+  background: var(--bs-key);
+  box-shadow: inset 0 0 0 1px var(--bs-rule), 0 2px 0 var(--bs-key-edge);
+  min-width: 0;
+}
+.bs-fu-hdr {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 8px 0;
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--bs-rule-ink);
+  font-size: 13px;
+}
+.bs-fu-to { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0; }
+.bs-fu-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 28px;
+  max-width: 100%;
+  padding: 0 4px 0 10px;
+  border-radius: 999px;
+  background: var(--bs-plate);
+  box-shadow: inset 0 0 0 1px var(--bs-rule), 0 1px 0 var(--bs-key-edge);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.bs-fu-chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.bs-fu-chip small { font: 500 9.5px var(--bs-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--bs-muted); }
+.bs-fu-chip button {
+  width: 20px; height: 20px; border: 0; border-radius: 50%;
+  display: grid; place-items: center;
+  background: transparent; color: var(--bs-muted); font-size: 13px; cursor: pointer;
+}
+.bs-fu-chip button:hover { color: var(--bs-ink); }
+.bs-fu-chip button:focus-visible { outline: 2px solid var(--bs-brand); outline-offset: 1px; }
+.bs-fu-add {
+  flex: 1 1 140px; min-width: 0; height: 28px; padding: 0 10px;
+  border: 0; border-radius: 999px; background: transparent;
+  box-shadow: inset 0 0 0 1px var(--bs-rule);
+  font: 500 12.5px var(--bs-sans); color: var(--bs-ink);
+}
+.bs-fu-add::placeholder { color: var(--bs-muted); }
+.bs-fu-add:focus-visible { outline: 2px solid var(--bs-brand); outline-offset: 1px; }
+.bs-fu-bad { flex-basis: 100%; font-size: 12px; color: var(--bs-brand); }
+/* An editable line: reads as text, a hairline on hover, sunk while typing. */
+.bs-fu-ed {
+  width: 100%; min-width: 0; margin: -3px -6px; padding: 3px 6px;
+  border: 0; border-radius: 6px; background: transparent;
+  font: inherit; color: var(--bs-ink);
+  box-shadow: inset 0 0 0 1px transparent;
+  transition: box-shadow 80ms, background 80ms;
+}
+.bs-fu-ed:not(:disabled):hover { box-shadow: inset 0 0 0 1px var(--bs-rule); }
+.bs-fu-ed:focus { outline: none; background: var(--bs-sunk); box-shadow: inset 0 0 0 1.5px var(--bs-ink); }
+.bs-fu-ed:disabled { opacity: 1; cursor: default; }
+.bs-fu-ed-area { display: block; resize: none; line-height: 1.6; overflow: hidden; field-sizing: content; }
+.bs-fu-subject { font-weight: 600; }
+.bs-fu-letter { padding-top: 16px; font-size: 14.5px; line-height: 1.6; min-width: 0; overflow-wrap: anywhere; }
+.bs-fu-letter p { margin: 0 0 12px; }
+html[data-style="bench-swiss"] .bs-plate .bs-fu-letter h4 {
+  margin: 18px 0 4px; padding-bottom: 6px; border-bottom: 1px solid var(--bs-rule);
+  font: 500 10.5px var(--bs-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--bs-muted);
+}
+.bs-fu-ai {
+  display: flex; gap: 8px; align-items: center; margin-bottom: 6px;
+  font: 500 10px var(--bs-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--bs-ai);
+}
+.bs-fu-dec { list-style: none; margin: 0; padding: 0; }
+.bs-fu-dec li { display: grid; grid-template-columns: 3px minmax(0, 1fr); gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--bs-rule2); }
+.bs-fu-tick { background: var(--bs-brand); border-radius: 2px; margin: 3px 0; }
+.bs-fu-who { display: grid; grid-template-columns: minmax(0, 1fr) 120px 92px; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--bs-rule2); }
+.bs-fu-o { color: var(--bs-ink2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bs-fu-d { font: 500 12px/1.9 var(--bs-mono); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.bs-fu-signoff { margin-top: 16px; }
+.bs-fu-foot { margin: 22px 0 0 !important; font-size: 12px; color: var(--bs-muted); }
+.bs-fu-auto { margin-top: 14px; padding: 14px 16px; border-radius: 12px; background: var(--bs-sunk); box-shadow: inset 0 1px 2px var(--bs-lo); }
+.bs-fu-auto .bs-sub { font-size: 13px; margin: 6px 0 0; }
+.bs-fu-big { font: 500 30px/1 var(--bs-mono); letter-spacing: -0.02em; margin: 8px 0 2px; font-variant-numeric: tabular-nums; }
+.bs-fu-why { color: var(--bs-ink2); }
+.bs-fu-keys { display: flex; gap: 8px; margin-top: 12px; }
+.bs-fu-people { list-style: none; margin: 10px 0 0; padding: 0; }
+.bs-fu-people li { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--bs-rule2); font-size: 13px; min-width: 0; }
+.bs-fu-people li > span:first-child { flex: none; white-space: nowrap; }
+.bs-fu-mail { font: 500 11.5px var(--bs-mono); color: var(--bs-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.bs-fu-opts { display: flex; flex-direction: column; gap: 10px; padding-top: 12px; font-size: 13px; color: var(--bs-ink2); }
+.bs-fu-opts label { display: inline-flex; gap: 10px; align-items: center; cursor: pointer; }
+.bs-fu-switch { display: flex; gap: 12px; align-items: center; padding-top: 12px; }
+.bs-fu-switch .bs-sub { font-size: 13px; }
+.bs-fu-phone-status .bs-fu-auto { margin-top: 16px; }
+.bs-fu-phone-opts { padding-top: 22px; }
+@media (max-width: 767.98px) {
+  .bs-fu-paper { padding: 18px 16px; }
+  .bs-fu-hdr { grid-template-columns: 60px minmax(0, 1fr); }
+  .bs-fu-who { grid-template-columns: minmax(0, 1fr) 78px; }
+  .bs-fu-o { display: none; }
+}
+
 /* Recording state banner: a ruled strip, not a card */
 .bs-recstat {
   display: grid;
