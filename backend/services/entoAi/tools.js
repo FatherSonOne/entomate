@@ -554,4 +554,4 @@ async function runTool(name, args, ctx, timeoutMs = 10000) {
   }
 }
 
-module.exports = { TOOLS, declarations, runTool, resultCount, CLOSED, ToolInputError };
+module.exports = { TOOLS, declarations, runTool, resultCount, CLOSED, ToolInputError, uuidArg, dateArg, trunc };

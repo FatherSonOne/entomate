@@ -1,0 +1,445 @@
+/**
+ * Entomate AI write spine (EAI-05, D6/D7).
+ *
+ * Guards docs/app-dev/entomate-ai-APP-PRODUCT.md §6 P4:
+ *   - ENTO_AI_WRITE_TOOLS off: no write declaration reaches the model, a write
+ *     call is an unknown tool, and every /actions endpoint is 404.
+ *   - On: a write call only PROPOSES (a row in ento_ai_action_log, a `proposal`
+ *     event); nothing changes until Confirm. Confirm runs once; Undo reverses
+ *     it only while the record is as the agent left it.
+ *   - Every read and write runs on the caller's user client with the org fence.
+ *
+ * The database is an in-memory stand-in with per-user RLS for the tables the
+ * verbs touch (the real policies and the lifecycle trigger are proven on PG17
+ * against migration 20261122200000). getUser and Gemini are faked.
+ */
+
+'use strict';
+
+process.env.SUPABASE_URL = process.env.SUPABASE_URL || 'https://test.supabase.co';
+process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'test-service-key';
+
+const USERS = { 'token-a': 'user-a', 'token-b': 'user-b' };
+jest.mock('@supabase/supabase-js', () => ({
+  createClient: () => ({
+    auth: {
+      getUser: async (token) => (USERS[token]
+        ? { data: { user: { id: USERS[token], email: `${USERS[token]}@example.com`, user_metadata: {} } }, error: null }
+        : { data: { user: null }, error: { message: 'invalid' } }),
+    },
+  }),
+}));
+
+// ── In-memory PostgREST with RLS ─────────────────────────────────────
+const mockDb = { tables: {}, members: {}, clock: 0, queries: [] };
+const mockTick = () => new Date(Date.UTC(2026, 10, 22, 12, 0, 0, mockDb.clock++)).toISOString();
+const NEXT = { proposed: ['confirmed', 'rejected'], confirmed: ['executed', 'failed'], executed: ['undone'] };
+
+function mockPolicy(table, uid, op, row) {
+  const inOrg = (mockDb.members[uid] || []).includes(row.org_id);
+  switch (table) {
+    case 'ento_ai_action_log': return row.user_id === uid && inOrg;
+    case 'projects': return op === 'select' ? inOrg : row.owner_id === uid && inOrg;
+    case 'meeting_notes': return op === 'select' ? inOrg && (row.visibility === 'team' || row.author_id === uid) : row.author_id === uid && inOrg;
+    default: return inOrg;
+  }
+}
+
+function mockTrigger(table, oldRow, row) {
+  if (table === 'ento_ai_action_log') {
+    if (!oldRow) {
+      if (row.status !== 'proposed') return 'a new row must be a bare proposal';
+    } else if (row.status !== oldRow.status && !(NEXT[oldRow.status] || []).includes(row.status)) {
+      return `${oldRow.status} -> ${row.status} is not allowed`;
+    } else if (['rejected', 'failed', 'undone'].includes(oldRow.status)) {
+      return 'final';
+    }
+  }
+  if (oldRow && ['tasks', 'projects', 'meeting_notes'].includes(table)) row.updated_at = mockTick();
+  return null;
+}
+
+function mockClient(uid) {
+  return {
+    from(table) {
+      const q = { table, op: 'select', filters: [], opts: {}, single: false };
+      mockDb.queries.push({ uid, q });
+      const rowsOf = () => (mockDb.tables[table] = mockDb.tables[table] || []);
+      const match = (r) => q.filters.every(([k, op, v]) => (op === 'eq' ? r[k] === v : v.includes(r[k])));
+      const run = () => {
+        const all = rowsOf();
+        let out = [];
+        if (q.op === 'insert') {
+          const defaults = table === 'ento_ai_action_log' ? { status: 'proposed', result: null, undo: null } : {};
+          const row = { id: require('crypto').randomUUID(), created_at: mockTick(), updated_at: mockTick(), ...defaults, ...q.value };
+          if (!mockPolicy(table, uid, 'insert', row)) return { data: null, error: { message: 'new row violates row-level security policy' } };
+          const bad = mockTrigger(table, null, row);
+          if (bad) return { data: null, error: { message: bad } };
+          all.push(row);
+          out = [row];
+        } else {
+          const seen = all.filter((r) => mockPolicy(table, uid, q.op === 'select' ? 'select' : q.op, r) && mockPolicy(table, uid, 'select', r) && match(r));
+          if (q.op === 'select') out = seen;
+          if (q.op === 'update') {
+            for (const r of seen) {
+              const next = { ...r, ...q.value };
+              const bad = mockTrigger(table, r, next);
+              if (bad) return { data: null, error: { message: bad } };
+              Object.assign(r, next);
+            }
+            out = seen;
+          }
+          if (q.op === 'delete') {
+            mockDb.tables[table] = all.filter((r) => !seen.includes(r));
+            out = seen;
+          }
+        }
+        if (q.opts.head) return { data: null, count: out.length, error: null };
+        const data = out.map((r) => ({ ...r }));
+        if (q.single) return data.length > 1 ? { data: null, error: { message: 'multiple rows' } } : { data: data[0] || null, error: null };
+        return { data, count: data.length, error: null };
+      };
+      const b = {
+        select(_cols, opts) { q.opts = opts || {}; q.selected = true; return b; },
+        insert(v) { q.op = 'insert'; q.value = v; return b; },
+        update(v) { q.op = 'update'; q.value = v; return b; },
+        delete() { q.op = 'delete'; return b; },
+        eq(k, v) { q.filters.push([k, 'eq', v]); return b; },
+        in(k, v) { q.filters.push([k, 'in', v]); return b; },
+        maybeSingle() { q.single = true; return b; },
+        // One macrotask per query, like a network round trip, so two requests can interleave.
+        then(resolve, reject) { return new Promise((r) => setImmediate(r)).then(run).then(resolve, reject); },
+      };
+      return b;
+    },
+    rpc: async () => ({ data: 'thread-1', error: null }),
+  };
+}
+
+jest.mock('../config/supabase', () => ({
+  supabase: { from: () => { throw new Error('service client used'); } },
+  supabaseAdmin: { from: () => { throw new Error('service client used'); } },
+  createUserClient: jest.fn((token) => mockClient(USERS[token])),
+}));
+
+const mockScript = [];
+const mockModelParams = [];
+jest.mock('../config/gemini', () => ({
+  isConfigured: jest.fn(() => true),
+  genAI: {
+    getGenerativeModel: (params) => {
+      mockModelParams.push(params);
+      return {
+        generateContentStream: async () => {
+          const step = mockScript.shift() || { text: 'ok' };
+          const parts = step.calls ? step.calls.map((c) => ({ functionCall: c })) : [{ text: step.text }];
+          async function* stream() { yield { candidates: [{ content: { role: 'model', parts } }] }; }
+          return { stream: stream(), response: Promise.reject(new Error('aggregate not used')) };
+        },
+      };
+    },
+  },
+}));
+jest.mock('../middleware/rateLimiter', () => ({ aiLimiter: (req, res, next) => next() }));
+jest.mock('../utils/orgContext', () => ({ getOrgIdsForUser: jest.fn(async (uid) => mockDb.members[uid] || []) }));
+jest.mock('../utils/log', () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() }));
+jest.mock('../services/calendarService', () => ({ isConfigured: () => false, getEvents: jest.fn() }));
+
+const express = require('express');
+const request = require('supertest');
+const { VERBS } = require('../services/entoAi/writeTools');
+
+const app = express();
+app.use(express.json());
+app.use('/api/ento-ai', require('../routes/entoAi'));
+
+const PROJECT_A = '0000000a-0000-4000-8000-00000000a001';
+const PROJECT_B = '0000000b-0000-4000-8000-00000000b001';
+const TASK_A = '0000000a-0000-4000-8000-00000000a002';
+const TASK_B = '0000000b-0000-4000-8000-00000000b002';
+const MEETING_A = '0000000a-0000-4000-8000-00000000a003';
+
+const sse = (text) => text.split('\n').filter((l) => l.startsWith('data: ')).map((l) => JSON.parse(l.slice(6)));
+const rows = (t) => mockDb.tables[t] || [];
+const ask = (question, token = 'token-a') => request(app).post('/api/ento-ai/query').set('Authorization', `Bearer ${token}`).send({ question });
+const act = (method, path, body, token = 'token-a') => request(app)[method](`/api/ento-ai/actions${path}`).set('Authorization', `Bearer ${token}`).send(body);
+
+/** Asks once with a scripted write call; returns the proposal the route emitted. */
+async function proposeVia(name, args) {
+  mockScript.push({ calls: [{ name, args }] }, { text: 'Proposed. It waits for your Confirm.' });
+  const res = await ask(`please ${name}`);
+  const ev = sse(res.text);
+  return { ev, proposal: ev.find((e) => e.type === 'proposal')?.proposal };
+}
+
+beforeEach(() => {
+  process.env.ENTO_AI_WRITE_TOOLS = 'true';
+  mockScript.length = 0;
+  mockModelParams.length = 0;
+  mockDb.queries.length = 0;
+  mockDb.members = { 'user-a': ['org-a'], 'user-b': ['org-a', 'org-b'] };
+  mockDb.tables = {
+    projects: [
+      { id: PROJECT_A, org_id: 'org-a', name: 'Launch', owner_id: 'user-a', status: 'active', end_date: null, updated_at: mockTick() },
+      { id: PROJECT_B, org_id: 'org-b', name: 'Secret', owner_id: 'user-b', status: 'active', updated_at: mockTick() },
+    ],
+    tasks: [
+      { id: TASK_A, org_id: 'org-a', title: 'Ship it', status: 'open', priority: 'medium', due_date: null, completed_at: null, assigned_to: null, updated_at: mockTick() },
+      { id: TASK_B, org_id: 'org-b', title: 'Hidden', status: 'open', updated_at: mockTick() },
+    ],
+    meetings: [{ id: MEETING_A, org_id: 'org-a', title: 'Weekly sync' }],
+    action_items: [],
+    meeting_notes: [],
+    ento_ai_action_log: [],
+  };
+});
+afterAll(() => { delete process.env.ENTO_AI_WRITE_TOOLS; });
+
+describe('flag off (D6: writes ship off)', () => {
+  beforeEach(() => { process.env.ENTO_AI_WRITE_TOOLS = 'false'; });
+
+  test('no write declaration reaches the model; the prompt says read-only', async () => {
+    mockScript.push({ text: 'hi' });
+    await ask('hi');
+    const names = mockModelParams[0].tools[0].functionDeclarations.map((d) => d.name);
+    for (const verb of Object.keys(VERBS)) expect(names).not.toContain(verb);
+    expect(mockModelParams[0].systemInstruction).toMatch(/You can only read/);
+  });
+
+  test('a write call is an unknown tool: no proposal, no row', async () => {
+    const { ev, proposal } = await proposeVia('create_task', { title: 'X' });
+    expect(proposal).toBeUndefined();
+    expect(ev.find((e) => e.type === 'tool_end').tools).toEqual([{ name: 'create_task', ok: false, count: 0 }]);
+    expect(rows('ento_ai_action_log')).toEqual([]);
+    expect(rows('tasks')).toHaveLength(2);
+  });
+
+  test.each([['get', '?ids=x'], ['post', '/x/confirm'], ['post', '/x/reject'], ['post', '/x/undo'], ['patch', '/x']])(
+    '%s /actions%s → 404', async (method, path) => {
+      expect((await act(method, path, {})).status).toBe(404);
+    });
+});
+
+test('anonymous and forged callers → 401 on the action endpoints', async () => {
+  expect((await request(app).post(`/api/ento-ai/actions/${TASK_A}/confirm`)).status).toBe(401);
+  expect((await act('post', `/${TASK_A}/confirm`, {}, 'forged')).status).toBe(401);
+});
+
+test('a write call only proposes: one row, a proposal event, nothing created, no chip', async () => {
+  const { ev, proposal } = await proposeVia('create_task', { title: 'Write the brief', dueDate: '2026-11-30', projectId: PROJECT_A });
+  expect(ev.map((e) => e.type)).toEqual(['start', 'tool_start', 'tool_end', 'proposal', 'answering', 'chunk', 'complete']);
+  expect(proposal).toMatchObject({
+    toolName: 'create_task', status: 'proposed', riskClass: 'write',
+    summary: 'Create task "Write the brief" · due 2026-11-30 · in "Launch"',
+    editable: expect.arrayContaining([expect.objectContaining({ key: 'title' })]),
+  });
+  expect(proposal).not.toHaveProperty('undo');
+  expect(rows('tasks')).toHaveLength(2);
+  expect(rows('ento_ai_action_log')).toHaveLength(1);
+  expect(rows('ento_ai_action_log')[0]).toMatchObject({ user_id: 'user-a', org_id: 'org-a', status: 'proposed' });
+  const complete = ev.at(-1);
+  expect(complete.tools).toEqual([]);
+  expect(complete.proposals.map((p) => p.id)).toEqual([proposal.id]);
+  expect(mockModelParams[0].systemInstruction).toMatch(/Never say it is done/);
+});
+
+test('confirm executes once on the user client with the org fence; a second confirm is 409', async () => {
+  const { proposal } = await proposeVia('create_task', { title: 'Write the brief', projectId: PROJECT_A });
+  const first = await act('post', `/${proposal.id}/confirm`, {});
+  expect(first.status).toBe(200);
+  expect(first.body).toMatchObject({ ok: true, proposal: { status: 'executed', view: { path: '/tasks' } } });
+  const created = rows('tasks').filter((t) => t.title === 'Write the brief');
+  expect(created).toHaveLength(1);
+  expect(created[0]).toMatchObject({ org_id: 'org-a', project_id: PROJECT_A, status: 'open' });
+
+  const second = await act('post', `/${proposal.id}/confirm`, {});
+  expect(second.status).toBe(409);
+  expect(rows('tasks').filter((t) => t.title === 'Write the brief')).toHaveLength(1);
+  // Every business query carried the fence or was scoped to the proposal's org.
+  for (const { q } of mockDb.queries.filter((x) => ['tasks', 'projects'].includes(x.q.table) && x.q.op !== 'insert')) {
+    expect(q.filters.some(([k]) => k === 'org_id')).toBe(true);
+  }
+});
+
+test('two confirms at the same time (double click, two tabs) execute once', async () => {
+  const { proposal } = await proposeVia('create_task', { title: 'Once only' });
+  const both = await Promise.all([act('post', `/${proposal.id}/confirm`, {}), act('post', `/${proposal.id}/confirm`, {})]);
+  expect(both.map((r) => r.status).sort()).toEqual([200, 409]);
+  expect(rows('tasks').filter((t) => t.title === 'Once only')).toHaveLength(1);
+});
+
+test('undo removes the created task once; a second undo is 409', async () => {
+  const { proposal } = await proposeVia('create_task', { title: 'Temp' });
+  await act('post', `/${proposal.id}/confirm`, {});
+  const res = await act('post', `/${proposal.id}/undo`, {});
+  expect(res.body).toMatchObject({ ok: true, proposal: { status: 'undone' } });
+  expect(rows('tasks').find((t) => t.title === 'Temp')).toBeUndefined();
+  expect((await act('post', `/${proposal.id}/undo`, {})).status).toBe(409);
+});
+
+test('undo is refused when the record changed after the agent; nothing is overwritten', async () => {
+  const { proposal } = await proposeVia('update_task', { taskId: TASK_A, status: 'done' });
+  await act('post', `/${proposal.id}/confirm`, {});
+  const task = rows('tasks').find((t) => t.id === TASK_A);
+  expect(task).toMatchObject({ status: 'done' });
+  expect(task.completed_at).toBeTruthy();
+  // Someone edits the task afterwards.
+  Object.assign(task, { title: 'Ship it v2', updated_at: mockTick() });
+
+  const res = await act('post', `/${proposal.id}/undo`, {});
+  expect(res.body).toMatchObject({ ok: false, proposal: { status: 'executed' } });
+  expect(res.body.error).toMatch(/changed after Entomate AI/);
+  expect(task).toMatchObject({ status: 'done', title: 'Ship it v2' });
+});
+
+test('update_task undo puts back the previous status and completed_at', async () => {
+  const { proposal } = await proposeVia('update_task', { taskId: TASK_A, status: 'done', priority: 'high' });
+  expect(proposal.summary).toBe('Update "Ship it": status → done, priority → high');
+  await act('post', `/${proposal.id}/confirm`, {});
+  await act('post', `/${proposal.id}/undo`, {});
+  expect(rows('tasks').find((t) => t.id === TASK_A)).toMatchObject({ status: 'open', priority: 'medium', completed_at: null });
+});
+
+test('undo restores only the verb\'s own columns, whatever the undo record names', async () => {
+  const { proposal } = await proposeVia('assign_task', { taskId: TASK_A, assignedTo: 'Sam' });
+  await act('post', `/${proposal.id}/confirm`, {});
+  const log = rows('ento_ai_action_log')[0];
+  log.undo.previous.title = 'Hijacked';
+  await act('post', `/${proposal.id}/undo`, {});
+  expect(rows('tasks').find((t) => t.id === TASK_A)).toMatchObject({ title: 'Ship it', assigned_to: null });
+});
+
+test('a project with tasks is not removed by undo', async () => {
+  const { proposal } = await proposeVia('create_project', { name: 'New thing' });
+  const done = await act('post', `/${proposal.id}/confirm`, {});
+  const projectId = done.body.proposal.result.projectId;
+  expect(rows('projects').find((p) => p.id === projectId)).toMatchObject({ owner_id: 'user-a', org_id: 'org-a', status: 'planning' });
+  rows('tasks').push({ id: 'child', org_id: 'org-a', project_id: projectId, title: 'Child', updated_at: mockTick() });
+  const res = await act('post', `/${proposal.id}/undo`, {});
+  expect(res.body).toMatchObject({ ok: false, proposal: { status: 'executed' } });
+  expect(res.body.error).toMatch(/has tasks/);
+  expect(rows('projects').find((p) => p.id === projectId)).toBeDefined();
+});
+
+test('another org\'s record is never proposed against (RLS + fence read nothing)', async () => {
+  const { ev, proposal } = await proposeVia('update_task', { taskId: TASK_B, status: 'done' });
+  expect(proposal).toBeUndefined();
+  expect(ev.find((e) => e.type === 'tool_end').tools[0]).toEqual({ name: 'update_task', ok: false, count: 0 });
+  expect(rows('ento_ai_action_log')).toEqual([]);
+  const { proposal: p2 } = await proposeVia('create_task', { title: 'x', projectId: PROJECT_B });
+  expect(p2).toBeUndefined();
+});
+
+test('confirm validates the stored payload again: a payload moved to another org is refused', async () => {
+  const { proposal } = await proposeVia('create_task', { title: 'x', projectId: PROJECT_A });
+  // A direct PostgREST edit of the caller's own row.
+  rows('ento_ai_action_log')[0].payload.projectId = PROJECT_B;
+  const res = await act('post', `/${proposal.id}/confirm`, {});
+  expect(res.status).toBe(422);
+  expect(rows('tasks')).toHaveLength(2);
+  expect(rows('ento_ai_action_log')[0].status).toBe('proposed');
+});
+
+test('a teammate cannot see, confirm or undo another user\'s proposal (D7 owner rule)', async () => {
+  const { proposal } = await proposeVia('create_task', { title: 'Mine' });
+  expect((await act('post', `/${proposal.id}/confirm`, {}, 'token-b')).status).toBe(404);
+  const list = await act('get', `?ids=${proposal.id}`, undefined, 'token-b');
+  expect(list.body.proposals).toEqual([]);
+  expect(rows('tasks').find((t) => t.title === 'Mine')).toBeUndefined();
+  expect((await act('get', `?ids=${proposal.id}`)).body.proposals.map((p) => p.status)).toEqual(['proposed']);
+});
+
+test('reject is final', async () => {
+  const { proposal } = await proposeVia('log_meeting_note', { meetingId: MEETING_A, body: 'Follow up with legal' });
+  expect(proposal.summary).toBe('Add a private note to "Weekly sync": Follow up with legal');
+  expect((await act('post', `/${proposal.id}/reject`, {})).body.proposal.status).toBe('rejected');
+  expect((await act('post', `/${proposal.id}/confirm`, {})).status).toBe(409);
+  expect(rows('meeting_notes')).toEqual([]);
+});
+
+test('edit changes only editable fields, re-validates, and stops after confirm', async () => {
+  const { proposal } = await proposeVia('create_task', { title: 'Draft' });
+  const bad = await act('patch', `/${proposal.id}`, { projectId: PROJECT_B });
+  expect(bad.status).toBe(400);
+  const invalid = await act('patch', `/${proposal.id}`, { dueDate: 'next week' });
+  expect(invalid.status).toBe(400);
+  const ok = await act('patch', `/${proposal.id}`, { title: 'Final title', dueDate: '2026-12-01' });
+  expect(ok.body.proposal).toMatchObject({ summary: 'Create task "Final title" · due 2026-12-01', payload: { title: 'Final title' } });
+  await act('post', `/${proposal.id}/confirm`, {});
+  expect(rows('tasks').find((t) => t.title === 'Final title')).toMatchObject({ due_date: '2026-12-01' });
+  expect((await act('patch', `/${proposal.id}`, { title: 'Late' })).status).toBe(409);
+});
+
+test('action item: needs a meeting, completes like the Meetings page, undo reopens it', async () => {
+  const { proposal: none } = await proposeVia('create_action_item', { description: 'x' });
+  expect(none).toBeUndefined();
+  const { proposal } = await proposeVia('create_action_item', { meetingId: MEETING_A, description: 'Send the deck', ownerName: 'Ana' });
+  const made = await act('post', `/${proposal.id}/confirm`, {});
+  expect(made.body.proposal.view).toEqual({ path: `/meetings/${MEETING_A}`, label: 'the meeting' });
+  const itemId = made.body.proposal.result.actionItemId;
+  expect(rows('action_items')[0]).toMatchObject({ org_id: 'org-a', meeting_id: MEETING_A, status: 'open', assigned_to_name: 'Ana' });
+
+  mockDb.clock += 5;
+  const { proposal: done } = await proposeVia('complete_action_item', { actionItemId: itemId });
+  await act('post', `/${done.id}/confirm`, {});
+  expect(rows('action_items')[0]).toMatchObject({ status: 'done' });
+  expect(rows('action_items')[0].completed_at).toBeTruthy();
+  const undone = await act('post', `/${done.id}/undo`, {});
+  expect(undone.body.ok).toBe(true);
+  expect(rows('action_items')[0]).toMatchObject({ status: 'open', completed_at: null });
+});
+
+test('update_project is refused for a project the caller does not own', async () => {
+  rows('projects').push({ id: '0000000a-0000-4000-8000-00000000a009', org_id: 'org-a', name: 'Theirs', owner_id: 'user-b', updated_at: mockTick() });
+  const { ev, proposal } = await proposeVia('update_project', { projectId: '0000000a-0000-4000-8000-00000000a009', status: 'completed' });
+  expect(proposal).toBeUndefined();
+  expect(ev.find((e) => e.type === 'tool_end').tools[0].ok).toBe(false);
+});
+
+test('a failed execute marks the proposal failed and says why', async () => {
+  const { proposal } = await proposeVia('update_task', { taskId: TASK_A, status: 'done' });
+  rows('tasks').splice(rows('tasks').findIndex((t) => t.id === TASK_A), 1);
+  const res = await act('post', `/${proposal.id}/confirm`, {});
+  // prepare() runs again first and finds no task: refused before the claim.
+  expect(res.status).toBe(422);
+  expect(rows('ento_ai_action_log')[0].status).toBe('proposed');
+});
+
+test('an execute that fails after the claim is stamped failed, never executed', async () => {
+  const { proposal } = await proposeVia('create_task', { title: 'Will fail' });
+  const original = VERBS.create_task.execute;
+  VERBS.create_task.execute = async () => { throw new Error('insert refused'); };
+  try {
+    const res = await act('post', `/${proposal.id}/confirm`, {});
+    expect(res.body).toMatchObject({ ok: false, proposal: { status: 'failed', result: { error: 'It could not be done: insert refused' } } });
+    expect(rows('ento_ai_action_log')[0].status).toBe('failed');
+    expect((await act('post', `/${proposal.id}/undo`, {})).status).toBe(409);
+  } finally {
+    VERBS.create_task.execute = original;
+  }
+});
+
+test('a sensitive verb needs the typed token on the server, not only on the card', async () => {
+  VERBS.test_sensitive = {
+    ...VERBS.create_task,
+    risk: 'sensitive',
+    confirmToken: (p) => p.title,
+  };
+  try {
+    const { proposal } = await proposeVia('test_sensitive', { title: 'Board deck' });
+    expect(proposal).toMatchObject({ riskClass: 'sensitive', confirmToken: 'Board deck' });
+    const none = await act('post', `/${proposal.id}/confirm`, {});
+    expect(none.status).toBe(400);
+    expect(rows('ento_ai_action_log')[0].status).toBe('proposed');
+    const ok = await act('post', `/${proposal.id}/confirm`, { confirmationText: '  board   DECK ' });
+    expect(ok.body.ok).toBe(true);
+  } finally {
+    delete VERBS.test_sensitive;
+  }
+});
+
+test('a bad action id is a 400, never a query', async () => {
+  const before = mockDb.queries.length;
+  expect((await act('post', '/not-a-uuid/confirm', {})).status).toBe(400);
+  expect(mockDb.queries.length).toBe(before);
+});

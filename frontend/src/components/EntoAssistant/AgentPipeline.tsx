@@ -55,6 +55,16 @@ const TOOL_LABELS: Record<string, string> = {
   get_project: 'Reading the project',
   get_calendar: 'Checking the calendar',
   search_everything: 'Searching everything',
+  // EAI-05 write verbs: the step prepares a proposal card; nothing changes until Confirm.
+  create_task: 'Preparing a task',
+  update_task: 'Preparing a task change',
+  assign_task: 'Preparing an assignment',
+  create_action_item: 'Preparing an action item',
+  complete_action_item: 'Preparing to close an action item',
+  update_action_item: 'Preparing an action item change',
+  create_project: 'Preparing a project',
+  update_project: 'Preparing a project change',
+  log_meeting_note: 'Preparing a meeting note',
 };
 
 /** Short names for the chips under a finished answer. */

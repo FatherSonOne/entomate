@@ -23,6 +23,9 @@ import { usePanelResize } from './usePanelResize'
 import { setVoiceState, pulseVoice, onVoiceRequest } from './voiceSignal'
 import { useMicLevel } from './useMicLevel'
 import { AgentPipeline, ToolsUsed, applyToolEvent } from './AgentPipeline'
+import ProposalCard from './ProposalCard'
+import { useProposals } from './useProposals'
+import { useNavigate } from 'react-router-dom'
 import { entoAiApi } from '../../services/api'
 import './EntoAI.css'
 import './EntoAI.tokens.css'
@@ -52,6 +55,26 @@ function isStale(messages, section) {
   return !last.ts || Date.now() - last.ts > STALE_AFTER_MS
 }
 
+/**
+ * EAI-05: a saved thread holds each proposal as it was proposed. Its real status (confirmed,
+ * undone, ...) lives in ento_ai_action_log, so read it back before the cards show. A failed
+ * read keeps the saved copies: the card's buttons then report the server's answer.
+ */
+async function withFreshProposals(messages) {
+  const ids = messages.flatMap((m) => (Array.isArray(m.proposals) ? m.proposals.map((p) => p.id) : []))
+  if (!ids.length) return messages
+  try {
+    const { proposals } = await entoAiApi.actions.list(ids)
+    const byId = new Map((proposals || []).map((p) => [p.id, p]))
+    return messages.map((m) => (Array.isArray(m.proposals)
+      ? { ...m, proposals: m.proposals.map((p) => byId.get(p.id) || p) }
+      : m))
+  } catch (err) {
+    console.warn('[EntoAI] Could not refresh proposals:', err?.message)
+    return messages
+  }
+}
+
 export default function EntoAssistant({ isOpen, onClose }) {
   const { user } = useAuth()
   const { context, section, sectionSummary, sectionLabel, isLoading: contextLoading, isReady: contextReady } = useAssistantContext(isOpen)
@@ -73,6 +96,16 @@ export default function EntoAssistant({ isOpen, onClose }) {
   // Used only by the /api/assistant/query fallback, which keeps its own conversations table.
   const [conversationId, setConversationId] = useState(null)
   const [isListening, setIsListening] = useState(false)
+
+  // EAI-05: confirm / dismiss / edit / undo for the cards under an answer. The proposals
+  // stay on their message; this patches one in place with the state the server reports.
+  const navigate = useNavigate()
+  const replaceProposal = useCallback((messageIdx, proposal) => {
+    setMessages(prev => prev.map((m, i) => (i === messageIdx && Array.isArray(m.proposals)
+      ? { ...m, proposals: m.proposals.map(p => (p.id === proposal.id ? proposal : p)) }
+      : m)))
+  }, [])
+  const proposalUi = useProposals({ replaceProposal, navigate, onClose })
 
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
@@ -97,12 +130,15 @@ export default function EntoAssistant({ isOpen, onClose }) {
       // First open: the newest saved thread, set aside by the same rule if it is stale.
       let cancelled = false
       entoAiApi.latestThread()
-        .then((thread) => {
+        .then(async (thread) => {
+          const saved = await withFreshProposals(Array.isArray(thread?.messages) ? thread.messages : [])
+          return { thread, saved }
+        })
+        .then(({ thread, saved }) => {
           if (cancelled) return
           setThreadLoaded(true)
           // A question asked while the read was in flight starts its own thread.
           if (!thread || messagesRef.current.length) return
-          const saved = Array.isArray(thread.messages) ? thread.messages : []
           if (!saved.length) return
           if (isStale(saved, section)) {
             setParked({ id: thread.id, messages: saved })
@@ -285,6 +321,7 @@ export default function EntoAssistant({ isOpen, onClose }) {
 
     let streamedCitations = []
     let streamedFollowUp = []
+    const streamedProposals = []
 
     try {
       await streamQuery(
@@ -298,6 +335,7 @@ export default function EntoAssistant({ isOpen, onClose }) {
         {
           signal: controller.signal,
           onToolEvent: (event) => setToolSteps(prev => applyToolEvent(prev, event)),
+          onProposal: (proposal) => { if (proposal?.id) streamedProposals.push(proposal) },
           onAnswering: () => setAnswering(true),
           // The text so far was a preamble to a tool call: the tool steps replace it.
           onChunkReset: () => { setStreamingContent(''); setAnswering(false) },
@@ -313,6 +351,8 @@ export default function EntoAssistant({ isOpen, onClose }) {
               citations: streamedCitations,
               followUp: streamedFollowUp,
               tools: Array.isArray(result.tools) ? result.tools : [],
+              // EAI-05: the writes this answer proposed. Nothing changed until a card is confirmed.
+              proposals: Array.isArray(result.proposals) ? result.proposals : streamedProposals,
               confidence: result.confidence,
               ts: Date.now(),
               section,
@@ -482,6 +522,34 @@ export default function EntoAssistant({ isOpen, onClose }) {
                           <ReactMarkdown>{msg.content}</ReactMarkdown>
                         </div>
                         {msg.tools?.length > 0 && <ToolsUsed calls={msg.tools} />}
+                        {msg.proposals?.length > 0 && (
+                          <div className="la-proposals">
+                            {msg.proposals.map((p) => (
+                              <ProposalCard
+                                key={p.id}
+                                proposal={p}
+                                isResolving={proposalUi.resolvingId === p.id}
+                                isEditing={proposalUi.editingId === p.id}
+                                editDraft={proposalUi.editDraft}
+                                editError={proposalUi.editingId === p.id ? proposalUi.editError : null}
+                                onStartEdit={() => proposalUi.handleStartEdit(p)}
+                                onEditField={proposalUi.handleEditField}
+                                onSaveEdit={() => proposalUi.handleSaveEdit(idx, p)}
+                                onCancelEdit={proposalUi.handleCancelEdit}
+                                isConfirming={proposalUi.confirmingId === p.id}
+                                confirmText={proposalUi.confirmText}
+                                confirmError={proposalUi.confirmingId === p.id ? proposalUi.confirmError : null}
+                                onConfirmTextChange={proposalUi.handleConfirmTextChange}
+                                onCancelConfirm={proposalUi.handleCancelConfirm}
+                                actionError={proposalUi.actionErrors[p.id] || null}
+                                onConfirm={() => proposalUi.handleConfirm(idx, p)}
+                                onReject={() => proposalUi.handleReject(idx, p)}
+                                onUndo={() => proposalUi.handleUndo(idx, p)}
+                                onView={() => proposalUi.handleView(p)}
+                              />
+                            ))}
+                          </div>
+                        )}
                       </>
                     ) : (
                       <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{msg.content}</p>

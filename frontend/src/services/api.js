@@ -1067,7 +1067,7 @@ export const assistantApi = {
  */
 export const entoAiApi = {
   queryStream: async (data, callbacks = {}) => {
-    const { signal, onStart, onToolEvent, onAnswering, onChunk, onChunkReset, onFollowUp, onComplete, onError } = callbacks
+    const { signal, onStart, onToolEvent, onProposal, onAnswering, onChunk, onChunkReset, onFollowUp, onComplete, onError } = callbacks
     const streamUrl = API_BASE_URL ? `${API_BASE_URL}/api/ento-ai/query` : '/api/ento-ai/query'
     const { data: { session } } = await supabase.auth.getSession()
     const response = await fetch(streamUrl, {
@@ -1091,6 +1091,8 @@ export const entoAiApi = {
       switch (event.type) {
         case 'start': started = true; onStart?.(event); break
         case 'tool_start': case 'tool_end': onToolEvent?.(event); break
+        // EAI-05: a write the agent proposed; nothing has changed until the user confirms it.
+        case 'proposal': onProposal?.(event.proposal); break
         case 'answering': onAnswering?.(); break
         case 'chunk': onChunk?.(event.content); break
         case 'chunk_reset': onChunkReset?.(); break
@@ -1135,6 +1137,38 @@ export const entoAiApi = {
     const body = await response.json()
     return body?.thread || null
   },
+
+  // EAI-05 write spine. Each call resolves to the server's body ({ ok, proposal, error? });
+  // a refusal (409, 422, 400) still carries the proposal's current state when the server sent it.
+  actions: {
+    list: (ids) => entoAiAction('GET', `?ids=${encodeURIComponent(ids.join(','))}`),
+    confirm: (id, confirmationText) => entoAiAction('POST', `/${id}/confirm`, confirmationText ? { confirmationText } : {}),
+    reject: (id) => entoAiAction('POST', `/${id}/reject`, {}),
+    undo: (id) => entoAiAction('POST', `/${id}/undo`, {}),
+    edit: (id, patch) => entoAiAction('PATCH', `/${id}`, patch),
+  },
+}
+
+/** Plain fetch for /api/ento-ai/actions: never the axios GET cache or its retries (a confirm must not repeat). */
+async function entoAiAction(method, path, body) {
+  const base = API_BASE_URL ? `${API_BASE_URL}/api/ento-ai/actions` : '/api/ento-ai/actions'
+  const { data: { session } } = await supabase.auth.getSession()
+  const response = await fetch(base + path, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': session?.access_token ? `Bearer ${session.access_token}` : '',
+    },
+    body: body === undefined || method === 'GET' ? undefined : JSON.stringify(body),
+  })
+  let data = null
+  try { data = await response.json() } catch { /* empty or not JSON */ }
+  if (!response.ok && !data?.proposal) {
+    const err = new Error(data?.error || `Entomate AI action failed: ${response.status}`)
+    err.status = response.status
+    throw err
+  }
+  return { ...(data || {}), ok: response.ok && data?.ok !== false, status: response.status }
 }
 
 // Create default export with all APIs
