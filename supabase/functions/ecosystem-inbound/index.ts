@@ -3,14 +3,16 @@
  *
  * Receives events from Pulse and Logos Vision via HTTP POST.
  * Validates the X-Ecosystem-Token header against ecosystem_config.inbound_token,
- * logs the event, and routes to local handlers.
+ * checks the HMAC signature (signature.ts), logs the event once per
+ * (source, event id), and routes to local handlers.
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { checkBridgeSignature } from './signature.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-ecosystem-token, x-ecosystem-source, x-ecosystem-event-id, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-ecosystem-token, x-ecosystem-source, x-ecosystem-event-id, x-ecosystem-timestamp, x-ecosystem-signature, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
@@ -62,8 +64,26 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: 'Invalid token or source app not configured' }, 403)
     }
 
-    // 2. Parse event body
-    const event = await req.json()
+    // 2. Verify the signature over the raw body (EAI-08), then parse it.
+    const rawBody = await req.text()
+    const features = (config.features || {}) as Record<string, unknown>
+    const check = await checkBridgeSignature({
+      secret: config.inbound_token,
+      rawBody,
+      eventId,
+      timestamp: req.headers.get('X-Ecosystem-Timestamp'),
+      signature: req.headers.get('X-Ecosystem-Signature'),
+      requireSignature: features.require_signature === true,
+    })
+    if (!check.ok) return jsonResponse({ error: check.error }, check.status)
+    if (!check.signed) console.warn(`[ecosystem-inbound] Unsigned request from ${sourceApp}`)
+
+    let event: Record<string, unknown>
+    try {
+      event = JSON.parse(rawBody)
+    } catch {
+      return jsonResponse({ error: 'Invalid JSON body' }, 400)
+    }
 
     // Heartbeats (Pulse sends one every 15 min) were 96% of ecosystem_events
     // rows. Record the latest beat on the config row instead of logging each.
@@ -75,11 +95,14 @@ Deno.serve(async (req) => {
       return jsonResponse({ success: true, pong: true, timestamp: new Date().toISOString(), app: 'entomate' })
     }
 
-    // 3. Log inbound event
-    const { data: eventLog } = await supabase
+    // 3. Log inbound event. ux_ecosystem_events_inbound_event makes a second
+    // request with the same (source, event id) a duplicate: it is not routed
+    // again. Only an earlier attempt that FAILED may run again (a retry).
+    const loggedEventId = eventId || (event.id as string) || crypto.randomUUID()
+    const { data: inserted, error: logError } = await supabase
       .from('ecosystem_events')
       .insert({
-        event_id: eventId || event.id || crypto.randomUUID(),
+        event_id: loggedEventId,
         source: sourceApp,
         target_app: 'entomate',
         event_type: event.eventType,
@@ -91,6 +114,16 @@ Deno.serve(async (req) => {
       })
       .select('id')
       .single()
+
+    let eventLog = inserted
+    if (logError?.code === '23505') {
+      eventLog = await claimFailedEvent(sourceApp, loggedEventId, event)
+      if (!eventLog) return jsonResponse({ success: true, duplicate: true }, 200)
+    } else if (logError) {
+      // Without the log row a replay could not be told apart; let the sender retry.
+      console.error('[ecosystem-inbound] Event log insert failed:', logError.message)
+      return jsonResponse({ error: 'Event log unavailable' }, 503)
+    }
 
     // 4. Route to handler
     let result: Record<string, unknown> = {}
@@ -123,6 +156,27 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: 'Internal server error' }, 500)
   }
 })
+
+// A replayed event id runs again only if its earlier attempt failed. The
+// conditional update claims it, so two concurrent retries run it once.
+async function claimFailedEvent(sourceApp: string, eventId: string, event: Record<string, unknown>) {
+  const { data: existing } = await supabase
+    .from('ecosystem_events')
+    .select('id, status, retry_count')
+    .eq('source', sourceApp)
+    .eq('event_id', eventId)
+    .eq('direction', 'inbound')
+    .maybeSingle()
+  if (!existing || existing.status !== 'failed') return null
+  const { data: claimed } = await supabase
+    .from('ecosystem_events')
+    .update({ status: 'pending', retry_count: (existing.retry_count || 0) + 1, payload: event })
+    .eq('id', existing.id)
+    .eq('status', 'failed')
+    .select('id')
+    .maybeSingle()
+  return claimed
+}
 
 // ── Event Router ──
 

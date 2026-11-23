@@ -13,11 +13,18 @@
  * - Retry support: failed events can be retried via API
  */
 
+const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 const { supabaseAdmin } = require('../config/supabase');
 const log = require('../utils/log');
 
 const SOURCE_APP = 'entomate';
+
+// Same scheme as supabase/functions/ecosystem-inbound/signature.ts (EAI-08):
+// v1=<hex HMAC-SHA256(secret, `${timestamp}.${eventId}.${rawBody}`)>.
+function signBridgeRequest(secret, timestamp, eventId, rawBody) {
+  return 'v1=' + crypto.createHmac('sha256', secret).update(`${timestamp}.${eventId}.${rawBody}`).digest('hex');
+}
 
 // Supabase edge functions require an anon key to pass the API gateway.
 // The key is stored in ecosystem_config.features.gateway_key for each app.
@@ -179,11 +186,15 @@ class EcosystemBridge {
       // Supabase edge functions need an anon key in Authorization header
       const anonKey = cfg.features?.gateway_key;
 
+      const body = JSON.stringify(ecosystemEvent);
+      const timestamp = String(Math.floor(Date.now() / 1000));
       const headers = {
         'Content-Type': 'application/json',
         'X-Ecosystem-Token': cfg.service_token,
         'X-Ecosystem-Source': SOURCE_APP,
-        'X-Ecosystem-Event-Id': eventId
+        'X-Ecosystem-Event-Id': eventId,
+        'X-Ecosystem-Timestamp': timestamp,
+        'X-Ecosystem-Signature': signBridgeRequest(cfg.service_token, timestamp, eventId, body)
       };
       if (anonKey) {
         headers['Authorization'] = `Bearer ${anonKey}`;
@@ -193,7 +204,7 @@ class EcosystemBridge {
       const response = await fetch(cfg.api_url, {
         method: 'POST',
         headers,
-        body: JSON.stringify(ecosystemEvent),
+        body,
         signal: AbortSignal.timeout(15000)  // 15s timeout
       });
 
@@ -540,4 +551,4 @@ async function getEcosystemBridge() {
   return bridge;
 }
 
-module.exports = { EcosystemBridge, getEcosystemBridge, ecosystemBridge: bridge };
+module.exports = { EcosystemBridge, getEcosystemBridge, ecosystemBridge: bridge, signBridgeRequest };
