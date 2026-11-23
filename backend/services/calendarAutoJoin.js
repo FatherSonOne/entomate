@@ -535,6 +535,7 @@ function stop() {
 
 module.exports = {
   LOOKAHEAD_MS,
+  persistTokens,
   SCOPES,
   findLink,
   meetingLink,

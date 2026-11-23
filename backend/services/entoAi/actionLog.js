@@ -12,11 +12,13 @@
  * PostgREST call is validated again, and must still land in the row's org.
  */
 
-const { VERBS, findRow } = require('./writeTools');
+const crypto = require('crypto');
+const { VERBS, findRow, MAX_PLAN_STEPS } = require('./writeTools');
 const { ToolInputError, uuidArg } = require('./tools');
 
-const COLUMNS = 'id, org_id, tool_name, risk_class, status, summary, payload, result, undo, proposed_at, executed_at, undone_at';
+const COLUMNS = 'id, org_id, tool_name, risk_class, status, summary, payload, result, undo, plan_id, step_order, arg_bindings, proposed_at, executed_at, undone_at';
 const PROPOSAL_NOTE = 'Not done yet. The user must press Confirm on the card in the panel. Tell them what you proposed; never say it is done.';
+const PLAN_NOTE = 'Not done yet. The user must press Confirm plan on the card in the panel; the steps then run in order. Tell them what the plan does; never say it is done.';
 
 class ActionError extends Error {
   constructor(status, message, proposal) {
@@ -48,7 +50,14 @@ function toProposal(row) {
     editable: verb?.editable || [],
     confirmToken: verb?.risk === 'sensitive' && verb.confirmToken ? verb.confirmToken(row.payload) : null,
     view: row.status === 'executed' && verb?.view ? verb.view(row.result) : null,
+    planId: row.plan_id || null,
+    stepOrder: row.plan_id ? row.step_order : null,
   };
+}
+
+/** A plan step is resolved only through its plan: confirming one alone would skip its bindings. */
+function notAPlanStep(row) {
+  if (row.plan_id) throw new ActionError(409, 'This step belongs to a plan. Confirm, dismiss or undo the whole plan.', toProposal(row));
 }
 
 async function loadRow(ctx, id) {
@@ -110,6 +119,7 @@ async function confirm(ctx, id, { confirmationText } = {}) {
   const row = await loadRow(ctx, id);
   const verb = VERBS[row.tool_name];
   if (!verb) throw new ActionError(422, 'This kind of action can no longer run');
+  notAPlanStep(row);
   if (row.status !== 'proposed') throw new ActionError(409, `This proposal is already ${row.status}`, toProposal(row));
 
   let prepared;
@@ -147,6 +157,7 @@ async function confirm(ctx, id, { confirmationText } = {}) {
 
 async function reject(ctx, id) {
   const row = await loadRow(ctx, id);
+  notAPlanStep(row);
   if (row.status !== 'proposed') throw new ActionError(409, `This proposal is already ${row.status}`, toProposal(row));
   const moved = await moveRow(ctx, id, 'proposed', { status: 'rejected', resolved_at: now() });
   if (!moved) throw new ActionError(409, 'This proposal was already resolved', toProposal(await loadRow(ctx, id)));
@@ -158,6 +169,7 @@ async function edit(ctx, id, patch) {
   const row = await loadRow(ctx, id);
   const verb = VERBS[row.tool_name];
   if (!verb) throw new ActionError(422, 'This kind of action can no longer run');
+  notAPlanStep(row);
   if (row.status !== 'proposed') throw new ActionError(409, `This proposal is already ${row.status}`, toProposal(row));
   if (!patch || typeof patch !== 'object' || Array.isArray(patch)) throw new ActionError(400, 'Send the changed fields as an object');
   const allowed = new Set(verb.editable.map((f) => f.key));
@@ -199,6 +211,12 @@ async function restoredByLaterUndo(ctx, u, currentAt) {
 
 async function undo(ctx, id) {
   const row = await loadRow(ctx, id);
+  notAPlanStep(row);
+  return undoRow(ctx, row);
+}
+
+async function undoRow(ctx, row) {
+  const id = row.id;
   const verb = VERBS[row.tool_name];
   if (!verb) throw new ActionError(422, 'This kind of action can no longer be undone');
   if (row.status !== 'executed') throw new ActionError(409, `Only a done action can be undone; this one is ${row.status}`, toProposal(row));
@@ -267,4 +285,205 @@ async function list(ctx, ids) {
   return (data || []).map(toProposal);
 }
 
-module.exports = { propose, confirm, reject, edit, undo, list, toProposal, tokensMatch, ActionError };
+// -- EAI-06 plans -------------------------------------------------------
+// A plan is the rows sharing one plan_id, run in step_order and confirmed once (ported from
+// Logos AI's confirmPlan / undoPlan). The new mechanic is the binding: at propose time a later
+// step cannot hold an id an earlier step has not made yet, so it carries
+// "{{stepN.result.key}}" in arg_bindings and the token is resolved as the plan runs.
+
+/** Whole-value token only, as Logos AI: the verbs take flat scalar args. */
+const BINDING_RE = /^\{\{\s*step(\d+)\.result\.([A-Za-z0-9_]+)\s*\}\}$/;
+
+/** A step's bindings, checked against the verb's `bindable` map and the earlier steps' tools. */
+function planBindings(raw, verb, tools, i) {
+  if (raw == null) return null;
+  if (typeof raw !== 'object' || Array.isArray(raw)) throw new ToolInputError(`Step ${i + 1}: arg_bindings must be an object`);
+  const out = {};
+  for (const [key, token] of Object.entries(raw)) {
+    if (token == null || token === '') continue;
+    const rule = verb.bindable?.[key];
+    if (!rule) throw new ToolInputError(`Step ${i + 1}: ${key} cannot come from an earlier step`);
+    const m = typeof token === 'string' ? token.match(BINDING_RE) : null;
+    if (!m) throw new ToolInputError(`Step ${i + 1}: ${key} must look like "{{step0.result.${rule.key}}}"`);
+    const from = Number(m[1]);
+    if (from >= i) throw new ToolInputError(`Step ${i + 1}: ${key} can only use a step that runs before it`);
+    if (tools[from] !== rule.from || m[2] !== rule.key) {
+      throw new ToolInputError(`Step ${i + 1}: ${key} must come from a ${rule.from} step's ${rule.key}`);
+    }
+    out[key] = token;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+/** Literal payload with each binding filled from the results so far (results[stepOrder]). */
+function resolveBindings(payload, bindings, results) {
+  const resolved = { ...(payload || {}) };
+  for (const [key, token] of Object.entries(bindings || {})) {
+    const m = typeof token === 'string' ? token.match(BINDING_RE) : null;
+    if (!m) throw new ToolInputError(`The binding for ${key} is not valid`);
+    const value = results[Number(m[1])]?.[m[2]];
+    if (value == null) throw new ToolInputError(`Step ${Number(m[1]) + 1} did not produce a ${m[2]}`);
+    resolved[key] = value;
+  }
+  return resolved;
+}
+
+/**
+ * The loop's handler for propose_plan. Every step is prepared (bound args left out until the
+ * plan runs), then ONE insert writes all rows, so a plan is recorded whole or not at all.
+ * Never throws, like propose().
+ */
+async function proposePlan(args, ctx) {
+  const name = 'propose_plan';
+  try {
+    const steps = Array.isArray(args?.steps) ? args.steps : [];
+    if (steps.length < 2) throw new ToolInputError('A plan needs at least 2 steps. For one change, call that tool directly');
+    if (steps.length > MAX_PLAN_STEPS) throw new ToolInputError(`A plan can have at most ${MAX_PLAN_STEPS} steps`);
+    const tools = steps.map((s) => (s && typeof s === 'object' ? String(s.tool || '') : ''));
+    const planId = crypto.randomUUID();
+    const rows = [];
+    for (let i = 0; i < steps.length; i += 1) {
+      const verb = VERBS[tools[i]];
+      if (!verb) throw new ToolInputError(`Step ${i + 1} uses an unknown tool "${tools[i]}"`);
+      if (verb.risk === 'sensitive') throw new ToolInputError(`Step ${i + 1} needs its own typed confirmation; propose it alone`);
+      const { tool: _tool, arg_bindings: rawBindings, ...stepArgs } = steps[i];
+      const bindings = planBindings(rawBindings, verb, tools, i);
+      for (const key of Object.keys(bindings || {})) delete stepArgs[key];
+      let prepared;
+      try {
+        prepared = await verb.prepare(stepArgs, ctx);
+      } catch (e) {
+        if (e instanceof ToolInputError) throw new ToolInputError(`Step ${i + 1}: ${e.message}`);
+        throw e;
+      }
+      if (!prepared.orgId) throw new ToolInputError('You are not in a workspace yet');
+      if (rows.length && prepared.orgId !== rows[0].org_id) throw new ToolInputError('Every step of a plan must be in the same workspace');
+      const summary = bindings?.projectId ? `${prepared.summary} · in the new project` : prepared.summary;
+      rows.push({
+        org_id: prepared.orgId,
+        user_id: ctx.userId,
+        tool_name: tools[i],
+        risk_class: verb.risk,
+        summary,
+        payload: prepared.payload,
+        plan_id: planId,
+        step_order: i,
+        arg_bindings: bindings,
+      });
+    }
+    const { data, error } = await ctx.db.from('ento_ai_action_log').insert(rows).select(COLUMNS);
+    if (error || !data || data.length !== rows.length) throw new Error(error?.message || 'the plan was not saved');
+    const proposals = data.map(toProposal).sort((a, b) => a.stepOrder - b.stepOrder);
+    return {
+      name,
+      ok: true,
+      count: 0,
+      proposals,
+      response: { proposed: true, steps: proposals.map((p) => p.summary), note: PLAN_NOTE },
+    };
+  } catch (e) {
+    const message = e instanceof ToolInputError ? e.message : `Could not prepare the plan: ${e.message}`;
+    return { name, ok: false, count: 0, response: { error: message } };
+  }
+}
+
+async function loadPlan(ctx, planId) {
+  uuidArg(planId, 'plan id');
+  const { data, error } = await ctx.db.from('ento_ai_action_log').select(COLUMNS)
+    .eq('plan_id', planId)
+    .in('org_id', ctx.orgIds)
+    .order('step_order', { ascending: true });
+  if (error) throw new Error(error.message);
+  if (!data || !data.length) throw new ActionError(404, 'Plan not found');
+  return data;
+}
+
+/** Every step's current state, in order, after a plan call. */
+async function planResult(ctx, planId, extra) {
+  return { ...extra, proposals: (await loadPlan(ctx, planId)).map(toProposal) };
+}
+
+/**
+ * Runs the plan in order under the caller's client. Every step is validated before step 1
+ * runs; a bound step is validated again once its binding is filled. Each step is claimed with
+ * the same conditional update as a single confirm, so a second tab stops at the first claim.
+ * The plan stops at the first failure; the steps already done stay done, for Undo plan.
+ */
+async function confirmPlan(ctx, planId) {
+  const rows = await loadPlan(ctx, planId);
+  const notProposed = rows.find((r) => r.status !== 'proposed');
+  if (notProposed) throw new ActionError(409, `Step ${notProposed.step_order + 1} is already ${notProposed.status}, so this plan cannot run again`);
+  for (const r of rows) {
+    const verb = VERBS[r.tool_name];
+    if (!verb) throw new ActionError(422, `Step ${r.step_order + 1} can no longer run`);
+    try {
+      await reprepare(verb, r.payload, ctx, r.org_id);
+    } catch (e) {
+      if (e instanceof ToolInputError) throw new ActionError(422, `Step ${r.step_order + 1}: ${e.message}`);
+      throw e;
+    }
+  }
+
+  const results = {};
+  for (const r of rows) {
+    const verb = VERBS[r.tool_name];
+    const step = r.step_order + 1;
+    const claimed = await moveRow(ctx, r.id, 'proposed', { status: 'confirmed', resolved_at: now() });
+    if (!claimed) return planResult(ctx, planId, { ok: false, failedStep: step, error: 'This plan is already running somewhere else' });
+
+    let outcome;
+    try {
+      const payload = resolveBindings(r.payload, r.arg_bindings, results);
+      const prepared = await reprepare(verb, payload, ctx, r.org_id);
+      outcome = await verb.execute(prepared.payload, { ...ctx, orgId: r.org_id });
+    } catch (e) {
+      const message = e instanceof ToolInputError ? e.message : `It could not be done: ${e.message}`;
+      await moveRow(ctx, r.id, 'confirmed', { status: 'failed', result: { error: message } }).catch(() => null);
+      return planResult(ctx, planId, { ok: false, failedStep: step, error: `Step ${step} stopped the plan: ${message}` });
+    }
+    const done = await moveRow(ctx, r.id, 'confirmed', {
+      status: 'executed', result: outcome.result, undo: outcome.undo, executed_at: now(),
+    }).catch(() => null);
+    if (!done) {
+      return planResult(ctx, planId, {
+        ok: false, reviewRequired: true, failedStep: step,
+        error: `Step ${step} was done, but its record was not saved. Check it before you repeat or undo this plan.`,
+      });
+    }
+    results[r.step_order] = outcome.result;
+  }
+  return planResult(ctx, planId, { ok: true });
+}
+
+async function rejectPlan(ctx, planId) {
+  const rows = await loadPlan(ctx, planId);
+  const notProposed = rows.find((r) => r.status !== 'proposed');
+  if (notProposed) throw new ActionError(409, `Step ${notProposed.step_order + 1} is already ${notProposed.status}`);
+  for (const r of rows) await moveRow(ctx, r.id, 'proposed', { status: 'rejected', resolved_at: now() });
+  return planResult(ctx, planId, { ok: true });
+}
+
+/**
+ * Undoes the done steps last-first, since a later step can depend on an earlier one (a task
+ * in the plan's new project). Each step uses the single undo, with all its guards. A refused
+ * step is reported and the rest still run, as Logos AI's undoPlan.
+ */
+async function undoPlan(ctx, planId) {
+  const rows = await loadPlan(ctx, planId);
+  if (rows.some((r) => r.status === 'confirmed')) {
+    throw new ActionError(409, 'A step of this plan needs review. Check its records before you undo it.');
+  }
+  const done = rows.filter((r) => r.status === 'executed').reverse();
+  if (!done.length) throw new ActionError(409, 'No step of this plan is done, so there is nothing to undo');
+  const errors = [];
+  for (const r of done) {
+    const out = await undoRow(ctx, r);
+    if (!out.ok) errors.push(`Step ${r.step_order + 1}: ${out.error}`);
+  }
+  return planResult(ctx, planId, errors.length ? { ok: false, error: errors.join(' ') } : { ok: true });
+}
+
+module.exports = {
+  propose, confirm, reject, edit, undo, list, toProposal, tokensMatch, ActionError,
+  proposePlan, confirmPlan, rejectPlan, undoPlan, resolveBindings,
+};

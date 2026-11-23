@@ -1,4 +1,4 @@
-import React, { Suspense, useState, useEffect } from 'react'
+import React, { Suspense, useState, useEffect, useCallback } from 'react'
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import PageSkeleton from './PageSkeleton'
 import ErrorBoundary from './ErrorBoundary'
@@ -152,7 +152,17 @@ export default function Layout() {
   // The panel chunk loads on first open, then stays mounted so its conversation survives a close.
   const [assistantMounted, setAssistantMounted] = useState(false)
   useEffect(() => { if (assistantOpen) setAssistantMounted(true) }, [assistantOpen])
-  const [proactiveSuggestion, setProactiveSuggestion] = useState(false)
+  // EAI-06: the server's signals. The badge shows while one of them has not been seen in
+  // the open panel yet; opening the panel marks the current ones seen.
+  const [signals, setSignals] = useState({ signals: [], total: 0 })
+  const [seenSignals, setSeenSignals] = useState(() => new Set())
+  const onSignals = useCallback((next) => setSignals(next), [])
+  const signalKey = signals.signals.map((s) => s.id).join(',')
+  useEffect(() => {
+    if (assistantOpen && signalKey) setSeenSignals((prev) => new Set([...prev, ...signalKey.split(',')]))
+  }, [assistantOpen, signalKey])
+  const proactiveSuggestion = signals.signals.some((s) => !seenSignals.has(s.id))
+  const proactiveCount = proactiveSuggestion ? signals.total : 0
   const location = useLocation()
   const navigate = useNavigate()
   const { isDark, toggleMode, setThemeMode, isHeldLight, isBenchSwiss } = useTheme()
@@ -176,7 +186,7 @@ export default function Layout() {
   useKeyboardShortcuts({
     'mod+k': () => setCommandPaletteOpen(true),
     'mod+?': () => setShortcutsHelpOpen(true),
-    'mod+/': () => { setAssistantOpen(prev => !prev); setProactiveSuggestion(false) },
+    'mod+/': () => setAssistantOpen(prev => !prev),
     'mod+m': () => navigate('/meetings?new=true'),
     'mod+,': () => navigate('/settings'),
   })
@@ -191,7 +201,7 @@ export default function Layout() {
     if (isBenchSwiss && onGuide && guideHasNew) dismissGuideNew()
   }, [isBenchSwiss, onGuide, guideHasNew, dismissGuideNew])
 
-  const toggleAssistant = () => { setAssistantOpen(prev => !prev); setProactiveSuggestion(false) }
+  const toggleAssistant = () => setAssistantOpen(prev => !prev)
   // The launcher's mic: open the panel if needed and ask it to start (or stop) listening.
   const voiceAssistant = () => { requestVoiceOnOpen(); if (!assistantOpen) toggleAssistant() }
 
@@ -217,10 +227,12 @@ export default function Layout() {
           <EntoAssistant
             isOpen={assistantOpen}
             onClose={() => setAssistantOpen(false)}
+            signals={signals.signals}
+            signalTotal={signals.total}
           />
         </Suspense>
       )}
-      <EntoAIProactiveChecker onProactiveChange={setProactiveSuggestion} />
+      <EntoAIProactiveChecker onSignals={onSignals} refreshKey={assistantOpen} />
     </>
   )
 
@@ -273,7 +285,7 @@ export default function Layout() {
               onClick={toggleAssistant}
               onVoice={voiceAssistant}
               isOpen={assistantOpen}
-              proactiveCount={proactiveSuggestion ? 1 : 0}
+              proactiveCount={proactiveCount}
             />
           }
         >
@@ -282,7 +294,7 @@ export default function Layout() {
             {/* A page that breaks keeps the shell; navigating away clears it */}
             <ErrorBoundary scope="page" resetKey={location.pathname}>
               <Suspense fallback={<PageSkeleton />}>
-                <Outlet context={{ openAssistant: () => { setAssistantOpen(true); setProactiveSuggestion(false) } }} />
+                <Outlet context={{ openAssistant: () => setAssistantOpen(true) }} />
                 <BootMark stage="page" />
               </Suspense>
             </ErrorBoundary>
@@ -363,10 +375,10 @@ export default function Layout() {
           {/* Footer: AI + Guide + Settings + User */}
           <div className="nl-footer">
             <EntoAssistantButton
-              onClick={() => { setAssistantOpen(prev => !prev); setProactiveSuggestion(false) }}
+              onClick={() => setAssistantOpen(prev => !prev)}
               onVoice={voiceAssistant}
               isOpen={assistantOpen}
-              proactiveCount={proactiveSuggestion ? 1 : 0}
+              proactiveCount={proactiveCount}
             />
 
             <NavLink

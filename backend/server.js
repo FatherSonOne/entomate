@@ -317,6 +317,9 @@ app.use('/api/internal', require('./routes/internalJobs'));
 // User & Workspace Settings
 app.use('/api/settings', require('./routes/settings'));
 
+// Stripe Checkout + Stripe webhook (billing rebuild, Phase 3)
+app.use('/api/billing', require('./routes/billing'));
+
 // AI Assistant (context-aware streaming)
 app.use('/api/assistant', require('./routes/assistant'));
 
@@ -462,6 +465,14 @@ if (process.env.NODE_ENV !== 'test') {
       require('./services/calendarAutoJoin').initialize();
     } catch (error) {
       logger.warn('Calendar auto-join not initialized:', error.message);
+    }
+
+    // Follow-up emails: draft after the minutes land, send the due ones
+    // every 5 min while awake (pg_cron calls /api/internal/jobs/followups too).
+    try {
+      require('./services/followUp').initialize();
+    } catch (error) {
+      logger.warn('Follow-up job not initialized:', error.message);
     }
 
     // Initialize retention sweep scheduler (P1.7 Slice 3 — daily 03:00 UTC)

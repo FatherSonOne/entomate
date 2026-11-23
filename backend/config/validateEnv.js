@@ -17,6 +17,8 @@ const OPTIONAL_WARNINGS = [
   { key: 'RECALL_API_KEY', message: 'Recall.ai bot launches will fail (no RECALL_API_KEY)' },
   { key: 'RECALL_WEBHOOK_SIGNING_SECRET', message: 'Recall webhooks will be rejected at the route — set the Svix whsec_… secret from the Recall dashboard' },
   { key: 'SECRETS_MASTER_KEY', message: 'Secrets vault is locked in production (no SECRETS_MASTER_KEY) - generate with: openssl rand -hex 32' },
+  { key: 'STRIPE_SECRET_KEY', message: 'Billing is off: checkout returns 503 (no STRIPE_SECRET_KEY)' },
+  { key: 'STRIPE_WEBHOOK_SECRET', message: 'Stripe webhooks will be rejected, so paid plans and packs are never applied (no STRIPE_WEBHOOK_SECRET)' },
   { key: 'INTERNAL_API_KEY', message: 'Service-to-service routes (e.g. CRM webhooks) will return 503 — set INTERNAL_API_KEY to enable' },
 ];
 

@@ -1,6 +1,6 @@
 /**
  * useProposals — the write spine's interaction layer (EAI-05). Ported from Logos AI's
- * useProposals; the plan verbs (confirm/dismiss/undo a plan) come with EAI-06.
+ * useProposals, with its plan verbs (confirm / dismiss / undo a whole plan, EAI-06).
  *
  * It owns the busy / edit / typed-confirm state and every call that resolves a proposal:
  * confirm, dismiss, inline edit, undo, view. It does NOT own a proposal list: proposals hang
@@ -22,6 +22,13 @@ interface ActionResponse {
   error?: string
 }
 
+/** EAI-06: a plan call answers with every step's current state. */
+interface PlanResponse {
+  ok: boolean
+  proposals?: EntoProposal[]
+  error?: string
+}
+
 interface UseProposalsArgs {
   /** Swap one proposal on one message (owned by the panel's message state). */
   replaceProposal: (messageIdx: number, proposal: EntoProposal) => void
@@ -39,6 +46,9 @@ export function useProposals({ replaceProposal, navigate, onClose }: UseProposal
   const [confirmError, setConfirmError] = useState<string | null>(null)
   // The last refusal per card ("changed since, so undo was not run").
   const [actionErrors, setActionErrors] = useState<Record<string, string>>({})
+  // EAI-06: the plan whose call is in flight, and the last refusal per plan.
+  const [resolvingPlanId, setResolvingPlanId] = useState<string | null>(null)
+  const [planErrors, setPlanErrors] = useState<Record<string, string>>({})
 
   const setActionError = useCallback((id: string, message: string | null) => {
     setActionErrors((prev) => {
@@ -159,6 +169,41 @@ export function useProposals({ replaceProposal, navigate, onClose }: UseProposal
     [editDraft, replaceProposal],
   )
 
+  /** One call for one plan; paints every step the server reports, even on a refusal. */
+  const resolvePlan = useCallback(
+    async (messageIdx: number, planId: string, call: () => Promise<PlanResponse>) => {
+      setResolvingPlanId(planId)
+      setPlanErrors((prev) => {
+        const next = { ...prev }
+        delete next[planId]
+        return next
+      })
+      try {
+        const res = await call()
+        for (const step of res.proposals || []) replaceProposal(messageIdx, step)
+        if (!res.ok) setPlanErrors((prev) => ({ ...prev, [planId]: res.error || 'That did not work. Try again.' }))
+      } catch (e) {
+        setPlanErrors((prev) => ({ ...prev, [planId]: (e as Error)?.message || 'Entomate AI could not be reached. Try again.' }))
+      } finally {
+        setResolvingPlanId(null)
+      }
+    },
+    [replaceProposal],
+  )
+
+  const handleConfirmPlan = useCallback(
+    (messageIdx: number, planId: string) => resolvePlan(messageIdx, planId, () => entoAiApi.plans.confirm(planId)),
+    [resolvePlan],
+  )
+  const handleRejectPlan = useCallback(
+    (messageIdx: number, planId: string) => resolvePlan(messageIdx, planId, () => entoAiApi.plans.reject(planId)),
+    [resolvePlan],
+  )
+  const handleUndoPlan = useCallback(
+    (messageIdx: number, planId: string) => resolvePlan(messageIdx, planId, () => entoAiApi.plans.undo(planId)),
+    [resolvePlan],
+  )
+
   const handleView = useCallback(
     (p: EntoProposal) => {
       if (!p.view) return
@@ -187,5 +232,10 @@ export function useProposals({ replaceProposal, navigate, onClose }: UseProposal
     handleEditField,
     handleSaveEdit,
     handleView,
+    resolvingPlanId,
+    planErrors,
+    handleConfirmPlan,
+    handleRejectPlan,
+    handleUndoPlan,
   }
 }
