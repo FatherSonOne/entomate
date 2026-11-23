@@ -160,32 +160,8 @@ async function getAiUsage(orgId, month) {
   return mapDbToAiUsage(data)
 }
 
-async function incrementAiUsage(orgId) {
-  const month = getCurrentMonth()
-
-  const { error: rpcError } = await supabase.rpc('increment_ai_usage', {
-    p_org_id: orgId,
-    p_month: month,
-  })
-
-  if (rpcError) {
-    // Fallback: read-then-upsert
-    const existing = await getAiUsage(orgId, month)
-
-    if (existing) {
-      const { error } = await supabase
-        .from('org_ai_usage_monthly')
-        .update({ request_count: existing.requestCount + 1 })
-        .eq('id', existing.id)
-      if (error) throw error
-    } else {
-      const { error } = await supabase
-        .from('org_ai_usage_monthly')
-        .insert({ org_id: orgId, month, request_count: 1, tokens_input: 0, tokens_output: 0, estimated_cost: 0 })
-      if (error) throw error
-    }
-  }
-}
+// AI usage is counted on the backend only (EAI-07): the browser cannot be
+// trusted to report its own usage, and increment_ai_usage is service-role only.
 
 async function checkAiQuota(orgId) {
   const { data: orgData, error: orgError } = await supabase
@@ -530,7 +506,6 @@ export const tenantOrgService = {
   updateOrg,
   getOrgMembers,
   getAiUsage,
-  incrementAiUsage,
   checkAiQuota,
   createOrgViaRpc,
   generateSlug,
