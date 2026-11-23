@@ -26,6 +26,7 @@ import { AgentPipeline, ToolsUsed, applyToolEvent } from './AgentPipeline'
 import ProposalCard from './ProposalCard'
 import PlanCard, { groupProposals } from './PlanCard'
 import ThreadRail from './ThreadRail'
+import { welcomeGreeting } from './welcomeGreeting'
 import { useProposals } from './useProposals'
 import { useNavigate } from 'react-router-dom'
 import { entoAiApi } from '../../services/api'
@@ -202,6 +203,14 @@ export default function EntoAssistant({ isOpen, onClose, signals = [], signalTot
   useEffect(() => {
     if (isOpen) setTimeout(() => inputRef.current?.focus(), 100)
   }, [isOpen])
+
+  // EAI-02c: the panel stays mounted, so the greeting's hour and line are drawn each time it
+  // opens: it changes between visits, never while it is being read.
+  const [greetingDraw, setGreetingDraw] = useState(() => ({ now: new Date(), pick: Math.floor(Math.random() * 1000) }))
+  useEffect(() => {
+    if (isOpen) setGreetingDraw({ now: new Date(), pick: Math.floor(Math.random() * 1000) })
+  }, [isOpen])
+  const greeting = welcomeGreeting({ ...greetingDraw, name: user?.name })
 
   // Cleanup on unmount
   useEffect(() => {
@@ -571,7 +580,11 @@ export default function EntoAssistant({ isOpen, onClose, signals = [], signalTot
                 <WelcomeOrb state={orbState} />
               </div>
               <div className="la-welcome-head">
-                <h3 className="la-welcome-title">{starter.title}</h3>
+                {/* EAI-02c: LV's greeting over the page's own line, stacked as in LV. */}
+                <div className="la-welcome-headings">
+                  <h3 className="la-welcome-title">{greeting}</h3>
+                  <p className="la-welcome-tagline">{starter.title}.</p>
+                </div>
               </div>
               <div className="la-quick-actions" aria-busy={!contextReady || undefined}>
                 <span className="la-quick-actions-label">Try asking</span>
