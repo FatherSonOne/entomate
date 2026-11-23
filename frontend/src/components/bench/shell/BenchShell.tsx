@@ -10,6 +10,7 @@ import { drawIcon } from '../iconDraw'
 import { prefersReducedMotion } from '../motion'
 import { logoAsset, useLogoSystem } from '../../../services/logoSystem'
 import { RippleCircles } from '../../ui/ripple-circles'
+import { navigationShortcut, shortcutLabel } from '../../../hooks/useNavigationShortcuts'
 
 /* ============================================================
    Bench Swiss shell: patch-panel rail (desktop), slim toolbar on
@@ -69,6 +70,8 @@ export interface BenchShellProps {
   dock: ReadonlyArray<{ name: string; href: string }>
   /** The AI launcher, docked in the rail above Record (desktop). */
   assistant?: React.ReactNode
+  commandSearch?: React.ReactNode
+  shortcutsHeld?: boolean
   children: React.ReactNode
 }
 
@@ -120,6 +123,8 @@ function PatchRow({ item, active, onNavigate }: PatchRowProps): React.ReactEleme
     <>
       <span className="bs-pi-n" aria-hidden="true">{item.no ?? ''}</span>
       <span className="bs-pi-name">{item.name}</span>
+      {navigationShortcut(item.href) && <kbd className="bs-nav-peek">{shortcutLabel(navigationShortcut(item.href))}</kbd>}
+      {item.name === 'Ask Entomate' && <kbd className="bs-nav-peek">{shortcutLabel('mod+/')}</kbd>}
       <span className={cx('bs-pi-c', item.noteIsNew && 'bs-pi-new')}>{item.note ?? ''}</span>
       <span className="bs-pi-led" aria-hidden="true" />
     </>
@@ -349,7 +354,7 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
   const brandMark = logoAsset(useLogoSystem().id, 'small')
   const {
     groups, isActive, user, isDark, onThemeChange, onSearch, onRecord,
-    onSettings, settingsActive, menuItems, onSignOut, modKey, dock, assistant, children,
+    onSettings, settingsActive, menuItems, onSignOut, modKey, dock, assistant, commandSearch, shortcutsHeld, children,
   } = props
   const [navOpen, setNavOpen] = useState<boolean>(false)
   const now = useClock()
@@ -384,6 +389,7 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
       <Link key={d.href} to={d.href} className="bs-dock-item" aria-current={active ? 'page' : undefined}>
         {Icon ? <Icon aria-hidden="true" strokeWidth={1.6} /> : null}
         {dockLabel(d.name, active)}
+        <kbd className="bs-nav-peek">{shortcutLabel(navigationShortcut(d.href))}</kbd>
       </Link>
     )
   }
@@ -393,7 +399,7 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
     : groups
 
   return (
-    <div className="bs-app">
+    <div className="bs-app" data-shortcuts-held={shortcutsHeld || undefined}>
       <a href="#bs-page" className="bs-sr">Skip to content</a>
 
       {/* Rail: the patch panel (desktop) */}
@@ -403,13 +409,13 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
           entomate
           <span className="bs-ver" aria-hidden="true">EN-01</span>
         </Link>
-        <Key className="bs-search" onClick={onSearch} kbd={`${modKey}K`} aria-label="Search or Ask Entomate">
+        {!commandSearch && <Key className="bs-search" onClick={onSearch} kbd={`${modKey}K`} aria-label="Search or Ask Entomate">
           <span className="bs-search-label">Search</span>
-        </Key>
+        </Key>}
         <nav className="bs-patch" aria-label="Modules">
           <PatchPanel groups={railGroups} isActive={isActive} />
         </nav>
-        {assistant ? <div className="la-launcher-wrap">{assistant}</div> : null}
+        {assistant ? <div className="la-launcher-wrap">{assistant}<kbd className="bs-nav-peek">{shortcutLabel('mod+/')}</kbd></div> : null}
         <button type="button" className="bs-recbox group" onClick={onRecord} {...railPress}>
           <span className="relative isolate inline-flex" aria-hidden="true">
             <RippleCircles className="-inset-[9px] -z-10 opacity-0 transition-opacity duration-300 [&_*]:[animation-play-state:paused] group-hover:opacity-100 group-hover:[&_*]:[animation-play-state:running] group-focus-visible:opacity-100 group-focus-visible:[&_*]:[animation-play-state:running] group-data-[lit=true]:opacity-100 group-data-[lit=true]:[&_*]:[animation-play-state:running]" />
@@ -435,7 +441,7 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
             <span aria-hidden="true">·</span>
             <time dateTime={now.toISOString()}>{DATE_FMT.format(now)} · {TIME_FMT.format(now)}</time>
           </div>
-          <Key className="bs-ph-only" iconOnly onClick={onSearch} aria-label="Search or Ask Entomate" icon={<Search aria-hidden="true" strokeWidth={1.6} />} />
+          {commandSearch || <Key className="bs-ph-only" iconOnly onClick={onSearch} aria-label="Search or Ask Entomate" icon={<Search aria-hidden="true" strokeWidth={1.6} />} />}
           <ThemeSwitch isDark={isDark} onChange={onThemeChange} />
           <Key
             iconOnly
@@ -443,7 +449,7 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
             aria-label="Settings"
             aria-current={settingsActive ? 'page' : undefined}
             icon={<Settings aria-hidden="true" strokeWidth={1.6} />}
-          />
+          ><kbd className="bs-nav-peek">{shortcutLabel('mod+,')}</kbd></Key>
           <ProfileMenu user={user} items={menuItems} onSignOut={onSignOut} onSettings={onSettings} modKey={modKey} />
         </div>
 

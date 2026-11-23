@@ -77,6 +77,19 @@ describe('searchEngine', () => {
     expect(matchCommands('').length).toBe(4)
   })
 
+  test('commands rank intended destinations despite misspellings without matching unrelated words', () => {
+    expect(matchCommands('proejcts')[0]?.id).toBe('go-projects')
+    expect(matchCommands('metings')[0]?.id).toBe('go-meetings')
+    expect(matchCommands('new taks')[0]?.id).toBe('new-task')
+    expect(matchCommands('autmations')[0]?.id).toBe('go-automations')
+    expect(matchCommands('zzzzzzz')).toEqual([])
+    expect(matchCommands('documentation')[0]?.path).toBe('/guide')
+    expect(matchCommands('notes')[0]?.path).toBe('/search?notes=1')
+    expect(matchCommands('bot', 30).some(c => c.id === 'go-bot')).toBe(false)
+    expect(matchCommands('bot', 30, true).some(c => c.id === 'go-bot')).toBe(true)
+    expect(matchCommands('new project')[0]?.path).toBe('/projects?dr=new')
+  })
+
   test('normalizeResponse tolerates junk and flatten keeps group order', () => {
     const r = normalizeResponse({ groups: { decisions: [decision], meetings: [meeting] }, total: 2, engine: 'nope' }, 'pricing')
     expect(r.engine).toBe('words')

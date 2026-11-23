@@ -1,6 +1,8 @@
 import React from 'react'
 import { X, Command, Search, Mic, HelpCircle, Sparkles } from 'lucide-react'
 import { useKeyboardShortcuts, getModKey } from '../hooks/useKeyboardShortcuts'
+import { COMMANDS } from '../services/searchEngine'
+import { useOrgSafe } from '../contexts/OrgContext'
 
 // Only keys that are registered somewhere (Layout, Tasks, Search, the palette).
 // Keep in step with SHORTCUTS in components/UsersGuide/guideData.js.
@@ -17,8 +19,16 @@ const shortcutGroups = [
     ]
   },
   {
+    title: 'Navigation (hold Ctrl or Cmd to peek)',
+    shortcuts: COMMANDS.filter(c => c.id.startsWith('go-') && c.shortcut).map(c => ({
+      keys: c.shortcut.split('+'), description: c.label, adminOnly: c.adminOnly,
+    })),
+  },
+  {
     title: 'On a page',
     shortcuts: [
+      { keys: ['>'], description: 'Find commands only' },
+      { keys: ['Right'], description: 'Complete the best match at the end of the input' },
       { keys: ['/'], description: 'Search on Tasks, Search and the User Guide', icon: Search },
       { keys: ['N'], description: 'New task, on Tasks' },
     ]
@@ -59,6 +69,8 @@ function KeyDisplay({ keys }) {
 }
 
 export default function KeyboardShortcutsHelp({ isOpen, onClose }) {
+  const org = useOrgSafe()
+  const isAdmin = org?.myRole === 'owner' || org?.myRole === 'admin'
   // Close on Escape
   useKeyboardShortcuts({
     'escape': { callback: onClose, allowInInput: true }
@@ -103,7 +115,7 @@ export default function KeyboardShortcutsHelp({ isOpen, onClose }) {
                 <div key={group.title}>
                   <h3 className="text-sm font-medium text-content-primary mb-3">{group.title}</h3>
                   <div className="space-y-2">
-                    {group.shortcuts.map((shortcut, idx) => {
+                    {group.shortcuts.filter(s => !s.adminOnly || isAdmin).map((shortcut, idx) => {
                       const Icon = shortcut.icon
                       return (
                         <div

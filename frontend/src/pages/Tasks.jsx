@@ -81,6 +81,15 @@ export default function Tasks() {
   const [dragKey, setDragKey] = useState(null)
   const searchRef = useRef(null)
 
+  // The command palette opens the same draft drawer as this page's New task key.
+  useEffect(() => {
+    if (params.get('new') !== 'true') return
+    setDrawer('new')
+    const next = new URLSearchParams(params)
+    next.delete('new')
+    setParams(next, { replace: true })
+  }, [params, setParams])
+
   const setUrl = useCallback((patch) => {
     setParams(writeUrl({ ...readUrl(params), ...patch }), { replace: true })
   }, [params, setParams])

@@ -1,0 +1,51 @@
+/* Toolbar search uses the Search module, with a compact spring settle. */
+.bs-command-search { position: relative; flex: 1 1 32rem; max-width: 38rem; min-width: 120px; z-index: 95; font-family: var(--bs-sans); }
+.bs-command-search > .bs-pal-in { height: 36px; padding: 0 10px; gap: 8px; border: 1px solid var(--bs-rule); border-radius: 9px; background: var(--bs-plate); box-shadow: inset 0 1px 2px #00000008; }
+.bs-command-search:focus-within > .bs-pal-in { border-color: var(--bs-brand); }
+.bs-command-search > .bs-pal-in input { font-size: 13px; }
+.bs-pal-clear { border: 0; background: none; padding: 3px; color: var(--bs-muted); cursor: pointer; }
+.bs-pal-clear svg { width: 14px; height: 14px; }
+.bs-command-search .bs-pal-toolbar { position: absolute; top: calc(100% + 8px); left: 0; transform: none; width: min(680px, calc(100vw - 32px)); max-height: min(76dvh, 650px); transform-origin: top left; animation: command-expand 360ms both; }
+.bs-pal-content { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.bs-pal-predict { display: flex; justify-content: space-between; gap: 12px; text-align: left; border: 0; padding: 9px 18px; color: var(--bs-ink2); background: var(--bs-sunk); font-size: 12px; cursor: pointer; }
+.bs-pal-predict kbd { font: 10px var(--bs-mono); color: var(--bs-muted); white-space: nowrap; }
+.bs-pal-toolbar .bs-pal-foot { display: flex; gap: 8px 12px; font-size: 10px; }
+.bs-pal-toolbar[data-open="false"] { pointer-events: none; animation: command-collapse 180ms both; }
+@keyframes command-expand {
+  0% { opacity: 0; transform: translateY(-8px) scale(.96); }
+  60% { opacity: 1; transform: translateY(2px) scale(1.008); }
+  82% { transform: translateY(-1px) scale(.998); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes command-collapse {
+  0% { opacity: 1; transform: none; }
+  25% { opacity: 1; transform: translateY(1px) scale(1.004); }
+  100% { opacity: 0; transform: translateY(-6px) scale(.97); }
+}
+.bs-nav-peek { display: none; font: 10px var(--bs-mono, monospace); color: var(--bs-muted, var(--text-secondary)); white-space: nowrap; padding: 2px 4px; border: 1px solid var(--bs-rule, var(--b1)); border-radius: 4px; background: var(--bs-sunk, var(--bg-elevated)); }
+[data-shortcuts-held] .bs-nav-peek { display: inline-block; }
+[data-shortcuts-held] .bs-pi { grid-template-columns: 26px minmax(0, 1fr) auto 10px; }
+[data-shortcuts-held] .bs-pi:has(.bs-nav-peek) .bs-pi-c { display: none; }
+.bs-pi, .bs-dock-item, .bs-ikey { position: relative; }
+.bs-dock-item .bs-nav-peek { position: absolute; bottom: 100%; }
+.bs-ikey .bs-nav-peek { position: absolute; top: calc(100% + 4px); right: 0; }
+.app-shell .bs-nav-peek { margin-left: auto; }
+.bs-tbar:has(.bs-command-search) .bs-tbar-stat { flex: 0 1 auto; }
+.bs-tbar:has(.bs-command-search) .bs-tbar-stat time { display: none; }
+.bs-tbar:has(.bs-command-search) { position: relative; z-index: 40; }
+@media (max-width: 1050px) {
+  .bs-tbar:has(.bs-command-search) .bs-tbar-stat { display: none; }
+}
+@media (max-width: 767.98px) {
+  .bs-tbar:has(.bs-command-search) { flex-wrap: wrap; height: auto; }
+  .bs-command-search { order: 5; flex-basis: 100%; max-width: none; }
+  .bs-command-search .bs-pal-toolbar { width: 100%; border-radius: 12px; max-height: 65dvh; }
+  .bs-pal-toolbar .bs-pal-foot { display: flex; }
+  .bs-pal-predict { padding: 9px 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bs-command-search .bs-pal-toolbar { animation: none; }
+  .bs-command-search .bs-pal-toolbar[data-open="false"] { opacity: 0; }
+}
+html[data-motion="reduce"] .bs-command-search .bs-pal-toolbar { animation: none; }
+html[data-motion="reduce"] .bs-command-search .bs-pal-toolbar[data-open="false"] { opacity: 0; }
