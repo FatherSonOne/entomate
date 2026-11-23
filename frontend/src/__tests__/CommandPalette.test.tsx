@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { vi, describe, test, expect, beforeEach } from 'vitest'
 
@@ -75,6 +75,25 @@ describe('CommandPalette', () => {
     expect(input).toHaveAttribute('aria-expanded', 'false')
     await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull())
     expect(input).toBeInTheDocument()
+  })
+
+  test('Enter waits for records after completing a suggestion instead of running Ask while loading', async () => {
+    let settle!: (value: unknown) => void
+    http.post.mockImplementation((_url: string, body: { query: string }) => body.query === 'pricing'
+      ? Promise.resolve(response)
+      : new Promise(resolve => { settle = resolve }))
+    const { input, onClose } = setup()
+    fireEvent.change(input, { target: { value: 'pricing' } })
+    await screen.findAllByText('▶ 14:55')
+    fireEvent.keyDown(input, { key: 'ArrowRight' })
+    expect(input).toHaveValue('Acme pricing call')
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(onClose).not.toHaveBeenCalled()
+    await waitFor(() => expect(settle).toBeTypeOf('function'))
+    await act(async () => settle({ ...response, query: 'Acme pricing call' }))
+    await screen.findAllByText('▶ 14:55')
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(screen.getByTestId('where')).toHaveTextContent('/meetings/m1?t=895000')
   })
 
   test('searches the shared engine and groups results with the moment', async () => {

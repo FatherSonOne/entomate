@@ -184,7 +184,14 @@ export default function CommandPalette({ isOpen, onClose, onShowShortcuts, toolb
     if (e.key === 'ArrowRight' && prediction && e.target === inputRef.current && inputRef.current?.selectionStart === query.length && inputRef.current?.selectionEnd === query.length) { e.preventDefault(); setQuery((commandMode ? '>' : '') + prediction); return }
     if (e.key === 'Home' && e.target === inputRef.current && !query) { e.preventDefault(); setActive(0); return }
     if (e.key === 'End' && e.target === inputRef.current && !query) { e.preventDefault(); setActive(rows.length - 1); return }
-    if (e.key === 'Enter') { e.preventDefault(); run(rows[active]); return }
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      // Completion starts a fresh record search. Do not turn a quick Enter into
+      // an AI question just because the result rows have not arrived yet.
+      if (loading && rows[active]?.kind === 'ask') { setFlash('Searching workspace...'); return }
+      run(rows[active])
+      return
+    }
     if (e.key === 'Tab' && q && !showingCommands && !e.shiftKey && !mod && !e.altKey) { e.preventDefault(); go(searchPagePath(q, true)); return }
     if (mod && e.key.toLowerCase() === 's') { e.preventDefault(); void clip(rows[active]); return }
   }
