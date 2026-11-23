@@ -4,8 +4,8 @@ import React from 'react'
  * First-load progress drawn into each logo's own geometry (2026-11-22).
  * Sits over the loader art in the same 1000-unit box, so the track lands on
  * the mark. Round marks get an orbit just outside the art, starting where the
- * mark's own motion starts; the two horizontal marks (Circuit E, Routed
- * Signal) get a rule under the bars instead. A tick marks each stage.
+ * mark's own motion starts; the Circuit E and the three hand marks get a
+ * rule under the art instead. A tick marks each stage.
  */
 type Geometry =
   | { kind: 'orbit'; cx: number; cy: number; r: number; startDeg: number }
@@ -21,10 +21,10 @@ export const PROGRESS_GEOMETRY: Record<string, Geometry> = {
   'orbital-network': orbit(432, 180),
   constellation: orbit(412),
   trinity: orbit(432),
-  'circuit-e': { kind: 'rule', x1: 141, x2: 882, y: 930 },
-  'circuit-spire': orbit(476, 90),
-  'catalyst-core': orbit(440),
-  'routed-signal': { kind: 'rule', x1: 117, x2: 883, y: 900 },
+  'circuit-e': { kind: 'rule', x1: 175, x2: 825, y: 860 },
+  'circuit-spire': { kind: 'rule', x1: 160, x2: 840, y: 880 },
+  'catalyst-core': { kind: 'rule', x1: 160, x2: 840, y: 880 },
+  'routed-signal': { kind: 'rule', x1: 160, x2: 840, y: 880 },
   ignition: orbit(404),
   aperture: orbit(490),
   bloom: orbit(486),
