@@ -464,6 +464,14 @@ if (process.env.NODE_ENV !== 'test') {
       logger.warn('Calendar auto-join not initialized:', error.message);
     }
 
+    // Follow-up emails: draft after the minutes land, send the due ones
+    // every 5 min while awake (pg_cron calls /api/internal/jobs/followups too).
+    try {
+      require('./services/followUp').initialize();
+    } catch (error) {
+      logger.warn('Follow-up job not initialized:', error.message);
+    }
+
     // Initialize retention sweep scheduler (P1.7 Slice 3 — daily 03:00 UTC)
     try {
       const retentionScheduler = require('./services/retentionScheduler');

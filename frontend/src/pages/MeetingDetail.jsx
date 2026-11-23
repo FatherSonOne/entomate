@@ -13,6 +13,8 @@ import CarryForward from '../components/meetings/CarryForward'
 import RecordingStatus from '../components/meetings/RecordingStatus'
 import RecordingPlayer from '../components/meetings/RecordingPlayer'
 import CrmSendDrawer from '../components/meetings/CrmSendDrawer'
+import { useFollowUp, FollowUpLetter, FollowUpContext, FollowUpSending, FollowUpOptions } from '../components/meetings/FollowUpPanel'
+import { sendBlocker, sendingView } from '../services/followUpView'
 import { canPlay, toRecordingJob } from '../services/meetingRecorderService'
 import cache from '../services/apiCache'
 import { clipToNotes } from '../services/searchNotesService'
@@ -126,6 +128,23 @@ export default function MeetingDetail() {
     requestAnimationFrame(() => jumpToTranscript(startAtMs))
   }, [transcriptSegments, startAtMs, jumpToTranscript])
 
+  // ?tab=followup|notes opens that tab (links from Today and the Share recap drawer).
+  const tabParam = searchParams.get('tab')
+  useEffect(() => {
+    if (['followup', 'notes', 'minutes'].includes(tabParam)) setTab(tabParam)
+  }, [tabParam])
+  const chooseTab = useCallback((value) => {
+    setTab(value)
+    const next = new URLSearchParams(searchParams)
+    if (value === 'followup' || value === 'notes') next.set('tab', value)
+    else next.delete('tab')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, setSearchParams])
+
+  // Follow-up email (Slate C "Letter"): drafted once the minutes are here.
+  const hasMinutes = Boolean(meeting && (meeting.summary || asList(meeting.decisions).length || asList(meeting.actionItems).length))
+  const followUp = useFollowUp(id, hasMinutes)
+
   // ?share=1 (list preview, row menu) opens Share recap once the meeting is here.
   useEffect(() => {
     if (!meeting || searchParams.get('share') !== '1') return
@@ -208,27 +227,9 @@ export default function MeetingDetail() {
     }
   }
 
-  // Recap email and PDF (moved here from the old Reports page, Insights pass 2026-11-22)
+  // Recap PDF (moved here from the old Reports page, Insights pass 2026-11-22). Email goes
+  // through the Follow-up tab now (Slate C, 2026-11-23).
   const [recapBusy, setRecapBusy] = useState(null)
-  const handleEmailRecap = async () => {
-    setRecapBusy('email')
-    try {
-      const { supabase } = await import('../services/supabaseClient')
-      const { data: { session } } = await supabase.auth.getSession()
-      const email = session?.user?.email
-      if (!email) {
-        toast.error('Error', 'Could not find your email address')
-        return
-      }
-      await reportsApi.sendMeetingRecap(id, email)
-      toast.success('Sent', `Recap emailed to ${email}`)
-    } catch (err) {
-      console.error('Failed to email recap:', err)
-      toast.error('Error', 'The recap email could not be sent')
-    } finally {
-      setRecapBusy(null)
-    }
-  }
   const handleRecapPdf = async () => {
     setRecapBusy('pdf')
     try {
@@ -437,6 +438,33 @@ export default function MeetingDetail() {
     </form>
   ) : meeting.title
 
+  // The Follow-up tab carries its state as a word ("Sends 15:05", "Sent").
+  const followUpWord = followUp.data ? sendingView(followUp.data).tabWord : ''
+  // Actions sit in Minutes beside the decisions; Ask and earlier meetings sit with the transcript.
+  // On phone the transcript column becomes its own tab.
+  const tabs = [
+    { value: 'minutes', label: 'Minutes' },
+    ...(isPhone ? [{ value: 'transcript', label: 'Transcript' }] : []),
+    {
+      value: 'followup',
+      label: (
+        <>Follow-up{followUpWord && <span className="bs-k bs-dt bs-fu-tabword">{followUpWord}</span>}</>
+      ),
+    },
+    { value: 'notes', label: 'Notes' },
+  ]
+  const activeTab = !isPhone && tab === 'transcript' ? 'minutes' : tab
+  // The bot debrief links "action items" here: they now live in Minutes.
+  const openTab = (value) => {
+    chooseTab(value === 'actions' ? 'minutes' : value)
+    if (value === 'actions') requestAnimationFrame(() => document.getElementById('meeting-actions')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  }
+
+  // On the Follow-up tab the primary key is Send now, until it has gone out.
+  const followUpRow = followUp.data?.row
+  const followUpPrimary = activeTab === 'followup' && followUpRow && !['sent', 'sending'].includes(followUpRow.status)
+  const followUpBlocker = followUp.data ? sendBlocker(followUp.data) : 'Loading'
+
   const actions = editingTitle ? (
     <>
       <Key onClick={() => setEditingTitle(false)} disabled={saving}>Cancel</Key>
@@ -466,25 +494,26 @@ export default function MeetingDetail() {
         ]}
       />
       <Key onClick={handleSyncToCRM}>Send to CRM</Key>
-      <Key variant="primary" onClick={openShareModal}>
-        Share recap{meeting.chat_posted && <span className="bs-k">Posted</span>}
-      </Key>
+      {followUpPrimary ? (
+        <>
+          <Key onClick={openShareModal}>Share recap</Key>
+          <Key
+            variant="primary"
+            onClick={followUp.send}
+            disabled={followUp.busy !== null || Boolean(followUpBlocker)}
+            title={followUpBlocker || undefined}
+          >
+            {followUp.busy === 'send' && <Loader2 className="animate-spin" aria-hidden="true" />}
+            {followUp.busy === 'send' ? 'Sending' : 'Send now'}
+          </Key>
+        </>
+      ) : (
+        <Key variant="primary" onClick={openShareModal}>
+          Share recap{meeting.chat_posted && <span className="bs-k">Posted</span>}
+        </Key>
+      )}
     </>
   )
-
-  // Actions sit in Minutes beside the decisions; Ask and earlier meetings sit with the transcript.
-  // On phone the transcript column becomes its own tab.
-  const tabs = [
-    { value: 'minutes', label: 'Minutes' },
-    ...(isPhone ? [{ value: 'transcript', label: 'Transcript' }] : []),
-    { value: 'notes', label: 'Notes' },
-  ]
-  const activeTab = !isPhone && tab === 'transcript' ? 'minutes' : tab
-  // The bot debrief links "action items" here: they now live in Minutes.
-  const openTab = (value) => {
-    setTab(value === 'actions' ? 'minutes' : value)
-    if (value === 'actions') requestAnimationFrame(() => document.getElementById('meeting-actions')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
-  }
 
   // The context column (a tab on phone): ask, earlier commitments, the transcript, ecosystem sync.
   const context = (
@@ -628,7 +657,7 @@ export default function MeetingDetail() {
 
       <Grid>
         <Cell span={8}>
-          <Tabs label="Meeting sections" idBase={TABS_ID} items={tabs} value={activeTab} onChange={setTab} />
+          <Tabs label="Meeting sections" idBase={TABS_ID} items={tabs} value={activeTab} onChange={chooseTab} />
 
           {activeTab === 'minutes' && (
             <TabPanel idBase={TABS_ID} value="minutes">
@@ -753,6 +782,14 @@ export default function MeetingDetail() {
             </TabPanel>
           )}
 
+          {activeTab === 'followup' && (
+            <TabPanel idBase={TABS_ID} value="followup">
+              {isPhone && <div className="bs-fu-phone-status"><FollowUpSending state={followUp} /></div>}
+              <FollowUpLetter state={followUp} />
+              {isPhone && <div className="bs-mtg-context bs-fu-phone-opts"><FollowUpOptions state={followUp} /></div>}
+            </TabPanel>
+          )}
+
           {activeTab === 'notes' && (
             <TabPanel idBase={TABS_ID} value="notes">
               <section className="bs-mtg-block" aria-labelledby="meeting-notes-heading">
@@ -767,7 +804,7 @@ export default function MeetingDetail() {
         </Cell>
 
         <Cell span={4} rule>
-          {!isPhone && context}
+          {!isPhone && (activeTab === 'followup' ? <FollowUpContext state={followUp} /> : context)}
         </Cell>
       </Grid>
 
@@ -832,8 +869,8 @@ export default function MeetingDetail() {
           <div className="bs-mtg-share-field">
             <span className="bs-lbl">Email or PDF</span>
             <div className="bs-mtg-share-keys">
-              <Key size="sm" onClick={handleEmailRecap} disabled={recapBusy !== null}>
-                {recapBusy === 'email' ? 'Sending' : 'Email me the recap'}
+              <Key size="sm" onClick={() => { setShowShareModal(false); chooseTab('followup') }}>
+                Email the people who were there
               </Key>
               <Key size="sm" onClick={handleRecapPdf} disabled={recapBusy !== null}>
                 {recapBusy === 'pdf' ? 'Preparing' : 'Download PDF'}

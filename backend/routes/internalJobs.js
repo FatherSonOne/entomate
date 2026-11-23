@@ -21,6 +21,7 @@ const JOBS = {
   embeddings: () => require('../services/embeddingService').backfillMissing(),
   autojoin: () => require('../services/calendarAutoJoin').runAutoJoin(),
   digest: () => require('../services/overdueDigest').runOverdueDigest(),
+  followups: () => require('../services/followUp').runFollowUps(),
 };
 
 const running = new Set();

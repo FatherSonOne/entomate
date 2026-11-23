@@ -308,6 +308,13 @@ export const meetingsApi = {
   // Email the owner one reminder in your name (once per item per 24 hours)
   nudgeActionItem: (id) => api.post(`/meetings/action-items/${id}/nudge`),
 
+  // Follow-up email (Slate C "Letter"). Typed use: components/meetings/FollowUpPanel.tsx
+  followUp: (id) => api.get(`/meetings/${id}/follow-up`),
+  saveFollowUp: (id, patch) => api.put(`/meetings/${id}/follow-up`, patch),
+  sendFollowUp: (id) => api.post(`/meetings/${id}/follow-up/send`),
+  stopFollowUp: (id) => api.post(`/meetings/${id}/follow-up/stop`),
+  setFollowUpAutoSend: (enabled) => api.put('/meetings/follow-up/auto-send', { enabled }),
+
   // ========================================
   // AI Meeting Summary Widget API (Quick Win 1)
   // ========================================
