@@ -570,3 +570,11 @@ describe('history page search (EAI-02c slice 4)', () => {
     expect((await as(request(app).get('/api/ento-ai/threads/search'))).status).toBe(502);
   });
 });
+
+test('the history page names itself to the model, not "Dashboard" (EAI-02c slice 4 fix)', async () => {
+  mockScript.push({ text: 'Done.' });
+  const res = await request(app).post('/api/ento-ai/query')
+    .set('Authorization', 'Bearer good-token').send({ question: 'hi', section: 'assistant' });
+  expect(res.status).toBe(200);
+  expect(events(res.text)[0]).toMatchObject({ type: 'start', section: 'AI conversations' });
+});

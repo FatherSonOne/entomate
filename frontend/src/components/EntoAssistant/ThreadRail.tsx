@@ -95,7 +95,7 @@ export const ThreadRail: React.FC<ThreadRailProps> = ({
           buttons (LV measured it). role="dialog" carries the meaning. */}
       <div className="la-rail" role="dialog" aria-label="Conversation history">
         <div className="la-rail-header">
-          <h3 className="la-rail-title">Transcripts</h3>
+          <h3 className="la-rail-title">Conversations</h3>
           <button
             type="button"
             className="la-rail-close"

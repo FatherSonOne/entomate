@@ -4415,6 +4415,49 @@ html.dark .la-sheet-handle-bar {
 .logos-assistant.la-swiss .la-header-right {
   gap: 6px;
 }
+/* The keys keep their size and the title side gives way: the status word clips first, so a
+   long one ("Waiting for your approval") or a narrow panel never runs under History. */
+.logos-assistant.la-swiss .la-header-left,
+.logos-assistant.la-swiss .la-header-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+.logos-assistant.la-swiss .la-header-title h2 {
+  flex: none;
+}
+/* A block, not a flex box: text-overflow cannot draw its "…" inside a flex container. */
+.logos-assistant.la-swiss .la-header-mode {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.logos-assistant.la-swiss .la-header-mode::before {
+  display: inline-block;
+  margin-right: 7px;
+  vertical-align: 0;
+}
+/* Phone: the panel is ~330px, so the name and three keys only just fit. The status word
+   stays, on its own line under the name, and the padding tightens. */
+@media (max-width: 767.98px) {
+  .logos-assistant.la-swiss .la-header {
+    padding: 0 8px 0 14px;
+  }
+  .logos-assistant.la-swiss .la-header-title {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+  }
+  .logos-assistant.la-swiss .la-header-mode {
+    max-width: 100%;
+  }
+  /* .la-header-right lifts it over the 11px padding set further down this file. */
+  .logos-assistant.la-swiss .la-header-right .la-header-history-btn {
+    padding: 0 8px;
+  }
+}
 .logos-assistant.la-swiss .la-header-action-btn,
 .logos-assistant.la-swiss .la-close-btn {
   width: 32px;

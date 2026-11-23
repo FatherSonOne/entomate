@@ -3,6 +3,8 @@
    and the states, on the same spacing as the Meetings list. Scoped to .bs-th. */
 .bs-th-search { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-top: 22px; }
 .bs-th-search .bs-input-wrap { flex: 1 1 260px; max-width: 560px; }
+/* The Clear key clears the box; the browser's own x beside it would be a second one. */
+.bs-th-search input[type='search']::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; display: none; }
 .bs-th-list { padding-top: 6px; }
 
 .bs-th .bs-tbl td { vertical-align: top; }

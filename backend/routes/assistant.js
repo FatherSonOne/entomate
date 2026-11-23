@@ -239,6 +239,7 @@ const SECTION_LABELS = {
   reports: 'Reports',
   settings: 'Settings',
   guide: 'User Guide',
+  assistant: 'AI conversations',
 };
 
 // ═══════════════════════════════════════════════════════

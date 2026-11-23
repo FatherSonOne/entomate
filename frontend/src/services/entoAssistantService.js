@@ -49,6 +49,8 @@ export const SECTIONS = {
   reports:          { label: 'Export',        path: '/analytics?export=' },
   settings:         { label: 'Settings',      path: '/settings' },
   guide:            { label: 'User Guide',    path: '/guide' },
+  // /assistant/history: the first path segment names the section.
+  assistant:        { label: 'AI conversations', path: '/assistant/history' },
 }
 
 export function resolveSection(pathname) {
@@ -263,6 +265,7 @@ const DATA_LOADERS = {
   search:  async () => ({ }),
   settings: async () => ({ }),
   guide:   async () => ({ }),
+  assistant: async () => ({ }), // the page itself lists the conversations
 }
 
 export async function loadSectionData(section) {
