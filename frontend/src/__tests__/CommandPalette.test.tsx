@@ -92,6 +92,7 @@ describe('CommandPalette', () => {
     await waitFor(() => expect(settle).toBeTypeOf('function'))
     await act(async () => settle({ ...response, query: 'Acme pricing call' }))
     await screen.findAllByText('▶ 14:55')
+    expect(screen.queryByText('Searching workspace...')).not.toBeInTheDocument()
     fireEvent.keyDown(input, { key: 'Enter' })
     expect(screen.getByTestId('where')).toHaveTextContent('/meetings/m1?t=895000')
   })

@@ -188,7 +188,7 @@ export default function CommandPalette({ isOpen, onClose, onShowShortcuts, toolb
       e.preventDefault()
       // Completion starts a fresh record search. Do not turn a quick Enter into
       // an AI question just because the result rows have not arrived yet.
-      if (loading && rows[active]?.kind === 'ask') { setFlash('Searching workspace...'); return }
+      if (loading && rows[active]?.kind === 'ask') return
       run(rows[active])
       return
     }
