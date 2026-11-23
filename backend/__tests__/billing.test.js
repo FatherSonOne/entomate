@@ -1,22 +1,29 @@
 /**
- * Stripe billing (billing rebuild, Phase 3): checkout refusals, webhook
+ * Stripe billing (billing rebuild, Phases 3 and 4): checkout refusals, webhook
  * signature check, pack grant once per session, plan set from the
- * subscription's state in Stripe.
+ * subscription's state in Stripe, the drawer's status read and the portal.
  */
 'use strict';
 
 process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test_secret';
 
+// The caller's role in the org; the mock applies each route's real role list.
+const mockAuth = { role: 'owner' };
 jest.mock('../middleware/auth', () => ({
   authenticate: (req, _res, next) => { req.user = { id: 'user-1', email: 'owner@example.com' }; next(); },
-  authorizeOrgRole: () => (req, _res, next) => { req.orgId = req.body?.workspaceId; next(); },
+  authorizeOrgRole: (roles, resolveOrgId) => async (req, res, next) => {
+    if (!roles.includes(mockAuth.role)) return res.status(403).json({ error: 'Forbidden' });
+    req.orgId = await resolveOrgId(req);
+    req.orgRole = mockAuth.role;
+    next();
+  },
   optionalAuth: (_req, _res, next) => next(),
 }));
 
 jest.mock('../utils/log', () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() }));
 
 // In-memory tenant_organizations + rpc.
-const mockDb = { orgs: {}, grants: new Set(), rpcCalls: [], updates: [] };
+const mockDb = { orgs: {}, grants: new Set(), rpcCalls: [], updates: [], hours: null, hoursError: null };
 jest.mock('../config/supabase', () => {
   const query = (table) => {
     const filters = [];
@@ -37,6 +44,7 @@ jest.mock('../config/supabase', () => {
   };
   const rpc = async (name, args) => {
     mockDb.rpcCalls.push({ name, args });
+    if (name === 'get_org_bot_hours') return { data: mockDb.hours, error: mockDb.hoursError };
     if (mockDb.grants.has(args.p_session_id)) return { data: false, error: null };
     mockDb.grants.add(args.p_session_id);
     return { data: true, error: null };
@@ -63,6 +71,7 @@ const fakeStripe = {
   },
   checkout: { sessions: { create: jest.fn(async (p) => ({ id: 'cs_1', url: 'https://checkout.stripe.test/cs_1', params: p })) } },
   subscriptions: { retrieve: jest.fn(async (id) => subs[id]) },
+  billingPortal: { sessions: { create: jest.fn(async () => ({ url: 'https://billing.stripe.test/p_1' })) } },
 };
 
 function app() {
@@ -90,7 +99,8 @@ function seedOrg(fields) {
 }
 
 beforeEach(() => {
-  mockDb.grants = new Set(); mockDb.rpcCalls = []; mockDb.updates = [];
+  mockDb.grants = new Set(); mockDb.rpcCalls = []; mockDb.updates = []; mockDb.hours = null; mockDb.hoursError = null;
+  mockAuth.role = 'owner';
   billing._setStripe(fakeStripe);
   jest.clearAllMocks();
   seedOrg({});
@@ -138,6 +148,9 @@ describe('POST /api/billing/checkout', () => {
       line_items: [{ price: 'price_entomate_team_yearly', quantity: 1 }],
       subscription_data: { metadata: { org_id: ORG, item: 'team_yearly' } },
     });
+    // Back to Settings with the Plan and billing drawer open.
+    expect(params.success_url).toMatch(/\/settings\?s=workspace&dr=billing&billing=success&session_id=\{CHECKOUT_SESSION_ID\}$/);
+    expect(params.cancel_url).toMatch(/\/settings\?s=workspace&dr=billing&billing=cancelled$/);
     expect(mockDb.orgs[ORG].stripe_customer_id).toBe('cus_new');
   });
 
@@ -148,6 +161,13 @@ describe('POST /api/billing/checkout', () => {
     const params = fakeStripe.checkout.sessions.create.mock.calls[0][0];
     expect(params).toMatchObject({ mode: 'payment', customer: 'cus_1', payment_intent_data: { metadata: { org_id: ORG } } });
     expect(fakeStripe.customers.create).not.toHaveBeenCalled();
+  });
+
+  test('a member who is not an owner or admin cannot check out', async () => {
+    mockAuth.role = 'member';
+    const res = await request(app()).post('/api/billing/checkout').send({ workspaceId: ORG, item: 'solo_monthly' });
+    expect(res.status).toBe(403);
+    expect(fakeStripe.checkout.sessions.create).not.toHaveBeenCalled();
   });
 
   test('a saved customer that Stripe cannot find (other mode) is replaced', async () => {
@@ -263,5 +283,91 @@ describe('POST /api/billing/webhook', () => {
     const res = await postEvent({ id: 'evt_i', type: 'invoice.paid', data: { object: {} } });
     expect(res.status).toBe(200);
     expect(mockDb.updates).toHaveLength(0);
+  });
+});
+
+describe('GET /api/billing/status', () => {
+  const HOURS = { plan: 'solo', limited: true, included_hours: 15, used_hours: 3.5, pack_hours: 10, remaining_hours: 21.5, resets_at: '2026-12-01T00:00:00+00:00' };
+
+  test('a Free org: plan and hours, no subscription, Stripe not called', async () => {
+    mockDb.hours = { ...HOURS, plan: 'free', included_hours: 2, pack_hours: 0, used_hours: 0, remaining_hours: 2 };
+    const res = await request(app()).get('/api/billing/status').query({ workspaceId: ORG });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      plan: 'free', botHours: mockDb.hours, hasSubscription: false, subscription: null, canManage: true, configured: true,
+    });
+    expect(mockDb.rpcCalls).toEqual([{ name: 'get_org_bot_hours', args: { p_org_id: ORG } }]);
+    expect(fakeStripe.subscriptions.retrieve).not.toHaveBeenCalled();
+  });
+
+  test('a subscribed org gets its renewal date from the subscription item', async () => {
+    seedOrg({ plan: 'solo', stripe_customer_id: 'cus_1', stripe_subscription_id: 'sub_s' });
+    mockDb.hours = HOURS;
+    subs.sub_s = { id: 'sub_s', status: 'active', cancel_at_period_end: true,
+      items: { data: [{ current_period_end: 1796083200, price: { recurring: { interval: 'year' } } }] } };
+    const res = await request(app()).get('/api/billing/status').query({ workspaceId: ORG });
+    expect(res.status).toBe(200);
+    expect(res.body.hasSubscription).toBe(true);
+    expect(res.body.subscription).toEqual({
+      status: 'active', interval: 'year', currentPeriodEnd: new Date(1796083200 * 1000).toISOString(), cancelAtPeriodEnd: true,
+    });
+  });
+
+  test('any member may read it, but only owners and admins may manage', async () => {
+    mockAuth.role = 'viewer';
+    const res = await request(app()).get('/api/billing/status').query({ workspaceId: ORG });
+    expect(res.status).toBe(200);
+    expect(res.body.canManage).toBe(false);
+  });
+
+  test('a failed bot-hours or Stripe read leaves that part empty, not a 500', async () => {
+    seedOrg({ plan: 'team', stripe_customer_id: 'cus_1', stripe_subscription_id: 'sub_s' });
+    mockDb.hoursError = { message: 'db down' };
+    fakeStripe.subscriptions.retrieve.mockRejectedValueOnce(new Error('stripe down'));
+    const res = await request(app()).get('/api/billing/status').query({ workspaceId: ORG });
+    expect(res.status).toBe(200);
+    expect(res.body.botHours).toBeNull();
+    expect(res.body.hasSubscription).toBe(true);
+    expect(res.body.subscription.status).toBeNull();
+  });
+
+  test('without Stripe the status still loads and says so', async () => {
+    billing._setStripe(null);
+    const res = await request(app()).get('/api/billing/status').query({ workspaceId: ORG });
+    expect(res.status).toBe(200);
+    expect(res.body.configured).toBe(false);
+  });
+});
+
+describe('POST /api/billing/portal', () => {
+  test('an org with a Stripe customer gets a portal session that returns to the drawer', async () => {
+    seedOrg({ plan: 'solo', stripe_customer_id: 'cus_1', stripe_subscription_id: 'sub_1' });
+    const res = await request(app()).post('/api/billing/portal').send({ workspaceId: ORG });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ url: 'https://billing.stripe.test/p_1' });
+    const params = fakeStripe.billingPortal.sessions.create.mock.calls[0][0];
+    expect(params.customer).toBe('cus_1');
+    expect(params.return_url).toMatch(/\/settings\?s=workspace&dr=billing$/);
+  });
+
+  test('an org with no Stripe customer gets 409', async () => {
+    const res = await request(app()).post('/api/billing/portal').send({ workspaceId: ORG });
+    expect(res.status).toBe(409);
+    expect(fakeStripe.billingPortal.sessions.create).not.toHaveBeenCalled();
+  });
+
+  test('a member who is not an owner or admin cannot open it', async () => {
+    mockAuth.role = 'member';
+    seedOrg({ plan: 'solo', stripe_customer_id: 'cus_1', stripe_subscription_id: 'sub_1' });
+    const res = await request(app()).post('/api/billing/portal').send({ workspaceId: ORG });
+    expect(res.status).toBe(403);
+  });
+
+  test('a Stripe failure is a 500 with a plain message', async () => {
+    seedOrg({ plan: 'solo', stripe_customer_id: 'cus_1', stripe_subscription_id: 'sub_1' });
+    fakeStripe.billingPortal.sessions.create.mockRejectedValueOnce(new Error('No configuration provided'));
+    const res = await request(app()).post('/api/billing/portal').send({ workspaceId: ORG });
+    expect(res.status).toBe(500);
+    expect(res.body.error).toBe('Could not open the billing portal. Try again.');
   });
 });

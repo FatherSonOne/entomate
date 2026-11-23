@@ -1,141 +1,46 @@
-// billingService.js — Stripe-backed billing for Entomate (QntmEcos ecosystem)
-import { supabase } from './supabaseClient'
+// billingService.js — Entomate plans and the backend billing routes
+// (backend/routes/billing.js). Stripe Checkout and the Customer Portal open on
+// Stripe's pages; the webhook is the only writer of the workspace's plan.
+import { billingApi } from './api'
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+/** Plans a workspace can buy itself. The ecosystem bundle is sold by contact only. */
+export const PAID_PLANS = ['solo', 'team']
 
-async function callEdgeFunction(name, body) {
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) throw new Error('Not authenticated')
+export const PLAN_OFFERS = [
+  {
+    id: 'solo',
+    name: 'Solo',
+    price: { monthly: 20, yearly: 200 },
+    what: '1 seat · 15 bot hours a month · unlimited browser recordings',
+  },
+  {
+    id: 'team',
+    name: 'Team',
+    price: { monthly: 100, yearly: 1000 },
+    what: 'Unlimited seats · 75 bot hours a month, shared by the workspace · unlimited browser recordings',
+  },
+]
 
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${session.access_token}`,
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  })
+export const FREE_BOT_HOURS = 2
+export const PACK = { item: 'bot_pack_10', hours: 10, price: 10 }
+export const CONTACT_EMAIL = 'fm1@qntmecos.com'
 
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error || 'Edge function call failed')
-  return data
-}
+/** The Stripe Checkout item for a plan and billing cycle, e.g. solo_yearly. */
+export const checkoutItem = (planId, cycle) => `${planId}_${cycle}`
 
 const billingService = {
-  async getAvailablePlans() {
-    const { data, error } = await supabase
-      .from('plans')
-      .select('*')
-      .eq('is_active', true)
-      .or('app.eq.entomate,app.eq.bundle')
-      .order('tier')
+  getStatus: (workspaceId) => billingApi.getStatus(workspaceId),
 
-    if (error) throw error
-    return data || []
+  /** Returns the Stripe Checkout URL. */
+  async startCheckout(workspaceId, item) {
+    const { url } = await billingApi.checkout(workspaceId, item)
+    return url
   },
 
-  async getEntitlements(workspaceId) {
-    const { data, error } = await supabase
-      .from('entitlements')
-      .select('*')
-      .eq('workspace_id', workspaceId)
-      .single()
-
-    if (error || !data) {
-      return {
-        workspace_id: workspaceId,
-        apps: {},
-        max_users: 5,
-        max_workflows: 5,
-        max_workflow_runs_mo: 500,
-        max_integrations: 3,
-        features: {},
-        is_trialing: false,
-        trial_ends_at: null,
-      }
-    }
-
-    // Fetch current usage
-    const now = new Date()
-    const periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
-      .toISOString().split('T')[0]
-
-    const { data: usageRecords } = await supabase
-      .from('usage_records')
-      .select('metric, quantity')
-      .eq('workspace_id', workspaceId)
-      .eq('period_start', periodStart)
-
-    const usage = {}
-    if (usageRecords) {
-      for (const record of usageRecords) {
-        usage[record.metric] = record.quantity
-      }
-    }
-
-    return { ...data, usage }
-  },
-
-  async getSubscription(workspaceId) {
-    const { data } = await supabase
-      .from('subscriptions')
-      .select('*')
-      .eq('workspace_id', workspaceId)
-      .in('status', ['active', 'trialing', 'past_due'])
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
-
-    return data || null
-  },
-
-  async createCheckout({ workspaceId, planId, billingCycle }) {
-    const { checkout_url } = await callEdgeFunction('billing-checkout', {
-      workspace_id: workspaceId,
-      plan_id: planId,
-      billing_cycle: billingCycle,
-      success_url: `${window.location.origin}/settings?billing=success`,
-      cancel_url: `${window.location.origin}/settings?billing=canceled`,
-    })
-    return checkout_url
-  },
-
-  async openCustomerPortal(workspaceId) {
-    const { portal_url } = await callEdgeFunction('billing-portal', {
-      workspace_id: workspaceId,
-      return_url: `${window.location.origin}/settings`,
-    })
-    return portal_url
-  },
-
-  async getInvoices(workspaceId) {
-    const { data, error } = await supabase
-      .from('invoices')
-      .select('*')
-      .eq('workspace_id', workspaceId)
-      .order('created_at', { ascending: false })
-      .limit(24)
-
-    if (error) throw error
-    return data || []
-  },
-
-  getEntomateTier(entitlements) {
-    return entitlements?.apps?.entomate || 'free'
-  },
-
-  canUseFeature(entitlements, feature) {
-    return !!entitlements?.features?.[feature]
-  },
-
-  isAtLimit(entitlements, metric) {
-    const usage = entitlements?.usage?.[metric] || 0
-    let limit = null
-    switch (metric) {
-      case 'workflow_runs': limit = entitlements?.max_workflow_runs_mo; break
-    }
-    if (limit === null) return false
-    return usage >= limit
+  /** Returns the Stripe Customer Portal URL. */
+  async openPortal(workspaceId) {
+    const { url } = await billingApi.portal(workspaceId)
+    return url
   },
 }
 

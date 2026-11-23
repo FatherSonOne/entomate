@@ -6,7 +6,40 @@ const log = require('../utils/log');
 const router = express.Router();
 
 const ADMIN_ROLES = ['owner', 'admin'];
+const MEMBER_ROLES = ['owner', 'admin', 'manager', 'member', 'viewer'];
 const orgFromBody = (req) => req.body?.workspaceId || null;
+const orgFromQuery = (req) => req.query?.workspaceId || null;
+
+function sendError(res, err, what, orgId) {
+  if (err.status) return res.status(err.status).json({ error: err.message });
+  log.error(`[Billing] ${what} failed`, { orgId, error: err.message });
+  return res.status(500).json({ error: `Could not ${what.toLowerCase()}. Try again.` });
+}
+
+/**
+ * GET /api/billing/status?workspaceId=
+ * Plan, bot hours this month, subscription state, and whether the caller may
+ * manage billing. Any member of the org.
+ */
+router.get('/status', authenticate, authorizeOrgRole(MEMBER_ROLES, orgFromQuery), async (req, res) => {
+  try {
+    res.json(await billing.getStatus({ orgId: req.orgId, role: req.orgRole }));
+  } catch (err) {
+    sendError(res, err, 'Load billing', req.orgId);
+  }
+});
+
+/**
+ * POST /api/billing/portal  { workspaceId }
+ * Returns { url } of a Stripe Customer Portal session. Owners and admins only.
+ */
+router.post('/portal', authenticate, authorizeOrgRole(ADMIN_ROLES, orgFromBody), async (req, res) => {
+  try {
+    res.json(await billing.createPortalSession({ orgId: req.orgId }));
+  } catch (err) {
+    sendError(res, err, 'Open the billing portal', req.orgId);
+  }
+});
 
 /**
  * POST /api/billing/checkout  { workspaceId, item }

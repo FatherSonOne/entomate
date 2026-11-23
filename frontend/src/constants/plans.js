@@ -3,13 +3,15 @@
 // Matches QntmEcos billing system Stripe tiers
 // ============================================
 
-/** @type {readonly ['free', 'starter', 'pro', 'business', 'ecosystem']} */
-export const TENANT_PLANS = ['free', 'starter', 'pro', 'business', 'ecosystem']
+/** @type {readonly ['free', 'solo', 'team', 'starter', 'pro', 'business', 'ecosystem']} */
+export const TENANT_PLANS = ['free', 'solo', 'team', 'starter', 'pro', 'business', 'ecosystem']
 
 export const SELF_SERVICE_PLANS = ['free', 'starter', 'pro', 'business', 'ecosystem']
 
 export const TENANT_PLAN_LABELS = {
   free: 'Free',
+  solo: 'Solo',
+  team: 'Team',
   starter: 'Starter',
   pro: 'Professional',
   business: 'Business',

@@ -1,252 +1,281 @@
-import React, { useState, useEffect, useCallback } from 'react'
-import { CreditCard, Check, ExternalLink, ArrowUpRight } from 'lucide-react'
-import { useEntitlements } from '../../hooks/useEntitlements'
-import billingService from '../../services/billingService'
+/**
+ * Settings › Plan and billing (billing rebuild, Phase 4).
+ *
+ * Reads GET /api/billing/status: the workspace's plan, its bot hours this
+ * month, and the Stripe subscription. Owners and admins buy a plan or a
+ * 10-hour pack through Stripe Checkout and manage the subscription in the
+ * Stripe Customer Portal; everyone else reads. Checkout returns here with
+ * ?billing=success|cancelled; on success the drawer re-reads the status until
+ * the Stripe webhook has set the plan.
+ */
 
-const TIER_NAMES = { free: 'Free', starter: 'Starter', pro: 'Professional', business: 'Business' }
+import React, { useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { useOrg } from '../../contexts/OrgContext'
+import { Key, Readout, Signal, Switch, Tag } from '../bench'
+import { TENANT_PLAN_LABELS } from '../../constants/plans'
+import billingService, {
+  CONTACT_EMAIL, FREE_BOT_HOURS, PACK, PAID_PLANS, PLAN_OFFERS, checkoutItem,
+} from '../../services/billingService'
 
-const ENT_PRICES = {
-  ent_starter: { monthly: 39, yearly: 390 },
-  ent_pro: { monthly: 79, yearly: 790 },
-  ent_business: { monthly: 149, yearly: 1490 },
+const CYCLES = [
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'yearly', label: 'Yearly' },
+]
+
+const POLL_MS = 3000
+const POLL_TRIES = 10
+
+const dateFmt = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+const fmtDate = (iso) => (iso ? dateFmt.format(new Date(iso)) : null)
+// Bot hours reset at the start of the UTC month; local time would show the day before in the Americas.
+const utcDayFmt = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', timeZone: 'UTC' })
+const fmtUtcDay = (iso) => (iso ? utcDayFmt.format(new Date(iso)) : null)
+const fmtHours = (n) => Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 1 })
+const fmtMoney = (n) => `$${n.toLocaleString()}`
+const planLabel = (plan) => TENANT_PLAN_LABELS[plan] || 'Free'
+
+function subscriptionLine(status) {
+  const sub = status.subscription
+  if (!status.hasSubscription) return 'No subscription'
+  if (!sub?.status) return 'Subscription details could not be read from Stripe'
+  const cycle = sub.interval === 'year' ? 'Yearly' : sub.interval === 'month' ? 'Monthly' : null
+  const end = fmtDate(sub.currentPeriodEnd)
+  if (sub.status === 'past_due') return 'Payment past due. Update the card in Manage billing.'
+  if (sub.cancelAtPeriodEnd && end) return `Ends ${end}. It does not renew.`
+  return [cycle, end && `renews ${end}`].filter(Boolean).join(', ') || 'Active'
 }
 
-const ENT_FEATURES = {
-  ent_starter: ['5 users', '5 workflows', '500 runs/mo', '3 integrations', 'Triggers'],
-  ent_pro: ['15 users', '25 workflows', '5,000 runs/mo', '10 integrations', 'Webhooks & scheduling'],
-  ent_business: ['Unlimited users', 'Unlimited workflows', 'Unlimited runs', 'Unlimited integrations', 'API access', 'Custom functions', 'Priority support'],
+function subscriptionSignal(sub) {
+  if (!sub?.status) return null
+  if (sub.status === 'past_due') return { tone: 'brand', text: 'Past due' }
+  if (sub.cancelAtPeriodEnd) return { tone: 'ai', text: 'Ending' }
+  return { tone: 'mint', text: 'Active' }
 }
 
-function formatNumber(n) {
-  if (n === null || n === undefined) return 'Unlimited'
-  return n.toLocaleString()
+function HoursReadout({ hours }) {
+  if (!hours) return <Readout label="Bot hours left this month" value="—" context="Bot hours could not be read." />
+  if (!hours.limited) return <Readout label="Bot hours this month" value="No limit" context={`${fmtHours(hours.used_hours)} hours used`} />
+
+  const included = Number(hours.included_hours)
+  const used = Number(hours.used_hours)
+  const pct = included > 0 ? Math.min(100, (used / included) * 100) : 100
+  const tone = pct >= 100 ? 'brand' : pct >= 80 ? 'ai' : 'ink'
+  const pack = Number(hours.pack_hours) > 0 ? ` · ${fmtHours(hours.pack_hours)} extra hours` : ''
+  const resets = fmtUtcDay(hours.resets_at)
+  return (
+    <div>
+      <Readout
+        label="Bot hours left this month"
+        value={fmtHours(hours.remaining_hours)}
+        context={`${fmtHours(used)} of ${fmtHours(included)} plan hours used${pack}${resets ? ` · resets ${resets}` : ''}`}
+      />
+      <div
+        className="bs-bill-meter"
+        role="img"
+        aria-label={`${fmtHours(used)} of ${fmtHours(included)} plan hours used`}
+      >
+        <i data-tone={tone} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  )
 }
 
 export default function BillingSettings() {
-  const { entitlements, entTier, isTrialing, trialDaysLeft, workspaceId, isLoading: entLoading } = useEntitlements()
-  const [plans, setPlans] = useState([])
-  const [invoices, setInvoices] = useState([])
-  const [subscription, setSubscription] = useState(null)
-  const [billingCycle, setBillingCycle] = useState('monthly')
-  const [loading, setLoading] = useState(true)
-  const [actionLoading, setActionLoading] = useState(null)
-  const [billingUnavailable, setBillingUnavailable] = useState(false)
+  const { org, myRole } = useOrg()
+  const orgId = org?.id || null
+  const [params, setParams] = useSearchParams()
+  // Read once: the URL flag is removed below so a reload does not repeat it.
+  const [returned] = useState(() => params.get('billing'))
+  const [status, setStatus] = useState(null)
+  const [error, setError] = useState(null)
+  const [waiting, setWaiting] = useState(returned === 'success')
+  const [cycle, setCycle] = useState('monthly')
+  const [busy, setBusy] = useState(null)
+  const [reload, setReload] = useState(0)
 
   useEffect(() => {
-    if (!workspaceId) return
-    const load = async () => {
-      setLoading(true)
-      setBillingUnavailable(false)
+    if (!returned) return
+    setParams((prev) => {
+      const p = new URLSearchParams(prev)
+      p.delete('billing')
+      p.delete('session_id')
+      return p
+    }, { replace: true })
+  }, [returned, setParams])
+
+  useEffect(() => {
+    if (!orgId) return undefined
+    let live = true
+    let timer
+    let tries = 0
+    const run = async () => {
       try {
-        const [plansData, invoicesData, subData] = await Promise.all([
-          billingService.getAvailablePlans(),
-          billingService.getInvoices(workspaceId),
-          billingService.getSubscription(workspaceId),
-        ])
-        setPlans(plansData)
-        setInvoices(invoicesData)
-        setSubscription(subData)
+        const s = await billingService.getStatus(orgId)
+        if (!live) return
+        setStatus(s)
+        setError(null)
+        tries += 1
+        if (returned === 'success' && !PAID_PLANS.includes(s.plan) && tries < POLL_TRIES) {
+          timer = setTimeout(run, POLL_MS)
+        } else {
+          setWaiting(false)
+        }
       } catch (err) {
-        console.error('Failed to load billing data:', err)
-        setBillingUnavailable(true)
-      } finally {
-        setLoading(false)
+        if (!live) return
+        setError(err.message || 'Could not load billing.')
+        setWaiting(false)
       }
     }
-    load()
-  }, [workspaceId])
+    run()
+    return () => { live = false; clearTimeout(timer) }
+  }, [orgId, returned, reload])
 
-  const handleCheckout = useCallback(async (planId) => {
-    if (!workspaceId) return
-    setActionLoading(planId)
+  const go = useCallback(async (key, open) => {
+    setBusy(key)
+    setError(null)
     try {
-      const url = await billingService.createCheckout({ workspaceId, planId, billingCycle })
-      window.location.href = url
+      window.location.assign(await open())
     } catch (err) {
-      console.error('Checkout failed:', err)
-    } finally {
-      setActionLoading(null)
+      setError(err.message || 'Could not open Stripe. Try again.')
+      setBusy(null)
     }
-  }, [workspaceId, billingCycle])
+  }, [])
 
-  const handleManageBilling = useCallback(async () => {
-    if (!workspaceId) return
-    setActionLoading('portal')
-    try {
-      const url = await billingService.openCustomerPortal(workspaceId)
-      window.location.href = url
-    } catch (err) {
-      console.error('Portal failed:', err)
-    } finally {
-      setActionLoading(null)
-    }
-  }, [workspaceId])
-
-  const entPlans = plans.filter(p => p.app === 'entomate')
-
-  // No workspace, or the billing tables could not be read: say so instead of loading forever
-  if (!entLoading && (!workspaceId || billingUnavailable)) {
+  if (!orgId) return <p className="bs-set-note">Choose a workspace to see its plan.</p>
+  if (!status && error) {
     return (
-      <div role="status">
-        <p className="bs-set-note">Billing is not set up for this workspace yet</p>
-        <p className="bs-set-help">Plans, usage and invoices will show here when billing is turned on.</p>
+      <div role="alert">
+        <p className="bs-set-note bs-set-err">{error}</p>
+        <Key size="sm" onClick={() => { setError(null); setReload((n) => n + 1) }}>Try again</Key>
       </div>
     )
   }
+  if (!status) return <p className="bs-set-note">Loading…</p>
 
-  if (loading || entLoading) {
-    return <div className="text-center text-sm text-gray-500 py-8">Loading billing information...</div>
+  const { plan, hasSubscription, subscription, canManage, configured } = status
+  const paid = PAID_PLANS.includes(plan)
+  const ecosystem = plan === 'ecosystem'
+  const canBuy = canManage && configured && !ecosystem
+  const sig = subscriptionSignal(subscription)
+
+  let notice = null
+  if (returned === 'success') {
+    notice = waiting
+      ? 'Payment received. Waiting for Stripe to confirm it…'
+      : paid
+        ? `Payment received. This workspace is on ${planLabel(plan)}.`
+        : 'Payment received, but Stripe has not confirmed it yet. Reload this page in a minute.'
+  } else if (returned === 'cancelled') {
+    notice = 'Checkout cancelled. Nothing was charged.'
   }
 
   return (
-    <div className="space-y-6">
-      {/* Current Plan */}
-      <div className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 rounded-xl p-5">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <CreditCard className="w-5 h-5 text-emerald-500" />
-              <h3 className="text-lg font-bold text-white">
-                Entomate {TIER_NAMES[entTier] || 'Free'}
-              </h3>
-              <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full uppercase ${
-                isTrialing ? 'bg-yellow-500/20 text-yellow-400' :
-                subscription?.status === 'past_due' ? 'bg-red-500/20 text-red-400' :
-                'bg-emerald-500/20 text-emerald-400'
-              }`}>
-                {isTrialing ? `Trial - ${trialDaysLeft}d left` :
-                 subscription?.status === 'past_due' ? 'Past Due' :
-                 subscription ? 'Active' : 'Free'}
-              </span>
-            </div>
-            <p className="text-sm text-gray-400 mt-1">
-              {subscription?.current_period_end
-                ? `Renews ${new Date(subscription.current_period_end).toLocaleDateString()}`
-                : 'Free tier'}
-            </p>
+    <div className="bs-bill">
+      {notice && <p className="bs-set-note" role="status">{notice}</p>}
+      {error && <p className="bs-set-note bs-set-err" role="alert">{error}</p>}
+
+      <div className="bs-bill-now">
+        <Readout label="Plan" value={planLabel(plan)} context={ecosystem ? 'Entomate, Logos Vision and Pulse' : subscriptionLine(status)} />
+        <HoursReadout hours={status.botHours} />
+      </div>
+
+      {plan === 'free' && (
+        <p className="bs-set-note">
+          Free includes {FREE_BOT_HOURS} bot hours a month. Solo and Team include more, and can add {PACK.hours}-hour packs.
+        </p>
+      )}
+      {!canManage && <p className="bs-set-note">Only an owner or admin can change the plan. Ask one of them.</p>}
+      {canManage && !configured && <p className="bs-set-note">Billing is not turned on for this server yet.</p>}
+
+      {hasSubscription && canManage && (
+        <div className="bs-set-row">
+          <div className="bs-set-l">
+            <b>Billing account</b>
+            <span>Card, invoices, plan changes and cancelling are in Stripe’s billing portal.</span>
           </div>
-          {subscription && (
-            <button
-              onClick={handleManageBilling}
-              disabled={actionLoading === 'portal'}
-              className="px-4 py-2 text-sm font-medium rounded-lg bg-white/10 border border-white/10 text-white hover:bg-white/20 transition-colors flex items-center gap-1.5"
+          <div className="bs-set-c">
+            {sig && <Signal tone={sig.tone}>{sig.text}</Signal>}
+            <Key
+              disabled={!!busy || !configured}
+              onClick={() => go('portal', () => billingService.openPortal(orgId))}
             >
-              {actionLoading === 'portal' ? 'Opening...' : <>Manage <ExternalLink className="w-3.5 h-3.5" /></>}
-            </button>
+              {busy === 'portal' ? 'Opening…' : 'Manage billing'}
+            </Key>
+          </div>
+        </div>
+      )}
+
+      {paid && (
+        <div className="bs-set-row">
+          <div className="bs-set-l">
+            <b>Extra bot hours</b>
+            <span>{PACK.hours} hours for {fmtMoney(PACK.price)}, paid once. They are used after the plan’s hours and do not expire.</span>
+          </div>
+          {canBuy && (
+            <div className="bs-set-c">
+              <Key disabled={!!busy} onClick={() => go(PACK.item, () => billingService.startCheckout(orgId, PACK.item))}>
+                {busy === PACK.item ? 'Opening…' : `Add ${PACK.hours} hours (${fmtMoney(PACK.price)})`}
+              </Key>
+            </div>
           )}
         </div>
+      )}
 
-        {/* Usage meters */}
-        {entitlements && (
-          <div className="grid grid-cols-3 gap-3 mt-4">
-            {[
-              { label: 'Workflows', current: entitlements.usage?.workflows || 0, limit: entitlements.max_workflows },
-              { label: 'Runs/mo', current: entitlements.usage?.workflow_runs || 0, limit: entitlements.max_workflow_runs_mo },
-              { label: 'Integrations', current: entitlements.usage?.integrations || 0, limit: entitlements.max_integrations },
-            ].map(m => {
-              const pct = m.limit ? Math.min(100, (m.current / m.limit) * 100) : 0
-              return (
-                <div key={m.label} className="bg-black/20 rounded-lg p-3">
-                  <div className="flex justify-between text-xs mb-1.5">
-                    <span className="text-gray-400">{m.label}</span>
-                    <span className="text-gray-300">{formatNumber(m.current)} / {formatNumber(m.limit)}</span>
-                  </div>
-                  {m.limit !== null && (
-                    <div className="w-full h-1 bg-gray-700 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full transition-all" style={{
-                        width: `${pct}%`,
-                        backgroundColor: pct >= 100 ? '#ef4444' : pct >= 80 ? '#f59e0b' : '#10b981',
-                      }} />
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        )}
+      <div className="bs-set-sub">
+        <span className="bs-h3">Plans</span>
+        <Switch label="Billing cycle" options={CYCLES} value={cycle} onChange={setCycle} />
       </div>
 
-      {/* Billing cycle toggle */}
-      <div className="flex items-center justify-center gap-3 text-sm">
-        <span className={billingCycle === 'monthly' ? 'font-semibold text-white' : 'text-gray-500'}>Monthly</span>
-        <button
-          type="button"
-          aria-label={`Switch to ${billingCycle === 'monthly' ? 'yearly' : 'monthly'} billing`}
-          onClick={() => setBillingCycle(c => c === 'monthly' ? 'yearly' : 'monthly')}
-          className={`relative w-10 h-5 rounded-full transition-colors ${billingCycle === 'yearly' ? 'bg-emerald-500' : 'bg-gray-600'}`}
-        >
-          <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${billingCycle === 'yearly' ? 'translate-x-5' : 'translate-x-0.5'}`} />
-        </button>
-        <span className={billingCycle === 'yearly' ? 'font-semibold text-white' : 'text-gray-500'}>
-          Yearly <span className="text-emerald-400 text-xs">(2 months free)</span>
-        </span>
-      </div>
-
-      {/* Plan Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {entPlans.map(plan => {
-          const pricing = ENT_PRICES[plan.id]
-          const features = ENT_FEATURES[plan.id] || []
-          const isCurrentPlan = (
-            (plan.tier === 1 && entTier === 'starter') ||
-            (plan.tier === 2 && entTier === 'pro') ||
-            (plan.tier === 3 && entTier === 'business')
-          )
-          const price = pricing ? (billingCycle === 'yearly' ? Math.round(pricing.yearly / 12) : pricing.monthly) : 0
-
-          return (
-            <div key={plan.id} className={`rounded-xl p-5 border ${isCurrentPlan ? 'border-emerald-500 ring-1 ring-emerald-500' : 'border-gray-700'} bg-gray-800 relative`}>
-              {isCurrentPlan && (
-                <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-2.5 py-0.5 bg-emerald-500 text-white text-[10px] font-bold rounded-full uppercase">Current</div>
-              )}
-              <h4 className="font-semibold text-white">{plan.name}</h4>
-              <div className="flex items-baseline gap-1 mt-2 mb-4">
-                <span className="text-2xl font-bold text-white">${price}</span>
-                <span className="text-sm text-gray-500">/mo</span>
-              </div>
-              <div className="space-y-2 mb-5">
-                {features.map(f => (
-                  <div key={f} className="flex items-center gap-2 text-sm text-gray-300">
-                    <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                    {f}
-                  </div>
-                ))}
-              </div>
-              <button
-                onClick={() => handleCheckout(plan.id)}
-                disabled={isCurrentPlan || !!actionLoading}
-                className={`w-full py-2 text-sm font-semibold rounded-lg transition-colors ${
-                  isCurrentPlan ? 'bg-gray-700 text-gray-500 cursor-default' : 'bg-emerald-500 hover:bg-emerald-600 text-white'
-                }`}
-              >
-                {actionLoading === plan.id ? 'Loading...' : isCurrentPlan ? 'Current Plan' : 'Upgrade'}
-              </button>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Invoice History */}
-      {invoices.length > 0 && (
-        <div className="bg-gray-800 rounded-xl border border-gray-700 p-5">
-          <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Invoice History</h4>
-          {invoices.map(inv => (
-            <div key={inv.id} className="flex items-center justify-between py-2.5 border-b border-gray-700 last:border-0">
-              <span className="text-sm text-gray-300">
-                {inv.period_start ? new Date(inv.period_start).toLocaleDateString() : 'N/A'}
+      {PLAN_OFFERS.map((offer) => {
+        const current = plan === offer.id
+        const amount = offer.price[cycle]
+        return (
+          <div className="bs-set-row" key={offer.id}>
+            <div className="bs-set-l">
+              <b>{offer.name}</b>
+              <span className="bs-mono">
+                {fmtMoney(amount)} a {cycle === 'yearly' ? 'year' : 'month'}
+                {cycle === 'yearly' ? ' · 2 months free' : ''}
               </span>
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-medium text-white">${(inv.amount_paid / 100).toFixed(2)}</span>
-                <span className={`text-xs px-2 py-0.5 rounded-full ${inv.status === 'paid' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-yellow-500/20 text-yellow-400'}`}>{inv.status}</span>
-                {inv.invoice_url && (
-                  <a href={inv.invoice_url} target="_blank" rel="noopener noreferrer" className="text-xs text-emerald-400 hover:underline flex items-center gap-1">
-                    View <ArrowUpRight className="w-3 h-3" />
-                  </a>
-                )}
-              </div>
+              <span>{offer.what}</span>
             </div>
-          ))}
+            <div className="bs-set-c">
+              {current && <Tag>Current plan</Tag>}
+              {!current && canBuy && hasSubscription && paid && (
+                <span className="bs-set-help">Change plans in Manage billing</span>
+              )}
+              {!current && canBuy && !(hasSubscription && paid) && (
+                <Key
+                  disabled={!!busy}
+                  onClick={() => {
+                    const item = checkoutItem(offer.id, cycle)
+                    go(item, () => billingService.startCheckout(orgId, item))
+                  }}
+                >
+                  {busy === checkoutItem(offer.id, cycle) ? 'Opening…' : `Choose ${offer.name}`}
+                </Key>
+              )}
+            </div>
+          </div>
+        )
+      })}
+
+      <div className="bs-set-row">
+        <div className="bs-set-l">
+          <b>Ecosystem bundle</b>
+          <span>Entomate, Logos Vision and Pulse together.</span>
         </div>
+        <div className="bs-set-c">
+          {ecosystem
+            ? <Tag>Current plan</Tag>
+            : <a className="bs-key sm" href={`mailto:${CONTACT_EMAIL}?subject=Entomate%20ecosystem%20bundle`}>Contact us</a>}
+        </div>
+      </div>
+      {ecosystem && (
+        <p className="bs-set-note">
+          To change the bundle, email <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
+        </p>
       )}
     </div>
   )

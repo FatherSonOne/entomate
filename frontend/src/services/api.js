@@ -598,6 +598,16 @@ export const reportsApi = {
 // ========================================
 // CALENDAR API (Phase 5 - Week 7)
 // ========================================
+export const billingApi = {
+  // Always fresh: the drawer re-reads it while the Stripe webhook sets the plan.
+  getStatus: (workspaceId) => {
+    cache.invalidate('/billing/status')
+    return api.get('/billing/status', { params: { workspaceId } })
+  },
+  checkout: (workspaceId, item) => api.post('/billing/checkout', { workspaceId, item }),
+  portal: (workspaceId) => api.post('/billing/portal', { workspaceId }),
+}
+
 export const calendarApi = {
   // Get calendar status
   getStatus: () => api.get('/calendar/status'),

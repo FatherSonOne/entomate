@@ -115,6 +115,12 @@ function refusal(org, item) {
   return null;
 }
 
+const ADMIN_ROLES = ['owner', 'admin'];
+
+// Settings URL state (frontend services/settingsView.ts): the workspace section
+// with the Plan and billing drawer open.
+const BILLING_DRAWER = '/settings?s=workspace&dr=billing';
+
 function frontendUrl() {
   return (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/+$/, '');
 }
@@ -151,10 +157,68 @@ async function createCheckoutSession({ orgId, itemKey, email }) {
     ...(item.mode === 'subscription'
       ? { subscription_data: { metadata } }
       : { payment_intent_data: { metadata } }),
-    success_url: `${base}/settings?billing=success&session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${base}/settings?billing=cancelled`,
+    success_url: `${base}${BILLING_DRAWER}&billing=success&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${base}${BILLING_DRAWER}&billing=cancelled`,
   });
   return { id: session.id, url: session.url };
+}
+
+/**
+ * What the billing drawer shows: plan, bot hours this month, and the
+ * subscription as Stripe has it now. A failed bot-hours or Stripe read leaves
+ * that part null instead of failing the whole drawer.
+ */
+async function getStatus({ orgId, role }) {
+  const org = await loadOrg(orgId);
+  if (!org) throw Object.assign(new Error('Workspace not found.'), { status: 404 });
+
+  let botHours = null;
+  const { data: hours, error } = await supabaseAdmin.rpc('get_org_bot_hours', { p_org_id: org.id });
+  if (error) log.warn('[Billing] Bot-hour read failed', { orgId: org.id, error: error.message });
+  else botHours = hours || null;
+
+  let subscription = null;
+  if (org.stripe_subscription_id && getStripe()) {
+    try {
+      const sub = await getStripe().subscriptions.retrieve(org.stripe_subscription_id);
+      const item = sub.items?.data?.[0];
+      // Since Stripe API 2025-03-31 the period end is on the item, not the subscription.
+      const periodEnd = item?.current_period_end ?? sub.current_period_end ?? null;
+      subscription = {
+        status: sub.status,
+        interval: item?.price?.recurring?.interval || null,
+        currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
+        cancelAtPeriodEnd: !!sub.cancel_at_period_end,
+      };
+    } catch (err) {
+      log.warn('[Billing] Subscription read failed', { orgId: org.id, error: err.message });
+      subscription = { status: null, interval: null, currentPeriodEnd: null, cancelAtPeriodEnd: false };
+    }
+  }
+
+  return {
+    plan: org.plan,
+    botHours,
+    hasSubscription: !!org.stripe_subscription_id,
+    subscription,
+    canManage: ADMIN_ROLES.includes(role),
+    configured: !!getStripe(),
+  };
+}
+
+/** A Stripe Customer Portal session for an org that has a Stripe customer. */
+async function createPortalSession({ orgId }) {
+  if (!getStripe()) throw Object.assign(new Error('Billing is not configured on this server.'), { status: 503 });
+  const org = await loadOrg(orgId);
+  if (!org) throw Object.assign(new Error('Workspace not found.'), { status: 404 });
+  if (!org.stripe_customer_id) {
+    throw Object.assign(new Error('This workspace has no billing account yet. Choose a plan first.'), { status: 409 });
+  }
+  const session = await getStripe().billingPortal.sessions.create({
+    customer: org.stripe_customer_id,
+    return_url: `${frontendUrl()}${BILLING_DRAWER}`,
+  });
+  return { url: session.url };
 }
 
 /**
@@ -232,4 +296,6 @@ async function handleEvent(event) {
   }
 }
 
-module.exports = { ITEMS, getStripe, createCheckoutSession, handleEvent, syncSubscription, _setStripe };
+module.exports = {
+  ITEMS, getStripe, createCheckoutSession, getStatus, createPortalSession, handleEvent, syncSubscription, _setStripe,
+};
