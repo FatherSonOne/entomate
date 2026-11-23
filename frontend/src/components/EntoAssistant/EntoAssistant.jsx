@@ -17,7 +17,7 @@ import { useMediaQuery } from '../bench/useMediaQuery'
 import { usePresence, MOTION } from '../bench/motion'
 import Composer from './Composer'
 import ContextCard from './ContextCard'
-import { WelcomeOrb, orbStateFor, useSettledOrbState, AI_ORB_LABELS } from './AiOrb'
+import { WelcomeOrb, orbStateFor, useSettledOrbState, AI_ORB_LABELS, headerStatusShown } from './AiOrb'
 import { EntoOrb, EntoOrbGlyph } from './EntoOrb'
 import { usePanelResize } from './usePanelResize'
 import { setVoiceState, pulseVoice, onVoiceRequest } from './voiceSignal'
@@ -560,6 +560,7 @@ export default function EntoAssistant({ isOpen, onClose, signals = [], signalTot
     awaitingApproval: false,
     hasAnswered: messages[messages.length - 1]?.role === 'assistant',
   }))
+  const headerShown = headerStatusShown({ contextLoading, voiceState, orbState })
 
   // Stays mounted through its exit so the panel slides away instead of vanishing.
   const { mounted, state: presence } = usePresence(isOpen, MOTION.base)
@@ -593,7 +594,12 @@ export default function EntoAssistant({ isOpen, onClose, signals = [], signalTot
           <div className="la-header-left">
             <div className="la-header-title">
               <h2>Ask Entomate</h2>
-              <span className="la-header-mode" data-voice={voiceState}>
+              <span
+                className="la-header-mode"
+                data-voice={voiceState}
+                data-shown={headerShown ? 'true' : 'false'}
+                aria-hidden={headerShown ? undefined : true}
+              >
                 {contextLoading ? 'Loading context' : AI_ORB_LABELS[orbState]}
               </span>
             </div>

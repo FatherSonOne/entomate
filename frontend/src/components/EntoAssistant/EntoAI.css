@@ -3376,8 +3376,11 @@ html.dark .la-tour-body,
   transition: color 200ms ease-out, opacity 200ms ease-out;
 }
 
-.la-header-mode[data-voice="idle"] {
+/* Shown while there is something to say (headerStatusShown); hidden, it keeps its line and
+   lets clicks through. */
+.la-header-mode[data-shown="false"] {
   opacity: 0;
+  pointer-events: none;
 }
 
 /* The readout takes the orb's state colour so the word and the sphere agree. */

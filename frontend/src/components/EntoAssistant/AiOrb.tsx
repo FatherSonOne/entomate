@@ -40,6 +40,16 @@ export const AI_ORB_LABELS: Record<AiOrbState, string> = {
   done: 'Done',
 };
 
+/**
+ * Whether the panel header shows its status word. It speaks while context loads, while Entomate
+ * listens or works on an answer (typed or spoken), when it is done, and on an error; otherwise
+ * it fades and keeps its place. Typing alone reads "listening" on the orb but stays quiet here,
+ * so the word does not flicker with every key.
+ */
+export function headerStatusShown(s: { contextLoading: boolean; voiceState: string; orbState: AiOrbState }): boolean {
+  return s.contextLoading || s.voiceState !== 'idle' || s.orbState === 'error' || s.orbState === 'done';
+}
+
 const LOOKS: Record<AiOrbState, OrbLook> = {
   idle: {},
   listening: { state: 'waiting' },
