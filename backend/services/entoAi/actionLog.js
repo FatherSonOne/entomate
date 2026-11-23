@@ -182,6 +182,21 @@ async function refuseUndo(ctx, row, message) {
   return { ok: false, error: message, proposal: toProposal(kept || row) };
 }
 
+/**
+ * The record moved since this action, but only because a LATER action of the caller's
+ * changed it and was then undone: that undo put back exactly the state this action left.
+ * Chains work one link at a time (undo C, then B, then A).
+ */
+async function restoredByLaterUndo(ctx, u, currentAt) {
+  if (!currentAt) return false;
+  const { data, error } = await ctx.db.from('ento_ai_action_log').select('id')
+    .eq('user_id', ctx.userId).eq('status', 'undone')
+    .eq('undo->>id', u.id).eq('undo->>prevUpdatedAt', u.updatedAt).eq('result->>restoredAt', currentAt)
+    .limit(1);
+  if (error) throw new Error(error.message);
+  return !!(data && data.length);
+}
+
 async function undo(ctx, id) {
   const row = await loadRow(ctx, id);
   const verb = VERBS[row.tool_name];
@@ -203,8 +218,12 @@ async function undo(ctx, id) {
     const gone = await moveRow(ctx, id, 'executed', { status: 'undone', undone_at: now(), result: { ...(row.result || {}), undoNote: 'It was already removed.' } });
     return { ok: true, proposal: toProposal(gone || row) };
   }
+  let guardAt = u.updatedAt;
   if (current.updated_at !== u.updatedAt) {
-    return refuseUndo(ctx, row, `The ${verb.noun} changed after Entomate AI made this change, so undo was not run. Change it by hand if needed.`);
+    if (!(await restoredByLaterUndo(ctx, u, current.updated_at))) {
+      return refuseUndo(ctx, row, `The ${verb.noun} changed after Entomate AI made this change, so undo was not run. Change it by hand if needed.`);
+    }
+    guardAt = current.updated_at;
   }
 
   let res;
@@ -212,7 +231,7 @@ async function undo(ctx, id) {
     const blocked = verb.beforeDelete ? await verb.beforeDelete(u.id, octx) : null;
     if (blocked) return refuseUndo(ctx, row, blocked);
     res = await ctx.db.from(verb.table).delete()
-      .eq('id', u.id).eq('org_id', row.org_id).eq('updated_at', u.updatedAt)
+      .eq('id', u.id).eq('org_id', row.org_id).eq('updated_at', guardAt)
       .select('id');
   } else {
     // Only the verb's own columns: undo data is never trusted to name what to write.
@@ -222,14 +241,18 @@ async function undo(ctx, id) {
     }
     if (!Object.keys(previous).length) throw new ActionError(422, 'This action has no undo record');
     res = await ctx.db.from(verb.table).update({ ...previous, updated_at: now() })
-      .eq('id', u.id).eq('org_id', row.org_id).eq('updated_at', u.updatedAt)
-      .select('id');
+      .eq('id', u.id).eq('org_id', row.org_id).eq('updated_at', guardAt)
+      .select('id, updated_at');
   }
   if (res.error) throw new Error(res.error.message);
   if (!res.data || !res.data.length) {
     return refuseUndo(ctx, row, `The ${verb.noun} changed while undo ran, so it was not undone.`);
   }
-  const moved = await moveRow(ctx, id, 'executed', { status: 'undone', undone_at: now() });
+  const kept = { ...(row.result || {}) };
+  delete kept.undoError;
+  // restoredAt: the record's updated_at after this undo, so the action before it can still be undone.
+  const result = verb.undo === 'delete' ? kept : { ...kept, restoredAt: res.data[0].updated_at };
+  const moved = await moveRow(ctx, id, 'executed', { status: 'undone', undone_at: now(), result });
   return { ok: true, proposal: toProposal(moved || { ...row, status: 'undone' }) };
 }
 

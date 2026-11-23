@@ -88,9 +88,11 @@ async function updateColumns(ctx, table, id, set, columns) {
     .update({ ...set, updated_at: new Date().toISOString() })
     .eq('id', id)
     .eq('org_id', ctx.orgId)
+    .eq('updated_at', prev.updated_at) // a change since the read would make `previous` wrong
     .select('id, updated_at')
     .maybeSingle(), 'The update');
-  return { id: row.id, updatedAt: row.updated_at, previous };
+  // prevUpdatedAt lets an older action's undo see that this one was undone exactly (actionLog.undo).
+  return { id: row.id, updatedAt: row.updated_at, prevUpdatedAt: prev.updated_at, previous };
 }
 
 const VERBS = {

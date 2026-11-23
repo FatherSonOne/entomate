@@ -65,7 +65,9 @@ function mockClient(uid) {
       const q = { table, op: 'select', filters: [], opts: {}, single: false };
       mockDb.queries.push({ uid, q });
       const rowsOf = () => (mockDb.tables[table] = mockDb.tables[table] || []);
-      const match = (r) => q.filters.every(([k, op, v]) => (op === 'eq' ? r[k] === v : v.includes(r[k])));
+      // 'col->>key' reads a jsonb key as text, as PostgREST does.
+      const val = (r, k) => { const [c, f] = k.split('->>'); if (!f) return r[c]; const o = r[c]; return o && o[f] != null ? String(o[f]) : null; };
+      const match = (r) => q.filters.every(([k, op, v]) => (op === 'eq' ? val(r, k) === v : v.includes(val(r, k))));
       const run = () => {
         const all = rowsOf();
         let out = [];
@@ -107,6 +109,7 @@ function mockClient(uid) {
         eq(k, v) { q.filters.push([k, 'eq', v]); return b; },
         in(k, v) { q.filters.push([k, 'in', v]); return b; },
         maybeSingle() { q.single = true; return b; },
+        limit() { return b; },
         // One macrotask per query, like a network round trip, so two requests can interleave.
         then(resolve, reject) { return new Promise((r) => setImmediate(r)).then(run).then(resolve, reject); },
       };
@@ -290,6 +293,35 @@ test('undo is refused when the record changed after the agent; nothing is overwr
   expect(res.body).toMatchObject({ ok: false, proposal: { status: 'executed' } });
   expect(res.body.error).toMatch(/changed after Entomate AI/);
   expect(task).toMatchObject({ status: 'done', title: 'Ship it v2' });
+});
+
+test('undo in reverse order: create, change, undo the change, then undo the create', async () => {
+  const create = (await proposeVia('create_task', { title: 'Chain', priority: 'high' })).proposal;
+  await act('post', `/${create.id}/confirm`, {});
+  const id = rows('tasks').find((t) => t.title === 'Chain').id;
+  const change = (await proposeVia('update_task', { taskId: id, priority: 'low' })).proposal;
+  await act('post', `/${change.id}/confirm`, {});
+  expect((await act('post', `/${change.id}/undo`, {})).body).toMatchObject({ ok: true });
+  expect(rows('tasks').find((t) => t.id === id)).toMatchObject({ priority: 'high' });
+
+  const res = await act('post', `/${create.id}/undo`, {});
+  expect(res.body).toMatchObject({ ok: true, proposal: { status: 'undone' } });
+  expect(rows('tasks').find((t) => t.id === id)).toBeUndefined();
+});
+
+test('a human edit after the undone change still blocks undo of the create', async () => {
+  const create = (await proposeVia('create_task', { title: 'Chain2' })).proposal;
+  await act('post', `/${create.id}/confirm`, {});
+  const task = rows('tasks').find((t) => t.title === 'Chain2');
+  const change = (await proposeVia('update_task', { taskId: task.id, priority: 'low' })).proposal;
+  await act('post', `/${change.id}/confirm`, {});
+  await act('post', `/${change.id}/undo`, {});
+  Object.assign(task, { title: 'Chain2 edited', updated_at: mockTick() });
+
+  const res = await act('post', `/${create.id}/undo`, {});
+  expect(res.body).toMatchObject({ ok: false, proposal: { status: 'executed' } });
+  expect(res.body.error).toMatch(/changed after Entomate AI/);
+  expect(rows('tasks').find((t) => t.id === task.id)).toBeTruthy();
 });
 
 test('update_task undo puts back the previous status and completed_at', async () => {
