@@ -3,9 +3,10 @@ process.env.SUPABASE_URL = process.env.SUPABASE_URL || 'http://localhost:54321';
 process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'test-service';
 
 const mockLaunch = jest.fn(async () => ({ sessionId: 's-new' }));
+const mockReschedule = jest.fn(async () => {});
 const mockStop = jest.fn(async () => ({}));
 const mockGetEvents = jest.fn();
-jest.mock('../services/botOrchestrator', () => ({ launchBotSession: mockLaunch, stopBotSession: mockStop }));
+jest.mock('../services/botOrchestrator', () => ({ launchBotSession: mockLaunch, stopBotSession: mockStop, rescheduleBotSession: mockReschedule }));
 jest.mock('../services/calendarService', () => ({ initialize: () => {}, isConfigured: () => true, getEvents: mockGetEvents }));
 
 // Minimal fake of the supabase query builder for the tables the job reads.
@@ -98,10 +99,10 @@ describe('settings', () => {
 });
 
 describe('runForUser', () => {
-  const row = { user_id: 'u1', calendar_json: { tokens: { access_token: 't' }, auto_join: { enabled: true, org_id: 'o1', consent_at: '2026-11-22T00:00:00Z' } } };
+  const row = { user_id: 'u1', updated_at: '2026-11-22T00:00:00', calendar_json: { tokens: { access_token: 't' }, auto_join: { enabled: true, org_id: 'o1', consent_at: '2026-11-22T00:00:00Z' } } };
   beforeEach(() => {
-    mockLaunch.mockClear(); mockStop.mockClear(); mockGetEvents.mockReset();
-    mockTables = { org_members: [{ user_id: 'u1', org_id: 'o1', role: 'owner' }], bot_sessions: [] };
+    mockLaunch.mockClear(); mockStop.mockClear(); mockReschedule.mockClear(); mockGetEvents.mockReset();
+    mockTables = { org_members: [{ user_id: 'u1', org_id: 'o1', role: 'owner' }], bot_sessions: [], user_settings: [row] };
   });
 
   test('schedules a bot at the start time with the event title and invitees', async () => {
@@ -113,6 +114,50 @@ describe('runForUser', () => {
       joinAt: inMin(30), title: 'Acme weekly', consentAcknowledgedBy: 'u1',
       participantEmails: ['ana@client.com'], calendarEventKey: aj.eventKey(event()),
     }));
+  });
+
+  test('uses the lead time and preserves a bot already scheduled for that time', async () => {
+    const early = {
+      ...row,
+      calendar_json: { ...row.calendar_json, auto_join: { ...row.calendar_json.auto_join, lead_minutes: 5 } },
+    };
+    mockTables.user_settings = [early];
+    mockGetEvents.mockResolvedValue([event()]);
+    expect((await aj.runForUser(early, now)).scheduled).toBe(1);
+    expect(mockLaunch).toHaveBeenLastCalledWith(expect.objectContaining({ joinAt: inMin(25) }));
+
+    mockTables.bot_sessions = [{ id: 's1', org_id: 'o1', consent_acknowledged_by: 'u1',
+      calendar_event_key: aj.eventKey(event()), status: 'launching', recall_bot_id: 'recall-1', join_at: inMin(25) }];
+    expect((await aj.runForUser(early, now)).scheduled).toBe(0);
+    expect(mockLaunch).toHaveBeenCalledTimes(1);
+    expect(mockStop).not.toHaveBeenCalled();
+
+    mockTables.bot_sessions[0].join_at = inMin(30);
+    expect(await aj.runForUser(early, now)).toMatchObject({ scheduled: 0, withdrawn: 0 });
+    expect(mockReschedule).toHaveBeenCalledWith(expect.objectContaining({ id: 's1', recall_bot_id: 'recall-1' }), inMin(25));
+    expect(mockStop).not.toHaveBeenCalled();
+    expect(mockLaunch).toHaveBeenCalledTimes(1);
+  });
+
+  test('leaves short-notice early arrivals for a run at or after the target time', async () => {
+    const early = {
+      ...row,
+      calendar_json: { ...row.calendar_json, auto_join: { ...row.calendar_json.auto_join, lead_minutes: 5 } },
+    };
+    mockTables.user_settings = [early];
+    mockGetEvents.mockResolvedValue([event({ start: { dateTime: inMin(9) } })]);
+    expect((await aj.runForUser(early, now)).scheduled).toBe(0);
+    expect(mockLaunch).not.toHaveBeenCalled();
+    expect((await aj.runForUser(early, new Date(inMin(4)))).scheduled).toBe(1);
+  });
+
+  test('stops preparing bots if the calendar disconnects during the provider read', async () => {
+    mockGetEvents.mockImplementation(async () => {
+      mockTables.user_settings = [];
+      return [event()];
+    });
+    expect((await aj.runForUser(row, now)).scheduled).toBe(0);
+    expect(mockLaunch).not.toHaveBeenCalled();
   });
 
   test('does not schedule the same event twice', async () => {
@@ -188,13 +233,14 @@ describe('per-meeting skip and join', () => {
     expect(out).toEqual({ [key]: 'skip' });
   });
   test('runForUser respects a skip and withdraws the scheduled bot', async () => {
-    mockLaunch.mockClear(); mockStop.mockClear(); mockGetEvents.mockReset();
+    mockLaunch.mockClear(); mockStop.mockClear(); mockReschedule.mockClear(); mockGetEvents.mockReset();
     mockTables = {
       org_members: [{ user_id: 'u1', org_id: 'o1', role: 'owner' }],
       bot_sessions: [{ id: 's1', org_id: 'o1', consent_acknowledged_by: 'u1', calendar_event_key: key, status: 'pending', join_at: inMin(30) }],
     };
     mockGetEvents.mockResolvedValue([event()]);
-    const row = { user_id: 'u1', calendar_json: { tokens: { access_token: 't' }, auto_join: { enabled: true, org_id: 'o1', consent_at: '2026-11-22T00:00:00Z', overrides: { [key]: 'skip' } } } };
+    const row = { user_id: 'u1', updated_at: '2026-11-22T00:00:00', calendar_json: { tokens: { access_token: 't' }, auto_join: { enabled: true, org_id: 'o1', consent_at: '2026-11-22T00:00:00Z', overrides: { [key]: 'skip' } } } };
+    mockTables.user_settings = [row];
     const r = await aj.runForUser(row, now);
     expect(r.scheduled).toBe(0);
     expect(mockStop).toHaveBeenCalledWith('s1', 'calendar_changed');

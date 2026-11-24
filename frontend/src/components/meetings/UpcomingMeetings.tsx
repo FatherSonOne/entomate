@@ -220,7 +220,7 @@ function Prep({ event, autoJoinOn, busy, onDecide }: { event: UpcomingEvent; aut
       <div className="bs-up-botbox">
         <div>
           <Signal tone={plan.tone}>{plan.word}</Signal>
-          <p>{plan.goes && plan.tone !== 'live' ? `The bot joins at ${timeOf(event)} and writes the minutes after.` : plan.why}</p>
+          <p>{plan.goes && plan.tone !== 'live' ? `The bot is set to join at ${timeOf({ ...event, start: event.joinAt || event.start })} and writes the minutes after.` : plan.why}</p>
         </div>
         <BotKey event={event} autoJoinOn={autoJoinOn} busy={busy} onDecide={onDecide} />
       </div>
@@ -231,9 +231,10 @@ function Prep({ event, autoJoinOn, busy, onDecide }: { event: UpcomingEvent; aut
           <p className="bs-up-prep-people">{peopleLine(event, 12)}</p>
         </section>
       )}
-      {event.htmlLink && (
+      {(event.meetingLink || event.htmlLink) && (
         <div className="bs-title-keys">
-          <a className="bs-key" href={event.htmlLink} target="_blank" rel="noopener noreferrer">Open in Google Calendar ↗</a>
+          {event.meetingLink && <a className="bs-key" href={event.meetingLink} target="_blank" rel="noopener noreferrer">Join meeting ↗</a>}
+          {event.htmlLink && <a className="bs-key" href={event.htmlLink} target="_blank" rel="noopener noreferrer">Open in Google Calendar ↗</a>}
         </div>
       )}
     </div>

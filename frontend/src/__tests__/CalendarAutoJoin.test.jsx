@@ -44,6 +44,20 @@ describe('Bot auto-join settings', () => {
     await waitFor(() => expect(updateAutoJoin).toHaveBeenCalledWith({ enabled: true, scope: 'organized', orgId: 'o1', consentAcknowledged: true }))
   })
 
+  test('saves the selected bot arrival time without enabling the rule', async () => {
+    getAutoJoin.mockResolvedValueOnce(base)
+      .mockResolvedValue({ ...base, settings: { ...base.settings, lead_minutes: 5 } })
+    updateAutoJoin.mockResolvedValue({ settings: { ...base.settings, lead_minutes: 5 } })
+    render(<CalendarAutoJoinSettings />)
+    const chooser = await screen.findByRole('combobox', { name: 'Bot arrival' })
+    fireEvent.click(chooser)
+    fireEvent.click(await screen.findByRole('option', { name: '5 minutes early' }))
+    await waitFor(() => expect(updateAutoJoin).toHaveBeenCalledWith({
+      enabled: false, scope: 'organized', orgId: 'o1', leadMinutes: 5,
+    }))
+    expect(await screen.findByText('5 minutes early', { selector: 'span:not([aria-hidden])' })).toBeTruthy()
+  })
+
   test('asks to connect the calendar first', async () => {
     getAutoJoin.mockResolvedValue({ ...base, connected: false, upcoming: [] })
     render(<CalendarAutoJoinSettings />)

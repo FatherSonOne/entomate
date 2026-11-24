@@ -13,6 +13,7 @@ const { validate } = require('../middleware/validate');
 const schemas = require('../schemas/calendar');
 const { attachOrgIds } = require('../utils/orgContext');
 const autoJoin = require('../services/calendarAutoJoin');
+const { readCalendarSettings, updateCalendarSettings } = require('../services/calendarSettings');
 const { createState, verifyState } = require('../utils/oauthState');
 router.use(attachOrgIds); // org-owned tables below are limited to req.orgIds (audit finding 3)
 
@@ -128,18 +129,15 @@ router.get('/callback', async (req, res) => {
  * Disconnect calendar integration
  */
 router.post('/disconnect', authenticate, async (req, res) => {
-  // Bots auto-join scheduled from this calendar would still join: withdraw them.
-  if (req.user?.id) {
-    await autoJoin.withdrawScheduled(req.user.id).catch((err) =>
-      log.warn('Auto-join withdraw on disconnect failed:', err.message));
+  try {
+    await updateCalendarSettings(req.user.id, () => ({}));
+  } catch (error) {
+    log.error('Failed to disconnect calendar', { error: error.message });
+    return res.status(500).json({ error: 'Failed to disconnect Google Calendar' });
   }
-  // Clear DB tokens
-  if (supabase && req.user?.id) {
-    await supabase
-      .from('user_settings')
-      .update({ calendar_json: {} })
-      .eq('user_id', req.user.id);
-  }
+  // Clear the connection first so the scheduler stops dispatching new bots.
+  await autoJoin.withdrawScheduled(req.user.id).catch((err) =>
+    log.warn('Auto-join withdraw on disconnect failed:', err.message));
   // Clear session/cookie fallbacks
   if (req.session) {
     delete req.session.calendarTokens;
@@ -198,23 +196,11 @@ const getTokens = async (req) => {
 const saveTokensToDB = (userId, tokens) => {
   if (!supabase || !userId || !tokens) return Promise.resolve();
   const { _onRefresh, ...clean } = tokens;
-  // Keep other calendar settings (auto_join) when the tokens change.
-  return supabase
-    .from('user_settings')
-    .select('calendar_json')
-    .eq('user_id', userId)
-    .maybeSingle()
-    .then(({ data }) => {
-      const prev = data?.calendar_json || {};
-      const calendarJson = { ...prev, tokens: clean, connected_at: prev.connected_at || new Date().toISOString() };
-      return supabase
-        .from('user_settings')
-        .upsert({ user_id: userId, calendar_json: calendarJson }, { onConflict: 'user_id' });
-    })
-    .then((res) => {
-      if (res?.error) log.warn('Failed to save calendar tokens to DB:', res.error.message);
-    })
-    .catch((err) => log.warn('Failed to save calendar tokens to DB:', err.message));
+  return updateCalendarSettings(userId, (prev) => ({
+    ...prev,
+    tokens: clean,
+    connected_at: new Date().toISOString(),
+  }), { create: true }).catch((err) => log.warn('Failed to save calendar tokens to DB:', err.message));
 };
 
 /**
@@ -229,9 +215,10 @@ const requireCalendar = async (req, res, next) => {
     });
   }
   // Attach refresh callback so calendarService can persist updated tokens
+  const original = { ...tokens };
   tokens._onRefresh = (updatedTokens) => {
     // Save refreshed tokens to DB
-    saveTokensToDB(req.user?.id, updatedTokens);
+    autoJoin.persistTokens(req.user.id, updatedTokens, original, supabase);
     // Also update session for current request
     if (req.session) {
       req.session.calendarTokens = updatedTokens;
@@ -289,6 +276,7 @@ router.get('/events', authenticate, requireCalendar, async (req, res) => {
         allDay: !event.start?.dateTime,
         location: event.location,
         htmlLink: event.htmlLink,
+        meetingLink: autoJoin.meetingLink(event)?.url || null,
         status: event.status,
         colorId: event.colorId
       }))
@@ -618,12 +606,6 @@ router.get('/auto-join', authenticate, async (req, res) => {
   }
 });
 
-async function calendarJsonFor(userId) {
-  const { data, error } = await supabase.from('user_settings').select('user_id, calendar_json').eq('user_id', userId).maybeSingle();
-  if (error) throw error;
-  return data;
-}
-
 /** A sync from the app runs at most this often per person; the scheduled runs cover the rest. */
 const SYNC_MIN_GAP_MS = 5 * 60 * 1000;
 
@@ -633,7 +615,7 @@ const SYNC_MIN_GAP_MS = 5 * 60 * 1000;
  */
 router.get('/auto-join/health', authenticate, async (req, res) => {
   try {
-    const row = await calendarJsonFor(req.user.id);
+    const row = await readCalendarSettings(req.user.id);
     res.set('Cache-Control', 'no-store');
     res.json({ enabled: autoJoin.normalizeSettings(row?.calendar_json?.auto_join).enabled, ...autoJoin.healthOf(row?.calendar_json) });
   } catch (error) {
@@ -649,7 +631,7 @@ router.get('/auto-join/health', authenticate, async (req, res) => {
  */
 router.post('/auto-join/sync', authenticate, async (req, res) => {
   try {
-    const row = await calendarJsonFor(req.user.id);
+    const row = await readCalendarSettings(req.user.id);
     const health = autoJoin.healthOf(row?.calendar_json);
     const enabled = autoJoin.normalizeSettings(row?.calendar_json?.auto_join).enabled;
     const recent = health.lastRunAt && Date.now() - Date.parse(health.lastRunAt) < SYNC_MIN_GAP_MS;
@@ -657,7 +639,7 @@ router.post('/auto-join/sync', authenticate, async (req, res) => {
       return res.json({ ran: false, enabled, ...health });
     }
     const result = await autoJoin.runForUser(row);
-    const after = autoJoin.healthOf((await calendarJsonFor(req.user.id))?.calendar_json);
+    const after = autoJoin.healthOf((await readCalendarSettings(req.user.id))?.calendar_json);
     res.json({ ran: true, enabled, scheduled: result.scheduled, ...after });
   } catch (error) {
     log.error('Error syncing auto-join:', { error: error.message || error });
@@ -672,12 +654,12 @@ router.post('/auto-join/sync', authenticate, async (req, res) => {
 router.post('/auto-join/missed/dismiss', authenticate, async (req, res) => {
   try {
     const key = typeof req.body?.key === 'string' ? req.body.key : '';
-    const row = await calendarJsonFor(req.user.id);
-    const json = row?.calendar_json || {};
-    const h = json.auto_join_health || {};
-    const missed = (Array.isArray(h.missed) ? h.missed : []).map((m) => (m.key === key ? { ...m, dismissedAt: new Date().toISOString() } : m));
-    const { error } = await supabase.from('user_settings').update({ calendar_json: { ...json, auto_join_health: { ...h, missed } } }).eq('user_id', req.user.id);
-    if (error) throw error;
+    await updateCalendarSettings(req.user.id, (json) => {
+      const h = json.auto_join_health || {};
+      const missed = (Array.isArray(h.missed) ? h.missed : [])
+        .map((m) => (m.key === key ? { ...m, dismissedAt: new Date().toISOString() } : m));
+      return { ...json, auto_join_health: { ...h, missed } };
+    });
     res.json({ success: true });
   } catch (error) {
     log.error('Error dismissing missed auto-join:', { error: error.message || error });
@@ -694,52 +676,8 @@ router.post('/auto-join/missed/dismiss', authenticate, async (req, res) => {
  */
 router.put('/auto-join', authenticate, validate(schemas.autoJoin), async (req, res) => {
   try {
-    const { enabled, scope, orgId, consentAcknowledged } = req.body;
-    const { data } = await supabase
-      .from('user_settings')
-      .select('calendar_json')
-      .eq('user_id', req.user.id)
-      .maybeSingle();
-    const calendarJson = data?.calendar_json || {};
-    const prev = autoJoin.normalizeSettings(calendarJson.auto_join);
-    let next;
-
-    if (enabled) {
-      if (!calendarJson.tokens) {
-        return res.status(400).json({ error: 'calendar_not_connected', message: 'Connect Google Calendar first.' });
-      }
-      const targetOrg = orgId || prev.org_id || req.orgIds?.[0];
-      if (!targetOrg || !req.orgIds?.includes(targetOrg)) {
-        return res.status(403).json({ error: 'org_not_allowed', message: 'Pick a workspace you belong to.' });
-      }
-      const { data: member } = await supabase
-        .from('org_members')
-        .select('role')
-        .eq('user_id', req.user.id)
-        .eq('org_id', targetOrg)
-        .maybeSingle();
-      if (!['owner', 'admin'].includes(member?.role)) {
-        return res.status(403).json({ error: 'admin_required', message: 'Only workspace owners and admins can send the bot.' });
-      }
-      if (consentAcknowledged !== true && !prev.consent_at) {
-        return res.status(400).json({ error: 'consent_required', message: 'Confirm that your invitees are told the meeting is recorded.' });
-      }
-      next = {
-        enabled: true,
-        scope: scope || prev.scope,
-        org_id: targetOrg,
-        consent_at: consentAcknowledged === true ? new Date().toISOString() : prev.consent_at,
-        overrides: prev.overrides
-      };
-    } else {
-      next = { ...prev, enabled: false, scope: scope || prev.scope };
-    }
-
-    const { error } = await supabase
-      .from('user_settings')
-      .update({ calendar_json: { ...calendarJson, auto_join: next } })
-      .eq('user_id', req.user.id);
-    if (error) throw error;
+    const { enabled } = req.body;
+    const settings = await autoJoin.configure(req.user.id, req.orgIds || [], req.body);
 
     let withdrawn = 0;
     if (!enabled) {
@@ -750,8 +688,11 @@ router.put('/auto-join', authenticate, validate(schemas.autoJoin), async (req, r
       });
     }
 
-    res.json({ settings: autoJoin.normalizeSettings(next), withdrawn });
+    res.json({ settings, withdrawn });
   } catch (error) {
+    if (error instanceof autoJoin.SettingsError) {
+      return res.status(error.status).json({ error: error.code, message: error.message });
+    }
     log.error('Error saving auto-join settings:', { error: error.message || error });
     res.status(500).json({ error: 'Failed to save auto-join settings' });
   }
@@ -804,29 +745,19 @@ router.get('/upcoming-meetings', authenticate, async (req, res) => {
 router.put('/auto-join/override', authenticate, validate(schemas.autoJoinOverride), async (req, res) => {
   try {
     const { eventKey, decision } = req.body;
-    const { data } = await supabase
-      .from('user_settings')
-      .select('user_id, calendar_json')
-      .eq('user_id', req.user.id)
-      .maybeSingle();
-    if (!data?.calendar_json?.tokens) {
+    const nextJson = await updateCalendarSettings(req.user.id, (json) => {
+      if (!json.tokens) return null;
+      const overrides = { ...autoJoin.normalizeSettings(json.auto_join).overrides };
+      if (decision) overrides[eventKey] = decision;
+      else delete overrides[eventKey];
+      return { ...json, auto_join: { ...json.auto_join, overrides: autoJoin.normalizeOverrides(overrides) } };
+    });
+    if (!nextJson) {
       return res.status(400).json({ error: 'calendar_not_connected', message: 'Connect Google Calendar first.' });
     }
-    const calendarJson = data.calendar_json;
-    const prev = autoJoin.normalizeSettings(calendarJson.auto_join);
-    const overrides = { ...prev.overrides };
-    if (decision) overrides[eventKey] = decision;
-    else delete overrides[eventKey];
-    const raw = { ...(calendarJson.auto_join || {}), overrides: autoJoin.normalizeOverrides(overrides) };
-    const nextJson = { ...calendarJson, auto_join: raw };
-    const { error } = await supabase
-      .from('user_settings')
-      .update({ calendar_json: nextJson })
-      .eq('user_id', req.user.id);
-    if (error) throw error;
 
     let run = null;
-    if (prev.enabled) {
+    if (autoJoin.normalizeSettings(nextJson.auto_join).enabled) {
       run = await autoJoin.runForUser({ user_id: req.user.id, calendar_json: nextJson }).catch((err) => {
         log.warn('Auto-join run after override failed:', err.message);
         return null;

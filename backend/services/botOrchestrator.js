@@ -270,8 +270,8 @@ async function launchBotSession(p) {
   const recallPayload = {
     meeting_url: meetingUrl,
     bot_name: botName || DEFAULT_BOT_NAME,
-    // A join_at more than a minute ahead makes this a scheduled bot; Recall
-    // joins at that time. Otherwise it joins now.
+    // Recall needs more than ten minutes to reserve a bot. Pass a future
+    // target when possible; a target at or near now uses its ad hoc pool.
     ...(joinAt && new Date(joinAt).getTime() > Date.now() + 60 * 1000 ? { join_at: joinAt } : {}),
     // Webhooks are configured at the Recall workspace level (dashboard),
     // not per-bot — Recall's bot create endpoint has no webhook_url field.
@@ -613,6 +613,18 @@ function latestRecallStatusCode(bot) {
   const changes = Array.isArray(bot?.status_changes) ? bot.status_changes : [];
   if (!changes.length) return bot?.status?.code || null;
   return changes[changes.length - 1]?.code || null;
+}
+
+/** Change only the arrival time, preserving the bot and its invitees’ opt-outs. */
+async function rescheduleBotSession(session, joinAt) {
+  if (!session.recall_bot_id) return;
+  await recallFetch(`/bot/${session.recall_bot_id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ join_at: joinAt }),
+  });
+  const { error } = await db().from('bot_sessions')
+    .update({ join_at: joinAt }).eq('id', session.id);
+  if (error) throw error;
 }
 
 /**
@@ -1004,6 +1016,7 @@ async function ingestSessionTranscript(sessionId) {
 
 module.exports = {
   launchBotSession,
+  rescheduleBotSession,
   stopBotSession,
   setRecordingPaused,
   addMark,

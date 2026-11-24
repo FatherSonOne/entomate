@@ -13,6 +13,7 @@
 const { SchemaType } = require('@google/generative-ai');
 const searchEverything = require('../searchEverything');
 const calendarService = require('../calendarService');
+const autoJoin = require('../calendarAutoJoin');
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}/;
@@ -47,8 +48,32 @@ function dateArg(v, name) {
   return v.slice(0, 10);
 }
 
-function today() {
-  return new Date().toISOString().slice(0, 10);
+function calendarTimeZone(value) {
+  try {
+    if (typeof value === 'string' && value.length <= 80) {
+      return new Intl.DateTimeFormat('en-US', { timeZone: value }).resolvedOptions().timeZone;
+    }
+  } catch { /* Older clients and invalid zones use UTC. */ }
+  return 'UTC';
+}
+
+function today(timeZone = 'UTC', now = new Date()) {
+  return new Intl.DateTimeFormat('sv-SE', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+}
+
+function dayBoundary(date, timeZone) {
+  const midnight = Date.parse(`${date}T00:00:00Z`);
+  const formatter = new Intl.DateTimeFormat('en-US', { timeZone, timeZoneName: 'longOffset' });
+  const offsetAt = (at) => {
+    const zone = formatter.formatToParts(at).find((part) => part.type === 'timeZoneName')?.value || '';
+    const offset = /GMT([+-])(\d{2}):(\d{2})/.exec(zone);
+    return offset ? (offset[1] === '-' ? -1 : 1) * (Number(offset[2]) * 60 + Number(offset[3])) * 60_000 : 0;
+  };
+  // Compare both offsets around a date with a midnight clock change.
+  const candidates = [-1, 1].map((day) => midnight - offsetAt(midnight + day * 86_400_000))
+    .sort((a, b) => a - b);
+  const boundary = candidates.find((at) => today(timeZone, new Date(at)) === date) ?? candidates[1];
+  return new Date(boundary).toISOString();
 }
 
 function addDays(ymd, days) {
@@ -160,7 +185,7 @@ const TOOLS = {
   get_meeting: {
     label: 'Reading the meeting',
     declaration: {
-      description: 'One meeting in full: summary, key points, decisions, topics, attendees, sentiment, its action items and a transcript excerpt.',
+      description: 'One meeting in full: summary, key points, decisions, topics, attendees, sentiment, action items, accessible meeting notes and a transcript excerpt.',
       parameters: {
         type: SchemaType.OBJECT,
         properties: {
@@ -170,7 +195,7 @@ const TOOLS = {
         required: ['meeting_id'],
       },
     },
-    async run(args, { db, orgIds }) {
+    async run(args, { db, orgIds, userId }) {
       const id = uuidArg(args.meeting_id, 'meeting_id');
       const n = args.transcript_chars === 0 ? 0 : limitOf(args.transcript_chars, 3000, 12000);
       const { data: m, error } = await db.from('meetings')
@@ -178,9 +203,15 @@ const TOOLS = {
         .eq('id', id).in('org_id', orgIds).maybeSingle();
       if (error) throw new Error(error.message);
       if (!m) return { found: false };
-      const items = rows(await db.from('action_items')
-        .select('id, task_description, assigned_to_name, assigned_to_email, due_date, priority, status, meeting_id')
-        .eq('meeting_id', id).in('org_id', orgIds).limit(50));
+      const [items, notes] = await Promise.all([
+        db.from('action_items')
+          .select('id, task_description, assigned_to_name, assigned_to_email, due_date, priority, status, meeting_id')
+          .eq('meeting_id', id).in('org_id', orgIds).limit(50).then(rows),
+        db.from('meeting_notes').select('author_id, author_name, body, visibility, created_at')
+          .eq('meeting_id', id).in('org_id', orgIds)
+          .or(`visibility.eq.team,author_id.eq.${userId}`)
+          .order('created_at', { ascending: false }).limit(10).then(rows),
+      ]);
       const transcript = m.transcript || '';
       return {
         found: true,
@@ -199,6 +230,8 @@ const TOOLS = {
           decisions: m.decisions,
           topics: m.topics,
           actionItems: items.map(slimActionItem),
+          notes: notes.filter((note) => note.visibility === 'team' || note.author_id === userId)
+            .map((note) => ({ text: trunc(note.body, 1000), author: note.author_name, date: note.created_at })),
           transcriptExcerpt: n ? transcript.slice(0, n) : undefined,
           transcriptTruncated: n ? transcript.length > n : undefined,
         },
@@ -411,25 +444,28 @@ const TOOLS = {
   get_calendar: {
     label: 'Checking the calendar',
     declaration: {
-      description: 'What falls in a date range: Google Calendar events (if connected), meetings, and open tasks and action items due.',
+      description: 'What falls in a date range: Google Calendar events (with video links and agendas when available), bot auto-join settings, meetings, and open tasks and action items due.',
       parameters: {
         type: SchemaType.OBJECT,
         properties: {
           from: DATE('First day, YYYY-MM-DD (default today).'),
+          query: { ...STR, description: 'Optional Google Calendar search by meeting title or topic.' },
           to: DATE('Last day, YYYY-MM-DD (default 7 days after from, max 62 days).'),
         },
       },
     },
-    async run(args, { db, orgIds, userId }) {
-      const from = dateArg(args.from, 'from') || today();
+    async run(args, { db, orgIds, userId, timeZone = 'UTC' }) {
+      const from = dateArg(args.from, 'from') || today(timeZone);
       let to = dateArg(args.to, 'to') || addDays(from, 7);
       if (to < from) throw new ToolInputError('to must be on or after from');
       if (to > addDays(from, MAX_RANGE_DAYS)) to = addDays(from, MAX_RANGE_DAYS);
-      const end = addDays(to, 1);
+      const timeMin = dayBoundary(from, timeZone);
+      const timeMax = dayBoundary(addDays(to, 1), timeZone);
+      const query = typeof args.query === 'string' ? args.query.trim().slice(0, 160) : '';
 
       const [meetings, tasks, items, google] = await Promise.all([
         db.from('meetings').select('id, title, start_time, end_time, created_at')
-          .in('org_id', orgIds).gte('start_time', from).lt('start_time', end)
+          .in('org_id', orgIds).gte('start_time', timeMin).lt('start_time', timeMax)
           .order('start_time', { ascending: true }).limit(25).then(rows),
         statusFilter(db.from('tasks').select('id, title, status, priority, due_date, assigned_to, project_id, projects(name)')
           .in('org_id', orgIds), 'open').gte('due_date', from).lte('due_date', to)
@@ -437,13 +473,14 @@ const TOOLS = {
         statusFilter(db.from('action_items').select('id, task_description, assigned_to_name, assigned_to_email, due_date, priority, status, meeting_id, meetings(title)')
           .in('org_id', orgIds), 'open').gte('due_date', from).lte('due_date', to)
           .order('due_date', { ascending: true }).limit(25).then(rows),
-        googleEvents(db, userId, from, end),
+        googleEvents(db, userId, timeMin, timeMax, query),
       ]);
       return {
         from,
         to,
         googleCalendar: google.state,
         events: google.events,
+        autoJoin: google.autoJoin || null,
         meetings: meetings.map((m) => ({ id: m.id, title: m.title, start: m.start_time, end: m.end_time })),
         tasksDue: tasks.map(slimTask),
         actionItemsDue: items.map(slimActionItem),
@@ -493,30 +530,40 @@ const TOOLS = {
 };
 
 /** The caller's own Google events, read with their own tokens (user_settings_self RLS). */
-async function googleEvents(db, userId, from, end) {
+async function googleEvents(db, userId, timeMin, timeMax, query) {
   if (!calendarService.isConfigured()) return { state: 'not_configured', events: [] };
+  let autoJoinSettings = null;
   try {
-    const { data } = await db.from('user_settings').select('calendar_json').eq('user_id', userId).maybeSingle();
+    const { data, error } = await db.from('user_settings').select('calendar_json').eq('user_id', userId).maybeSingle();
+    if (error) throw error;
     const tokens = data?.calendar_json?.tokens;
     if (!tokens) return { state: 'not_connected', events: [] };
-    const events = await calendarService.getEvents(tokens, {
-      timeMin: new Date(`${from}T00:00:00Z`).toISOString(),
-      timeMax: new Date(`${end}T00:00:00Z`).toISOString(),
+    const settings = autoJoin.normalizeSettings(data.calendar_json.auto_join);
+    autoJoinSettings = { enabled: settings.enabled, scope: settings.scope, leadMinutes: settings.lead_minutes };
+    const events = await calendarService.getEvents({
+      ...tokens, _onRefresh: (updated) => autoJoin.persistTokens(userId, updated, tokens, db),
+    }, {
+      timeMin,
+      timeMax,
       maxResults: 50,
+      query: query || undefined,
     });
     return {
       state: 'connected',
-      events: (events || []).map((e) => ({
+      autoJoin: autoJoinSettings,
+      events: (events || []).filter((e) => e.status !== 'cancelled').map((e) => ({
         title: e.summary,
         start: e.start?.dateTime || e.start?.date,
         end: e.end?.dateTime || e.end?.date,
         allDay: !e.start?.dateTime,
-        location: e.location || null,
+        location: trunc(e.location, 200),
+        agenda: trunc(e.description, 720),
+        meetingLink: autoJoin.meetingLink(e)?.url || null,
         attendees: (e.attendees || []).filter((a) => !a.resource).length,
       })),
     };
   } catch (e) {
-    return { state: 'error', events: [] };
+    return { state: 'error', events: [], autoJoin: autoJoinSettings };
   }
 }
 
@@ -601,4 +648,4 @@ async function runTool(name, args, ctx, timeoutMs = 10000) {
   }
 }
 
-module.exports = { TOOLS, declarations, runTool, resultCount, recordLinksOf, recordLinksForAnswer, CLOSED, ToolInputError, uuidArg, dateArg, trunc };
+module.exports = { calendarTimeZone, today, TOOLS, declarations, runTool, resultCount, recordLinksOf, recordLinksForAnswer, CLOSED, ToolInputError, uuidArg, dateArg, trunc };

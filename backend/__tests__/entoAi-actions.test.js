@@ -39,6 +39,7 @@ const NEXT = { proposed: ['confirmed', 'rejected'], confirmed: ['executed', 'fai
 function mockPolicy(table, uid, op, row) {
   const inOrg = (mockDb.members[uid] || []).includes(row.org_id);
   switch (table) {
+    case 'user_settings': return row.user_id === uid;
     case 'ento_ai_action_log': return row.user_id === uid && inOrg;
     case 'projects': return op === 'select' ? inOrg : row.owner_id === uid && inOrg;
     case 'meeting_notes': return op === 'select' ? inOrg && (row.visibility === 'team' || row.author_id === uid) : row.author_id === uid && inOrg;
@@ -139,7 +140,10 @@ function mockClient(uid) {
 
 jest.mock('../config/supabase', () => ({
   supabase: { from: () => { throw new Error('service client used'); } },
-  supabaseAdmin: { from: () => { throw new Error('service client used'); } },
+  supabaseAdmin: { from: (table) => {
+    if (table !== 'org_members') throw new Error('service client used');
+    return mockClient('user-a').from(table);
+  } },
   createUserClient: jest.fn((token) => mockClient(USERS[token])),
 }));
 
@@ -166,7 +170,7 @@ jest.mock('../utils/orgContext', () => ({ getOrgIdsForUser: jest.fn(async (uid) 
 jest.mock('../utils/log', () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() }));
 // EAI-07 metering reads billing tables on the service client; it has its own test (aiUsage.test.js).
 jest.mock('../services/aiUsage', () => ({ meterAi: jest.fn((req, res, next) => next()), addUsage: jest.fn() }));
-jest.mock('../services/calendarService', () => ({ isConfigured: () => false, getEvents: jest.fn() }));
+jest.mock('../services/calendarService', () => ({ initialize: jest.fn(), isConfigured: jest.fn(() => false), getEvents: jest.fn() }));
 
 const express = require('express');
 const request = require('supertest');
@@ -247,6 +251,46 @@ describe('flag off (D6: writes ship off)', () => {
 test('anonymous and forged callers → 401 on the action endpoints', async () => {
   expect((await request(app).post(`/api/ento-ai/actions/${TASK_A}/confirm`)).status).toBe(401);
   expect((await act('post', `/${TASK_A}/confirm`, {}, 'forged')).status).toBe(401);
+});
+
+test('a calendar bot proposal requires typed consent and updates only the caller’s settings', async () => {
+  const calendar = require('../services/calendarService');
+  const originalKey = process.env.RECALL_API_KEY;
+  process.env.RECALL_API_KEY = 'fake-key';
+  calendar.isConfigured.mockReturnValue(true);
+  calendar.getEvents.mockRejectedValue(new Error('fake provider'));
+  const existing = { user_id: 'user-a', updated_at: mockTick(), calendar_json: {
+    tokens: { access_token: 'private-token' }, auto_join_health: { missed: [] },
+  } };
+  const other = { user_id: 'user-b', updated_at: mockTick(), calendar_json: { tokens: { access_token: 'other' } } };
+  mockDb.tables.user_settings = [existing, other];
+  mockDb.tables.org_members = [{ org_id: 'org-a', user_id: 'user-a', role: 'owner' }];
+  try {
+    const { proposal } = await proposeVia('configure_bot_auto_join', { leadMinutes: 5 });
+    expect(proposal).toMatchObject({ riskClass: 'sensitive', confirmToken: 'I will notify attendees', status: 'proposed' });
+    expect(proposal.summary).toContain('5 minutes before the start of eligible meetings you organize');
+    expect(JSON.stringify(proposal)).not.toContain('private-token');
+    expect(existing.calendar_json.auto_join).toBeUndefined();
+    expect((await act('post', `/${proposal.id}/confirm`, { confirmationText: 'Wrong' })).status).toBe(400);
+    expect(existing.calendar_json.auto_join).toBeUndefined();
+
+    mockDb.tables.org_members[0].role = 'member';
+    expect((await act('post', `/${proposal.id}/confirm`, { confirmationText: proposal.confirmToken })).status).toBe(422);
+    expect(existing.calendar_json.auto_join).toBeUndefined();
+
+    mockDb.tables.org_members[0].role = 'owner';
+    const done = await act('post', `/${proposal.id}/confirm`, { confirmationText: proposal.confirmToken });
+    expect(done.body).toMatchObject({ ok: true, proposal: { canUndo: false, status: 'executed', result: { leadMinutes: 5 } } });
+    expect(existing.calendar_json).toMatchObject({
+      tokens: { access_token: 'private-token' }, auto_join_health: { missed: [] },
+      auto_join: { enabled: true, scope: 'organized', lead_minutes: 5, org_id: 'org-a', consent_at: expect.any(String) },
+    });
+    expect(other.calendar_json.auto_join).toBeUndefined();
+  } finally {
+    calendar.isConfigured.mockReturnValue(false);
+    if (originalKey === undefined) delete process.env.RECALL_API_KEY;
+    else process.env.RECALL_API_KEY = originalKey;
+  }
 });
 
 test('a write call only proposes: one row, a proposal event, nothing created, no chip', async () => {

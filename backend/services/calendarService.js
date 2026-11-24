@@ -134,19 +134,21 @@ class CalendarService {
       timeMax = addDays(new Date(), 30).toISOString(),
       maxResults = 100,
       singleEvents = true,
-      orderBy = 'startTime'
+      orderBy = 'startTime',
+      query,
+      allPages = false,
     } = options;
 
-    const response = await calendar.events.list({
-      calendarId,
-      timeMin,
-      timeMax,
-      maxResults,
-      singleEvents,
-      orderBy
-    });
-
-    return response.data.items || [];
+    const events = [];
+    let pageToken;
+    do {
+      const { data } = await calendar.events.list({
+        calendarId, timeMin, timeMax, maxResults, singleEvents, orderBy, q: query, pageToken,
+      });
+      events.push(...(data.items || []));
+      pageToken = data.nextPageToken;
+    } while (allPages && pageToken);
+    return events;
   }
 
   /**

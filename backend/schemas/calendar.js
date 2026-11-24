@@ -1,4 +1,5 @@
 const { z } = require('zod');
+const { MAX_LEAD_MINUTES } = require('../services/calendarAutoJoin');
 
 const isoDateString = z.string().refine(
   (val) => !isNaN(Date.parse(val)),
@@ -74,6 +75,7 @@ const autoJoin = z.object({
   body: z.object({
     enabled: z.boolean(),
     scope: z.enum(['organized', 'all']).optional(),
+    leadMinutes: z.number().int().min(0).max(MAX_LEAD_MINUTES).optional(),
     orgId: z.string().uuid().optional(),
     consentAcknowledged: z.boolean().optional()
   }),
