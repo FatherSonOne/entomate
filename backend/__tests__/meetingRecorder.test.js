@@ -23,6 +23,7 @@ const OUTSIDER = '00000000-0000-4000-8000-0000000000b3';
 const mockDb = {};
 const mockStorage = new Map(); // `${bucket}/${path}` -> Buffer
 let mockIdSeq = 0;
+let mockFailActions = false;
 
 function mockMakeQuery(table) {
   const filters = [];
@@ -32,6 +33,9 @@ function mockMakeQuery(table) {
   const run = () => {
     const rows = mockDb[table] || (mockDb[table] = []);
     if (mode === 'insert') {
+      if (table === 'action_items' && mockFailActions) {
+        return { rows: null, error: { message: 'action write failed' } };
+      }
       const list = Array.isArray(payload) ? payload : [payload];
       const made = list.map((p) => ({ id: p.id || `00000000-0000-4000-8000-${String(++mockIdSeq).padStart(12, '0')}`, ...p }));
       rows.push(...made);
@@ -72,7 +76,7 @@ function mockMakeQuery(table) {
       return Promise.resolve(rows.length === 1 ? { data: rows[0], error: null } : { data: null, error: { message: 'not single' } });
     },
     then(resolve, reject) {
-      try { const { rows } = run(); resolve({ data: rows, error: null }); } catch (e) { reject(e); }
+      try { const { rows, error } = run(); resolve({ data: rows, error: error ?? null }); } catch (e) { reject(e); }
     },
   };
   return q;
@@ -179,6 +183,7 @@ const meeting = (id) => mockDb.meetings.find((m) => m.id === id);
 beforeEach(() => {
   for (const k of Object.keys(mockDb)) delete mockDb[k];
   mockStorage.clear();
+  mockFailActions = false;
   mockDb.org_members = [
     { user_id: MEMBER, org_id: ORG_A },
     { user_id: OUTSIDER, org_id: ORG_B },
@@ -334,6 +339,24 @@ describe('recorder routes', () => {
     expect(meeting(id).recording_job).toMatchObject({ status: 'done', summaryError: 'Summary generation failed: Unexpected token' });
     expect(meeting(id).transcript_segments).toHaveLength(4);
     expect(meeting(id).summary).toBeNull();
+  });
+
+  test('retries a failed action write from the transcript without resending audio', async () => {
+    const server = app();
+    const id = await startAndUpload(server, 1);
+    mockFailActions = true;
+    await request(server).post('/api/recordings/' + id + '/finish').set(as(MEMBER)).send({ pieces: 1 }).expect(202);
+    await settle(id);
+    expect(meeting(id)).toMatchObject({ summary: null, recording_job: { status: 'done', summaryError: 'Could not save the meeting action items' } });
+    expect(meeting(id).transcript_segments).toHaveLength(4);
+    expect(mockDb.action_items).toEqual([]);
+
+    mockFailActions = false;
+    await request(server).post('/api/meetings/' + id + '/reprocess').set(as(MEMBER)).expect(200);
+    expect(meeting(id).recording_job.summaryError).toBeNull();
+    expect(mockDb.action_items).toHaveLength(1);
+    expect(mockDb.action_items[0].transcript_at_ms).toBe(21000);
+    expect(geminiRecording.transcribeRecording).toHaveBeenCalledTimes(1);
   });
 
   test('silence is a failure that says so', async () => {

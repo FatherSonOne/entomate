@@ -38,7 +38,8 @@ const update = z.object({
     end_date: z.string().optional().nullable(),
     team_ids: z.array(z.string()).optional(),
     tags: z.array(z.string()).optional(),
-    settings: z.record(z.any()).optional()
+    settings: z.record(z.string(), z.unknown())
+      .refine((value) => !Object.hasOwn(value, 'brief'), 'Use the project brief endpoint to edit the brief').optional()
   }).strict(),
   query: z.object({}).passthrough(),
   params: z.object({
@@ -58,4 +59,27 @@ const fromDeal = z.object({
   params: z.object({}).passthrough()
 });
 
-module.exports = { create, list, update, fromDeal };
+const brief = z.object({
+  outcome: z.string().trim().max(2000),
+  scope: z.string().trim().max(4000),
+  successCriteria: z.string().trim().max(4000),
+  ownerId: z.uuid().nullable(),
+  resources: z.array(z.string().trim().max(2048).refine((value) => {
+    if (!/^https?:\/\//i.test(value)) return false;
+    try {
+      const url = new URL(value);
+      return (url.protocol === 'https:' || url.protocol === 'http:') && !url.username && !url.password;
+    } catch {
+      return false;
+    }
+  }, 'Enter an HTTP or HTTPS link without credentials')).max(10)
+}).strict();
+
+const briefParams = z.object({ id: z.uuid() });
+const getBrief = z.object({ params: briefParams });
+const updateBrief = z.object({
+  params: briefParams,
+  body: z.object({ brief, version: z.iso.datetime({ offset: true }).nullable() }).strict()
+});
+
+module.exports = { create, list, update, fromDeal, brief, getBrief, updateBrief };

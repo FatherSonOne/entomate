@@ -334,14 +334,16 @@ async function ingestBotTranscript(sessionId, { transcriptUrl } = {}) {
 
   let minutes;
   let saved;
+  let savedActions;
   try {
     minutes = await meetingFinish().writeMinutes({ meeting, segments, title, attendees, onStage: markStage });
     await markStage('saving');
+    savedActions = await meetingFinish().saveMinutesActions(meeting, minutes);
 
     const now = new Date().toISOString();
     const lines = minutes.segments;
     const doneJob = browserRecording
-      ? { ...priorJob, botSessionId: sessionId }
+      ? { ...priorJob, botSessionId: sessionId, summaryError: minutes.summaryError }
       : {
         ...meeting.recording_job, status: 'done', source: 'bot', stage: null, stageAt: null, error: null,
         summaryError: minutes.summaryError, speakerSuggestions: minutes.speakerSuggestions,
@@ -379,8 +381,7 @@ async function ingestBotTranscript(sessionId, { transcriptUrl } = {}) {
     throw err;
   }
 
-  // The minutes are saved; action items and post-processing follow (a failure here is logged by the caller).
-  await meetingFinish().publishMinutes(db(), saved, minutes, { userId });
+  meetingFinish().publishMinutes(saved, minutes, savedActions, { userId });
   log.info('Transcript ingested', { sessionId, meetingId: saved.id, segments: saved.transcript_segments.length });
   return { status: 'ingested', meetingId: saved.id, segments: saved.transcript_segments.length };
 }

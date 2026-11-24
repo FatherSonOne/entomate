@@ -600,7 +600,7 @@ export default function MeetingDetail() {
       )}
 
       <div className="bs-mtg-status-row">
-        <RecordingStatus meetingId={meeting.id} recordingJob={meeting.recording_job} onRefresh={refreshMeeting} hasSummary={!!meeting.summary} title={meeting.title} attendees={meeting.attendees} />
+        <RecordingStatus meetingId={meeting.id} recordingJob={meeting.recording_job} onRefresh={refreshMeeting} hasSummary={!!meeting.summary} hasTranscript={!!meeting.transcript} title={meeting.title} attendees={meeting.attendees} />
       </div>
 
       {showTape && (

@@ -506,9 +506,9 @@ export const guideSections = [
     summary: 'Which project is slipping and what needs you. Projects gather tasks and the action items of their linked meetings.',
     steps: [
       'Open 04 Projects from the rail.',
-      'Deadlines shows every active project as a track with a Now line. Give a project an end date to see it there.',
+      'Deadlines shows exact dates and days remaining or overdue for active and planning projects. Select a row to open the project. Expand No end date to find projects without a deadline.',
       'The table lists projects with their progress and how many items are late. Filter by Active, Planning, Done or All, or search.',
-      'Needs you lists late items across all projects.',
+      'Needs you lists late items for the projects on the current page.',
       'Press New project, give it a name, and optionally a description, dates and tags.',
     ],
     subsections: [
@@ -517,8 +517,11 @@ export const guideSections = [
         title: 'A project',
         steps: [
           'Open items lists its tasks and the action items from its meetings. Switch List and Lanes.',
+          'Open a meeting action item and choose Edit action item to correct the original commitment in Projects, Tasks, and its meeting.',
           'Add task adds one straight to the project.',
           'Who owes what shows the open items per owner.',
+          'The project timeline shows elapsed calendar days separately from completed work items.',
+          'The shared project brief keeps the outcome, scope, success criteria, lead, and resource links with the project. Project owners and workspace admins can edit it.',
           'Link meetings to bring in their action items and decisions. Unlink removes them.',
           'Edit project changes name, status, dates and deal value. Delete project is in the same place.',
         ],

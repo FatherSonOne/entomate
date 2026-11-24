@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { meetingsApi, tasksApi } from '../../services/api'
 import { Key, Signal, Switch, Tag, TextInput } from '../bench'
 import { useToast } from '../vc/ToastProvider'
+import ActionItemEdit from './ActionItemEdit'
 import { agentLabel, dueLabel, isOverdue, meetingHref, nudgeState, priorityWord, statusTone, statusWord, timecode } from '../../services/tasksView'
 
 /**
@@ -23,12 +24,13 @@ export function Priority({ p }) {
 }
 
 /** The inspector: fields, the meeting it came from, the agent's call, subtasks. Column on wide screens, drawer below. */
-export default function TaskDetail({ item, now, inDrawer = false, onStatus, onEdit, onDelete, onOpenMeeting }) {
+export default function TaskDetail({ item, now, inDrawer = false, onStatus, onEdit, onActionSaved, onDelete, onOpenMeeting }) {
   const toast = useToast()
   const [subtasks, setSubtasks] = useState([])
   const [subLoading, setSubLoading] = useState(false)
   const [newSub, setNewSub] = useState('')
   const [adding, setAdding] = useState(false)
+  const [editingAction, setEditingAction] = useState(false)
   const isTask = item.kind === 'task'
   // Nudge: email the owner one reminder in your name. Kept here so "Nudged" shows at once.
   const [nudgedAt, setNudgedAt] = useState(item.nudgedAt || null)
@@ -164,6 +166,7 @@ export default function TaskDetail({ item, now, inDrawer = false, onStatus, onEd
           {item.status === 'done' ? 'Reopen' : 'Mark done'}
         </Key>
         {isTask && <Key onClick={onEdit}>Edit</Key>}
+        {!isTask && src && onActionSaved && <Key onClick={() => setEditingAction(true)}>Edit action item</Key>}
         {isTask && <Key onClick={onDelete} className="bs-tasks-del">Delete</Key>}
         {nudge === 'ready' && (
           <Key onClick={sendNudge} disabled={nudging} aria-label={`Email ${item.owner || 'the owner'} a reminder`}>
@@ -173,6 +176,7 @@ export default function TaskDetail({ item, now, inDrawer = false, onStatus, onEd
         {nudge === 'recent' && <Signal tone="mint">Nudged</Signal>}
         {!isTask && src && <Key onClick={() => onOpenMeeting(meetingHref(src))} className="bs-tasks-del">Open meeting</Key>}
       </div>
+      {editingAction && onActionSaved && <ActionItemEdit item={item} onSaved={onActionSaved} onClose={() => setEditingAction(false)} />}
     </div>
   )
 }

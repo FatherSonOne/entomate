@@ -42,6 +42,7 @@ export interface TaskActionRow extends ActionItemRow {
   context?: string | null
   assigned_to_email?: string | null
   last_nudged_at?: string | null
+  updated_at?: string | null
 }
 
 // ── The work item ───────────────────────────────────────────────
@@ -71,6 +72,7 @@ export interface WorkItem {
   /** Action items only: where a Nudge reminder goes, and when the last one went. */
   ownerEmail?: string | null
   nudgedAt?: string | null
+  updatedAt?: string | null
   tags: string[]
   projectId: string | null
   source: MeetingSource | null
@@ -190,6 +192,7 @@ export function fromActionItem(row: TaskActionRow): WorkItem {
     owner: row.assigned_to_name?.trim() || null,
     ownerEmail: row.assigned_to_email?.trim() || null,
     nudgedAt: row.last_nudged_at || null,
+    updatedAt: row.updated_at ?? null,
     tags: [],
     projectId: null,
     source: row.meeting_id

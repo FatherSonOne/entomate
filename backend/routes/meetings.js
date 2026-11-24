@@ -1,6 +1,6 @@
 const express = require('express');
 const multer = require('multer');
-const { v4: uuidv4 } = require('uuid');
+const { v4: uuidv4, v5: uuidv5 } = require('uuid');
 const { supabase } = require('../config/supabase');
 const ai = require('../config/ai');
 const embeddingService = require('../services/embeddingService');
@@ -10,7 +10,7 @@ const { authenticate, apiKeyAuth } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const schemas = require('../schemas/meetings');
 const log = require('../utils/log');
-const { getOrgIdForUser, getOrgIdForMeeting } = require('../utils/orgContext');
+const { getOrgIdForUser } = require('../utils/orgContext');
 const carryForward = require('../services/carryForward');
 
 const calendarService = require('../services/calendarService');
@@ -97,6 +97,7 @@ router.post('/process', authenticate, upload.single('audio'), validate(schemas.p
     if (!req.file) {
       return res.status(400).json({ error: 'No audio file provided' });
     }
+    if (!supabase) return res.status(503).json({ error: 'Database not configured' });
 
     if (!ai.isConfigured()) {
       return res.status(503).json({ error: 'AI API not configured (set OPENAI_API_KEY or GEMINI_API_KEY)' });
@@ -168,26 +169,7 @@ router.post('/process', authenticate, upload.single('audio'), validate(schemas.p
       meetingData.transcript_embedding = embedding;
     }
 
-    let savedMeeting = meetingData;
-    if (supabase) {
-      const { data: meeting, error: meetingError } = await supabase
-        .from('meetings')
-        .insert(meetingData)
-        .select()
-        .single();
-
-      if (meetingError) {
-        log.error('Meeting save error:', { error: meetingError.message || meetingError });
-      } else {
-        savedMeeting = meeting;
-      }
-    }
-
-    log.info('Meeting saved:', savedMeeting.id);
-
-    // Step 5: Save action items
-    const savedActionItems = await saveActionItems(savedMeeting.id, actionItems);
-    log.info(`Saved ${savedActionItems.length} action items`);
+    const { meeting: savedMeeting, actionItems: savedActionItems } = await createMeetingWithActions(meetingData, actionItems);
 
     // Step 6: Async post-processing (embeddings + ecosystem sync + calendar auto-sync)
     firePostProcessing(savedMeeting, summaryData, savedActionItems, {
@@ -222,7 +204,8 @@ router.post('/process', authenticate, upload.single('audio'), validate(schemas.p
     log.error('Error processing meeting:', { error: error.message || error });
     res.status(500).json({
       error: 'Failed to process meeting',
-      details: error.message
+      details: error.message,
+      ...(error.meetingId && { meetingId: error.meetingId })
     });
   }
 });
@@ -238,6 +221,7 @@ router.post('/transcript', authenticate, validate(schemas.transcript), async (re
     if (!transcript) {
       return res.status(400).json({ error: 'Transcript is required' });
     }
+    if (!supabase) return res.status(503).json({ error: 'Database not configured' });
 
     if (!ai.isConfigured()) {
       return res.status(503).json({ error: 'AI API not configured' });
@@ -278,21 +262,7 @@ router.post('/transcript', authenticate, validate(schemas.transcript), async (re
       meetingData.transcript_embedding = embedding;
     }
 
-    let savedMeeting = meetingData;
-    if (supabase) {
-      const { data: meeting, error: meetingError } = await supabase
-        .from('meetings')
-        .insert(meetingData)
-        .select()
-        .single();
-
-      if (!meetingError) {
-        savedMeeting = meeting;
-      }
-    }
-
-    // Save action items
-    const savedActionItems = await saveActionItems(savedMeeting.id, actionItems);
+    const { meeting: savedMeeting, actionItems: savedActionItems } = await createMeetingWithActions(meetingData, actionItems);
 
     // Async post-processing (embeddings + ecosystem sync + calendar auto-sync)
     firePostProcessing(savedMeeting, summaryData, savedActionItems, {
@@ -319,7 +289,8 @@ router.post('/transcript', authenticate, validate(schemas.transcript), async (re
     log.error('Error processing transcript:', { error: error.message || error });
     res.status(500).json({
       error: 'Failed to process transcript',
-      details: error.message
+      details: error.message,
+      ...(error.meetingId && { meetingId: error.meetingId })
     });
   }
 });
@@ -567,50 +538,61 @@ router.delete('/:id', authenticate, async (req, res) => {
 
 /**
  * PATCH /api/meetings/action-items/:id
- * Toggle action item status (open/done)
+ * Correct an action item's wording, owner or deadline, or toggle open/done.
  */
-router.patch('/action-items/:id', authenticate, async (req, res) => {
+router.patch('/action-items/:id', authenticate, validate(schemas.actionItemUpdate), async (req, res) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { version, ...changes } = req.validated.body;
 
     if (!supabase) {
       return res.status(503).json({ error: 'Database not configured' });
     }
 
-    const allowedStatuses = ['open', 'done'];
-    if (!status || !allowedStatuses.includes(status)) {
-      return res.status(400).json({ error: 'Status must be "open" or "done"' });
-    }
-
-    const { data: existingItem } = await supabase
+    const { data: existingItem, error: readError } = await supabase
       .from('action_items')
-      .select('meeting_id')
+      .select('meeting_id, org_id, assigned_to_name, assigned_to_email, updated_at')
       .eq('id', id)
       .maybeSingle();
+    if (readError) throw readError;
     if (!existingItem?.meeting_id) {
       return res.status(404).json({ error: 'Action item not found' });
     }
     const itemOrgId = await meetingOrgOrRespond(req, res, existingItem.meeting_id);
     if (!itemOrgId) return;
+    if (existingItem.org_id !== itemOrgId) return res.status(404).json({ error: 'Action item not found' });
+
+    const currentVersion = existingItem.updated_at ?? null;
+    const conflict = () => res.status(409).json({ error: 'This action item changed. Reload it before editing again.' });
+    if (version !== undefined && version !== currentVersion) return conflict();
+
+    // A name-only reassignment must never keep the previous recipient's address.
+    const nameChanged = changes.assigned_to_name !== undefined && changes.assigned_to_name !== existingItem.assigned_to_name;
+    const emailChanged = changes.assigned_to_email !== undefined && changes.assigned_to_email !== existingItem.assigned_to_email;
+    if (nameChanged && changes.assigned_to_email === undefined) changes.assigned_to_email = null;
+    if (nameChanged || emailChanged) changes.assigned_to_id = null;
 
     // completed_at feeds the follow-through rate on Insights (done by the due date).
-    const now = new Date().toISOString();
-    const { data: item, error } = await supabase
+    const previous = Date.parse(currentVersion);
+    const now = new Date(Math.max(Date.now(), Number.isFinite(previous) ? previous + 1 : 0)).toISOString();
+    const updates = { ...changes, updated_at: now };
+    if (changes.status !== undefined) updates.completed_at = changes.status === 'done' ? now : null;
+    const query = supabase
       .from('action_items')
-      .update({ status, updated_at: now, completed_at: status === 'done' ? now : null })
+      .update(updates)
       .eq('id', id)
-      .select()
-      .single();
+      .eq('meeting_id', existingItem.meeting_id)
+      .eq('org_id', itemOrgId);
+    const scoped = currentVersion == null ? query.is('updated_at', null) : query.eq('updated_at', currentVersion);
+    const { data: item, error } = await scoped.select().maybeSingle();
 
-    if (error) {
-      return res.status(404).json({ error: 'Action item not found' });
-    }
+    if (error) throw error;
+    if (!item) return conflict();
 
     res.json(item);
   } catch (error) {
     log.error('Error updating action item:', { error: error.message || error });
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Could not update the action item. Try again.' });
   }
 });
 
@@ -973,6 +955,9 @@ async function runAIPipeline(transcript, title, opts = {}) {
   // Summary template per meeting type: chosen on the meeting page, else guessed from title/attendees.
   const template = summaryTemplates.detectTemplate({ title, attendees: opts.attendees, chosen: opts.template });
   const summaryData = await ai.generateSummary(transcript, { addon: summaryTemplates.promptAddon(template) });
+  if (typeof summaryData?.summary !== 'string' || !summaryData.summary.trim()) {
+    throw new Error('Meeting summary was empty');
+  }
   summaryData.template = template;
   summaryData.sections = summaryTemplates.normalizeSections(summaryData.sections, template);
   const actionItems = await ai.extractActionItems(transcript);
@@ -989,45 +974,65 @@ async function runAIPipeline(transcript, title, opts = {}) {
 }
 
 /**
- * Save action items to DB for a given meeting.
- * @returns {Array} saved action items
+ * The first successful batch is the meeting's action list. Reuse stored rows so a
+ * retry preserves edits, completion and integration IDs, even if AI paraphrases.
  */
-async function saveActionItems(meetingId, actionItems) {
-  const orgId = await getOrgIdForMeeting(meetingId);
-  const saved = [];
-  for (const item of actionItems) {
-    const data = {
-      id: uuidv4(),
-      meeting_id: meetingId,
-      org_id: orgId,
-      task_description: item.task,
-      context: item.context,
-      assigned_to_name: item.owner,
-      assigned_to_email: item.ownerEmail,
-      due_date: item.dueDate,
-      priority: item.priority?.toLowerCase() || 'medium',
-      status: 'open',
-      crm_sync_status: 'pending',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    // Set by transcriptMoments for meetings with timed transcript lines.
-    if (Number.isInteger(item.transcriptAtMs) && item.transcriptAtMs >= 0) {
-      data.transcript_at_ms = item.transcriptAtMs;
-    }
+async function saveActionItems(meeting, actionItems) {
+  const read = () => supabase.from('action_items').select('*')
+    .eq('meeting_id', meeting.id).eq('org_id', meeting.org_id);
 
-    if (supabase) {
-      const { data: row, error } = await supabase
-        .from('action_items')
-        .insert(data)
-        .select()
-        .single();
-      saved.push(error ? data : row);
-    } else {
-      saved.push(data);
-    }
+  if (!meeting.org_id) throw new Error('Cannot save actions without a meeting workspace');
+  const { data: existing, error: readError } = await read();
+  if (readError) throw readError;
+  if (existing.length || !actionItems.length) return { items: existing, created: false };
+
+  const now = new Date().toISOString();
+  const rows = actionItems.map((item, index) => ({
+    // Concurrent runs all contend on the same first ID, even with differing AI output.
+    // Postgres inserts the entire batch or none of it.
+    id: index === 0 ? uuidv5('urn:entomate:meeting-actions:' + meeting.id, uuidv5.URL) : uuidv4(),
+    meeting_id: meeting.id,
+    org_id: meeting.org_id,
+    task_description: item.task,
+    context: item.context ?? null,
+    assigned_to_name: item.owner ?? null,
+    assigned_to_email: item.ownerEmail ?? null,
+    due_date: item.dueDate ?? null,
+    priority: item.priority?.toLowerCase() || 'medium',
+    status: 'open',
+    crm_sync_status: 'pending',
+    created_at: now,
+    updated_at: now,
+    transcript_at_ms: Number.isInteger(item.transcriptAtMs) && item.transcriptAtMs >= 0
+      ? item.transcriptAtMs : null,
+  }));
+  const { data, error } = await supabase.from('action_items').insert(rows).select();
+  if (!error) return { items: data, created: true };
+  if (error.code === '23505') {
+    const { data: committed, error: retryError } = await read();
+    if (retryError) throw retryError;
+    if (committed.some((item) => item.id === rows[0].id)) return { items: committed, created: false };
   }
-  return saved;
+  throw error;
+}
+
+async function createMeetingWithActions(meeting, actionItems) {
+  const { error: insertError } = await supabase.from('meetings').insert({ ...meeting, summary: null });
+  if (insertError) throw insertError;
+
+  try {
+    const { items: savedActions } = await saveActionItems(meeting, actionItems);
+    const { data, error } = await supabase.from('meetings').update({ summary: meeting.summary })
+      .eq('id', meeting.id).eq('org_id', meeting.org_id).is('summary', null).select().maybeSingle();
+    if (error) throw error;
+    if (!data) throw new Error('Meeting changed while saving its minutes');
+    return { meeting: data, actionItems: savedActions };
+  } catch (error) {
+    log.error('Could not finish imported meeting minutes', { meetingId: meeting.id, error: error.message });
+    const failure = new Error('The transcript is saved. Open the meeting to try writing the minutes again.');
+    failure.meetingId = meeting.id;
+    throw failure;
+  }
 }
 
 /**
@@ -1035,6 +1040,9 @@ async function saveActionItems(meetingId, actionItems) {
  * Non-blocking — errors are logged but never thrown.
  */
 function firePostProcessing(savedMeeting, summaryData, savedActionItems, ctx = {}) {
+  // Existing commitments can be included in the recap without reassigning them
+  // or replaying action-created notifications and exports.
+  const newActions = ctx.actionsCreated === false ? [] : savedActionItems;
   // Fire-and-forget with top-level .catch() to prevent unhandled rejections
   (async () => {
     try {
@@ -1066,7 +1074,7 @@ function firePostProcessing(savedMeeting, summaryData, savedActionItems, ctx = {
           metadata: { meetingId: savedMeeting.id },
         });
 
-        const highPriItems = savedActionItems.filter(i => i.priority === 'high');
+        const highPriItems = newActions.filter(i => i.priority === 'high');
         if (highPriItems.length > 0) {
           const taskMsg = highPriItems.map(i =>
             `🔴 ${i.task_description} → ${i.assigned_to_name || 'Unassigned'} (due ${i.due_date || 'TBD'})`
@@ -1080,7 +1088,7 @@ function firePostProcessing(savedMeeting, summaryData, savedActionItems, ctx = {
         }
 
         const workspaceId = process.env.ECOSYSTEM_PULSE_WORKSPACE_ID;
-        if (workspaceId && savedActionItems.length > 0) {
+        if (workspaceId && newActions.length > 0) {
           await bridge.sendEvent('pulse', {
             eventType: 'meeting.action_items_extracted',
             entityType: 'meeting',
@@ -1088,7 +1096,7 @@ function firePostProcessing(savedMeeting, summaryData, savedActionItems, ctx = {
             data: {
               workspaceId,
               meetingTitle: savedMeeting.title,
-              actionItems: savedActionItems.map(item => ({
+              actionItems: newActions.map(item => ({
                 id: item.id,
                 description: item.task_description,
                 assignee: item.assigned_to_name || item.assigned_to_email || null,
@@ -1103,7 +1111,8 @@ function firePostProcessing(savedMeeting, summaryData, savedActionItems, ctx = {
       if (bridge.isConnected('logos_vision')) {
         await bridge.syncMeetingToLogosVision({
           meeting: savedMeeting,
-          actionItems: savedActionItems,
+          actionItems: newActions,
+          actionItemCount: savedActionItems.length,
         });
 
         const attendees = savedMeeting.attendees || [];
@@ -1155,7 +1164,7 @@ function firePostProcessing(savedMeeting, summaryData, savedActionItems, ctx = {
     }
 
     // Agents + meeting/action-item workflow triggers (never throws)
-    await meetingEvents.handleMeetingProcessed(savedMeeting, savedActionItems);
+    await meetingEvents.handleMeetingProcessed(savedMeeting, newActions);
   })().catch(err => {
     log.error('Post-processing unexpected error:', err.message || err);
   });
@@ -1211,15 +1220,20 @@ router.post('/:id/reprocess', userOrServiceAuth, async (req, res) => {
       .select('*')
       .eq('id', id)
       .eq('org_id', orgId)
-      .single();
+      .maybeSingle();
 
-    if (error || !meeting) {
+    if (error) throw error;
+    if (!meeting) {
       return res.status(404).json({ error: 'Meeting not found' });
     }
 
-    // Already fully processed?
-    if (meeting.summary && meeting.key_points?.length > 0) {
+    // A completed extraction can legitimately have no key points or actions.
+    if (meeting.summary && !meeting.recording_job?.summaryError) {
       return res.json({ success: true, alreadyProcessed: true, meetingId: id });
+    }
+
+    if (meeting.recording_job?.status === 'transcribing') {
+      return res.status(409).json({ error: 'This meeting is still being processed. Try again when it finishes.' });
     }
 
     if (!ai.isConfigured()) {
@@ -1264,7 +1278,7 @@ router.post('/:id/reprocess', userOrServiceAuth, async (req, res) => {
       topics: summaryData.topics || [],
       ...summaryTemplates.summaryFields(summaryData),
       duration_minutes: meeting.duration_minutes || parseDuration(summaryData.estimatedDuration),
-      updated_at: new Date().toISOString(),
+      updated_at: new Date(Math.max(Date.now(), (Date.parse(meeting.updated_at) || 0) + 1)).toISOString(),
     };
     if (segments) {
       updateData.summary_moments = transcriptMoments.summaryMoments(segments, updateData.key_points, updateData.decisions);
@@ -1278,16 +1292,25 @@ router.post('/:id/reprocess', userOrServiceAuth, async (req, res) => {
       updateData.recording_job = { ...meeting.recording_job, summaryError: null };
     }
 
-    await supabase.from('meetings').update(updateData).eq('id', id);
-
-    // Save action items
-    const savedActionItems = await saveActionItems(id, actionItems);
-
-    // Build the updated meeting object for post-processing
-    const updatedMeeting = { ...meeting, ...updateData };
+    // Do not mark the minutes complete until the whole action batch is durable.
+    const { items: savedActionItems, created: actionsCreated } = await saveActionItems(meeting, actionItems);
+    let save = supabase.from('meetings').update(updateData).eq('id', id).eq('org_id', orgId);
+    save = meeting.updated_at == null ? save.is('updated_at', null) : save.eq('updated_at', meeting.updated_at);
+    const { data: updatedMeeting, error: saveError } = await save.select().maybeSingle();
+    if (saveError) throw saveError;
+    if (!updatedMeeting) {
+      const { data: latest, error: readError } = await supabase.from('meetings').select('summary, recording_job')
+        .eq('id', id).eq('org_id', orgId).maybeSingle();
+      if (readError) throw readError;
+      if (latest?.summary && !latest.recording_job?.summaryError) {
+        return res.json({ success: true, alreadyProcessed: true, meetingId: id });
+      }
+      return res.status(409).json({ error: 'The meeting changed while loading its minutes. Try again.' });
+    }
 
     // Fire async post-processing (embeddings + ecosystem sync + calendar auto-sync)
     firePostProcessing(updatedMeeting, summaryData, savedActionItems, {
+      actionsCreated,
       userId: req.user?.id,
       calendarTokens: getCalendarTokens(req)
     });
@@ -1301,7 +1324,7 @@ router.post('/:id/reprocess', userOrServiceAuth, async (req, res) => {
     });
   } catch (err) {
     log.error('Reprocess error:', err);
-    res.status(500).json({ error: 'Failed to reprocess meeting' });
+    res.status(500).json({ error: 'Could not finish writing the meeting minutes. Try again.' });
   }
 });
 

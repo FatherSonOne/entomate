@@ -24,6 +24,8 @@ const MEETING_B = '00000000-0000-4000-8000-0000000000e2';
 // ── In-memory fake of the subset of supabase-js these modules use ──────────
 const mockDb = {};
 let mockInsertError = null;
+let mockActionInsertError = null;
+let mockMeetingUpdateError = null;
 
 function mockMakeQuery(table) {
   const filters = [];
@@ -40,11 +42,28 @@ function mockMakeQuery(table) {
         mockInsertError = null;
         return { error: err };
       }
+      if (mockActionInsertError && table === 'action_items') {
+        const error = mockActionInsertError;
+        mockActionInsertError = null;
+        return { error };
+      }
+      if (Array.isArray(payload)) {
+        if (payload.some((item) => rows.some((row) => row.id === item.id))) {
+          return { error: { code: '23505', message: 'duplicate key' } };
+        }
+        rows.push(...payload);
+        return { rows: payload };
+      }
       const row = { id: payload.id || `gen-${rows.length + 1}`, ...payload };
       rows.push(row);
       return { rows: [row] };
     }
     if (mode === 'update') {
+      if (mockMeetingUpdateError && table === 'meetings') {
+        const error = mockMeetingUpdateError;
+        mockMeetingUpdateError = null;
+        return { error };
+      }
       const hit = rows.filter(matches);
       hit.forEach((r) => Object.assign(r, payload));
       return { rows: hit };
@@ -90,7 +109,7 @@ function mockMakeQuery(table) {
     range(a, b) { range = [a, b]; return q; },
     maybeSingle() {
       const { rows, error } = run();
-      return Promise.resolve(error ? { data: null, error } : { data: rows[0] || null, error: null });
+      return Promise.resolve(error ? { data: null, error } : { data: rows[0] ? { ...rows[0] } : null, error: null });
     },
     single() {
       const { rows, error } = run();
@@ -176,6 +195,8 @@ const flush = () => new Promise((r) => setImmediate(r));
 beforeEach(() => {
   jest.clearAllMocks();
   mockInsertError = null;
+  mockActionInsertError = null;
+  mockMeetingUpdateError = null;
   ai.isConfigured.mockReturnValue(true);
   mockDb.bot_sessions = [{
     id: SESSION, org_id: ORG_A, meeting_id: BOT_MEETING, platform: 'zoom',
@@ -287,6 +308,23 @@ describe('ingestBotTranscript', () => {
     const meeting = mockDb.meetings.find((m) => m.id === BOT_MEETING);
     expect(meeting.summary).toBeNull();
     expect(meeting.transcript_segments).toHaveLength(3);
+  });
+
+  test('a failed action batch keeps the bot transcript and can finish from the meeting page', async () => {
+    mockFetchJson(RECALL_TRANSCRIPT);
+    mockActionInsertError = { code: '23514', message: 'action write failed' };
+    await ingest.ingestBotTranscript(SESSION, { transcriptUrl: 'https://recall.example/t.json' });
+    const meeting = mockDb.meetings.find((row) => row.id === BOT_MEETING);
+    expect(meeting.transcript_segments).toHaveLength(3);
+    expect(meeting).toMatchObject({ summary: null, recording_job: { status: 'done', summaryError: 'Could not save the meeting action items' } });
+    expect(mockDb.action_items).toEqual([]);
+    expect(meetingEvents.handleMeetingProcessed).not.toHaveBeenCalled();
+
+    const app = express().use('/api/meetings', require('../routes/meetings'));
+    await request(app).post('/api/meetings/' + BOT_MEETING + '/reprocess').set('x-test-user', MEMBER).expect(200);
+    expect(meeting.recording_job.summaryError).toBeNull();
+    expect(mockDb.action_items).toHaveLength(1);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
   test('a transcript with no speech creates no meeting', async () => {
@@ -417,6 +455,108 @@ describe('meeting routes are org-scoped', () => {
     expect(mockDb.meetings.find((m) => m.id === MEETING_A).title).toBe('A');
   });
 
+  describe('action item extraction retries', () => {
+    const reprocess = (id = MEETING_A, user = MEMBER) =>
+      request(app).post('/api/meetings/' + id + '/reprocess').set(as(user));
+
+    test('reuses legacy commitments even when new AI wording changes', async () => {
+      const retained = {
+        id: 'retained', meeting_id: MEETING_A, org_id: ORG_A, task_description: 'Approved copy',
+        status: 'done', assigned_to_name: 'Mira', due_date: '2026-11-30',
+        completed_at: '2026-11-22T16:00:00.000Z', transcript_at_ms: 5000, crm_task_id: 'external-reference',
+      };
+      mockDb.action_items = [retained];
+      const first = await reprocess().expect(200);
+      expect(first.body.actionItemCount).toBe(1);
+      const replay = await reprocess().expect(200);
+      expect(replay.body.alreadyProcessed).toBe(true);
+      expect(mockDb.action_items).toEqual([retained]);
+      expect(ai.extractActionItems).toHaveBeenCalledTimes(1);
+      await flush();
+      expect(meetingEvents.handleMeetingProcessed).toHaveBeenCalledWith(expect.objectContaining({ id: MEETING_A }), []);
+    });
+
+    test('zero key points and zero actions is a completed extraction', async () => {
+      ai.generateSummary.mockResolvedValueOnce({ summary: 'No follow-up.', keyPoints: [] });
+      ai.extractActionItems.mockResolvedValueOnce([]);
+      const first = await reprocess().expect(200);
+      expect(first.body.actionItemCount).toBe(0);
+      const replay = await reprocess().expect(200);
+      expect(replay.body.alreadyProcessed).toBe(true);
+      expect(ai.extractActionItems).toHaveBeenCalledTimes(1);
+    });
+
+    test('an extraction failure leaves the transcript eligible for retry', async () => {
+      ai.extractActionItems.mockRejectedValueOnce(new Error('provider failed'));
+      await reprocess().expect(500);
+      expect(mockDb.meetings[0].summary).toBeUndefined();
+      expect(mockDb.action_items).toEqual([]);
+      await reprocess().expect(200);
+      expect(mockDb.action_items).toHaveLength(1);
+    });
+
+    test('failed batch writes never publish ghost action items', async () => {
+      mockActionInsertError = { code: '23514', message: 'Invalid action item' };
+      ai.extractActionItems.mockResolvedValueOnce([{ task: 'One' }, { task: 'Two' }]);
+      await reprocess().expect(500);
+      expect(mockDb.meetings[0].summary).toBeUndefined();
+      expect(mockDb.action_items).toEqual([]);
+      await flush();
+      expect(meetingEvents.handleMeetingProcessed).not.toHaveBeenCalled();
+      await reprocess().expect(200);
+      expect(mockDb.action_items).toHaveLength(1);
+    });
+
+    test('retry after the summary write failed keeps committed actions and their edits', async () => {
+      mockMeetingUpdateError = { message: 'write failed' };
+      ai.extractActionItems.mockResolvedValueOnce([{ task: 'One' }, { task: 'Two' }]);
+      await reprocess().expect(500);
+      expect(mockDb.meetings[0].summary).toBeUndefined();
+      expect(mockDb.action_items).toHaveLength(2);
+      Object.assign(mockDb.action_items[0], { task_description: 'User changed this', status: 'done' });
+      const retained = structuredClone(mockDb.action_items);
+      await reprocess().expect(200);
+      expect(mockDb.action_items).toEqual(retained);
+    });
+
+    test('concurrent requests publish one batch and only the completed meeting event', async () => {
+      let ready = 0;
+      let release;
+      const bothReady = new Promise((resolve) => { release = resolve; });
+      const waitForOther = (actions) => async () => {
+        if (++ready === 2) release();
+        await bothReady;
+        return actions;
+      };
+      ai.extractActionItems
+        .mockImplementationOnce(waitForOther([{ task: 'Send quote' }, { task: 'Confirm delivery' }]))
+        .mockImplementationOnce(waitForOther([{ task: 'Email the quote' }, { task: 'Verify arrival' }]));
+      const results = await Promise.all([reprocess().expect(200), reprocess().expect(200)]);
+      expect(results.filter(({ body }) => body.alreadyProcessed)).toHaveLength(1);
+      expect(mockDb.action_items).toHaveLength(2);
+      expect(mockDb.action_items.map((item) => item.task_description).join('|')).toMatch(/^(Send quote\|Confirm delivery|Email the quote\|Verify arrival)$/);
+      await flush();
+      expect(meetingEvents.handleMeetingProcessed).toHaveBeenCalledTimes(1);
+    });
+
+    test('never processes another workspace meeting', async () => {
+      await reprocess(MEETING_A, OUTSIDER).expect(404);
+      expect(ai.extractActionItems).not.toHaveBeenCalled();
+    });
+
+    test('initial transcript import reports a failed batch with a recoverable meeting ID', async () => {
+      mockActionInsertError = { message: 'action write failed' };
+      const first = await request(app).post('/api/meetings/transcript').set(as(MEMBER))
+        .send({ title: 'Imported', transcript: 'Ann agreed to send the deck.' }).expect(500);
+      const imported = mockDb.meetings.find((meeting) => meeting.id === first.body.meetingId);
+      expect(imported).toMatchObject({ transcript: 'Ann agreed to send the deck.', summary: null });
+      expect(mockDb.action_items).toHaveLength(0);
+      await reprocess(imported.id).expect(200);
+      expect(mockDb.action_items).toHaveLength(1);
+      expect(mockDb.action_items[0].meeting_id).toBe(imported.id);
+    });
+  });
+
   test('a member reads their own meeting, segments included', async () => {
     const res = await request(app).get(`/api/meetings/${MEETING_A}`).set(as(MEMBER));
     expect(res.status).toBe(200);
@@ -430,8 +570,9 @@ describe('meeting routes are org-scoped', () => {
   });
 
   test("an outsider cannot toggle another org's action item", async () => {
-    mockDb.action_items = [{ id: 'ai-1', meeting_id: MEETING_A, status: 'open' }];
-    const res = await request(app).patch('/api/meetings/action-items/ai-1').set(as(OUTSIDER)).send({ status: 'done' });
+    const id = '00000000-0000-4000-8000-0000000000f1';
+    mockDb.action_items = [{ id, meeting_id: MEETING_A, org_id: ORG_A, status: 'open' }];
+    const res = await request(app).patch('/api/meetings/action-items/' + id).set(as(OUTSIDER)).send({ status: 'done' });
     expect(res.status).toBe(404);
     expect(mockDb.action_items[0].status).toBe('open');
   });

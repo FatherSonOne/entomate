@@ -2342,46 +2342,62 @@ div.bs-proj-empty p { margin: 0; }
 .bs-proj-cap { padding-top: 14px; }
 .bs-proj-ro .bs-readout:first-child { padding-top: 0; }
 
-/* Display: head, deadlines timeline, project tape */
+/* Project schedules use one date scale and separate work counts. */
+.bs-proj-disp { --proj-label-width: min(42%, 232px); container-type: inline-size; }
 .bs-proj-disp-head { display: flex; justify-content: space-between; align-items: center; gap: 8px 14px; flex-wrap: wrap; }
-.bs-proj-disp-head .bs-lbl { color: var(--bs-d-mut); }
+.bs-proj-disp-head .bs-lbl { margin: 0; color: var(--bs-d-ink); }
 .bs-proj-disp-head .bs-sig { color: var(--bs-d-ink); }
 .bs-proj-disp-empty { margin: 18px 0 4px; font: 500 12.5px/1.5 var(--bs-mono); color: var(--bs-d-mut); }
-.bs-proj-tl { position: relative; margin-top: 14px; padding-bottom: 16px; }
-.bs-proj-tl-row, .bs-proj-tl-over { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 14px; align-items: center; }
-.bs-proj-tl-row { padding: 7px 0; border-top: 1px solid var(--bs-d-rule); }
-.bs-proj-tl-ax { border-top: 0; padding: 0 0 4px; }
-.bs-proj-tl-over { position: absolute; inset: 0 0 0 0; pointer-events: none; }
-.bs-proj-tl-over .bs-proj-tl-trk { height: 100%; }
-.bs-proj-tl-nm { font-size: 12.5px; color: var(--bs-d-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bs-proj-tl-trk { position: relative; height: 14px; min-width: 0; }
-.bs-proj-tl-ax .bs-proj-tl-trk { height: 14px; }
-.bs-proj-tl-m { position: absolute; top: 0; padding-left: 6px; border-left: 1px solid var(--bs-d-rule); font: 500 10px/14px var(--bs-mono); letter-spacing: 0.1em; color: var(--bs-d-mut); }
-.bs-proj-tl-bar { position: absolute; top: 3px; height: 8px; border-radius: 2px; background: #3f3f3d; overflow: hidden; }
-.bs-proj-tl-bar > i { display: block; height: 100%; background: #8a8a85; }
-.bs-proj-tl-end { position: absolute; top: -1px; width: 2px; height: 16px; margin-left: -1px; background: var(--bs-d-ink); }
-.bs-proj-tl-late { position: absolute; top: 2px; width: 10px; height: 10px; margin-left: 6px; border-radius: 50%; background: var(--bs-d-brand); box-shadow: 0 0 6px var(--bs-d-brand); text-decoration: none; }
-.bs-proj-tl-now { position: absolute; top: 0; bottom: -16px; width: 2px; margin-left: -1px; background: var(--bs-d-live); box-shadow: 0 0 8px var(--bs-d-live); }
-.bs-proj-tl-now > span { position: absolute; bottom: 0; left: 6px; font: 600 9.5px var(--bs-mono); letter-spacing: 0.1em; color: var(--bs-d-live); }
-
-.bs-proj-cd { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-top: 12px; }
-.bs-proj-cd .bs-disp-big { color: var(--bs-d-ink); font-variant-numeric: tabular-nums; }
-.bs-proj-cd .bs-lbl { color: var(--bs-d-mut); }
-.bs-proj-tape { position: relative; height: 96px; margin-top: 16px; }
-.bs-proj-tape-base { position: absolute; left: 0; right: 0; top: 52px; height: 8px; border-radius: 2px; background: #2c2c2b; overflow: hidden; }
-.bs-proj-tape-base > i { display: block; height: 100%; background: #8a8a85; }
-.bs-proj-tape-mk { position: absolute; top: 14px; bottom: 24px; width: 2px; margin-left: -1px; background: #cfcfca; }
-.bs-proj-tape-mk.up { opacity: 0.4; }
-.bs-proj-tape-mk > span { position: absolute; top: -14px; left: 4px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; font: 500 9.5px var(--bs-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--bs-d-mut); white-space: nowrap; }
-.bs-proj-tape-dec { position: absolute; left: 3px; top: 26px; width: 3px; height: 22px; border-radius: 1px; background: var(--bs-d-brand); }
-.bs-proj-tape-now { position: absolute; top: 6px; bottom: 6px; width: 2px; margin-left: -1px; background: var(--bs-d-live); box-shadow: 0 0 8px var(--bs-d-live); }
-.bs-proj-tape-now > span { position: absolute; bottom: -4px; left: 6px; font: 600 9.5px var(--bs-mono); letter-spacing: 0.1em; color: var(--bs-d-live); }
-.bs-proj-tape-st, .bs-proj-tape-end { position: absolute; bottom: 0; font: 500 9.5px var(--bs-mono); letter-spacing: 0.1em; }
-.bs-proj-tape-st { left: 0; color: var(--bs-d-mut); }
-.bs-proj-tape-end { right: 0; color: var(--bs-d-ink); }
+.bs-proj-scale-meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 16px; margin: 14px 0 10px; color: var(--bs-d-mut); font: 500 11px/1.5 var(--bs-mono); }
+.bs-proj-scale-meta > :last-child { color: var(--bs-d-live); }
+.bs-proj-axis { height: 22px; margin-left: calc(var(--proj-label-width) + 18px); position: relative; }
+.bs-proj-axis-tick { position: absolute; bottom: 0; height: 6px; border-left: 1px solid var(--bs-d-rule); }
+.bs-proj-axis-tick > span { position: absolute; bottom: 6px; white-space: nowrap; font: 500 10px/1.3 var(--bs-mono); color: var(--bs-d-mut); }
+.bs-proj-schedule-rows, .bs-proj-undated ul { list-style: none; margin: 0; padding: 0; }
+.bs-proj-schedule-row { display: grid; grid-template-columns: var(--proj-label-width) minmax(0, 1fr); align-items: center; gap: 18px; border-top: 1px solid var(--bs-d-rule); padding: 10px 0; color: var(--bs-d-ink); text-decoration: none; }
+.bs-proj-schedule-row:hover { background: rgba(255, 255, 255, .04); }
+.bs-proj-schedule-row:focus-visible, .bs-proj-display-link:focus-visible, .bs-proj-undated summary:focus-visible { outline: 2px solid var(--bs-d-live); outline-offset: -2px; }
+.bs-proj-schedule-info, .bs-proj-schedule-work, .bs-proj-detail-schedule { display: grid; gap: 4px; min-width: 0; }
+.bs-proj-schedule-info > strong { font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.bs-proj-dates, .bs-proj-measures { color: var(--bs-d-mut); font: 500 11px/1.5 var(--bs-mono); }
+.bs-proj-measures { display: flex; gap: 2px 12px; flex-wrap: wrap; }
+.bs-proj-due-late { color: var(--bs-d-brand); }
+.bs-proj-track { display: block; height: 20px; position: relative; background: linear-gradient(var(--bs-d-rule), var(--bs-d-rule)) center / 100% 1px no-repeat; }
+.bs-proj-track > i { position: absolute; width: 1px; }
+.bs-proj-gridline { inset-block: 0; background: var(--bs-d-rule); }
+.bs-proj-track > .bs-proj-today { inset-block: 0; width: 2px; margin-left: -1px; background: var(--bs-d-live); z-index: 1; }
+.bs-proj-track > .bs-proj-span { top: 7px; height: 6px; background: #868681; border-radius: 2px; }
+.bs-proj-track > .bs-proj-end { inset-block: 4px; width: 2px; margin-left: -1px; background: var(--bs-d-ink); z-index: 2; }
+.bs-proj-track > .bs-proj-end.late { background: var(--bs-d-brand); }
+.bs-proj-schedule-more, .bs-proj-undated { border-top: 1px solid var(--bs-d-rule); padding-top: 10px; margin-top: 4px; color: var(--bs-d-mut); font-size: 12px; }
+.bs-proj-schedule-more { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 6px 12px; }
+.bs-proj-display-link { padding: 2px; border: 0; background: transparent; color: var(--bs-d-ink); cursor: pointer; font: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.bs-proj-undated summary { cursor: pointer; color: var(--bs-d-ink); }
+.bs-proj-undated li { display: flex; flex-wrap: wrap; gap: 2px 10px; padding-top: 6px; }
+.bs-proj-detail-schedule { margin-top: 12px; }
+.bs-proj-detail-schedule .bs-proj-dates { color: var(--bs-d-ink); font-size: 15px; }
+.bs-proj-detail-schedule ~ .bs-proj-axis { margin-left: 0; }
+.bs-proj-disp-head ~ .bs-proj-display-link { margin-top: 8px; font-size: 12px; }
+.bs-proj-tape { height: 27px; }
+.bs-proj-tape-mk { position: absolute; top: 1px; height: 8px; width: 2px; margin-left: -1px; background: #cfcfca; }
+.bs-proj-tape-mk.up { opacity: .55; }
+.bs-proj-tape-mk > span { position: absolute; top: 10px; left: 4px; max-width: 108px; overflow: hidden; text-overflow: ellipsis; font: 500 10px var(--bs-mono); color: var(--bs-d-mut); white-space: nowrap; }
+.bs-proj-tape-dec { position: absolute; left: 3px; height: 8px; width: 2px; background: var(--bs-d-brand); }
+@container (max-width: 480px) {
+  .bs-proj-axis { margin-left: 0; }
+  .bs-proj-axis-tick:nth-child(even):not(:last-child) > span { display: none; }
+  .bs-proj-schedule-row { grid-template-columns: 1fr; gap: 6px; }
+}
 .bs-proj-nodisp { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 4px 0; }
 .bs-proj-nodisp p, .bs-proj-desc { margin: 0; font-size: 15px; line-height: 1.6; max-width: 62ch; }
 .bs-proj-desc { margin-top: 16px; color: var(--bs-ink2); }
+.bs-proj-brief { margin-top: 26px; }
+.bs-proj-brief-fields { display: grid; gap: 12px; margin: 14px 0 8px; }
+.bs-proj-brief-fields > div { display: grid; grid-template-columns: 128px minmax(0, 1fr); gap: 4px 14px; align-items: baseline; }
+.bs-proj-brief-fields dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.bs-proj-brief-fields ul { margin: 0; padding: 0; list-style: none; }
+.bs-proj-brief-fields li + li { margin-top: 4px; }
+.bs-proj-brief-error { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
 
 /* Projects table */
 .bs-proj-filter button { white-space: nowrap; padding: 0 9px; }
@@ -2450,13 +2466,11 @@ a.bs-proj-pt:focus-visible { outline: 2px solid var(--bs-brand); outline-offset:
 @media (hover: none) { .bs-proj-unlink { opacity: 1; } }
 @media (max-width: 767.98px) {
   .bs-proj-row2 { margin-top: 30px; }
+  .bs-proj-brief-fields > div { grid-template-columns: minmax(0, 1fr); }
   .bs-proj-ro { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 14px; padding-top: 24px; }
   .bs-proj-ro .bs-readout { padding: 0; border-bottom: 0; }
   .bs-proj-ro .bs-readout b { font-size: 24px; }
   .bs-proj-ro .bs-readout-ctx { font-size: 11.5px; }
-  .bs-proj-tl-row, .bs-proj-tl-over { grid-template-columns: 86px minmax(0, 1fr); gap: 8px; }
-  .bs-proj-tl-nm { font-size: 11.5px; }
-  .bs-proj-tl-m { font-size: 9px; padding-left: 3px; }
   .bs-proj-pt { grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: start; }
   .bs-proj-pt.head { display: none; }
   .bs-proj-pt-sub { display: none; }
@@ -2466,7 +2480,6 @@ a.bs-proj-pt:focus-visible { outline: 2px solid var(--bs-brand); outline-offset:
   .bs-proj-filter { width: 100%; }
   .bs-proj-filter button { flex: 1; padding: 0 4px; }
   .bs-proj-mt { grid-template-columns: 44px minmax(0, 1fr) auto; }
-  .bs-proj-tape-now > span { bottom: auto; top: -4px; }
 }
 
 /* ── Bot: send, live, debrief (bot Slate pass, mix M) ── */

@@ -193,9 +193,12 @@ Rules:
 
       const text = response.choices[0].message.content;
       const result = JSON.parse(text);
-      log.info(`Extracted ${result.actionItems?.length || 0} action items`);
-
-      return result.actionItems || [];
+      if (!Array.isArray(result?.actionItems) ||
+          result.actionItems.some((item) => typeof item?.task !== 'string' || !item.task.trim())) {
+        throw new Error('AI returned an invalid action item list');
+      }
+      log.info('Extracted action items', { count: result.actionItems.length });
+      return result.actionItems;
     } catch (error) {
       log.error('Action items error:', { error: error.message || error });
       throw new Error(`Action item extraction failed: ${error.message}`);

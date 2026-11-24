@@ -382,6 +382,19 @@ describe('RecordingStatus', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
+  test('a transcript import exposes a failed retry and can recover', async () => {
+    meetings.reprocess.mockRejectedValueOnce(new Error('Request failed')).mockResolvedValueOnce({ success: true })
+    const onRefresh = vi.fn()
+    render(<RecordingStatus meetingId="import" recordingJob={null} hasTranscript onRefresh={onRefresh} />)
+    const retry = screen.getByRole('button', { name: /write the summary/i })
+    fireEvent.click(retry)
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+    expect(onRefresh).not.toHaveBeenCalled()
+    fireEvent.click(retry)
+    await waitFor(() => expect(onRefresh).toHaveBeenCalledTimes(1))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
   test('an unstopped recording offers to transcribe the saved audio', async () => {
     api.salvage.mockResolvedValue({ status: 'transcribing' })
     const onRefresh = vi.fn()

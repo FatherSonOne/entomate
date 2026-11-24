@@ -27,6 +27,8 @@ export interface RecordingStatusProps {
   onRefresh: () => void
   /** The meeting already has a summary (so an old summary failure no longer matters). */
   hasSummary?: boolean
+  /** A saved transcript can be used to recover minutes from non-recorder imports. */
+  hasTranscript?: boolean
   /** For the writing loader's title line and its placeholder speakers. */
   title?: string | null
   attendees?: unknown
@@ -35,7 +37,7 @@ export interface RecordingStatusProps {
 export const POLL_MS = 5000
 
 
-export function RecordingStatus({ meetingId, recordingJob, onRefresh, hasSummary = false, title, attendees }: RecordingStatusProps): React.ReactElement | null {
+export function RecordingStatus({ meetingId, recordingJob, onRefresh, hasSummary = false, hasTranscript = false, title, attendees }: RecordingStatusProps): React.ReactElement | null {
   const job = toRecordingJob(recordingJob)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -49,8 +51,8 @@ export function RecordingStatus({ meetingId, recordingJob, onRefresh, hasSummary
     return () => window.clearInterval(timer)
   }, [waiting, onRefresh])
 
-  const summaryMissing = job?.status === 'done' && !!job.summaryError && !hasSummary
-  if (!job || (job.status === 'done' && !summaryMissing)) return null
+  const summaryMissing = !hasSummary && ((!job && hasTranscript) || (job?.status === 'done' && !!job.summaryError))
+  if (!summaryMissing && (!job || job.status === 'done')) return null
 
   const act = async (fn: (id: string) => Promise<void>): Promise<void> => {
     setBusy(true)
@@ -81,12 +83,12 @@ export function RecordingStatus({ meetingId, recordingJob, onRefresh, hasSummary
       {summaryMissing ? (
         <>
           <Signal tone="brand">No summary</Signal>
-          <p className="bs-recstat-text">The transcript is saved, but the summary, decisions and action items could not be written.</p>
+          <p className="bs-recstat-text">The transcript is saved. Try writing the minutes again to finish the summary and action items.</p>
           <Key disabled={busy} onClick={() => void act(rewriteSummary)} icon={icon}>
             Write the summary
           </Key>
         </>
-      ) : job.status === 'backup' ? (
+      ) : job?.status === 'backup' ? (
         <>
           <Signal tone="brand">Backup</Signal>
           <p className="bs-recstat-text">
@@ -97,7 +99,7 @@ export function RecordingStatus({ meetingId, recordingJob, onRefresh, hasSummary
             Use my recording instead
           </Key>
         </>
-      ) : job.status === 'recording' ? (
+      ) : job?.status === 'recording' ? (
         <>
           <Signal tone="brand">Not stopped</Signal>
           <p className="bs-recstat-text">
@@ -110,9 +112,9 @@ export function RecordingStatus({ meetingId, recordingJob, onRefresh, hasSummary
         </>
       ) : (
         <>
-          <Signal tone="brand">{job.status === 'failed' ? 'Failed' : 'Stopped'}</Signal>
+          <Signal tone="brand">{job?.status === 'failed' ? 'Failed' : 'Stopped'}</Signal>
           <p className="bs-recstat-text">
-            {job.status === 'failed'
+            {job?.status === 'failed'
               ? job.error || 'The transcript could not be written.'
               : 'Writing the transcript stopped before it finished.'}
           </p>

@@ -571,6 +571,7 @@ async function transcribeMeeting(meetingId) {
     const speakers = [...new Set(segments.map((s) => s.speaker))];
 
     await markStage(meeting, 'saving');
+    const savedActions = await meetingFinish.saveMinutesActions(meeting, minutes);
     const now = new Date().toISOString();
     const durationMs = job.durationMs || 0;
     const startMs = Date.parse(meeting.start_time || job.startedAt || now);
@@ -597,7 +598,7 @@ async function transcribeMeeting(meetingId) {
       .single();
     if (error) throw error;
 
-    await meetingFinish.publishMinutes(supabase, saved, minutes, { userId: job.startedBy || meeting.created_by || null });
+    meetingFinish.publishMinutes(saved, minutes, savedActions, { userId: job.startedBy || meeting.created_by || null });
 
     log.info('Recording transcribed', { meetingId, lines: segments.length, speakers: speakers.length });
     return { status: 'done', lines: segments.length };

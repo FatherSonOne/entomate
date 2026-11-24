@@ -145,18 +145,6 @@ export function endsLabel(end: string | null | undefined, now = new Date()): str
   return `Ended ${-left} ${left === -1 ? 'day' : 'days'} ago`
 }
 
-/** Countdown to the end of the end date: "9d 04:40". Null once it has passed or without a date. */
-export function countdown(end: string | null | undefined, now = new Date()): string | null {
-  const d = parseDay(end ?? null)
-  if (!d) return null
-  const ms = startOfDay(d).getTime() + DAY_MS - now.getTime()
-  if (ms <= 0) return null
-  const days = Math.floor(ms / DAY_MS)
-  const h = Math.floor((ms % DAY_MS) / 3_600_000)
-  const m = Math.floor((ms % 3_600_000) / 60_000)
-  return `${days}d ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-}
-
 export function plural(n: number, word: string): string {
   return `${n} ${word}${n === 1 ? '' : 's'}`
 }
@@ -206,53 +194,131 @@ export function listSummary(list: ReadonlyArray<ProjectRow>, now = new Date()): 
 export interface TimelineRow {
   id: string
   name: string
-  startPct: number
+  schedule: ProjectSchedule
+  startPct: number | null
   endPct: number
-  /** Width of the done part, as a share of the bar. */
-  donePct: number
+  done: number
+  total: number
   late: number
 }
 
-export interface Timeline {
-  months: Array<{ key: string; label: string; pct: number }>
-  rows: TimelineRow[]
-  nowPct: number | null
+export interface ProjectSchedule {
+  start: number | null
+  end: number | null
+  dateLabel: string
+  duration: number | null
+  elapsed: number | null
+  deadline: string | null
+  overdue: boolean
+  reversed: boolean
 }
 
 const clampPct = (v: number): number => Math.max(0, Math.min(100, v))
 
-/** Every live (active or planning) project with an end date, as a track from start to end with a NOW line. */
-export function timeline(list: ReadonlyArray<ProjectRow>, now = new Date(), maxRows = 6): Timeline | null {
-  const live = list
-    .filter((p) => filterGroup(p) !== 'done' && parseDay(p.end_date ?? null))
-    .sort((a, b) => (parseDay(a.end_date ?? null)?.getTime() ?? 0) - (parseDay(b.end_date ?? null)?.getTime() ?? 0))
-    .slice(0, maxRows)
-  if (live.length === 0) return null
-  const today = startOfDay(now).getTime()
-  const startOf = (p: ProjectRow): number => parseDay(p.start_date ?? null)?.getTime() ?? Math.min(today, parseDay(p.end_date ?? null)!.getTime())
-  const first = new Date(Math.min(today, ...live.map(startOf)))
-  const from = new Date(first.getFullYear(), first.getMonth(), 1).getTime()
-  const lastEnd = new Date(Math.max(today, ...live.map((p) => parseDay(p.end_date ?? null)!.getTime())))
-  const to = new Date(lastEnd.getFullYear(), lastEnd.getMonth() + 1, 1).getTime()
-  const span = to - from
-  const at = (t: number): number => clampPct(((t - from) / span) * 100)
+// Use local calendar dates with equal spacing, including across clock changes.
+function calendarDay(date: Date): number {
+  return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / DAY_MS
+}
 
-  const months: Timeline['months'] = []
-  for (let d = new Date(from); d.getTime() < to; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) {
-    months.push({ key: `${d.getFullYear()}-${d.getMonth()}`, label: d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase(), pct: at(d.getTime()) })
+function storedDay(value: string | null | undefined): number | null {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null
+  const date = Date.parse(value)
+  return Number.isFinite(date) && new Date(date).toISOString().slice(0, 10) === value ? date / DAY_MS : null
+}
+
+const exactDate = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+const tickDate = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
+const tickMonth = new Intl.DateTimeFormat('en-US', { month: 'short', year: '2-digit', timeZone: 'UTC' })
+
+export function projectSchedule(project: ProjectRow, now = new Date()): ProjectSchedule {
+  const start = storedDay(project.start_date)
+  const end = storedDay(project.end_date)
+  const reversed = start != null && end != null && end < start
+  const duration = start != null && end != null && !reversed ? end - start : null
+  const today = calendarDay(now)
+  const elapsed = duration != null && start != null ? Math.max(0, Math.min(duration, today - start)) : null
+  const startLabel = start == null ? 'Start not set' : exactDate.format(start * DAY_MS)
+  const endLabel = end == null ? 'End date not set' : exactDate.format(end * DAY_MS)
+  const dateLabel = `${startLabel} → ${endLabel}`
+  const remaining = end == null ? null : end - today
+  const closed = filterGroup(project) === 'done'
+  const overdue = remaining != null && remaining < 0 && !closed
+  let deadline = null
+  if (remaining != null && !closed) {
+    deadline = remaining === 0 ? 'Due today' : remaining > 0
+      ? `${plural(remaining, 'day')} remaining`
+      : `${plural(-remaining, 'day')} overdue`
   }
-  const rows = live.map((p) => {
-    const r = rollupOf(p)
-    return {
-      id: p.id,
-      name: projectName(p),
-      startPct: at(startOf(p)),
-      endPct: at(parseDay(p.end_date ?? null)!.getTime()),
-      donePct: progressPct(r),
-      late: r.late,
+  return { start, end, dateLabel, duration, elapsed, deadline, overdue, reversed }
+}
+
+export interface ScheduleScale {
+  from: number
+  to: number
+  rangeLabel: string
+  todayLabel: string
+  nowPct: number
+  unit: 'Days' | 'Weeks' | 'Months'
+  ticks: Array<{ day: number; label: string; pct: number }>
+}
+
+function scalePosition(day: number, from: number, to: number): number {
+  return clampPct((day - from) / (to - from) * 100)
+}
+
+function scheduleScale(first: number, last: number, today: number): ScheduleScale {
+  const from = Math.min(today, first)
+  const to = Math.max(today, last, from + 1)
+  const span = to - from
+  const unit = span <= 10 ? 'Days' : span <= 56 ? 'Weeks' : 'Months'
+  const ticks: ScheduleScale['ticks'] = []
+  const addTick = (day: number, format: Intl.DateTimeFormat) => {
+    ticks.push({ day, label: format.format(day * DAY_MS), pct: scalePosition(day, from, to) })
+  }
+  if (unit === 'Months') {
+    const firstMonth = new Date(from * DAY_MS)
+    const lastMonth = new Date(to * DAY_MS)
+    const months = (lastMonth.getUTCFullYear() - firstMonth.getUTCFullYear()) * 12 + lastMonth.getUTCMonth() - firstMonth.getUTCMonth() + 1
+    const step = Math.ceil(months / 6)
+    for (let m = 0; m < months; m += step) {
+      const day = Date.UTC(firstMonth.getUTCFullYear(), firstMonth.getUTCMonth() + m, 1) / DAY_MS
+      if (day >= from) addTick(day, tickMonth)
     }
+  } else {
+    const step = unit === 'Weeks' ? 7 : span > 6 ? 2 : 1
+    const untilMonday = (8 - new Date(from * DAY_MS).getUTCDay()) % 7
+    for (let day = from + (unit === 'Weeks' ? untilMonday : 0); day <= to; day += step) addTick(day, tickDate)
+  }
+  return {
+    from, to, unit, ticks,
+    rangeLabel: `${exactDate.format(from * DAY_MS)} – ${exactDate.format(to * DAY_MS)}`,
+    todayLabel: `Today · ${exactDate.format(today * DAY_MS)}`,
+    nowPct: scalePosition(today, from, to),
+  }
+}
+
+/** A deadline-only row has a marker. A project with no end date stays in its own list. */
+export function timeline(list: ReadonlyArray<ProjectRow>, now = new Date(), maxRows = 6) {
+  const live = list
+    .filter((project) => filterGroup(project) !== 'done')
+    .map((project) => ({ project, schedule: projectSchedule(project, now) }))
+  const undated = live.filter(({ schedule }) => schedule.end == null)
+  const dated = live.flatMap(({ project, schedule }) => schedule.end == null ? [] : [{ project, schedule, end: schedule.end }])
+    .sort((a, b) => a.end - b.end)
+  const shown = dated.slice(0, maxRows)
+  if (shown.length === 0) return { scale: null, rows: [], datedCount: dated.length, undated }
+
+  const scale = scheduleScale(
+    Math.min(...shown.map(({ schedule, end }) => schedule.reversed ? end : schedule.start ?? end)),
+    Math.max(...shown.map(({ end }) => end)), calendarDay(now),
+  )
+  const rows: TimelineRow[] = shown.map(({ project, schedule, end }) => {
+    const r = rollupOf(project)
+    return { id: project.id, name: projectName(project), schedule,
+      startPct: schedule.start == null || schedule.reversed ? null : scalePosition(schedule.start, scale.from, scale.to),
+      endPct: scalePosition(end, scale.from, scale.to), done: r.done, total: r.total, late: r.late }
   })
-  return { months, rows, nowPct: at(today) }
+  return { scale, rows, datedCount: dated.length, undated }
 }
 
 // ── Project page ────────────────────────────────────────────────
@@ -354,45 +420,44 @@ export interface TapeMark { key: string; pct: number; label: string; decisions: 
 const TAPE_LABEL_GAP = 18
 
 export interface ProjectTape {
-  startLabel: string
-  endLabel: string
+  scale: ScheduleScale
+  startPct: number | null
+  endPct: number | null
   marks: TapeMark[]
   /** Upcoming linked meetings, drawn dim. */
   upcoming: TapeMark[]
-  nowPct: number
-  /** How far through the time the project is, 0–100. */
-  elapsedPct: number
 }
 
-/** Null without an end date: the tape needs both ends. */
-export function projectTape(p: ProjectDetailRow, now = new Date()): ProjectTape | null {
-  const end = parseDay(p.end_date ?? null)
-  if (!end) return null
-  const meetings = (p.meetings ?? []).filter((m) => meetingMs(m) != null)
-  const earliest = Math.min(...meetings.map((m) => meetingMs(m)!), now.getTime())
-  const start = parseDay(p.start_date ?? null)?.getTime() ?? earliest
-  const endMs = startOfDay(end).getTime() + DAY_MS
-  const span = Math.max(DAY_MS, endMs - start)
-  const at = (t: number): number => clampPct(((t - start) / span) * 100)
-  const mark = (m: ProjectMeetingRow): TapeMark => ({
-    key: m.id, pct: at(meetingMs(m)!), label: (m.title || 'Meeting').trim(), decisions: asList(m.decisions).length, labelled: true,
-  })
-  const nowPct = at(now.getTime())
-  const fmt = (t: number): string => new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }).toUpperCase()
-  const marks = meetings.filter((m) => meetingMs(m)! <= now.getTime()).map(mark).sort((a, b) => a.pct - b.pct)
-  const upcoming = meetings.filter((m) => meetingMs(m)! > now.getTime()).map(mark).sort((a, b) => a.pct - b.pct)
+export function projectTape(p: ProjectDetailRow, now = new Date(), schedule = projectSchedule(p, now)): ProjectTape | null {
+  const { start, end } = schedule
+  if (start == null && end == null) return null
+  const first = start ?? end!
+  const last = end ?? first
+  const scale = scheduleScale(Math.min(first, last), Math.max(first, last), calendarDay(now))
+  const at = (day: number) => scalePosition(day, scale.from, scale.to)
+  const marks: TapeMark[] = []
+  const upcoming: TapeMark[] = []
+  for (const meeting of p.meetings ?? []) {
+    const time = meetingMs(meeting)
+    if (time == null) continue
+    const day = calendarDay(new Date(time))
+    if (day < scale.from || day > scale.to) continue
+    const group = time <= now.getTime() ? marks : upcoming
+    group.push({ key: meeting.id, pct: at(day), label: meeting.title?.trim() || 'Meeting', decisions: asList(meeting.decisions).length, labelled: true })
+  }
+  marks.sort((a, b) => a.pct - b.pct)
+  upcoming.sort((a, b) => a.pct - b.pct)
   let lastLabel = -Infinity
   for (const m of [...marks, ...upcoming]) {
     m.labelled = m.pct - lastLabel >= TAPE_LABEL_GAP
     if (m.labelled) lastLabel = m.pct
   }
   return {
-    startLabel: fmt(start),
-    endLabel: fmt(startOfDay(end).getTime()),
+    scale,
+    startPct: start == null ? null : at(start),
+    endPct: end == null ? null : at(end),
     marks,
     upcoming,
-    nowPct,
-    elapsedPct: nowPct,
   }
 }
 

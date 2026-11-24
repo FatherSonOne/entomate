@@ -168,7 +168,7 @@ api.interceptors.response.use(
     }
 
     // Retry logic for other errors
-    if (config && isRetryableError(error) && config._retryCount < RETRY_CONFIG.maxRetries) {
+    if (config && !config.skipRetry && isRetryableError(error) && config._retryCount < RETRY_CONFIG.maxRetries) {
       config._retryCount += 1
       const delay = getRetryDelay(config._retryCount - 1)
 
@@ -191,7 +191,8 @@ api.interceptors.response.use(
     } else if (error.response?.status === 404) {
       message = 'The requested resource was not found.'
     } else if (error.response?.status >= 500) {
-      message = 'A server error occurred. Please try again later.'
+      const captured = config?.skipRetry && error.response.data?.meetingId
+      message = (captured && error.response.data.details) || 'A server error occurred. Please try again later.'
     } else {
       message = error.response?.data?.error || error.message || 'An error occurred'
     }
@@ -256,16 +257,23 @@ export const recordingsApi = {
 // ========================================
 // MEETINGS API
 // ========================================
+function invalidateActionItemViews() {
+  cache.invalidate('/meetings')
+  cache.invalidate('/dashboard')
+  cache.invalidate('/projects')
+}
+
 export const meetingsApi = {
   // Process audio file
   processAudio: async (formData) => {
     return api.post('/meetings/process', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+      headers: { 'Content-Type': 'multipart/form-data' },
+      skipRetry: true,
     })
   },
 
   // Process text transcript
-  processTranscript: (data) => api.post('/meetings/transcript', data),
+  processTranscript: (data) => api.post('/meetings/transcript', data, { skipRetry: true }),
 
   // List meetings
   list: (params = {}) => api.get('/meetings', { params }),
@@ -285,8 +293,12 @@ export const meetingsApi = {
   carryForward: (id) => api.get(`/meetings/${id}/carry-forward`),
   // Same, for an upcoming calendar event: { title, attendees, startsAt }
   carryForwardPreview: (event) => api.post('/meetings/carry-forward', event),
-  // Re-run the summary, decisions and action items from the saved transcript.
-  reprocess: (id) => api.post(`/meetings/${id}/reprocess`),
+  // Finish pending minutes from the saved transcript and refresh linked work.
+  reprocess: async (id) => {
+    const result = await api.post(`/meetings/${id}/reprocess`)
+    invalidateActionItemViews()
+    return result
+  },
 
   // Get formatted recap
   getRecap: (id) => api.get(`/meetings/${id}/recap`),
@@ -303,8 +315,12 @@ export const meetingsApi = {
   // Guess real names for "Speaker N" labels (renames nothing)
   suggestSpeakers: (meetingId) => api.post(`/meetings/${meetingId}/speakers/suggest`),
 
-  // Update action item status
-  updateActionItem: (id, data) => api.patch(`/meetings/action-items/${id}`, data),
+  // Update the original action item, which also appears in Tasks and Projects.
+  updateActionItem: async (id, data) => {
+    const item = await api.patch(`/meetings/action-items/${id}`, data)
+    invalidateActionItemViews()
+    return item
+  },
   // Email the owner one reminder in your name (once per item per 24 hours)
   nudgeActionItem: (id) => api.post(`/meetings/action-items/${id}/nudge`),
 
@@ -346,6 +362,14 @@ export const projectsApi = {
   // Get project by ID
   get: (id) => api.get(`/projects/${id}`),
 
+  getBrief: (id) => {
+    const path = `/projects/${id}/brief`
+    cache.invalidate(path)
+    return api.get(path)
+  },
+
+  saveBrief: (id, data) => api.put(`/projects/${id}/brief`, data),
+
   // Update project
   update: (id, data) => api.put(`/projects/${id}`, data),
 
@@ -376,7 +400,12 @@ export const tasksApi = {
   get: (id) => api.get(`/tasks/${id}`),
 
   // Update task
-  update: (id, data) => api.put(`/tasks/${id}`, data),
+  update: async (id, data) => {
+    const task = await api.put(`/tasks/${id}`, data)
+    cache.invalidate('/tasks')
+    cache.invalidate('/projects')
+    return task
+  },
 
   // Delete task
   delete: (id) => api.delete(`/tasks/${id}`),
@@ -545,7 +574,11 @@ export const dashboardApi = {
   getActionItems: (params = {}) => api.get('/dashboard/action-items', { params }),
 
   // Update action item status (for Kanban drag/drop)
-  updateActionItemStatus: (id, status) => api.patch(`/dashboard/action-items/${id}`, { status }),
+  updateActionItemStatus: async (id, status) => {
+    const result = await api.patch(`/dashboard/action-items/${id}`, { status })
+    invalidateActionItemViews()
+    return result
+  },
 
   // Get team workload
   getTeamWorkload: () => api.get('/dashboard/team-workload'),

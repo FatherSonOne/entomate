@@ -7,6 +7,7 @@ import {
 } from '../components/bench'
 import { useToast } from '../components/vc/ToastProvider'
 import ErrorState from '../components/vc/ErrorState'
+import { ScheduleAxis, ScheduleFacts, ScheduleTrack } from '../components/ProjectSchedule'
 import {
   dayShort, endsLabel, filterCounts, listSummary, plural, progressPct, projectName, projectSignal, readUrl, rollupOf,
   shownProjects, timeline, writeUrl,
@@ -15,8 +16,8 @@ import type { NeedRow, ProjectFilter, ProjectRow, ProjectsUrlState } from '../se
 
 /**
  * 04 Projects (Bench Swiss, direction B "Bench", 2026-11-22): which project is slipping
- * and what needs you. A deadlines display (every live project as a track with a NOW
- * line) beside readouts, then the projects table beside the late items across them.
+ * and what needs you. A measured deadlines display beside readouts, then the
+ * projects table beside the late items across them.
  * Counts include the action items of each project's linked meetings (projectRollup.js).
  * View logic lives in services/projectsView.ts.
  */
@@ -26,9 +27,10 @@ interface ToastApi {
   error: (title: string, message?: string) => void
 }
 
-interface ListResponse { projects?: ProjectRow[]; needsYou?: NeedRow[]; lateTotal?: number; count?: number }
+interface ListResponse { projects?: ProjectRow[]; needsYou?: NeedRow[]; lateTotal?: number; count?: number; hasMore?: boolean }
 
 const LOAD_LIMIT = 100
+const SCHEDULE_PREVIEW = 6
 const EMPTY_NEW = { name: '', description: '', startDate: '', endDate: '', tags: '' }
 
 export default function Projects(): React.ReactElement {
@@ -41,9 +43,12 @@ export default function Projects(): React.ReactElement {
   const [needs, setNeeds] = useState<NeedRow[]>([])
   const [lateTotal, setLateTotal] = useState<number>(0)
   const [count, setCount] = useState<number>(0)
+  const [offset, setOffset] = useState<number>(0)
+  const [hasMore, setHasMore] = useState<boolean>(false)
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState<string>('')
+  const [showAllDates, setShowAllDates] = useState(false)
   const [draft, setDraft] = useState(EMPTY_NEW)
   const [draftError, setDraftError] = useState<string>('')
   const [creating, setCreating] = useState<boolean>(false)
@@ -55,18 +60,20 @@ export default function Projects(): React.ReactElement {
   const load = useCallback(async () => {
     try {
       setError(null)
-      const res = (await projectsApi.list({ limit: LOAD_LIMIT, offset: 0 })) as unknown as ListResponse
+      setLoading(true)
+      const res = (await projectsApi.list({ limit: LOAD_LIMIT, offset })) as unknown as ListResponse
       setRows(res.projects ?? [])
       setNeeds(res.needsYou ?? [])
       setLateTotal(res.lateTotal ?? 0)
       setCount(res.count ?? 0)
+      setHasMore(res.hasMore ?? false)
     } catch (err) {
       console.error('[Projects] load error:', err)
       setError(err instanceof Error ? err.message : 'Failed to load projects')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [offset])
 
   useEffect(() => { void load() }, [load])
 
@@ -79,7 +86,9 @@ export default function Projects(): React.ReactElement {
   const counts = filterCounts(rows)
   const shown = shownProjects(rows, url.show, search)
   const sum = listSummary(rows, now)
-  const tl = timeline(rows, now)
+  const tl = loading ? null : timeline(rows, now, showAllDates ? rows.length : SCHEDULE_PREVIEW)
+  const scale = tl?.scale
+  const paged = offset > 0 || hasMore
 
   const create = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
@@ -106,7 +115,12 @@ export default function Projects(): React.ReactElement {
     }
   }
 
-  if (error) return <ErrorState message={error} onRetry={load} />
+  if (error) return (
+    <>
+      <ErrorState message={error} onRetry={load} />
+      {offset > 0 && <Key onClick={() => setOffset(offset - LOAD_LIMIT)}>Previous page</Key>}
+    </>
+  )
 
   const filterOptions: Array<{ value: ProjectFilter; label: React.ReactNode }> = [
     { value: 'active', label: <>Active <span className="bs-proj-n">{counts.active}</span></> },
@@ -117,7 +131,7 @@ export default function Projects(): React.ReactElement {
 
   const meta = loading
     ? <span>Loading</span>
-    : <span><b>{plural(rows.length, 'project')}</b> · {sum.active} active{lateTotal > 0 && <> · <span className="bs-proj-late">{plural(lateTotal, 'late item')}</span></>}</span>
+    : <span><b>{paged ? `${rows.length} of ${count} projects` : plural(rows.length, 'project')}</b> · {sum.active} active{lateTotal > 0 && <> · <span className="bs-proj-late">{plural(lateTotal, 'late item')}</span></>}{paged && ' · Totals for this page'}</span>
 
   return (
     <div className="bs-proj">
@@ -129,40 +143,57 @@ export default function Projects(): React.ReactElement {
 
       <Grid>
         <Cell span={8}>
-          <Display className="bs-proj-disp" aria-label="Deadlines">
+          <Display className="bs-proj-disp" role="region" aria-label="Deadlines">
             <div className="bs-proj-disp-head">
-              <span className="bs-lbl">Deadlines{tl && tl.months.length > 0 ? ` · ${tl.months[0]?.label} → ${tl.months[tl.months.length - 1]?.label}` : ''}</span>
-              {sum.slipping > 0 && <Signal tone="brand">{plural(sum.slipping, 'project')} slipping</Signal>}
+              <h2 className="bs-lbl">Deadlines</h2>
+              {!loading && sum.slipping > 0 && <Signal tone="brand">{plural(sum.slipping, 'project')} slipping</Signal>}
             </div>
-            {tl ? (
-              <div className="bs-proj-tl" role="img" aria-label={tl.rows.map((r) => `${r.name}: ${r.donePct}% done${r.late ? `, ${r.late} late` : ''}`).join('; ')}>
-                <div className="bs-proj-tl-row bs-proj-tl-ax" aria-hidden="true">
-                  <span />
-                  <div className="bs-proj-tl-trk">
-                    {tl.months.map((m) => <span key={m.key} className="bs-proj-tl-m" style={{ left: `${m.pct}%` }}>{m.label}</span>)}
-                  </div>
-                </div>
-                {tl.rows.map((r) => (
-                  <div key={r.id} className="bs-proj-tl-row" aria-hidden="true">
-                    <span className="bs-proj-tl-nm">{r.name}</span>
-                    <div className="bs-proj-tl-trk">
-                      <i className="bs-proj-tl-bar" style={{ left: `${r.startPct}%`, width: `${Math.max(0.5, r.endPct - r.startPct)}%` }}>
-                        <i style={{ width: `${r.donePct}%` }} />
-                      </i>
-                      <b className="bs-proj-tl-end" style={{ left: `${r.endPct}%` }} />
-                      {r.late > 0 && <u className="bs-proj-tl-late" style={{ left: `${r.endPct}%` }} />}
-                    </div>
-                  </div>
-                ))}
-                {tl.nowPct != null && (
-                  <div className="bs-proj-tl-over" aria-hidden="true">
-                    <span />
-                    <div className="bs-proj-tl-trk"><span className="bs-proj-tl-now" style={{ left: `${tl.nowPct}%` }}><span>NOW</span></span></div>
+            {tl && scale ? (
+              <>
+                <ScheduleAxis scale={scale} />
+                <ul className="bs-proj-schedule-rows">
+                  {tl.rows.map((r) => (
+                    <li key={r.id}>
+                      <Link to={`/projects/${r.id}`} className="bs-proj-schedule-row">
+                        <span className="bs-proj-schedule-info">
+                          <strong>{r.name}</strong>
+                          <ScheduleFacts schedule={r.schedule} />
+                        </span>
+                        <span className="bs-proj-schedule-work">
+                          <ScheduleTrack scale={scale} startPct={r.startPct} endPct={r.endPct} overdue={r.schedule.overdue} />
+                          <span className="bs-proj-measures">
+                            <span>{r.total ? `${r.done} of ${r.total} items complete` : 'No work items'}</span>
+                            {r.late > 0 && <span className="bs-proj-due-late">{plural(r.late, 'late item')}</span>}
+                          </span>
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+                {tl.datedCount > SCHEDULE_PREVIEW && (
+                  <div className="bs-proj-schedule-more">
+                    <span>{tl.rows.length} of {tl.datedCount} dated projects{paged ? ' on this page' : ''}</span>
+                    <button type="button" className="bs-proj-display-link" aria-expanded={showAllDates} onClick={() => setShowAllDates(!showAllDates)}>
+                      {showAllDates ? 'Show nearest deadlines' : 'Show all dated projects'}
+                    </button>
                   </div>
                 )}
-              </div>
+              </>
             ) : (
-              <p className="bs-proj-disp-empty">{loading ? 'Loading' : 'Give a project an end date and it shows up here.'}</p>
+              <p className="bs-proj-disp-empty">{loading ? 'Loading deadlines' : 'No active or planning projects with an end date.'}</p>
+            )}
+            {tl && tl.undated.length > 0 && (
+              <details className="bs-proj-undated">
+                <summary>No end date ({tl.undated.length})</summary>
+                <ul>
+                  {tl.undated.map(({ project, schedule }) => (
+                    <li key={project.id}>
+                      <Link className="bs-proj-display-link" to={`/projects/${project.id}`}>{projectName(project)}</Link>
+                      {schedule.start != null && <span className="bs-proj-dates">{schedule.dateLabel}</span>}
+                    </li>
+                  ))}
+                </ul>
+              </details>
             )}
           </Display>
         </Cell>
@@ -180,15 +211,15 @@ export default function Projects(): React.ReactElement {
           <section aria-labelledby="proj-list">
             <Section number="01" id="proj-list" title="Projects" aside={<Switch<ProjectFilter> label="Status" options={filterOptions} value={url.show} onChange={(v) => setUrl({ show: v })} className="bs-proj-filter" />} />
             <div className="bs-proj-search">
-              <TextInput icon={<Search aria-hidden="true" />} placeholder="Search projects" aria-label="Search projects" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <TextInput icon={<Search aria-hidden="true" />} placeholder={paged ? 'Search this page' : 'Search projects'} aria-label={paged ? 'Search projects on this page' : 'Search projects'} value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
             <div className="bs-proj-pt head bs-lbl" aria-hidden="true">
               <span>Project</span><span className="bs-dt bs-proj-c-end">Ends</span><span className="bs-dt bs-proj-c-prog">Progress</span><span className="bs-dt bs-proj-c-num bs-proj-r">Open</span><span className="bs-dt bs-proj-c-num bs-proj-r">Late</span><span>Status</span>
             </div>
             {loading ? <p className="bs-proj-empty">Loading projects</p> : shown.length === 0 ? (
               <div className="bs-proj-empty">
-                <p>{search || url.show !== 'all' ? 'No projects match.' : 'No projects yet. A project collects the decisions and action items of the meetings you link to it.'}</p>
-                {!search && url.show === 'all' && <Key onClick={() => setUrl({ drawer: 'new' })}>New project</Key>}
+                <p>{paged ? 'No projects match on this page.' : search || url.show !== 'all' ? 'No projects match.' : 'No projects yet. A project collects the decisions and action items of the meetings you link to it.'}</p>
+                {!paged && !search && url.show === 'all' && <Key onClick={() => setUrl({ drawer: 'new' })}>New project</Key>}
               </div>
             ) : (
               <ul className="bs-rows">
@@ -221,14 +252,20 @@ export default function Projects(): React.ReactElement {
                 })}
               </ul>
             )}
-            {!loading && count > LOAD_LIMIT && <p className="bs-lbl bs-proj-cap">Showing the first {LOAD_LIMIT} of {count} projects · search to narrow</p>}
+            {paged && (
+              <nav className="bs-tasks-keys bs-proj-cap" aria-label="Project pages">
+                <Key disabled={loading || offset === 0} onClick={() => { setLoading(true); setOffset(offset - LOAD_LIMIT) }}>Previous page</Key>
+                <span className="bs-lbl" aria-live="polite">{loading ? 'Loading projects' : rows.length ? `${offset + 1}–${offset + rows.length} of ${count}` : `0 on this page · ${count} total`}</span>
+                <Key disabled={loading || !hasMore} onClick={() => { setLoading(true); setOffset(offset + LOAD_LIMIT) }}>Next page</Key>
+              </nav>
+            )}
           </section>
         </Cell>
         <Cell span={4} rule>
           <section aria-labelledby="proj-needs">
             <Section number="02" id="proj-needs" title="Needs you" level={3} aside={lateTotal > needs.length ? `${needs.length} of ${lateTotal}` : undefined} />
             {loading ? <p className="bs-proj-empty">Loading</p> : needs.length === 0 ? (
-              <p className="bs-proj-empty">Nothing late across your projects.</p>
+              <p className="bs-proj-empty">{paged ? 'Nothing late in the projects on this page.' : 'Nothing late across your projects.'}</p>
             ) : (
               <ul className="bs-rows">
                 {needs.map((n) => (

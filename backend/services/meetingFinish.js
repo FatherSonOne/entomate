@@ -12,7 +12,7 @@
  *   summary   the AI pipeline with the meeting's summary template, decisions, action items,
  *             embedding; a failure keeps the transcript and records why (`summaryError`)
  *   moments   each summary point and action item linked to the line it came from
- *   publish   action items saved (replacing any from an earlier, half-finished run) and
+ *   publish   action items saved once per meeting, followed by
  *             the usual post-processing (search, ecosystem sync, agents, workflows)
  *
  * `onStage` is called as each stage starts (transcript is the caller's own), so the
@@ -117,21 +117,24 @@ async function writeMinutes({ meeting, segments, transcript, title, attendees, o
 }
 
 /**
- * Save the action items and run post-processing for a meeting whose minutes were just saved.
- * A retry replaces the action items an earlier, half-finished run may have saved.
- *
- * @param {object} db  supabase client (service role)
- * @param {object} saved  the saved meetings row
- * @param {{ summaryData: object, actionItems: Array }} minutes  from writeMinutes
- * @param {{ userId?: string|null }} [opts]
+ * Save commitments before marking the minutes complete. On failure the callers
+ * still save the transcript, and the meeting page can retry from that transcript.
  */
-async function publishMinutes(db, saved, { summaryData, actionItems }, { userId = null } = {}) {
-  const { saveActionItems, firePostProcessing } = pipeline();
-  const { error } = await db.from('action_items').delete().eq('meeting_id', saved.id);
-  if (error) throw error;
-  const savedActionItems = await saveActionItems(saved.id, actionItems);
-  firePostProcessing(saved, summaryData, savedActionItems, { userId });
-  return savedActionItems;
+async function saveMinutesActions(meeting, minutes) {
+  if (minutes.summaryError) return null;
+  try {
+    return await pipeline().saveActionItems(meeting, minutes.actionItems);
+  } catch (err) {
+    log.error('Minutes: could not save action items', { meetingId: meeting.id, error: err.message });
+    minutes.summaryError = 'Could not save the meeting action items';
+    minutes.fields.summary = null;
+    return null;
+  }
 }
 
-module.exports = { writeMinutes, publishMinutes, buildTranscriptText, EMPTY_SUMMARY };
+function publishMinutes(saved, minutes, savedActions, { userId = null } = {}) {
+  if (savedActions === null) return;
+  pipeline().firePostProcessing(saved, minutes.summaryData, savedActions.items, { userId, actionsCreated: savedActions.created });
+}
+
+module.exports = { writeMinutes, saveMinutesActions, publishMinutes, buildTranscriptText, EMPTY_SUMMARY };

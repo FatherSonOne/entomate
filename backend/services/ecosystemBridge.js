@@ -351,7 +351,7 @@ class EcosystemBridge {
   /**
    * Sync a processed meeting to Logos Vision (activity + tasks)
    */
-  async syncMeetingToLogosVision({ meeting, actionItems = [] }) {
+  async syncMeetingToLogosVision({ meeting, actionItems = [], actionItemCount = actionItems.length }) {
     const results = { activity: null, tasks: [] };
 
     // 1. Create activity in LV
@@ -368,7 +368,7 @@ class EcosystemBridge {
         decisions: meeting.decisions || [],
         attendees: meeting.attendees || [],
         duration: meeting.duration_minutes,
-        actionItemCount: actionItems.length,
+        actionItemCount,
         createdAt: meeting.created_at
       }
     });

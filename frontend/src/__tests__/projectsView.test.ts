@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('../services/supabaseClient', () => ({ supabase: {} }))
 import {
-  countdown, daysLeft, endsLabel, filterCounts, linkCandidates, owners, projectDecisions, projectSignal, projectTape,
+  daysLeft, endsLabel, filterCounts, linkCandidates, owners, projectDecisions, projectSchedule, projectSignal, projectTape,
   projectWork, readUrl, shownProjects, timeline, workCounts, writeUrl,
   type ProjectDetailRow, type ProjectRow, type Rollup,
 } from '../services/projectsView'
@@ -16,13 +16,22 @@ const roll = (over: Partial<Rollup> = {}): Rollup => ({
 const proj = (over: Partial<ProjectRow>): ProjectRow => ({ id: Math.random().toString(36).slice(2), name: 'P', status: 'active', ...over })
 
 describe('projectsView', () => {
-  it('reads the end date as days left and a countdown', () => {
+  it('reads the end date as calendar days left', () => {
     expect(daysLeft('2026-12-01', NOW)).toBe(9)
     expect(daysLeft(null, NOW)).toBeNull()
     expect(endsLabel('2026-11-22', NOW)).toBe('Ends today')
     expect(endsLabel('2026-11-19', NOW)).toBe('Ended 3 days ago')
-    expect(countdown('2026-12-01', NOW)).toBe('9d 14:00')
-    expect(countdown('2026-11-20', NOW)).toBeNull()
+    expect(projectSchedule(proj({ end_date: '2026-11-22' }), NOW).deadline).toBe('Due today')
+    expect(projectSchedule(proj({ end_date: '2026-12-01' }), NOW).deadline).toBe('9 days remaining')
+    expect(projectSchedule(proj({ end_date: '2026-11-19' }), NOW)).toMatchObject({ deadline: '3 days overdue', overdue: true })
+    expect(projectSchedule(proj({ end_date: '2026-11-19', status: 'completed' }), NOW).deadline).toBeNull()
+  })
+
+  it('measures calendar days across a clock change and flags invalid date ranges', () => {
+    const planned = projectSchedule(proj({ start_date: '2026-10-31', end_date: '2026-11-02' }), new Date(2026, 10, 1, 12))
+    expect(planned).toMatchObject({ duration: 2, elapsed: 1, dateLabel: 'Oct 31, 2026 → Nov 2, 2026' })
+    expect(projectSchedule(proj({ start_date: '2026-12-02', end_date: '2026-12-01' }), NOW)).toMatchObject({ reversed: true, duration: null })
+    expect(projectSchedule(proj({ start_date: '2026-02-30', end_date: '2026-12-01' }), NOW).start).toBeNull()
   })
 
   it('gives each project one signal: slipping when late work meets a near end date', () => {
@@ -46,19 +55,30 @@ describe('projectsView', () => {
     expect(filterCounts(list)).toEqual({ active: 2, planning: 1, done: 1, all: 4 })
   })
 
-  it('lays live projects on a timeline with a NOW line', () => {
+  it('lays out dates and keeps item counts separate from the schedule span', () => {
     const tl = timeline([
       proj({ name: 'A', start_date: '2026-11-01', end_date: '2026-12-31', rollup: roll({ total: 4, done: 2, late: 1 }) }),
       proj({ name: 'Done', status: 'completed', end_date: '2026-11-10' }),
       proj({ name: 'No date' }),
     ], NOW)!
     expect(tl.rows).toHaveLength(1)
-    expect(tl.months.map((m) => m.label)).toEqual(['NOV', 'DEC'])
-    expect(tl.rows[0]).toMatchObject({ name: 'A', startPct: 0, donePct: 50, late: 1 })
-    expect(tl.rows[0]!.endPct).toBeGreaterThan(95)
-    expect(tl.nowPct).toBeGreaterThan(30)
-    expect(tl.nowPct).toBeLessThan(40)
-    expect(timeline([proj({ status: 'planning' })], NOW)).toBeNull()
+    expect(tl.scale).toMatchObject({ unit: 'Months', rangeLabel: 'Nov 1, 2026 – Dec 31, 2026' })
+    expect(tl.scale?.nowPct).toBeCloseTo(35)
+    expect(tl.rows[0]).toMatchObject({ name: 'A', startPct: 0, endPct: 100, done: 2, total: 4, late: 1 })
+    expect(tl.undated.map(({ project }) => project.name)).toEqual(['No date'])
+    expect(timeline([proj({ status: 'planning' })], NOW).scale).toBeNull()
+  })
+
+  it('adapts tick granularity and keeps deadline-only projects as markers', () => {
+    const dateOnly = proj({ end_date: '2026-11-25' })
+    const later = proj({ start_date: '2026-11-15', end_date: '2026-12-12' })
+    const preview = timeline([dateOnly, later], NOW, 1)
+    expect(preview.datedCount).toBe(2)
+    expect(preview.rows[0]).toMatchObject({ startPct: null, endPct: 100, schedule: { duration: null } })
+    expect(preview.scale?.ticks.map(t => t.label)).toEqual(['Nov 22', 'Nov 23', 'Nov 24', 'Nov 25'])
+    const full = timeline([dateOnly, later], NOW)
+    expect(full.scale?.unit).toBe('Weeks')
+    expect(full.scale?.ticks.map(t => t.label)).toEqual(['Nov 16', 'Nov 23', 'Nov 30', 'Dec 7'])
   })
 
   const detail: ProjectDetailRow = {
@@ -108,9 +128,10 @@ describe('projectsView', () => {
     expect(t.upcoming.map((m) => m.label)).toEqual(['Handoff'])
     expect(t.marks[0]!.decisions).toBe(2)
     expect([...t.marks, ...t.upcoming].map((m) => m.labelled)).toEqual([true, true, false])
-    expect(t.nowPct).toBeGreaterThan(70)
-    expect(t.nowPct).toBeLessThan(80)
-    expect(projectTape({ ...detail, end_date: null }, NOW)).toBeNull()
+    expect(t.scale.nowPct).toBeGreaterThan(70)
+    expect(t.scale.nowPct).toBeLessThan(80)
+    expect(projectTape({ ...detail, end_date: null }, NOW)?.endPct).toBeNull()
+    expect(projectTape({ ...detail, start_date: null, end_date: null }, NOW)).toBeNull()
   })
 
   it('ranks meetings to link by how often they mention the project', () => {

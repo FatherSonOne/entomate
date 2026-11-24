@@ -151,6 +151,8 @@ export default function Tasks() {
     else setActionRows((rows) => rows.map((r) => (r.id === item.id ? { ...r, status } : r)))
   }
 
+  const patchAction = (saved) => setActionRows((rows) => rows.map((r) => r.id === saved.id ? { ...r, ...saved } : r))
+
   const setStatus = async (item, status) => {
     if (item.status === status) return
     patchLocal(item, status)
@@ -160,7 +162,8 @@ export default function Tasks() {
         else if (item.status === 'done' && status === 'open') await tasksApi.reopen(item.id)
         else await tasksApi.update(item.id, { status })
       } else {
-        await dashboardApi.updateActionItemStatus(item.id, status)
+        const { actionItem } = await dashboardApi.updateActionItemStatus(item.id, status)
+        if (actionItem) patchAction(actionItem)
       }
     } catch (err) {
       console.error('[Tasks] status error:', err)
@@ -477,6 +480,7 @@ export default function Tasks() {
                   now={now}
                   onStatus={setStatus}
                   onEdit={() => setEditing(taskRows.find((t) => t.id === inspected.id) ?? null)}
+                  onActionSaved={patchAction}
                   onDelete={() => handleDelete(inspected)}
                   onOpenMeeting={(href) => navigate(href)}
                 />
@@ -497,6 +501,7 @@ export default function Tasks() {
             inDrawer
             onStatus={setStatus}
             onEdit={() => setEditing(taskRows.find((t) => t.id === selected.id) ?? null)}
+            onActionSaved={patchAction}
             onDelete={() => handleDelete(selected)}
             onOpenMeeting={(href) => navigate(href)}
           />

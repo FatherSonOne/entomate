@@ -8,15 +8,17 @@ import {
 import { useConfirm } from '../components/vc/ConfirmDialog'
 import { useToast } from '../components/vc/ToastProvider'
 import ErrorState from '../components/vc/ErrorState'
+import ProjectBrief from '../components/ProjectBrief'
+import { ScheduleAxis, ScheduleFacts, ScheduleTrack } from '../components/ProjectSchedule'
 import TaskEditModal from '../components/TaskEditModal'
 import TaskDetail from '../components/tasks/TaskDetail'
 import {
   STATUSES, dueLabel, groupByUrgency, isOverdue, laneWord, lanes, meetingHref, statusTone, statusWord, timecode,
 } from '../services/tasksView'
-import type { TaskRow, WorkItem, WorkStatus } from '../services/tasksView'
+import type { TaskActionRow, TaskRow, WorkItem, WorkStatus } from '../services/tasksView'
 import {
-  countdown, dayShort, decisionHref, endsLabel, heldMeetings, linkCandidates, meetingDay, nextMeeting, normalizeProjectStatus,
-  owners, plural, projectDecisions, projectName, projectSignal, projectTape, projectWork, readUrl, toTags, workCounts, writeUrl,
+  dayShort, decisionHref, heldMeetings, linkCandidates, meetingDay, nextMeeting, normalizeProjectStatus,
+  owners, plural, projectDecisions, projectName, projectSchedule, projectSignal, projectTape, projectWork, readUrl, toTags, workCounts, writeUrl,
 } from '../services/projectsView'
 import type { LinkCandidate, ProjectDetailRow, ProjectStatus, ProjectsUrlState, WorkLayout } from '../services/projectsView'
 
@@ -130,7 +132,6 @@ export default function ProjectDetail(): React.ReactElement {
   const decisions = project ? projectDecisions(project, now) : []
   const held = project ? heldMeetings(project, now) : []
   const next = project ? nextMeeting(project, now) : null
-  const tape = project ? projectTape(project, now) : null
   const selected = work.find((w) => w.key === url.item) ?? null
 
   // ── Writes (same endpoints as Tasks) ──
@@ -142,6 +143,10 @@ export default function ProjectDetail(): React.ReactElement {
     })
   }
 
+  const patchAction = (saved: TaskActionRow) => setProject((p) => p && ({
+    ...p, actionItems: (p.actionItems ?? []).map((a) => a.id === saved.id ? { ...a, ...saved } : a),
+  }))
+
   const setStatus = async (item: WorkItem, status: WorkStatus): Promise<void> => {
     if (item.status === status) return
     patchLocal(item, status)
@@ -151,7 +156,8 @@ export default function ProjectDetail(): React.ReactElement {
         else if (item.status === 'done' && status === 'open') await tasksApi.reopen(item.id)
         else await tasksApi.update(item.id, { status })
       } else {
-        await dashboardApi.updateActionItemStatus(item.id, status)
+        const result = await dashboardApi.updateActionItemStatus(item.id, status) as unknown as { actionItem?: TaskActionRow }
+        if (result.actionItem) patchAction(result.actionItem)
       }
     } catch (err) {
       console.error('[Project] status error:', err)
@@ -298,7 +304,8 @@ export default function ProjectDetail(): React.ReactElement {
   const sig = projectSignal({ ...project, rollup: { ...counts, fromMeetings: 0, decisions: decisions.length, meetings: held.length, lastMeeting: null, nextMeeting: null } }, now)
   const status = normalizeProjectStatus(project.status)
   const tags = toTags(project.tags)
-  const left = countdown(project.end_date, now)
+  const schedule = projectSchedule(project, now)
+  const tape = projectTape(project, now, schedule)
 
   const meta = (
     <span>
@@ -413,36 +420,41 @@ export default function ProjectDetail(): React.ReactElement {
       <Grid>
         <Cell span={8}>
           {tape ? (
-            <Display className="bs-proj-disp" aria-label="Project timeline">
+            <Display className="bs-proj-disp" role="region" aria-label="Project timeline">
               <div className="bs-proj-disp-head">
-                <span className="bs-lbl">{tape.startLabel} → {tape.endLabel}</span>
-                <Signal tone={sig.tone}>{sig.word}{counts.late > 0 ? ` · ${counts.late} late` : ''}</Signal>
+                <h2 className="bs-lbl">Project timeline</h2>
+                <Signal tone={sig.tone}>{sig.word}{counts.late > 0 ? ` · ${plural(counts.late, 'late item')}` : ''}</Signal>
               </div>
-              <div className="bs-proj-cd">
-                <span className="bs-disp-big">{left ?? endsLabel(project.end_date, now)}</span>
-                {left && <span className="bs-lbl">to the end date</span>}
+              <div className="bs-proj-detail-schedule">
+                <ScheduleFacts schedule={schedule} showElapsed />
+                <span className="bs-proj-measures">{counts.total ? `${counts.done} of ${counts.total} items complete` : 'No work items'}</span>
               </div>
-              <div className="bs-proj-tape" role="img" aria-label={`${held.length} meetings, ${decisions.length} decisions, ${tape.elapsedPct.toFixed(0)}% of the time used`}>
-                <div className="bs-proj-tape-base"><i style={{ width: `${tape.elapsedPct}%` }} /></div>
-                {tape.marks.map((m) => (
-                  <b key={m.key} className="bs-proj-tape-mk" style={{ left: `${m.pct}%` }}>
-                    {m.labelled && <span className="bs-dt">{m.label}</span>}
-                    {m.decisions > 0 && <i className="bs-proj-tape-dec" aria-hidden="true" />}
-                  </b>
-                ))}
-                {tape.upcoming.map((m) => <b key={m.key} className="bs-proj-tape-mk up" style={{ left: `${m.pct}%` }}>{m.labelled && <span className="bs-dt">{m.label}</span>}</b>)}
-                <span className="bs-proj-tape-now" style={{ left: `${tape.nowPct}%` }}><span>NOW</span></span>
-                <span className="bs-proj-tape-st">{tape.startLabel}</span>
-                {tape.nowPct < 82 && <span className="bs-proj-tape-end">ENDS {tape.endLabel}</span>}
-              </div>
+              <ScheduleAxis scale={tape.scale} />
+              <ScheduleTrack scale={tape.scale} startPct={schedule.reversed ? null : tape.startPct} endPct={tape.endPct} overdue={schedule.overdue} />
+              {(tape.marks.length > 0 || tape.upcoming.length > 0) && (
+                <div className="bs-proj-tape" aria-hidden="true">
+                  {tape.marks.map((m) => (
+                    <b key={m.key} className="bs-proj-tape-mk" style={{ left: `${m.pct}%` }}>
+                      {m.labelled && <span className="bs-dt">{m.label}</span>}
+                      {m.decisions > 0 && <i className="bs-proj-tape-dec" />}
+                    </b>
+                  ))}
+                  {tape.upcoming.map((m) => <b key={m.key} className="bs-proj-tape-mk up" style={{ left: `${m.pct}%` }}>{m.labelled && <span className="bs-dt">{m.label}</span>}</b>)}
+                </div>
+              )}
+              {(schedule.start == null || schedule.end == null || schedule.reversed) && (
+                <button type="button" className="bs-proj-display-link" onClick={() => setUrl({ drawer: 'edit' })}>Edit dates</button>
+              )}
             </Display>
           ) : (
             <div className="bs-proj-nodisp">
-              <p className="bs-mut">{project.description || 'No end date yet. Add one to see the timeline and countdown.'}</p>
-              {!project.end_date && <Key size="sm" onClick={() => setUrl({ drawer: 'edit' })}>Add an end date</Key>}
+              <p className="bs-mut">{project.description}</p>
+              <span className="bs-mut">Set a start or end date to show the project timeline.</span>
+              <Key size="sm" onClick={() => setUrl({ drawer: 'edit' })}>Add dates</Key>
             </div>
           )}
           {tape && project.description && <p className="bs-proj-desc">{project.description}</p>}
+          <ProjectBrief key={project.id} projectId={project.id} />
         </Cell>
         <Cell span={4} rule>
           <div className="bs-proj-ro">
@@ -544,6 +556,7 @@ export default function ProjectDetail(): React.ReactElement {
             inDrawer
             onStatus={(it: WorkItem, s: WorkStatus) => void setStatus(it, s)}
             onEdit={() => setEditingTask((project.tasks ?? []).find((t) => t.id === selected.id) ?? null)}
+            onActionSaved={patchAction}
             onDelete={() => void deleteTask(selected)}
             onOpenMeeting={(href: string) => navigate(href)}
           />

@@ -3,7 +3,9 @@ import { RefreshCw, Loader2, CalendarPlus } from 'lucide-react'
 import { integrationsApi, meetingsApi, calendarApi } from '../services/api'
 import TimecodeButton from './meetings/TimecodeButton'
 import AgentNotes from './meetings/AgentNotes'
+import ActionItemEdit from './tasks/ActionItemEdit'
 import { Key, Signal } from './bench'
+import { fromActionItem } from '../services/tasksView'
 
 /**
  * Action items of a meeting (Bench Swiss): grouped by priority under group heads,
@@ -20,6 +22,7 @@ export default function ActionItemsList({ items = [], onUpdate, meetingId, onJum
   const [toggling, setToggling] = useState({})
   const [calSyncing, setCalSyncing] = useState({})
   const [error, setError] = useState(null)
+  const [editingItem, setEditingItem] = useState(null)
 
   const syncItem = async (itemId) => {
     try {
@@ -183,6 +186,7 @@ export default function ActionItemsList({ items = [], onUpdate, meetingId, onJum
                     <div className="bs-agentnotes"><AgentNotes notes={item.agent_notes} /></div>
                   </div>
                   <div className="bs-action-keys">
+                    <Key size="sm" onClick={() => setEditingItem(fromActionItem(item))} aria-label={`Edit action item: ${item.task_description}`}>Edit</Key>
                     {onJumpToTranscript && (
                       <TimecodeButton
                         atMs={item.transcript_at_ms}
@@ -211,6 +215,7 @@ export default function ActionItemsList({ items = [], onUpdate, meetingId, onJum
           </ul>
         </section>
       ))}
+      {editingItem && <ActionItemEdit item={editingItem} onSaved={() => onUpdate?.()} onClose={() => setEditingItem(null)} />}
     </div>
   )
 }
