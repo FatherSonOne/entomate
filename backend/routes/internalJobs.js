@@ -22,6 +22,7 @@ const JOBS = {
   autojoin: () => require('../services/calendarAutoJoin').runAutoJoin(),
   digest: () => require('../services/overdueDigest').runOverdueDigest(),
   followups: () => require('../services/followUp').runFollowUps(),
+  'meeting-briefs': () => require('../services/entoAi/scheduledBriefs').runScheduledBriefs(),
 };
 
 const running = new Set();

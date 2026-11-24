@@ -52,6 +52,13 @@ async function quotaFor(orgId) {
   return { used: Number(usage.data?.request_count) || 0, limit: limitFor(org.data) };
 }
 
+/** Background questions use the same counter and quota as interactive questions. */
+async function withAiUsage(orgId, run) {
+  const { used, limit } = await quotaFor(orgId);
+  if (used >= limit) return null;
+  return scope.run({ orgId, counted: false }, run);
+}
+
 /** Gemini usageMetadata → tokens and USD. Output includes thinking tokens (billed as output). */
 function usageOf(meta) {
   const input = Number(meta?.promptTokenCount) || 0;
@@ -114,4 +121,4 @@ async function meterAiForOrg(orgId, res, next) {
   return scope.run({ orgId, counted: false }, next);
 }
 
-module.exports = { meterAi, meterAiForOrg, addUsage, usageOf, limitFor, monthStart, PLAN_AI_LIMITS, PRICE_PER_MILLION };
+module.exports = { meterAi, meterAiForOrg, addUsage, withAiUsage, usageOf, limitFor, monthStart, PLAN_AI_LIMITS, PRICE_PER_MILLION };
