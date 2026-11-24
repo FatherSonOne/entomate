@@ -19,7 +19,6 @@ import { canPlay, toRecordingJob } from '../services/meetingRecorderService'
 import cache from '../services/apiCache'
 import { clipToNotes } from '../services/searchNotesService'
 import { formatClock, toSegments, toSummaryMoments } from '../services/meetingTranscriptService'
-import { saveDownload } from '../utils/downloadHelper'
 import MeetingIntelligencePanel from '../components/intelligence/MeetingIntelligencePanel'
 import { BotDebrief, BotMeetingPending } from '../components/bot/BotDebrief'
 import {
@@ -232,29 +231,20 @@ export default function MeetingDetail() {
     }
   }
 
-  const [recapBusy, setRecapBusy] = useState(false)
+  const [exportBusy, setExportBusy] = useState(false)
   const exportName = meeting?.title?.trim().replace(/[<>:"/\\|?*\p{Cc}]/gu, '-').slice(0, 100).replace(/[. ]+$/, '') || 'Meeting'
   const transcriptText = typeof meeting?.transcript === 'string' ? meeting.transcript : ''
   const hasTranscript = Boolean(transcriptSegments || transcriptText.trim())
-  const handleRecapPdf = async () => {
-    setRecapBusy(true)
+  const handleExport = async (kind, format) => {
+    const documentName = kind === 'recap' ? 'Recap' : 'Transcript'
+    setExportBusy(true)
     try {
-      await reportsApi.downloadMeetingPDF(id, `${exportName} - Recap.pdf`)
+      await reportsApi.downloadMeetingDocument(id, kind, format, `${exportName} - ${documentName}.${format}`)
     } catch (err) {
-      console.error('Failed to download recap PDF:', err)
-      toast.error('Error', 'The recap PDF could not be made')
+      console.error('Failed to download meeting export:', err)
+      toast.error('Error', `The ${kind} could not be downloaded`)
     } finally {
-      setRecapBusy(false)
-    }
-  }
-  const handleTranscriptDownload = () => {
-    const body = transcriptSegments
-      ? transcriptSegments.map(({ atMs, speaker, text }) => `[${formatClock(atMs)}] ${speaker}: ${text}`).join('\n')
-      : transcriptText
-    try {
-      saveDownload(new Blob([`${meeting.title || 'Meeting'}\n\n${body}\n`], { type: 'text/plain;charset=utf-8' }), `${exportName} - Transcript.txt`)
-    } catch {
-      toast.error('Error', 'The transcript could not be downloaded')
+      setExportBusy(false)
     }
   }
 
@@ -512,10 +502,12 @@ export default function MeetingDetail() {
       <Key onClick={handleSyncToCRM}>Send to CRM</Key>
       <Menu
         label="Export meeting"
-        trigger={recapBusy ? 'Preparing PDF' : 'Export'}
+        trigger={exportBusy ? 'Preparing export' : 'Export'}
         entries={[
-          { key: 'recap', label: 'Download recap', hint: 'PDF', disabled: recapBusy, onSelect: handleRecapPdf },
-          { key: 'transcript', label: 'Download transcript', hint: 'TXT', disabled: !hasTranscript, onSelect: handleTranscriptDownload },
+          { key: 'recap-pdf', label: 'Recap PDF', disabled: exportBusy, onSelect: () => handleExport('recap', 'pdf') },
+          { key: 'recap-docx', label: 'Recap Word (.docx)', disabled: exportBusy, onSelect: () => handleExport('recap', 'docx') },
+          { key: 'transcript-pdf', label: 'Transcript PDF', disabled: exportBusy || !hasTranscript, onSelect: () => handleExport('transcript', 'pdf') },
+          { key: 'transcript-docx', label: 'Transcript Word (.docx)', disabled: exportBusy || !hasTranscript, onSelect: () => handleExport('transcript', 'docx') },
         ]}
       />
       {followUpPrimary ? (
@@ -891,13 +883,16 @@ export default function MeetingDetail() {
             </p>
           )}
           <div className="bs-mtg-share-field">
-            <span className="bs-lbl">Email or PDF</span>
+            <span className="bs-lbl">Email or download</span>
             <div className="bs-mtg-share-keys">
               <Key size="sm" onClick={() => { setShowShareModal(false); chooseTab('followup') }}>
                 Email the people who were there
               </Key>
-              <Key size="sm" onClick={handleRecapPdf} disabled={recapBusy}>
-                {recapBusy ? 'Preparing' : 'Download PDF'}
+              <Key size="sm" onClick={() => handleExport('recap', 'pdf')} disabled={exportBusy}>
+                {exportBusy ? 'Preparing export' : 'Download PDF'}
+              </Key>
+              <Key size="sm" onClick={() => handleExport('recap', 'docx')} disabled={exportBusy}>
+                Download Word (.docx)
               </Key>
             </div>
           </div>
