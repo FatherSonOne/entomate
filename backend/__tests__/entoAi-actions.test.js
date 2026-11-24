@@ -70,7 +70,13 @@ function mockClient(uid) {
       mockDb.queries.push({ uid, q });
       const rowsOf = () => (mockDb.tables[table] = mockDb.tables[table] || []);
       // 'col->>key' reads a jsonb key as text, as PostgREST does.
-      const val = (r, k) => { const [c, f] = k.split('->>'); if (!f) return r[c]; const o = r[c]; return o && o[f] != null ? String(o[f]) : null; };
+      const val = (r, k) => {
+        if (k.startsWith('thread.')) return r.thread?.[k.slice('thread.'.length)];
+        const [c, f] = k.split('->>');
+        if (!f) return r[c];
+        const o = r[c];
+        return o && o[f] != null ? String(o[f]) : null;
+      };
       const OPS = {
         eq: (a, v) => a === v,
         neq: (a, v) => a !== v,
@@ -78,6 +84,7 @@ function mockClient(uid) {
         notIn: (a, v) => !v.includes(a),
         lt: (a, v) => a != null && a < v,
         gte: (a, v) => a != null && a >= v,
+        gt: (a, v) => a != null && a > v,
       };
       const match = (r) => q.filters.every(([k, op, v]) => OPS[op](val(r, k), v));
       const run = () => {
@@ -133,6 +140,7 @@ function mockClient(uid) {
         not(k, op, list) { q.filters.push([k, 'notIn', list.slice(1, -1).split(',').map((x) => x.replace(/"/g, ''))]); return b; },
         lt(k, v) { q.filters.push([k, 'lt', v]); return b; },
         gte(k, v) { q.filters.push([k, 'gte', v]); return b; },
+        gt(k, v) { q.filters.push([k, 'gt', v]); return b; },
         order(k, o) { q.order = [k, o?.ascending !== false]; return b; },
         maybeSingle() { q.single = true; return b; },
         limit() { return b; },
@@ -387,6 +395,28 @@ test('Ask Entomate schedules and cancels the exact brief from the active workspa
   expect((await upcoming('get')).body.schedule).toBeNull();
   expect(mockDb.tables.user_settings[0].calendar_json.auto_join).toEqual({ enabled: false, lead_minutes: 5 });
   expect(rows('bot_sessions')).toHaveLength(0);
+});
+
+test('ready brief notifications expose only the caller’s recent, completed briefs in the selected workspace', async () => {
+  const row = (id, changes = {}) => ({
+    user_id: 'user-b', org_id: 'org-b', status: 'ready', thread_id: id,
+    starts_at: new Date(Date.now() + 300_000).toISOString(),
+    thread: { title: 'Pre-meeting brief for Budget review', user_id: 'user-b', org_id: 'org-b' },
+    ...changes,
+  });
+  mockDb.tables.ento_ai_brief_schedules = [
+    row('ready'),
+    row('old', { starts_at: new Date(Date.now() - 3_600_000).toISOString() }),
+    row(null, { status: 'scheduled' }),
+    row('other-workspace', { org_id: 'org-a' }),
+    row('other-owner', { user_id: 'user-a' }),
+    row('mismatched-thread', { thread: { title: 'Private', user_id: 'user-a', org_id: 'org-b' } }),
+  ];
+  const url = '/api/ento-ai/meeting-briefs?orgId=org-b';
+  await request(app).get(url).expect(401);
+  await request(app).get(url).set('Authorization', 'Bearer token-a').expect(403);
+  await request(app).get(url).set('Authorization', 'Bearer token-b').expect('Cache-Control', 'no-store')
+    .expect(200, { briefs: [{ threadId: 'ready', title: 'Budget review' }] });
 });
 
 test('a write call only proposes: one row, a proposal event, nothing created, no chip', async () => {

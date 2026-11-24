@@ -1155,6 +1155,11 @@ export const assistantApi = {
  */
 export const entoAiApi = {
   meetingBriefs: {
+    ready: (orgId) => {
+      const path = '/ento-ai/meeting-briefs'
+      cache.invalidate(path)
+      return api.get(path, { params: { orgId }, skipRetry: true })
+    },
     status: (eventId, orgId) => {
       const path = `/ento-ai/meeting-briefs/${encodeURIComponent(eventId)}`
       cache.invalidate(path)

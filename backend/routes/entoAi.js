@@ -441,6 +441,18 @@ async function meetingBriefSchedule(req, res) {
   }
 }
 
+router.get('/meeting-briefs', authenticate, async (req, res) => {
+  const { BriefError, listReadyBriefs } = require('../services/entoAi/scheduledBriefs');
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    res.json({ briefs: await listReadyBriefs(req.user.id, req.query.orgId) });
+  } catch (error) {
+    if (error instanceof BriefError) return res.status(error.status).json({ error: error.message });
+    log.warn('[ScheduledBriefs] Ready brief lookup failed', { error: error.message });
+    return res.status(503).json({ error: 'Ready briefs could not be checked.' });
+  }
+});
+
 router.route('/meeting-briefs/:eventId')
   .get(authenticate, meetingBriefSchedule)
   .put(authenticate, aiLimiter, meetingBriefSchedule)
