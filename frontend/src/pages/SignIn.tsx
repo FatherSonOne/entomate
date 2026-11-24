@@ -3,6 +3,7 @@ import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Key, Signal, Switch, TextInput } from '../components/bench'
 import { AuthFrame, AuthProblemLine } from '../components/signin/AuthFrame'
+import { rememberOAuthDestination, safeAuthDestination } from '../services/authDestination'
 import {
   MIN_PASSWORD,
   PRIMARY_LABEL,
@@ -45,13 +46,14 @@ const GoogleG = (): React.ReactElement => (
 export default function SignInPage(): React.ReactElement {
   const auth = useAuth() as unknown as AuthCtx
   const [params] = useSearchParams()
+  const destination = safeAuthDestination(params.get('next'))
   const [view, setView] = useState<SignInView>(() => viewFromParam(params.get('mode')))
   const [fields, setFields] = useState<SignInFields>({ name: '', email: '', password: '' })
   const [busy, setBusy] = useState<Busy>(null)
   const [problem, setProblem] = useState<AuthProblem | null>(null)
   const [sent, setSent] = useState<{ reason: SentReason; at: string } | null>(null)
 
-  if (!auth.loading && auth.isSignedIn) return <Navigate to="/dashboard" replace />
+  if (!auth.loading && auth.isSignedIn) return <Navigate to={destination ?? '/dashboard'} replace />
 
   const go = (next: SignInView): void => { setView(next); setProblem(null) }
   const set = (key: keyof SignInFields) => (e: React.ChangeEvent<HTMLInputElement>): void =>
@@ -61,11 +63,13 @@ export default function SignInPage(): React.ReactElement {
 
   const google = async (): Promise<void> => {
     setBusy('google'); setProblem(null)
+    rememberOAuthDestination(destination)
     try {
       const { error } = await auth.signInWithOAuth('google')
       if (error) throw error
       // The browser leaves for Google; keep the key down until it does.
     } catch (e) {
+      rememberOAuthDestination(null)
       fail(view, (e as Error).message)
       setBusy(null)
     }

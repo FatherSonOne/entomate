@@ -75,7 +75,7 @@ export default function LandingPage() {
       <main id="lc-main">
         {/* 01 Hero */}
         <section className="lc-hero lc-media lc-wrap" aria-labelledby="lc-h1">
-          <BrandMotion clip={heroClip} mediaDirectory={LANDING_MEDIA_DIR} className="lc-hero-film" />
+          <BrandMotion clip={heroClip} mediaDirectory={LANDING_MEDIA_DIR} className="lc-hero-film" responsive priority />
           <div className="lc-scrim" aria-hidden="true" />
           <div className="lc-in">
             <div className="lc-rule lc-eyebrow"><span>01 · Meeting intelligence that executes</span></div>
@@ -176,7 +176,7 @@ export default function LandingPage() {
 
         {/* 06 Close */}
         <section className="lc-close lc-media" id="start" aria-labelledby="lc-close-h">
-          <BrandMotion clip="glass-torus" mediaDirectory={LANDING_MEDIA_DIR} className="lc-close-film" />
+          <BrandMotion clip="glass-torus" mediaDirectory={LANDING_MEDIA_DIR} className="lc-close-film" responsive />
           <div className="lc-scrim" aria-hidden="true" />
           <div className="lc-in">
             <div className="lc-eyebrow">06 · Start free</div>

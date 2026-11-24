@@ -22,6 +22,7 @@
    ============================================================ */
 
 :root {
+  scroll-behavior: smooth;
   --m-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --m-ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --m-ease-exit: cubic-bezier(0.4, 0, 1, 1);
@@ -41,9 +42,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root { --m-rise: 0px; --m-slide: 0px; --m-pop-scale: 1; }
+  :root { scroll-behavior: auto; --m-rise: 0px; --m-slide: 0px; --m-pop-scale: 1; }
 }
-html[data-motion="reduce"] { --m-rise: 0px; --m-slide: 0px; --m-pop-scale: 1; }
+html[data-motion="reduce"] { scroll-behavior: auto; --m-rise: 0px; --m-slide: 0px; --m-pop-scale: 1; }
 
 /* ── Keyframes (mount-only entrances; toggled states use transitions) ── */
 @keyframes m-fade-in { from { opacity: 0; } }

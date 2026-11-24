@@ -416,7 +416,7 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
           <PatchPanel groups={railGroups} isActive={isActive} />
         </nav>
         {assistant ? <div className="la-launcher-wrap">{assistant}<kbd className="bs-nav-peek">{shortcutLabel('mod+/')}</kbd></div> : null}
-        <button type="button" className="bs-recbox group" onClick={onRecord} {...railPress}>
+        <button type="button" className="bs-recbox group" onClick={onRecord} aria-haspopup="dialog" {...railPress}>
           <span className="relative isolate inline-flex" aria-hidden="true">
             <RippleCircles className="-inset-[9px] -z-10 opacity-0 transition-opacity duration-300 [&_*]:[animation-play-state:paused] group-hover:opacity-100 group-hover:[&_*]:[animation-play-state:running] group-focus-visible:opacity-100 group-focus-visible:[&_*]:[animation-play-state:running] group-data-[lit=true]:opacity-100 group-data-[lit=true]:[&_*]:[animation-play-state:running]" />
             <span className="bs-rec" />
@@ -462,7 +462,7 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
       <nav className="bs-dock" aria-label="Quick navigation" ref={dockRef}>
         {d0 && dockItem(d0)}
         {d1 && dockItem(d1)}
-        <button type="button" className="bs-dock-rec group" onClick={onRecord} aria-label="Record a meeting" {...dockPress}>
+        <button type="button" className="bs-dock-rec group" onClick={onRecord} aria-label="Record a meeting" aria-haspopup="dialog" {...dockPress}>
           {/* The rail's hover ripple, here on press: touch has no hover. */}
           <span className="relative isolate inline-flex" aria-hidden="true">
             <RippleCircles className="-inset-[9px] -z-10 opacity-0 transition-opacity duration-300 [&_*]:[animation-play-state:paused] group-focus-visible:opacity-100 group-focus-visible:[&_*]:[animation-play-state:running] group-data-[lit=true]:opacity-100 group-data-[lit=true]:[&_*]:[animation-play-state:running]" />

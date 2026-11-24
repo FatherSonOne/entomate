@@ -42,7 +42,6 @@ function useNow(ticking) {
 export default function Today() {
   const navigate = useNavigate()
   const toast = useToast()
-  // The bench shell passes openAssistant; the legacy shells pass nothing.
   const outlet = useOutletContext()
   const openAssistant = outlet?.openAssistant
   const workspaceId = useOrgSafe()?.org?.id
@@ -86,7 +85,7 @@ export default function Today() {
     setLoading(false)
   }, [toast])
 
-  useEffect(() => { loadData() }, [loadData])
+  useEffect(() => { loadData() }, [loadData, outlet?.recordingVersion])
   useEffect(() => {
     if (!workspaceId || loading) return undefined
     let cancelled = false
@@ -96,14 +95,17 @@ export default function Today() {
     return () => { cancelled = true }
   }, [workspaceId, loading])
 
-  const startRecording = () => navigate('/meetings?new=true')
+  const startRecording = () => {
+    if (outlet?.openRecorder) outlet.openRecorder()
+    else navigate('/meetings?new=true')
+  }
 
   useKeyboardShortcuts({
     r: { callback: () => { toast.info('Refreshing Today'); loadData() }, requireMod: false },
     n: { callback: startRecording, requireMod: false },
     t: { callback: () => navigate('/tasks'), requireMod: false },
     '?': { callback: () => setKeysOpen((v) => !v), requireMod: false },
-  })
+  }, !outlet?.recorderOpen)
 
   // ── Derived view ────────────────────────────────────────────
   const events = useMemo(() => calendarEvents(upcoming), [upcoming])

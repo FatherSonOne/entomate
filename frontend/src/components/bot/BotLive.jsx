@@ -53,12 +53,34 @@ export const canPip = () => typeof window !== 'undefined' && 'documentPictureInP
 export function dressWindow(win, title = 'Entomate · bot') {
   const doc = win.document
   doc.title = title
-  for (const node of document.querySelectorAll('link[rel="stylesheet"], style')) {
-    doc.head.appendChild(node.cloneNode(true))
-  }
+  // Picture-in-Picture has its own about:blank document. Resolve the app's
+  // root-relative styles and font URLs against the opener before copying them.
+  const base = doc.createElement('base')
+  base.href = document.baseURI
+  doc.head.appendChild(base)
   const html = doc.documentElement
-  html.dataset.style = document.documentElement.dataset.style || 'bench-swiss'
-  html.className = document.documentElement.className
+  const appHtml = document.documentElement
+  Object.assign(html.dataset, appHtml.dataset)
+  html.lang = appHtml.lang
+  html.className = appHtml.classList.contains('dark') ? 'dark' : ''
+  html.style.colorScheme = appHtml.classList.contains('dark') ? 'dark' : 'light'
+  for (const sheet of document.styleSheets) {
+    if (sheet.disabled) continue
+    try {
+      const style = doc.createElement('style')
+      style.media = sheet.media.mediaText
+      style.textContent = Array.from(sheet.cssRules, (rule) => rule.cssText).join('\n')
+      doc.head.appendChild(style)
+    } catch {
+      // Cross-origin sheets can be linked, but their rules cannot be read.
+      if (!sheet.href) continue
+      const link = doc.createElement('link')
+      link.rel = 'stylesheet'
+      link.href = sheet.href
+      link.media = sheet.media.mediaText
+      doc.head.appendChild(link)
+    }
+  }
   doc.body.className = 'bs-bot-popbody'
   const root = doc.createElement('div')
   doc.body.appendChild(root)

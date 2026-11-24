@@ -830,7 +830,7 @@ export const workflowsApi = {
   get: (id) => api.get(`/workflows/${id}`),
 
   // Create workflow
-  create: (data) => api.post('/workflows', data),
+  create: (data, options) => api.post('/workflows', data, options),
 
   // Update workflow
   update: (id, data) => api.put(`/workflows/${id}`, data),

@@ -12,6 +12,7 @@ import {
   Cell, Drawer, Grid, Key, Readout, Section, Signal, Tag, TextInput, TitleRule, Toggle, applyReduceMotion,
   Select,
 } from '../components/bench'
+import { smoothScrollBehavior } from '../components/bench/motion'
 import AppearanceSettings, { STYLE_SCROLL_KEY } from '../components/settings/AppearanceSettings'
 import RecordingSettings from '../components/settings/RecordingSettings'
 import type { MeetingsJson } from '../components/settings/RecordingSettings'
@@ -197,7 +198,7 @@ export default function Settings(): React.ReactElement {
     lastScrolled.current = null
     setUrl({ section, query: '', drawer: drawer ?? null })
     setCurrent(section)
-    requestAnimationFrame(() => sectionEl(section)?.scrollIntoView({ block: 'start', behavior: 'smooth' }))
+    requestAnimationFrame(() => sectionEl(section)?.scrollIntoView({ block: 'start', behavior: smoothScrollBehavior() }))
   }
 
   const onThemeChange = (mode: string): void => {

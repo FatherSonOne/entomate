@@ -1308,6 +1308,8 @@ html[data-motion="reduce"] :is(.bs-key, .bs-av) { transition-duration: 1ms !impo
 .bs-mtg-dec .bs-tick { align-self: auto; flex: none; height: 12px; margin: 0; transform: translateY(1px); }
 .bs-mtg-dec-more { font: 500 11px var(--bs-mono); color: var(--bs-muted); white-space: nowrap; }
 .bs-mtg-mine { margin-top: 5px; font: 500 11px var(--bs-mono); letter-spacing: 0.04em; color: var(--bs-brand); }
+.bs-mtg-mobile-status { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin-top: 6px; }
+.bs-mtg-mobile-status .bs-mtg-mine { margin: 0; }
 .bs-mtg .bs-tbl td.bs-mtg-acts { width: 112px; font: 500 12px var(--bs-mono); }
 .bs-mtg .bs-tbl td.bs-mtg-acts > span { display: block; }
 .bs-mtg-acts-mine { margin-top: 3px; color: var(--bs-brand); }
@@ -1325,7 +1327,11 @@ html[data-motion="reduce"] :is(.bs-key, .bs-av) { transition-duration: 1ms !impo
 @media (max-width: 767.98px) { .bs-mtg-keyhint { display: none; } }
 .bs-mtg .bs-tbl .bs-mtg-open { height: 28px; width: 30px; padding: 0; justify-content: center; color: var(--bs-ink2); text-decoration: none; }
 .bs-mtg .bs-tbl .bs-mtg-open:hover { color: var(--bs-ink); }
-@media (max-width: 767.98px) { .bs-mtg-rowkeys { flex-direction: column; gap: 4px; } .bs-mtg .bs-tbl td.bs-mtg-more-col { padding-left: 10px; } }
+@media (max-width: 767.98px) {
+  .bs-mtg-list .bs-tbl th[scope="col"] { white-space: normal; }
+  .bs-mtg-rowkeys { flex-direction: column; gap: 4px; }
+  .bs-mtg .bs-tbl td.bs-mtg-more-col { padding-left: 10px; }
+}
 .bs-mtg .bs-tbl td { vertical-align: top; }
 .bs-mtg .bs-tbl td.bs-mtg-status, .bs-mtg .bs-tbl td.bs-num, .bs-mtg .bs-tbl td.bs-mtg-acts { padding-top: 14px; }
 
@@ -1384,9 +1390,6 @@ html[data-motion="reduce"] .bs-menu-list { animation: none; }
 .bs-mtg-more { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 18px; }
 .bs-mtg-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 40px 0 12px; }
 .bs-mtg-empty .bs-h3 { max-width: 46ch; }
-.bs-mtg-recorder { padding-top: 22px; }
-.bs-mtg-recorder:focus { outline: none; }
-.bs-mtg-recorder .bs-skin { padding-top: 14px; max-width: 760px; }
 
 /* Detail */
 .bs-title-edit { min-width: 0; }

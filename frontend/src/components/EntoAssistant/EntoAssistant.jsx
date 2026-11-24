@@ -15,7 +15,7 @@ import { useOrgSafe } from '../../contexts/OrgContext'
 import useAssistantContext from './useAssistantContext'
 import { getStarter, streamQuery } from '../../services/entoAssistantService'
 import { useMediaQuery } from '../bench/useMediaQuery'
-import { usePresence, MOTION } from '../bench/motion'
+import { usePresence, MOTION, smoothScrollBehavior } from '../bench/motion'
 import Composer from './Composer'
 import ContextCard from './ContextCard'
 import { WelcomeOrb, orbStateFor, useSettledOrbState, AI_ORB_LABELS, headerStatusShown } from './AiOrb'
@@ -209,7 +209,7 @@ export default function EntoAssistant({ isOpen, onClose, signals = [], signalTot
 
   // Auto-scroll
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    messagesEndRef.current?.scrollIntoView({ behavior: smoothScrollBehavior() })
   }, [messages, streamingContent])
 
   // Auto-focus input when panel opens

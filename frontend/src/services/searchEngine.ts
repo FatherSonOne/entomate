@@ -85,9 +85,9 @@ const http = api as unknown as { post: (url: string, body: unknown) => Promise<u
 /** Run the shared search. `log` records the query in history (page / Enter only). */
 export async function searchEverything(
   query: string,
-  opts: { limit?: number; log?: boolean; types?: GroupKey[] } = {},
+  opts: { limit?: number; log?: boolean; types?: GroupKey[]; meaning?: boolean } = {},
 ): Promise<SearchResponse> {
-  const raw = await http.post('/search/everything', { query, limit: opts.limit ?? 8, log: opts.log === true, types: opts.types })
+  const raw = await http.post('/search/everything', { query, limit: opts.limit ?? 8, log: opts.log === true, types: opts.types, meaning: opts.meaning })
   return normalizeResponse(raw, query)
 }
 

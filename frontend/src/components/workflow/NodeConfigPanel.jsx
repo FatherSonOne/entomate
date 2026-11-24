@@ -652,13 +652,13 @@ export default function NodeConfigPanel({
       {/* Actions footer */}
       <div className="p-3 border-t border-line-default space-y-2">
         <div className="flex gap-2">
-          <button
+          {onTest && <button
             onClick={() => onTest?.(node.id)}
             className="flex-1 btn btn-secondary btn-sm"
           >
             <Play className="w-4 h-4" />
             Test
-          </button>
+          </button>}
           <button
             onClick={() => onTogglePin?.(node.id)}
             className={`btn btn-sm ${isPinned ? 'btn-primary' : 'btn-secondary'}`}

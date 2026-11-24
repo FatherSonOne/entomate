@@ -12,6 +12,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Check, ChevronDown, ChevronUp, Loader2, Pencil, Search, X } from 'lucide-react'
+import { smoothScrollBehavior } from '../bench/motion'
 import {
   formatClock,
   isGenericSpeaker,
@@ -131,7 +132,7 @@ export function TranscriptPanel({ meetingId, segments, onRenamed, suggestions, f
 
   useEffect(() => {
     if (activeLine === undefined) return
-    lineRefs.current[activeLine]?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' })
+    lineRefs.current[activeLine]?.scrollIntoView?.({ block: 'nearest', behavior: smoothScrollBehavior() })
   }, [activeLine])
 
   const step = (delta: number): void => {
