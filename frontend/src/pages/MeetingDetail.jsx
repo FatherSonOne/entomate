@@ -26,7 +26,7 @@ import {
   TextInput, TextArea, Menu, useMediaQuery, PHONE_QUERY,
 } from '../components/bench'
 import { smoothScrollBehavior } from '../components/bench/motion'
-import { asList, meetingDate, meetingLengthMs, formatLength, speechDensity } from '../services/meetingView'
+import { asList, meetingDate, meetingLengthMs, formatLength } from '../services/meetingView'
 
 const TABS_ID = 'meeting'
 
@@ -51,10 +51,12 @@ export default function MeetingDetail() {
   const summaryMoments = useMemo(() => toSummaryMoments(meeting?.summary_moments), [meeting?.summary_moments])
   // Timecodes next to decisions, key points and action items jump the transcript here.
   const [focusAtMs, setFocusAtMs] = useState(null)
-  // A browser recording's audio, played under the tape; a pressed timecode or tape mark loads and plays it.
+  // A pressed playback timecode or recording marker loads the audio and plays from there.
   const playerRef = useRef(null)
   const [playingAtMs, setPlayingAtMs] = useState(null)
-  const playable = canPlay(meeting?.recording_job)
+  const keptRecording = canPlay(meeting?.recording_job)
+  const uploadedAudioUrl = keptRecording ? undefined : meeting?.audio_file_url || undefined
+  const playable = keptRecording || Boolean(uploadedAudioUrl)
   // A browser recording whose minutes are still being written: empty sections say so instead of "none".
   const minutesPending = ['transcribing', 'backup'].includes(toRecordingJob(meeting?.recording_job)?.status)
   const jumpToTranscript = useCallback((atMs) => {
@@ -362,7 +364,6 @@ export default function MeetingDetail() {
 
   // ── Tape: the meeting's length with its decisions and action items ──
   const lengthMs = meeting ? meetingLengthMs(meeting, transcriptSegments) : 0
-  const density = useMemo(() => speechDensity(transcriptSegments, lengthMs), [transcriptSegments, lengthMs])
   const decisions = asList(meeting?.decisions)
   const keyPoints = asList(meeting?.key_points)
   // Extra sections from the meeting-type template; empty ones stay hidden.
@@ -382,9 +383,7 @@ export default function MeetingDetail() {
     const next = dir > 0 ? moments.find(m => m > at) : [...moments].reverse().find(m => m < at)
     jumpToTranscript(next ?? (dir > 0 ? moments[0] : moments[moments.length - 1]))
   }
-  const showTape = Boolean(transcriptSegments && lengthMs > 0)
-  // While the recording plays, the tape follows it; otherwise it shows the last jump.
-  const tapeAtMs = playable && playingAtMs != null ? playingAtMs : focusAtMs
+  const showTape = !playable && Boolean(transcriptSegments && lengthMs > 0)
 
   if (loading) {
     return (
@@ -608,6 +607,23 @@ export default function MeetingDetail() {
         <RecordingStatus meetingId={meeting.id} recordingJob={meeting.recording_job} onRefresh={refreshMeeting} hasSummary={!!meeting.summary} hasTranscript={!!meeting.transcript} title={meeting.title} attendees={meeting.attendees} />
       </div>
 
+      {playable && (
+        <div className="bs-cell">
+          <RecordingPlayer
+            key={meeting.id}
+            ref={playerRef}
+            meetingId={meeting.id}
+            audioUrl={uploadedAudioUrl}
+            durationMs={meeting.recording_job?.durationMs || lengthMs}
+            onTime={setPlayingAtMs}
+            decisions={decisionMarks}
+            actions={actionMarks}
+            onMoment={playMoment}
+            onStepMoment={moments.length ? stepMoment : undefined}
+            onAudioRemoved={keptRecording ? refreshMeeting : undefined}
+          />
+        </div>
+      )}
       {showTape && (
         <div className="bs-cell">
           <Display className="bs-transport">
@@ -620,37 +636,18 @@ export default function MeetingDetail() {
                   {actionMarks.length > 0 && <span><span className="bs-transport-key a" aria-hidden="true" /> {actionMarks.length === 1 ? 'action item' : 'action items'}</span>}
                 </span>
                 <span className="bs-transport-clock" aria-live="polite">
-                  <b>{formatClock(tapeAtMs ?? 0)}</b> / {formatClock(lengthMs)}
+                  <b>{formatClock(focusAtMs ?? 0)}</b> / {formatClock(lengthMs)}
                 </span>
               </div>
               <Tape
                 durationMs={lengthMs}
-                density={density}
                 decisions={decisionMarks}
                 actions={actionMarks}
-                progress={tapeAtMs != null ? Math.min(1, tapeAtMs / lengthMs) : 0}
-                playhead={tapeAtMs != null}
-                onSeek={playMoment}
-                label={`Meeting tape: ${decisionMarks.length} decisions and ${actionMarks.length} action items. Choose one to ${playable ? 'play from it' : 'jump the transcript'}.`}
+                progress={focusAtMs != null ? Math.min(1, focusAtMs / lengthMs) : 0}
+                playhead={focusAtMs != null}
+                onSeek={jumpToTranscript}
+                label={`Meeting tape: ${decisionMarks.length} decisions and ${actionMarks.length} action items. Choose one to jump the transcript.`}
               />
-              {/* Player slot: the synced video/audio player goes here, under the tape. */}
-              {playable ? (
-                <div className="bs-transport-media" data-slot="player">
-                  <RecordingPlayer
-                    ref={playerRef}
-                    meetingId={meeting.id}
-                    durationMs={meeting.recording_job?.durationMs}
-                    onTime={setPlayingAtMs}
-                    onAudioRemoved={refreshMeeting}
-                  />
-                </div>
-              ) : meeting.audio_file_url && (
-                <div className="bs-transport-media" data-slot="player">
-                  <audio controls preload="none" src={meeting.audio_file_url}>
-                    Your browser does not support the audio element.
-                  </audio>
-                </div>
-              )}
             </div>
             <div className="bs-transport-keys">
               <Key size="sm" onDisplay onClick={() => stepMoment(-1)} disabled={!moments.length} aria-label="Previous moment">◀◀ Prev</Key>

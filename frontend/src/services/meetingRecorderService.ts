@@ -104,6 +104,7 @@ export async function loadRecordingAudio(
   meetingId: string,
   fetcher: typeof fetch = fetch,
   onProgress?: (fraction: number) => void,
+  signal?: AbortSignal,
 ): Promise<RecordingAudio> {
   let res: PlaybackResponse
   try {
@@ -112,6 +113,7 @@ export async function loadRecordingAudio(
   } catch (err) {
     throw new Error(errorText(err, 'The recording could not be loaded.'))
   }
+  signal?.throwIfAborted()
   const durationMs = typeof res?.durationMs === 'number' ? res.durationMs : 0
   if (typeof res?.url === 'string') return { url: res.url, durationMs }
   const urls = (Array.isArray(res?.pieces) ? res.pieces : []).map((p) => p?.url)
@@ -119,7 +121,7 @@ export async function loadRecordingAudio(
   let downloaded = 0
   const parts = await Promise.all(
     (urls as string[]).map(async (url) => {
-      const r = await fetcher(url)
+      const r = await fetcher(url, { signal })
       if (!r.ok) throw new Error('Part of the recording could not be downloaded. Try again.')
       // Bytes, not a Blob: a Blob from fetch and the page's Blob can be
       // different classes (jsdom), and new Blob() would stringify it.

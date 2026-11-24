@@ -70,15 +70,20 @@ describe('playback service', () => {
 })
 
 describe('RecordingPlayer', () => {
-  test('downloads nothing until asked, then plays the joined audio', async () => {
-    render(<RecordingPlayer meetingId={MEETING} durationMs={754_000} />)
-    expect(screen.getByText('12:34 of audio')).toBeTruthy()
+  test('downloads nothing until asked, then seeks with the Slate slider without starting playback', async () => {
+    const onTime = vi.fn()
+    render(<RecordingPlayer meetingId={MEETING} durationMs={754_000} onTime={onTime} />)
     expect(api.playback).not.toHaveBeenCalled()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Play the recording' }))
+    const slider = screen.getByRole('slider', { name: 'Playback position' })
+    fireEvent.change(slider, { target: { value: '12.25' } })
     const audio = (await screen.findByTestId('recording-player')) as HTMLAudioElement
+    const play = vi.spyOn(audio, 'play').mockResolvedValue(undefined)
+    Object.defineProperty(audio, 'duration', { configurable: true, value: 60 })
+    fireEvent.loadedMetadata(audio)
     expect(audio.getAttribute('src')).toBe('blob:recording')
-    expect(audio.hasAttribute('controls')).toBe(true)
+    expect(audio.currentTime).toBe(12.25)
+    expect(play).not.toHaveBeenCalled()
+    expect(onTime).toHaveBeenLastCalledWith(12_000)
   })
 
   test('playFrom before loading loads, then seeks once the length is known', async () => {
@@ -115,6 +120,37 @@ describe('RecordingPlayer', () => {
       fireEvent.error(audio)
     })
     expect((await screen.findByRole('alert')).textContent).toContain('could not be played')
+  })
+
+  test('renders waveform bars from decoded audio and leaves its silent half empty', async () => {
+    const signedUrl = 'https://signed.test/seekable'
+    api.playback.mockResolvedValue({ url: signedUrl, durationMs: 12_000 })
+    const decodeAudioData = vi.fn().mockResolvedValue({
+      length: 4,
+      numberOfChannels: 1,
+      getChannelData: () => Float32Array.from([0, 0, 0.25, -0.5]),
+    })
+    vi.stubGlobal('OfflineAudioContext', class {
+      decodeAudioData = decodeAudioData
+    })
+    render(<RecordingPlayer meetingId={MEETING} />)
+    expect(screen.queryByTestId('recording-waveform')).toBeNull()
+    expect(okFetch).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Play the recording' }))
+    const waveform = await screen.findByTestId('recording-waveform')
+    const path = waveform.querySelector('path')?.getAttribute('d') ?? ''
+    expect(okFetch).toHaveBeenCalledWith(signedUrl, expect.objectContaining({ credentials: 'omit' }))
+    expect(decodeAudioData).toHaveBeenCalledTimes(1)
+    expect(path.match(/M/g)).toHaveLength(2)
+    expect(Number(path.match(/^M([\d.]+),/)?.[1])).toBeGreaterThan(500)
+  })
+
+  test('a recording moment passes the original transcript time to the jump handler', () => {
+    const onMoment = vi.fn()
+    render(<RecordingPlayer meetingId={MEETING} durationMs={60_000}
+      decisions={[{ atMs: 22_000, label: 'Decision: Ship on the fourteenth' }]} onMoment={onMoment} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Decision: Ship on the fourteenth' }))
+    expect(onMoment).toHaveBeenCalledWith(22_000)
   })
 
   test('remove audio asks first, then removes it', async () => {

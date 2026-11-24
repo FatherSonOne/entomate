@@ -15,9 +15,13 @@ vi.mock('../components/ChatChannelSelector', () => ({ default: () => null }))
 vi.mock('../components/meetings/RecordingPlayer', async () => {
   const { forwardRef, useImperativeHandle } = await import('react')
   return {
-    default: forwardRef(function Stub(_props, ref) {
+    default: forwardRef(function Stub({ decisions, onMoment, audioUrl }, ref) {
       useImperativeHandle(ref, () => ({ isReady: () => player.ready, playFrom: player.playFrom }))
-      return <div data-testid="player-stub" />
+      return <div data-testid="player-stub" data-audio-url={audioUrl}>
+        {decisions.map(({ atMs, label }) => (
+          <button key={label} type="button" onClick={() => onMoment(atMs)}>{label}</button>
+        ))}
+      </div>
     }),
   }
 })
@@ -36,8 +40,8 @@ const MEETING = {
   action_items: [],
 }
 
-function renderPage(recordingJob) {
-  api.get.mockResolvedValue({ ...MEETING, recording_job: recordingJob })
+function renderPage(recordingJob, overrides) {
+  api.get.mockResolvedValue({ ...MEETING, recording_job: recordingJob, ...overrides })
   return render(
     <MemoryRouter initialEntries={['/meetings/m1']}>
       <Routes><Route path="/meetings/:id" element={<MeetingDetail />} /></Routes>
@@ -68,11 +72,16 @@ describe('a pressed timecode plays the recording', () => {
     expect(player.playFrom).toHaveBeenCalledTimes(1)
   })
 
-  test('a decision mark on the tape plays from it too', async () => {
+  test('a decision mark in the Slate player plays from it too', async () => {
     renderPage({ status: 'done', audioKept: true, durationMs: 60_000 })
-    expect(await screen.findByRole('group', { name: /Choose one to play from it/ })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Decision: Ship on the fourteenth' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Decision: Ship on the fourteenth' }))
     expect(player.playFrom).toHaveBeenCalledWith(22_000)
+  })
+
+  test('routes legacy uploaded audio through Slate even without a timed transcript', async () => {
+    const audioUrl = 'https://signed.test/uploaded'
+    renderPage(undefined, { audio_file_url: audioUrl, transcript_segments: null })
+    expect(await screen.findByTestId('player-stub')).toHaveAttribute('data-audio-url', audioUrl)
   })
 
   test('without kept audio it only jumps the transcript', async () => {
