@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation } from 'react-router-dom'
 import EnhancedLoadingScreen from './EnhancedLoadingScreen'
-import { prefersReducedMotion } from './bench/motion'
+import { useReducedMotion } from './bench/motion'
 import {
   bootProgress, endBoot, isPublicPath, markBoot, stageDurations, uncoverBoot, useBoot,
 } from '../services/bootProgress'
@@ -50,6 +50,7 @@ function stopsFor(stages: ReadonlyArray<BootStage>): Array<{ at: number; done: b
 export default function BootLoader(): React.ReactElement | null {
   const boot = useBoot()
   const { pathname } = useLocation()
+  const reduce = useReducedMotion()
   const [shown, setShown] = useState(() => bootProgress(boot.stages))
   const [exiting, setExiting] = useState(false)
   const mountedAt = useRef(now())
@@ -69,26 +70,24 @@ export default function BootLoader(): React.ReactElement | null {
   const stagesRef = useRef(boot.stages)
   stagesRef.current = boot.stages
   useEffect(() => {
-    if (!boot.covering || boot.phase !== 'loading') return undefined
-    const reduce = prefersReducedMotion()
+    if (!boot.covering || boot.phase !== 'loading' || reduce) return undefined
     let frame = 0
     let last = now()
     const tick = (): void => {
       const t = now()
-      const target = bootProgress(stagesRef.current, t, !reduce)
-      const k = reduce ? 1 : Math.min(1, (t - last) / 140)
+      const target = bootProgress(stagesRef.current, t)
+      const k = Math.min(1, (t - last) / 140)
       last = t
       setShown((v) => v + (target - v) * k)
       frame = requestAnimationFrame(tick)
     }
     frame = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(frame)
-  }, [boot.covering, boot.phase])
+  }, [boot.covering, boot.phase, reduce])
 
   // Finished: run the fill to 100, hold a beat, then open onto the app
   useEffect(() => {
     if (!boot.covering || boot.phase === 'loading' || boot.phase === 'idle') return undefined
-    const reduce = prefersReducedMotion()
     const timers: number[] = []
     let frame = 0
     const exitMs = reduce ? 200 : EXIT_MS
@@ -98,29 +97,33 @@ export default function BootLoader(): React.ReactElement | null {
     }
     if (boot.phase === 'aborted') {
       leave()
+    } else if (reduce) {
+      setShown(100)
+      timers.push(window.setTimeout(leave, 120))
     } else {
       const from = shown
-      const fillMs = reduce ? 0 : Math.max(MIN_FILL_MS, MIN_VISIBLE_MS - (now() - mountedAt.current))
+      const fillMs = Math.max(MIN_FILL_MS, MIN_VISIBLE_MS - (now() - mountedAt.current))
       const start = now()
       const tick = (): void => {
-        const p = fillMs ? Math.min(1, (now() - start) / fillMs) : 1
+        const p = Math.min(1, (now() - start) / fillMs)
         setShown(from + (100 - from) * easeOut(p))
         if (p < 1) frame = requestAnimationFrame(tick)
-        else timers.push(window.setTimeout(leave, reduce ? 120 : HOLD_MS))
+        else timers.push(window.setTimeout(leave, HOLD_MS))
       }
       frame = requestAnimationFrame(tick)
     }
     return () => { cancelAnimationFrame(frame); timers.forEach((id) => window.clearTimeout(id)) }
     // `shown` is read once as the starting point of the fill
-  }, [boot.covering, boot.phase])
+  }, [boot.covering, boot.phase, reduce])
 
   if (!boot.covering) return null
   const rows = rowsFor(boot.stages)
   const live = rows.find(([, tone]) => tone === 'live')
   const label = live ? `${live[0]}: ${live[2]}` : 'Ready'
+  const progress = reduce && boot.phase === 'loading' ? bootProgress(boot.stages, now(), false) : shown
   return createPortal(
-    <div className="en-boot" data-state={exiting ? 'exit' : 'on'} data-reduce={prefersReducedMotion() ? '' : undefined}>
-      <EnhancedLoadingScreen boot={{ progress: shown, rows, label, stops: stopsFor(boot.stages) }} />
+    <div className="en-boot" data-state={exiting ? 'exit' : 'on'} data-reduce={reduce ? '' : undefined}>
+      <EnhancedLoadingScreen boot={{ progress, rows, label, stops: stopsFor(boot.stages) }} />
     </div>,
     document.body,
   )

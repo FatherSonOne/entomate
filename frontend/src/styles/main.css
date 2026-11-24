@@ -258,7 +258,7 @@
 
   /* Card glow — active AI elements */
   .card-glow {
-    animation: intel-glow 3s ease-in-out infinite;
+    animation: var(--m-decorative-effect, intel-glow 3s ease-in-out infinite);
   }
 
   /* ── BUTTONS ── */
@@ -328,7 +328,7 @@
     border-radius: 50%;
     background: currentColor;
     margin-right: 4px;
-    animation: phosphor-flicker 4s infinite;
+    animation: var(--m-decorative-effect, phosphor-flicker 4s infinite);
   }
 
   /* ── ICON CONTAINERS ── */
@@ -382,7 +382,7 @@
   /* ── WAVEFORM BARS ── */
   .waveform-bar {
     transform-origin: bottom;
-    animation: waveform-bar 0.8s ease-in-out infinite alternate;
+    animation: var(--m-decorative-effect, waveform-bar 0.8s ease-in-out infinite alternate);
   }
   .waveform-bar:nth-child(2) { animation-delay: 0.1s; }
   .waveform-bar:nth-child(3) { animation-delay: 0.2s; }
@@ -393,7 +393,7 @@
   .shimmer-crimson {
     background: linear-gradient(90deg, var(--bg-muted) 0%, rgba(255, 45, 107, 0.08) 50%, var(--bg-muted) 100%);
     background-size: 200% 100%;
-    animation: en-shimmer 1.5s linear infinite;
+    animation: var(--m-decorative-effect, en-shimmer 1.5s linear infinite);
   }
 
   /* ── SKELETON LOADER (LoadingSkeletons.jsx) ── */
@@ -405,7 +405,7 @@
       var(--bg-elevated, #101010) 100%
     );
     background-size: 300% 100%;
-    animation: en-skeleton-shimmer 2s ease-in-out infinite;
+    animation: var(--m-decorative-effect, en-skeleton-shimmer 2s ease-in-out infinite);
   }
 
   @keyframes en-skeleton-shimmer {
@@ -431,12 +431,12 @@
   }
 
   /* ── ANIMATION UTILITY CLASSES ── */
-  .animate-catalyst-pulse { animation: catalyst-pulse 3s ease-in-out infinite; }
-  .animate-intel-glow     { animation: intel-glow 3s ease-in-out infinite; }
-  .animate-phosphor       { animation: phosphor-flicker 4s infinite; }
+  .animate-catalyst-pulse { animation: var(--m-decorative-effect, catalyst-pulse 3s ease-in-out infinite); }
+  .animate-intel-glow     { animation: var(--m-decorative-effect, intel-glow 3s ease-in-out infinite); }
+  .animate-phosphor       { animation: var(--m-decorative-effect, phosphor-flicker 4s infinite); }
   .animate-transform-in   { animation: transform-in 0.6s var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both; }
   .animate-cascade-reveal { animation: cascade-reveal 0.4s var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both; }
-  .animate-signal-scan    { animation: signal-scan 2s var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) infinite; }
+  .animate-signal-scan    { animation: var(--m-decorative-effect, signal-scan 2s var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) infinite); }
 
   /* ── CUSTOM SCROLLBAR (legacy class — global * rule in @layer base handles all scrollbars now) ── */
   .custom-scrollbar { scrollbar-width: thin; scrollbar-color: var(--cg) transparent; }
@@ -527,7 +527,7 @@ body.theme-terminal {
     rgba(0, 255, 65, 0.02) 50%
   );
   background-size: 100% 4px;
-  animation: scan 8s linear infinite;
+  animation: var(--m-decorative-effect, scan 8s linear infinite);
 }
 
 /* CRT Screen Glow Effect */

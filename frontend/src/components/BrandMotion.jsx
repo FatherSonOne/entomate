@@ -1,20 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { useMotionPlayback } from './bench/motion'
 import './BrandMotion.css'
 
 /** Decorative brand footage: still first, opt-in motion when reduced motion is set. */
 export default function BrandMotion({ clip = 'hands', className = '', controls = true, mediaDirectory = '/brand-lab/assets/motion', responsive = false, priority = false }) {
   const ref = useRef(null)
-  const [playing, setPlaying] = useState(() => !window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+  const [playing, setPlaying, reduced] = useMotionPlayback()
   const [ready, setReady] = useState(false)
   const [failed, setFailed] = useState(false)
   const base = `${mediaDirectory}/${clip}`
-
-  useEffect(() => {
-    const query = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const onChange = (event) => { if (event.matches) setPlaying(false) }
-    query.addEventListener('change', onChange)
-    return () => query.removeEventListener('change', onChange)
-  }, [])
 
   useEffect(() => {
     const video = ref.current
@@ -40,10 +34,10 @@ export default function BrandMotion({ clip = 'hands', className = '', controls =
       document.removeEventListener('visibilitychange', sync)
       video.pause()
     }
-  }, [base, playing, failed, responsive])
+  }, [base, playing, failed, responsive, setPlaying])
 
   return (
-    <div className={`brand-motion ${ready && !failed ? 'brand-motion-ready' : ''} ${className}`}>
+    <div className={`brand-motion ${ready && !failed && (!reduced || playing) ? 'brand-motion-ready' : ''} ${className}`}>
       <picture>
         {responsive && <source media="(max-width: 760px)" srcSet={`${base}-mobile.webp`} />}
         <img className="brand-motion-poster" src={`${base}.jpg`} alt="" aria-hidden="true"
@@ -54,7 +48,7 @@ export default function BrandMotion({ clip = 'hands', className = '', controls =
         onLoadedData={() => { setReady(true); setFailed(false) }}
         onError={() => { setFailed(true); setReady(false) }} />
       {controls && !failed && (
-        <button type="button" className="brand-motion-control" onClick={() => setPlaying(value => !value)}
+        <button type="button" className="brand-motion-control" onClick={() => setPlaying(!playing)}
           aria-label={playing ? 'Pause background animation' : 'Play background animation'}>
           <span aria-hidden="true">{playing ? 'Ⅱ' : '▷'}</span>{' '}
           <span className="brand-motion-label">{playing ? 'Pause motion' : 'Play motion'}</span>

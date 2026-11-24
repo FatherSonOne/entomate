@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { Mic } from 'lucide-react';
-import useReducedMotion from '../landing/useReducedMotion';
+import { useReducedMotion } from '../bench/motion';
 import { EntoOrb } from './EntoOrb';
 import { LauncherTourOrb } from './AiOrb';
 import { DotMatrix } from './DotMatrix';

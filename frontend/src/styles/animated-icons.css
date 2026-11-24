@@ -14,7 +14,7 @@
 
 /* ── Gentle pulse — soft scale breathe (sentiment-positive, target, brain, bot) */
 .ento-icon--pulse-gentle {
-  animation: ento-pulse-gentle 3s ease-in-out infinite;
+  animation: var(--m-decorative-effect, ento-pulse-gentle 3s ease-in-out infinite);
 }
 
 @keyframes ento-pulse-gentle {
@@ -24,7 +24,7 @@
 
 /* ── Status dot ring — expanding halo (risk dots) ─────────────────────── */
 .ento-icon--status-dot .ento-icon__ring {
-  animation: ento-ring-expand 2.4s ease-out infinite;
+  animation: var(--m-decorative-effect, ento-ring-expand 2.4s ease-out infinite);
 }
 
 @keyframes ento-ring-expand {
@@ -43,7 +43,7 @@
   inset: 0;
   border-radius: 50%;
   border: 1px solid currentColor;
-  animation: ento-pulse-ring 2s ease-out infinite;
+  animation: var(--m-decorative-effect, ento-pulse-ring 2s ease-out infinite);
   pointer-events: none;
 }
 
@@ -54,7 +54,7 @@
 
 /* ── Sparkle — tiny twinkle rotation (meeting-processed doc) ──────────── */
 .ento-icon--sparkle {
-  animation: ento-sparkle 4s ease-in-out infinite;
+  animation: var(--m-decorative-effect, ento-sparkle 4s ease-in-out infinite);
 }
 
 @keyframes ento-sparkle {
@@ -85,7 +85,7 @@
 
 /* ── Shine — currency circle gleam ────────────────────────────────────── */
 .ento-icon--shine {
-  animation: ento-shine 3s ease-in-out infinite;
+  animation: var(--m-decorative-effect, ento-shine 3s ease-in-out infinite);
 }
 
 @keyframes ento-shine {
@@ -96,7 +96,7 @@
 /* ── Tick — clock hand sweep hint ─────────────────────────────────────── */
 .ento-icon--tick .ento-icon__clock-hand {
   transform-origin: 12px 12px;
-  animation: ento-tick 4s steps(4) infinite;
+  animation: var(--m-decorative-effect, ento-tick 4s steps(4) infinite);
 }
 
 @keyframes ento-tick {
@@ -105,7 +105,7 @@
 
 /* ── Float — gentle vertical bob (book) ──────────────────────────────── */
 .ento-icon--float {
-  animation: ento-float 3.5s ease-in-out infinite;
+  animation: var(--m-decorative-effect, ento-float 3.5s ease-in-out infinite);
 }
 
 @keyframes ento-float {
@@ -137,7 +137,7 @@
 
 /* ── Flow — workflow node connection pulse ────────────────────────────── */
 .ento-icon--flow {
-  animation: ento-flow 3s ease-in-out infinite;
+  animation: var(--m-decorative-effect, ento-flow 3s ease-in-out infinite);
 }
 
 @keyframes ento-flow {
@@ -147,7 +147,7 @@
 
 /* ── Flash — lightning bolt flicker ──────────────────────────────────── */
 .ento-icon--flash {
-  animation: ento-flash 2.5s ease-in-out infinite;
+  animation: var(--m-decorative-effect, ento-flash 2.5s ease-in-out infinite);
 }
 
 @keyframes ento-flash {
@@ -159,7 +159,7 @@
 
 /* ── Slow spin — globe rotation ──────────────────────────────────────── */
 .ento-icon--spin-slow {
-  animation: ento-spin 20s linear infinite;
+  animation: var(--m-decorative-effect, ento-spin 20s linear infinite);
 }
 
 @keyframes ento-spin {
@@ -187,7 +187,7 @@
 
 /* ── Handshake — gentle rocking for client check-in ─────────────────── */
 .ento-icon--handshake {
-  animation: ento-handshake 2.5s ease-in-out infinite;
+  animation: var(--m-decorative-effect, ento-handshake 2.5s ease-in-out infinite);
 }
 
 @keyframes ento-handshake {
@@ -198,7 +198,7 @@
 
 /* ── Blueprint — staggered node appearance for strategic planning ──── */
 .ento-icon--blueprint .ento-icon__node {
-  animation: ento-node-pop 2.4s ease-in-out infinite;
+  animation: var(--m-decorative-effect, ento-node-pop 2.4s ease-in-out infinite);
 }
 .ento-icon--blueprint .ento-icon__node--1 { animation-delay: 0s; }
 .ento-icon--blueprint .ento-icon__node--2 { animation-delay: 0.3s; }
@@ -211,7 +211,7 @@
 
 /* ── Negotiate — subtle document slide for vendor negotiation ──────── */
 .ento-icon--negotiate {
-  animation: ento-negotiate 3s ease-in-out infinite;
+  animation: var(--m-decorative-effect, ento-negotiate 3s ease-in-out infinite);
 }
 
 @keyframes ento-negotiate {
@@ -221,7 +221,7 @@
 
 /* ── Radar — pulsing crosshair dot for sales discovery ─────────────── */
 .ento-icon--radar .ento-icon__radar-dot {
-  animation: ento-radar-pulse 2s ease-in-out infinite;
+  animation: var(--m-decorative-effect, ento-radar-pulse 2s ease-in-out infinite);
 }
 
 @keyframes ento-radar-pulse {

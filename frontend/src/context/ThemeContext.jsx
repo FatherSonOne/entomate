@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { flushSync } from 'react-dom';
-import { applyReduceMotion } from '../components/bench/motion';
+import { applyReduceMotion, prefersReducedMotion } from '../components/bench/motion';
 
 const ThemeContext = createContext(null);
 
@@ -179,18 +179,17 @@ export function ThemeProvider({ children }) {
   }, []);
 
   // Crossfades between styles with the View Transitions API where it exists.
-  // Skipped for reduced motion (OS setting, or { animate: false } from the app setting).
+  // Either reduced-motion preference can skip the crossfade.
   const chooseDesignStyle = useCallback((id, { animate = true } = {}) => {
     if (!STYLE_IDS.includes(id)) return;
     localStorage.setItem(STYLE_KEY, id);
-    const reduced = typeof window !== 'undefined'
-      && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    if (animate && !reduced && typeof document !== 'undefined' && document.startViewTransition) {
+    if (animate && !prefersReducedMotion() && typeof document !== 'undefined' && document.startViewTransition) {
       document.documentElement.classList.add('style-switching');
       const transition = document.startViewTransition(() => {
         flushSync(() => setDesignStyle(id));
       });
-      transition.finished.finally(() => document.documentElement.classList.remove('style-switching'));
+      const cleanUp = () => document.documentElement.classList.remove('style-switching');
+      transition.finished.then(cleanUp, cleanUp);
       return;
     }
     setDesignStyle(id);

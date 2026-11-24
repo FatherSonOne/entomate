@@ -14,6 +14,7 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 import { Display, Led } from '../bench'
+import { prefersReducedMotion, subscribeReducedMotion } from '../bench/motion'
 import { botsApi } from '../../services/api'
 import type { BotSessionView, BotStep, CaptionLine } from '../../services/botView'
 import { runTitle } from '../../services/botView'
@@ -67,9 +68,6 @@ export interface DebriefLoaderProps {
 
 const TONES = 4
 const MAX_LINES = 8
-const reducedMotion = (): boolean =>
-  typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-
 /** Speaker names from the call's live captions, for the typed lines' initials. Empty when there were none. */
 function useCallSpeakers(sessionId: string | undefined): string[] {
   const [names, setNames] = useState<string[]>([])
@@ -180,6 +178,7 @@ export function DebriefLoader({ view, source, plain = false }: DebriefLoaderProp
     const seenAt: Partial<Record<StepKey, number>> = {}
     let shown = 0, lastStep = -1, lastFrame = 0, frame = 0, tick = 0, lineNo = 0, typedAt = 0, lastAt = 0
     let ro: ResizeObserver | null = null
+    let reduced = prefersReducedMotion()
 
     const names = (): string[] => {
       const list = speakersRef.current.filter(Boolean)
@@ -213,8 +212,9 @@ export function DebriefLoader({ view, source, plain = false }: DebriefLoaderProp
         span.appendChild(u)
       }
       row.append(b, t, span)
+      if (reduced) row.classList.add('is-in')
       list.appendChild(row)
-      requestAnimationFrame(() => row.classList.add('is-in'))
+      if (!reduced) requestAnimationFrame(() => row.classList.add('is-in'))
       while (list.children.length > MAX_LINES) list.firstElementChild?.remove()
       lineNo++
     }
@@ -234,7 +234,6 @@ export function DebriefLoader({ view, source, plain = false }: DebriefLoaderProp
       const cur = steps.find((s) => s.state !== 'done')
       if (cur && seenAt[cur.key] == null) seenAt[cur.key] = now
       const state = estimate(info, now)
-      const reduced = reducedMotion()
       shown = glide(shown, state.percent, lastFrame ? now - lastFrame : 0, reduced)
       lastFrame = now
       const step = steps[state.step]
@@ -290,21 +289,38 @@ export function DebriefLoader({ view, source, plain = false }: DebriefLoaderProp
       frame = 0
       if (!el.isConnected) { stop(); return }
       if (document.visibilityState !== 'hidden') {
-        life?.draw(now, !reducedMotion())
+        life?.draw(now, true)
         render(Date.now())
       }
       frame = requestAnimationFrame(loop)
     }
 
-    life?.resize()
-    if (life && typeof ResizeObserver === 'function') { ro = new ResizeObserver(() => life.resize()); ro.observe(el) }
+    const resizeLife = () => {
+      life?.resize()
+      if (reduced) life?.draw(performance.now(), false)
+    }
+    const syncMotion = () => {
+      const next = prefersReducedMotion()
+      if (next === reduced) return
+      reduced = next
+      if (reduced) {
+        cancelAnimationFrame(frame)
+        frame = 0
+        life?.draw(performance.now(), false)
+        render(Date.now())
+      } else {
+        frame = requestAnimationFrame(loop)
+      }
+    }
+    const unsubscribe = subscribeReducedMotion(syncMotion)
+    resizeLife()
+    if (life && typeof ResizeObserver === 'function') { ro = new ResizeObserver(resizeLife); ro.observe(el) }
     for (let i = 0; i < 4; i++) typeLine()
-    if (reducedMotion()) life?.draw(performance.now(), false)
     render(Date.now())
-    if (typeof requestAnimationFrame === 'function') frame = requestAnimationFrame(loop)
+    if (!reduced) frame = requestAnimationFrame(loop)
     // A one-second tick keeps the stopwatch moving when animation frames are slowed down.
     tick = window.setInterval(() => { if (el.isConnected && document.visibilityState !== 'hidden') render(Date.now()) }, 1000)
-    return stop
+    return () => { unsubscribe(); stop() }
   }, [])
 
   const steps = src.steps

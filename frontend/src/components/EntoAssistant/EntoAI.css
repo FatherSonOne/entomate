@@ -478,7 +478,7 @@ body.la-resizing {
   border-radius: 50%;
   background: radial-gradient(circle, color-mix(in oklab, var(--cmf-text, #1E1B18) 12%, transparent), transparent 62%);
   will-change: transform, opacity;
-  animation: la-aura-breathe 4.5s ease-in-out infinite;
+  animation: var(--m-decorative-effect, la-aura-breathe 4.5s ease-in-out infinite);
 }
 
 @keyframes la-aura-breathe {
@@ -699,7 +699,7 @@ body.la-resizing {
 }
 
 .la-spinner {
-  animation: la-spin 1s linear infinite;
+  animation: var(--m-decorative-effect, la-spin 1s linear infinite);
   color: var(--la-secondary);
 }
 
@@ -730,7 +730,7 @@ body.la-resizing {
     var(--cmf-border, rgba(30, 27, 24, 0.08)) 75%
   );
   background-size: 200% 100%;
-  animation: la-skeleton-pulse 1.5s ease-in-out infinite;
+  animation: var(--m-decorative-effect, la-skeleton-pulse 1.5s ease-in-out infinite);
 }
 
 .la-skeleton__line:nth-child(1) { width: 85%; }
@@ -1403,7 +1403,7 @@ html.dark .la-skeleton__line,
     rgba(148, 163, 184, 0.12) 75%
   );
   background-size: 200% 100%;
-  animation: la-skeleton-pulse 1.5s ease-in-out infinite;
+  animation: var(--m-decorative-effect, la-skeleton-pulse 1.5s ease-in-out infinite);
 }
 
 /* Error */
@@ -1696,7 +1696,7 @@ html.dark .la-backdrop,
 
 /* Idle "awaiting your call" — a slow breathing glow so the card feels live */
 .la-proposal.la-proposal-proposed {
-  animation: la-proposal-idle 3.6s ease-in-out infinite;
+  animation: var(--m-decorative-effect, la-proposal-idle 3.6s ease-in-out infinite);
 }
 
 @keyframes la-proposal-idle {
@@ -1711,7 +1711,7 @@ html.dark .la-backdrop,
   inset: 0;
   background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.4) 50%, transparent 80%);
   transform: translateX(-100%);
-  animation: la-proposal-shimmer 1.1s var(--la-ease-out) infinite;
+  animation: var(--m-decorative-effect, la-proposal-shimmer 1.1s var(--la-ease-out) infinite);
   pointer-events: none;
 }
 
@@ -2049,7 +2049,7 @@ html.dark .la-proposal-view:hover:not(:disabled),
 
 /* Awaiting confirmation — same slow breathing glow as a single proposal */
 .la-plan.la-plan-proposed {
-  animation: la-proposal-idle 3.6s ease-in-out infinite;
+  animation: var(--m-decorative-effect, la-proposal-idle 3.6s ease-in-out infinite);
 }
 
 /* Executing — the light sweep reuses the proposal shimmer */
@@ -2059,7 +2059,7 @@ html.dark .la-proposal-view:hover:not(:disabled),
   inset: 0;
   background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.4) 50%, transparent 80%);
   transform: translateX(-100%);
-  animation: la-proposal-shimmer 1.1s var(--la-ease-out) infinite;
+  animation: var(--m-decorative-effect, la-proposal-shimmer 1.1s var(--la-ease-out) infinite);
   pointer-events: none;
 }
 
@@ -2186,7 +2186,7 @@ html.dark .la-plan-step-view:hover {
   background: linear-gradient(160deg, var(--la-secondary-light), var(--la-secondary-dark));
   border-color: transparent;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 2px 6px rgba(var(--la-secondary-rgb), 0.4);
-  animation: la-proposal-idle 1.4s ease-in-out infinite;
+  animation: var(--m-decorative-effect, la-proposal-idle 1.4s ease-in-out infinite);
 }
 
 /* Executed step — green marker, the check springs in (shared keyframe) */
@@ -2399,7 +2399,7 @@ html.dark .la-plan-step-view:hover {
   background: var(--la-secondary);
   margin-left: 1px;
   vertical-align: text-bottom;
-  animation: la-cursor-blink 1s ease-in-out infinite;
+  animation: var(--m-decorative-effect, la-cursor-blink 1s ease-in-out infinite);
 }
 
 @keyframes la-cursor-blink {
@@ -2703,7 +2703,7 @@ html.dark .la-tour-body,
 
 .logos-assistant .la-ring {
   transform-origin: center;
-  animation: laRingPulse 4s ease-in-out infinite;
+  animation: var(--m-decorative-effect, laRingPulse 4s ease-in-out infinite);
 }
 
 .logos-assistant .la-ring-2 { animation-delay: 0.6s; }
@@ -2715,7 +2715,7 @@ html.dark .la-tour-body,
 }
 
 .logos-assistant .la-core-glow {
-  animation: laCoreGlow 3s ease-in-out infinite;
+  animation: var(--m-decorative-effect, laCoreGlow 3s ease-in-out infinite);
 }
 
 @keyframes laCoreGlow {
@@ -2724,7 +2724,7 @@ html.dark .la-tour-body,
 }
 
 .logos-assistant .la-center-dot {
-  animation: laDotPulse 2.5s ease-in-out infinite;
+  animation: var(--m-decorative-effect, laDotPulse 2.5s ease-in-out infinite);
 }
 
 @keyframes laDotPulse {
@@ -2887,7 +2887,7 @@ html.dark .la-tour-body,
 .la-voice-btn-active {
   color: #2C2520; /* Ink: white on the patina fill read 3.08:1 */
   background: #3B9E8F;
-  animation: la-pulse-mic 1.5s ease-in-out infinite;
+  animation: var(--m-decorative-effect, la-pulse-mic 1.5s ease-in-out infinite);
 }
 
 @keyframes la-pulse-mic {
@@ -2900,7 +2900,7 @@ html.dark .la-tour-body,
    ============================================================================ */
 
 .la-spin {
-  animation: la-spin-rotate 1s linear infinite;
+  animation: var(--m-decorative-effect, la-spin-rotate 1s linear infinite);
 }
 
 @keyframes la-spin-rotate {
@@ -3006,7 +3006,7 @@ html.dark .la-tour-body,
   color: var(--cmf-text, #1E1B18);
   border-color: var(--la-secondary);
   background: rgba(var(--la-secondary-rgb), 0.1);
-  animation: la-pipeline-glow 1.8s ease-in-out infinite;
+  animation: var(--m-decorative-effect, la-pipeline-glow 1.8s ease-in-out infinite);
 }
 
 /* Dashed connector; the one leading into the active stage carries a moving dot */
@@ -3028,7 +3028,7 @@ html.dark .la-tour-body,
   height: 5px;
   border-radius: 50%;
   background: var(--la-secondary);
-  animation: la-pipeline-flow 1.1s linear infinite;
+  animation: var(--m-decorative-effect, la-pipeline-flow 1.1s linear infinite);
 }
 
 .la-pipeline-status {
@@ -3084,7 +3084,7 @@ html.dark .la-tour-body,
   height: 6px;
   border-radius: 50%;
   background: var(--la-secondary);
-  animation: la-pipeline-pulse 1.2s ease-in-out infinite;
+  animation: var(--m-decorative-effect, la-pipeline-pulse 1.2s ease-in-out infinite);
 }
 
 .la-pipeline-step.is-done .la-pipeline-step-dot {
@@ -3235,7 +3235,7 @@ html.dark .la-tour-body,
   background-clip: text;
   -webkit-text-fill-color: transparent;
   color: transparent;
-  animation: la-label-shimmer 2.4s linear infinite;
+  animation: var(--m-decorative-effect, la-label-shimmer 2.4s linear infinite);
 }
 
 @keyframes la-label-shimmer {
@@ -3245,7 +3245,7 @@ html.dark .la-tour-body,
 
 /* Avatar pulse ring while loading */
 .la-message-loading .la-message-avatar {
-  animation: la-avatar-pulse 2s ease-in-out infinite;
+  animation: var(--m-decorative-effect, la-avatar-pulse 2s ease-in-out infinite);
   border-radius: 50%;
 }
 
@@ -3264,7 +3264,7 @@ html.dark .la-tour-body,
   margin-left: 2px;
   vertical-align: text-bottom;
   border-radius: 1px;
-  animation: la-cursor-blink 0.8s ease-in-out infinite;
+  animation: var(--m-decorative-effect, la-cursor-blink 0.8s ease-in-out infinite);
 }
 
 /* ============================================================================

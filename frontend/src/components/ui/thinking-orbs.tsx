@@ -8,6 +8,7 @@
  * Added here: an `fps` cap on redraws, so an orb that is always on screen costs less.
  */
 import { useEffect, useRef } from "react";
+import { prefersReducedMotion, useReducedMotion } from "../bench/motion";
 
 /** One state per thing an agent does, and the looks each comes in, `default` first. */
 export const VARIANTS = {
@@ -487,7 +488,6 @@ export function mountOrb(
 
   const look = `${state}@${speed}`;
   draw(tick(look, performance.now(), speed));
-  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
   // Only orbs on screen redraw; a page of them off screen would otherwise cost every frame.
   let visible = true, raf = 0, dead = false, drawnAt = -Infinity;
   // 4ms slack, so a 30fps cap on a 60Hz display draws every second frame, not every third.
@@ -510,7 +510,7 @@ export function mountOrb(
     raf = 0;
   };
   const play = () => {
-    if (!raf && !still && !dead) raf = requestAnimationFrame(frame);
+    if (!raf && !prefersReducedMotion() && !dead) raf = requestAnimationFrame(frame);
   };
   play();
   return {
@@ -548,6 +548,7 @@ export function Orb({
 }: OrbOptions & { paused?: boolean; className?: string }) {
   const ref = useRef<SVGSVGElement>(null);
   const orb = useRef<ReturnType<typeof mountOrb> | null>(null);
+  const reduced = useReducedMotion();
   useEffect(() => {
     // Destructuring split state from variant, so TypeScript no longer sees they belong together.
     const o = (orb.current = mountOrb(ref.current!, { state, variant, size, speed, label, shape, render, density, dotSize, tilt, fps } as OrbOptions));
@@ -555,9 +556,9 @@ export function Orb({
   }, [state, variant, size, speed, label, shape, render, density, dotSize, tilt, fps]);
   // After the mount above, so a remounted orb comes back paused if it should be.
   useEffect(() => {
-    if (paused) orb.current!.pause();
+    if (paused || reduced) orb.current!.pause();
     else orb.current!.play();
-  }, [paused, state, variant, size, speed, label, shape, render, density, dotSize, tilt, fps]);
+  }, [paused, reduced, state, variant, size, speed, label, shape, render, density, dotSize, tilt, fps]);
   // The same a11y attributes mountOrb sets, so the server's HTML has them before it runs.
   const a11y = label ? { role: "img", "aria-label": label } : { "aria-hidden": true };
   return <svg ref={ref} width={size} height={size} viewBox={`0 0 ${size} ${size}`} fill="currentColor" className={className} {...a11y} />;

@@ -32,6 +32,7 @@
  * recordings of all three). Every voice state still runs at the full rate.
  */
 import React, { useEffect, useMemo, useRef } from 'react';
+import { useReducedMotion } from '../bench/motion';
 import { getVoiceSignal, readPulse, subscribeVoiceState, type VoiceState } from './voiceSignal';
 import './EntoOrb.css';
 
@@ -113,6 +114,7 @@ export const EntoOrb: React.FC<EntoOrbProps> = ({ size = 44, className }) => {
   );
   const points = useMemo(() => fibonacciSphere(count), [count]);
 
+  const reduceMotion = useReducedMotion();
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -124,11 +126,6 @@ export const EntoOrb: React.FC<EntoOrbProps> = ({ size = 44, className }) => {
     const dpr = Math.min(2, (typeof window !== 'undefined' && window.devicePixelRatio) || 1);
     canvas.width = Math.round(size * dpr);
     canvas.height = Math.round(size * dpr);
-
-    const reduceMotion =
-      typeof window !== 'undefined' &&
-      typeof window.matchMedia === 'function' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     // Three fixed directions give a cheap, organic "noise" without a noise library.
     const d1 = [0.36, 0.8, 0.48] as const, d2 = [-0.7, 0.2, 0.68] as const, d3 = [0.5, -0.6, 0.62] as const;
@@ -371,7 +368,7 @@ export const EntoOrb: React.FC<EntoOrbProps> = ({ size = 44, className }) => {
       themeObs?.disconnect();
       document.removeEventListener('visibilitychange', onVis);
     };
-  }, [size, count, points]);
+  }, [size, count, points, reduceMotion]);
 
   return (
     <canvas

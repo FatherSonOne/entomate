@@ -72,7 +72,7 @@
 
 /* Push the SVG breathe animation scope */
 .nl-logo svg {
-  animation: vc-logo-breathe 2.8s ease-in-out infinite;
+  animation: var(--m-decorative-effect, vc-logo-breathe 2.8s ease-in-out infinite);
 }
 
 
@@ -248,7 +248,7 @@
   background: var(--c, #FF2D6B);
   border-radius: 0 2px 2px 0;
   box-shadow: 0 0 8px rgba(255,45,107,.7);
-  animation: nl-bar-pulse 2.2s ease-in-out infinite;
+  animation: var(--m-decorative-effect, nl-bar-pulse 2.2s ease-in-out infinite);
 }
 
 /* Active hover — stay put */
@@ -328,7 +328,7 @@
 .nl-item[data-icon="goals"]:hover       .nl-icon-box svg { transform: scale(1.22); filter: drop-shadow(0 0 6px rgba(255,45,107,.5)); }
 .nl-item[data-icon="workflows"]:hover   .nl-icon-box svg { transform: scale(1.15) rotate(45deg); }
 .nl-item[data-icon="automations"]:hover .nl-icon-box svg { transform: scale(1.25) skewX(-4deg); filter: drop-shadow(0 0 6px rgba(255,184,0,.6)); }
-.nl-item[data-icon="agents"]:hover      .nl-icon-box svg { transform: scale(1.18); animation: bot-think 600ms ease infinite alternate; }
+.nl-item[data-icon="agents"]:hover      .nl-icon-box svg { transform: scale(1.18); animation: var(--m-decorative-effect, bot-think 600ms ease infinite alternate); }
 .nl-item[data-icon="analytics"]:hover   .nl-icon-box svg { transform: scale(1.15) translateY(-1px); filter: drop-shadow(0 0 5px rgba(0,245,212,.4)); }
 .nl-item[data-icon="reports"]:hover     .nl-icon-box svg { transform: scale(1.15) translateY(-2px) rotate(-3deg); }
 .nl-item[data-icon="settings"]:hover    .nl-icon-box svg { transform: scale(1.1) rotate(45deg); }
