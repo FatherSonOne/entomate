@@ -248,6 +248,8 @@ describe('MeetingRecorder', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /pop out/i }))
     await waitFor(() => expect(popDoc.querySelector('[data-testid="recorder-pop"]')).not.toBeNull())
+    expect(popDoc.querySelector('canvas')).not.toBeNull() // the level meter
+    expect(popDoc.querySelector('video')).toBeNull() // a microphone has no picture
     const popButton = (name: string): HTMLButtonElement =>
       [...popDoc.querySelectorAll('button')].find((b) => b.textContent?.trim() === name) as HTMLButtonElement
 
@@ -278,6 +280,24 @@ describe('MeetingRecorder', () => {
     URL.revokeObjectURL = vi.fn()
     fireEvent.click(screen.getByRole('button', { name: /stop recording/i }))
     expect(await screen.findByRole('link', { name: /download the video/i })).toHaveAttribute('href', 'blob:video')
+  })
+
+  test('the pop-out shows the shared tab and the level meter', async () => {
+    const popDoc = document.implementation.createHTMLDocument('pop')
+    const popWin = { document: popDoc, addEventListener: vi.fn(), close: vi.fn(), focus: vi.fn() }
+    const open = vi.spyOn(window, 'open').mockReturnValue(popWin as unknown as Window)
+    renderRecorder()
+    fireEvent.click(screen.getByRole('radio', { name: /browser tab/i }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /knows it is being recorded/i }))
+    fireEvent.click(screen.getByRole('button', { name: /start recording/i }))
+    await screen.findByRole('button', { name: /stop recording/i })
+
+    fireEvent.click(screen.getByRole('button', { name: /pop out/i }))
+    await waitFor(() => expect(popDoc.querySelector('[data-testid="recorder-pop"]')).not.toBeNull())
+    expect(open).toHaveBeenCalledWith('', 'entomate-recorder', expect.stringContaining('height=560'))
+    expect(popDoc.querySelector('video[aria-label="Recording preview"]')).not.toBeNull()
+    expect(popDoc.querySelector('canvas')).not.toBeNull()
+    open.mockRestore()
   })
 
   test('a blocked share explains itself and makes no meeting', async () => {

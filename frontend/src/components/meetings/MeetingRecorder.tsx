@@ -95,10 +95,12 @@ function LevelMeter({ context, stream }: { context: AudioContext; stream: MediaS
     const source = context.createMediaStreamSource(stream)
     source.connect(analyser)
     const data = new Uint8Array(analyser.frequencyBinCount)
-    const accent = getComputedStyle(canvas).color || '#888'
+    // The window showing the canvas: in the pop-out it keeps animating while the app's tab is hidden.
+    const view = canvas.ownerDocument.defaultView ?? window
+    const accent = view.getComputedStyle(canvas).color || '#888'
     let frame = 0
     const draw = (): void => {
-      frame = requestAnimationFrame(draw)
+      frame = view.requestAnimationFrame(draw)
       analyser.getByteFrequencyData(data)
       ctx.clearRect(0, 0, canvas.width, canvas.height)
       const bars = 32
@@ -113,7 +115,7 @@ function LevelMeter({ context, stream }: { context: AudioContext; stream: MediaS
     }
     draw()
     return () => {
-      cancelAnimationFrame(frame)
+      view.cancelAnimationFrame(frame)
       source.disconnect()
     }
   }, [context, stream])
@@ -416,7 +418,8 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded }: MeetingRecor
     try {
       const pip = (window as unknown as { documentPictureInPicture?: { requestWindow: (o: { width: number; height: number }) => Promise<Window> } })
         .documentPictureInPicture
-      const win = canPip() && pip ? await pip.requestWindow({ width: 340, height: 300 }) : window.open('', 'entomate-recorder', 'popup,width=360,height=340')
+      const height = capture.current?.preview ? 520 : 340
+      const win = canPip() && pip ? await pip.requestWindow({ width: 360, height }) : window.open('', 'entomate-recorder', `popup,width=380,height=${height + 40}`)
       if (!win) {
         setError('Your browser blocked the pop-out. Allow pop-ups for Entomate.')
         return
@@ -733,6 +736,8 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded }: MeetingRecor
               </span>
               <span className="font-mono text-2xl tabular-nums">{formatClock(elapsedMs)}</span>
             </div>
+            {c?.preview && phase === 'recording' && <Preview stream={c.preview} />}
+            {c && phase === 'recording' && <LevelMeter context={c.audioContext} stream={c.audioRecorder.stream} />}
             {c && phase === 'recording' && !paused && <SilenceAlert context={c.audioContext} stream={c.audioRecorder.stream} mode={mode} />}
             <p className="text-xs text-content-secondary">
               {upload.failed ??
