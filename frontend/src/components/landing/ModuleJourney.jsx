@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { MODULES, STATUS, MEDIA } from './landingData'
+import { MODULES, STATUS, MEDIA, LANDING_MEDIA_DIR } from './landingData'
+import BrandMotion from '../BrandMotion'
 import { smoothScrollBehavior } from '../bench/motion'
 
 const PHONE_MAX = 760
@@ -10,7 +11,8 @@ const VH_PER_MODULE = 80
  * Section 02: the pinned module journey (qntmecos.com "Signal Spine" pattern).
  * The section is tall; an inner panel sticks to the viewport while scroll
  * progress picks the active module, crossfading its footage and sheet.
- * On phones, in short windows and with reduced motion it falls back to a static stack.
+ * On phones, in short windows and with reduced motion it uses a stack of cards.
+ * Selected mobile cards play inline when motion is enabled.
  * Keep every ancestor free of transform and overflow:hidden, or sticky breaks.
  */
 export default function ModuleJourney({ reducedMotion }) {
@@ -18,8 +20,10 @@ export default function ModuleJourney({ reducedMotion }) {
   const progRef = useRef(null)
   const videoRefs = useRef([])
   const [active, setActive] = useState(0)
-  const [isStatic, setIsStatic] = useState(true)
+  const [layout, setLayout] = useState('static')
   const [inView, setInView] = useState(false)
+  const isStatic = reducedMotion || layout !== 'pinned'
+  const playMobileMotion = !reducedMotion && layout === 'mobile'
 
   useEffect(() => {
     const section = sectionRef.current
@@ -29,15 +33,17 @@ export default function ModuleJourney({ reducedMotion }) {
     return () => observer.disconnect()
   }, [])
 
-  // Decide pinned vs static on mount and resize.
+  // Keep narrow screens and landscape phones in the card layout.
   useEffect(() => {
-    const decide = () => setIsStatic(
-      reducedMotion || window.innerWidth <= PHONE_MAX || window.innerHeight < PIN_MIN_HEIGHT
-    )
+    const decide = () => {
+      const short = window.innerHeight < PIN_MIN_HEIGHT
+      const mobile = window.innerWidth <= PHONE_MAX || (short && window.matchMedia('(pointer: coarse)').matches)
+      setLayout(mobile ? 'mobile' : short ? 'static' : 'pinned')
+    }
     decide()
     window.addEventListener('resize', decide)
     return () => window.removeEventListener('resize', decide)
-  }, [reducedMotion])
+  }, [])
 
   // Scroll progress → active module (pinned mode only).
   useEffect(() => {
@@ -156,9 +162,15 @@ export default function ModuleJourney({ reducedMotion }) {
                 aria-hidden={!isStatic && i !== active ? true : undefined}
                 className={`lc-sheet${isStatic || i === active ? ' is-on' : ''}`}
               >
-                {isStatic && <div className="lc-thumb" aria-hidden="true">
-                  {inView && <img src={MEDIA(m.media).poster} alt="" loading="lazy" decoding="async" />}
-                </div>}
+                {isStatic && (
+                  <div className="lc-thumb">
+                    {playMobileMotion && m.mobileMotion ? (
+                      <BrandMotion clip={m.media} mediaDirectory={LANDING_MEDIA_DIR} responsive />
+                    ) : inView && (
+                      <img src={MEDIA(m.media).poster} alt="" loading="lazy" decoding="async" />
+                    )}
+                  </div>
+                )}
                 <div className={`lc-k lc-k--${m.sig}`}>
                   <span className={`lc-sq lc-sq--${m.sig}`} aria-hidden="true" />{m.kicker}
                 </div>
