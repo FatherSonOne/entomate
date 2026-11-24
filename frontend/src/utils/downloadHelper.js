@@ -6,17 +6,23 @@ import api from '../services/api'
  * and triggers a browser download via blob URL.
  */
 export async function downloadFile(apiPath, filename, params = {}) {
-  const response = await api.get(apiPath, {
+  // The API interceptor already returns the response body, including for blobs.
+  const blob = await api.get(apiPath, {
     responseType: 'blob',
     params
   })
+  saveDownload(blob, filename)
+}
 
-  const contentType = response.headers?.['content-type'] || 'application/octet-stream'
-  const blob = new Blob([response.data], { type: contentType })
+export function saveDownload(blob, filename) {
+  if (!(blob instanceof Blob) || !blob.size) throw new Error('The download is empty or invalid.')
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
   a.download = filename
+  document.body.appendChild(a)
   a.click()
-  URL.revokeObjectURL(url)
+  a.remove()
+  // Let browsers start reading the object URL before releasing it.
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
 }

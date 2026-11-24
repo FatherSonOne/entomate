@@ -19,6 +19,7 @@ import { canPlay, toRecordingJob } from '../services/meetingRecorderService'
 import cache from '../services/apiCache'
 import { clipToNotes } from '../services/searchNotesService'
 import { formatClock, toSegments, toSummaryMoments } from '../services/meetingTranscriptService'
+import { saveDownload } from '../utils/downloadHelper'
 import MeetingIntelligencePanel from '../components/intelligence/MeetingIntelligencePanel'
 import { BotDebrief, BotMeetingPending } from '../components/bot/BotDebrief'
 import {
@@ -231,18 +232,29 @@ export default function MeetingDetail() {
     }
   }
 
-  // Recap PDF (moved here from the old Reports page, Insights pass 2026-11-22). Email goes
-  // through the Follow-up tab now (Slate C, 2026-11-23).
-  const [recapBusy, setRecapBusy] = useState(null)
+  const [recapBusy, setRecapBusy] = useState(false)
+  const exportName = meeting?.title?.trim().replace(/[<>:"/\\|?*\p{Cc}]/gu, '-').slice(0, 100).replace(/[. ]+$/, '') || 'Meeting'
+  const transcriptText = typeof meeting?.transcript === 'string' ? meeting.transcript : ''
+  const hasTranscript = Boolean(transcriptSegments || transcriptText.trim())
   const handleRecapPdf = async () => {
-    setRecapBusy('pdf')
+    setRecapBusy(true)
     try {
-      await reportsApi.downloadMeetingPDF(id)
+      await reportsApi.downloadMeetingPDF(id, `${exportName} - Recap.pdf`)
     } catch (err) {
       console.error('Failed to download recap PDF:', err)
       toast.error('Error', 'The recap PDF could not be made')
     } finally {
-      setRecapBusy(null)
+      setRecapBusy(false)
+    }
+  }
+  const handleTranscriptDownload = () => {
+    const body = transcriptSegments
+      ? transcriptSegments.map(({ atMs, speaker, text }) => `[${formatClock(atMs)}] ${speaker}: ${text}`).join('\n')
+      : transcriptText
+    try {
+      saveDownload(new Blob([`${meeting.title || 'Meeting'}\n\n${body}\n`], { type: 'text/plain;charset=utf-8' }), `${exportName} - Transcript.txt`)
+    } catch {
+      toast.error('Error', 'The transcript could not be downloaded')
     }
   }
 
@@ -498,6 +510,14 @@ export default function MeetingDetail() {
         ]}
       />
       <Key onClick={handleSyncToCRM}>Send to CRM</Key>
+      <Menu
+        label="Export meeting"
+        trigger={recapBusy ? 'Preparing PDF' : 'Export'}
+        entries={[
+          { key: 'recap', label: 'Download recap', hint: 'PDF', disabled: recapBusy, onSelect: handleRecapPdf },
+          { key: 'transcript', label: 'Download transcript', hint: 'TXT', disabled: !hasTranscript, onSelect: handleTranscriptDownload },
+        ]}
+      />
       {followUpPrimary ? (
         <>
           <Key onClick={openShareModal}>Share recap</Key>
@@ -876,8 +896,8 @@ export default function MeetingDetail() {
               <Key size="sm" onClick={() => { setShowShareModal(false); chooseTab('followup') }}>
                 Email the people who were there
               </Key>
-              <Key size="sm" onClick={handleRecapPdf} disabled={recapBusy !== null}>
-                {recapBusy === 'pdf' ? 'Preparing' : 'Download PDF'}
+              <Key size="sm" onClick={handleRecapPdf} disabled={recapBusy}>
+                {recapBusy ? 'Preparing' : 'Download PDF'}
               </Key>
             </div>
           </div>
