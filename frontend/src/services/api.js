@@ -1010,6 +1010,8 @@ export const settingsApi = {
   // Meeting agents (Settings › Meeting agents): which run on meeting end, and their confidence bars
   getMeetingAgents: (workspaceId) => api.get('/settings/meeting-agents', { params: { workspaceId } }),
   updateMeetingAgents: (workspaceId, settings) => api.put('/settings/meeting-agents', { workspaceId, settings }),
+  getOwnerPreferences: (workspaceId) => api.get('/settings/owner-preferences', { params: { workspaceId } }),
+  decideOwnerPreference: (workspaceId, scopeKey, memberId, decision) => api.patch('/settings/owner-preferences', { workspaceId, scopeKey, memberId, decision }),
 
   // Get current user settings
   getUser: () => api.get('/settings/user'),

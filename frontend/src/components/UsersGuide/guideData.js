@@ -836,7 +836,7 @@ export const guideSections = [
         steps: [
           'Turn the Owner, Priority, Deadline and Follow-up agents on or off.',
           'Set how sure an agent must be before it applies a change.',
-          'What the agents learned: approve or reject patterns taken from calls you overrode.',
+          'What the agents learned: review suggested and approved Owner preferences for this workspace.',
         ],
       },
       {
@@ -963,12 +963,13 @@ export const guideSections = [
       },
       {
         id: 'faq-ai-learn',
-        title: 'How does the AI learn from my feedback?',
-        scenario: 'You want to understand how accepting or overriding recommendations improves the AI.',
+        title: 'How does the Owner agent learn?',
+        scenario: 'You keep changing the owner Entomate assigns to a recurring action item.',
         steps: [
-          'When you accept, modify, or override AI recommendations, the system tracks these decisions.',
-          'Over time, it detects patterns in your preferences.',
-          'Review and approve them in Settings \u203a Meeting agents \u203a What the agents learned, or from the Learning row on Today.',
+          'Edit the action item to replace an agent-assigned owner with a workspace member.',
+          'Repeated corrections across at least three meetings with the same title and action-item wording can suggest a preference.',
+          'A workspace owner or admin can approve it in Settings \u203a Meeting agents \u203a What the agents learned, or from the Learning row on Today.',
+          'The Owner agent uses the approved preference for future matching action items that need an owner.',
         ],
       },
       {

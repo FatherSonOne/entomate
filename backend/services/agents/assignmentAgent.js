@@ -8,6 +8,7 @@ const BaseAgent = require('./baseAgent');
 const ai = require('../../config/ai');
 const { supabase } = require('../../config/supabase');
 const LearningEngine = require('../learning/LearningEngine');
+const { approvedMember } = require('../ownerPreferences');
 const { getOrgTeam, findMember } = require('./orgTeam');
 
 class AssignmentAgent extends BaseAgent {
@@ -78,11 +79,19 @@ class AssignmentAgent extends BaseAgent {
       return { recommended: null, reason: `Error in analysis: ${error.message}`, confidence: 0, alternatives: [] };
     }
 
-    const suggestion = await this._suggest(context, automation, analysis);
+    const preferred = context.useOwnerPreferences
+      ? await approvedMember(supabase, context.orgId, analysis.meetingContext, analysis.taskDescription, analysis.teamMembers)
+      : null;
+    const suggestion = preferred ? {
+      recommended: preferred.name,
+      reason: 'Approved Owner preference for matching meetings and action items.',
+      confidence: 1,
+      alternatives: []
+    } : await this._suggest(context, automation, analysis);
 
     // Attach the matched member so callers can store email / user id too.
     // A name that isn't on the team is dropped.
-    const member = findMember(analysis.teamMembers, suggestion?.recommended);
+    const member = preferred || findMember(analysis.teamMembers, suggestion?.recommended);
     if (suggestion && suggestion.recommended && !member) {
       return { ...suggestion, recommended: null, confidence: 0, recommendedMember: null };
     }

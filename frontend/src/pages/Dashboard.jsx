@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useOutletContext } from 'react-router-dom'
 import IntelligenceDashboard from '../components/intelligence/IntelligenceDashboard'
 import CarryForward from '../components/meetings/CarryForward'
-import { meetingsApi, tasksApi, dashboardApi, calendarApi, learningApi } from '../services/api'
+import { meetingsApi, tasksApi, dashboardApi, calendarApi, settingsApi } from '../services/api'
+import { useOrgSafe } from '../contexts/OrgContext'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { useToast } from '../components/vc/ToastProvider'
 import {
@@ -44,6 +45,7 @@ export default function Today() {
   // The bench shell passes openAssistant; the legacy shells pass nothing.
   const outlet = useOutletContext()
   const openAssistant = outlet?.openAssistant
+  const workspaceId = useOrgSafe()?.org?.id
 
   const [meetings, setMeetings] = useState([])
   const [meetingTotal, setMeetingTotal] = useState(0)
@@ -51,7 +53,7 @@ export default function Today() {
   const [taskCount, setTaskCount] = useState(0)
   const [upcoming, setUpcoming] = useState([])
   const [calendarOn, setCalendarOn] = useState(null)
-  const [learning, setLearning] = useState(null)
+  const [ownerPreferences, setOwnerPreferences] = useState(null)
   const [loading, setLoading] = useState(true)
   const [completing, setCompleting] = useState(() => new Set())
   const [briefOpen, setBriefOpen] = useState(false)
@@ -82,15 +84,17 @@ export default function Today() {
     setCalendarOn(status ? Boolean(status.connected) : null)
     setUpcoming(next.upcoming || next.data?.upcoming || [])
     setLoading(false)
-
-    try {
-      const res = await learningApi.getInsights()
-      const ld = res?.data ?? res
-      if (ld?.success) setLearning(ld.insights)
-    } catch { /* learning insights are optional */ }
   }, [toast])
 
   useEffect(() => { loadData() }, [loadData])
+  useEffect(() => {
+    if (!workspaceId || loading) return undefined
+    let cancelled = false
+    settingsApi.getOwnerPreferences(workspaceId).then(({ suggested }) => {
+      if (!cancelled) setOwnerPreferences({ workspaceId, count: suggested.length })
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [workspaceId, loading])
 
   const startRecording = () => navigate('/meetings?new=true')
 
@@ -336,7 +340,7 @@ export default function Today() {
   ]
   const openItems = groups.reduce((n, g) => n + g.total, 0)
 
-  const pendingPatterns = learning?.pendingApprovals || 0
+  const pendingPreferences = ownerPreferences?.workspaceId === workspaceId ? ownerPreferences?.count || 0 : 0
 
   return (
     <div className="bs-today">
@@ -369,7 +373,7 @@ export default function Today() {
 
         <Cell span={4} rule>
           <Section number="02" title="Agents" aside="Latest calls" />
-          {calls.length === 0 && pendingPatterns === 0 ? (
+          {calls.length === 0 && pendingPreferences === 0 ? (
             <p className="bs-today-empty">{loading ? 'Loading' : 'No agent calls yet. After a meeting, agents set each item’s priority, due date and owner, and say why.'}</p>
           ) : (
             <ul className="bs-rows">
@@ -391,14 +395,14 @@ export default function Today() {
                   </div>
                 </li>
               ))}
-              {pendingPatterns > 0 && (
+              {pendingPreferences > 0 && (
                 <li className="bs-row bs-today-call">
                   <Led tone="ai" />
                   <div className="bs-row-text">
-                    <div className="bs-today-call-head"><span className="bs-h3">Learning</span><span className="bs-lbl">Needs your OK</span></div>
-                    <span className="bs-today-call-what">{pendingPatterns} {pendingPatterns === 1 ? 'pattern' : 'patterns'} learned from your overrides</span>
+                    <div className="bs-today-call-head"><span className="bs-h3">Learning</span><span className="bs-lbl">Awaiting review</span></div>
+                    <span className="bs-today-call-what">{pendingPreferences} suggested Owner {pendingPreferences === 1 ? 'preference' : 'preferences'}</span>
                   </div>
-                  <Key size="sm" onClick={() => navigate('/settings', { state: { section: 'ai-learning' } })}>Review</Key>
+                  <Key size="sm" onClick={() => navigate('/settings?s=agents&dr=learning')}>Review</Key>
                 </li>
               )}
             </ul>

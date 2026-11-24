@@ -1,4 +1,5 @@
 const express = require('express');
+const { z } = require('zod');
 const { authenticate, authorizeOrgRole } = require('../middleware/auth');
 const { supabaseAdmin } = require('../config/supabase');
 const log = require('../utils/log');
@@ -256,7 +257,37 @@ router.put('/workspace', authenticate, authorizeOrgRole(ADMIN_ROLES, orgFromBody
 // ========================================
 
 const meetingAgentConfig = require('../services/meetingAgentConfig');
+const ownerPreferences = require('../services/ownerPreferences');
 const MEMBER_ROLES = ['owner', 'admin', 'manager', 'member', 'viewer'];
+
+router.get('/owner-preferences', authenticate, authorizeOrgRole(MEMBER_ROLES, orgFromQuery), async (req, res) => {
+  try {
+    const { suggested, active } = await ownerPreferences.list(supabaseAdmin, req.orgId);
+    res.json({ suggested, active });
+  } catch (error) {
+    log.error('[Owner preferences] List failed:', error.message);
+    res.status(500).json({ error: 'Could not load Owner preferences.' });
+  }
+});
+
+const ownerPreferenceDecision = z.object({
+  scopeKey: z.string().regex(/^[0-9a-f]{64}$/),
+  memberId: z.uuid(),
+  decision: z.enum(['approve', 'dismiss', 'disable'])
+});
+
+router.patch('/owner-preferences', authenticate, authorizeOrgRole(ADMIN_ROLES, orgFromBody), async (req, res) => {
+  const input = ownerPreferenceDecision.safeParse(req.body);
+  if (!input.success) return res.status(400).json({ error: 'Invalid Owner preference decision.' });
+  try {
+    const updated = await ownerPreferences.decide(supabaseAdmin, req.orgId, req.user.id, input.data);
+    if (!updated) return res.status(409).json({ error: 'This preference changed. Refresh and try again.' });
+    res.json({ success: true });
+  } catch (error) {
+    log.error('[Owner preferences] Decision failed:', error.message);
+    res.status(500).json({ error: 'Could not update the Owner preference.' });
+  }
+});
 
 /**
  * GET /api/settings/meeting-agents?workspaceId=<org-uuid>

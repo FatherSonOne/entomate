@@ -20,6 +20,7 @@ const transcriptMoments = require('../services/transcriptMoments');
 const summaryTemplates = require('../services/summaryTemplates');
 const speakerNames = require('../services/speakerNames');
 const actionItemNudge = require('../services/actionItemNudge');
+const ownerPreferences = require('../services/ownerPreferences');
 
 const router = express.Router();
 
@@ -551,7 +552,7 @@ router.patch('/action-items/:id', authenticate, validate(schemas.actionItemUpdat
 
     const { data: existingItem, error: readError } = await supabase
       .from('action_items')
-      .select('meeting_id, org_id, assigned_to_name, assigned_to_email, updated_at')
+      .select('meeting_id, org_id, assigned_to_name, assigned_to_email, updated_at, task_description, agent_notes, owner_correction')
       .eq('id', id)
       .maybeSingle();
     if (readError) throw readError;
@@ -577,6 +578,11 @@ router.patch('/action-items/:id', authenticate, validate(schemas.actionItemUpdat
     const now = new Date(Math.max(Date.now(), Number.isFinite(previous) ? previous + 1 : 0)).toISOString();
     const updates = { ...changes, updated_at: now };
     if (changes.status !== undefined) updates.completed_at = changes.status === 'done' ? now : null;
+    if (nameChanged && (existingItem.agent_notes?.assignment?.applied || existingItem.owner_correction)) {
+      updates.owner_correction = await ownerPreferences.correctionForEdit(supabase, existingItem, changes, now);
+    } else if (emailChanged && existingItem.owner_correction) {
+      updates.owner_correction = null;
+    }
     const query = supabase
       .from('action_items')
       .update(updates)
