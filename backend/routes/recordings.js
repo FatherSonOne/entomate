@@ -12,6 +12,7 @@
  *   POST   /api/recordings/:id/retry          transcribe again after a failure
  *   DELETE /api/recordings/:id                discard an unfinished recording
  *   GET    /api/recordings/:id/playback       a signed link to the seekable copy, or to the pieces in order
+ *   GET    /api/recordings/:id/waveform       audio peaks for a linked recording
  *   DELETE /api/recordings/:id/audio          remove a finished recording's audio; keep the transcript
  *
  * Progress is read from the meeting itself (`recording_job` on GET /api/meetings/:id).
@@ -124,6 +125,17 @@ router.get('/:id/playback', authenticate, async (req, res) => {
     res.json({ success: true, ...(await recorder.getPlayback({ orgId, meetingId: req.params.id })) });
   } catch (err) {
     sendError(res, err, 'playback');
+  }
+});
+
+router.get('/:id/waveform', authenticate, async (req, res) => {
+  try {
+    const orgId = await meetingNotes.assertMeetingAccess(req.user?.id, req.params.id);
+    const peaks = await recorder.getRecordingWaveform({ orgId, meetingId: req.params.id });
+    res.set('Cache-Control', 'no-store');
+    res.json({ success: true, peaks });
+  } catch (err) {
+    sendError(res, err, 'waveform');
   }
 });
 

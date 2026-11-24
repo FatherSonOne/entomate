@@ -18,13 +18,22 @@ const path = require('path');
 /** Per container: put the index first, so a seek does not first read the end of the file. */
 const MUXER_FLAGS = { webm: ['-cues_to_front', '1'], m4a: ['-movflags', '+faststart'], ogg: [] };
 const TIMEOUT_MS = 2 * 60 * 1000;
+const WAVEFORM_BARS = 160;
+const WAVEFORM_LIMIT_SECONDS = 3 * 60 * 60;
 
-function run(cmd, args, timeoutMs = TIMEOUT_MS) {
+// Measure a peak every quarter second before combining measurements into the display's bars.
+const PEAK_FILTER = 'aresample=8000:async=1:first_pts=0,asetnsamples=n=2000:p=0,' +
+  'astats=metadata=1:reset=1:measure_perchannel=none:measure_overall=Peak_level,' +
+  'ametadata=mode=print:key=lavfi.astats.Overall.Peak_level:file=-';
+
+function run(cmd, args, timeoutMs = TIMEOUT_MS, maxStdout = 0) {
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
     let stdout = '';
     child.stdout.on('data', (d) => {
-      stdout = (stdout + d).slice(-2000);
+      stdout += d;
+      if (!maxStdout) stdout = stdout.slice(-2000);
+      else if (stdout.length > maxStdout) child.kill('SIGKILL');
     });
     let stderr = '';
     child.stderr.on('data', (d) => {
@@ -86,4 +95,35 @@ async function extractSpeechAudio(inputPath, outputPath) {
   }
 }
 
-module.exports = { makeSeekable, extractSpeechAudio };
+/** Stream a signed recording through its audio track and return only numeric waveform data. */
+async function readWaveformPeaks(url) {
+  if (new URL(url).protocol !== 'https:') throw new Error('Expected a signed HTTPS recording URL');
+  let output;
+  try {
+    output = await run('ffmpeg', [
+      '-nostdin', '-hide_banner', '-loglevel', 'error',
+      '-protocol_whitelist', 'https,tls,tcp,crypto',
+      '-rw_timeout', '12000000', '-i', url,
+      '-map', '0:a:0', '-t', String(WAVEFORM_LIMIT_SECONDS + 1),
+      '-af', PEAK_FILTER, '-f', 'null', '-',
+    ], 90_000, 5 * 1024 * 1024);
+  } catch {
+    // ffmpeg's error may include the signed URL.
+    throw new Error('The recording audio could not be measured');
+  }
+  const levels = [...output.matchAll(/^lavfi\.astats\.Overall\.Peak_level=(-?inf|[-+]?\d+(?:\.\d+)?)$/gm)];
+  if (!levels.length || levels.length > WAVEFORM_LIMIT_SECONDS * 4) throw new Error('No supported waveform available');
+  const count = Math.min(WAVEFORM_BARS, levels.length);
+  return Array.from({ length: count }, (_, bar) => {
+    const first = Math.floor(bar * levels.length / count);
+    const last = Math.floor((bar + 1) * levels.length / count);
+    let peak = 0;
+    for (let i = first; i < last; i++) {
+      const level = Number(levels[i][1]);
+      if (Number.isFinite(level)) peak = Math.max(peak, Math.min(1, 10 ** (level / 20)));
+    }
+    return Math.round(peak * 10_000) / 10_000;
+  });
+}
+
+module.exports = { makeSeekable, extractSpeechAudio, readWaveformPeaks };

@@ -2,7 +2,7 @@ import React from 'react'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { vi, describe, test, expect, beforeEach, afterEach } from 'vitest'
 
-const api = vi.hoisted(() => ({ playback: vi.fn(), removeAudio: vi.fn() }))
+const api = vi.hoisted(() => ({ playback: vi.fn(), waveform: vi.fn(), removeAudio: vi.fn() }))
 const cacheMock = vi.hoisted(() => ({ invalidate: vi.fn() }))
 vi.mock('../services/api', () => ({ recordingsApi: api, meetingsApi: { renameSpeaker: vi.fn() } }))
 vi.mock('../services/apiCache', () => ({ default: cacheMock }))
@@ -143,6 +143,20 @@ describe('RecordingPlayer', () => {
     expect(decodeAudioData).toHaveBeenCalledTimes(1)
     expect(path.match(/M/g)).toHaveLength(2)
     expect(Number(path.match(/^M([\d.]+),/)?.[1])).toBeGreaterThan(500)
+  })
+
+  test('renders server peaks for a linked video without downloading it to decode the waveform', async () => {
+    const url = 'https://signed.test/full-meeting.mp4'
+    api.playback.mockResolvedValue({ url, durationMs: 3_215_044, serverWaveform: true })
+    api.waveform.mockResolvedValue({ peaks: [0, 0.4, 0, 0.25] })
+    render(<RecordingPlayer meetingId={MEETING} />)
+    expect(api.waveform).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Play the recording' }))
+    const waveform = await screen.findByTestId('recording-waveform')
+    expect(screen.getByTestId('recording-player')).toHaveAttribute('src', url)
+    expect(api.waveform).toHaveBeenCalledWith(MEETING, expect.any(AbortSignal))
+    expect(okFetch).not.toHaveBeenCalled()
+    expect(waveform.querySelector('path')?.getAttribute('d')?.match(/M/g)).toHaveLength(2)
   })
 
   test('a recording moment passes the original transcript time to the jump handler', () => {
