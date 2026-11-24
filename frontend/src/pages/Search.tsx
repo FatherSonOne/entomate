@@ -4,14 +4,13 @@
  * palette has no room for (the words that matched, the moment, the agent's call),
  * Ask Entomate with sources, and Notes: a private column of clips and typed notes.
  *
- * Direction A "Bench" from the Search Slate pass (2026-11-22). Results take 8
- * columns, Notes take 4; on phone Notes open in a sheet from the title.
+ * Results use the full page. Private notes and clips live in the Notepad drawer.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Search as SearchIcon } from 'lucide-react'
+import { ChevronDown, NotebookPen, Search as SearchIcon } from 'lucide-react'
 import {
-  Cell, Drawer, GroupHead, Grid, Key, Section, Signal, Switch, Tag, TextArea, TextInput, TitleRule, useMediaQuery, PHONE_QUERY,
+  Drawer, GroupHead, Key, Section, Signal, Tag, TextArea, TextInput, TitleRule, useMediaQuery, PHONE_QUERY,
 } from '../components/bench'
 import { Highlight } from '../components/search/Highlight'
 import { useToast } from '../components/vc/ToastProvider'
@@ -19,7 +18,7 @@ import { useNotes, useRecentSearches, useSearch } from '../hooks/useSearch'
 import type { UseNotesResult } from '../hooks/useSearch'
 import { searchApi } from '../services/api'
 import {
-  GROUPS, groupCount, isQuestion, matchCommands, metaLine, readUrlState, resultHref, searchEverything,
+  GROUPS, groupCount, isFilter, isQuestion, matchCommands, metaLine, readUrlState, resultHref, searchEverything,
   shortDate, statusSignal, timecode, writeUrlState,
 } from '../services/searchEngine'
 import type { Filter, SearchResponse, SearchResult } from '../services/searchEngine'
@@ -90,14 +89,20 @@ export default function Search(): React.ReactElement {
     const t = draft.trim()
     if (!t) return
     logQuery(t)
-    if (isQuestion(t)) setUrl({ q: t, ask: true })
+    if (isQuestion(t)) setUrl({ q: t, ask: true, filter: 'all' })
   }
 
   const ask = () => {
     const t = draft.trim()
     if (!t) { inputRef.current?.focus(); return }
     logQuery(t)
-    setUrl({ q: t, ask: true })
+    setUrl({ q: t, ask: true, filter: 'all' })
+  }
+
+  const pickRecent = (text: string) => {
+    setDraft(text)
+    setUrl({ q: text, ask: false })
+    logQuery(text)
   }
 
   const clip = useCallback(async (note: NewNote) => {
@@ -109,19 +114,22 @@ export default function Search(): React.ReactElement {
     }
   }, [notes, toast])
 
-  const total = data && settledQuery === q ? data.total : 0
-  const meta = q
-    ? <><b>{loading && !data ? 'Searching' : `${total} result${total === 1 ? '' : 's'}`}</b> · “{q}”</>
-    : <><b>Search</b> · meetings, decisions, tasks and your notes</>
+  const currentData = settledQuery === q ? data : null
+  const count = currentData ? (url.filter === 'all' ? currentData.total : groupCount(currentData, url.filter)) : null
 
   return (
     <>
       <TitleRule
         title="Search"
-        meta={meta}
         actions={(
           <>
-            <Key className="bs-ph-only" onClick={() => setUrl({ notes: true })} kbd={String(notes.notes.length)}>Notes</Key>
+            <Key
+              icon={<NotebookPen aria-hidden="true" />}
+              kbd={notes.notes.length ? String(notes.notes.length) : undefined}
+              aria-haspopup="dialog"
+              aria-expanded={url.notes}
+              onClick={() => setUrl({ notes: true })}
+            >Notepad</Key>
             <Key variant="primary" onClick={ask}>Ask Entomate</Key>
           </>
         )}
@@ -133,51 +141,47 @@ export default function Search(): React.ReactElement {
           icon={<SearchIcon strokeWidth={1.6} />}
           value={draft}
           onChange={(e) => onType(e.target.value)}
-          placeholder="Search meetings, decisions, tasks, or ask a question"
+          placeholder={isPhone ? 'Search anything' : 'Search meetings, decisions, tasks, and notes'}
           aria-label="Search meetings, decisions, tasks, or ask a question"
-          autoFocus={!q && !isPhone}
+          autoFocus={!q && !isPhone && !url.notes}
           autoComplete="off"
           spellCheck={false}
         />
+        <FilterSelect data={currentData} value={url.filter} onChange={(filter) => setUrl({ filter })} />
       </form>
-      <EngineLine data={data} />
+      <div className="bs-srch-status">
+        <EngineLine data={currentData} />
+        <span className="bs-srch-count">{count == null ? '' : `${count} result${count === 1 ? '' : 's'}`}</span>
+      </div>
 
-      <Grid className="bs-srch-grid">
-        <Cell span={8} className="bs-srch-main">
-          {q.length >= MIN_QUERY ? (
-            <>
-              <FilterSwitch data={data} value={url.filter} onChange={(f) => setUrl({ filter: f })} />
-              {url.ask && url.filter === 'all' && <AskAnswer key={q} question={q} onClip={clip} clipped={notes.clipped} />}
-              <Results
-                data={settledQuery === q ? data : null}
-                loading={loading}
-                error={error}
-                filter={url.filter}
-                q={q}
-                clipped={notes.clipped}
-                onClip={(r) => clip(clipFromResult(r, q, 'search'))}
-                onOpen={(r) => navigate(resultHref(r))}
-                onAsk={ask}
-              />
-            </>
-          ) : (
-            <EmptyState recent={recent} onPick={(t) => { setDraft(t); setUrl({ q: t }); logQuery(t) }} />
-          )}
-        </Cell>
-        <Cell span={4} rule desktopOnly className="bs-srch-side">
-          <NotesPanel notes={notes} onClipError={() => toast.error('Could not save the note')} />
-          {q && recent.length > 0 && (
-            <div className="bs-srch-side-sec">
-              <Section level={3} title="Recent" />
-              <RecentList recent={recent} onPick={(t) => { setDraft(t); setUrl({ q: t }); logQuery(t) }} />
-            </div>
-          )}
-        </Cell>
-      </Grid>
+      <div className="bs-srch-main">
+        {q.length >= MIN_QUERY ? (
+          <>
+            {url.ask && url.filter === 'all' && <AskAnswer key={q} question={q} onClip={clip} clipped={notes.clipped} />}
+            <Results
+              data={currentData}
+              loading={loading}
+              error={error}
+              filter={url.filter}
+              q={q}
+              clipped={notes.clipped}
+              onClip={(r) => clip(clipFromResult(r, q, 'search'))}
+              onOpen={(r) => navigate(resultHref(r))}
+              onAsk={ask}
+            />
+            {recent.length > 0 && (
+              <details className="bs-srch-history">
+                <summary>Recent searches</summary>
+                <RecentList recent={recent} onPick={pickRecent} />
+              </details>
+            )}
+          </>
+        ) : (
+          <EmptyState recent={recent} onPick={pickRecent} />
+        )}
+      </div>
 
-      <Drawer open={isPhone && url.notes} onClose={() => setUrl({ notes: false })} label="Notes">
-        <NotesPanel notes={notes} onClipError={() => toast.error('Could not save the note')} />
-      </Drawer>
+      <Notepad open={url.notes} onClose={() => setUrl({ notes: false })} notes={notes} onClipError={() => toast.error('Could not save the note')} />
     </>
   )
 }
@@ -187,19 +191,31 @@ function EngineLine({ data }: { data: SearchResponse | null }): React.ReactEleme
   return (
     <p className="bs-srch-engine">
       <Signal tone={meaning ? 'live' : 'off'}>{meaning ? 'Words and meaning' : 'Matching words'}</Signal>
-      <span>{meaning ? 'Meetings found by meaning are marked.' : 'Transcripts, decisions, items, tasks, projects and notes.'}</span>
-      {!meaning && <span className="bs-dt">Meaning search turns on once meetings are indexed.</span>}
-      <span className="bs-dt">Press ⌘K anywhere for the same search.</span>
     </p>
   )
 }
 
-function FilterSwitch({ data, value, onChange }: { data: SearchResponse | null; value: Filter; onChange: (f: Filter) => void }): React.ReactElement {
+function FilterSelect({ data, value, onChange }: { data: SearchResponse | null; value: Filter; onChange: (f: Filter) => void }): React.ReactElement {
   const options = [
-    { value: 'all' as Filter, label: <>All <span className="bs-srch-n">{data?.total ?? ''}</span></> },
-    ...GROUPS.map((g) => ({ value: g.key as Filter, label: <>{g.short} <span className="bs-srch-n">{data ? groupCount(data, g.key) : ''}</span></> })),
+    { value: 'all', label: 'All types', count: data?.total },
+    ...GROUPS.map((g) => ({ value: g.key, label: g.short, count: data ? groupCount(data, g.key) : undefined })),
   ]
-  return <div className="bs-srch-filter"><Switch label="Show" options={options} value={value} onChange={onChange} /></div>
+  return (
+    <div className="bs-srch-filter">
+      <select
+        aria-label="Filter by result type"
+        value={value}
+        onChange={(e) => { if (isFilter(e.target.value)) onChange(e.target.value) }}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}{option.count == null ? '' : ` (${option.count})`}
+          </option>
+        ))}
+      </select>
+      <ChevronDown aria-hidden="true" />
+    </div>
+  )
 }
 
 interface ResultsProps {
@@ -377,7 +393,7 @@ function AskAnswer({ question, onClip, clipped }: { question: string; onClip: (n
 function EmptyState({ recent, onPick }: { recent: ReturnType<typeof useRecentSearches>; onPick: (q: string) => void }): React.ReactElement {
   return (
     <div className="bs-srch-start">
-      <Section level={3} title="Recent" />
+      <Section level={2} title="Recent searches" />
       {recent.length ? <RecentList recent={recent} onPick={onPick} /> : <p className="bs-srch-empty">Your searches show up here.</p>}
       <p className="bs-srch-tip">End with a question mark to ask across meetings. Press / to type, ⌘K from any page for the same search.</p>
     </div>
@@ -401,18 +417,18 @@ function RecentList({ recent, onPick }: { recent: ReturnType<typeof useRecentSea
 
 // ── Notes ──
 
-function NotesPanel({ notes, onClipError }: { notes: UseNotesResult; onClipError: () => void }): React.ReactElement {
+function Notepad({ open, onClose, notes, onClipError }: { open: boolean; onClose: () => void; notes: UseNotesResult; onClipError: () => void }): React.ReactElement {
   const [draft, setDraft] = useState('')
   const [saving, setSaving] = useState(false)
   const [copied, setCopied] = useState(false)
 
   const add = async () => {
     const body = draft.trim()
-    if (!body) return
+    if (!body || saving) return
     setSaving(true)
     try {
       await notes.add({ kind: 'note', body, origin: 'search' })
-      setDraft('')
+      setDraft((current) => (current === draft ? '' : current))
     } catch {
       onClipError()
     } finally {
@@ -432,24 +448,24 @@ function NotesPanel({ notes, onClipError }: { notes: UseNotesResult; onClipError
 
   const count = notes.notes.length
   return (
-    <div className="bs-srch-notes">
-      <Section level={3} title="Notes" aside={<span className="bs-lbl">{count} {count === 1 ? 'clip' : 'clips'} · private</span>} />
+    <Drawer open={open} onClose={onClose} label="Notepad" className="bs-srch-notepad">
+      <p className="bs-srch-note-info">Private{!notes.loading && !notes.failed && ` · ${count} ${count === 1 ? 'item' : 'items'}`}</p>
       <form className="bs-srch-note-new" onSubmit={(e) => { e.preventDefault(); void add() }}>
         <TextArea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void add() } }}
-          placeholder="Type a note, or clip anything with + Notes"
+          placeholder="Write a note…"
           aria-label="New note"
           rows={3}
           maxLength={8000}
         />
-        {draft.trim() && <Key size="sm" type="submit" disabled={saving}>Add note</Key>}
+        <Key type="submit" disabled={!draft.trim() || saving}>{saving ? 'Adding…' : 'Add note'}</Key>
       </form>
       {notes.failed ? (
         <p className="bs-srch-empty">Notes aren't available right now.</p>
       ) : notes.loading ? null : count === 0 ? (
-        <p className="bs-srch-empty">Nothing clipped yet. Use + Notes on a result, an answer or a transcript line.</p>
+        <p className="bs-srch-empty">Use + Notes on a result, answer, or transcript line to save it here.</p>
       ) : (
         <ul className="bs-srch-clips">
           {notes.notes.map((n) => <NoteRow key={n.id} n={n} notes={notes} />)}
@@ -460,25 +476,30 @@ function NotesPanel({ notes, onClipError }: { notes: UseNotesResult; onClipError
           <Key size="sm" onClick={copy}>{copied ? 'Copied' : 'Copy as Markdown'}</Key>
         </div>
       )}
-    </div>
+    </Drawer>
   )
 }
 
 function NoteRow({ n, notes }: { n: SearchNote; notes: UseNotesResult }): React.ReactElement {
   const [editing, setEditing] = useState(false)
   const [body, setBody] = useState(n.body)
+  const editButton = useRef<HTMLButtonElement>(null)
   const href = noteHref(n)
   const src = sourceLine(n)
   const from = originLabel(n)
+  const finishEditing = () => {
+    editButton.current?.focus()
+    setEditing(false)
+  }
   const save = async () => {
     const t = body.trim()
-    if (!t || t === n.body) { setEditing(false); return }
+    if (!t || t === n.body) { setBody(n.body); finishEditing(); return }
     try {
       await notes.edit(n.id, t)
-      setEditing(false)
+      finishEditing()
     } catch {
       setBody(n.body)
-      setEditing(false)
+      finishEditing()
     }
   }
   return (
@@ -489,15 +510,21 @@ function NoteRow({ n, notes }: { n: SearchNote; notes: UseNotesResult }): React.
       </div>
       {editing ? (
         <TextArea value={body} onChange={(e) => setBody(e.target.value)} rows={3} aria-label="Edit note" autoFocus
-          onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void save() } if (e.key === 'Escape') { setBody(n.body); setEditing(false) } }} />
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void save() }
+            if (e.key === 'Escape') { e.stopPropagation(); setBody(n.body); finishEditing() }
+          }} />
       ) : (
         <p className={n.kind === 'transcript' ? 'bs-srch-clip-b q' : 'bs-srch-clip-b'}>{n.body}</p>
       )}
       <div className="bs-srch-clip-m">
         {src && (href ? <Link to={href}>{src}</Link> : <span>{src}</span>)}
         <span className="bs-srch-clip-k">
-          {n.kind === 'note' && !editing && <button type="button" onClick={() => setEditing(true)}>Edit</button>}
-          {editing && <button type="button" onClick={() => void save()}>Save</button>}
+          {n.kind === 'note' && (
+            <button ref={editButton} type="button" onClick={() => editing ? void save() : setEditing(true)}>
+              {editing ? 'Save' : 'Edit'}
+            </button>
+          )}
           <button type="button" onClick={() => { void notes.remove(n.id) }} aria-label="Delete note">Delete</button>
         </span>
       </div>
