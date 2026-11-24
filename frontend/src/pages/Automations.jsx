@@ -122,21 +122,7 @@ export default function Automations() {
     }
   }
 
-  const newBlank = async () => {
-    try {
-      const res = await workflowsApi.create({
-        name: 'New automation',
-        description: '',
-        nodes: [{ id: 'trigger', type: 'trigger', subtype: 'meeting_processed', position: { x: 100, y: 100 }, config: {} }],
-        connections: [],
-        active: false,
-      })
-      fresh()
-      navigate(`/workflows/${res.data.id}`)
-    } catch (err) {
-      toast?.error?.(err.message || 'Could not create it')
-    }
-  }
+  const newBlank = () => navigate('/workflows/new')
 
   if (error && rows.length === 0) {
     return <ErrorState message={error} onRetry={load} />

@@ -48,6 +48,7 @@ const generateId = () => `node_${Date.now()}_${Math.random().toString(36).substr
 // Inner component with flow instance access
 function WorkflowCanvasInner({
   workflow,
+  draft = false,
   onSave,
   onExecute,
   onTest,
@@ -83,6 +84,7 @@ function WorkflowCanvasInner({
   const [showGrid, setShowGrid] = useState(true)
   const [isDirty, setIsDirty] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const savePending = useRef(false)
   const [isExecuting, setIsExecuting] = useState(false)
   const [pinnedNodes, setPinnedNodes] = useState(new Set())
   const [pinnedData, setPinnedData] = useState({})
@@ -345,6 +347,8 @@ function WorkflowCanvasInner({
 
   // Save workflow
   const handleSave = useCallback(async () => {
+    if (savePending.current) return
+    savePending.current = true
     setIsSaving(true)
     try {
       // Transform React Flow edges to backend connection format
@@ -364,6 +368,7 @@ function WorkflowCanvasInner({
     } catch (error) {
       console.error('Save failed:', error)
     } finally {
+      savePending.current = false
       setIsSaving(false)
     }
   }, [nodes, edges, onSave])
@@ -478,12 +483,12 @@ function WorkflowCanvasInner({
     onUpdate: handleUpdateNode,
     onDelete: handleDeleteNode,
     onDuplicate: handleDuplicateNode,
-    onTest: handleTestNode,
+    onTest: draft ? undefined : handleTestNode,
     onTogglePin: handleTogglePin,
     isPinned: selectedNode ? pinnedNodes.has(selectedNode.id) : false,
   }
 
-  const debugPanel = showDebugPanel && (
+  const debugPanel = !draft && showDebugPanel && (
     <WorkflowDebugPanel
       workflowId={workflow?.id}
       nodes={nodes}
@@ -518,6 +523,7 @@ function WorkflowCanvasInner({
         {/* Toolbar */}
         <WorkflowToolbar
           workflow={workflow}
+          draft={draft}
           isDirty={isDirty}
           canUndo={historyIndexRef.current > 0}
           canRedo={historyIndexRef.current < historyRef.current.length - 1}

@@ -13,20 +13,36 @@ import { VCButton, VCBadge } from '../components/vc'
 import { useConfirm } from '../components/vc/ConfirmDialog'
 import { FullPageLoader } from '../components/EntoLoader'
 
+const blankWorkflow = () => ({
+  name: 'New automation',
+  description: '',
+  nodes: [{ id: 'trigger', type: 'trigger', subtype: 'meeting_processed', position: { x: 100, y: 100 }, config: {} }],
+  connections: [],
+  active: false,
+})
+
 export default function WorkflowBuilder() {
   const { id } = useParams()
+  const draft = id === 'new'
   const navigate = useNavigate()
   const confirm = useConfirm()
-  const [workflow, setWorkflow] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [workflow, setWorkflow] = useState(() => draft ? blankWorkflow() : null)
+  const [loading, setLoading] = useState(!draft)
   const [error, setError] = useState(null)
   const [saveError, setSaveError] = useState(null)
 
   useEffect(() => {
+    if (draft) {
+      setWorkflow(blankWorkflow())
+      setLoading(false)
+      setError(null)
+      setSaveError(null)
+      return
+    }
     if (id) {
       loadWorkflow()
     }
-  }, [id])
+  }, [id, draft])
 
   const loadWorkflow = async () => {
     try {
@@ -45,14 +61,18 @@ export default function WorkflowBuilder() {
   const handleSave = async (data) => {
     try {
       setSaveError(null)
-      const response = await workflowsApi.update(id, {
+      const payload = {
         name: workflow.name,
         description: workflow.description,
         nodes: data.nodes,
         connections: data.connections,
-        settings: workflow.settings
-      })
+        settings: workflow.settings,
+      }
+      const response = draft
+        ? await workflowsApi.create({ ...payload, active: false }, { skipRetry: true })
+        : await workflowsApi.update(id, payload)
       setWorkflow(response.data)
+      if (draft) navigate(`/workflows/${response.data.id}`, { replace: true })
       return response.data
     } catch (err) {
       console.error('Failed to save workflow:', err)
@@ -96,6 +116,10 @@ export default function WorkflowBuilder() {
   }
 
   const handleNameChange = async (newName) => {
+    if (draft) {
+      setWorkflow(prev => ({ ...prev, name: newName }))
+      return
+    }
     try {
       await workflowsApi.update(id, { name: newName })
       setWorkflow(prev => ({ ...prev, name: newName }))
@@ -200,15 +224,17 @@ export default function WorkflowBuilder() {
       {/* Canvas */}
       <div className="flex-1 overflow-hidden">
         <WorkflowCanvas
+          key={id}
+          draft={draft}
           workflow={workflow}
           onSave={handleSave}
-          onExecute={handleExecute}
-          onTest={handleTest}
+          onExecute={draft ? undefined : handleExecute}
+          onTest={draft ? undefined : handleTest}
           onBack={handleBack}
           onChange={handleChange}
-          onToggleActive={handleToggleActive}
-          onDuplicate={handleDuplicate}
-          onDelete={handleDelete}
+          onToggleActive={draft ? undefined : handleToggleActive}
+          onDuplicate={draft ? undefined : handleDuplicate}
+          onDelete={draft ? undefined : handleDelete}
           onNameChange={handleNameChange}
         />
       </div>

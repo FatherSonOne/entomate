@@ -18,6 +18,15 @@ export default function ModuleJourney({ reducedMotion }) {
   const videoRefs = useRef([])
   const [active, setActive] = useState(0)
   const [isStatic, setIsStatic] = useState(true)
+  const [inView, setInView] = useState(false)
+
+  useEffect(() => {
+    const section = sectionRef.current
+    if (!section) return undefined
+    const observer = new IntersectionObserver(([entry]) => setInView(entry.isIntersecting))
+    observer.observe(section)
+    return () => observer.disconnect()
+  }, [])
 
   // Decide pinned vs static on mount and resize.
   useEffect(() => {
@@ -56,14 +65,18 @@ export default function ModuleJourney({ reducedMotion }) {
   useEffect(() => {
     videoRefs.current.forEach((video, i) => {
       if (!video) return
-      if (!isStatic && i === active && !reducedMotion) {
-        video.preload = 'auto'
+      if (inView && !isStatic && i === active && !reducedMotion) {
+        if (!video.hasAttribute('src')) {
+          const media = MEDIA(MODULES[i].media)
+          video.poster = media.poster
+          video.src = media.video
+        }
         video.play().catch(() => {})
       } else {
         video.pause()
       }
     })
-  }, [active, isStatic, reducedMotion])
+  }, [active, inView, isStatic, reducedMotion])
 
   const goTo = useCallback((i) => {
     const el = sectionRef.current
@@ -96,7 +109,7 @@ export default function ModuleJourney({ reducedMotion }) {
     >
       <h2 id="lc-modules-h" className="lc-sr">02 · Modules</h2>
       <div className="lc-pin">
-        {MODULES.map((m, i) => (
+        {!isStatic && MODULES.map((m, i) => (
           <div key={m.name} className={`lc-layer${i === active ? ' is-on' : ''}`} aria-hidden="true">
             <video
               ref={(node) => { videoRefs.current[i] = node }}
@@ -105,10 +118,7 @@ export default function ModuleJourney({ reducedMotion }) {
               loop
               playsInline
               preload="none"
-              poster={MEDIA(m.media).poster}
-            >
-              <source src={MEDIA(m.media).video} type="video/mp4" />
-            </video>
+            />
           </div>
         ))}
         <div className="lc-shade" aria-hidden="true" />
@@ -145,7 +155,9 @@ export default function ModuleJourney({ reducedMotion }) {
                 aria-hidden={!isStatic && i !== active ? true : undefined}
                 className={`lc-sheet${isStatic || i === active ? ' is-on' : ''}`}
               >
-                <img className="lc-thumb" src={MEDIA(m.media).poster} alt="" loading="lazy" />
+                {isStatic && <div className="lc-thumb" aria-hidden="true">
+                  {inView && <img src={MEDIA(m.media).poster} alt="" loading="lazy" decoding="async" />}
+                </div>}
                 <div className={`lc-k lc-k--${m.sig}`}>
                   <span className={`lc-sq lc-sq--${m.sig}`} aria-hidden="true" />{m.kicker}
                 </div>

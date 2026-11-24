@@ -452,7 +452,7 @@ router.delete('/conversations/:id', authenticate, async (req, res) => {
 /**
  * POST /api/search/everything
  * The one engine behind the ⌘K palette and the Search page. Body:
- * { query, types?: string[], limit?: number (per group, max 25), log?: boolean }.
+ * { query, types?: string[], limit?: number (per group, max 25), log?: boolean, meaning?: boolean }.
  * Returns { query, terms, groups: { meetings, decisions, action_items, tasks,
  * projects, notes }, counts, total, engine, executionTime }.
  */
@@ -465,7 +465,7 @@ router.post('/everything', authenticate, async (req, res) => {
 
     const startTime = Date.now();
     const result = await searchEverything.search({ query, types, limit, orgIds: req.orgIds, userId: req.user.id });
-    const engine = await addMeaningMatches(result, query, limit);
+    const engine = req.body.meaning === false ? 'words' : await addMeaningMatches(result, query, limit);
     const executionTime = Date.now() - startTime;
 
     // The palette searches as you type; only the page (or Enter) logs history.
