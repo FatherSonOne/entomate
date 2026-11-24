@@ -55,7 +55,7 @@ export const MODULES = [
     src: 'routes/entoAi.js · routes/search.js',
   },
   {
-    name: 'Agents', sig: 'ai', kicker: 'AI · Action items', media: 'glyphs',
+    name: 'Agents', sig: 'ai', kicker: 'AI · Action items', media: 'agent-relay',
     head: 'From talk to owned tasks',
     tag: 'After every processed meeting, the agents set the priority, fill in a due date and suggest an owner from your team for anything unassigned.',
     features: [
@@ -93,7 +93,7 @@ export const MODULES = [
     src: 'services/workflow/*',
   },
   {
-    name: 'Explainable', sig: 'ai', kicker: 'AI · Shows its work', media: 'factors',
+    name: 'Explainable', sig: 'ai', kicker: 'AI · Shows its work', media: 'decision-trace',
     head: 'Every decision explained',
     tag: 'Agents attach a reason and a confidence score to every recommendation, shown right under the action item.',
     features: [
