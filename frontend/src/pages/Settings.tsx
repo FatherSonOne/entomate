@@ -381,7 +381,7 @@ export default function Settings(): React.ReactElement {
                       </div>
                     </div>
                     <TeamSettings inviteOpen={url.drawer === 'invite'} onInviteOpen={(o) => openDrawer(o ? 'invite' : null)} />
-                    <PrivacySettings />
+                    <PrivacySettings key={org.id} />
                     {admin && (
                       <div className="bs-set-danger">
                         <div className="bs-set-l">

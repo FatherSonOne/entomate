@@ -486,7 +486,8 @@ export default function NodeConfigPanel({
   onDuplicate,
   onTest,
   onTogglePin,
-  isPinned
+  isPinned,
+  embedded = false
 }) {
   const [config, setConfig] = useState({})
   const [showAdvanced, setShowAdvanced] = useState(false)
@@ -499,7 +500,7 @@ export default function NodeConfigPanel({
 
   if (!node) {
     return (
-      <div className="w-80 bg-surface-muted border-l border-line-default flex items-center justify-center">
+      <div className="w-80 shrink-0 bg-surface-muted border-l border-line-default flex items-center justify-center">
         <div className="text-center text-content-tertiary p-6">
           <Settings className="w-12 h-12 mx-auto mb-3 opacity-30" />
           <p className="text-sm">Select a node to configure</p>
@@ -525,25 +526,27 @@ export default function NodeConfigPanel({
   }
 
   return (
-    <div className="w-80 bg-surface border-l border-line-default flex flex-col h-full">
+    <div className={embedded ? 'w-full' : 'w-80 shrink-0 bg-surface border-l border-line-default flex flex-col h-full'}>
       {/* Header */}
-      <div className="flex items-center justify-between p-3 border-b border-line-default">
+      {!embedded && <div className="flex items-center justify-between p-3 border-b border-line-default">
         <h3 className="text-sm font-semibold text-content-primary">Node Configuration</h3>
         <button
+          aria-label="Close node configuration"
           onClick={onClose}
           className="p-1 hover:bg-surface-muted rounded text-content-tertiary"
         >
           <X className="w-4 h-4" />
         </button>
-      </div>
+      </div>}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {/* Basic info */}
         <div className="space-y-3">
           <div>
-            <label className="block text-xs font-medium text-content-secondary mb-1">Node Label</label>
+            <label htmlFor="workflow-node-label" className="block text-xs font-medium text-content-secondary mb-1">Node Label</label>
             <input
+              id="workflow-node-label"
               type="text"
               value={node.data?.label || ''}
               onChange={handleLabelChange}
@@ -674,6 +677,7 @@ export default function NodeConfigPanel({
           </button>
           <button
             onClick={() => onDelete?.(node.id)}
+            aria-label="Delete node"
             className="btn btn-ghost btn-sm text-semantic-error hover:bg-semantic-error-dim"
           >
             <Trash2 className="w-4 h-4" />

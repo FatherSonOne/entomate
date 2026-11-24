@@ -28,20 +28,21 @@ html:not([data-style="bench-swiss"]) .bs-tokens {
   --bs-sunk: #E2E1DB;
   --bs-ink: #161615;
   --bs-ink2: #4A4A46;
-  --bs-muted: #7D7D77;
+  --bs-muted: #565650;
   --bs-faint: #A9A9A2;
   --bs-rule: rgba(0, 0, 0, 0.13);
   --bs-rule2: rgba(0, 0, 0, 0.07);
   --bs-rule-ink: #161615;
   --bs-display: #141415;
   --bs-d-ink: #E9E9E4;
-  --bs-d-mut: #7B7B76;
+  --bs-d-mut: #909089;
   --bs-d-rule: rgba(255, 255, 255, 0.08);
-  --bs-brand: #E0004D;
+  --bs-brand: #B5003E;
+  --bs-on-brand: #fff;
   --bs-brand-edge: #9E0036;
-  --bs-ai: #E09A00;
-  --bs-live: #56B30F;
-  --bs-mint: #00A68F;
+  --bs-ai: #795000;
+  --bs-live: #346600;
+  --bs-mint: #006659;
   --bs-d-brand: #FF2D6B;
   --bs-d-ai: #FFB800;
   --bs-d-live: #A0FF32;
@@ -71,13 +72,14 @@ html.dark:not([data-style="bench-swiss"]) .bs-tokens {
   --bs-sunk: #141415;
   --bs-ink: #EDEDE8;
   --bs-ink2: #A8A8A2;
-  --bs-muted: #74746F;
+  --bs-muted: #91918A;
   --bs-faint: #4E4E4A;
   --bs-rule: rgba(255, 255, 255, 0.10);
   --bs-rule2: rgba(255, 255, 255, 0.05);
   --bs-rule-ink: #EDEDE8;
   --bs-display: #060606;
   --bs-brand: #FF2D6B;
+  --bs-on-brand: #080808;
   --bs-brand-edge: #9E1240;
   --bs-ai: #FFB800;
   --bs-live: #A0FF32;
@@ -99,7 +101,7 @@ html .bs-tokens.bs-vc {
   --bs-sunk: #FFF0F4;
   --bs-ink: #08080A;
   --bs-ink2: #4A3840;
-  --bs-muted: #7A6870;
+  --bs-muted: #6D5B63;
   --bs-faint: #ADA0A8;
   --bs-rule: rgba(8, 8, 10, 0.10);
   --bs-rule2: rgba(8, 8, 10, 0.06);
@@ -108,6 +110,7 @@ html .bs-tokens.bs-vc {
   --bs-d-ink: #F8F0F2;
   --bs-d-mut: #968890;
   --bs-brand: #CC0044;
+  --bs-on-brand: #fff;
   --bs-brand-edge: #8A002E;
   --bs-ai: #9B6800;
   --bs-live: #5A9B00;
@@ -126,13 +129,14 @@ html.dark .bs-tokens.bs-vc {
   --bs-sunk: #0C0C0C;
   --bs-ink: #F8F0F2;
   --bs-ink2: #968890;
-  --bs-muted: #7A6E74;
+  --bs-muted: #978991;
   --bs-faint: #585055;
   --bs-rule: rgba(248, 240, 242, 0.10);
   --bs-rule2: rgba(248, 240, 242, 0.06);
   --bs-rule-ink: #F8F0F2;
   --bs-display: #050505;
   --bs-brand: #FF2D6B;
+  --bs-on-brand: #080808;
   --bs-brand-edge: #8F1A40;
   --bs-ai: #FFB800;
   --bs-live: #A0FF32;
@@ -724,7 +728,7 @@ html[data-motion="reduce"] :is(.bs-recbox, .bs-dock-rec) .animate-ripple { anima
 .bs-key svg { width: 15px; height: 15px; flex: none; }
 .bs-key.pri {
   background: var(--bs-brand);
-  color: #fff;
+  color: var(--bs-on-brand, #fff);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 0 0 1px var(--bs-brand-edge), 0 2px 0 var(--bs-brand-edge);
 }
 .bs-key.pri:active:not(:disabled) { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 0 0 1px var(--bs-brand-edge), 0 0 0 var(--bs-brand-edge); }

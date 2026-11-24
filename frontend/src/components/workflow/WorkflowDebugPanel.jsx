@@ -60,7 +60,8 @@ export default function WorkflowDebugPanel({
   onSelectNode,
   onRestore,
   isExpanded = true,
-  onToggleExpand
+  onToggleExpand,
+  embedded = false
 }) {
   const [activeTab, setActiveTab] = useState('trace')
   const [executionStatus, setExecutionStatus] = useState('idle')
@@ -145,12 +146,12 @@ export default function WorkflowDebugPanel({
   }
 
   return (
-    <div className={`flex flex-col bg-surface border-t border-line-default ${
-      isExpanded ? 'h-80' : 'h-12'
+    <div className={`min-w-0 flex flex-col bg-surface border-t border-line-default ${
+      embedded ? '' : isExpanded ? 'h-80' : 'h-12'
     } transition-all duration-200`}>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 h-12 border-b border-line-default bg-surface-muted flex-shrink-0">
-        <div className="flex items-center gap-4">
+      <div className={`flex items-center justify-between border-b border-line-default bg-surface-muted flex-shrink-0 ${embedded ? 'flex-wrap gap-2 py-2' : 'h-12 px-4'}`}>
+        <div className={`flex items-center gap-4 ${embedded ? 'flex-wrap' : ''}`}>
           <div className="flex items-center gap-2">
             <Bug className="w-5 h-5 text-content-tertiary" />
             <span className="font-medium text-content-primary">Debug</span>
@@ -193,7 +194,7 @@ export default function WorkflowDebugPanel({
 
         <div className="flex items-center gap-2">
           {/* Tabs */}
-          <div className="flex items-center bg-surface-muted rounded-lg p-0.5">
+          <div className="flex flex-wrap items-center bg-surface-muted rounded-lg p-0.5">
             {Object.entries(TABS).map(([key, config]) => {
               const Icon = config.icon
               return (
@@ -214,18 +215,21 @@ export default function WorkflowDebugPanel({
           </div>
 
           {/* Controls */}
-          <button
+          {!embedded && <button
             onClick={() => onToggleExpand?.()}
+            aria-label={isExpanded ? 'Collapse debug panel' : 'Expand debug panel'}
+            aria-expanded={isExpanded}
             className="p-1.5 text-content-tertiary hover:text-content-secondary hover:bg-surface-muted rounded"
           >
             {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-          </button>
-          <button
+          </button>}
+          {!embedded && <button
             onClick={() => setIsMinimized(true)}
+            aria-label="Minimize debug panel"
             className="p-1.5 text-content-tertiary hover:text-content-secondary hover:bg-surface-muted rounded"
           >
             <Minimize2 className="w-4 h-4" />
-          </button>
+          </button>}
         </div>
       </div>
 

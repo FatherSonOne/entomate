@@ -135,7 +135,7 @@ const colorClasses = {
   }
 }
 
-export default function NodePalette({ onAddNode }) {
+export default function NodePalette({ onAddNode, embedded = false }) {
   const [searchTerm, setSearchTerm] = useState('')
   const [expandedCategories, setExpandedCategories] = useState({
     triggers: true,
@@ -177,14 +177,15 @@ export default function NodePalette({ onAddNode }) {
   })).filter(category => category.nodes.length > 0)
 
   return (
-    <div className="w-64 bg-surface border-r border-line-default flex flex-col h-full">
+    <div className={embedded ? 'w-full' : 'w-64 shrink-0 bg-surface border-r border-line-default flex flex-col h-full'}>
       {/* Header */}
       <div className="p-3 border-b border-line-default">
-        <h3 className="text-sm font-semibold text-content-primary mb-2">Nodes</h3>
+        {!embedded && <h3 className="text-sm font-semibold text-content-primary mb-2">Nodes</h3>}
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-content-tertiary" />
           <input
             type="text"
+            aria-label="Search nodes"
             placeholder="Search nodes..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -203,7 +204,9 @@ export default function NodePalette({ onAddNode }) {
             <div key={category.id} className="rounded-lg overflow-hidden">
               {/* Category header */}
               <button
+                type="button"
                 onClick={() => toggleCategory(category.id)}
+                aria-expanded={isExpanded}
                 className={`w-full flex items-center gap-2 px-3 py-2 ${colors.bg} ${colors.hover} transition-colors`}
               >
                 {isExpanded ? (
@@ -222,13 +225,14 @@ export default function NodePalette({ onAddNode }) {
                     const IconComponent = node.icon
 
                     return (
-                      <div
+                      <button
                         key={node.type}
-                        draggable
+                        type="button"
+                        draggable={!embedded}
                         onDragStart={(e) => handleDragStart(e, node, category)}
                         onClick={() => handleNodeClick(node)}
                         className={`
-                          flex items-center gap-2 px-3 py-2 mx-1 rounded-md cursor-grab
+                          flex w-full text-left items-center gap-2 px-3 py-2 rounded-md cursor-pointer
                           border ${colors.border} ${colors.bg}
                           hover:shadow-sm hover:border-line-strong transition-all
                           active:cursor-grabbing
@@ -236,11 +240,11 @@ export default function NodePalette({ onAddNode }) {
                         title={node.description}
                       >
                         <IconComponent className={`w-4 h-4 ${colors.icon} flex-shrink-0`} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-content-primary truncate">{node.label}</p>
-                          <p className="text-xs text-content-tertiary truncate">{node.description}</p>
-                        </div>
-                      </div>
+                        <span className="flex-1 min-w-0">
+                          <span className="block text-sm font-medium text-content-primary truncate">{node.label}</span>
+                          <span className="block text-xs text-content-tertiary truncate">{node.description}</span>
+                        </span>
+                      </button>
                     )
                   })}
                 </div>
@@ -260,7 +264,7 @@ export default function NodePalette({ onAddNode }) {
       {/* Help text */}
       <div className="p-3 border-t border-line-default bg-surface-muted">
         <p className="text-xs text-content-tertiary">
-          Drag nodes to the canvas or click to add at center
+          {embedded ? 'Choose a node to add it at the center of the canvas.' : 'Drag nodes to the canvas or click to add at center'}
         </p>
       </div>
     </div>

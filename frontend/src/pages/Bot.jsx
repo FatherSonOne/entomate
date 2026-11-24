@@ -2,15 +2,14 @@
  * Bot (Tools › Bot) — send the meeting bot and watch it while it's in the
  * call. Desktop direction B from the bot Slate pass: the live display beside
  * readouts, the send form when nothing is running, last runs in the context
- * column. When the call ends the app moves to the meeting page, which is the
- * debrief. On phone this page is only the send form: a launch, a live bot and
- * a finished one all open the meeting page (direction A).
+ * column. A completed run can be opened from Last runs. On phone, sending
+ * a bot opens its live meeting page directly.
  *
  * Replaces the old Bot Launcher (session ids, Recall ids, curl and webhook
  * copy are gone; the bot's name is the workspace default).
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useOrgSafe } from '../contexts/OrgContext'
 import { botsApi } from '../services/api'
@@ -20,14 +19,10 @@ import {
 import SendBotForm from '../components/bot/SendBotForm'
 import BotLive from '../components/bot/BotLive'
 import {
-  BOT_LAUNCHED_EVENT, isActive, markSeen, meetingPath, phaseSignal, runTitle,
+  BOT_LAUNCHED_EVENT, isActive, isDebriefDelayed, phaseSignal, runTitle,
 } from '../services/botView'
 
 const ADMIN_ROLES = ['owner', 'admin']
-
-function storage() {
-  try { return window.localStorage } catch { return null }
-}
 
 const when = (iso) => {
   if (!iso) return ''
@@ -49,7 +44,6 @@ export default function Bot() {
   const [error, setError] = useState(null)
   const [stopping, setStopping] = useState(false)
   const [stopError, setStopError] = useState(null)
-  const watchedRef = useRef(null) // the live run this page is showing
 
   const load = useCallback(async () => {
     if (!orgId || !canSend) return
@@ -71,28 +65,12 @@ export default function Bot() {
   }, [load])
 
   const live = useMemo(() => (sessions || []).find((s) => isActive(s.phase) || (s.phase === 'scheduled' && Date.parse(s.joinAt) - Date.now() < 10 * 60 * 1000)) || null, [sessions])
-  const hasActive = Boolean(live)
+  const hasActive = Boolean(live) || (sessions || []).some((run) => run.phase === 'processing' && !isDebriefDelayed(run))
   useEffect(() => {
     if (!hasActive) return undefined
     const t = window.setInterval(load, 4000)
     return () => window.clearInterval(t)
   }, [hasActive, load])
-
-  // The run we were showing left the call: move to its meeting, which is the debrief.
-  useEffect(() => {
-    if (live) { watchedRef.current = live.sessionId; return }
-    const was = watchedRef.current && (sessions || []).find((s) => s.sessionId === watchedRef.current)
-    if (was && (was.phase === 'processing' || was.phase === 'ready')) {
-      markSeen(storage(), was.sessionId)
-      navigate(meetingPath(was.meetingId))
-    }
-    watchedRef.current = null
-  }, [live, sessions, navigate])
-
-  // Phone is direction A: a live bot lives on its meeting page.
-  useEffect(() => {
-    if (isPhone && live && isActive(live.phase)) navigate(`/meetings/${live.meetingId}`, { replace: true })
-  }, [isPhone, live, navigate])
 
   const onLaunched = ({ meetingId }) => {
     if (isPhone) navigate(`/meetings/${meetingId}`)
@@ -140,7 +118,7 @@ export default function Bot() {
                 <BotLive view={live} canControl onStop={stop} stopping={stopping} />
                 {stopError && <p className="bs-bot-note bs-bot-err" role="alert">{stopError}</p>}
                 <p className="bs-bot-note bs-bot-after">
-                  When the bot leaves, this opens the meeting with what it caught.{' '}
+                  When the minutes are ready, open them from Last runs.{' '}
                   <Link to={`/meetings/${live.meetingId}`}>Open the meeting now</Link>
                 </p>
               </>
@@ -174,7 +152,7 @@ export default function Bot() {
                       <span className="bs-bot-run-when">{when(s.endedAt || s.joinAt || s.startedAt)}</span>
                       <span className="bs-bot-run-main">
                         {open ? <Link to={`/meetings/${s.meetingId}`}>{runTitle(s)}</Link> : <span>{runTitle(s)}</span>}
-                        <Signal tone={ps.tone}>{ps.word}</Signal>
+                        <Signal tone={ps.tone}>{isDebriefDelayed(s) ? 'Minutes delayed' : ps.word}</Signal>
                         {s.phase === 'failed' && s.failure && <span className="bs-bot-run-why">{s.failure}</span>}
                       </span>
                     </li>

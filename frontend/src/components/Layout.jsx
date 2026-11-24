@@ -173,7 +173,7 @@ export default function Layout() {
   const orgCtx = useOrgSafe()
   const isAdmin = orgCtx?.myRole === 'owner' || orgCtx?.myRole === 'admin'
   const shortcutsHeld = useNavigationShortcuts(navigate, isAdmin, !commandPaletteOpen && !shortcutsHelpOpen)
-  // When a bot's call ends, the app moves to its debrief (bot Slate pass).
+  // Announce a saved debrief without interrupting the current page.
   useBotDebriefWatch({ orgId: orgCtx?.org?.id, userId: user?.id || null, enabled: isAdmin })
 
   const handleSignOut = async () => {

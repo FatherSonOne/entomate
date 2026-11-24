@@ -50,8 +50,9 @@ export default function EnhancedLoadingScreen({ autoAnimate = true, stage = 'ses
   if (boot) {
     const pct = Math.round(boot.progress)
     return (
-      <div className="en-loader en-loader--boot" role="progressbar" aria-valuemin={0} aria-valuemax={100}
-        aria-valuenow={pct} aria-valuetext={`${boot.label}, ${pct}%`} aria-label="Loading Entomate" data-logo={logo.id}>
+      <div className="en-loader en-loader--boot" data-logo={logo.id}>
+        <div className="sr-only" role="progressbar" aria-valuemin={0} aria-valuemax={100}
+          aria-valuenow={pct} aria-valuetext={`${boot.label}, ${pct}%`} aria-label="Loading Entomate" />
         <div className="en-loader-stage">
           <AnimatedLoadingLogo logoId={logo.id} size={1024} />
           {hasProgressOrbit(logo.id) && <ProgressOrbit logoId={logo.id} progress={boot.progress} stops={boot.stops} />}

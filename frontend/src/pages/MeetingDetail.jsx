@@ -398,7 +398,10 @@ export default function MeetingDetail() {
         <TitleRule title="Meeting not found" meta={<Link to="/meetings"><b>Meetings</b></Link>} />
         <div className="bs-mtg-empty">
           <p className="bs-h3">It may have been deleted, or it belongs to another workspace.</p>
-          <Link to="/meetings" className="bs-key">Back to meetings</Link>
+          <div className="flex flex-wrap gap-3">
+            <Key onClick={refreshMeeting}>Check again</Key>
+            <Link to="/meetings" className="bs-key">Back to meetings</Link>
+          </div>
         </div>
       </div>
     )
