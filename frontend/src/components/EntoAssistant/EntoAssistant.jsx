@@ -11,6 +11,7 @@ import { createPortal } from 'react-dom'
 import { X, AlertCircle, User as UserIcon, Copy, Check, Share2 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import { useAuth } from '../../contexts/AuthContext'
+import { useOrgSafe } from '../../contexts/OrgContext'
 import useAssistantContext from './useAssistantContext'
 import { getStarter, streamQuery } from '../../services/entoAssistantService'
 import { useMediaQuery } from '../bench/useMediaQuery'
@@ -85,6 +86,7 @@ async function withFreshProposals(messages) {
 
 export default function EntoAssistant({ isOpen, onClose, signals = [], signalTotal = 0 }) {
   const { user } = useAuth()
+  const workspaceId = useOrgSafe()?.org?.id
   const { context, section, sectionSummary, sectionLabel, isLoading: contextLoading, isReady: contextReady } = useAssistantContext(isOpen)
 
   // EAI-03: the thread lives in ento_ai_threads (the backend appends each exchange), so it
@@ -378,6 +380,7 @@ export default function EntoAssistant({ isOpen, onClose, signals = [], signalTot
           threadId: calendarEventId ? null : threadId,
           conversationId: calendarEventId ? null : conversationId,
           calendarEventId,
+          workspaceId,
         },
         {
           signal: controller.signal,
@@ -426,7 +429,7 @@ export default function EntoAssistant({ isOpen, onClose, signals = [], signalTot
       setStreamingContent('')
       setToolSteps([])
     }
-  }, [inputValue, isQuerying, context, section, user, threadId, conversationId])
+  }, [inputValue, isQuerying, context, section, user, threadId, conversationId, workspaceId])
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {

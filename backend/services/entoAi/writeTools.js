@@ -29,6 +29,7 @@ const calendarService = require('../calendarService');
 const autoJoin = require('../calendarAutoJoin');
 const { readCalendarSettings } = require('../calendarSettings');
 const { uuidArg, dateArg, trunc, calendarTimeZone, localDateTime, ToolInputError } = require('./tools');
+const scheduledBriefs = require('./scheduledBriefs');
 
 const STR = { type: SchemaType.STRING };
 const DATE = (description) => ({ type: SchemaType.STRING, description });
@@ -101,6 +102,17 @@ async function updateColumns(ctx, table, id, set, columns) {
 function bookingError(error) {
   if (error instanceof autoJoin.SettingsError) throw new ToolInputError(error.message);
   throw error;
+}
+
+function briefScheduleError(error) {
+  if (error instanceof scheduledBriefs.BriefError) throw new ToolInputError(error.message);
+  throw error;
+}
+
+function upcomingMeeting(result) {
+  return result?.eventId ? {
+    path: `/meetings?tab=upcoming&event=${encodeURIComponent(result.eventId)}`, label: 'upcoming meeting',
+  } : null;
 }
 
 const VERBS = {
@@ -559,9 +571,48 @@ const VERBS = {
       const result = await autoJoin.saveBooking(ctx, payload).catch(bookingError);
       return { result, undo: null };
     },
-    view: (r) => r?.eventId ? {
-      path: `/meetings?tab=upcoming&event=${encodeURIComponent(r.eventId)}`, label: 'upcoming meeting',
-    } : null,
+    view: upcomingMeeting,
+  },
+
+  change_calendar_brief_schedule: {
+    risk: 'write',
+    editable: [],
+    declaration: {
+      description: 'Propose scheduling or cancelling one pre-meeting brief in Ask Entomate. First look up the exact eventKey in get_calendar. A cancellation only removes a pending brief. The bot and Google Calendar event are not changed. The user must confirm the card.',
+      parameters: {
+        type: SchemaType.OBJECT,
+        properties: {
+          eventKey: { ...STR, description: 'The exact eventKey from get_calendar.' },
+          decision: enumOf(['schedule', 'cancel'], 'Schedule a brief or cancel its pending schedule.'),
+          leadMinutes: {
+            type: SchemaType.INTEGER,
+            description: `Minutes before the meeting: ${scheduledBriefs.LEADS.join(', ')}. Default ${scheduledBriefs.DEFAULT_LEAD}. Omit when cancelling.`,
+          },
+        },
+        required: ['eventKey', 'decision'],
+      },
+    },
+    async prepare(args, ctx) {
+      const orgId = ctx.proposalOrgId ?? ctx.workspaceId ?? (ctx.orgIds.length === 1 ? ctx.orgIds[0] : null);
+      if (!orgId) throw new ToolInputError('Choose a workspace before scheduling or cancelling a brief.');
+      const { event, start, runAt, leadMinutes, guard } = await scheduledBriefs.prepareChange(ctx.userId, orgId, args).catch(briefScheduleError);
+      const timeZone = calendarTimeZone(args.timeZone ?? ctx.timeZone);
+      const title = quote(event.summary || 'Untitled meeting');
+      const meetingTime = localDateTime(new Date(start).toISOString(), timeZone);
+      const when = runAt > Date.now() ? `at ${localDateTime(new Date(runAt).toISOString(), timeZone)} (${leadMinutes} minutes before)` : 'as soon as possible';
+      return {
+        orgId,
+        payload: { eventKey: args.eventKey, decision: args.decision, leadMinutes, timeZone, guard },
+        summary: args.decision === 'cancel'
+          ? `Cancel the pending pre-meeting brief for ${title} on ${meetingTime}.`
+          : `Prepare a brief for ${title} on ${meetingTime}, ${when}.`,
+      };
+    },
+    async execute(payload, ctx) {
+      const result = await scheduledBriefs.confirmChange(ctx.userId, ctx.orgId, payload).catch(briefScheduleError);
+      return { result, undo: null };
+    },
+    view: upcomingMeeting,
   },
 
   configure_bot_auto_join: {
@@ -675,7 +726,8 @@ const MAX_PLAN_STEPS = 8;
  */
 function planDeclaration() {
   const props = {};
-  for (const v of Object.values(VERBS)) {
+  const verbs = Object.entries(VERBS).filter(([, verb]) => verb.undo && verb.risk !== 'sensitive');
+  for (const [, v] of verbs) {
     for (const [key, schema] of Object.entries(v.declaration.parameters.properties)) {
       const seen = props[key];
       if (seen?.enum && schema.enum) props[key] = { ...seen, enum: [...new Set([...seen.enum, ...schema.enum])], description: undefined };
@@ -695,7 +747,7 @@ function planDeclaration() {
           items: {
             type: SchemaType.OBJECT,
             properties: {
-              tool: enumOf(Object.keys(VERBS), 'The write tool this step runs.'),
+              tool: enumOf(verbs.map(([name]) => name), 'The write tool this step runs.'),
               ...props,
               arg_bindings: {
                 type: SchemaType.OBJECT,

@@ -5,13 +5,14 @@ const log = require('../../utils/log');
 const { getOrgIdsForUser } = require('../../utils/orgContext');
 const calendar = require('../calendarService');
 const { readCalendarSettings } = require('../calendarSettings');
-const { meetingLink, persistTokens } = require('../calendarAutoJoin');
+const { eventKey: calendarEventKey, meetingLink, persistTokens } = require('../calendarAutoJoin');
 const { withAiUsage, addUsage } = require('../aiUsage');
 const { calendarTimeZone, localDateTime, trunc, runTool, recordLinksForAnswer, CLOSED } = require('./tools');
 
 const TABLE = 'ento_ai_brief_schedules';
 const MINUTE = 60_000;
 const LEADS = [5, 15, 30, 60];
+const DEFAULT_LEAD = 15;
 const CHECK_EVERY = 5 * MINUTE;
 const MAX_AHEAD = 62 * 24 * 60 * MINUTE;
 
@@ -61,37 +62,34 @@ function publicSchedule(row) {
   };
 }
 
-async function manage(userId, orgId, eventId, method, body) {
+async function scheduleScope(userId, orgId, eventId) {
   if (!db) throw new BriefError(503, 'Brief scheduling is unavailable.');
   if (typeof eventId !== 'string' || !/^[\w.@+-]{1,1024}$/.test(eventId)) throw new BriefError(400, 'Invalid calendar event.');
   if (!(await getOrgIdsForUser(userId)).includes(orgId)) throw new BriefError(403, 'This workspace is unavailable.');
   const connection = await connectionFor(userId);
-  if (!connection) {
-    if (method === 'GET') return null;
-    throw new BriefError(409, 'Connect Google Calendar to schedule a brief.');
-  }
-
+  if (!connection) return null;
   const scope = { user_id: userId, org_id: orgId, event_id: eventId, calendar_binding: connection.binding };
-  const read = async () => unwrap(await db.from(TABLE).select('*').match(scope).maybeSingle());
-  if (method === 'GET') return publicSchedule(await read());
-  if (method === 'DELETE') {
-    unwrap(await db.from(TABLE).delete().match(scope).neq('status', 'ready'));
-    return publicSchedule(await read());
-  }
+  return { scope, connection, read: async () => unwrap(await db.from(TABLE).select('*').match(scope).maybeSingle()) };
+}
 
-  const leadMinutes = body?.leadMinutes;
+function validateLead(leadMinutes) {
   if (!LEADS.includes(leadMinutes)) throw new BriefError(400, 'Choose 5, 15, 30, or 60 minutes.');
   if (!gemini.isConfigured() || !gemini.genAI) throw new BriefError(503, 'Ask Entomate is unavailable.');
-  const old = await read();
-  if (old && old.status !== 'failed') return publicSchedule(old);
-  const event = await eventFor(userId, connection.tokens, eventId);
+}
+
+function validateStart(event, now) {
   const start = Date.parse(event?.start?.dateTime);
-  const now = Date.now();
   if (!Number.isFinite(start) || start <= now || start > now + MAX_AHEAD) {
     throw new BriefError(409, 'Choose a timed meeting that has not started.');
   }
+  return start;
+}
+
+async function saveSchedule({ scope, read }, old, event, leadMinutes, timeZone) {
+  const now = Date.now();
+  const start = validateStart(event, now);
   const fields = {
-    starts_at: new Date(start).toISOString(), lead_minutes: leadMinutes, time_zone: calendarTimeZone(body?.timeZone),
+    starts_at: new Date(start).toISOString(), lead_minutes: leadMinutes, time_zone: calendarTimeZone(timeZone),
     check_at: checkAt(start, leadMinutes, now), status: 'scheduled', attempts: 0,
   };
   const saved = old
@@ -100,6 +98,59 @@ async function manage(userId, orgId, eventId, method, body) {
       onConflict: 'user_id,org_id,calendar_binding,event_id', ignoreDuplicates: true,
     }).select().maybeSingle();
   return publicSchedule(unwrap(saved) || await read());
+}
+
+async function manage(userId, orgId, eventId, method, body) {
+  const data = await scheduleScope(userId, orgId, eventId);
+  if (method === 'GET') return data ? publicSchedule(await data.read()) : null;
+  if (!data) throw new BriefError(409, 'Connect Google Calendar to schedule a brief.');
+  if (method === 'DELETE') {
+    unwrap(await db.from(TABLE).delete().match(data.scope).neq('status', 'ready'));
+    return publicSchedule(await data.read());
+  }
+
+  const leadMinutes = body?.leadMinutes;
+  validateLead(leadMinutes);
+  const old = await data.read();
+  if (old && old.status !== 'failed') return publicSchedule(old);
+  const event = await eventFor(userId, data.connection.tokens, eventId);
+  return saveSchedule(data, old, event, leadMinutes, body?.timeZone);
+}
+
+async function prepareChange(userId, orgId, { eventKey, decision, leadMinutes = DEFAULT_LEAD, guard }) {
+  if (!['schedule', 'cancel'].includes(decision)) throw new BriefError(400, 'Choose schedule or cancel.');
+  if (decision === 'schedule') validateLead(leadMinutes);
+  const separator = typeof eventKey === 'string' ? eventKey.lastIndexOf('@') : -1;
+  if (separator < 1) throw new BriefError(400, 'Look up the exact meeting in Google Calendar first.');
+  const eventId = eventKey.slice(0, separator);
+  const data = await scheduleScope(userId, orgId, eventId);
+  if (!data) throw new BriefError(409, 'Connect Google Calendar in Settings first.');
+  const calendarStamp = createHash('sha256').update(data.connection.binding).digest('hex');
+  if (guard && guard.calendarStamp !== calendarStamp) throw new BriefError(409, 'Your calendar connection changed. Ask again to create a new proposal.');
+  const [event, old] = await Promise.all([eventFor(userId, data.connection.tokens, eventId), data.read()]);
+  if (!event?.start?.dateTime || calendarEventKey(event) !== eventKey) throw new BriefError(409, 'The meeting moved or is unavailable. Look it up again.');
+  if (old?.status === 'ready') throw new BriefError(409, 'The brief is already prepared. Open it from Upcoming or Ask Entomate history.');
+  const scheduleId = old?.id ?? null;
+  if (guard && guard.scheduleId !== scheduleId) throw new BriefError(409, 'The brief schedule changed. Ask again before making another change.');
+  if (decision === 'cancel' && old?.status !== 'scheduled') throw new BriefError(409, 'There is no pending brief to cancel for this meeting.');
+  if (decision === 'schedule' && old?.status === 'scheduled') throw new BriefError(409, 'A brief is already scheduled. Cancel it before changing the lead time.');
+  const start = decision === 'schedule' ? validateStart(event, Date.now()) : Date.parse(event.start?.dateTime);
+  return { data, event, old, eventId, start, runAt: start - leadMinutes * MINUTE, leadMinutes, guard: { calendarStamp, scheduleId } };
+}
+
+async function confirmChange(userId, orgId, payload) {
+  const { data, event, old, eventId, leadMinutes } = await prepareChange(userId, orgId, payload);
+  if (payload.decision === 'cancel') {
+    const cancelled = unwrap(await db.from(TABLE).delete().match(data.scope).eq('id', old.id)
+      .eq('status', 'scheduled').select('id').maybeSingle());
+    if (!cancelled) throw new BriefError(409, 'The schedule changed before it could be cancelled.');
+    return { eventId, status: 'cancelled' };
+  }
+  const schedule = await saveSchedule(data, old, event, leadMinutes, payload.timeZone);
+  if (schedule?.status !== 'scheduled' || schedule.leadMinutes !== leadMinutes) {
+    throw new BriefError(409, 'The schedule changed. Check Upcoming for its current status.');
+  }
+  return { eventId, ...schedule };
 }
 
 async function prepare(job, event) {
@@ -215,4 +266,4 @@ function stop() {
   timer = undefined;
 }
 
-module.exports = { BriefError, manage, runScheduledBriefs, initialize, stop };
+module.exports = { BriefError, manage, prepareChange, confirmChange, LEADS, DEFAULT_LEAD, runScheduledBriefs, initialize, stop };

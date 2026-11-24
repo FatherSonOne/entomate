@@ -367,6 +367,7 @@ export async function streamQuery(userQuery, context, callbacks) {
       {
         question: userQuery, section: context.section, threadId: context.threadId,
         calendarEventId: context.calendarEventId,
+        workspaceId: context.workspaceId,
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       },
       callbacks

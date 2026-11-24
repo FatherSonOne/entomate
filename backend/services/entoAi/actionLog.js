@@ -84,7 +84,7 @@ async function moveRow(ctx, id, from, set) {
 
 /** prepare() again on a payload, and refuse a result in another org than the row's. */
 async function reprepare(verb, payload, ctx, orgId) {
-  const prepared = await verb.prepare(payload || {}, ctx);
+  const prepared = await verb.prepare(payload || {}, { ...ctx, proposalOrgId: orgId });
   if (prepared.orgId !== orgId) throw new ToolInputError('That record is in a different workspace than this proposal');
   return prepared;
 }
@@ -349,6 +349,7 @@ async function proposePlan(args, ctx) {
       const verb = VERBS[tools[i]];
       if (!verb) throw new ToolInputError(`Step ${i + 1} uses an unknown tool "${tools[i]}"`);
       if (verb.risk === 'sensitive') throw new ToolInputError(`Step ${i + 1} needs its own typed confirmation; propose it alone`);
+      if (!verb.undo) throw new ToolInputError(`Step ${i + 1} needs its own confirmation; propose it alone`);
       const { tool: _tool, arg_bindings: rawBindings, ...stepArgs } = steps[i];
       const bindings = planBindings(rawBindings, verb, tools, i);
       for (const key of Object.keys(bindings || {})) delete stepArgs[key];
@@ -419,6 +420,7 @@ async function confirmPlan(ctx, planId) {
   for (const r of rows) {
     const verb = VERBS[r.tool_name];
     if (!verb) throw new ActionError(422, `Step ${r.step_order + 1} can no longer run`);
+    if (!verb.undo || verb.risk === 'sensitive') throw new ActionError(422, `Step ${r.step_order + 1} needs its own confirmation`);
     try {
       await reprepare(verb, r.payload, ctx, r.org_id);
     } catch (e) {

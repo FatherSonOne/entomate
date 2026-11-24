@@ -118,6 +118,7 @@ describe('record buttons in the panel', () => {
   })
 
   test('a streamed answer takes its records from the complete event', async () => {
+    api.org.mockReturnValue({ org: { id: 'active-workspace' } })
     svc.streamQuery.mockImplementation(async (_q: string, _ctx: unknown, cb: { onComplete: (r: unknown) => void }) => {
       cb.onComplete({ answer: 'The Website relaunch is on track.', threadId: T.id, tools: [], proposals: [], recordLinks: [LINKS[1]] })
     })
@@ -125,6 +126,7 @@ describe('record buttons in the panel', () => {
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'how is the relaunch?' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
     const group = await screen.findByRole('group', { name: 'Records in this answer' })
+    expect(svc.streamQuery).toHaveBeenCalledWith('how is the relaunch?', expect.objectContaining({ workspaceId: 'active-workspace' }), expect.anything())
     fireEvent.click(within(group).getByRole('button', { name: 'Open Website relaunch' }))
     await waitFor(() => expect(screen.getByTestId('where').textContent).toBe(`/projects/${P1}`))
   })
