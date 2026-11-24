@@ -67,6 +67,7 @@ jest.mock('../config/supabase', () => ({
 // list each call was given.
 const mockScript = [];
 const mockSent = [];
+const mockToolConfigs = [];
 const mockModelParams = [];
 function mockChunks(step) {
   if (step.chunks) return step.chunks.map((part) => [part]);
@@ -79,8 +80,9 @@ jest.mock('../config/gemini', () => ({
     getGenerativeModel: (params) => {
       mockModelParams.push(params);
       return {
-        generateContentStream: async ({ contents }) => {
+        generateContentStream: async ({ contents, toolConfig }) => {
           mockSent.push(JSON.parse(JSON.stringify(contents)));
+          mockToolConfigs.push(toolConfig);
           const step = mockScript.shift() || { text: 'fallback answer' };
           async function* stream() {
             const chunks = mockChunks(step);
@@ -102,7 +104,7 @@ jest.mock('../config/gemini', () => ({
 jest.mock('../middleware/rateLimiter', () => ({ aiLimiter: (req, res, next) => next() }));
 jest.mock('../utils/orgContext',() => ({ getOrgIdsForUser: jest.fn(async () => ['org-a']) }));
 jest.mock('../utils/log', () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() }));
-jest.mock('../services/calendarService', () => ({ isConfigured: jest.fn(() => false), getEvents: jest.fn() }));
+jest.mock('../services/calendarService', () => ({ isConfigured: jest.fn(() => false), getEvents: jest.fn(), getEvent: jest.fn() }));
 // EAI-07 metering reads billing tables on the service client; it has its own test (aiUsage.test.js).
 jest.mock('../services/aiUsage', () => ({ meterAi: jest.fn((req, res, next) => next()), addUsage: jest.fn() }));
 
@@ -128,6 +130,7 @@ beforeEach(() => {
   mockServiceQueries.length = 0;
   mockScript.length = 0;
   mockSent.length = 0;
+  mockToolConfigs.length = 0;
   mockModelParams.length = 0;
   for (const k of Object.keys(mockResults)) delete mockResults[k];
   jest.clearAllMocks();
@@ -198,6 +201,45 @@ test('no tool call: answers directly, no follow-ups invented', async () => {
   const ev = events(res.text);
   expect(ev.map((e) => e.type)).toEqual(['start', 'answering', 'chunk', 'complete']);
   expect(ev.at(-1).tools).toEqual([]);
+});
+
+test('Upcoming briefs use the selected occurrence and the caller’s calendar', async () => {
+  const calendar = require('../services/calendarService');
+  const eventId = 'weeklyreview_20261211T160000Z';
+  calendar.isConfigured.mockReturnValueOnce(true);
+  calendar.getEvent.mockResolvedValueOnce({
+    id: eventId, summary: 'Weekly review', description: 'Review the rollout owner',
+    start: { dateTime: '2026-12-11T16:00:00Z' }, hangoutLink: 'https://meet.google.com/abc-defg-hij',
+  });
+  mockResults.user_settings = { data: { calendar_json: { tokens: { access_token: 'calendar-token' } } } };
+  mockResults.meetings = { data: { id: ID, title: 'Previous rollout review' } };
+  mockResults.meeting_notes = { data: [
+    { id: 'team-note', meeting_id: ID, body: 'Avery owns the rollout.', visibility: 'team', meetings: { title: 'Previous rollout review' } },
+    { id: 'private-note', meeting_id: ID, body: 'Private rollout note.', visibility: 'private', author_id: 'user-b' },
+  ] };
+  mockScript.push(
+    { calls: [{ name: 'get_calendar', args: { query: 'Weekly review' } }] },
+    { calls: [{ name: 'search_everything', args: { query: 'rollout', types: ['notes'] } }] },
+    { calls: [{ name: 'get_meeting', args: { meeting_id: ID } }] },
+    { text: 'Previous rollout review recorded that Avery owns the rollout.' },
+  );
+
+  const res = await request(app).post('/api/ento-ai/query').set('Authorization', 'Bearer good-token')
+    .send({ question: 'Give me a pre-meeting brief for Weekly review.', section: 'meetings', calendarEventId: eventId });
+
+  expect(res.status).toBe(200);
+  expect(calendar.getEvent).toHaveBeenCalledWith(expect.objectContaining({ access_token: 'calendar-token' }), eventId);
+  expect(mockToolConfigs).toEqual([{ functionCallingConfig: { mode: 'ANY', allowedFunctionNames: ['get_calendar'] } }, undefined, undefined, undefined]);
+  expect(calendar.getEvents).not.toHaveBeenCalled();
+  expect(mockUserQueries.find((q) => q.table === 'user_settings').calls).toContainEqual(['eq', ['user_id', 'user-a']]);
+  expect(mockSent[1].at(-1).parts[0].functionResponse.response.events).toMatchObject([{
+    title: 'Weekly review', agenda: 'Review the rollout owner', meetingLink: 'https://meet.google.com/abc-defg-hij',
+  }]);
+  expect(mockSent[2].at(-1).parts[0].functionResponse.response.groups.notes).toMatchObject([{ meetingId: ID }]);
+  expect(mockSent[3].at(-1).parts[0].functionResponse.response.meeting.notes).toMatchObject([{ text: 'Avery owns the rollout.' }]);
+  expect(events(res.text).at(-1).recordLinks).toEqual([{ kind: 'meeting', id: ID, label: 'Previous rollout review' }]);
+  expect(JSON.stringify(mockSent)).not.toContain('Private rollout note.');
+  expect(res.text).not.toContain('calendar-token');
 });
 
 test('rounds are capped at 5, then the model is asked for the answer', async () => {

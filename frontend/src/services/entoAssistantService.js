@@ -366,6 +366,7 @@ export async function streamQuery(userQuery, context, callbacks) {
     await entoAiApi.queryStream(
       {
         question: userQuery, section: context.section, threadId: context.threadId,
+        calendarEventId: context.calendarEventId,
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       },
       callbacks
@@ -378,6 +379,10 @@ export async function streamQuery(userQuery, context, callbacks) {
       callbacks.onError?.(new Error(err.code === 'ai_quota' && err.quotaMessage
         ? err.quotaMessage
         : 'Too many questions in a short time. Wait a minute, then ask again.'))
+      return
+    }
+    if (context.calendarEventId) {
+      callbacks.onError?.(new Error('The calendar brief could not be loaded. Try again from Upcoming.'))
       return
     }
     console.warn('[EntoAI] Tool endpoint unavailable, using the assistant endpoint:', err?.message)

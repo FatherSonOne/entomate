@@ -341,9 +341,9 @@ export default function EntoAssistant({ isOpen, onClose, signals = [], signalTot
   const voiceState = isListening ? 'listening' : !isQuerying ? 'idle' : streamingContent ? 'speaking' : 'thinking'
   useEffect(() => { setVoiceState(voiceState) }, [voiceState])
 
-  const handleSend = useCallback(async (text) => {
+  const handleSend = useCallback(async (text, calendarEventId) => {
     const query = (text || inputValue).trim()
-    if (!query || isQuerying) return
+    if (!query || (isQuerying && !calendarEventId)) return
 
     setError(null)
     setInputValue('')
@@ -374,8 +374,10 @@ export default function EntoAssistant({ isOpen, onClose, signals = [], signalTot
         {
           ...context,
           userName: user?.name || user?.email || 'User',
-          threadId,
-          conversationId,
+          section,
+          threadId: calendarEventId ? null : threadId,
+          conversationId: calendarEventId ? null : conversationId,
+          calendarEventId,
         },
         {
           signal: controller.signal,
@@ -528,9 +530,14 @@ export default function EntoAssistant({ isOpen, onClose, signals = [], signalTot
   // what it deleted. One subscription, through a ref, so it always calls this render's handlers.
   const pageBridgeRef = useRef(null)
   pageBridgeRef.current = {
-    open: (id) => {
+    open: (request) => {
       pageAskedRef.current = true
-      return id ? handleSelectThread(id, true) : handleNewThread()
+      if (request.brief) {
+        const { eventId, title } = request.brief
+        handleNewThread()
+        return handleSend(`Give me a pre-meeting brief for ${JSON.stringify(title)}.`, eventId)
+      }
+      return request.id ? handleSelectThread(request.id, true) : handleNewThread()
     },
     deleted: (ids) => {
       const gone = new Set(ids)
@@ -540,7 +547,7 @@ export default function EntoAssistant({ isOpen, onClose, signals = [], signalTot
     },
   }
   useEffect(() => {
-    const offRequest = onThreadRequest(({ id }) => { pageBridgeRef.current.open(id) })
+    const offRequest = onThreadRequest((request) => { pageBridgeRef.current.open(request) })
     const offDeleted = onThreadsDeleted((ids) => pageBridgeRef.current.deleted(ids))
     return () => { offRequest(); offDeleted() }
   }, [])

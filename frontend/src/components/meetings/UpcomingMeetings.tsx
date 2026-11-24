@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useLocation, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useOutletContext, useSearchParams } from 'react-router-dom'
 import { Cell, Drawer, Grid, Key, Section, Select, Signal, Switch, TextInput, useMediaQuery, PHONE_QUERY, cx } from '../bench'
 import CarryForward, { type CarryForwardData } from './CarryForward'
 import { calendarApi, entoAiApi, meetingsApi } from '../../services/api'
 import { tokensMatch, type EntoProposal } from '../EntoAssistant/ProposalCard'
+import { requestMeetingBrief } from '../EntoAssistant/threadSignal'
 import { useOrgSafe } from '../../contexts/OrgContext'
 import { useToast } from '../vc/ToastProvider'
 import {
@@ -293,7 +294,7 @@ function BookingControls({ event, defaultLead, onBooked }: {
   )
 }
 
-function Prep({ event, autoJoinOn, busy, onDecide, defaultLead, onBooked }: { event: UpcomingEvent; autoJoinOn: boolean; busy: boolean; onDecide: (e: UpcomingEvent, d: 'skip' | 'join' | null) => void; defaultLead: number; onBooked: () => void }): React.ReactElement {
+function Prep({ event, autoJoinOn, busy, onDecide, defaultLead, onBooked, onBrief }: { event: UpcomingEvent; autoJoinOn: boolean; busy: boolean; onDecide: (e: UpcomingEvent, d: 'skip' | 'join' | null) => void; defaultLead: number; onBooked: () => void; onBrief?: () => void }): React.ReactElement {
   const [carry, setCarry] = useState<CarryForwardData | null>(null)
   const plan = botPlan(event, autoJoinOn)
   const d = startDate(event)
@@ -314,6 +315,7 @@ function Prep({ event, autoJoinOn, busy, onDecide, defaultLead, onBooked }: { ev
       <p className="bs-up-prep-m">
         {WD[d.getDay()]} {d.getDate()} {MO[d.getMonth()]} · {timeOf(event)}{durationMin(event) ? ` · ${durationLabel(durationMin(event))}` : ''}{event.platform ? ` · ${PLATFORM_LABEL[event.platform]}` : ''}
       </p>
+      {onBrief && <div className="bs-title-keys"><Key onClick={onBrief}>Pre-meeting brief</Key></div>}
       <div className="bs-up-botbox">
         <div>
           <Signal tone={plan.tone}>{plan.word}</Signal>
@@ -343,6 +345,7 @@ function Prep({ event, autoJoinOn, busy, onDecide, defaultLead, onBooked }: { ev
 
 export default function UpcomingMeetings(): React.ReactElement {
   const toast = useToast() as ToastApi
+  const openAssistant = useOutletContext<{ openAssistant?: () => void } | null>()?.openAssistant
   const isPhone = useMediaQuery(PHONE_QUERY)
   const [params, setParams] = useSearchParams()
   const { key: locationKey } = useLocation()
@@ -491,7 +494,13 @@ export default function UpcomingMeetings(): React.ReactElement {
 
   const prep = (
     <Drawer open={Boolean(open)} onClose={() => setOpenId(null)} label="Upcoming meeting">
-      {open && <Prep event={open} autoJoinOn={autoJoinOn} busy={busyKey === open.key} onDecide={decide} defaultLead={data?.autoJoin.leadMinutes ?? 0} onBooked={load} />}
+      {open && <Prep event={open} autoJoinOn={autoJoinOn} busy={busyKey === open.key} onDecide={decide} defaultLead={data?.autoJoin.leadMinutes ?? 0} onBooked={load}
+        onBrief={openAssistant ? () => {
+          requestMeetingBrief(open.id, open.title)
+          setOpenId(null)
+          openAssistant()
+        } : undefined}
+      />}
     </Drawer>
   )
 

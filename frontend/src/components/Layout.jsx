@@ -152,6 +152,7 @@ export default function Layout() {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [shortcutsHelpOpen, setShortcutsHelpOpen] = useState(false)
   const [assistantOpen, setAssistantOpen] = useState(false)
+  const assistantOutlet = { openAssistant: () => setAssistantOpen(true) }
   // The panel chunk loads on first open, then stays mounted so its conversation survives a close.
   const [assistantMounted, setAssistantMounted] = useState(false)
   useEffect(() => { if (assistantOpen) setAssistantMounted(true) }, [assistantOpen])
@@ -303,7 +304,7 @@ export default function Layout() {
             {/* A page that breaks keeps the shell; navigating away clears it */}
             <ErrorBoundary scope="page" resetKey={location.pathname}>
               <Suspense fallback={<PageSkeleton />}>
-                <Outlet context={{ openAssistant: () => setAssistantOpen(true) }} />
+                <Outlet context={assistantOutlet} />
                 <BootMark stage="page" />
               </Suspense>
             </ErrorBoundary>
@@ -547,7 +548,7 @@ export default function Layout() {
         <main className="p-4 lg:p-6" style={{ position: 'relative', zIndex: 1 }}>
           <ErrorBoundary scope="page" resetKey={location.pathname}>
             <Suspense fallback={<PageSkeleton />}>
-              <Outlet />
+              <Outlet context={isActive('/meetings') ? assistantOutlet : undefined} />
               <BootMark stage="page" />
             </Suspense>
           </ErrorBoundary>
