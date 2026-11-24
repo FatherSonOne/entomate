@@ -20,8 +20,7 @@ function meetingAttendees(meeting) {
   return [...new Set((names.length ? names : speakers).map(name => name.trim()))];
 }
 
-function meetingDate(meeting, timeZone) {
-  const value = meeting.start_time || meeting.created_at;
+function formatMeetingDate(value, timeZone) {
   if (!value) return '';
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return '';
@@ -233,8 +232,11 @@ function renderDocx({ title, label, metadata, sections }) {
 }
 
 function generateMeetingDocument(meeting, { actionItems = [], timeZone, kind, format }) {
-  const date = meetingDate(meeting, timeZone);
-  const dateLabel = meeting.start_time ? (meeting.recording_job?.source === 'bot' ? 'Bot launched' : 'Meeting started') : 'Saved';
+  const recordingStart = formatMeetingDate(meeting.recording_job?.recordingStartedAt, timeZone);
+  const date = recordingStart || formatMeetingDate(meeting.start_time || meeting.created_at, timeZone);
+  const dateLabel = recordingStart ? 'Recording started' : meeting.start_time
+    ? (meeting.recording_job?.source === 'bot' ? 'Bot launched' : 'Meeting started')
+    : 'Saved';
   const duration = meetingDuration(meeting);
   const attendees = meetingAttendees(meeting);
   const isTranscript = kind === 'transcript';
