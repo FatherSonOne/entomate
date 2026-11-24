@@ -25,13 +25,15 @@ const api = vi.hoisted(() => ({
   plans: { confirm: vi.fn(), reject: vi.fn(), undo: vi.fn() },
   signals: vi.fn(),
   upcoming: vi.fn(),
+  org: vi.fn(),
+  meetingBriefs: { status: vi.fn(), schedule: vi.fn(), cancel: vi.fn() },
 }))
 vi.mock('../services/api', () => ({
   entoAiApi: api,
   calendarApi: { getUpcomingMeetings: api.upcoming },
   meetingsApi: { carryForwardPreview: vi.fn().mockResolvedValue(null) },
 }))
-vi.mock('../contexts/OrgContext', () => ({ useOrgSafe: () => null }))
+vi.mock('../contexts/OrgContext', () => ({ useOrgSafe: api.org }))
 vi.mock('../components/vc/ToastProvider', () => ({ useToast: () => ({ error: vi.fn() }) }))
 
 import EntoAssistant from '../components/EntoAssistant/EntoAssistant'
@@ -73,6 +75,8 @@ describe('record buttons in the panel', () => {
     Element.prototype.scrollIntoView = vi.fn()
     api.latestThread.mockResolvedValue(null)
     api.threads.list.mockResolvedValue({ threads: [T] })
+    api.org.mockReturnValue(null)
+    api.meetingBriefs.status.mockResolvedValue({ schedule: null })
   })
 
   const renderPanel = () => render(
@@ -146,6 +150,42 @@ describe('record buttons in the panel', () => {
       expect.anything(),
     )
     expect(screen.getByRole('button', { name: 'Open Budget review' })).toBeTruthy()
+  })
+
+  test('Upcoming schedules a brief with bot auto-join off and opens the prepared conversation', async () => {
+    api.org.mockReturnValue({ org: { id: 'workspace' } })
+    const start = new Date(Date.now() + 86_400_000).toISOString()
+    const scheduled = { status: 'scheduled', runAt: start, threadId: null }
+    api.upcoming.mockResolvedValue({ connected: true, autoJoin: { enabled: false }, events: [{ id: 'one', title: 'Budget review', start }] })
+    api.meetingBriefs.schedule.mockImplementation(async () => {
+      api.meetingBriefs.status.mockResolvedValue({ schedule: scheduled })
+      return { schedule: scheduled }
+    })
+    api.meetingBriefs.cancel.mockImplementation(async () => {
+      const ready = { ...scheduled, status: 'ready', threadId: T.id }
+      api.meetingBriefs.status.mockResolvedValue({ schedule: ready })
+      return { schedule: ready }
+    })
+    api.threads.get.mockResolvedValue({ thread: { ...T, messages: [
+      { role: 'user', content: 'Prepare a pre-meeting brief.', section: 'meetings', ts: 1 },
+      { role: 'assistant', content: 'The scheduled brief is ready.', section: 'meetings', ts: 2 },
+    ] } })
+    render(<MemoryRouter initialEntries={['/meetings?tab=upcoming&event=one']}>
+      <Routes><Route element={<BriefTestShell />}><Route path="meetings" element={<UpcomingMeetings />} /></Route></Routes>
+    </MemoryRouter>)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Schedule brief' }))
+    expect(screen.getByRole('combobox', { name: 'Prepare brief' }).textContent).toContain('15 minutes before')
+    fireEvent.click(screen.getByRole('button', { name: 'Schedule brief' }))
+    expect(await screen.findByText('Brief scheduled')).toBeTruthy()
+    expect(api.meetingBriefs.schedule).toHaveBeenCalledWith('one', expect.objectContaining({ orgId: 'workspace', leadMinutes: 15 }))
+
+    // The worker won the race with Cancel, so the finished conversation stays available.
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel scheduled brief' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Open prepared brief' }))
+    expect(await screen.findByText('The scheduled brief is ready.')).toBeTruthy()
+    expect(api.threads.get).toHaveBeenCalledWith(T.id)
+    expect(svc.streamQuery).not.toHaveBeenCalled()
   })
   const NOTE = /Answered with limited access to your records/
   const answerWith = (extra: Record<string, unknown>) => {

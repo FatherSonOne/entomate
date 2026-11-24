@@ -384,6 +384,7 @@ async function gracefulShutdown(signal) {
 
   try {
     require('./services/calendarAutoJoin').stop();
+    require('./services/entoAi/scheduledBriefs').stop();
   } catch {
     // Ignore if not initialized
   }
@@ -465,6 +466,12 @@ if (process.env.NODE_ENV !== 'test') {
       require('./services/calendarAutoJoin').initialize();
     } catch (error) {
       logger.warn('Calendar auto-join not initialized:', error.message);
+    }
+
+    try {
+      require('./services/entoAi/scheduledBriefs').initialize();
+    } catch (error) {
+      logger.warn('Meeting brief scheduler not initialized:', error.message);
     }
 
     // Follow-up emails: draft after the minutes land, send the due ones

@@ -422,6 +422,25 @@ router.delete('/threads/:id', authenticate, threadRoute(async (db, orgIds, req) 
   return data && data.length ? { ok: true } : null;
 }));
 
+async function meetingBriefSchedule(req, res) {
+  const { BriefError, manage } = require('../services/entoAi/scheduledBriefs');
+  try {
+    const orgId = req.method === 'PUT' ? req.body?.orgId : req.query.orgId;
+    const schedule = await manage(req.user.id, orgId, req.params.eventId, req.method, req.body);
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json({ schedule });
+  } catch (error) {
+    if (error instanceof BriefError) return res.status(error.status).json({ error: error.message });
+    log.warn('[ScheduledBriefs] Schedule request failed', { error: error.message });
+    return res.status(503).json({ error: 'The brief schedule could not be loaded or saved.' });
+  }
+}
+
+router.route('/meeting-briefs/:eventId')
+  .get(authenticate, meetingBriefSchedule)
+  .put(authenticate, aiLimiter, meetingBriefSchedule)
+  .delete(authenticate, meetingBriefSchedule);
+
 // -- EAI-05 write spine ------------------------------------------------
 // Everything runs under the caller's JWT client (D2); RLS (owner AND org member) and the
 // table's trigger are the perimeter. While the flag is off the endpoints do not exist.

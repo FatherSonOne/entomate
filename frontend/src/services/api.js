@@ -1125,6 +1125,15 @@ export const assistantApi = {
  * before the stream starts; after `start`, failures go to onError.
  */
 export const entoAiApi = {
+  meetingBriefs: {
+    status: (eventId, orgId) => {
+      const path = `/ento-ai/meeting-briefs/${encodeURIComponent(eventId)}`
+      cache.invalidate(path)
+      return api.get(path, { params: { orgId } })
+    },
+    schedule: (eventId, body) => api.put(`/ento-ai/meeting-briefs/${encodeURIComponent(eventId)}`, body),
+    cancel: (eventId, orgId) => api.delete(`/ento-ai/meeting-briefs/${encodeURIComponent(eventId)}`, { params: { orgId } }),
+  },
   queryStream: async (data, callbacks = {}) => {
     const { signal, onStart, onToolEvent, onProposal, onAnswering, onChunk, onChunkReset, onFollowUp, onComplete, onError } = callbacks
     const streamUrl = API_BASE_URL ? `${API_BASE_URL}/api/ento-ai/query` : '/api/ento-ai/query'

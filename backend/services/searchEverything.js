@@ -344,8 +344,10 @@ async function search({ query, types = TYPES, limit = 8, orgIds, userId, db = su
         .order('created_at', { ascending: false }), ['body', 'source_label'], words, 30),
       searchRows(() => db
         .from('meeting_notes')
-        .select('id, meeting_id, author_id, body, visibility, created_at, meetings(title)')
+        .select('id, meeting_id, author_id, body, visibility, created_at, meetings!inner(title)')
         .in('org_id', orgIds)
+        .in('meetings.org_id', orgIds)
+        .or(`visibility.eq.team,author_id.eq.${userId}`)
         .order('created_at', { ascending: false }), ['body'], words, 30),
     ]).then(([clips, mnotes]) => {
       // A missing table (clips not migrated yet) must not sink the whole search.

@@ -18,7 +18,11 @@ describe('searchEverything helpers', () => {
       tasks: [{ id: 'own-task', org_id: 'org-a', title: 'Pricing' }, { id: 'other-task', org_id: 'org-b', title: 'Pricing' }],
       projects: [{ id: 'own-project', org_id: 'org-a', name: 'Pricing' }],
       search_notes: [{ id: 'mine', org_id: 'org-a', user_id: 'me', body: 'Pricing' }, { id: 'private', org_id: 'org-a', user_id: 'other', body: 'Pricing' }],
-      meeting_notes: [{ id: 'team', org_id: 'org-a', author_id: 'other', body: 'Pricing', visibility: 'team' }, { id: 'hidden', org_id: 'org-a', author_id: 'other', body: 'Pricing', visibility: 'private' }],
+      meeting_notes: [
+        { id: 'team', org_id: 'org-a', author_id: 'other', body: 'Pricing', visibility: 'team', meetings: { org_id: 'org-a' } },
+        { id: 'hidden', org_id: 'org-a', author_id: 'other', body: 'Pricing', visibility: 'private', meetings: { org_id: 'org-a' } },
+        { id: 'foreign-parent', org_id: 'org-a', author_id: 'me', body: 'Pricing', visibility: 'team', meetings: { org_id: 'org-b' } },
+      ],
     };
     const db = { from(table) {
       let data = fixtures[table];
@@ -27,9 +31,13 @@ describe('searchEverything helpers', () => {
       calls.push(call);
       const builder = {
         select() { return this; }, order() { return this; },
-        in(field, values) { data = data.filter(row => values.includes(row[field])); if (field === 'org_id') call.scope = true; return this; },
+        in(field, values) { data = data.filter(row => values.includes(field === 'meetings.org_id' ? row.meetings?.org_id : row[field])); if (field === 'org_id') call.scope = true; return this; },
         eq(field, value) { data = data.filter(row => row[field] === value); return this; },
-        or() { exact = true; return this; },
+        or(filter) {
+          if (filter === 'visibility.eq.team,author_id.eq.me') data = data.filter(row => row.visibility === 'team' || row.author_id === 'me');
+          else exact = true;
+          return this;
+        },
         limit(value) { call.limit = value; return this; },
         then(resolve) { return Promise.resolve({ data: exact ? [] : data, error: null }).then(resolve); },
       };
