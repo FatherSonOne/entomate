@@ -44,18 +44,20 @@ describe('Entomate brand motion', () => {
     expect(container.querySelector('video').getAttribute('src')).toBeNull()
     expect(container.querySelector('img').src).toContain('glyphs.jpg')
     expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled()
-    expect(screen.getByRole('button', { name: 'Play background animation' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Play motion' })).toHaveTextContent('Play motion')
   })
 
   it('lets the user opt into motion and pause it again', () => {
     reduced = true
     render(<BrandMotion />)
     act(() => onVisibility([{ isIntersecting: true }]))
-    fireEvent.click(screen.getByRole('button', { name: 'Play background animation' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Play motion' }))
     act(() => onVisibility([{ isIntersecting: true }]))
     expect(HTMLMediaElement.prototype.play).toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: 'Pause background animation' }))
-    expect(screen.getByRole('button', { name: 'Play background animation' })).toBeInTheDocument()
+    const pause = screen.getByRole('button', { name: 'Pause motion' })
+    expect(pause).toHaveTextContent('Pause motion')
+    fireEvent.click(pause)
+    expect(screen.getByRole('button', { name: 'Play motion' })).toBeInTheDocument()
   })
 
   it('falls back to the still when media fails', () => {

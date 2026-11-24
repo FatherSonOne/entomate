@@ -211,7 +211,7 @@ export default function DataDeletion() {
           --border: rgba(255, 255, 255, 0.07);
           --text-primary: #F8F0F3;
           --text-secondary: #C8AAB8;
-          --text-muted: #7A6070;
+          --text-muted: #A28697;
           --font-display: 'Syne', sans-serif;
           --font-body: 'Space Grotesk', system-ui, sans-serif;
           --font-mono: 'JetBrains Mono', monospace;

@@ -242,7 +242,7 @@ export default function NodePalette({ onAddNode, embedded = false }) {
                         <IconComponent className={`w-4 h-4 ${colors.icon} flex-shrink-0`} />
                         <span className="flex-1 min-w-0">
                           <span className="block text-sm font-medium text-content-primary truncate">{node.label}</span>
-                          <span className="block text-xs text-content-tertiary truncate">{node.description}</span>
+                          <span className="block text-xs text-content-secondary truncate">{node.description}</span>
                         </span>
                       </button>
                     )
