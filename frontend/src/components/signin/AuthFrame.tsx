@@ -7,8 +7,7 @@ import { nextHeroClip } from '../heroRotation'
 import { SIGNIN_TIPS, nextTagline, nextTipIndex } from '../../services/signInRotation'
 import '../../styles/sign-in.css'
 
-// Once per page load: the landing's hero film rotation (shared, so the
-// sign-in film follows on from the landing's), and a rotating headline.
+// Pick the sign-in film and headline once per document load.
 const heroClip = nextHeroClip() ?? 'hands'
 const tagline = nextTagline()
 const firstTip = nextTipIndex()

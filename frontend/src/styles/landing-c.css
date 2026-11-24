@@ -99,14 +99,15 @@
     linear-gradient(0deg, rgba(8,8,8,.88) 0%, rgba(8,8,8,0) 42%);
 }
 .lc-hero .lc-in { position: relative; z-index: 2; }
-.lc-hero-film { position: absolute; inset: 0; }
+.lc-page .lc-hero-film, .lc-page .lc-close-film { position: absolute; inset: 0; }
 .lc-hero .lc-scrim { z-index: 1; }
-.lc-page .lc-hero-film .brand-motion-control {
-  right: clamp(20px, 5vw, 72px); bottom: 24px; z-index: 3; border-radius: 2px; border-color: rgba(248,240,242,.28);
+.lc-page :is(.lc-hero-film, .lc-close-film) .brand-motion-control {
+  right: clamp(20px, 5vw, 72px); bottom: 24px; z-index: 3; border-radius: 2px;
+  color: var(--ink); background: #080808e8; border: 1px solid rgba(248,240,242,.35);
   font-family: var(--font-mono); font-size: 11px; letter-spacing: .06em; min-height: 36px;
 }
-.lc-page .lc-hero-film .brand-motion-control:hover { border-color: var(--accent); }
-.lc-page .lc-hero-film .brand-motion-control:focus-visible { outline-color: var(--accent); }
+.lc-page :is(.lc-hero-film, .lc-close-film) .brand-motion-control:hover { border-color: var(--accent); }
+.lc-page :is(.lc-hero-film, .lc-close-film) .brand-motion-control:focus-visible { outline-color: var(--accent); }
 .lc-hero .lc-eyebrow { color: var(--ink2); }
 .lc-hero .lc-rule { display: flex; gap: 24px; border-bottom: 2px solid var(--ink); padding-bottom: 12px; margin-bottom: 28px; max-width: 760px; }
 .lc-hero h1 { font-family: var(--font-display); font-weight: 800; font-size: clamp(46px, 6.6vw, 104px); line-height: .9; letter-spacing: -.035em; max-width: 12ch; }
@@ -207,16 +208,16 @@
 .lc-agents h3 { font-size: 22px; letter-spacing: -.015em; margin: 26px 0 8px; }
 .lc-agents p { color: var(--ink2); font-size: 14px; }
 
-/* ── 05 Close ── */
+/* ── 06 Close ── */
 .lc-close { min-height: 86vh; display: grid; place-items: center; text-align: center; }
-.lc-close .lc-scrim { position: absolute; inset: 0; background: radial-gradient(60% 70% at 50% 50%, rgba(8,8,8,.9), rgba(8,8,8,.55) 55%, rgba(8,8,8,.2)); }
+.lc-close .lc-scrim { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(60% 70% at 50% 50%, rgba(8,8,8,.9), rgba(8,8,8,.55) 55%, rgba(8,8,8,.2)); }
 .lc-close .lc-in { position: relative; z-index: 2; padding: 0 20px; }
 .lc-close .lc-eyebrow { color: #FF6699; }
 .lc-close h2 { font-family: var(--font-display); font-weight: 800; font-size: clamp(40px, 6vw, 92px); line-height: .95; letter-spacing: -.035em; max-width: 16ch; margin: 18px auto 0; }
 .lc-close .lc-ctas { justify-content: center; margin-top: 34px; }
 .lc-close .lc-where { margin-top: 20px; font-size: 12px; color: #A89BA1; }
 
-/* ── 06 Guide ── */
+/* ── 07 Guide ── */
 .lc-guide .guide-master-toggle, .lc-guide .guide-body { --font-display: var(--font-body); }
 .lc-guide .guide-cta { text-align: center; margin-top: 32px; }
 .lc-page .guide-note-sq { display: inline-block; width: 8px; height: 8px; background: var(--ai); flex: none; margin-top: 6px; }
@@ -230,11 +231,22 @@
 .lc-footer .lc-about { color: var(--muted); font-size: 13px; margin-top: 10px; max-width: 34ch; }
 .lc-footer .lc-fine { margin-top: 36px; font-size: 12px; color: var(--muted); display: flex; gap: 20px; flex-wrap: wrap; }
 
+@media (max-width: 960px) {
+  .lc-nav-links { display: none; }
+}
+
 /* ── Phone ── */
 @media (max-width: 760px) {
   .lc-nav { height: 56px; gap: 12px; }
-  .lc-nav-links, .lc-nav-r .lc-signin { display: none; }
+  .lc-nav-r .lc-signin { display: none; }
+  .lc-nav .lc-brand, .lc-nav-r { flex-shrink: 0; }
+  .lc-nav .en-brand-logo { gap: 6px; }
+  .lc-nav .en-brand-mark { width: 26px; height: 26px; }
+  .lc-nav .en-brand-wordmark { width: clamp(80px, 25vw, 105px); height: auto; }
+  .lc-nav-r .lc-btn { padding-inline: 12px; }
   .lc-hero { padding-bottom: 36px; padding-top: 96px; }
+  .lc-hero h1 { font-size: clamp(36px, 11.5vw, 50px); }
+  .lc-close h2 { font-size: clamp(38px, 6vw, 46px); }
   .lc-hero .lc-scrim {
     background:
       linear-gradient(180deg, rgba(8,8,8,.9) 0, rgba(8,8,8,.6) 56px, rgba(8,8,8,0) 120px),
@@ -245,8 +257,8 @@
   .lc-page .lc-theme { padding: 0 6px; }
   .lc-hero-film .brand-motion-poster, .lc-hero-film .brand-motion-video { object-position: 72% center; }
   /* Phone: the film control moves out of the nav's path and shrinks to its glyph. */
-  .lc-page .lc-hero-film .brand-motion-control { bottom: 36px; width: 44px; height: 44px; padding: 0; display: grid; place-items: center; }
-  .lc-page .lc-hero-film .brand-motion-control .brand-motion-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .lc-page :is(.lc-hero-film, .lc-close-film) .brand-motion-control { bottom: 36px; width: 44px; height: 44px; padding: 0; display: grid; place-items: center; }
+  .lc-page :is(.lc-hero-film, .lc-close-film) .brand-motion-control .brand-motion-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .lc-hero .lc-status { padding-right: 56px; }
   .lc-hero .lc-rule { flex-direction: column; gap: 4px; }
   .lc-hero .lc-cue { display: none; }

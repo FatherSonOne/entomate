@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../context/ThemeContext'
@@ -9,25 +9,25 @@ import { Logo } from '../components/Logo'
 import ModuleJourney from '../components/landing/ModuleJourney'
 import LandingGuide from '../components/landing/LandingGuide'
 import useReducedMotion from '../components/landing/useReducedMotion'
-import { AGENTS, BAND, CAPTURE, ECOSYSTEM_LINKS, MEDIA, NAV_LINKS } from '../components/landing/landingData'
+import { AGENTS, BAND, CAPTURE, ECOSYSTEM_LINKS, LANDING_MEDIA_DIR, MEDIA, MODULES, NAV_LINKS } from '../components/landing/landingData'
 import '../styles/landing-c.css'
 
-// Hero film rotates once per page load (workflow, hands, bridge, signal, factors).
-// Module scope so it is picked once, including under React Strict Mode.
-const heroClip = nextHeroClip()
+// Pick once per document with a rotation independent of the sign-in page.
+const heroClip = nextHeroClip({
+  clips: ['signal-chamber', 'coastal-relay', 'project-lines', 'hands', 'workflow'],
+  storageKey: 'entomate.landing.hero.previous',
+})
 
 /**
  * Public landing page, direction C "Minutes" (2026-11-21).
  * Sections: 01 hero, band, 02 module journey, 03 minutes specimen,
- * 04 agents, 05 close, 06 user guide, footer.
- * Copy follows the claims ledger in landing-copy-revision-plan-2026-11-21.md.
+ * 04 agents, 05 capture, 06 close, 07 user guide, footer.
  */
 export default function LandingPage() {
   const { isSignedIn, loading: isLoading } = useAuth()
   const { isLight, toggleMode } = useTheme()
   const reducedMotion = useReducedMotion()
   const [navSolid, setNavSolid] = useState(false)
-  const closeVideo = useRef(null)
 
   // Nav turns solid after the hero, except while the pinned journey fills the screen.
   useEffect(() => {
@@ -47,14 +47,6 @@ export default function LandingPage() {
       if (frame) cancelAnimationFrame(frame)
     }
   }, [])
-
-  // The closing loop autoplays unless the user asked for reduced motion.
-  useEffect(() => {
-    const video = closeVideo.current
-    if (!video) return
-    if (reducedMotion) video.pause()
-    else video.play().catch(() => {})
-  }, [reducedMotion])
 
   if (!isLoading && isSignedIn) {
     return <Navigate to="/dashboard" replace />
@@ -81,16 +73,16 @@ export default function LandingPage() {
       </header>
 
       <main id="lc-main">
-        {/* 01 Hero · hands loop */}
+        {/* 01 Hero */}
         <section className="lc-hero lc-media lc-wrap" aria-labelledby="lc-h1">
-          <BrandMotion clip={heroClip} className="lc-hero-film" />
+          <BrandMotion clip={heroClip} mediaDirectory={LANDING_MEDIA_DIR} className="lc-hero-film" />
           <div className="lc-scrim" aria-hidden="true" />
           <div className="lc-in">
             <div className="lc-rule lc-eyebrow"><span>01 · Meeting intelligence that executes</span></div>
             <h1 id="lc-h1">Meetings end. <em>The work shouldn’t.</em></h1>
             <p className="lc-lede">
-              Entomate turns every recording into a transcript, a summary, the decisions made, and action items.
-              After every meeting, its agents prioritize and schedule each one, then you route them with workflows you design.
+              Record in your browser, upload audio, or send Meet Mate to your call.
+              Entomate turns recordings into searchable minutes and action items you can track in projects or route through workflows.
             </p>
             <div className="lc-ctas">
               <Link className="lc-btn is-primary" to="/sign-in?mode=signup">Start free <span aria-hidden="true">→</span></Link>
@@ -98,7 +90,7 @@ export default function LandingPage() {
             </div>
             <div className="lc-status lc-mono"><span>Early access</span><span>Web</span><span>entomate.logosvision.org</span></div>
           </div>
-          <div className="lc-cue" aria-hidden="true"><b>Scroll</b><span className="lc-mono">6 modules below</span></div>
+          <div className="lc-cue" aria-hidden="true"><b>Scroll</b><span className="lc-mono">{MODULES.length} modules below</span></div>
         </section>
 
         {/* Band: four facts, each shipped */}
@@ -119,7 +111,7 @@ export default function LandingPage() {
           <div className="lc-sh">
             <span className="lc-n">03</span>
             <h2 id="lc-work-h">Every meeting, minuted.</h2>
-            <p>Every meeting leaves behind a clear record: transcript, decisions, the owners named in the room and deadlines. Ask it anything later.</p>
+            <p>Read the transcript, decisions and action items together. Jump to the moment a decision was made, or review a follow-up email before it goes out.</p>
           </div>
           <div className="lc-minutes">
             <div className="lc-doc">
@@ -142,7 +134,7 @@ export default function LandingPage() {
               <div className="lc-tr"><span className="lc-tc">12:04</span><div><b>Priya S.</b> So my proposal: ingestion first, then notes. I can own the spec.</div></div>
               <div className="lc-tr"><span className="lc-tc">12:20</span><div><b>Frankie</b> Agreed. Let’s make that the call.</div></div>
               <div className="lc-tr"><span className="lc-tc">23:40</span><div><b>Frankie</b> Pulse can wait until January.</div></div>
-              <p className="lc-foot">Ask any meeting a question, or search every meeting by meaning as well as by words.</p>
+              <p className="lc-foot">Ask a question about this meeting, or search across meetings by exact words or meaning.</p>
             </div>
           </div>
         </section>
@@ -172,8 +164,8 @@ export default function LandingPage() {
         <section className="lc-pad lc-wrap" id="capture" aria-labelledby="lc-capture-h">
           <div className="lc-sh">
             <span className="lc-n">05</span>
-            <h2 id="lc-capture-h">A notetaker that asks first.</h2>
-            <p>Send Meet Mate into a video call and the meeting becomes minutes: a transcript, then the summary, decisions and action items. Workspace admins launch it during early access.</p>
+            <h2 id="lc-capture-h">Let Meet Mate take minutes.</h2>
+            <p>Workspace owners and admins can send Meet Mate to Google Meet, Zoom or Microsoft Teams, or set it to join eligible calls from a connected Google Calendar.</p>
           </div>
           <ul className="lc-agents lc-agents--live">
             {CAPTURE.map((c) => (
@@ -182,11 +174,9 @@ export default function LandingPage() {
           </ul>
         </section>
 
-        {/* 06 Close · portal loop */}
+        {/* 06 Close */}
         <section className="lc-close lc-media" id="start" aria-labelledby="lc-close-h">
-          <video ref={closeVideo} className="lc-bg" autoPlay={!reducedMotion} muted loop playsInline preload="metadata" poster={MEDIA('portal').poster} aria-hidden="true">
-            <source src={MEDIA('portal').video} type="video/mp4" />
-          </video>
+          <BrandMotion clip="glass-torus" mediaDirectory={LANDING_MEDIA_DIR} className="lc-close-film" />
           <div className="lc-scrim" aria-hidden="true" />
           <div className="lc-in">
             <div className="lc-eyebrow">06 · Start free</div>

@@ -1,16 +1,15 @@
 /**
  * Landing page content (direction C, "Minutes").
  *
- * Every line here is checked against the code and the claims ledger in
- * landing-copy-revision-plan-2026-11-21.md (§4). Do not add a claim that is
- * not in that ledger. Status: 'ship' = works today, 'plan' = not built yet.
- *
- * Media lives in /public/landing (re-encoded from QNTM-Assets/entomate/assets).
+ * Check public claims against the current implementation and any access
+ * requirements. Status: 'ship' = available, 'plan' = planned.
  */
 
+export const LANDING_MEDIA_DIR = '/landing'
+
 export const MEDIA = (name) => ({
-  poster: `/landing/${name}.jpg`,
-  video: `/landing/${name}.mp4`,
+  poster: `${LANDING_MEDIA_DIR}/${name}.jpg`,
+  video: `${LANDING_MEDIA_DIR}/${name}.mp4`,
 })
 
 export const NAV_LINKS = [
@@ -32,30 +31,28 @@ export const BAND = [
 export const MODULES = [
   {
     name: 'Meetings', sig: 'live', kicker: 'Meeting intelligence', media: 'signal',
-    head: 'Every recording, understood',
-    tag: 'Upload a recording. Entomate transcribes it, summarizes it and pulls out the decisions.',
+    head: 'From recording to minutes',
+    tag: 'Capture a call with Meet Mate, record in your browser, or upload audio.',
     features: [
-      ['Audio upload, transcribed by Gemini or OpenAI', 'ship'],
-      ['Summary, key points and decisions', 'ship'],
-      ['Sentiment for each meeting', 'ship'],
-      ['Ask questions of any meeting', 'ship'],
-      ['Full-text and semantic search', 'ship'],
-      ['Meet Mate notetaker for your video calls', 'ship'],
-      ['Decisions and action items linked to the moment in the transcript', 'ship'],
+      ['Browser recording with live captions, pause and a pop-out recorder', 'ship'],
+      ['Summaries, key points, decisions and action items', 'ship'],
+      ['Timecodes that jump to the transcript or available recording', 'ship'],
+      ['Private-by-default meeting notes', 'ship'],
+      ['Editable follow-up emails', 'ship'],
     ],
-    src: 'routes/meetings.js · routes/search.js · services/transcriptIngest.js',
+    src: 'routes/meetings.js · services/transcriptIngest.js',
   },
   {
-    name: 'Assistant', sig: 'ai', kicker: 'AI · Ento Assistant', media: 'intelligence',
-    head: 'Ask your work anything',
-    tag: 'A chat assistant that knows your meetings, tasks and goals.',
+    name: 'Assistant', sig: 'ai', kicker: 'AI · Ask Entomate', media: 'intelligence',
+    head: 'Get answers from your work',
+    tag: 'Ask about your meetings, tasks and projects in a chat you can pick up later.',
     features: [
-      ['Streaming chat', 'ship'],
-      ['Context from meetings, tasks and goals', 'ship'],
-      ['Meeting-prep briefs', 'ship'],
-      ['Suggested follow-up questions', 'ship'],
+      ['Streaming answers and searchable chat history', 'ship'],
+      ['Pre-meeting briefs using past decisions, open follow-ups and your connected calendar', 'ship'],
+      ['Full-text and semantic search across meetings', 'ship'],
+      ['Admin confirmation for Meet Mate auto-join rules in chat, where enabled', 'ship'],
     ],
-    src: 'routes/assistant.js',
+    src: 'routes/entoAi.js · routes/search.js',
   },
   {
     name: 'Agents', sig: 'ai', kicker: 'AI · Action items', media: 'glyphs',
@@ -69,6 +66,17 @@ export const MODULES = [
       ['Send action items to your CRM in one click', 'ship'],
     ],
     src: 'services/agents/* · services/meetingEvents.js',
+  },
+  {
+    name: 'Projects', sig: 'brand', kicker: 'Projects & tasks', media: 'project-lines',
+    head: 'Keep projects on track',
+    tag: 'Keep tasks and action items from linked meetings together in one project.',
+    features: [
+      ['Shared briefs with scope, success criteria, leads and resource links', 'ship'],
+      ['Project deadlines, overdue work and schedule progress', 'ship'],
+      ['Edit the same meeting action item from Projects, Tasks or its meeting', 'ship'],
+    ],
+    src: 'routes/projects.js · routes/meetings.js',
   },
   {
     name: 'Workflows', sig: 'brand', kicker: 'Visual workflow builder', media: 'workflow',
@@ -106,7 +114,7 @@ export const MODULES = [
       ['Google Calendar with OAuth', 'ship'],
       ['Email, and webhooks in and out', 'ship'],
       ['Logos Vision and Pulse bridge, when connected', 'ship'],
-      ['Microsoft Teams', 'plan'],
+      ['Microsoft Teams app integration', 'plan'],
     ],
     src: 'crmService.js · ecosystemBridge.js · slackNotifier.js',
   },
@@ -124,11 +132,11 @@ export const AGENTS = [
   { n: '4.4 · Follow-up', head: 'Catches promises', body: 'Detects promised follow-ups in the conversation.' },
 ]
 
-/** Section 05: the Meet Mate notetaker. Each line is checked against botOrchestrator.js, consent.js, transcriptIngest.js, transcriptMoments.js and dataDeletion.js. */
+/** Section 05: the Meet Mate notetaker. */
 export const CAPTURE = [
   { n: '5.1 · Visible', head: 'Joins by name', body: 'Meet Mate joins as a named participant and announces itself in the meeting chat.' },
-  { n: '5.2 · Asks first', head: 'One-click opt-out', body: 'Attendees get an email before the meeting and can opt out in one click. The organizer is told.' },
-  { n: '5.3 · Linked', head: 'Back to the moment', body: 'The transcript keeps speaker names, and every decision and action item links to the moment it was said.' },
+  { n: '5.2 · Consent', head: 'Notify attendees', body: 'Organizers confirm they’ll notify attendees before recording. When opt-out emails are sent, attendees can opt out in one click.' },
+  { n: '5.3 · Linked', head: 'Back to the moment', body: 'Speaker names are kept when available. Timecodes take you back to the moments behind decisions and action items.' },
   { n: '5.4 · Yours', head: 'Ask to delete', body: 'Anyone can request that their data be deleted.' },
 ]
 

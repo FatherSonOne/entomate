@@ -2,12 +2,12 @@ import React, { useEffect, useRef, useState } from 'react'
 import './BrandMotion.css'
 
 /** Decorative brand footage: still first, opt-in motion when reduced motion is set. */
-export default function BrandMotion({ clip = 'hands', className = '', controls = true }) {
+export default function BrandMotion({ clip = 'hands', className = '', controls = true, mediaDirectory = '/brand-lab/assets/motion' }) {
   const ref = useRef(null)
   const [playing, setPlaying] = useState(() => !window.matchMedia('(prefers-reduced-motion: reduce)').matches)
   const [ready, setReady] = useState(false)
   const [failed, setFailed] = useState(false)
-  const base = `/brand-lab/assets/motion/${clip}`
+  const base = `${mediaDirectory}/${clip}`
 
   useEffect(() => {
     const query = window.matchMedia('(prefers-reduced-motion: reduce)')

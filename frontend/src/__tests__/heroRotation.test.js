@@ -18,6 +18,16 @@ describe('landing hero rotation', () => {
     expect(nextHeroClip()).toBe('bridge')
   })
 
+  it('keeps the landing rotation independent of the default rotation', () => {
+    window.localStorage.setItem('entomate.hero.previous', 'hands')
+    const landing = { clips: ['signal-chamber', 'coastal-relay'], storageKey: 'entomate.landing.hero.previous' }
+    window.localStorage.setItem(landing.storageKey, 'signal-chamber')
+
+    expect(nextHeroClip(landing)).toBe('coastal-relay')
+    expect(nextHeroClip()).toBe('bridge')
+    expect(nextHeroClip(landing)).toBe('signal-chamber')
+  })
+
   it('recovers from a stale direction', () => {
     window.localStorage.setItem('entomate.hero.previous', 'old-clip')
     vi.spyOn(Math, 'random').mockReturnValue(0)
