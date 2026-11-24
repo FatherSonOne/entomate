@@ -28,6 +28,8 @@ export interface MeetingsJson {
 
 export interface RecordingSettingsProps {
   meetingsJson: MeetingsJson | undefined
+  calendarVersion: number
+  onManageCalendar: () => void
   onUpdate: (key: keyof MeetingsJson, value: string | boolean) => void
 }
 
@@ -38,7 +40,7 @@ export function permissionSignal(state: Permission['state'] | undefined): { tone
   return { tone: 'off', word: 'Not allowed yet' }
 }
 
-export default function RecordingSettings({ meetingsJson, onUpdate }: RecordingSettingsProps): React.ReactElement {
+export default function RecordingSettings({ meetingsJson, onUpdate, calendarVersion, onManageCalendar }: RecordingSettingsProps): React.ReactElement {
   const m = meetingsJson ?? {}
   const audio = useAudioDevices({ initialInput: m.audioInputDeviceId || '', initialOutput: '' }) as unknown as AudioDevicesApi
   const { permissions, requestPermission } = usePermissions() as unknown as PermissionsApi
@@ -85,7 +87,7 @@ export default function RecordingSettings({ meetingsJson, onUpdate }: RecordingS
       </div>
 
       <div className="bs-set-sub"><span className="bs-h3">Bot auto-join</span></div>
-      <CalendarAutoJoinSettings />
+      <CalendarAutoJoinSettings key={calendarVersion} onManageCalendar={onManageCalendar} />
     </>
   )
 }

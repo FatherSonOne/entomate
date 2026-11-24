@@ -8,6 +8,7 @@ import { calendarApi, checkHealth, integrationsApi } from '../../services/api'
 import { authFetch } from '../../services/authFetch'
 import EcosystemSettings from '../EcosystemSettings'
 import SlackSettings from './SlackSettings'
+import CalendarConnectionSettings from './CalendarConnectionSettings'
 import { Drawer, Key, Signal } from '../bench'
 import type { SignalTone } from '../bench'
 import { serviceState } from '../../services/settingsView'
@@ -43,12 +44,13 @@ interface Row {
 export interface ConnectionsSettingsProps {
   drawer: DrawerId | null
   onDrawer: (d: DrawerId | null) => void
-  onJump: (section: 'recording') => void
+  onCalendarChange: () => void
+  calendarError: string | null
 }
 
 const clock = (d: Date): string => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
-export default function ConnectionsSettings({ drawer, onDrawer, onJump }: ConnectionsSettingsProps): React.ReactElement {
+export default function ConnectionsSettings({ drawer, onDrawer, onCalendarChange, calendarError }: ConnectionsSettingsProps): React.ReactElement {
   const [data, setData] = useState<StatusData | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -77,7 +79,12 @@ export default function ConnectionsSettings({ drawer, onDrawer, onJump }: Connec
   const base: Row[] = [
     { key: 'lv', name: 'Logos Vision', what: 'CRM task sync through the ecosystem bridge', state: st(data?.eco?.logosVision), word: '', action: { label: 'Manage', onClick: () => onDrawer('ecosystem') } },
     { key: 'pulse', name: 'Pulse', what: 'Team recaps and alerts through the ecosystem bridge', state: st(data?.eco?.pulse), word: '', action: { label: 'Manage', onClick: () => onDrawer('ecosystem') } },
-    { key: 'cal', name: 'Google Calendar', what: 'Bot auto-join reads your primary calendar', state: st(data?.cal ? (data.cal.connected ? 'connected' : 'not configured') : undefined), word: '', action: { label: 'Manage', onClick: () => onJump('recording') } },
+    {
+      key: 'cal', name: 'Google Calendar', what: 'Upcoming meetings, briefings and bot scheduling',
+      state: st(data?.cal ? data.cal.connected : undefined),
+      word: data?.cal?.configured && !data.cal.connected ? 'Not connected' : '',
+      action: { label: 'Manage', onClick: () => onDrawer('calendar') },
+    },
     { key: 'ai', name: aiName, what: 'Transcription and analysis', state: st(ai?.status), word: '' },
     { key: 'db', name: 'Database', what: 'Supabase · live query', state: st(db), word: '' },
     { key: 'slack', name: 'Slack', what: 'Two-way Slack waits on per-workspace connect', state: 'hold' as ServiceState, word: 'On hold', action: { label: 'Set up', onClick: () => onDrawer('slack') } },
@@ -103,6 +110,15 @@ export default function ConnectionsSettings({ drawer, onDrawer, onJump }: Connec
 
       <Drawer open={drawer === 'ecosystem'} onClose={() => onDrawer(null)} label="Logos Vision and Pulse">
         <div className="bs-skin"><EcosystemSettings /></div>
+      </Drawer>
+      <Drawer open={drawer === 'calendar'} onClose={() => onDrawer(null)} label="Google Calendar">
+        {drawer === 'calendar' && (
+          <CalendarConnectionSettings
+            status={data?.cal}
+            oauthError={calendarError}
+            onDisconnect={() => { onCalendarChange(); return load() }}
+          />
+        )}
       </Drawer>
       <Drawer open={drawer === 'slack'} onClose={() => onDrawer(null)} label="Slack">
         <p className="bs-set-note">Two-way Slack is on hold until each workspace can connect its own Slack. Recaps to a channel still work when the server has a Slack bot token.</p>

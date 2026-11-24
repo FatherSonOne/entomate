@@ -70,7 +70,7 @@ class CalendarService {
       access_type: 'offline',
       scope: scopes,
       state,
-      prompt: 'consent'
+      prompt: 'select_account consent'
     });
   }
 

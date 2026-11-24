@@ -89,39 +89,40 @@ router.get('/auth', authenticate, (req, res) => {
  * OAuth callback handler
  */
 router.get('/callback', async (req, res) => {
+  const { code, state, error: providerError } = req.query;
+  const verified = verifyState(state);
+  if (!verified) return res.status(400).json({ error: 'Invalid or expired Google Calendar authorization' });
+
+  const { userId, returnUrl } = verified;
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  const separator = returnUrl.includes('?') ? '&' : '?';
+  const returnToApp = (result) => res.redirect(`${frontendUrl}${returnUrl}${separator}${result}`);
+
+  if (providerError === 'access_denied') return returnToApp('calendar_error=cancelled');
+  if (typeof code !== 'string' || !code || providerError) return returnToApp('calendar_error=failed');
+
   try {
-    const { code, state } = req.query;
-
-    if (!code) {
-      return res.status(400).json({ error: 'Authorization code required' });
-    }
-
     const tokens = await calendarService.getTokensFromCode(code);
+    if (!tokens?.access_token || !tokens.refresh_token) throw new Error('Google did not grant offline calendar access');
 
-    // Store tokens in session as immediate transport
-    if (!req.session) {
-      req.session = {};
-    }
-    req.session.calendarTokens = tokens;
+    // A changed account must not inherit consent, overrides or booked calls
+    // from the old calendar. Keep it connected until Google's grant is saved.
+    const switchedAt = new Date();
+    const saved = await updateCalendarSettings(userId, () => ({
+      tokens, connected_at: switchedAt.toISOString(),
+    }), { create: true });
+    if (!saved) throw new Error('Calendar connection was not saved');
 
-    // Save for the user named in the signed state. Without a valid state the
-    // tokens stay in the session only (old flow).
-    const verified = verifyState(state);
-    if (verified) {
-      await saveTokensToDB(verified.userId, tokens);
-    } else {
-      log.warn('Calendar OAuth callback without a valid state; tokens not saved to the account');
-    }
-
-    // Redirect to frontend (the return path was checked when the state was made).
-    const returnUrl = verified ? verified.returnUrl : '/calendar';
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    const separator = returnUrl.includes('?') ? '&' : '?';
-    res.redirect(`${frontendUrl}${returnUrl}${separator}connected=true`);
+    // Only withdraw bookings created before the switch. A newly enabled rule
+    // in another tab may already be scheduling calls for the new calendar.
+    await autoJoin.withdrawScheduled(userId, switchedAt, { createdBefore: switchedAt }).catch((err) =>
+      log.warn('Auto-join withdraw on calendar change failed:', err.message));
+    if (req.session) delete req.session.calendarTokens;
+    res.clearCookie('calendar_tokens');
+    return returnToApp('connected=true');
   } catch (error) {
     log.error('Calendar OAuth error:', { error: error.message || error });
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    res.redirect(`${frontendUrl}/calendar?error=${encodeURIComponent(error.message)}`);
+    return returnToApp('calendar_error=failed');
   }
 });
 

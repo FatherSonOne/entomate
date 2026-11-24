@@ -653,14 +653,16 @@ function healthOf(calendarJson) {
  * Withdraw every bot auto-join scheduled for this user that has not joined
  * yet. Used when they switch auto-join off or disconnect the calendar.
  */
-async function withdrawScheduled(userId, now = new Date(), { keepBookings = false } = {}) {
-  const { data, error } = await db()
+async function withdrawScheduled(userId, now = new Date(), { keepBookings = false, createdBefore } = {}) {
+  const query = db()
     .from('bot_sessions')
     .select('id, org_id, calendar_event_key')
     .eq('consent_acknowledged_by', userId)
     .not('calendar_event_key', 'is', null)
     .in('status', LIVE_STATUSES)
     .gt('join_at', now.toISOString());
+  if (createdBefore) query.lt('created_at', createdBefore.toISOString());
+  const { data, error } = await query;
   if (error) throw error;
   const settings = keepBookings ? normalizeSettings((await readCalendarSettings(userId, db()))?.calendar_json?.auto_join, now) : null;
   let withdrawn = 0;

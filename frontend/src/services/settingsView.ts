@@ -5,7 +5,7 @@
  */
 
 export type SectionId = 'you' | 'appearance' | 'recording' | 'agents' | 'connections' | 'workspace'
-export type DrawerId = 'profile' | 'invite' | 'billing' | 'learning' | 'ecosystem' | 'slack'
+export type DrawerId = 'profile' | 'invite' | 'billing' | 'learning' | 'ecosystem' | 'slack' | 'calendar'
 
 export interface SectionDef {
   id: SectionId
@@ -24,7 +24,7 @@ export const SECTIONS: ReadonlyArray<SectionDef> = [
 ]
 
 const SECTION_IDS: ReadonlyArray<string> = SECTIONS.map((s) => s.id)
-const DRAWER_IDS: ReadonlyArray<string> = ['profile', 'invite', 'billing', 'learning', 'ecosystem', 'slack']
+const DRAWER_IDS: ReadonlyArray<string> = ['profile', 'invite', 'billing', 'learning', 'ecosystem', 'slack', 'calendar']
 
 export function isSectionId(v: string | null | undefined): v is SectionId {
   return typeof v === 'string' && SECTION_IDS.includes(v)
@@ -113,6 +113,7 @@ export const FIND_INDEX: ReadonlyArray<FindEntry> = [
   { label: 'Logos Vision', section: 'connections', drawer: 'ecosystem', words: 'crm ecosystem bridge token inbound api' },
   { label: 'Pulse', section: 'connections', drawer: 'ecosystem', words: 'chat ecosystem recaps' },
   { label: 'Slack', section: 'connections', drawer: 'slack', words: 'slack channel' },
+  { label: 'Google Calendar', section: 'connections', drawer: 'calendar', words: 'connect switch account work personal oauth' },
   { label: 'System status', section: 'connections', words: 'health status database ai provider gemini openai test' },
   { label: 'Team members', section: 'workspace', words: 'team members invite role admin owner remove people' },
   { label: 'Plan and billing', section: 'workspace', drawer: 'billing', words: 'plan billing invoice stripe subscription upgrade' },
