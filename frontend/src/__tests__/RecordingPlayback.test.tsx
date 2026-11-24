@@ -153,6 +153,38 @@ describe('RecordingPlayer', () => {
     expect(onMoment).toHaveBeenCalledWith(22_000)
   })
 
+  test('toggles speaker colors and labels using transcript ranges without changing playback', () => {
+    const transcriptSegments: TranscriptSegment[] = [
+      { speaker: 'Morgan', atMs: 1_000, endMs: 3_000, text: 'First turn' },
+      { speaker: 'Avery', atMs: 5_000, text: 'Older line with a start time only' },
+      { speaker: 'Morgan', atMs: 8_000, endMs: 9_000, text: 'Last turn' },
+    ]
+    const { container } = render(<RecordingPlayer meetingId={MEETING} durationMs={10_000} transcriptSegments={transcriptSegments} />)
+    const toggle = screen.getByRole('switch', { name: 'Speaker colors' })
+    const slider = screen.getByRole('slider', { name: 'Playback position' })
+    expect(toggle).not.toBeChecked()
+    expect(screen.queryByRole('list', { name: 'Waveform speakers' })).toBeNull()
+
+    fireEvent.click(toggle)
+    expect(toggle).toBeChecked()
+    const legend = screen.getByRole('list', { name: 'Waveform speakers' })
+    expect(legend).toHaveTextContent('Morgan')
+    expect(legend).toHaveTextContent('Avery')
+    const stops = [...container.querySelectorAll('svg stop')]
+    expect(stops.map(stop => Number(stop.getAttribute('offset')))).toEqual([
+      .1, .1, .3, .3, .5, .5, .8, .8, .8, .8, .9, .9,
+    ])
+    expect(stops[1]?.getAttribute('stop-color')).not.toBe(stops[5]?.getAttribute('stop-color'))
+    expect(stops[3]?.getAttribute('stop-color')).toBe('transparent')
+    expect(slider).toHaveValue('0')
+    expect(api.playback).not.toHaveBeenCalled()
+
+    fireEvent.click(toggle)
+    expect(toggle).not.toBeChecked()
+    expect(screen.queryByRole('list', { name: 'Waveform speakers' })).toBeNull()
+    expect(container.querySelector('svg stop')).toBeNull()
+  })
+
   test('remove audio asks first, then removes it', async () => {
     api.removeAudio.mockResolvedValue({ success: true })
     const onAudioRemoved = vi.fn()
