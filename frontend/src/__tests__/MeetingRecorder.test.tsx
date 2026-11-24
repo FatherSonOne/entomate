@@ -214,6 +214,15 @@ describe('MeetingRecorder', () => {
     expect(onRecorded).toHaveBeenCalledWith('m-1')
   })
 
+  test('an untitled recording is named by this device\'s date, not the server\'s', async () => {
+    renderRecorder()
+    fireEvent.click(screen.getByRole('checkbox', { name: /knows it is being recorded/i }))
+    fireEvent.click(screen.getByRole('button', { name: /start recording/i }))
+    await screen.findByRole('button', { name: /stop recording/i })
+    const today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    expect(api.start).toHaveBeenCalledWith(expect.objectContaining({ title: `Recording, ${today}` }))
+  })
+
   test('pause stops the recorders, and paused time is not counted in the piece', async () => {
     let now = 1_000_000
     const clock = vi.spyOn(Date, 'now').mockImplementation(() => now)

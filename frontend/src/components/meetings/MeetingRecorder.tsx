@@ -320,7 +320,10 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded }: MeetingRecor
     let id: string
     try {
       const beside = bot && sameAsBot ? { botSessionId: bot.sessionId } : { separate: true }
-      ;({ meetingId: id } = await startRecording({ title, attendees, mode, mimeType: audioMime, ...beside }))
+      // The server's clock is UTC: name an untitled recording by this device's date, or an
+      // evening meeting gets tomorrow's. Beside a bot, an empty title keeps the bot's title.
+      const named = title.trim() || (bot && sameAsBot ? '' : `Recording, ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`)
+      ;({ meetingId: id } = await startRecording({ title: named, attendees, mode, mimeType: audioMime, ...beside }))
     } catch (err) {
       opened.streams.forEach((s) => s.getTracks().forEach((t) => t.stop()))
       void audioContext.close()

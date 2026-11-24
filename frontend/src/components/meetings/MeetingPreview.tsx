@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Drawer, Key, Section, Signal } from '../bench'
+import { Drawer, Key, Section, Signal, Tag } from '../bench'
 import { meetingsApi } from '../../services/api'
 import {
   asList, attendeeLine, formatLength, meetingDate, meetingLengthMs, meetingStatus, type MeetingRow,
@@ -91,11 +91,13 @@ export default function MeetingPreview({ meeting, onClose, myEmail }: MeetingPre
           {date.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' })}
           {' · '}
           {date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}
-          {length > 0 && <> · {formatLength(length)}</>}
         </span>
         <h2 className="bs-h2">{m.title || 'Untitled meeting'}</h2>
         {people && <p className="bs-mtg-pv-people">{people}</p>}
-        <Signal tone={status.tone}>{status.word}</Signal>
+        <span className="bs-mtg-pv-status">
+          <Signal tone={status.tone}>{status.word}</Signal>
+          {length > 0 && <Tag className="bs-mtg-pv-length"><span className="sr-only">Length </span>{formatLength(length)}</Tag>}
+        </span>
         {m.summary && <p className="bs-mtg-pv-sum">{m.summary}</p>}
 
         <div className="bs-mtg-block">

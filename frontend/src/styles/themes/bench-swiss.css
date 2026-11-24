@@ -1370,6 +1370,7 @@ html[data-motion="reduce"] .bs-menu-list { animation: none; }
 .bs-mtg-pv { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding-top: 14px; }
 .bs-mtg-pv > .bs-h2 { margin-top: 2px; overflow-wrap: anywhere; }
 .bs-mtg-pv-people { font: 500 11.5px var(--bs-mono); color: var(--bs-muted); }
+.bs-mtg-pv-status { display: flex; align-items: center; gap: 10px; }
 .bs-mtg-pv-sum { margin-top: 8px; font-size: 14px; line-height: 1.55; color: var(--bs-ink2); }
 .bs-mtg-pv .bs-mtg-block { align-self: stretch; padding-top: 18px; }
 .bs-mtg-pv .bs-row-dec .bs-row-text { font-size: 13.5px; }
