@@ -24,6 +24,7 @@ import NodePalette from './NodePalette'
 import NodeConfigPanel from './NodeConfigPanel'
 import WorkflowToolbar from './WorkflowToolbar'
 import WorkflowDebugPanel from './WorkflowDebugPanel'
+import { Drawer, useMediaQuery } from '../bench'
 
 // Default edge options
 const defaultEdgeOptions = {
@@ -76,6 +77,9 @@ function WorkflowCanvasInner({
   const [nodes, setNodes, onNodesChange] = useNodesState(workflow?.nodes || [])
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
   const [selectedNode, setSelectedNode] = useState(null)
+  const compact = useMediaQuery('(max-width: 1199px)')
+  const [paletteOpen, setPaletteOpen] = useState(false)
+  const [debugOpen, setDebugOpen] = useState(false)
   const [showGrid, setShowGrid] = useState(true)
   const [isDirty, setIsDirty] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -390,6 +394,7 @@ function WorkflowCanvasInner({
   // Execute workflow
   const handleExecute = useCallback(async () => {
     setIsExecuting(true)
+    if (compact) setDebugOpen(true)
     try {
       const result = await onExecute?.()
       setLastExecution(result)
@@ -400,11 +405,12 @@ function WorkflowCanvasInner({
     } finally {
       setIsExecuting(false)
     }
-  }, [onExecute])
+  }, [compact, onExecute])
 
   // Test workflow
   const handleTest = useCallback(async () => {
     setIsExecuting(true)
+    if (compact) setDebugOpen(true)
     try {
       const result = await onTest?.()
       setLastExecution(result)
@@ -415,7 +421,7 @@ function WorkflowCanvasInner({
     } finally {
       setIsExecuting(false)
     }
-  }, [onTest])
+  }, [compact, onTest])
 
   // Export workflow
   const handleExport = useCallback(() => {
@@ -466,13 +472,49 @@ function WorkflowCanvasInner({
     }
   }, [])
 
+  const nodeConfigProps = {
+    node: selectedNode,
+    onClose: () => setSelectedNode(null),
+    onUpdate: handleUpdateNode,
+    onDelete: handleDeleteNode,
+    onDuplicate: handleDuplicateNode,
+    onTest: handleTestNode,
+    onTogglePin: handleTogglePin,
+    isPinned: selectedNode ? pinnedNodes.has(selectedNode.id) : false,
+  }
+
+  const debugPanel = showDebugPanel && (
+    <WorkflowDebugPanel
+      workflowId={workflow?.id}
+      nodes={nodes}
+      selectedNodeId={selectedNode?.id}
+      execution={lastExecution}
+      pinnedData={pinnedData}
+      onTest={handleTest}
+      onExecute={handleExecute}
+      onPinData={handlePinData}
+      onUnpinData={handleUnpinData}
+      onSelectNode={(nodeId) => {
+        const node = nodes.find(n => n.id === nodeId)
+        if (node) {
+          setDebugOpen(false)
+          setSelectedNode(node)
+        }
+      }}
+      onRestore={() => window.location.reload()}
+      isExpanded={compact || debugPanelExpanded}
+      onToggleExpand={compact ? undefined : () => setDebugPanelExpanded(!debugPanelExpanded)}
+      embedded={compact}
+    />
+  )
+
   return (
     <div className="flex h-full">
       {/* Node Palette */}
-      <NodePalette onAddNode={handleAddNode} />
+      {!compact && <NodePalette onAddNode={handleAddNode} />}
 
       {/* Main canvas area */}
-      <div className="flex-1 flex flex-col">
+      <div className="min-w-0 flex-1 flex flex-col">
         {/* Toolbar */}
         <WorkflowToolbar
           workflow={workflow}
@@ -501,12 +543,15 @@ function WorkflowCanvasInner({
           onOpenHistory={() => {
             setShowDebugPanel(true)
             setDebugPanelExpanded(true)
+            setDebugOpen(true)
           }}
           onNameChange={onNameChange}
+          compact={compact}
+          onOpenNodes={() => setPaletteOpen(true)}
         />
 
         {/* React Flow Canvas */}
-        <div ref={reactFlowWrapper} className="flex-1">
+        <div ref={reactFlowWrapper} className="min-h-0 flex-1">
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -549,7 +594,7 @@ function WorkflowCanvasInner({
                   </div>
                   <h3 className="text-lg font-medium text-content-primary mb-2">Start building your workflow</h3>
                   <p className="text-content-tertiary text-sm mb-4">
-                    Drag nodes from the left panel or click to add them to the canvas
+                    {compact ? 'Open Nodes to add a step to the canvas' : 'Drag nodes from the left panel or click to add them to the canvas'}
                   </p>
                   <p className="text-content-tertiary text-xs">
                     Start with a trigger node to define when your workflow runs
@@ -559,44 +604,25 @@ function WorkflowCanvasInner({
             )}
           </ReactFlow>
         </div>
+        {!compact && debugPanel}
       </div>
 
       {/* Node Config Panel */}
-      <NodeConfigPanel
-        node={selectedNode}
-        onClose={() => setSelectedNode(null)}
-        onUpdate={handleUpdateNode}
-        onDelete={handleDeleteNode}
-        onDuplicate={handleDuplicateNode}
-        onTest={handleTestNode}
-        onTogglePin={handleTogglePin}
-        isPinned={selectedNode ? pinnedNodes.has(selectedNode.id) : false}
-      />
+      {compact ? (
+        <Drawer
+          open={paletteOpen || Boolean(selectedNode) || debugOpen}
+          label={paletteOpen ? 'Nodes' : debugOpen ? 'Workflow debug' : 'Node configuration'}
+          onClose={() => { setPaletteOpen(false); setDebugOpen(false); setSelectedNode(null) }}
+        >
+          {paletteOpen ? (
+            <NodePalette embedded onAddNode={(type, label) => {
+              handleAddNode(type, label)
+              setPaletteOpen(false)
+            }} />
+          ) : debugOpen ? debugPanel : selectedNode && <NodeConfigPanel embedded {...nodeConfigProps} />}
+        </Drawer>
+      ) : <NodeConfigPanel {...nodeConfigProps} />}
 
-      {/* Debug Panel */}
-      {showDebugPanel && (
-        <WorkflowDebugPanel
-          workflowId={workflow?.id}
-          nodes={nodes}
-          selectedNodeId={selectedNode?.id}
-          execution={lastExecution}
-          pinnedData={pinnedData}
-          onTest={handleTest}
-          onExecute={handleExecute}
-          onPinData={handlePinData}
-          onUnpinData={handleUnpinData}
-          onSelectNode={(nodeId) => {
-            const node = nodes.find(n => n.id === nodeId)
-            if (node) setSelectedNode(node)
-          }}
-          onRestore={() => {
-            // Reload workflow after restore
-            window.location.reload()
-          }}
-          isExpanded={debugPanelExpanded}
-          onToggleExpand={() => setDebugPanelExpanded(!debugPanelExpanded)}
-        />
-      )}
     </div>
   )
 }

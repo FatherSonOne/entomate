@@ -13,14 +13,15 @@ export interface SwitchProps<V extends string> {
   /** Accessible name for the group. */
   label: string
   className?: string
+  disabled?: boolean
 }
 
 /** Segmented hardware switch: sunk track, raised thumb. Used for filters. */
-export function Switch<V extends string>({ options, value, onChange, label, className }: SwitchProps<V>): React.ReactElement {
+export function Switch<V extends string>({ options, value, onChange, label, className, disabled }: SwitchProps<V>): React.ReactElement {
   return (
     <div className={cx('bs-switch', className)} role="group" aria-label={label}>
       {options.map((opt) => (
-        <button key={opt.value} type="button" aria-pressed={opt.value === value} onClick={() => onChange(opt.value)}>
+        <button key={opt.value} type="button" disabled={disabled} aria-pressed={opt.value === value} onClick={() => onChange(opt.value)}>
           {opt.label}
         </button>
       ))}

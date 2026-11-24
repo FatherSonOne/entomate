@@ -73,7 +73,7 @@ export function ToastProvider({ children }) {
   }, [pause, resume])
 
   const toast = {
-    show: (opts) => addToast(opts),
+    show: addToast,
     success: (title, message) => addToast({ title, message, color: 'mint' }),
     // error(title, messageOrError): known causes (signed out, offline, no access,
     // server down) get their own words and key; pass the Error itself for the best match.

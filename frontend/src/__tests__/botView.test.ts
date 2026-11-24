@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import {
-  debriefToOpen, elapsedMs, formatElapsed, markSeen, phaseSignal, readSeen, runTitle,
+  debriefToNotify, elapsedMs, formatElapsed, isDebriefDelayed, markSeen, phaseSignal, readSeen, runTitle,
   type BotSessionView,
 } from '../services/botView'
 
@@ -35,21 +35,29 @@ describe('botView', () => {
     expect(phaseSignal('failed').tone).toBe('brand')
   })
 
-  test('opens the newest unseen debrief this person sent, once', () => {
+  test('selects an unseen debrief this person sent', () => {
     const sessions = [
       run({ sessionId: 'live', phase: 'live', endedAt: null }),
       run({ sessionId: 'other', launchedBy: 'u2' }),
       run({ sessionId: 'mine' }),
     ]
-    expect(debriefToOpen(sessions, { userId: 'u1', seen: [], now: NOW })?.sessionId).toBe('mine')
-    expect(debriefToOpen(sessions, { userId: 'u1', seen: ['mine'], now: NOW })).toBeNull()
+    expect(debriefToNotify(sessions, { userId: 'u1', seen: [], now: NOW })?.sessionId).toBe('mine')
+    expect(debriefToNotify(sessions, { userId: 'u1', seen: ['mine'], now: NOW })).toBeNull()
   })
 
-  test('ignores old, failed and stopped runs; processing ones still open', () => {
-    expect(debriefToOpen([run({ endedAt: '2026-11-21T01:00:00Z' })], { userId: 'u1', seen: [], now: NOW })).toBeNull()
-    expect(debriefToOpen([run({ phase: 'failed' })], { userId: 'u1', seen: [], now: NOW })).toBeNull()
-    expect(debriefToOpen([run({ phase: 'stopped' })], { userId: 'u1', seen: [], now: NOW })).toBeNull()
-    expect(debriefToOpen([run({ phase: 'processing', meetingReady: false })], { userId: 'u1', seen: [], now: NOW })).not.toBeNull()
+  test('skips stale, failed, and unsaved minutes', () => {
+    const opts = { userId: 'u1', seen: [], now: NOW }
+    expect(debriefToNotify([run({ endedAt: '2026-11-21T01:00:00Z' })], opts)).toBeNull()
+    expect(debriefToNotify([run({ phase: 'failed' })], opts)).toBeNull()
+    expect(debriefToNotify([run({ phase: 'stopped' })], opts)).toBeNull()
+    expect(debriefToNotify([run({ phase: 'processing', meetingReady: false })], opts)).toBeNull()
+    expect(debriefToNotify([run({ phase: 'ready', meetingReady: false })], opts)).toBeNull()
+  })
+
+  test('distinguishes delayed minutes from ongoing and completed work', () => {
+    expect(isDebriefDelayed(run({ phase: 'processing' }), NOW)).toBe(true)
+    expect(isDebriefDelayed(run({ phase: 'processing', endedAt: '2026-11-22T15:59:00Z' }), NOW)).toBe(false)
+    expect(isDebriefDelayed(run({ phase: 'ready' }), NOW)).toBe(false)
   })
 
   test('seen list survives bad storage', () => {

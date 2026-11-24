@@ -11,7 +11,7 @@
 .lc-page {
   --bg: #080808; --paper: #141414; --ink: #F8F0F2; --ink2: #C4B6BC; --muted: #968890;
   --hair: rgba(248, 240, 242, .12); --hair2: rgba(248, 240, 242, .06);
-  --accent: #FF2D6B; --accent-ink: #FF6699; --band: #CC0044;
+  --accent: #FF2D6B; --on-accent: #080808; --accent-ink: #FF6699; --band: #CC0044;
   --ai: #FFB800; --live: #A0FF32; --mint: #00F5D4;
   /* aliases used by the guide section */
   --crimson: var(--accent); --amber: var(--ai);
@@ -33,8 +33,8 @@
 .lc-page.is-light {
   --bg: #FFF8FA; --paper: #FFFFFF; --ink: #08080A; --ink2: #4A3840; --muted: #76646C;
   --hair: rgba(8, 8, 10, .12); --hair2: rgba(8, 8, 10, .05);
-  --accent: #CC0044; --accent-ink: #A30036; --band: #CC0044;
-  --ai: #9B6800; --live: #5A9B00; --mint: #008C7A;
+  --accent: #CC0044; --on-accent: #fff; --accent-ink: #A30036; --band: #CC0044;
+  --ai: #9B6800; --live: #3D7400; --mint: #008C7A;
 }
 .lc-page *, .lc-page *::before, .lc-page *::after { box-sizing: border-box; }
 .lc-page h1, .lc-page h2, .lc-page h3, .lc-page h4, .lc-page p, .lc-page ul, .lc-page ol { margin: 0; padding: 0; }
@@ -51,20 +51,20 @@
   height: 44px; padding: 0 18px; border: 1px solid currentColor; border-radius: 2px;
   display: inline-flex; align-items: center; gap: 10px; font-weight: 600; font-size: 14px; white-space: nowrap;
 }
-.lc-btn.is-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.lc-btn.is-primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .lc-sq { display: inline-block; width: 8px; height: 8px; flex: none; }
 .lc-sq--ai { background: var(--ai); }
 .lc-sq--live { background: var(--live); }
 .lc-sq--brand { background: var(--accent); }
 .lc-wrap { padding-left: clamp(20px, 5vw, 72px); padding-right: clamp(20px, 5vw, 72px); }
 .lc-pad { padding-top: 110px; padding-bottom: 110px; }
-.lc-skip { position: absolute; left: -9999px; top: 8px; z-index: 300; background: var(--accent); color: #fff; padding: 8px 14px; }
+.lc-page .lc-skip { position: absolute; left: -9999px; top: 8px; z-index: 300; background: var(--accent); color: var(--on-accent); padding: 8px 14px; }
 .lc-skip:focus { left: 8px; }
 
 /* Media zones stay dark in both themes: the footage is dark. */
 .lc-media {
   --ink: #F8F0F2; --ink2: #D6CACF; --muted: #A89BA1; --hair: rgba(248, 240, 242, .16);
-  --accent: #FF2D6B; --ai: #FFB800; --live: #A0FF32; --mint: #00F5D4;
+  --accent: #FF2D6B; --on-accent: #080808; --ai: #FFB800; --live: #A0FF32; --mint: #00F5D4;
   color: var(--ink); background: #080808; position: relative; overflow: hidden;
 }
 .lc-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
@@ -76,7 +76,7 @@
   border-bottom: 1px solid transparent; transition: background .3s, border-color .3s;
 }
 .lc-nav.is-solid { background: color-mix(in srgb, var(--bg) 92%, transparent); border-color: var(--hair); backdrop-filter: blur(8px); }
-.lc-nav:not(.is-solid) { --ink: #F8F0F2; --ink2: #D6CACF; --muted: #A89BA1; --accent: #FF2D6B; }
+.lc-nav:not(.is-solid) { --ink: #F8F0F2; --ink2: #D6CACF; --muted: #A89BA1; --accent: #FF2D6B; --on-accent: #080808; }
 .lc-brand { display: flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: -.02em; font-size: 17px; color: var(--ink); }
 .lc-brand .en-brand-logo { color: var(--ink); }
 .lc-nav-links { display: flex; gap: 26px; font-size: 13.5px; color: var(--ink2); margin-left: 18px; }
@@ -125,7 +125,7 @@
 .lc-band li:last-child { border-right: 0; }
 .lc-band .lc-v { font-size: 44px; font-weight: 800; letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums; }
 .lc-band .lc-l { font-size: 13px; margin-top: 8px; opacity: .92; }
-.lc-band .lc-note { display: block; opacity: .8; font-size: 12px; }
+.lc-band .lc-note { display: block; font-size: 12px; }
 
 /* ── Swiss section head ── */
 .lc-sh { display: grid; grid-template-columns: repeat(12, 1fr); gap: 24px; border-top: 2px solid var(--ink); padding-top: 14px; margin-bottom: 44px; }
@@ -246,13 +246,15 @@
 
 /* ── Phone ── */
 @media (max-width: 760px) {
-  .lc-nav { height: 56px; gap: 12px; }
-  .lc-nav-r .lc-signin { display: none; }
+  .lc-nav { height: 56px; gap: 8px; }
+  .lc-nav-r { gap: 8px; }
+  .lc-nav-r .lc-signin { display: inline-flex; align-items: center; min-height: 36px; font-size: 12px; }
+  .lc-page .lc-theme { letter-spacing: .06em; padding-inline: 2px; }
   .lc-nav .lc-brand, .lc-nav-r { flex-shrink: 0; }
-  .lc-nav .en-brand-logo { gap: 6px; }
-  .lc-nav .en-brand-mark { width: 26px; height: 26px; }
-  .lc-nav .en-brand-wordmark { width: clamp(80px, 25vw, 105px); height: auto; }
-  .lc-nav-r .lc-btn { padding-inline: 12px; }
+  .lc-nav .en-brand-logo { gap: 5px; }
+  .lc-nav .en-brand-mark { width: 24px; height: 24px; }
+  .lc-nav .en-brand-wordmark { width: clamp(60px, 20vw, 105px); height: auto; }
+  .lc-nav-r .lc-btn { padding-inline: 10px; }
   .lc-hero { padding-bottom: 36px; padding-top: 96px; }
   .lc-hero h1 { font-size: clamp(36px, 11.5vw, 50px); }
   .lc-close h2 { font-size: clamp(38px, 6vw, 46px); }

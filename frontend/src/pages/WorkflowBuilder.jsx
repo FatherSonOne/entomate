@@ -178,7 +178,7 @@ export default function WorkflowBuilder() {
   }
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden" style={{ background: 'var(--bg0, #080808)' }}>
+    <div className="h-dvh flex flex-col overflow-hidden" style={{ background: 'var(--bg0, #080808)' }}>
       {/* Error banner */}
       {saveError && (
         <div style={{

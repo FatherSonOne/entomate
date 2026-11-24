@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Logo } from '../components/Logo'
+import { requestConsent } from '../services/publicConsent'
 
 /**
  * Public GDPR right-to-delete request form (P1.7 Slice 3).
@@ -22,21 +23,19 @@ export default function DataDeletion() {
     setSubmitting(true)
     setError(null)
     try {
-      const res = await fetch('/api/consent/data-deletion', {
+      const { ok, data } = await requestConsent('/data-deletion', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim(), reason: reason.trim() || undefined })
       })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        setError(body.message || body.error || 'submit_failed')
+      if (!ok || data?.ok !== true || !data.requestId) {
+        setError(data?.error === 'invalid_email' ? 'invalid_email' : 'unavailable')
         return
       }
-      const data = await res.json()
-      setRequestId(data.requestId || null)
+      setRequestId(data.requestId)
       setSubmitted(true)
     } catch (err) {
-      setError('network_error')
+      setError('unavailable')
     } finally {
       setSubmitting(false)
     }
@@ -142,9 +141,11 @@ export default function DataDeletion() {
                   />
 
                   {error && (
-                    <p style={{ color: 'var(--crimson)', fontSize: 14, marginTop: 12 }}>
-                      Couldn't submit your request: <code>{error}</code>. Please try again or
-                      email <a href="mailto:fm1@qntmecos.com">fm1@qntmecos.com</a> directly.
+                    <p role="alert" style={{ color: 'var(--crimson)', fontSize: 14, marginTop: 12 }}>
+                      Couldn't submit your request.{' '}
+                      {error === 'invalid_email'
+                        ? 'Enter a valid email address and try again.'
+                        : <>Try again or email <a href="mailto:fm1@qntmecos.com">fm1@qntmecos.com</a> directly.</>}
                     </p>
                   )}
 
@@ -155,7 +156,7 @@ export default function DataDeletion() {
                       style={{
                         padding: '14px 28px',
                         background: 'var(--crimson)',
-                        color: '#fff',
+                        color: '#080808',
                         border: 'none',
                         borderRadius: 'var(--radius-md)',
                         fontFamily: 'var(--font-body)',
@@ -172,7 +173,7 @@ export default function DataDeletion() {
               </section>
             </>
           ) : (
-            <section className="legal-intro">
+            <section className="legal-intro" role="status">
               <h2 style={{ marginTop: 0 }}>Request received</h2>
               <p>
                 Thanks. Your deletion request for <strong>{email}</strong>{' '}

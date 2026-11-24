@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Logo } from '../components/Logo'
+import { requestConsent } from '../services/publicConsent'
 
 /**
  * Public opt-out landing page (P1.7 Slice 2).
@@ -12,6 +13,11 @@ import { Logo } from '../components/Logo'
  */
 export default function OptOut() {
   const { token } = useParams()
+  return <OptOutForm key={token} token={token} />
+}
+
+function OptOutForm({ token }) {
+  const path = `/opt-out/${encodeURIComponent(token)}`
 
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
@@ -20,50 +26,47 @@ export default function OptOut() {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState(null)
   const [submitted, setSubmitted] = useState(false)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
-    let cancelled = false
+    const controller = new AbortController()
     async function load() {
       try {
-        const res = await fetch(`/api/consent/opt-out/${encodeURIComponent(token)}`)
-        if (!res.ok) {
-          if (cancelled) return
-          setLoadError(res.status === 404 ? 'invalid_or_expired' : 'lookup_failed')
-          setLoading(false)
-          return
+        const { ok, status, data } = await requestConsent(path, { signal: controller.signal })
+        if (controller.signal.aborted) return
+        if (!ok || !data?.email) {
+          setLoadError(status === 404 ? 'invalid' : 'unavailable')
+        } else {
+          setCtx(data)
+          setSubmitted(Boolean(data.alreadyOptedOut))
         }
-        const data = await res.json()
-        if (cancelled) return
-        setCtx(data)
-        if (data.alreadyOptedOut) setSubmitted(true)
-        setLoading(false)
-      } catch (err) {
-        if (cancelled) return
-        setLoadError('network_error')
-        setLoading(false)
+      } catch {
+        if (!controller.signal.aborted) setLoadError('unavailable')
+      } finally {
+        if (!controller.signal.aborted) setLoading(false)
       }
     }
     load()
-    return () => { cancelled = true }
-  }, [token])
+    return () => controller.abort()
+  }, [path, attempt])
 
   async function handleOptOut(e) {
     e.preventDefault()
     setSubmitting(true)
     setSubmitError(null)
     try {
-      const res = await fetch(`/api/consent/opt-out/${encodeURIComponent(token)}`, {
+      const { ok, status, data } = await requestConsent(path, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason: reason.trim() || undefined })
       })
-      if (!res.ok) {
-        setSubmitError(res.status === 404 ? 'invalid_or_expired' : 'submit_failed')
+      if (!ok || data?.ok !== true) {
+        setSubmitError(status === 404 ? 'invalid' : 'unavailable')
         return
       }
       setSubmitted(true)
-    } catch (err) {
-      setSubmitError('network_error')
+    } catch {
+      setSubmitError('unavailable')
     } finally {
       setSubmitting(false)
     }
@@ -92,12 +95,12 @@ export default function OptOut() {
 
           {loading && (
             <section className="legal-intro">
-              <p className="muted">Loading…</p>
+              <p className="muted" role="status">Checking your opt-out link…</p>
             </section>
           )}
 
-          {!loading && loadError && (
-            <section className="legal-intro">
+          {!loading && loadError === 'invalid' && (
+            <section className="legal-intro" role="alert">
               <h2 style={{ marginTop: 0 }}>This opt-out link isn't valid</h2>
               <p>
                 The link may have expired, been mistyped, or already been
@@ -105,9 +108,20 @@ export default function OptOut() {
                 an error, reply directly to the email you received or
                 contact the organizer.
               </p>
-              <p className="muted" style={{ marginTop: 16 }}>
-                Error: <code>{loadError}</code>
-              </p>
+            </section>
+          )}
+
+          {!loading && loadError === 'unavailable' && (
+            <section className="legal-intro">
+              <div role="alert">
+                <h2 style={{ marginTop: 0 }}>Couldn't check your opt-out link</h2>
+                <p>Try again in a moment, or reply to the original email to contact the organizer.</p>
+              </div>
+              <button type="button" className="btn-ghost" style={{ marginTop: 12 }} onClick={() => {
+                setLoading(true)
+                setLoadError(null)
+                setAttempt(value => value + 1)
+              }}>Try again</button>
             </section>
           )}
 
@@ -134,7 +148,7 @@ export default function OptOut() {
               ) : null}
 
               {submitted && (
-                <section className="legal-intro">
+                <section className="legal-intro" role="status">
                   <h2 style={{ marginTop: 0 }}>You're opted out</h2>
                   <p>
                     {ctx.organizerName ? <strong>{ctx.organizerName}</strong> : 'The meeting organizer'}
@@ -179,8 +193,10 @@ export default function OptOut() {
                       }}
                     />
                     {submitError && (
-                      <p style={{ color: 'var(--crimson)', fontSize: 14, marginTop: 12 }}>
-                        Couldn't record your opt-out: <code>{submitError}</code>. Please try again or reply to the email directly.
+                      <p role="alert" style={{ color: 'var(--crimson)', fontSize: 14, marginTop: 12 }}>
+                        {submitError === 'invalid'
+                          ? 'This link is no longer valid. Reply to the original email to contact the organizer.'
+                          : "Couldn't record your opt-out. Try again or reply to the original email."}
                       </p>
                     )}
                     <div style={{ marginTop: 24 }}>
@@ -190,7 +206,7 @@ export default function OptOut() {
                         style={{
                           padding: '14px 28px',
                           background: 'var(--crimson)',
-                          color: '#fff',
+                          color: '#080808',
                           border: 'none',
                           borderRadius: 'var(--radius-md)',
                           fontFamily: 'var(--font-body)',

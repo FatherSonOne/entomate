@@ -81,12 +81,11 @@ export default function AnimatedLoadingLogo({ logoId, size = 512, controls = tru
       )}
       {controls && supported && !failed && (
         <button className="en-app-loading-motion-control" type="button"
-          aria-label={playing ? 'Pause loading animation' : 'Play loading animation'}
           onClick={() => {
             if (!playing) setManual(true)
             setPlaying(value => !value)
           }}>
-          {playing ? 'Pause motion' : 'Play motion'}
+          {playing ? 'Pause loading animation' : 'Play loading animation'}
         </button>
       )}
     </div>

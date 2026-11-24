@@ -4,7 +4,7 @@
  * Top toolbar with workflow actions and controls
  */
 
-import React, { useState } from 'react'
+import React, { useId, useRef, useState } from 'react'
 import {
   Save, Play, TestTube, Undo, Redo,
   ZoomIn, ZoomOut, Maximize2, Grid,
@@ -39,30 +39,35 @@ export default function WorkflowToolbar({
   onDelete,
   onBack,
   onNameChange,
-  showGrid
+  showGrid,
+  compact = false,
+  onOpenNodes
 }) {
   const [showMenu, setShowMenu] = useState(false)
+  const moreButton = useRef(null)
+  const moreId = useId()
   const [isEditingName, setIsEditingName] = useState(false)
   const [editName, setEditName] = useState('')
 
   return (
-    <div className="h-14 bg-surface border-b border-line-default flex items-center justify-between px-4">
+    <div className={`relative z-10 min-h-14 shrink-0 bg-surface border-b border-line-default flex flex-wrap items-center justify-between py-2 ${compact ? 'gap-2 px-3' : 'gap-x-3 gap-y-1 px-4'}`}>
       {/* Left section */}
-      <div className="flex items-center gap-4">
+      <div className={`flex min-w-0 items-center gap-3 ${compact ? 'w-full' : ''}`}>
         {/* Back button */}
         <button
           onClick={onBack}
-          className="flex items-center gap-1 text-content-tertiary hover:text-content-secondary"
+          className="flex min-h-9 shrink-0 items-center gap-1 text-content-tertiary hover:text-content-secondary"
         >
           <ChevronLeft className="w-5 h-5" />
           <span className="text-sm">Back</span>
         </button>
 
         {/* Workflow name — click to edit */}
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           {isEditingName ? (
             <input
               type="text"
+              aria-label="Workflow name"
               value={editName}
               onChange={(e) => setEditName(e.target.value)}
               onBlur={() => {
@@ -83,18 +88,19 @@ export default function WorkflowToolbar({
                 }
               }}
               autoFocus
-              className="text-lg font-semibold text-content-primary max-w-xs bg-transparent border-b-2 border-accent-primary focus:outline-none"
+              className="min-w-0 w-full text-lg font-semibold text-content-primary max-w-xs bg-transparent border-b-2 border-accent-primary focus:outline-none"
             />
           ) : (
-            <h1
-              className="text-lg font-semibold text-content-primary max-w-xs truncate cursor-pointer hover:opacity-80"
-              onClick={() => {
-                setEditName(workflow?.name || '')
-                setIsEditingName(true)
-              }}
-              title="Click to rename"
-            >
-              {workflow?.name || 'Untitled Workflow'}
+            <h1 className="min-w-0 max-w-xs text-lg font-semibold text-content-primary">
+              <button type="button" className="block max-w-full truncate text-left hover:opacity-80"
+                onClick={() => {
+                  setEditName(workflow?.name || '')
+                  setIsEditingName(true)
+                }}
+                title="Rename workflow"
+              >
+                {workflow?.name || 'Untitled Workflow'}
+              </button>
             </h1>
           )}
           {isDirty && (
@@ -111,7 +117,7 @@ export default function WorkflowToolbar({
       </div>
 
       {/* Center section - Actions */}
-      <div className="flex items-center gap-1">
+      {!compact && <div className="flex shrink-0 items-center gap-1">
         {/* Undo/Redo */}
         <div className="flex items-center border-r border-line-default pr-2 mr-2">
           <button
@@ -191,12 +197,14 @@ export default function WorkflowToolbar({
             Execute
           </button>
         </div>
-      </div>
+      </div>}
 
       {/* Right section */}
-      <div className="flex items-center gap-2">
+      <div className={`flex shrink-0 items-center gap-2 ${compact ? 'w-full' : ''}`}>
+        {compact && <button type="button" onClick={onOpenNodes} aria-haspopup="dialog"
+          className="min-h-9 mr-auto rounded bg-surface-muted px-3 text-sm text-content-primary">Nodes</button>}
         {/* Toggle Active */}
-        <button
+        {!compact && <button
           onClick={onToggleActive}
           className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md ${
             isActive
@@ -210,13 +218,13 @@ export default function WorkflowToolbar({
             <ToggleLeft className="w-4 h-4" />
           )}
           {isActive ? 'Active' : 'Inactive'}
-        </button>
+        </button>}
 
         {/* Save button */}
         <button
           onClick={onSave}
           disabled={isSaving || !isDirty}
-          className="flex items-center gap-1.5 px-4 py-1.5 text-sm bg-accent-primary text-white rounded-md hover:opacity-90 disabled:opacity-50"
+          className="flex min-h-9 items-center gap-1.5 px-4 py-1.5 text-sm bg-accent-primary text-[color:var(--bs-on-brand,white)] rounded-md hover:opacity-90 disabled:opacity-50"
         >
           {isSaving ? (
             <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -227,10 +235,21 @@ export default function WorkflowToolbar({
         </button>
 
         {/* More menu */}
-        <div className="relative">
+        <div className="relative" onKeyDown={(event) => {
+          if (event.key === 'Escape' && showMenu) {
+            event.stopPropagation()
+            setShowMenu(false)
+            moreButton.current?.focus()
+          }
+        }}>
           <button
+            type="button"
+            ref={moreButton}
+            aria-label="More workflow actions"
+            aria-expanded={showMenu}
+            aria-controls={showMenu ? moreId : undefined}
             onClick={() => setShowMenu(!showMenu)}
-            className="p-2 text-content-tertiary hover:text-content-secondary hover:bg-surface-muted rounded"
+            className="min-h-9 min-w-9 p-2 text-content-tertiary hover:text-content-secondary hover:bg-surface-muted rounded"
           >
             <MoreVertical className="w-4 h-4" />
           </button>
@@ -239,16 +258,27 @@ export default function WorkflowToolbar({
             <>
               <div
                 className="fixed inset-0 z-10"
+                aria-hidden="true"
                 onClick={() => setShowMenu(false)}
               />
-              <div className="absolute right-0 top-full mt-1 w-48 bg-surface border border-line-default rounded-lg shadow-lg py-1 z-20">
-                <button
-                  onClick={() => { onOpenSettings?.(); setShowMenu(false); }}
+              <div id={moreId} className="absolute right-0 top-full mt-1 max-h-[55dvh] overflow-y-auto w-48 bg-surface border border-line-default rounded-lg shadow-lg py-1 z-20">
+                {compact && [
+                  ['Undo', onUndo, !canUndo], ['Redo', onRedo, !canRedo],
+                  [showGrid ? 'Hide grid' : 'Show grid', onToggleGrid, false],
+                  ['Test', onTest, isExecuting], ['Execute', onExecute, isExecuting || !isActive],
+                  [isActive ? 'Deactivate workflow' : 'Activate workflow', onToggleActive, false],
+                ].map(([label, action, disabled]) => (
+                  <button key={label} type="button" disabled={disabled}
+                    onClick={() => { setShowMenu(false); action?.(); moreButton.current?.focus() }}
+                    className="w-full px-3 py-2 text-left text-sm text-content-secondary hover:bg-surface-muted disabled:opacity-50">{label}</button>
+                ))}
+                {onOpenSettings && <button
+                  onClick={() => { onOpenSettings(); setShowMenu(false); }}
                   className="w-full flex items-center gap-2 px-3 py-2 text-sm text-content-secondary hover:bg-surface-muted"
                 >
                   <Settings className="w-4 h-4" />
                   Workflow Settings
-                </button>
+                </button>}
                 <button
                   onClick={() => { onOpenHistory?.(); setShowMenu(false); }}
                   className="w-full flex items-center gap-2 px-3 py-2 text-sm text-content-secondary hover:bg-surface-muted"

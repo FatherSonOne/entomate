@@ -114,10 +114,10 @@ export const BOT_LAUNCHED_EVENT = 'entomate:bot-launched'
 
 export const meetingPath = (meetingId: string): string => `/meetings/${meetingId}?debrief=1`
 
-// ── Debrief takes focus ─────────────────────────────────────────────
+// ── Debrief notifications ───────────────────────────────────────────
 
 export const SEEN_KEY = 'entomate.bot.debriefSeen'
-const FOCUS_WINDOW_MS = 12 * 60 * 60 * 1000
+const NOTICE_WINDOW_MS = 12 * 60 * 60 * 1000
 
 export function readSeen(storage: Pick<Storage, 'getItem'> | null): string[] {
   try {
@@ -134,27 +134,32 @@ export function markSeen(storage: Pick<Storage, 'getItem' | 'setItem'> | null, s
     const next = [sessionId, ...readSeen(storage).filter((s) => s !== sessionId)].slice(0, 50)
     storage?.setItem(SEEN_KEY, JSON.stringify(next))
   } catch {
-    /* private mode: the debrief may open twice, nothing worse */
+    /* Private browsers may not retain the notification across sessions. */
   }
 }
 
 /**
- * The debrief the app should move to, if any: a run this person sent (or
- * their calendar sent) that ended in the last 12 hours and hasn't been shown
- * yet. Its minutes may still be writing: the meeting page shows that. Newest first.
+ * The newest unseen, saved debrief from the user's bot runs in the last 12 hours.
  */
-export function debriefToOpen(
+export function debriefToNotify(
   sessions: ReadonlyArray<BotSessionView>,
   opts: { userId: string | null; seen: ReadonlyArray<string>; now?: number },
 ): BotSessionView | null {
   const now = opts.now ?? Date.now()
   return sessions.find((s) =>
-    (s.phase === 'ready' || s.phase === 'processing')
+    s.phase === 'ready' && s.meetingReady
     && (!opts.userId || !s.launchedBy || s.launchedBy === opts.userId)
     && !opts.seen.includes(s.sessionId)
     && s.endedAt != null
-    && now - Date.parse(s.endedAt) < FOCUS_WINDOW_MS,
+    && now - Date.parse(s.endedAt) < NOTICE_WINDOW_MS,
   ) || null
+}
+
+/** Very long calls have a longer read-back before they count as delayed. */
+export function isDebriefDelayed(view: BotSessionView, now = Date.now()): boolean {
+  if (view.phase !== 'processing' || !view.endedAt) return false
+  const limit = Math.max(10 * 60_000, elapsedMs(view, now) * 0.03 + 2 * 60_000)
+  return now - Date.parse(view.endedAt) >= limit
 }
 
 /** No captions for this long, while the bot should be hearing people, earns a warning. */

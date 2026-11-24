@@ -3,7 +3,7 @@
  *
  * BotDebrief: the band at the top of a bot meeting after the call: the
  * pipeline display, the figures, and where each piece went. It shows when
- * the app moved here after a call (?debrief=1) or for a day after the call
+ * opened from a debrief link (?debrief=1) or for a day after the call
  * until dismissed.
  *
  * BotMeetingPending: the meeting page before the meeting exists (the bot is
@@ -19,7 +19,7 @@ import { BotPipelineDisplay } from './BotDisplays'
 import TimecodeButton from '../meetings/TimecodeButton'
 import BotLive from './BotLive'
 import DebriefLoader from './DebriefLoader'
-import { formatElapsed, isActive, markSeen, phaseSignal, runTitle } from '../../services/botView'
+import { formatElapsed, isActive, isDebriefDelayed, markSeen, phaseSignal, runTitle } from '../../services/botView'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const dismissKey = (meetingId) => `entomate.bot.debriefDismissed.${meetingId}`
@@ -56,8 +56,8 @@ export function BotDebrief({ meetingId, forced, onOpenTab, onMinutesReady, onJum
   const [dismissed, setDismissed] = useState(() => storage()?.getItem(dismissKey(meetingId)) === '1')
 
   useEffect(() => {
-    if (view?.sessionId) markSeen(storage(), view.sessionId)
-  }, [view?.sessionId])
+    if (view?.sessionId && view.phase === 'ready' && view.meetingReady) markSeen(storage(), view.sessionId)
+  }, [view?.sessionId, view?.phase, view?.meetingReady])
 
   // The page loaded while the summary was still writing: re-read it once it lands.
   const [sawProcessing, setSawProcessing] = useState(false)
@@ -133,7 +133,7 @@ export function BotDebrief({ meetingId, forced, onOpenTab, onMinutesReady, onJum
 export function BotMeetingPending({ meetingId, onReady, notFound }) {
   const navigate = useNavigate()
   const { view, canControl, loaded, reload } = useBotSession(meetingId, {
-    poll: (v) => (!v ? 0 : isActive(v.phase) ? 4000 : v.phase === 'processing' || v.phase === 'scheduled' ? 5000 : 0),
+    poll: (v) => (!v ? 0 : isActive(v.phase) ? 4000 : (v.phase === 'scheduled' || (v.phase === 'processing' && !isDebriefDelayed(v))) ? 5000 : 0),
   })
   const [stopping, setStopping] = useState(false)
   const [stopError, setStopError] = useState(null)
@@ -146,6 +146,23 @@ export function BotMeetingPending({ meetingId, onReady, notFound }) {
     return <div className="bs-mtg-empty" aria-busy="true"><Signal tone="brand">Loading meeting</Signal></div>
   }
   if (!view) return notFound
+  const delayed = isDebriefDelayed(view)
+  const missing = view.phase === 'ready'
+  if (delayed || missing) {
+    return (
+      <div className="bs-mtg bs-mtg-detail">
+        <TitleRule title={runTitle(view)} crumbs={<Breadcrumbs current={runTitle(view)} />} />
+        <div className="bs-mtg-empty">
+          <p className="bs-h3">{delayed ? 'The minutes are taking longer than expected.' : 'The meeting record is unavailable.'}</p>
+          <p className="bs-bot-note">Check again for the minutes, or return to your meeting list.</p>
+          <div className="flex flex-wrap gap-3">
+            <Key onClick={() => { void reload(); void onReady() }}>Check again</Key>
+            <Link to="/meetings" className="bs-key">Back to meetings</Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const stop = async () => {
     setStopping(true)
