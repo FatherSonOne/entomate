@@ -25,6 +25,9 @@
  */
 
 const { SchemaType } = require('@google/generative-ai');
+const calendarService = require('../calendarService');
+const autoJoin = require('../calendarAutoJoin');
+const { readCalendarSettings } = require('../calendarSettings');
 const { uuidArg, dateArg, trunc, ToolInputError } = require('./tools');
 
 const STR = { type: SchemaType.STRING };
@@ -513,6 +516,63 @@ const VERBS = {
       return { result: { projectId: u.id }, undo: u };
     },
     view: (r) => (r?.projectId ? { path: `/projects/${r.projectId}`, label: 'the project' } : null),
+  },
+
+  configure_bot_auto_join: {
+    risk: 'sensitive',
+    editable: [],
+    confirmToken: () => 'I will notify attendees',
+    declaration: {
+      description: "Propose turning on the recording bot for qualifying events on the user's primary Google Calendar, with a lead time before each meeting. Use only when the user explicitly asks for a recurring recording bot rule. Confirmation requires the user to acknowledge notice to attendees. For existing rules this updates the rule.",
+      parameters: {
+        type: SchemaType.OBJECT,
+        properties: {
+          leadMinutes: { type: SchemaType.INTEGER, description: `Minutes before meeting start, 0 through ${autoJoin.MAX_LEAD_MINUTES}. Use 0 for start time.` },
+          scope: enumOf(autoJoin.SCOPES, 'Set organized or all only when the user specifies which scope. Otherwise preserve the existing scope or default to organized.'),
+        },
+        required: ['leadMinutes'],
+      },
+    },
+    async prepare(args, ctx) {
+      if (!autoJoin.validLeadMinutes(args.leadMinutes)) {
+        throw new ToolInputError(`Choose a lead time from 0 to ${autoJoin.MAX_LEAD_MINUTES} whole minutes.`);
+      }
+      if (!calendarService.isConfigured() || !process.env.RECALL_API_KEY) {
+        throw new ToolInputError('Google Calendar and the meeting bot need to be configured first.');
+      }
+      const row = await readCalendarSettings(ctx.userId, ctx.db);
+      const json = row?.calendar_json || {};
+      const prev = autoJoin.normalizeSettings(json.auto_join);
+      if (!json.tokens) throw new ToolInputError('Connect Google Calendar in Settings → Recording first.');
+      const orgId = prev.org_id || (ctx.orgIds.length === 1 ? ctx.orgIds[0] : null);
+      if (!orgId) throw new ToolInputError('Choose a workspace for Bot auto-join in Settings → Recording first.');
+      const payload = {
+        enabled: true,
+        scope: enumArg(args.scope, 'scope', autoJoin.SCOPES, prev.scope),
+        leadMinutes: args.leadMinutes,
+        orgId,
+      };
+      try {
+        await autoJoin.nextSettings(ctx.userId, ctx.orgIds, json, { ...payload, consentAcknowledged: true });
+      } catch (e) {
+        if (e instanceof autoJoin.SettingsError) throw new ToolInputError(e.message);
+        throw e;
+      }
+      const when = payload.leadMinutes
+        ? `${payload.leadMinutes} minute${payload.leadMinutes === 1 ? '' : 's'} before the start`
+        : 'at the start';
+      const scope = payload.scope === 'all' ? 'all eligible meetings' : 'eligible meetings you organize';
+      return {
+        orgId,
+        payload,
+        summary: `Send the recording bot ${when} of ${scope} on your primary Google Calendar. Confirm that you’ll tell invitees the meeting is recorded.`,
+      };
+    },
+    async execute(payload, ctx) {
+      const settings = await autoJoin.configure(ctx.userId, ctx.orgIds, { ...payload, consentAcknowledged: true }, ctx.db);
+      return { result: { leadMinutes: settings.lead_minutes, scope: settings.scope }, undo: null };
+    },
+    view: () => ({ path: '/settings?section=recording', label: 'Bot auto-join settings' }),
   },
 
   log_meeting_note: {

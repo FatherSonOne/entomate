@@ -30,6 +30,7 @@ export interface EntoProposal {
   riskClass: 'safe' | 'write' | 'sensitive'
   status: ProposalStatus
   summary: string | null
+  canUndo?: boolean
   payload: Record<string, unknown>
   result: Record<string, unknown> | null
   editable: EditableField[]
@@ -212,10 +213,12 @@ const ProposalCard: React.FC<ProposalCardProps> = ({
                 View {proposal.view.label} <ArrowUpRight size={12} />
               </button>
             )}
-            <button type="button" className="la-proposal-btn la-proposal-undo" onClick={onUndo} disabled={isResolving}>
-              <RotateCcw size={12} />
-              {isResolving ? 'Undoing…' : 'Undo'}
-            </button>
+            {proposal.canUndo !== false && (
+              <button type="button" className="la-proposal-btn la-proposal-undo" onClick={onUndo} disabled={isResolving}>
+                <RotateCcw size={12} />
+                {isResolving ? 'Undoing…' : 'Undo'}
+              </button>
+            )}
           </div>
         </>
       )}

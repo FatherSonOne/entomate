@@ -101,6 +101,7 @@ const QUICK_ACTIONS = {
     { label: 'Recent executions',   query: 'Show me recent workflow execution results' },
   ],
   automations: [
+    { label: 'Meeting bot schedule', query: 'Is my Google Calendar recording bot set to auto-join? Tell me which meetings it joins and how early.' },
     { label: 'Automation status',   query: 'Which automations are active and how are they performing?' },
     { label: 'Failed runs',         query: 'Have any automations failed recently?' },
     { label: 'Optimization tips',   query: 'How can I optimize my current automations?' },
@@ -119,6 +120,7 @@ const QUICK_ACTIONS = {
     { label: 'Team performance',    query: 'How is the team performing based on available data?' },
   ],
   search: [
+    { label: 'Brief me for my next meeting', query: 'Give me a pre-meeting brief for my next meeting. Use relevant past meeting notes and include the video link if available.' },
     { label: 'Search tips',         query: 'What kind of things can I search for in Entomate?' },
   ],
   settings: [
@@ -150,7 +152,7 @@ const STARTER_SUBJECT = {
   agents: 'your agents',
   analytics: 'your numbers',
   reports: 'your reports',
-  search: 'anything you recorded',
+  search: 'past meetings or what’s coming up',
   settings: 'setting up Entomate',
   guide: 'how Entomate works',
 }
@@ -362,7 +364,10 @@ function noteFallback(from, to, err, callbacks) {
 export async function streamQuery(userQuery, context, callbacks) {
   try {
     await entoAiApi.queryStream(
-      { question: userQuery, section: context.section, threadId: context.threadId },
+      {
+        question: userQuery, section: context.section, threadId: context.threadId,
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      },
       callbacks
     )
     return

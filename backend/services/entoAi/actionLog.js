@@ -49,6 +49,7 @@ function toProposal(row) {
     result: row.result || null,
     editable: verb?.editable || [],
     confirmToken: verb?.risk === 'sensitive' && verb.confirmToken ? verb.confirmToken(row.payload) : null,
+    ...(verb && !verb.undo ? { canUndo: false } : {}),
     view: row.status === 'executed' && verb?.view ? verb.view(row.result) : null,
     planId: row.plan_id || null,
     stepOrder: row.plan_id ? row.step_order : null,
@@ -218,7 +219,7 @@ async function undo(ctx, id) {
 async function undoRow(ctx, row) {
   const id = row.id;
   const verb = VERBS[row.tool_name];
-  if (!verb) throw new ActionError(422, 'This kind of action can no longer be undone');
+  if (!verb?.undo) throw new ActionError(422, 'Manage this change in Settings.', toProposal(row));
   if (row.status !== 'executed') throw new ActionError(409, `Only a done action can be undone; this one is ${row.status}`, toProposal(row));
 
   const u = row.undo || {};

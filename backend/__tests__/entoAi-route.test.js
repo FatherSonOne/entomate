@@ -102,7 +102,7 @@ jest.mock('../config/gemini', () => ({
 jest.mock('../middleware/rateLimiter', () => ({ aiLimiter: (req, res, next) => next() }));
 jest.mock('../utils/orgContext',() => ({ getOrgIdsForUser: jest.fn(async () => ['org-a']) }));
 jest.mock('../utils/log', () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() }));
-jest.mock('../services/calendarService', () => ({ isConfigured: () => false, getEvents: jest.fn() }));
+jest.mock('../services/calendarService', () => ({ isConfigured: jest.fn(() => false), getEvents: jest.fn() }));
 // EAI-07 metering reads billing tables on the service client; it has its own test (aiUsage.test.js).
 jest.mock('../services/aiUsage', () => ({ meterAi: jest.fn((req, res, next) => next()), addUsage: jest.fn() }));
 
@@ -469,9 +469,51 @@ describe('tools', () => {
     expect(out.response).toMatchObject({ from: '2026-01-01', to: '2026-03-04', googleCalendar: 'not_configured' });
   });
 
+  test('get_calendar returns the attached video link and searches a local day across DST', async () => {
+    const calendar = require('../services/calendarService');
+    calendar.isConfigured.mockReturnValueOnce(true);
+    calendar.getEvents.mockResolvedValueOnce([
+      {
+        summary: 'Acme budget review',
+        start: { dateTime: '2026-03-08T18:00:00-04:00' },
+        conferenceData: { entryPoints: [{ entryPointType: 'video', uri: 'https://meet.google.com/abc-defg-hij' }] },
+        description: 'Bring the budget draft',
+      },
+      { summary: 'Focus time' },
+      { summary: 'Cancelled', status: 'cancelled' },
+    ]);
+    mockResults.user_settings = { data: { calendar_json: { tokens: { access_token: 'secret' } } } };
+    const out = await runTool('get_calendar', {
+      from: '2026-03-08', to: '2026-03-08', query: 'Acme',
+    }, { ...ORG, timeZone: 'America/New_York' });
+    expect(calendar.getEvents).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({
+      timeMin: '2026-03-08T05:00:00.000Z', timeMax: '2026-03-09T04:00:00.000Z', query: 'Acme',
+    }));
+    expect(out.response.events).toEqual([
+      expect.objectContaining({ title: 'Acme budget review', meetingLink: 'https://meet.google.com/abc-defg-hij', agenda: 'Bring the budget draft' }),
+      expect.objectContaining({ title: 'Focus time', meetingLink: null }),
+    ]);
+    expect(JSON.stringify(out)).not.toContain('secret');
+  });
+
+  test('get_meeting supplies team notes and the caller’s private notes, omitting private notes from others', async () => {
+    mockResults.meetings = { data: { id: ID, title: 'Acme budget review' } };
+    mockResults.meeting_notes = { data: [
+      { body: 'Shared budget decision', visibility: 'team', author_id: 'user-b' },
+      { body: 'My own question', visibility: 'private', author_id: 'user-a' },
+      { body: 'Another person’s private note', visibility: 'private', author_id: 'user-b' },
+    ] };
+    const out = await runTool('get_meeting', { meeting_id: ID }, ORG);
+    expect(out.response.meeting.notes.map((note) => note.text)).toEqual(['Shared budget decision', 'My own question']);
+    expect(mockUserQueries.find((query) => query.table === 'meeting_notes').calls).toEqual(expect.arrayContaining([
+      ['in', ['org_id', ['org-a']]], ['or', ['visibility.eq.team,author_id.eq.user-a']],
+    ]));
+  });
+
   test('search_everything reads through the user client', async () => {
     await runTool('search_everything', { query: 'budget review', types: ['tasks'] }, ORG);
-    expect(mockUserQueries.map((q) => q.table)).toEqual(['tasks']);
+    expect([...new Set(mockUserQueries.map((q) => q.table))]).toEqual(['tasks']);
+    for (const q of mockUserQueries) expect(q.calls).toContainEqual(['in', ['org_id', ['org-a']]]);
     expect(mockServiceQueries).toEqual([]);
   });
 });

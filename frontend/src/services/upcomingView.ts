@@ -31,6 +31,8 @@ export interface UpcomingEvent {
   attendees: UpcomingAttendee[]
   botStatus: string | null
   htmlLink: string | null
+  meetingLink?: string | null
+  joinAt?: string | null
 }
 
 export interface UpcomingData {
@@ -72,6 +74,8 @@ function readEvent(raw: unknown): UpcomingEvent | null {
     attendees,
     botStatus: str(r.botStatus),
     htmlLink: str(r.htmlLink),
+    meetingLink: platform && typeof r.meetingLink === 'string' && r.meetingLink.startsWith('https://') ? r.meetingLink : null,
+    joinAt: str(r.joinAt),
   }
 }
 

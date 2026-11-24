@@ -3,7 +3,7 @@
  *
  * Sends the meeting bot to calls on your Google Calendar without a launch
  * step (feature audit 2026-11-22, rec 1). The backend
- * (services/calendarAutoJoin.js) schedules a bot about two hours ahead for
+ * (services/calendarAutoJoin.js) schedules a bot ahead of time for
  * each qualifying event; this screen switches it on, picks the scope and
  * shows what it will do with the next day of events.
  * GET/PUT /api/calendar/auto-join.
@@ -19,6 +19,11 @@ const SCOPES = [
   { id: 'organized', label: 'Meetings I organise' },
   { id: 'all', label: 'Every meeting with a video link' },
 ]
+
+const LEAD_TIMES = Array.from({ length: 6 }, (_, n) => ({
+  value: String(n),
+  label: n === 0 ? 'At meeting start' : `${n} minute${n === 1 ? '' : 's'} early`,
+}))
 
 const PLATFORM = { meet: 'Google Meet', zoom: 'Zoom', teams: 'Teams' }
 
@@ -63,7 +68,7 @@ export default function CalendarAutoJoinSettings() {
     try {
       // A partial response (no settings yet) must not crash Settings: fill the defaults.
       const res = (await calendarApi.getAutoJoin()) || {}
-      setState({ ...res, settings: { enabled: false, scope: 'organized', ...(res.settings || {}) }, upcoming: Array.isArray(res.upcoming) ? res.upcoming : [] })
+      setState({ ...res, settings: { enabled: false, scope: 'organized', lead_minutes: 0, ...(res.settings || {}) }, upcoming: Array.isArray(res.upcoming) ? res.upcoming : [] })
     } catch (err) {
       setError(err.message || 'Could not load auto-join settings')
     }
@@ -90,13 +95,14 @@ export default function CalendarAutoJoinSettings() {
         enabled: patch.enabled ?? settings.enabled,
         scope: patch.scope ?? settings.scope,
         orgId: org?.id,
+        ...(patch.leadMinutes !== undefined ? { leadMinutes: patch.leadMinutes } : {}),
         ...(patch.enabled && !settings.consent_at ? { consentAcknowledged: consent } : {}),
       }
       const res = await calendarApi.updateAutoJoin(body)
       setNotice(
         body.enabled
-          ? 'On. The bot is scheduled about two hours before each meeting, and invitees get an email with an opt-out link.'
-          : res.withdrawn ? `Off. ${res.withdrawn} scheduled bot${res.withdrawn === 1 ? '' : 's'} withdrawn.` : 'Off.'
+          ? 'Auto-join settings saved. Invitees get an email with an opt-out link when a bot is scheduled.'
+          : res.withdrawn ? `Off. ${res.withdrawn} scheduled bot${res.withdrawn === 1 ? '' : 's'} withdrawn.` : 'Auto-join is off. Settings saved.'
       )
       await load()
     } catch (err) {
@@ -160,6 +166,18 @@ export default function CalendarAutoJoinSettings() {
                 disabled={!connected || saving || !canSend}
                 onChange={(v) => save({ scope: v })}
                 options={SCOPES.map((s) => ({ value: s.id, label: s.label }))}
+              />
+            </div>
+            <div className="bs-agents-bar">
+              <span className="bs-lbl" id="aj-lead">Bot arrival</span>
+              <Select
+                className="bs-agents-select"
+                aria-labelledby="aj-lead"
+                sheetLabel="Bot arrival"
+                value={String(settings.lead_minutes)}
+                disabled={!connected || saving || !canSend}
+                onChange={(v) => save({ leadMinutes: Number(v) })}
+                options={LEAD_TIMES}
               />
             </div>
             {!settings.enabled && needsConsent && connected && canSend && (

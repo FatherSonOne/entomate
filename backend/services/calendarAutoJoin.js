@@ -5,7 +5,7 @@
  * Settings › Bot auto-join. Every run (GitHub Actions every 15 minutes via
  * POST /api/internal/jobs/autojoin, plus an in-process timer while the
  * server is awake) looks at their next LOOKAHEAD_MS of events and schedules
- * a Recall bot, with join_at set to the start time, for each event that
+ * a Recall bot, with join_at set from the configured lead time, for each event that
  * qualifies:
  *
  *   - it has a Google Meet, Zoom or Teams link
@@ -20,7 +20,7 @@
  * whose event was moved, cancelled or no longer qualifies is withdrawn.
  *
  * Settings live at user_settings.calendar_json.auto_join:
- *   { enabled, scope, org_id, consent_at, overrides }
+ *   { enabled, scope, org_id, consent_at, lead_minutes, overrides }
  *
  * overrides: { [eventKey]: 'skip' | 'join' }, set per meeting from
  * Meetings › Upcoming. 'skip' keeps the bot out of a meeting auto-join would
@@ -30,7 +30,9 @@
 
 'use strict';
 
+const { isDeepStrictEqual } = require('node:util');
 const { supabaseAdmin } = require('../config/supabase');
+const { readCalendarSettings, updateCalendarSettings } = require('./calendarSettings');
 const log = require('../utils/log');
 
 // Twelve hours ahead: Recall holds a scheduled bot and joins at join_at on its own, so
@@ -38,6 +40,10 @@ const log = require('../utils/log');
 // sleeping server both skip runs; a short lookahead turned each skip into a missed meeting.
 const LOOKAHEAD_MS = 12 * 60 * 60 * 1000;
 const GRACE_MS = 5 * 60 * 1000; // still join a meeting that started up to 5 min ago
+// Google Meet caps the waiting room at 10 minutes. Leave time for a late host.
+const MAX_LEAD_MINUTES = 5;
+// Recall treats bots with 10 minutes or less of notice as ad hoc.
+const RECALL_SCHEDULE_NOTICE_MS = 10 * 60 * 1000;
 const ADMIN_ROLES = ['owner', 'admin'];
 const SCOPES = ['organized', 'all'];
 const LIVE_STATUSES = ['pending', 'launching'];
@@ -62,7 +68,7 @@ const LINK_PATTERNS = [
 function findLink(text) {
   if (!text) return null;
   for (const { platform, re } of LINK_PATTERNS) {
-    const m = String(text).match(re);
+    const m = String(text).replace(/&amp;/gi, '&').match(re);
     if (m) return { platform, url: m[0].replace(/[).,;]+$/, '') };
   }
   return null;
@@ -82,6 +88,10 @@ function otherInvitees(event) {
 
 function startOf(event) {
   return event?.start?.dateTime ? new Date(event.start.dateTime) : null;
+}
+
+function targetArrival(event, settings) {
+  return new Date(startOf(event).getTime() - settings.lead_minutes * 60_000);
 }
 
 /** Event id + start, so a moved event counts as a new one. */
@@ -110,15 +120,20 @@ function qualifies(event, { scope = 'organized', now = new Date(), lookaheadMs =
   return { join: true, link };
 }
 
+function validLeadMinutes(value) {
+  return Number.isInteger(value) && value >= 0 && value <= MAX_LEAD_MINUTES;
+}
+
 /** Settings with defaults; never trusts stored values blindly. */
-function normalizeSettings(raw) {
+function normalizeSettings(raw, now = new Date()) {
   const s = raw && typeof raw === 'object' ? raw : {};
   return {
-    enabled: s.enabled === true && Boolean(s.consent_at) && typeof s.org_id === 'string',
+    enabled: s.enabled === true && typeof s.consent_at === 'string' && Boolean(s.consent_at) && typeof s.org_id === 'string',
     scope: SCOPES.includes(s.scope) ? s.scope : 'organized',
+    lead_minutes: validLeadMinutes(s.lead_minutes) ? s.lead_minutes : 0,
     org_id: typeof s.org_id === 'string' ? s.org_id : null,
     consent_at: typeof s.consent_at === 'string' ? s.consent_at : null,
-    overrides: normalizeOverrides(s.overrides),
+    overrides: normalizeOverrides(s.overrides, now),
   };
 }
 
@@ -168,27 +183,66 @@ function calendar() {
 }
 function orchestrator() { return require('./botOrchestrator'); }
 
-/** Keep refreshed Google tokens without dropping the auto-join settings. */
-async function persistTokens(userId, tokens) {
-  const { data } = await db().from('user_settings').select('calendar_json').eq('user_id', userId).maybeSingle();
-  const next = { ...(data?.calendar_json || {}), tokens: stripCallbacks(tokens) };
-  const { error } = await db().from('user_settings').update({ calendar_json: next }).eq('user_id', userId);
-  if (error) log.warn('[AutoJoin] could not save refreshed tokens', { userId, error: error.message });
+// A refresh should never reconnect a disconnected calendar or replace a new connection.
+async function persistTokens(userId, tokens, original, client = db()) {
+  const { _onRefresh, ...clean } = tokens;
+  try {
+    await updateCalendarSettings(userId, (json) => {
+      const current = json.tokens;
+      const same = original.refresh_token
+        ? current?.refresh_token === original.refresh_token
+        : current?.access_token === original.access_token;
+      return same ? { ...json, tokens: clean } : null;
+    }, { client });
+  } catch (error) {
+    log.warn('[AutoJoin] could not save refreshed tokens', { userId, error: error.message });
+  }
 }
 
-function stripCallbacks(tokens) {
-  const { _onRefresh, ...rest } = tokens || {};
-  return rest;
+class SettingsError extends Error {
+  constructor(status, code, message) {
+    super(message);
+    this.status = status;
+    this.code = code;
+  }
 }
 
-async function isOrgAdmin(userId, orgId) {
-  const { data } = await db()
-    .from('org_members')
-    .select('role')
-    .eq('user_id', userId)
-    .eq('org_id', orgId)
-    .maybeSingle();
-  return ADMIN_ROLES.includes(data?.role);
+async function orgRole(userId, orgId) {
+  const { data, error } = await db().from('org_members')
+    .select('role').eq('user_id', userId).eq('org_id', orgId).maybeSingle();
+  if (error) throw error;
+  return data?.role;
+}
+
+async function nextSettings(userId, orgIds, json, { enabled, scope, orgId, leadMinutes, consentAcknowledged }) {
+  const prev = normalizeSettings(json.auto_join);
+  const next = { ...prev, enabled, scope: scope ?? prev.scope, lead_minutes: leadMinutes ?? prev.lead_minutes };
+  if (!enabled) return next;
+  if (!json.tokens) throw new SettingsError(400, 'calendar_not_connected', 'Connect Google Calendar in Settings first.');
+  const target = orgId || prev.org_id || orgIds[0];
+  if (!target || !orgIds.includes(target)) {
+    throw new SettingsError(403, 'org_not_allowed', 'Pick a workspace you belong to.');
+  }
+  if (!ADMIN_ROLES.includes(await orgRole(userId, target))) {
+    throw new SettingsError(403, 'admin_required', 'Only workspace owners and admins can send the bot.');
+  }
+  if (consentAcknowledged !== true && !prev.consent_at) {
+    throw new SettingsError(400, 'consent_required', 'Confirm that your invitees are told the meeting is recorded.');
+  }
+  return { ...next, org_id: target, consent_at: prev.consent_at || new Date().toISOString() };
+}
+
+async function configure(userId, orgIds, changes, client = db()) {
+  const json = await updateCalendarSettings(userId, async (current) => ({
+    ...current,
+    auto_join: await nextSettings(userId, orgIds, current, changes),
+  }), { client });
+  const settings = normalizeSettings(json?.auto_join);
+  if (settings.enabled && process.env.RECALL_API_KEY && calendar().isConfigured()) {
+    runForUser({ user_id: userId, calendar_json: json }).catch((err) =>
+      log.warn('[AutoJoin] run after settings change failed', { userId, error: err.message }));
+  }
+  return settings;
 }
 
 async function userIdentity(userId) {
@@ -208,46 +262,82 @@ async function userIdentity(userId) {
  */
 async function runForUser(row, now = new Date()) {
   const userId = row.user_id;
-  const settings = normalizeSettings(row.calendar_json?.auto_join);
+  const settings = normalizeSettings(row.calendar_json?.auto_join, now);
   const out = { scheduled: 0, withdrawn: 0, skipped: 0, errors: 0 };
   const tokens = row.calendar_json?.tokens;
   if (!settings.enabled || !tokens) return out;
-  if (!(await isOrgAdmin(userId, settings.org_id))) {
+  if (!ADMIN_ROLES.includes(await orgRole(userId, settings.org_id))) {
     log.warn('[AutoJoin] user is no longer an owner or admin of the org; skipping', { userId, orgId: settings.org_id });
     return out;
   }
 
-  const live = { ...tokens, _onRefresh: (t) => persistTokens(userId, t) };
+  const stillCurrent = async () => {
+    const current = (await readCalendarSettings(userId, db()))?.calendar_json;
+    return Boolean(current?.tokens && current.connected_at === row.calendar_json.connected_at &&
+      isDeepStrictEqual(normalizeSettings(current.auto_join, now), settings));
+  };
+  const live = { ...tokens, _onRefresh: (t) => persistTokens(userId, t, tokens) };
   const events = await calendar().getEvents(live, {
     timeMin: new Date(now.getTime() - MISSED_WINDOW_MS).toISOString(),
     timeMax: new Date(now.getTime() + LOOKAHEAD_MS).toISOString(),
-    maxResults: 50,
+    maxResults: 250,
+    allPages: true,
   });
 
   const wanted = new Map();
   for (const event of events) {
     const q = decide(event, { scope: settings.scope, now, overrides: settings.overrides });
-    if (q.join) wanted.set(eventKey(event), { event, link: q.link });
-    else out.skipped += 1;
+    if (q.join) {
+      const joinAt = targetArrival(event, settings);
+      wanted.set(eventKey(event), { event, link: q.link, joinAt });
+    } else {
+      out.skipped += 1;
+    }
   }
 
   const { data: existing, error } = await db()
     .from('bot_sessions')
-    .select('id, calendar_event_key, status, join_at')
+    .select('id, calendar_event_key, status, join_at, recall_bot_id')
     .eq('org_id', settings.org_id)
     .eq('consent_acknowledged_by', userId)
     .not('calendar_event_key', 'is', null)
     .neq('status', 'stopped')
-    .gte('join_at', new Date(now.getTime() - MISSED_WINDOW_MS).toISOString());
+    .gte('join_at', new Date(now.getTime() - MISSED_WINDOW_MS - MAX_LEAD_MINUTES * 60 * 1000).toISOString());
   if (error) throw error;
+  if (!(await stillCurrent())) return out;
   const have = new Set((existing || []).map((s) => s.calendar_event_key));
 
-  const me = await userIdentity(userId);
-  for (const [key, { event, link }] of wanted) {
-    if (have.has(key)) continue;
-    const start = startOf(event);
+  // Keep an imminent bot at its booked time. Recall may already be dispatching it.
+  const canSchedule = (at) => at.getTime() > now.getTime() + RECALL_SCHEDULE_NOTICE_MS;
+  for (const s of existing || []) {
+    if (!LIVE_STATUSES.includes(s.status) || !s.join_at) continue;
+    const oldTime = new Date(s.join_at);
+    if (oldTime <= now) continue;
+    const planned = wanted.get(s.calendar_event_key);
+    if (planned && (planned.joinAt.getTime() === oldTime.getTime() ||
+      !canSchedule(oldTime) || !canSchedule(planned.joinAt))) continue;
     try {
-      await orchestrator().launchBotSession({
+      if (!(await stillCurrent())) return out;
+      if (planned) {
+        await orchestrator().rescheduleBotSession(s, planned.joinAt.toISOString());
+      } else {
+        await orchestrator().stopBotSession(s.id, 'calendar_changed');
+        out.withdrawn += 1;
+      }
+    } catch (err) {
+      out.errors += 1;
+      log.warn('[AutoJoin] could not update scheduled bot', { sessionId: s.id, error: err.message });
+    }
+  }
+
+  const me = await userIdentity(userId);
+  for (const [key, { event, link, joinAt }] of wanted) {
+    if (have.has(key)) continue;
+    // With an early-join rule, an ad hoc bot must not arrive before the selected time.
+    if (settings.lead_minutes && joinAt > now && !canSchedule(joinAt)) continue;
+    try {
+      if (!(await stillCurrent())) return out;
+      const bot = await orchestrator().launchBotSession({
         workspaceId: settings.org_id,
         meetingId: require('crypto').randomUUID(),
         meetingUrl: link.url,
@@ -256,10 +346,15 @@ async function runForUser(row, now = new Date()) {
         consentAcknowledgedByName: me.name,
         consentAcknowledgedByEmail: me.email,
         participantEmails: otherInvitees(event).map((a) => a.email),
-        joinAt: start.toISOString(),
+        joinAt: joinAt.toISOString(),
         calendarEventKey: key,
         title: event.summary || null,
       });
+      if (!(await stillCurrent())) {
+        await orchestrator().stopBotSession(bot.sessionId, 'calendar_settings_changed');
+        out.withdrawn += 1;
+        return out;
+      }
       out.scheduled += 1;
     } catch (err) {
       // A duplicate key means another run got there first; anything else is logged.
@@ -270,19 +365,6 @@ async function runForUser(row, now = new Date()) {
     }
   }
 
-  // Withdraw bots that have not joined yet and whose event no longer qualifies.
-  for (const s of existing || []) {
-    if (wanted.has(s.calendar_event_key)) continue;
-    if (!LIVE_STATUSES.includes(s.status)) continue;
-    if (!s.join_at || new Date(s.join_at).getTime() <= now.getTime()) continue;
-    try {
-      await orchestrator().stopBotSession(s.id, 'calendar_changed');
-      out.withdrawn += 1;
-    } catch (err) {
-      out.errors += 1;
-      log.warn('[AutoJoin] could not withdraw bot', { sessionId: s.id, error: err.message });
-    }
-  }
   await recordHealth(userId, missedEvents(events, existing || [], settings.scope, now, settings.overrides), now, me)
     .catch((err) => log.warn('[AutoJoin] could not save the run', { userId, error: err.message }));
   return out;
@@ -316,25 +398,26 @@ function missedEvents(events, sessions, scope, now = new Date(), overrides = {})
  * is also emailed once: the person is probably in that call, not looking at Entomate.
  */
 async function recordHealth(userId, missed, now, me) {
-  const { data } = await db().from('user_settings').select('calendar_json').eq('user_id', userId).maybeSingle();
-  const json = data?.calendar_json || {};
-  const prev = json.auto_join_health || {};
-  const known = new Map((Array.isArray(prev.missed) ? prev.missed : []).map((m) => [m.key, m]));
-  const fresh = missed.filter((m) => !known.has(m.key));
-  for (const m of fresh) known.set(m.key, { ...m, notedAt: now.toISOString() });
-  const keep = [...known.values()]
-    .filter((m) => now.getTime() - Date.parse(m.start) < 24 * 60 * 60 * 1000)
-    .sort((a, b) => Date.parse(b.start) - Date.parse(a.start))
-    .slice(0, MAX_MISSED);
-  const health = { ...prev, lastRunAt: now.toISOString(), missed: keep };
-  const { error } = await db().from('user_settings').update({ calendar_json: { ...json, auto_join_health: health } }).eq('user_id', userId);
-  if (error) throw error;
+  let fresh = [];
+  const saved = await updateCalendarSettings(userId, (json) => {
+    if (!json.tokens) return null;
+    const prev = json.auto_join_health || {};
+    const known = new Map((Array.isArray(prev.missed) ? prev.missed : []).map((m) => [m.key, m]));
+    fresh = missed.filter((m) => !known.has(m.key));
+    for (const m of fresh) known.set(m.key, { ...m, notedAt: now.toISOString() });
+    const keep = [...known.values()]
+      .filter((m) => now.getTime() - Date.parse(m.start) < 24 * 60 * 60 * 1000)
+      .sort((a, b) => Date.parse(b.start) - Date.parse(a.start))
+      .slice(0, MAX_MISSED);
+    return { ...json, auto_join_health: { ...prev, lastRunAt: now.toISOString(), missed: keep } };
+  }, { client: db() });
+  if (!saved) return null;
   if (fresh.length && me?.email) {
     for (const m of fresh) {
       await notifyMissed(me.email, m).catch((err) => log.warn('[AutoJoin] missed-bot email failed', { userId, error: err.message }));
     }
   }
-  return health;
+  return saved.auto_join_health;
 }
 
 async function notifyMissed(to, m) {
@@ -392,7 +475,7 @@ async function withdrawScheduled(userId, now = new Date()) {
  * Settings screen. Read-only.
  */
 async function preview(userId, tokens, settings, now = new Date()) {
-  const s = normalizeSettings(settings);
+  const s = normalizeSettings(settings, now);
   const events = await calendar().getEvents(tokens, {
     timeMin: new Date(now.getTime() - GRACE_MS).toISOString(),
     timeMax: new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString(),
@@ -404,7 +487,7 @@ async function preview(userId, tokens, settings, now = new Date()) {
     .eq('consent_acknowledged_by', userId)
     .not('calendar_event_key', 'is', null)
     .neq('status', 'stopped')
-    .gte('join_at', new Date(now.getTime() - GRACE_MS).toISOString());
+    .gte('join_at', new Date(now.getTime() - GRACE_MS - MAX_LEAD_MINUTES * 60 * 1000).toISOString());
   const byKey = new Map((sessions || []).map((x) => [x.calendar_event_key, x.status]));
   return events
     .filter((e) => startOf(e))
@@ -437,7 +520,7 @@ function dayOf(event) {
  * for each, and why. Read-only. With auto-join off, `join` says what it would do.
  */
 async function upcoming(userId, tokens, settings, { days = 60, now = new Date() } = {}) {
-  const s = normalizeSettings(settings);
+  const s = normalizeSettings(settings, now);
   const span = Math.min(Math.max(Number(days) || 60, 1), UPCOMING_MAX_DAYS);
   const events = await calendar().getEvents(tokens, {
     timeMin: new Date(now.getTime() - GRACE_MS).toISOString(),
@@ -446,11 +529,11 @@ async function upcoming(userId, tokens, settings, { days = 60, now = new Date() 
   });
   const { data: sessions } = await db()
     .from('bot_sessions')
-    .select('id, calendar_event_key, status')
+    .select('id, calendar_event_key, status, join_at')
     .eq('consent_acknowledged_by', userId)
     .not('calendar_event_key', 'is', null)
     .neq('status', 'stopped')
-    .gte('join_at', new Date(now.getTime() - GRACE_MS).toISOString());
+    .gte('join_at', new Date(now.getTime() - GRACE_MS - MAX_LEAD_MINUTES * 60 * 1000).toISOString());
   const byKey = new Map((sessions || []).map((x) => [x.calendar_event_key, x]));
   return events
     .filter((e) => dayOf(e) && e.status !== 'cancelled')
@@ -476,7 +559,9 @@ async function upcoming(userId, tokens, settings, { days = 60, now = new Date() 
         organizer,
         attendees: (e.attendees || []).filter((a) => !a.resource).map((a) => ({ name: a.displayName || null, email: a.email || null, self: Boolean(a.self) })),
         botStatus: session?.status || null,
+        joinAt: session?.join_at || (d.join ? targetArrival(e, s).toISOString() : null),
         htmlLink: typeof e.htmlLink === 'string' ? e.htmlLink : null,
+        meetingLink: meetingLink(e)?.url || null,
       };
     });
 }
@@ -535,6 +620,11 @@ function stop() {
 
 module.exports = {
   LOOKAHEAD_MS,
+  MAX_LEAD_MINUTES,
+  validLeadMinutes,
+  SettingsError,
+  nextSettings,
+  configure,
   persistTokens,
   SCOPES,
   findLink,

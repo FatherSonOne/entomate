@@ -119,6 +119,21 @@ beforeEach(() => {
 // Tier 1 — pure function units
 // ─────────────────────────────────────────────────────────────────────────
 
+test('reschedules the same Recall bot without changing the recording or its consent records', async () => {
+  const fetch = jest.spyOn(global, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
+  const at = '2026-12-01T15:55:00.000Z';
+  try {
+    await orchestrator.rescheduleBotSession({ id: 'session', recall_bot_id: 'recall' }, at);
+    expect(fetch).toHaveBeenCalledWith(expect.stringMatching(/\/bot\/recall$/), expect.objectContaining({
+      method: 'PATCH', body: JSON.stringify({ join_at: at }),
+    }));
+    expect(mockSupabase.from.mock.calls).toEqual([['bot_sessions']]);
+    expect(mockSupabase.update).toHaveBeenCalledWith({ join_at: at });
+  } finally {
+    fetch.mockRestore();
+  }
+});
+
 describe('mapRecallStatus', () => {
   test.each([
     ['ready', 'pending'],
