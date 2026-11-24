@@ -73,6 +73,7 @@
 .bs-recording-scrub svg { pointer-events: none; }
 .bs-recording-unplayed { fill: color-mix(in srgb, var(--bs-d-ink) 48%, var(--bs-display)); }
 .bs-recording-played { fill: var(--bs-d-brand); }
+.bs-recording-played-neutral { fill: var(--bs-d-ink); opacity: .8; }
 .bs-recording-scrub input {
   z-index: 2;
   display: block;
@@ -141,6 +142,48 @@
 .bs-recording-ruler span:first-child::before { left: 0; }
 .bs-recording-ruler span:last-child { transform: translateX(-100%); }
 .bs-recording-ruler span:last-child::before { left: auto; right: 0; }
+
+.bs-recording-speakers {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 8px;
+  margin: 3px 0 2px;
+  padding: 0;
+  list-style: none;
+}
+.bs-recording-speakers li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 3px 7px;
+  border: 1px solid var(--recording-rule);
+  border-radius: 4px;
+  color: var(--bs-d-ink);
+  font: 500 11px/1.2 var(--bs-sans);
+  overflow-wrap: anywhere;
+}
+.bs-recording-speakers li[data-current="true"] {
+  border-color: var(--speaker-color);
+  background: color-mix(in srgb, var(--speaker-color) 13%, var(--bs-display));
+  font-weight: 700;
+}
+.bs-recording-speakers li > span {
+  flex: 0 0 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--speaker-color);
+}
+.bs-recording-speaker-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  color: var(--bs-ink2);
+  font: 600 12px/1.2 var(--bs-sans);
+}
 
 .bs-recording-moments { margin-top: 3px; }
 .bs-recording-moments .bs-tape {
@@ -247,6 +290,6 @@
 }
 
 @media (forced-colors: active) {
-  .bs-recording-unplayed, .bs-recording-played { fill: CanvasText; }
+  .bs-recording-unplayed, .bs-recording-played, .bs-recording-played-neutral { fill: CanvasText; }
   .bs-recording-head { background: Highlight; forced-color-adjust: none; }
 }
