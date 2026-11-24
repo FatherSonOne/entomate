@@ -2,13 +2,14 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { MODULES, STATUS, MEDIA } from './landingData'
 
 const PHONE_MAX = 760
+const PIN_MIN_HEIGHT = 640
 const VH_PER_MODULE = 80
 
 /**
  * Section 02: the pinned module journey (qntmecos.com "Signal Spine" pattern).
  * The section is tall; an inner panel sticks to the viewport while scroll
  * progress picks the active module, crossfading its footage and sheet.
- * On phones and with reduced motion it falls back to a static stack.
+ * On phones, in short windows and with reduced motion it falls back to a static stack.
  * Keep every ancestor free of transform and overflow:hidden, or sticky breaks.
  */
 export default function ModuleJourney({ reducedMotion }) {
@@ -20,7 +21,9 @@ export default function ModuleJourney({ reducedMotion }) {
 
   // Decide pinned vs static on mount and resize.
   useEffect(() => {
-    const decide = () => setIsStatic(reducedMotion || window.innerWidth <= PHONE_MAX)
+    const decide = () => setIsStatic(
+      reducedMotion || window.innerWidth <= PHONE_MAX || window.innerHeight < PIN_MIN_HEIGHT
+    )
     decide()
     window.addEventListener('resize', decide)
     return () => window.removeEventListener('resize', decide)

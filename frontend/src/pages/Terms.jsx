@@ -4,7 +4,7 @@ import { Logo } from '../components/Logo'
 import BackToTop from '../components/BackToTop'
 
 export default function Terms() {
-  const lastUpdated = 'April 27, 2026'
+  const lastUpdated = 'November 23, 2026'
 
   return (
     <div className="legal-page">
@@ -47,9 +47,11 @@ export default function Terms() {
               Entomate is an AI-powered meeting intelligence platform that
               captures meeting content, generates transcripts and summaries,
               extracts action items, automates follow-ups, and integrates with
-              third-party productivity tools (calendar, chat, CRM). Features
-              and pricing may change; we’ll give reasonable notice of material
-              changes.
+              third-party productivity tools (calendar, chat, CRM).
+              It also provides project tracking and Ask Entomate, an assistant
+              that can answer questions and prepare meeting briefs.
+              Features and pricing may change. We’ll give reasonable notice
+              of material changes.
             </p>
           </section>
 
@@ -96,43 +98,37 @@ export default function Terms() {
             <h2>4. Meeting Recording Consent and the Meet Mate Bot</h2>
             <p className="legal-pending-review">
               <em>
-                Effective {lastUpdated} — pending counsel review. The
-                disclosure language and jurisdiction allocation in this
-                section are being reviewed by counsel.
+                This section describes current recording practices and
+                remains pending counsel review.
               </em>
             </p>
             <p>
               Entomate operates an AI notetaker called <strong>Meet Mate</strong>{' '}
-              that joins meetings as a visible participant, captures audio and
-              video, and produces a transcript and summary. Recording
-              conversations is regulated in many jurisdictions, including
-              several US states (which require all-party consent) and most EU
-              member states.{' '}
+              that joins meetings as a visible participant, captures audio
+              and video where available, and produces a transcript and summary.
+              Workspace owners and admins can enable auto-join for eligible
+              calls from a connected Google Calendar.{' '}
               <strong>
                 You are solely responsible for obtaining any legally required
-                consent from meeting participants before launching Meet Mate.
+                consent from meeting participants before launching Meet Mate,
+                including when you schedule it to join automatically.
               </strong>
             </p>
             <p>
-              To make that obligation explicit, the launch flow requires the
-              organizer to affirm that consent has been obtained from all
-              participants. We record who acknowledged this and when. The bot
-              joins under a clearly identifiable display name and posts a chat
-              announcement on join indicating that recording has started, but
-              these surfaces alone do not constitute consent. Misuse of the
-              recording feature — including launching Meet Mate into a meeting
-              where required consent has not been obtained — may violate law
-              and these Terms.
+              The manual launch flow asks the organizer to confirm consent.
+              Enabling auto-join requires acknowledgment that invitees will
+              be told the meeting is recorded. We record these acknowledgments.
+              You must obtain any required consent separately from the bot’s
+              display name and chat announcement. Launching Meet Mate without
+              required consent may violate applicable law and these Terms.
             </p>
             <p>
-              Per the Privacy Policy, recordings and transcripts are visible
-              only to the workspace that launched the bot, and are not used to
-              train foundational AI models. Where the organizer provides an
-              attendee email list at launch, each external attendee receives
-              a pre-meeting email with an opt-out link; the organizer is
-              notified of any opt-out. Workspace owners set a recording
-              retention window (30 / 90 / 365 days) in Settings, after which
-              the Recall.ai-hosted media is deleted permanently. Personal-data
+              Workspace access, opt-outs, and retention are described in
+              the <Link to="/privacy">Privacy Policy</Link>. Where attendee
+              addresses are available, Meet Mate can send opt-out links.
+              The organizer is notified when an attendee uses a link and
+              is responsible for responding. Workspace owners and admins
+              can set recording retention in Settings. Personal-data
               deletion requests are handled at{' '}
               <Link to="/data-deletion">/data-deletion</Link> with a 72-hour
               action target.
@@ -185,8 +181,11 @@ export default function Terms() {
               and the provider’s terms.
             </p>
             <p>
-              You may revoke any integration at any time from Settings; this
-              also revokes the scopes you previously granted.
+              You can disconnect integrations in Settings. To revoke
+              permissions at the provider, use its account settings.
+              The <Link to="/privacy">Privacy Policy</Link> describes how
+              Entomate uses connected Google Calendar data for Ask Entomate
+              and Meet Mate auto-join.
             </p>
           </section>
 
@@ -194,7 +193,8 @@ export default function Terms() {
             <h2>7. AI Output</h2>
             <p>
               Entomate uses machine-learning systems to produce transcripts,
-              summaries, suggested tasks, priorities, and automations
+              summaries, suggested tasks, priorities, automations, and
+              answers or meeting briefs in Ask Entomate
               (<strong>“AI Output”</strong>). AI Output may contain
               inaccuracies. You are responsible for reviewing AI Output before
               relying on it for decisions, especially those with legal,
@@ -207,13 +207,19 @@ export default function Terms() {
             <h2>8. Plans, Billing, and Trials</h2>
             <ul>
               <li>
+                The Free plan includes a monthly allowance of bot recording
+                hours. Eligible paid plans can buy additional bot hours as
+                a one-time purchase. Stripe processes these payments.
+              </li>
+              <li>
                 Paid plans are billed in advance on a recurring basis (monthly
                 or annually) until canceled.
               </li>
               <li>
-                You can cancel at any time from Settings; cancellation takes
-                effect at the end of the current billing period. Fees already
-                paid are non-refundable except where required by law.
+                You can cancel at any time through the billing portal in
+                Settings. Cancellation takes effect at the end of the
+                current billing period. Fees already paid are non-refundable
+                except where required by law.
               </li>
               <li>
                 Free trials, if offered, convert automatically to a paid plan

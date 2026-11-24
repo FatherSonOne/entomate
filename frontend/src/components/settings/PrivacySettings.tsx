@@ -67,7 +67,7 @@ export default function PrivacySettings(): React.ReactElement {
       <div className="bs-set-row">
         <div className="bs-set-l">
           <b>Keep recordings for</b>
-          <span>Audio and video are cleared after this. The meeting, transcript and action items stay.</span>
+          <span>The retention sweep clears recordings and transcripts. Meeting records, summaries and action items can remain.</span>
         </div>
         <div className="bs-set-c">
           <Switch

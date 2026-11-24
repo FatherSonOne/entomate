@@ -4,7 +4,7 @@ import { Logo } from '../components/Logo'
 import BackToTop from '../components/BackToTop'
 
 export default function PrivacyPolicy() {
-  const lastUpdated = 'November 21, 2026'
+  const lastUpdated = 'November 23, 2026'
 
   return (
     <div className="legal-page">
@@ -52,9 +52,10 @@ export default function PrivacyPolicy() {
             <h3>1.1 Information You Provide</h3>
             <ul>
               <li>
-                <strong>Account data</strong> — name, email, password hash,
-                avatar, organization name, role, and timezone (provided via
-                Clerk authentication).
+                <strong>Account data</strong> — name, email, avatar, organization
+                name, role, and time zone. Supabase Auth handles sign-in and
+                password credentials. If you use Google sign-in, we receive
+                the profile information you authorize Google to share.
               </li>
               <li>
                 <strong>Meeting content</strong> — audio you choose to record,
@@ -67,9 +68,15 @@ export default function PrivacyPolicy() {
                 deadlines, goals, assignments, and automation configurations.
               </li>
               <li>
-                <strong>Billing information</strong> — handled by our payment
-                processor; we store only the minimum needed to operate the
-                subscription (plan, status, last 4 digits of card).
+                <strong>Ask Entomate conversations</strong> — your prompts and
+                responses are saved in your account’s chat history so you can
+                reopen or delete conversations.
+              </li>
+              <li>
+                <strong>Billing information</strong> — Stripe processes payments
+                and collects payment details. Entomate keeps workspace plan
+                information, Stripe customer and subscription identifiers,
+                and records of bot-hour purchases and usage.
               </li>
               <li>
                 <strong>Support and feedback</strong> — messages you send us.
@@ -86,11 +93,21 @@ export default function PrivacyPolicy() {
                 <strong>Google Calendar</strong> — scopes{' '}
                 <code>https://www.googleapis.com/auth/calendar</code> and{' '}
                 <code>https://www.googleapis.com/auth/calendar.events</code>.
-                We use these to list your calendars, read events relevant to
-                your meetings, and create or modify events you schedule through
-                Entomate. We do <strong>not</strong> read events outside your
-                working context, and we never sell or transfer this data. Our
-                use of Google user data complies with the{' '}
+                We use these permissions to show calendar events and to
+                create or modify events when you use calendar actions in
+                Entomate. When you ask for a briefing or calendar answer,
+                Ask Entomate can send relevant event details, such as the
+                title, time, location, agenda, and meeting link, to Google
+                Gemini to generate your answer. Details included in an answer
+                may remain in your chat history until you delete it. If you
+                turn on Meet Mate auto-join, we use the meeting link and time
+                to schedule the bot through Recall.ai and may use invitee
+                email addresses to send recording notices and opt-out links.
+                We store authorization tokens so the features you enable can
+                keep working. Disconnecting Google Calendar removes the
+                connection from Entomate. You can also revoke access in your
+                Google Account. Our use and transfer of Google user data
+                adheres to the{' '}
                 <a
                   href="https://developers.google.com/terms/api-services-user-data-policy"
                   target="_blank"
@@ -156,8 +173,13 @@ export default function PrivacyPolicy() {
                 secure the platform.
               </li>
               <li>
-                Deliver notifications you’ve configured (email, Slack,
-                in-app).
+                Deliver recording notices, meeting follow-ups, and
+                notifications you’ve configured (email, Slack, in-app).
+                Follow-up emails can be sent automatically after meetings.
+                Recipients may come from the calendar invitation,
+                the bot’s attendee list, or action-item owners. You can
+                review the draft, change recipients, or turn off automatic
+                sending in the meeting’s Follow-up tab.
               </li>
               <li>Process payments and manage your subscription.</li>
               <li>Respond to support requests and communicate updates.</li>
@@ -199,8 +221,16 @@ export default function PrivacyPolicy() {
                 Recall under our Deepgram credential.
               </li>
               <li>
-                <strong>Supabase</strong> — database and authenticated file
-                storage for your workspace data.
+                <strong>Supabase</strong> — authentication, database, and
+                authenticated file storage for your workspace data.
+              </li>
+              <li>
+                <strong>Stripe</strong> — checkout, payments, and subscription
+                management.
+              </li>
+              <li>
+                <strong>Resend</strong> — delivers recording notices, opt-out
+                links, and meeting follow-up emails when configured.
               </li>
               <li>
                 <strong>Cloud hosting providers</strong> — application compute,
@@ -230,12 +260,8 @@ export default function PrivacyPolicy() {
             <h2>4. Meeting Recording, Consent, and the Meet Mate Bot</h2>
             <p className="legal-pending-review">
               <em>
-                Effective {lastUpdated} — pending counsel review. This
-                section describes our current recording disclosure
-                practices. Jurisdiction-by-jurisdiction detail is
-                summarized in our internal engineering reference and is
-                being reviewed by counsel; concrete contractual language
-                will be tightened after that review.
+                This section describes current recording practices and
+                remains pending counsel review.
               </em>
             </p>
 
@@ -281,32 +307,27 @@ export default function PrivacyPolicy() {
 
             <h3>4.3 Who sees it</h3>
             <p>
-              Recordings, transcripts, and derivatives are visible only to
-              members of the workspace that launched the bot, subject to that
-              workspace’s role settings. Entomate does not share recordings
-              with third parties beyond the subprocessors listed in §3, and
-              does not sell or use them to train foundational AI models.
+              Access to recordings, transcripts, and summaries inside
+              Entomate follows workspace permissions. You can choose to share
+              a recap or send a follow-up outside the workspace. Personal
+              meeting notes are private by default and excluded from
+              follow-up emails. Entomate does not sell recordings or use
+              them to train foundational AI models.
             </p>
 
             <h3>4.4 Consent — your responsibility</h3>
             <p>
-              You are responsible for obtaining consent from all participants
-              before launching Meet Mate. To make that obligation explicit,
-              the launch flow requires the organizer to affirm that consent
-              has been obtained; we record who acknowledged this and when as
-              part of the meeting’s audit trail.
-            </p>
-            <p>
-              Many jurisdictions (including several US states and most EU
-              member states) require all-party consent for audio recording.
-              Where you operate determines what counts as consent — we
-              provide the disclosure surfaces (chat announcement, visible
-              participant name, this Policy), but the legal obligation to
-              notify and obtain consent from every participant rests with you.
+              You are responsible for notifying participants and obtaining
+              any required consent before recording. When sending Meet Mate
+              manually, the organizer confirms consent in the launch flow.
+              Workspace owners and admins who enable calendar auto-join
+              acknowledge that they will notify invitees. Entomate records
+              the acknowledgment. The bot’s name and chat announcement provide
+              notice in the meeting.
             </p>
             <p>
               Workspace administrators can declare a consent posture in{' '}
-              <em>Settings → Data &amp; Privacy → Consent jurisdiction</em>{' '}
+              <em>Settings → Workspace → Data and privacy → Consent rules</em>{' '}
               (<strong>permissive</strong>, <strong>all-party (US two-party
               states)</strong>, or <strong>GDPR (EU + UK)</strong>). The
               setting surfaces a stronger consent prompt at bot launch. It
@@ -315,18 +336,18 @@ export default function PrivacyPolicy() {
 
             <h3>4.5 Opting out</h3>
             <p>
-              When the organizer launches Meet Mate with a list of external
-              attendees, each attendee receives a pre-meeting email with an
-              opt-out link. Clicking the link records the opt-out and
-              notifies the organizer, who decides whether to continue with
-              the bot, ask the attendee in person, or stop the bot. The
-              legal obligation to honor an opt-out rests with the organizer.
+              Meet Mate can send opt-out links to attendee email addresses
+              provided by the organizer or available from a connected
+              calendar. Using the link records your opt-out and notifies
+              the organizer. The organizer is responsible for responding,
+              including stopping or removing the bot when needed. You can
+              also ask the organizer directly.
             </p>
             <p>
-              You may also opt out by leaving the meeting, asking the
-              organizer to remove Meet Mate, or replying directly to the
-              opt-out email. The opt-out link remains valid for the duration
-              of the meeting.
+              During transcript import, Entomate removes speech from
+              opted-out participants it can match to the transcript by
+              email. To request deletion of personal data, use the form
+              described in §8.
             </p>
 
             <h3>4.6 Retention</h3>
@@ -370,10 +391,11 @@ export default function PrivacyPolicy() {
           <section>
             <h2>6. Data Retention</h2>
             <p>
-              <strong>Workspace data</strong> — we retain meetings,
-              transcripts, tasks, and projects for as long as your account
-              is active. You may delete any of these at any time; deletions
-              are propagated from backups on a rolling 30-day schedule. On
+              <strong>Workspace data</strong> — we retain meeting records,
+              tasks, and projects while your account is active. The recording
+              and transcript retention windows are described below. You may
+              delete workspace records at any time. Deletions are propagated
+              from backups on a rolling 30-day schedule. On
               account deletion, we remove personal data within 90 days
               except where retention is required for legal, tax, or
               security reasons.
@@ -381,13 +403,12 @@ export default function PrivacyPolicy() {
             <p>
               <strong>Meet Mate recordings + transcripts</strong> — workspace
               owners and admins set a retention window of <strong>30, 90, or
-              365 days</strong> in <em>Settings → Data &amp; Retention</em>{' '}
+              365 days</strong> in <em>Settings → Workspace → Data and privacy</em>{' '}
               (default 90). After that window, the Recall.ai-hosted
-              recording and transcript are deleted permanently and the URLs
-              are cleared from our database. The meeting record itself
-              (date, organizer, participant list, audit fields) is preserved
-              indefinitely so legal-hold requests and audits remain
-              answerable. Already-deleted recordings cannot be restored.
+              recording and transcript are deleted, the URLs are cleared,
+              and the transcript copy in Entomate is removed. The meeting
+              record, summaries, and action items can remain after the
+              sweep. Already-deleted recordings cannot be restored.
             </p>
             <p>
               <strong>Meetings recorded in the browser</strong> — the audio is
@@ -426,8 +447,8 @@ export default function PrivacyPolicy() {
               </li>
               <li>Withdraw consent for optional processing at any time.</li>
               <li>
-                Disconnect any integration, revoking the scopes previously
-                granted.
+                Disconnect integrations in Settings. To revoke permissions
+                at the provider, use the provider’s account settings.
               </li>
               <li>
                 Lodge a complaint with your local data protection authority.
