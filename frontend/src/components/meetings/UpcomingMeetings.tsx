@@ -482,7 +482,7 @@ export default function UpcomingMeetings(): React.ReactElement {
       {!autoJoinOn && (
         <div className="bs-up-note">
           <Signal tone="off">Auto-join off</Signal>
-          <span>The bot only goes where you send it. Turn auto-join on to choose meeting by meeting.</span>
+          <span>Open an upcoming meeting with a video link to schedule a bot just for that meeting.</span>
           <Link className="bs-key sm" to="/settings?section=recording">Turn on</Link>
         </div>
       )}
