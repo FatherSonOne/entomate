@@ -8,18 +8,26 @@
  * - requestThread(id) asks the panel to show that conversation (null = a new one). The page
  *   opens the panel itself (Layout's openAssistant). If the panel has not mounted yet, the
  *   request parks and the first subscriber takes it.
+ * - requestMeetingBrief(eventId, title) starts a new conversation for one calendar occurrence.
  * - announceThreadsDeleted(ids) tells a mounted panel that the page deleted conversations, so
  *   it drops them from the rail and leaves one it was showing. Unmounted, nothing to tell.
  */
 
-export type ThreadRequest = { id: string | null }
+export type ThreadRequest = { id: string | null; brief?: { eventId: string; title: string } }
 
 let pending: ThreadRequest | null = null
 const requestListeners = new Set<(req: ThreadRequest) => void>()
 const deleteListeners = new Set<(ids: string[]) => void>()
 
 export function requestThread(id: string | null): void {
-  const req = { id }
+  publish({ id })
+}
+
+export function requestMeetingBrief(eventId: string, title: string): void {
+  publish({ id: null, brief: { eventId, title } })
+}
+
+function publish(req: ThreadRequest): void {
   if (requestListeners.size > 0) {
     pending = null
     requestListeners.forEach((fn) => fn(req))

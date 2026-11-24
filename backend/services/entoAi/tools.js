@@ -465,7 +465,11 @@ const TOOLS = {
         },
       },
     },
-    async run(args, { db, orgIds, userId, timeZone = 'UTC' }) {
+    async run(args, { db, orgIds, userId, timeZone = 'UTC', calendarEventId }) {
+      if (calendarEventId) {
+        const { state, events } = await googleEvents(db, userId, { eventId: calendarEventId, timeZone });
+        return { googleCalendar: state, events, timeZone };
+      }
       const from = dateArg(args.from, 'from') || today(timeZone);
       let to = dateArg(args.to, 'to') || addDays(from, 7);
       if (to < from) throw new ToolInputError('to must be on or after from');
@@ -484,7 +488,7 @@ const TOOLS = {
         statusFilter(db.from('action_items').select('id, task_description, assigned_to_name, assigned_to_email, due_date, priority, status, meeting_id, meetings(title)')
           .in('org_id', orgIds), 'open').gte('due_date', from).lte('due_date', to)
           .order('due_date', { ascending: true }).limit(25).then(rows),
-        googleEvents(db, userId, timeMin, timeMax, query, timeZone),
+        googleEvents(db, userId, { timeMin, timeMax, query, timeZone }),
       ]);
       return {
         from,
@@ -546,7 +550,7 @@ const TOOLS = {
 };
 
 /** The caller's own Google events, read with their own tokens (user_settings_self RLS). */
-async function googleEvents(db, userId, timeMin, timeMax, query, timeZone) {
+async function googleEvents(db, userId, { timeMin, timeMax, query, timeZone, eventId }) {
   if (!calendarService.isConfigured()) return { state: 'not_configured', events: [] };
   let autoJoinSettings = null;
   try {
@@ -556,9 +560,10 @@ async function googleEvents(db, userId, timeMin, timeMax, query, timeZone) {
     if (!tokens) return { state: 'not_connected', events: [] };
     const settings = autoJoin.normalizeSettings(data.calendar_json.auto_join);
     autoJoinSettings = { enabled: settings.enabled, scope: settings.scope, leadMinutes: settings.lead_minutes };
-    const events = await calendarService.getEvents({
+    const credentials = {
       ...tokens, _onRefresh: (updated) => autoJoin.persistTokens(userId, updated, tokens, db),
-    }, {
+    };
+    const events = eventId ? [await calendarService.getEvent(credentials, eventId)] : await calendarService.getEvents(credentials, {
       timeMin,
       timeMax,
       maxResults: 50,
@@ -567,7 +572,7 @@ async function googleEvents(db, userId, timeMin, timeMax, query, timeZone) {
     return {
       state: 'connected',
       autoJoin: autoJoinSettings,
-      events: (events || []).filter((e) => e.status !== 'cancelled').map((e) => ({
+      events: (events || []).filter((e) => e && e.status !== 'cancelled').map((e) => ({
         title: e.summary,
         eventKey: e.start?.dateTime && Number.isFinite(Date.parse(e.start.dateTime)) ? autoJoin.eventKey(e) : null,
         botBooking: Object.hasOwn(settings.bookings, e.id) ? settings.bookings[e.id].decision : null,

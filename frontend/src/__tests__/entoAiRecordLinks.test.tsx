@@ -1,8 +1,9 @@
 import React from 'react'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
-import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom'
+import { MemoryRouter, Outlet, Routes, Route, useLocation } from 'react-router-dom'
 import { describe, test, expect, vi, beforeEach } from 'vitest'
 import { recordLinkPath } from '../components/EntoAssistant/AnswerRecordLinks'
+import UpcomingMeetings from '../components/meetings/UpcomingMeetings'
 
 // EAI-02c slice 3: record buttons under an answer, ported from Logos AI `AnswerRecordLinks`.
 // The panel cases render the real Entomate panel.
@@ -23,8 +24,15 @@ const api = vi.hoisted(() => ({
   actions: { list: vi.fn(), confirm: vi.fn(), reject: vi.fn(), undo: vi.fn(), edit: vi.fn() },
   plans: { confirm: vi.fn(), reject: vi.fn(), undo: vi.fn() },
   signals: vi.fn(),
+  upcoming: vi.fn(),
 }))
-vi.mock('../services/api', () => ({ entoAiApi: api }))
+vi.mock('../services/api', () => ({
+  entoAiApi: api,
+  calendarApi: { getUpcomingMeetings: api.upcoming },
+  meetingsApi: { carryForwardPreview: vi.fn().mockResolvedValue(null) },
+}))
+vi.mock('../contexts/OrgContext', () => ({ useOrgSafe: () => null }))
+vi.mock('../components/vc/ToastProvider', () => ({ useToast: () => ({ error: vi.fn() }) }))
 
 import EntoAssistant from '../components/EntoAssistant/EntoAssistant'
 
@@ -49,6 +57,11 @@ describe('recordLinkPath', () => {
 
 function Where() {
   return <div data-testid="where">{useLocation().pathname}</div>
+}
+
+function BriefTestShell() {
+  const [open, setOpen] = React.useState(false)
+  return <><Outlet context={{ openAssistant: () => setOpen(true) }} />{open && <EntoAssistant isOpen onClose={() => setOpen(false)} />}</>
 }
 
 describe('record buttons in the panel', () => {
@@ -110,6 +123,29 @@ describe('record buttons in the panel', () => {
     const group = await screen.findByRole('group', { name: 'Records in this answer' })
     fireEvent.click(within(group).getByRole('button', { name: 'Open Website relaunch' }))
     await waitFor(() => expect(screen.getByTestId('where').textContent).toBe(`/projects/${P1}`))
+  })
+
+  test('Upcoming opens Ask Entomate and sends a brief request for the exact event, even without a video link', async () => {
+    api.upcoming.mockResolvedValue({ connected: true, events: [
+      { id: 'first', title: 'Budget review', start: new Date(Date.now() + 86_400_000).toISOString() },
+      { id: 'selected', title: 'Budget review', start: new Date(Date.now() + 2 * 86_400_000).toISOString() },
+    ] })
+    svc.streamQuery.mockImplementation(async (_q: string, _ctx: unknown, cb: { onComplete: (r: unknown) => void }) => {
+      cb.onComplete({ answer: 'Bring the draft from last time.', threadId: T.id, recordLinks: [LINKS[0]] })
+    })
+    render(<MemoryRouter initialEntries={['/meetings?tab=upcoming&event=selected']}>
+      <Routes><Route element={<BriefTestShell />}><Route path="meetings" element={<UpcomingMeetings />} /></Route></Routes>
+    </MemoryRouter>)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Pre-meeting brief' }))
+
+    expect(await screen.findByText('Bring the draft from last time.')).toBeTruthy()
+    expect(svc.streamQuery).toHaveBeenCalledExactlyOnceWith(
+      'Give me a pre-meeting brief for "Budget review".',
+      expect.objectContaining({ calendarEventId: 'selected', section: 'meetings', threadId: null }),
+      expect.anything(),
+    )
+    expect(screen.getByRole('button', { name: 'Open Budget review' })).toBeTruthy()
   })
   const NOTE = /Answered with limited access to your records/
   const answerWith = (extra: Record<string, unknown>) => {
