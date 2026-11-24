@@ -1,0 +1,33 @@
+/* The recorder enters from the drawer edge with just enough travel to place it. */
+.bs-scrim:has(+ .meeting-recorder-drawer) { background: var(--bs-scrim, rgb(8 8 10 / 45%)); }
+
+.bs-drawer.meeting-recorder-drawer {
+  --recorder-offset: translateX(var(--m-slide));
+  opacity: 0;
+  transform: var(--recorder-offset);
+  transition: opacity var(--m-exit) var(--m-ease-exit), transform var(--m-exit) var(--m-ease-exit);
+}
+
+.bs-drawer.meeting-recorder-drawer[data-open="true"] {
+  opacity: 1;
+  transform: translate3d(0, var(--bs-drag, 0px), 0);
+  transition: opacity var(--m-base) var(--m-ease-out), transform var(--m-base) var(--m-ease-out);
+}
+
+@media (max-width: 767.98px) {
+  .bs-drawer.meeting-recorder-drawer { --recorder-offset: translateY(var(--m-slide)); }
+}
+
+.meeting-recorder-body { padding-top: 0.75rem; }
+
+.meeting-recorder-pop {
+  box-sizing: border-box;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: var(--bs-plate, var(--bg-elevated));
+  color: var(--bs-ink, var(--text-primary));
+  font: 1rem/1.45 var(--bs-sans, system-ui);
+}

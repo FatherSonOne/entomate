@@ -25,6 +25,7 @@ import {
   TitleRule, Breadcrumbs, Section, Key, Signal, Display, Tape, Grid, Cell, Tabs, TabPanel, Drawer,
   TextInput, TextArea, Menu, useMediaQuery, PHONE_QUERY,
 } from '../components/bench'
+import { smoothScrollBehavior } from '../components/bench/motion'
 import { asList, meetingDate, meetingLengthMs, formatLength, speechDensity } from '../services/meetingView'
 
 const TABS_ID = 'meeting'
@@ -461,7 +462,7 @@ export default function MeetingDetail() {
   // The bot debrief links "action items" here: they now live in Minutes.
   const openTab = (value) => {
     chooseTab(value === 'actions' ? 'minutes' : value)
-    if (value === 'actions') requestAnimationFrame(() => document.getElementById('meeting-actions')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+    if (value === 'actions') requestAnimationFrame(() => document.getElementById('meeting-actions')?.scrollIntoView({ behavior: smoothScrollBehavior(), block: 'start' }))
   }
 
   // On the Follow-up tab the primary key is Send now, until it has gone out.

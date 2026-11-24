@@ -17,7 +17,7 @@
  * two summaries and every action item twice. You can say it is a different meeting.
  */
 
-import React, { useCallback, useEffect, useId, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, Bot, Camera, Download, ExternalLink, Loader2, Mic, MonitorUp, Pause, Play, Square, Trash2 } from 'lucide-react'
@@ -50,6 +50,9 @@ export interface MeetingRecorderProps {
   audioInputDeviceId?: string
   /** Called once the recording is handed to the server for its transcript. */
   onRecorded?: (meetingId: string) => void
+  /** Locks the containing drawer while capture or audio handoff is in progress. */
+  onCaptureChange?: (active: boolean) => void
+  onOpenMeeting?: () => void
 }
 
 type Phase = 'setup' | 'starting' | 'recording' | 'finishing' | 'done'
@@ -159,7 +162,7 @@ function Preview({ stream }: { stream: MediaStream }): React.ReactElement {
   return <video ref={ref} autoPlay muted playsInline aria-label="Recording preview" className="aspect-video w-full rounded-lg bg-black object-contain" />
 }
 
-export function MeetingRecorder({ audioInputDeviceId, onRecorded }: MeetingRecorderProps): React.ReactElement {
+export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChange, onOpenMeeting }: MeetingRecorderProps): React.ReactElement {
   const navigate = useNavigate()
   // Unique per recorder, so two on one page (or a test harness) never share a radio group.
   const uid = useId()
@@ -185,6 +188,28 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded }: MeetingRecor
   const [paused, setPaused] = useState(false)
   // A small always-on-top window with the controls, for while you are in the call's tab.
   const [pop, setPop] = useState<{ win: Window; root: HTMLElement } | null>(null)
+  const heading = useRef<HTMLHeadingElement | null>(null)
+  const liveStatus = useRef<HTMLSpanElement | null>(null)
+  const savedStatus = useRef<HTMLParagraphElement | null>(null)
+  const previousPhase = useRef(phase)
+  const captureActive = phase === 'starting' || phase === 'recording' || phase === 'finishing'
+
+  useLayoutEffect(() => {
+    onCaptureChange?.(captureActive)
+  }, [captureActive, onCaptureChange])
+
+  useEffect(() => {
+    if (previousPhase.current === phase) return
+    previousPhase.current = phase
+    if (phase === 'starting' || phase === 'setup') heading.current?.focus({ preventScroll: true })
+    if (phase === 'recording') liveStatus.current?.focus({ preventScroll: true })
+    if (phase === 'done') savedStatus.current?.focus({ preventScroll: true })
+  }, [phase])
+
+  const openMeeting = (id: string): void => {
+    onOpenMeeting?.()
+    navigate(`/meetings/${id}`)
+  }
 
   const capture = useRef<Capture | null>(null)
   const uploader = useRef<PieceUploader | null>(null)
@@ -421,8 +446,8 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded }: MeetingRecor
     try {
       const pip = (window as unknown as { documentPictureInPicture?: { requestWindow: (o: { width: number; height: number }) => Promise<Window> } })
         .documentPictureInPicture
-      const height = capture.current?.preview ? 520 : 340
-      const win = canPip() && pip ? await pip.requestWindow({ width: 360, height }) : window.open('', 'entomate-recorder', `popup,width=380,height=${height + 40}`)
+      const height = capture.current?.preview ? 420 : 230
+      const win = canPip() && pip ? await pip.requestWindow({ width: 360, height }) : window.open('', 'entomate-recorder', `popup,width=360,height=${height}`)
       if (!win) {
         setError('Your browser blocked the pop-out. Allow pop-ups for Entomate.')
         return
@@ -500,11 +525,13 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded }: MeetingRecor
   const c = capture.current
   const waiting = upload.recorded - upload.sent
   const locked = phase !== 'setup'
+  const showSetup = phase === 'setup' || phase === 'starting'
+  const status = phase === 'finishing' ? (error ? 'Audio needs attention' : 'Sending the last of the audio') : paused ? 'Paused' : 'Recording'
 
   return (
     <section aria-labelledby={`${uid}-heading`} className="space-y-4 rounded-xl border border-line bg-surface-elevated p-4">
-      <h3 id={`${uid}-heading`} className="text-base font-semibold text-content-primary">
-        Record a meeting
+      <h3 ref={heading} id={`${uid}-heading`} tabIndex={-1} className="text-base font-semibold text-content-primary">
+        {showSetup ? 'Record in this browser' : title.trim() || 'Meeting recording'}
       </h3>
 
       {error && (
@@ -515,13 +542,13 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded }: MeetingRecor
 
       {phase === 'done' && meetingId ? (
         <div className="space-y-3" aria-live="polite">
-          <p className="text-sm text-content-primary">
+          <p ref={savedStatus} tabIndex={-1} className="text-sm text-content-primary">
             {handedToBot
               ? 'Recording saved with the bot’s meeting. The bot writes the minutes; your recording is kept as a backup and is written up on its own if the bot cannot finish.'
               : 'Recording saved. The transcript, speakers, summary and action items are being written now. This takes about a minute for every ten minutes recorded.'}
           </p>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className={PRIMARY} onClick={() => navigate(`/meetings/${meetingId}`)}>
+            <button type="button" className={PRIMARY} onClick={() => openMeeting(meetingId)}>
               Open the meeting
             </button>
             {videoUrl && (
@@ -535,9 +562,9 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded }: MeetingRecor
           </div>
           {videoUrl && <p className="text-xs text-content-secondary">The video stays on this device. Download it before leaving this page.</p>}
         </div>
-      ) : (
+      ) : showSetup ? (
         <>
-          {bot && (phase === 'setup' || phase === 'starting') && (
+          {bot && (
             <fieldset data-testid="recorder-bot" className="space-y-2 rounded-lg border border-line p-3" disabled={locked}>
               <legend className="flex items-center gap-2 px-1 text-sm font-medium text-content-primary">
                 <Bot className="h-4 w-4 text-accent-primary" aria-hidden="true" />
@@ -558,7 +585,7 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded }: MeetingRecor
                 <input type="radio" name={`${uid}-bot`} checked={!sameAsBot} onChange={() => setSameAsBot(false)} className="mt-0.5 h-4 w-4 accent-accent-primary" />
                 <span>A different meeting</span>
               </label>
-              <button type="button" className="text-xs font-medium text-accent-primary underline-offset-2 hover:underline" onClick={() => navigate(`/meetings/${bot.meetingId}`)}>
+              <button type="button" className="text-xs font-medium text-accent-primary underline-offset-2 hover:underline" onClick={() => openMeeting(bot.meetingId)}>
                 Open the bot&apos;s meeting
               </button>
             </fieldset>
@@ -620,7 +647,7 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded }: MeetingRecor
               <input
                 id={`${uid}-attendees`}
                 type="text"
-                placeholder="Names or emails, separated by commas"
+                placeholder="Comma-separated names or emails"
                 value={attendees}
                 onChange={(e) => setAttendees(e.target.value)}
                 disabled={locked}
@@ -629,133 +656,127 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded }: MeetingRecor
             </div>
           </div>
 
-          {phase === 'setup' || phase === 'starting' ? (
-            <>
-              <label className="flex items-start gap-2 text-sm text-content-primary">
-                <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} disabled={locked} className="mt-0.5 h-4 w-4 accent-accent-primary" />
-                Everyone in this meeting knows it is being recorded and has agreed.
-              </label>
-              <button type="button" className={`${PRIMARY} w-full`} onClick={() => void start()} disabled={!consent || phase === 'starting'}>
-                {phase === 'starting' ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Mic className="h-4 w-4" aria-hidden="true" />}
-                {phase === 'starting' ? 'Starting' : 'Start recording'}
-              </button>
-            </>
-          ) : (
-            <div className="space-y-3 rounded-lg border border-line-subtle p-3">
-              {c?.preview && phase === 'recording' && <Preview stream={c.preview} />}
-              <div className="flex items-center justify-between gap-3">
-                <span className="flex items-center gap-2 text-sm font-medium text-content-primary">
-                  {phase === 'recording' && !paused && <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-accent-primary" aria-hidden="true" />}
-                  {phase === 'recording' ? (paused ? 'Paused' : 'Recording') : 'Sending the last of the audio'}
-                </span>
-                <span className="font-mono text-2xl tabular-nums text-content-primary" aria-label={`Recorded ${formatClock(elapsedMs)}`}>
-                  {formatClock(elapsedMs)}
-                </span>
-              </div>
-              {c && phase === 'recording' && (
-                <LevelMeter context={c.audioContext} stream={c.audioRecorder.stream} />
-              )}
-              {c && phase === 'recording' && !paused && <SilenceAlert context={c.audioContext} stream={c.audioRecorder.stream} mode={mode} />}
-              {c && phase === 'recording' && !paused && captions && (
-                <LiveCaptions
-                  track={c.audioRecorder.stream.getAudioTracks()[0] ?? null}
-                  startedAt={startedAt.current}
-                  onClose={() => setCaptions(false)}
-                />
-              )}
-              <p className="text-xs text-content-secondary" aria-live="polite">
-                {upload.failed
-                  ? upload.failed
-                  : paused
-                    ? 'Paused. Nothing is recorded until you resume.'
-                    : upload.retrying
-                    ? 'Connection lost. The audio is kept here and will be sent when it is back.'
-                    : waiting > 1
-                      ? `${waiting} pieces waiting to be sent.`
-                      : upload.sent > 0
-                        ? `Saved to Entomate up to ${formatClock(upload.sent * PIECE_MS)}.`
-                        : 'Audio is saved to Entomate every 30 seconds.'}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {phase === 'recording' ? (
-                  <>
-                    <button type="button" className={`${PRIMARY} flex-1`} onClick={() => void stop()}>
-                      <Square className="h-4 w-4" aria-hidden="true" /> Stop recording
-                    </button>
-                    <button type="button" className={SECONDARY} onClick={togglePause} aria-pressed={paused}>
-                      {paused ? <Play className="h-4 w-4" aria-hidden="true" /> : <Pause className="h-4 w-4" aria-hidden="true" />}
-                      {paused ? 'Resume' : 'Pause'}
-                    </button>
-                    {/* Desktop only: phones have no second window. */}
-                    {tabSupported && (
-                      <button type="button" className={SECONDARY} onClick={() => void openPop()} aria-pressed={Boolean(pop)}>
-                        <ExternalLink className="h-4 w-4" aria-hidden="true" /> {pop ? 'Popped out' : 'Pop out'}
-                      </button>
-                    )}
-                  </>
-                ) : error ? (
-                  <button type="button" className={`${PRIMARY} flex-1`} onClick={() => void sendAll()}>
-                    Try sending again
-                  </button>
-                ) : (
-                  <span className="flex flex-1 items-center gap-2 text-sm text-content-secondary">
-                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Finishing
-                  </span>
-                )}
-                {(phase === 'recording' || error) && (
-                  <button
-                    type="button"
-                    className={SECONDARY}
-                    onClick={() => {
-                      if (window.confirm('Discard this recording? The audio will be deleted.')) {
-                        void (async () => {
-                          const c2 = capture.current
-                          if (c2) {
-                            stopping.current = true
-                            await Promise.all([stopRecorder(c2.audioRecorder), stopRecorder(c2.videoRecorder)])
-                            releaseDevices()
-                          }
-                          await discard()
-                        })()
-                      }
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" aria-hidden="true" /> Discard
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
+          <label className="flex items-start gap-2 text-sm text-content-primary">
+            <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} disabled={locked} className="mt-0.5 h-4 w-4 accent-accent-primary" />
+            Everyone in this meeting knows it is being recorded and has agreed.
+          </label>
+          <button type="button" className={`${PRIMARY} w-full`} onClick={() => void start()} disabled={!consent || phase === 'starting'}>
+            {phase === 'starting' ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Mic className="h-4 w-4" aria-hidden="true" />}
+            {phase === 'starting' ? 'Starting' : 'Start recording'}
+          </button>
         </>
+      ) : (
+        <div className="m-enter space-y-3">
+          {c?.preview && phase === 'recording' && <Preview stream={c.preview} />}
+          <div className="flex items-center justify-between gap-3">
+            <span ref={liveStatus} tabIndex={-1} role="status" className="flex items-center gap-2 text-sm font-medium text-content-primary">
+              {phase === 'recording' && !paused && <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-accent-primary" aria-hidden="true" />}
+              {status}
+            </span>
+            <span className="font-mono text-2xl tabular-nums text-content-primary" aria-label={`Recorded ${formatClock(elapsedMs)}`}>
+              {formatClock(elapsedMs)}
+            </span>
+          </div>
+          {c && phase === 'recording' && !paused && (
+            <LevelMeter context={c.audioContext} stream={c.audioRecorder.stream} />
+          )}
+          {c && phase === 'recording' && !paused && <SilenceAlert context={c.audioContext} stream={c.audioRecorder.stream} mode={mode} />}
+          {c && phase === 'recording' && !paused && captions && (
+            <LiveCaptions
+              track={c.audioRecorder.stream.getAudioTracks()[0] ?? null}
+              startedAt={startedAt.current}
+              onClose={() => setCaptions(false)}
+            />
+          )}
+          <p className="text-xs text-content-secondary" aria-live="polite">
+            {upload.failed
+              ? upload.failed
+              : paused
+                ? 'Paused. Nothing is recorded until you resume.'
+                : upload.retrying
+                ? 'Connection lost. The audio is kept here and will be sent when it is back.'
+                : waiting > 1
+                  ? `${waiting} pieces waiting to be sent.`
+                  : upload.sent > 0
+                    ? `Saved to Entomate up to ${formatClock(upload.sent * PIECE_MS)}.`
+                    : 'Audio is saved to Entomate every 30 seconds.'}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {phase === 'recording' ? (
+              <>
+                <button type="button" className={`${PRIMARY} flex-1`} onClick={() => void stop()}>
+                  <Square className="h-4 w-4" aria-hidden="true" /> Stop recording
+                </button>
+                <button type="button" className={SECONDARY} onClick={togglePause} aria-pressed={paused}>
+                  {paused ? <Play className="h-4 w-4" aria-hidden="true" /> : <Pause className="h-4 w-4" aria-hidden="true" />}
+                  {paused ? 'Resume' : 'Pause'}
+                </button>
+                {/* Desktop only: phones have no second window. */}
+                {tabSupported && (
+                  <button type="button" className={SECONDARY} onClick={() => void openPop()}>
+                    <ExternalLink className="h-4 w-4" aria-hidden="true" /> {pop ? 'Focus pop-out' : 'Pop out'}
+                  </button>
+                )}
+              </>
+            ) : error ? (
+              <button type="button" className={`${PRIMARY} flex-1`} onClick={() => void sendAll()}>
+                Try sending again
+              </button>
+            ) : (
+              <span className="flex flex-1 items-center gap-2 text-sm text-content-secondary">
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Finishing
+              </span>
+            )}
+            {(phase === 'recording' || error) && (
+              <button
+                type="button"
+                className={SECONDARY}
+                onClick={() => {
+                  if (window.confirm('Discard this recording? The audio will be deleted.')) {
+                    void (async () => {
+                      const c2 = capture.current
+                      if (c2) {
+                        stopping.current = true
+                        await Promise.all([stopRecorder(c2.audioRecorder), stopRecorder(c2.videoRecorder)])
+                        releaseDevices()
+                      }
+                      await discard()
+                    })()
+                  }
+                }}
+              >
+                <Trash2 className="h-4 w-4" aria-hidden="true" /> Discard
+              </button>
+            )}
+          </div>
+        </div>
       )}
       {pop &&
         (phase === 'recording' || phase === 'finishing') &&
         createPortal(
-          <div className="bs-bot-pop bs-skin space-y-3 text-content-primary" data-testid="recorder-pop">
+          <section className="meeting-recorder-pop bs-skin m-enter" aria-label="Meeting recording" data-testid="recorder-pop">
             <div className="flex items-center justify-between gap-3">
-              <span className="flex items-center gap-2 text-sm font-medium">
-                {phase === 'recording' && !paused && <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-accent-primary" aria-hidden="true" />}
-                {phase === 'recording' ? (paused ? 'Paused' : 'Recording') : 'Sending the last of the audio'}
+              <span role="status" className="flex items-center gap-2 text-sm font-semibold">
+                {phase === 'recording' && !paused && <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-accent-primary" aria-hidden="true" />}
+                {status}
               </span>
-              <span className="font-mono text-2xl tabular-nums">{formatClock(elapsedMs)}</span>
+              <span className="font-mono text-2xl tabular-nums" aria-label={`Recorded ${formatClock(elapsedMs)}`}>{formatClock(elapsedMs)}</span>
             </div>
             {c?.preview && phase === 'recording' && <Preview stream={c.preview} />}
-            {c && phase === 'recording' && <LevelMeter context={c.audioContext} stream={c.audioRecorder.stream} />}
+            {c && phase === 'recording' && !paused && <LevelMeter context={c.audioContext} stream={c.audioRecorder.stream} />}
             {c && phase === 'recording' && !paused && <SilenceAlert context={c.audioContext} stream={c.audioRecorder.stream} mode={mode} />}
-            <p className="text-xs text-content-secondary">
-              {upload.failed ??
-                (paused
-                  ? 'Paused. Nothing is recorded until you resume.'
-                  : upload.retrying
-                    ? 'Connection lost. The audio is kept and sent when it is back.'
-                    : upload.sent > 0
-                      ? `Saved up to ${formatClock(upload.sent * PIECE_MS)}.`
+            {phase === 'finishing' && error ? <p role="alert" className="text-sm text-semantic-error">{error}</p> : (
+              <p className="text-xs text-content-secondary" aria-live="polite">
+                {upload.failed ?? (paused ? 'Nothing is recorded until you resume.'
+                  : upload.retrying ? 'Connection lost. The audio is kept and sent when it is back.'
+                    : upload.sent > 0 ? `Saved up to ${formatClock(upload.sent * PIECE_MS)}.`
                       : 'Audio is saved every 30 seconds.')}
-            </p>
+              </p>
+            )}
             {phase === 'recording' && (
               <div className="flex flex-wrap gap-2">
                 <button type="button" className={`${PRIMARY} flex-1`} onClick={() => void stop()}>
-                  <Square className="h-4 w-4" aria-hidden="true" /> Stop
+                  <Square className="h-4 w-4" aria-hidden="true" /> Stop recording
                 </button>
                 <button type="button" className={`${SECONDARY} flex-1`} onClick={togglePause}>
                   {paused ? <Play className="h-4 w-4" aria-hidden="true" /> : <Pause className="h-4 w-4" aria-hidden="true" />}
@@ -763,7 +784,10 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded }: MeetingRecor
                 </button>
               </div>
             )}
-          </div>,
+            {phase === 'finishing' && error && (
+              <button type="button" className={PRIMARY} onClick={() => void sendAll()}>Try sending again</button>
+            )}
+          </section>,
           pop.root,
         )}
     </section>

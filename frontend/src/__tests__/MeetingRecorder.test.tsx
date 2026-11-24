@@ -194,6 +194,24 @@ describe('MeetingRecorder', () => {
     expect(start).toBeEnabled()
   })
 
+  test('the drawer can only dismiss once the recording is handed over', async () => {
+    const onCaptureChange = vi.fn()
+    render(<MemoryRouter><MeetingRecorder onCaptureChange={onCaptureChange} /></MemoryRouter>)
+    expect(onCaptureChange).toHaveBeenLastCalledWith(false)
+
+    fireEvent.click(screen.getByRole('checkbox', { name: /knows it is being recorded/i }))
+    fireEvent.click(screen.getByRole('button', { name: /start recording/i }))
+    expect(onCaptureChange).toHaveBeenLastCalledWith(true)
+    const stop = await screen.findByRole('button', { name: /stop recording/i })
+    expect(onCaptureChange).toHaveBeenLastCalledWith(true)
+    expect(screen.queryByText(/what to record/i)).not.toBeInTheDocument()
+
+    fireEvent.click(stop)
+    expect(onCaptureChange).toHaveBeenLastCalledWith(true)
+    await screen.findByRole('button', { name: /open the meeting/i })
+    expect(onCaptureChange).toHaveBeenLastCalledWith(false)
+  })
+
   test('records the microphone in pieces and hands the recording over', async () => {
     const onRecorded = renderRecorder()
     fireEvent.change(screen.getByLabelText(/title/i), { target: { value: 'Standup' } })
@@ -266,7 +284,7 @@ describe('MeetingRecorder', () => {
     expect(recorders[0]!.state).toBe('paused')
     expect(screen.getByRole('button', { name: /resume/i })).toBeInTheDocument()
 
-    act(() => popButton('Stop').click())
+    act(() => popButton('Stop recording').click())
     await screen.findByRole('button', { name: /open the meeting/i })
     expect(popWin.close).toHaveBeenCalled()
     open.mockRestore()
@@ -303,7 +321,7 @@ describe('MeetingRecorder', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /pop out/i }))
     await waitFor(() => expect(popDoc.querySelector('[data-testid="recorder-pop"]')).not.toBeNull())
-    expect(open).toHaveBeenCalledWith('', 'entomate-recorder', expect.stringContaining('height=560'))
+    expect(open).toHaveBeenCalledWith('', 'entomate-recorder', expect.stringContaining('height=420'))
     expect(popDoc.querySelector('video[aria-label="Recording preview"]')).not.toBeNull()
     expect(popDoc.querySelector('canvas')).not.toBeNull()
     open.mockRestore()

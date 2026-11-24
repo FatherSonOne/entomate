@@ -11,6 +11,7 @@ import {
   Type, Calendar, List, Braces, Filter, Zap, Lock, Globe,
   ArrowRight, Layers, Search
 } from 'lucide-react'
+import { smoothScrollBehavior } from '../bench/motion'
 
 // Category configuration with icons and colors
 const CATEGORIES = {
@@ -260,7 +261,7 @@ export default function ExpressionAutocomplete({
     if (selectedRef.current) {
       selectedRef.current.scrollIntoView({
         block: 'nearest',
-        behavior: 'smooth'
+        behavior: smoothScrollBehavior(),
       })
     }
   }, [selectedIndex])

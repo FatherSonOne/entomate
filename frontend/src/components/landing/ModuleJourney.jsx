@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { MODULES, STATUS, MEDIA } from './landingData'
+import { smoothScrollBehavior } from '../bench/motion'
 
 const PHONE_MAX = 760
 const PIN_MIN_HEIGHT = 640
@@ -85,9 +86,9 @@ export default function ModuleJourney({ reducedMotion }) {
     const total = rect.height - window.innerHeight
     window.scrollTo({
       top: window.scrollY + rect.top + ((i + 0.5) / MODULES.length) * total,
-      behavior: reducedMotion ? 'auto' : 'smooth',
+      behavior: smoothScrollBehavior(),
     })
-  }, [reducedMotion])
+  }, [])
 
   const onRailKey = useCallback((e) => {
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return

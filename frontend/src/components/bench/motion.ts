@@ -27,6 +27,11 @@ export function prefersReducedMotion(): boolean {
   return window.matchMedia?.(REDUCE_QUERY).matches ?? false
 }
 
+/** Read both preferences at scroll time, including for nested scroll containers. */
+export function smoothScrollBehavior(): ScrollBehavior {
+  return prefersReducedMotion() ? 'instant' : 'smooth'
+}
+
 /** Apply the in-app Reduce motion setting (Settings > Appearance) and remember it for the next boot. */
 export function applyReduceMotion(on: boolean): void {
   if (typeof document === 'undefined') return
@@ -85,23 +90,18 @@ export function usePresence(open: boolean, exitMs: number = MOTION.exit): { moun
  * motion (fade only). Runs on the compositor through the Web Animations API.
  */
 export function useEnterOnChange(ref: RefObject<HTMLElement | null>, key: unknown, opts: { rise?: number; duration?: number } = {}): void {
-  const first = useRef(true)
+  const previousKey = useRef(key)
   const { rise = 6, duration = MOTION.base } = opts
   useLayoutEffect(() => {
-    if (first.current) {
-      first.current = false
-      return
-    }
+    if (Object.is(previousKey.current, key)) return
+    previousKey.current = key
     const el = ref.current
     if (!el || typeof el.animate !== 'function') return
     const travel = prefersReducedMotion() ? 0 : rise
-    const anim = el.animate(
-      [
-        { opacity: 0, transform: `translate3d(0, ${travel}px, 0)` },
-        { opacity: 1, transform: 'translate3d(0, 0, 0)' },
-      ],
-      { duration, easing: MOTION.easeOut },
-    )
+    const frames = travel
+      ? [{ opacity: 0, transform: `translateY(${travel}px)` }, { opacity: 1, transform: 'none' }]
+      : [{ opacity: 0 }, { opacity: 1 }]
+    const anim = el.animate(frames, { duration, easing: MOTION.easeOut })
     return () => anim.cancel()
-  }, [key]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [key, ref, rise, duration])
 }

@@ -1,16 +1,16 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
 import { Search, Loader2 } from 'lucide-react'
 import { ExternalLinkIcon } from '../components/icons/ExternalLinkIcon'
-import MeetingRecorder from '../components/meetings/MeetingRecorder'
 import InlineRename from '../components/meetings/InlineRename'
 import MeetingPreview from '../components/meetings/MeetingPreview'
 import { useAuth } from '../contexts/AuthContext'
-import { meetingsApi, settingsApi } from '../services/api'
+import { meetingsApi } from '../services/api'
 import { useToast } from '../components/vc/ToastProvider'
 import {
-  TitleRule, Section, Key, Switch, Signal, RuledTable, DateStamp, TextInput, Menu,
+  TitleRule, Key, Switch, Signal, RuledTable, DateStamp, TextInput, Menu,
 } from '../components/bench'
+import { MOTION, useEnterOnChange } from '../components/bench/motion'
 import {
   actionCounts, attendeeLine, firstDecision, formatLength, groupByTime, matchesFilter,
   meetingDate, meetingLengthMs, meetingStatus, plural, isAutoTitle } from '../services/meetingView'
@@ -46,6 +46,7 @@ const isThisWeek = (d) => {
 export default function Meetings() {
   const toast = useToast()
   const navigate = useNavigate()
+  const { openRecorder, recordingVersion } = useOutletContext()
   const { user } = useAuth()
   // The meeting whose preview has slid out beside the list.
   const [previewId, setPreviewId] = useState(null)
@@ -59,6 +60,8 @@ export default function Meetings() {
   const [searchQuery, setSearchQuery] = useState('')
   const [filter, setFilter] = useState('all')
   const tab = searchParams.get('tab') === 'upcoming' ? 'upcoming' : 'past'
+  const viewRef = useRef(null)
+  useEnterOnChange(viewRef, tab, { rise: 0, duration: MOTION.fast })
   const setTab = (v) => {
     const next = new URLSearchParams(searchParams)
     if (v === 'upcoming') next.set('tab', 'upcoming')
@@ -71,39 +74,12 @@ export default function Meetings() {
       <Switch label="Past or upcoming meetings" options={TABS} value={tab} onChange={setTab} />
     </div>
   )
-  const [showRecorder, setShowRecorder] = useState(searchParams.get('new') === 'true')
-  const [audioInputDeviceId, setAudioInputDeviceId] = useState('')
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState(new Set())
   // Deletes wait UNDO_MS before reaching the server: { rows, timer, toastId }
   const pendingDelete = useRef(null)
 
   const searchTimer = useRef(null)
-  const recorderRef = useRef(null)
-
-  useEffect(() => {
-    // Load user's preferred audio device
-    settingsApi.getUser().then(res => {
-      const deviceId = res?.settings?.meetings_json?.audioInputDeviceId
-      if (deviceId) setAudioInputDeviceId(deviceId)
-    }).catch(() => {})
-  }, [])
-
-  // The rail's record key (and the phone dock) land here with ?new=true.
-  useEffect(() => {
-    if (searchParams.get('new') !== 'true') return
-    setShowRecorder(true)
-    const next = new URLSearchParams(searchParams)
-    next.delete('new')
-    setSearchParams(next, { replace: true })
-    // Bring the recorder into view and move focus to it, so the next step
-    // (choose what to record, confirm consent, Start recording) is where the user is.
-    requestAnimationFrame(() => {
-      recorderRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      recorderRef.current?.focus({ preventScroll: true })
-    })
-  }, [searchParams, setSearchParams])
-
   // Debounced server-side search (also the first load)
   useEffect(() => {
     if (searchTimer.current) clearTimeout(searchTimer.current)
@@ -111,7 +87,7 @@ export default function Meetings() {
       loadMeetings(searchQuery)
     }, searchQuery ? 300 : 0)
     return () => clearTimeout(searchTimer.current)
-  }, [searchQuery, filter])
+  }, [searchQuery, filter, recordingVersion])
 
   const loadMeetings = async (search = '') => {
     try {
@@ -152,10 +128,6 @@ export default function Meetings() {
     } finally {
       setLoadingMore(false)
     }
-  }
-
-  const handleMeetingProcessed = () => {
-    loadMeetings(searchQuery)
   }
 
   // Send a pending delete to the server now. Failed rows come back with their titles named.
@@ -449,46 +421,14 @@ export default function Meetings() {
       {tabSwitch}
       <div className="bs-title-keys">
         {meetings.length > 0 && <Key onClick={startSelectionMode}>Select</Key>}
-        {/* Sending the bot is the main way in; while the recorder is open its Start key is the one primary key. */}
-        <SendBotKey variant={showRecorder ? 'plain' : 'primary'} />
-        <Key onClick={() => setShowRecorder(v => !v)} aria-expanded={showRecorder}>
-          {showRecorder ? 'Close recorder' : 'Record'}
-        </Key>
+        <SendBotKey variant="primary" />
+        <Key onClick={openRecorder} aria-haspopup="dialog">Record</Key>
       </div>
     </>
   )
 
-  if (tab === 'upcoming') {
-    return (
-      <div className="bs-mtg">
-        <TitleRule
-          title="Meetings"
-          meta={<><b>Upcoming</b> · from your calendar</>}
-          actions={<>{tabSwitch}<div className="bs-title-keys"><SendBotKey variant="primary" /></div></>}
-        />
-        <UpcomingMeetings />
-      </div>
-    )
-  }
-
-  return (
-    <div className="bs-mtg">
-      <TitleRule
-        title="Meetings"
-        meta={<><b>{total} meetings</b> · {week.length} this week · {formatLength(weekMs)} recorded</>}
-        actions={actions}
-      />
-
-      {showRecorder && (
-        // The panel stays open after recording: it offers the video download and a link to the meeting.
-        <section ref={recorderRef} tabIndex={-1} className="bs-mtg-recorder" aria-label="New meeting">
-          <Section title="New meeting" level={3} aside={<Signal tone="off">In this browser · no bot</Signal>} />
-          <div className="bs-skin">
-            <MeetingRecorder onRecorded={handleMeetingProcessed} audioInputDeviceId={audioInputDeviceId} />
-          </div>
-        </section>
-      )}
-
+  const pastContent = (
+    <>
       <div className="bs-mtg-search">
         <TextInput
           type="search"
@@ -526,7 +466,7 @@ export default function Meetings() {
             {!searchQuery && filter === 'all' && (
               <div className="bs-title-keys">
                 <SendBotKey />
-                <Key onClick={() => setShowRecorder(true)}>Record now</Key>
+                <Key onClick={openRecorder} aria-haspopup="dialog">Record now</Key>
               </div>
             )}
           </div>
@@ -553,6 +493,18 @@ export default function Meetings() {
         )}
       </div>
       <MeetingPreview meeting={previewRow} onClose={() => setPreviewId(null)} myEmail={user?.email} />
+    </>
+  )
+
+  const upcoming = tab === 'upcoming'
+  return (
+    <div className="bs-mtg">
+      <TitleRule
+        title="Meetings"
+        meta={upcoming ? <><b>Upcoming</b> · from your calendar</> : <><b>{total} meetings</b> · {week.length} this week · {formatLength(weekMs)} recorded</>}
+        actions={upcoming ? <>{tabSwitch}<div className="bs-title-keys"><SendBotKey variant="primary" /></div></> : actions}
+      />
+      <div ref={viewRef} className="bs-mtg-view">{upcoming ? <UpcomingMeetings /> : pastContent}</div>
     </div>
   )
 }

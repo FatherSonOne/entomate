@@ -187,10 +187,6 @@
    ============================================ */
 
 @layer base {
-  html {
-    @apply scroll-smooth;
-  }
-
   body {
     background-color: var(--bg-base);
     color: var(--text-primary);

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useId, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Key } from './Key'
 import { PHONE_QUERY, useMediaQuery } from './useMediaQuery'
@@ -12,7 +12,7 @@ const FLICK_VELOCITY = 0.11
 /** Dragging up past the top meets friction instead of a wall. */
 const OVERDRAG_DAMPING = 0.2
 
-const FOCUSABLE = 'a[href], button:not([disabled]):not(.bs-drawer-grip), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+const FOCUSABLE = 'a[href], button:not(:disabled):not(.bs-drawer-grip), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
 
 export interface DrawerProps {
   open: boolean
@@ -24,6 +24,8 @@ export interface DrawerProps {
   footer?: React.ReactNode
   /** Hide the Esc hint on the close key (e.g. on phone-only sheets). */
   hideEscHint?: boolean
+  /** Keep the drawer open while its task cannot safely be interrupted. */
+  dismissible?: boolean
   /**
    * false: a side panel that leaves the page usable (no scrim, no scroll lock,
    * no focus trap, focus stays where it was). Esc still closes it. Desktop
@@ -46,7 +48,7 @@ let scrollLocks = 0
  * in and returns on close. On phone, drag the grip down past 90px (or flick
  * it) to close; dragging up meets friction.
  */
-export function Drawer({ open, onClose, label, children, footer, hideEscHint = false, modal: modalProp = true, className, layer = 'base' }: DrawerProps): React.ReactPortal | null {
+export function Drawer({ open, onClose, label, children, footer, hideEscHint = false, dismissible = true, modal: modalProp = true, className, layer = 'base' }: DrawerProps): React.ReactPortal | null {
   const isPhone = useMediaQuery(PHONE_QUERY)
   const modal = modalProp || isPhone
   const [mounted, setMounted] = useState<boolean>(open)
@@ -57,6 +59,9 @@ export function Drawer({ open, onClose, label, children, footer, hideEscHint = f
   const dragStartRef = useRef<number | null>(null)
   const dragStartTimeRef = useRef<number>(0)
   const labelId = useId()
+  const dismiss = useCallback(() => {
+    if (dismissible) onClose()
+  }, [dismissible, onClose])
 
   // Mount, then flip to "shown" on the next frames so the spring runs.
   useEffect(() => {
@@ -77,6 +82,10 @@ export function Drawer({ open, onClose, label, children, footer, hideEscHint = f
     return () => window.clearTimeout(t)
   }, [open])
 
+  useLayoutEffect(() => {
+    panelRef.current?.toggleAttribute('inert', !open)
+  }, [open, mounted])
+
   // Focus in on open, back to the opener on close. Lock page scroll.
   useEffect(() => {
     if (!mounted || !modal) return
@@ -96,38 +105,42 @@ export function Drawer({ open, onClose, label, children, footer, hideEscHint = f
   // Side panel: Esc closes it from anywhere on the page.
   useEffect(() => {
     if (!open || modal) return
-    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') onClose() }
+    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') dismiss() }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [open, modal, onClose])
+  }, [open, modal, dismiss])
 
   const onKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Escape') {
       e.stopPropagation()
-      onClose()
+      dismiss()
       return
     }
     if (e.key !== 'Tab' || !modal || !panelRef.current) return
     const items = Array.from(panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE))
-    if (items.length === 0) return
     const firstEl = items[0]
     const lastEl = items[items.length - 1]
-    if (!firstEl || !lastEl) return
-    if (e.shiftKey && document.activeElement === firstEl) {
+    if (!firstEl || !lastEl) {
+      e.preventDefault()
+      return
+    }
+    const active = document.activeElement
+    // A status heading can receive focus programmatically before the first key.
+    if (e.shiftKey && (active === firstEl || (active && active.compareDocumentPosition(firstEl) & Node.DOCUMENT_POSITION_FOLLOWING))) {
       e.preventDefault()
       lastEl.focus()
     } else if (!e.shiftKey && document.activeElement === lastEl) {
       e.preventDefault()
       firstEl.focus()
     }
-  }, [onClose, modal])
+  }, [dismiss, modal])
 
   // Phone: drag the grip or head down to dismiss.
   const setDrag = (px: number): void => {
     panelRef.current?.style.setProperty('--bs-drag', `${px}px`)
   }
   const onPointerDown = (e: React.PointerEvent<HTMLElement>): void => {
-    if (!isPhone) return
+    if (!isPhone || !dismissible) return
     if ((e.target as HTMLElement).closest('button:not(.bs-drawer-grip)')) return
     dragStartRef.current = e.clientY
     dragStartTimeRef.current = performance.now()
@@ -145,7 +158,7 @@ export function Drawer({ open, onClose, label, children, footer, hideEscHint = f
     dragStartRef.current = null
     setDragging(false)
     const velocity = dy / Math.max(1, performance.now() - dragStartTimeRef.current)
-    if (dy > DISMISS_PX || (dy > 8 && velocity > FLICK_VELOCITY)) onClose()
+    if (dy > DISMISS_PX || (dy > 8 && velocity > FLICK_VELOCITY)) dismiss()
     // Let the spring carry it home (or the snap carry it away).
     requestAnimationFrame(() => setDrag(0))
   }
@@ -161,7 +174,7 @@ export function Drawer({ open, onClose, label, children, footer, hideEscHint = f
 
   return createPortal(
     <>
-      {modal && <div className="bs-scrim" data-open={shown} data-layer={layer === 'top' ? 'top' : undefined} onClick={onClose} aria-hidden="true" />}
+      {modal && <div className="bs-scrim" data-open={shown} data-layer={layer === 'top' ? 'top' : undefined} onClick={dismiss} aria-hidden="true" />}
       <div
         ref={panelRef}
         className={className ? `bs-drawer ${className}` : 'bs-drawer'}
@@ -175,10 +188,10 @@ export function Drawer({ open, onClose, label, children, footer, hideEscHint = f
         data-dragging={dragging || undefined}
         onKeyDown={onKeyDown}
       >
-        <button type="button" className="bs-drawer-grip" aria-label="Drag down to close" tabIndex={-1} {...dragHandlers} />
+        <button type="button" className="bs-drawer-grip" aria-label="Drag down to close" tabIndex={-1} disabled={!dismissible} {...dragHandlers} />
         <div className="bs-drawer-head" {...dragHandlers}>
           <span className="bs-lbl" id={labelId}>{label}</span>
-          <Key size="sm" onClick={onClose} kbd={hideEscHint || isPhone ? undefined : 'Esc'}>Close</Key>
+          <Key size="sm" onClick={dismiss} disabled={!dismissible} kbd={hideEscHint || isPhone || !dismissible ? undefined : 'Esc'}>Close</Key>
         </div>
         <div className="bs-drawer-body">{children}</div>
         {footer && <div className="bs-drawer-foot">{footer}</div>}
