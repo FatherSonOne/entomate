@@ -1,4 +1,4 @@
-# Meeting follow-up loader - FU-01 / FU-02 / FU-03
+# Meeting follow-up loader - FU-01 / FU-02 / FU-03 / FU-04
 
 ## Problem and confirmed cause
 
@@ -60,8 +60,22 @@ Validation:
 - Browser acceptance: `F:/entomate-command-deps/verify-fu03.cjs` injects delayed successes/failures into the deployed app and navigates between meeting routes without reloading. The second meeting and its draft are browser-local fixtures, avoiding any server-side draft creation. Desktop checks an old success while the new read is pending; phone checks an old error after the new draft loads. Results: `F:/entomate-command-deps/fu03-live-verification.json`; screenshots: `fu03-desktop-{pending,settled}.png` and `fu03-phone-settled.png`. The historical real draft is checked unchanged before/after, and follow-up writes are blocked.
 - Impact: the existing `MeetingDetail` caller and `FollowUpState` interface remain compatible; tests are extended in `FollowUpPanel.test.tsx`; there are no new dependencies, configuration, API or schema changes. This document records the change. The required code-only graphify update stays local and is excluded from scoped publication.
 
+## FU-04 - preserve mutations against stale reads
+
+Confirmed: FU-03 scoped reads to the current meeting but did not invalidate them when its draft changed. Eight new regression cases failed before the fix. The deployed renderer also reproduced a scheduled refresh replacing the edited subject while a browser-local save was still pending; no real save reached the backend.
+
+Each mutation now invalidates prior reads and increments an in-flight write count. Read results cannot update data, errors or loading state while a write is pending. When a write settles, its read sequence advances again, rejecting reads that began during the write. Fresh reads after settlement continue normally. Busy state remains until all overlapping writes settle; a successful full-draft mutation clears an obsolete read error. Failed save/send/stop operations still perform their quiet recovery read after updating the write count.
+
+Save/send/stop/auto-send keep their existing API calls, arguments and notifications for current requests. No mutation is cancelled or retried by this fix, and scheduled refresh requests retain their existing timing. Backend, schema, API contracts and mail controls are unchanged.
+
+Validation:
+
+- Eleven new tests cover old read successes/errors after save, reads completing during save, reads begun during save, fresh reads afterward, failed-save recovery, clearing a prior read error, overlapping busy state, mocked send/stop/auto-send responses and scheduled refresh ordering. All 448 frontend tests pass with runner exit 0; TypeScript, production build and scoped whitespace checks pass. Existing build warnings are unchanged.
+- Browser acceptance uses `F:/entomate-command-deps/verify-fu04.cjs`. It supplies a browser-local scheduled draft, delays its read and intercepts the subject save without forwarding it. Desktop checks a stale success during the pending save; phone checks a stale error after the save reply. Results: `F:/entomate-command-deps/fu04-live-verification.json`; screenshots: `fu04-desktop-pending-save.png` and `fu04-{desktop,phone}-settled.png`. The real historical draft is compared unchanged before/after. No email, real follow-up write, send control or auto-send control is used.
+- Impact: `MeetingDetail` and the `FollowUpState` interface remain compatible; `FollowUpPanel.test.tsx` is extended. There are no new dependencies, configuration, backend, API or schema changes. This document records the change, and the code-only graph update stays local outside scoped publication. `F:/entomate` remains untouched.
+
 ## Next recommended sweep
 
-Review pending read-versus-save ordering within the same meeting: a read started before an edit can still finish after that edit. Keep this separate from FU-03's meeting/navigation isolation.
+Review response ordering for overlapping saves from rapid edits to different fields. FU-04 guards reads around writes; it does not serialize writes or order their replies.
 
 Technique: validate database projections against the deployed schema as well as testing pure helpers. A valid draft renderer cannot protect a loader that fails before it reads the meeting.

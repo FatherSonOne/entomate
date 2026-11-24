@@ -59,12 +59,12 @@ export function useFollowUp(meetingId: string, ready: boolean): FollowUpState {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [busy, setBusy] = useState<FollowUpState['busy']>(null)
   const path = `/meetings/${meetingId}/follow-up`
-  const scope = useRef({ meetingId, ready, active: false, read: 0 })
+  const scope = useRef({ meetingId, ready, active: false, read: 0, writes: 0 })
   const isCurrent = useCallback((s: typeof scope.current) => s.active && scope.current === s, [])
 
   // Retire the previous meeting before paint, including its pending callbacks.
   useLayoutEffect(() => {
-    const current = { meetingId, ready, active: true, read: 0 }
+    const current = { meetingId, ready, active: true, read: 0, writes: 0 }
     scope.current = current
     setData(null)
     setLoadError(null)
@@ -77,7 +77,7 @@ export function useFollowUp(meetingId: string, ready: boolean): FollowUpState {
     const current = scope.current
     if (!isCurrent(current) || current.meetingId !== meetingId || !current.ready) return
     const request = ++current.read
-    const latest = (): boolean => isCurrent(current) && current.read === request
+    const latest = (): boolean => isCurrent(current) && current.read === request && current.writes === 0
     if (!quiet) setLoading(true)
     try {
       cache.invalidate(path)
@@ -108,19 +108,31 @@ export function useFollowUp(meetingId: string, ready: boolean): FollowUpState {
   const run = useCallback(async (kind: NonNullable<FollowUpState['busy']>, call: () => Promise<unknown>, done?: string) => {
     const current = scope.current
     if (!isCurrent(current) || current.meetingId !== meetingId || !current.ready) return
+    // Reads from before or during a mutation cannot restore its old snapshot.
+    current.read++
+    current.writes++
+    setLoading(false)
     setBusy(kind)
+    let recover = false
     try {
       const reply = await call()
       if (!isCurrent(current)) return
       cache.invalidate(path)
       setData(normalizeFollowUp(reply))
+      setLoadError(null)
       if (done) toast.success(done)
     } catch (err) {
       if (!isCurrent(current)) return
       toast.error(kind === 'send' ? 'Not sent' : 'Not saved', errorText(err))
-      load(true)
+      recover = true
     } finally {
-      if (isCurrent(current)) setBusy(null)
+      if (isCurrent(current)) {
+        current.writes--
+        current.read++
+        setLoading(false)
+        if (current.writes === 0) setBusy(null)
+        if (recover) load(true)
+      }
     }
   }, [meetingId, path, toast, load, isCurrent])
 
@@ -130,6 +142,9 @@ export function useFollowUp(meetingId: string, ready: boolean): FollowUpState {
   const setAutoSend = useCallback(async (enabled: boolean) => {
     const current = scope.current
     if (!isCurrent(current) || current.meetingId !== meetingId || !current.ready) return
+    current.read++
+    current.writes++
+    setLoading(false)
     setBusy('auto')
     try {
       await meetingsApi.setFollowUpAutoSend(enabled)
@@ -138,7 +153,12 @@ export function useFollowUp(meetingId: string, ready: boolean): FollowUpState {
     } catch (err) {
       if (isCurrent(current)) toast.error('Not saved', errorText(err))
     } finally {
-      if (isCurrent(current)) setBusy(null)
+      if (isCurrent(current)) {
+        current.writes--
+        current.read++
+        setLoading(false)
+        if (current.writes === 0) setBusy(null)
+      }
     }
   }, [meetingId, toast, isCurrent])
 

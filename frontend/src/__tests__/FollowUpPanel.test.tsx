@@ -110,6 +110,128 @@ function pending() {
 
 const otherDraft = { ...draft, followUp: { ...draft.followUp, id: 'f2', subject: 'Meeting two' } }
 
+describe('follow-up read and mutation ordering', () => {
+  const edited = { ...draft, followUp: { ...draft.followUp, subject: 'Saved edit', edited_at: '2026-11-23T20:00:00Z' } }
+
+  it.each(['success', 'failure'] as const)('ignores a read %s arriving after a successful save', async (outcome) => {
+    const read = pending()
+    load.mockResolvedValueOnce(draft).mockReturnValueOnce(read.promise)
+    mutate.mockResolvedValueOnce(edited)
+    const { result } = renderHook(() => useFollowUp('m1', true))
+    await waitFor(() => expect(result.current.data?.row?.id).toBe('f1'))
+    let retry!: Promise<void>
+    act(() => { retry = result.current.retry() })
+    await act(async () => { await result.current.save({ subject: 'Saved edit' }) })
+    await act(async () => { outcome === 'success' ? read.resolve(draft) : read.reject(new Error('Old read failed')); await retry })
+    expect(result.current.data?.row?.subject).toBe('Saved edit')
+    expect(result.current.loadError).toBeNull()
+    expect(result.current.loading).toBe(false)
+  })
+
+  it('ignores a read that finishes while a save is still pending', async () => {
+    const read = pending(), write = pending()
+    load.mockResolvedValueOnce(edited).mockReturnValueOnce(read.promise)
+    mutate.mockReturnValueOnce(write.promise)
+    const { result } = renderHook(() => useFollowUp('m1', true))
+    await waitFor(() => expect(result.current.data?.row?.subject).toBe('Saved edit'))
+    let retry!: Promise<void>, save!: Promise<void>
+    act(() => { retry = result.current.retry(); save = result.current.save({ opening: 'Another edit' }) })
+    await act(async () => { read.resolve(draft); await retry })
+    expect(result.current.data?.row?.subject).toBe('Saved edit')
+    expect(result.current.busy).toBe('save')
+    await act(async () => { write.resolve(edited); await save })
+  })
+
+  it('rejects reads begun during a save but accepts fresh reads after it settles', async () => {
+    const write = pending(), read = pending()
+    load.mockResolvedValueOnce(draft).mockReturnValueOnce(read.promise).mockResolvedValueOnce(otherDraft)
+    mutate.mockReturnValueOnce(write.promise)
+    const { result } = renderHook(() => useFollowUp('m1', true))
+    await waitFor(() => expect(result.current.data?.row?.id).toBe('f1'))
+    let save!: Promise<void>, retry!: Promise<void>
+    act(() => { save = result.current.save({ subject: 'Saved edit' }); retry = result.current.retry() })
+    await act(async () => { write.resolve(edited); await save })
+    await act(async () => { read.resolve(draft); await retry })
+    expect(result.current.data?.row?.subject).toBe('Saved edit')
+    await act(async () => { await result.current.retry() })
+    expect(result.current.data?.row?.id).toBe('f2')
+    expect(result.current.loading).toBe(false)
+  })
+
+  it('still reloads the current draft after a failed save', async () => {
+    load.mockResolvedValueOnce(draft).mockResolvedValueOnce(edited)
+    mutate.mockRejectedValueOnce(new Error('Save conflict'))
+    const { result } = renderHook(() => useFollowUp('m1', true))
+    await waitFor(() => expect(result.current.data?.row?.id).toBe('f1'))
+    await act(async () => { await result.current.save({ subject: 'Saved edit' }) })
+    await waitFor(() => expect(result.current.data?.row?.subject).toBe('Saved edit'))
+    expect(error).toHaveBeenCalledWith('Not saved', 'Save conflict')
+    expect(load).toHaveBeenCalledTimes(2)
+    expect(result.current.busy).toBeNull()
+  })
+
+  it('clears a prior read error when a save returns a fresh draft', async () => {
+    load.mockResolvedValueOnce(draft).mockRejectedValueOnce(new Error('Refresh failed'))
+    mutate.mockResolvedValueOnce(edited)
+    const { result } = renderHook(() => useFollowUp('m1', true))
+    await waitFor(() => expect(result.current.data?.row?.id).toBe('f1'))
+    await act(async () => { await result.current.retry() })
+    expect(result.current.loadError).toBe('Refresh failed')
+    await act(async () => { await result.current.save({ subject: 'Saved edit' }) })
+    expect(result.current.loadError).toBeNull()
+    expect(result.current.data?.row?.subject).toBe('Saved edit')
+  })
+
+  it('holds busy state and rejects reads until all overlapping saves settle', async () => {
+    const first = pending(), second = pending(), read = pending()
+    load.mockResolvedValueOnce(draft).mockReturnValueOnce(read.promise)
+    mutate.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+    const { result } = renderHook(() => useFollowUp('m1', true))
+    await waitFor(() => expect(result.current.data?.row?.id).toBe('f1'))
+    let firstSave!: Promise<void>, secondSave!: Promise<void>, retry!: Promise<void>
+    act(() => { firstSave = result.current.save({ subject: 'Saved edit' }); secondSave = result.current.save({ opening: 'New opening' }); retry = result.current.retry() })
+    await act(async () => { first.resolve(edited); await firstSave })
+    expect(result.current.busy).toBe('save')
+    await act(async () => { read.resolve(draft); await retry })
+    expect(result.current.data?.row?.subject).toBe('Saved edit')
+    await act(async () => { second.resolve({ ...edited, followUp: { ...edited.followUp, opening: 'New opening' } }); await secondSave })
+    expect(result.current.busy).toBeNull()
+    expect(result.current.data?.row?.opening).toBe('New opening')
+  })
+
+  it.each(['send', 'stop', 'auto'] as const)('preserves a mocked %s result against an older read', async (kind) => {
+    const read = pending()
+    load.mockResolvedValueOnce(draft).mockReturnValueOnce(read.promise)
+    const reply = { ...draft, followUp: { ...draft.followUp, status: kind === 'send' ? 'sent' : 'stopped' } }
+    mutate.mockResolvedValueOnce(reply)
+    const { result } = renderHook(() => useFollowUp('m1', true))
+    await waitFor(() => expect(result.current.data?.row?.id).toBe('f1'))
+    let retry!: Promise<void>
+    act(() => { retry = result.current.retry() })
+    await act(async () => { await (kind === 'auto' ? result.current.setAutoSend(true) : result.current[kind]()) })
+    await act(async () => { read.resolve(draft); await retry })
+    if (kind === 'auto') expect(result.current.data?.autoSend).toBe(true)
+    else expect(result.current.data?.row?.status).toBe(reply.followUp.status)
+    expect(result.current.busy).toBeNull()
+    expect(result.current.loading).toBe(false)
+  })
+
+  it('keeps an old scheduled refresh from restoring scheduling after an edit', async () => {
+    vi.useFakeTimers()
+    const read = pending()
+    const scheduled = { ...draft, followUp: { ...draft.followUp, status: 'scheduled', send_at: new Date().toISOString() } }
+    load.mockResolvedValueOnce(scheduled).mockReturnValueOnce(read.promise)
+    mutate.mockResolvedValueOnce(edited)
+    const { result } = renderHook(() => useFollowUp('m1', true))
+    await act(async () => {})
+    await act(async () => { await vi.advanceTimersByTimeAsync(90_000) })
+    await act(async () => { await result.current.save({ subject: 'Saved edit' }) })
+    await act(async () => { read.resolve(scheduled) })
+    expect(result.current.data?.row?.status).toBe('draft')
+    expect(result.current.data?.row?.subject).toBe('Saved edit')
+  })
+})
+
 describe('follow-up request isolation', () => {
   it('ignores the previous meeting response without finishing the current load', async () => {
     const first = pending(), second = pending()
