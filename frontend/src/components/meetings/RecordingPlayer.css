@@ -1,0 +1,252 @@
+.bs-recording {
+  min-width: 0;
+  padding: 12px;
+  border-radius: 9px;
+  background: var(--bs-sunk);
+  color: var(--bs-ink);
+  box-shadow: inset 0 1px var(--bs-hi), 0 0 0 1px var(--bs-rule), 0 1px 0 var(--bs-key-edge);
+  font-family: var(--bs-sans);
+}
+
+.bs-recording .bs-recording-display {
+  display: grid;
+  gap: 0;
+  padding: 12px 14px 10px;
+  border-radius: 5px;
+  --recording-rule: color-mix(in srgb, var(--bs-d-ink) 22%, transparent);
+}
+.bs-recording .bs-recording-display::after { content: none; }
+.bs-recording-readout {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.bs-recording-state, .bs-recording-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--bs-d-mut);
+  font: 500 10px/1.2 var(--bs-mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.bs-recording-state > span:first-child {
+  flex: 0 0 6px;
+  height: 6px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+}
+.bs-recording-state[data-playing="true"] > span:first-child {
+  background: var(--bs-d-brand);
+  border-color: var(--bs-d-brand);
+}
+.bs-recording-clock {
+  color: var(--bs-d-mut);
+  font: 500 12px/1.25 var(--bs-mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.bs-recording-clock b { color: var(--bs-d-ink); font-size: 14px; font-weight: 600; }
+
+.bs-recording-scrub {
+  position: relative;
+  isolation: isolate;
+  min-width: 0;
+  height: 62px;
+  border-bottom: 1px solid var(--recording-rule);
+  background: color-mix(in srgb, var(--bs-display), black 38%);
+}
+.bs-recording-scrub::before {
+  content: "";
+  position: absolute;
+  inset: 50% 0 auto;
+  border-top: 1px solid var(--recording-rule);
+}
+.bs-recording-scrub :is(svg, input) {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.bs-recording-scrub svg { pointer-events: none; }
+.bs-recording-unplayed { fill: color-mix(in srgb, var(--bs-d-ink) 48%, var(--bs-display)); }
+.bs-recording-played { fill: var(--bs-d-brand); }
+.bs-recording-scrub input {
+  z-index: 2;
+  display: block;
+  appearance: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.bs-recording-scrub input:disabled { cursor: default; }
+.bs-recording-scrub input::-webkit-slider-runnable-track { height: 100%; background: transparent; }
+.bs-recording-scrub input::-moz-range-track { height: 100%; background: transparent; }
+.bs-recording-scrub input::-webkit-slider-thumb { appearance: none; width: 2px; height: 100%; border: 0; background: transparent; }
+.bs-recording-scrub input::-moz-range-thumb { width: 2px; height: 100%; border: 0; background: transparent; }
+.bs-recording .bs-recording-scrub input:focus-visible {
+  outline: 2px solid var(--bs-d-brand);
+  outline-offset: 2px;
+}
+.bs-recording-head {
+  position: absolute;
+  left: clamp(1px, var(--position), calc(100% - 1px));
+  inset-block: 0;
+  width: 1px;
+  background: var(--bs-d-ink);
+  pointer-events: none;
+}
+.bs-recording-head::before {
+  content: "";
+  position: absolute;
+  left: -3px;
+  width: 7px;
+  height: 5px;
+  background: inherit;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+.bs-recording-hover {
+  position: absolute;
+  z-index: 3;
+  top: 6px;
+  transform: translateX(-50%);
+  padding: 3px 5px;
+  border-radius: 3px;
+  background: var(--bs-d-ink);
+  color: var(--bs-display);
+  font: 600 10px/1 var(--bs-mono);
+  pointer-events: none;
+}
+.bs-recording-ruler {
+  position: relative;
+  height: 21px;
+  color: var(--bs-d-mut);
+  font: 500 10px/1 var(--bs-mono);
+  white-space: nowrap;
+}
+.bs-recording-ruler span { position: absolute; top: 0; transform: translateX(-50%); padding-top: 8px; }
+.bs-recording-ruler span::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  height: 4px;
+  border-left: 1px solid var(--recording-rule);
+}
+.bs-recording-ruler span:first-child { transform: none; }
+.bs-recording-ruler span:first-child::before { left: 0; }
+.bs-recording-ruler span:last-child { transform: translateX(-100%); }
+.bs-recording-ruler span:last-child::before { left: auto; right: 0; }
+
+.bs-recording-moments { margin-top: 3px; }
+.bs-recording-moments .bs-tape {
+  height: 24px;
+  background: transparent;
+  border-top: 1px solid var(--recording-rule);
+  border-radius: 0;
+  box-shadow: none;
+  overflow: visible;
+}
+.bs-recording-moments .bs-tape-mk {
+  top: 0;
+  bottom: auto;
+  height: 24px;
+  width: 24px;
+  padding: 4px 11px;
+  transform: translateX(-50%);
+  background-clip: content-box;
+}
+.bs-recording-moments .bs-tape:has(.bs-tape-mk.a):has(.bs-tape-mk.d) { height: 48px; }
+.bs-recording-moments .bs-tape:has(.bs-tape-mk.d) .bs-tape-mk.a { top: 24px; }
+.bs-recording-moments .bs-tape-mk:hover { opacity: .75; }
+.bs-recording-moments .bs-tape-mk:focus-visible { z-index: 1; outline: 1px solid var(--bs-d-ink); outline-offset: -2px; }
+.bs-recording-legend { gap: 12px; }
+.bs-recording-legend span::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: var(--bs-d-brand);
+}
+.bs-recording-legend .action::before { background: var(--bs-d-ai); }
+
+.bs-recording-controls,
+.bs-recording-controls > div {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.bs-recording-controls { padding-top: 10px; }
+.bs-recording-controls .bs-key { position: relative; justify-content: center; }
+.bs-recording-controls .bs-key.pri { min-width: 86px; }
+.bs-recording-controls .bs-ikey { min-width: 36px; padding: 0; }
+.bs-recording-transport .bs-ikey svg { width: 24px; height: 24px; }
+.bs-recording-transport .bs-ikey small {
+  position: absolute;
+  top: 56%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font: 600 8px/1 var(--bs-mono);
+}
+.bs-recording-controls .bs-recording-step { margin-left: 4px; }
+.bs-recording-controls .bs-recording-settings { margin-left: auto; gap: 10px; }
+.bs-recording-volume, .bs-recording-speed { display: inline-flex; align-items: center; gap: 4px; }
+.bs-recording-volume button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--bs-ink2);
+  cursor: pointer;
+}
+.bs-recording-volume svg { width: 16px; height: 16px; }
+.bs-recording-volume input { width: 54px; height: 34px; accent-color: var(--bs-brand); cursor: pointer; }
+.bs-recording-speed { position: relative; }
+.bs-recording-speed select {
+  appearance: none;
+  padding-inline: 9px 23px;
+  font: 600 11px/1 var(--bs-mono);
+}
+.bs-recording-speed svg { position: absolute; right: 6px; width: 13px; height: 13px; pointer-events: none; }
+.bs-recording-remove {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  margin-top: 5px;
+  color: var(--bs-muted);
+  font-size: 12px;
+}
+.bs-recording-remove > button:not(.bs-key) {
+  min-height: 28px;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+}
+.bs-recording-remove > button:hover { text-decoration: underline; }
+.bs-recording-error { margin: 9px 0 0; color: var(--bs-brand); font-size: 13px; }
+
+@media (max-width: 767.98px) {
+  .bs-recording { padding: 9px; }
+  .bs-recording .bs-recording-display { padding-inline: 12px; }
+  .bs-recording-controls :is(.bs-key, .bs-recording-volume button, .bs-recording-volume input) { min-height: 44px; }
+  .bs-recording-controls .bs-ikey { min-width: 44px; }
+  .bs-recording-remove > button:not(.bs-key) { min-height: 44px; }
+}
+
+@media (forced-colors: active) {
+  .bs-recording-unplayed, .bs-recording-played { fill: CanvasText; }
+  .bs-recording-head { background: Highlight; forced-color-adjust: none; }
+}
