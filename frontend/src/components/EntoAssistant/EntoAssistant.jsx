@@ -83,7 +83,7 @@ async function withFreshProposals(messages) {
   }
 }
 
-export default function EntoAssistant({ isOpen, onClose, signals = [], signalTotal = 0 }) {
+export default function EntoAssistant({ isOpen, onClose, signals = [], signalTotal = 0, workspaceId = '' }) {
   const { user } = useAuth()
   const { context, section, sectionSummary, sectionLabel, isLoading: contextLoading, isReady: contextReady } = useAssistantContext(isOpen)
 
@@ -378,6 +378,7 @@ export default function EntoAssistant({ isOpen, onClose, signals = [], signalTot
           threadId: calendarEventId ? null : threadId,
           conversationId: calendarEventId ? null : conversationId,
           calendarEventId,
+          workspaceId: workspaceId || undefined,
         },
         {
           signal: controller.signal,
@@ -426,7 +427,7 @@ export default function EntoAssistant({ isOpen, onClose, signals = [], signalTot
       setStreamingContent('')
       setToolSteps([])
     }
-  }, [inputValue, isQuerying, context, section, user, threadId, conversationId])
+  }, [inputValue, isQuerying, context, section, user, threadId, conversationId, workspaceId])
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {

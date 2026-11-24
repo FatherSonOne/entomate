@@ -67,8 +67,10 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const writesEnabled = () => process.env.ENTO_AI_WRITE_TOOLS === 'true';
 
 const READ_ONLY_RULE = 'You can only read. If the user asks you to create, change or send something, say that you cannot do that yet and tell them where in Entomate to do it. You may write a draft (an email, an agenda) as text in your answer.';
-const WRITE_RULE = `You can propose changes with your write tools (create or update tasks, action items and projects, assign tasks, add meeting notes, and configure the calendar recording bot). A write tool never changes anything by itself: it puts a card in the panel, and the change happens only when the user presses Confirm. After proposing, say in one line what you proposed and that it waits for their Confirm. Never say it is done.
-Look records up first so you pass real ids. Propose only what the user asked for, one card per change. When the user asks for several changes that belong together (a new project and its tasks, or the same change to several records), use propose_plan so they confirm once. For a request about one calendar meeting, find its exact occurrence with get_calendar and use change_calendar_bot_booking for scheduling or cancellation. If multiple events match, ask which one. Use configure_bot_auto_join only for an explicit recurring calendar bot request, on its own card. It configures the user's rule; it does not guarantee that a particular bot has joined. You cannot send email or messages, or create calendar meetings; say so, and you may write a draft as text in your answer.`;
+const WRITE_RULE = `You can propose changes with your write tools (create or update tasks, action items and projects, assign tasks, add meeting notes, schedule or cancel a pre-meeting brief, and configure the calendar recording bot). A write tool never changes anything by itself: it puts a card in the panel, and the change happens only when the user presses Confirm. After proposing, say in one line what you proposed and that it waits for their Confirm. Never say it is done.
+Look records up first so you pass real ids. Propose only what the user asked for, one card per change. When the user asks for several changes that belong together (a new project and its tasks, or the same change to several records), use propose_plan so they confirm once.
+For an explicit request to schedule or cancel a pre-meeting brief, find the exact occurrence with get_calendar and use change_calendar_brief_schedule on its own card. The lead time is 5, 15, 30, or 60 minutes, defaulting to 15 when omitted. Ask which supported lead time to use if the user requests a different one. An immediate brief request only needs read tools. Brief schedules work independently of the bot and do not change Google Calendar.
+For a request to send or cancel a recording bot for one calendar meeting, find its exact occurrence with get_calendar and use change_calendar_bot_booking. If multiple events match a calendar change, ask which one. Use configure_bot_auto_join only for an explicit recurring calendar bot request, on its own card. It configures the user's rule; it does not guarantee that a particular bot has joined. You cannot send email or messages, or create calendar meetings; say so, and you may write a draft as text in your answer.`;
 
 function systemInstruction(sectionLabel, userName, writes = false, timeZone = 'UTC', selectedCalendarEvent = false) {
   const now = new Date();
@@ -286,7 +288,10 @@ router.post('/query', authenticate, aiLimiter, meterAi, async (req, res) => {
       model,
       history,
       question,
-      ctx: { db, orgIds: Array.isArray(orgIds) ? orgIds : [], userId, userName, writes, timeZone, calendarEventId },
+      ctx: {
+        db, orgIds: Array.isArray(orgIds) ? orgIds : [], userId, userName, writes, timeZone, calendarEventId,
+        workspaceId: typeof req.body.workspaceId === 'string' ? req.body.workspaceId : null,
+      },
       emit: (event) => sse(res, event),
     });
 

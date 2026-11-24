@@ -79,9 +79,9 @@ describe('record buttons in the panel', () => {
     api.meetingBriefs.status.mockResolvedValue({ schedule: null })
   })
 
-  const renderPanel = () => render(
+  const renderPanel = (workspaceId?: string) => render(
     <MemoryRouter initialEntries={['/meetings']}>
-      <EntoAssistant isOpen onClose={onClose} />
+      <EntoAssistant isOpen onClose={onClose} workspaceId={workspaceId} />
       <Routes><Route path="*" element={<Where />} /></Routes>
     </MemoryRouter>,
   )
@@ -121,10 +121,11 @@ describe('record buttons in the panel', () => {
     svc.streamQuery.mockImplementation(async (_q: string, _ctx: unknown, cb: { onComplete: (r: unknown) => void }) => {
       cb.onComplete({ answer: 'The Website relaunch is on track.', threadId: T.id, tools: [], proposals: [], recordLinks: [LINKS[1]] })
     })
-    renderPanel()
+    renderPanel('active-workspace')
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'how is the relaunch?' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
     const group = await screen.findByRole('group', { name: 'Records in this answer' })
+    expect(svc.streamQuery).toHaveBeenCalledWith('how is the relaunch?', expect.objectContaining({ workspaceId: 'active-workspace' }), expect.anything())
     fireEvent.click(within(group).getByRole('button', { name: 'Open Website relaunch' }))
     await waitFor(() => expect(screen.getByTestId('where').textContent).toBe(`/projects/${P1}`))
   })

@@ -37,9 +37,11 @@ const mockTick = () => new Date(Date.UTC(2026, 10, 22, 12, 0, 0, mockDb.clock++)
 const NEXT = { proposed: ['confirmed', 'rejected'], confirmed: ['executed', 'failed'], executed: ['undone'] };
 
 function mockPolicy(table, uid, op, row) {
+  if (uid === 'service') return true;
   const inOrg = (mockDb.members[uid] || []).includes(row.org_id);
   switch (table) {
     case 'user_settings': return row.user_id === uid;
+    case 'ento_ai_brief_schedules': return false;
     case 'ento_ai_action_log': return row.user_id === uid && inOrg;
     case 'projects': return op === 'select' ? inOrg : row.owner_id === uid && inOrg;
     case 'meeting_notes': return op === 'select' ? inOrg && (row.visibility === 'team' || row.author_id === uid) : row.author_id === uid && inOrg;
@@ -71,6 +73,7 @@ function mockClient(uid) {
       const val = (r, k) => { const [c, f] = k.split('->>'); if (!f) return r[c]; const o = r[c]; return o && o[f] != null ? String(o[f]) : null; };
       const OPS = {
         eq: (a, v) => a === v,
+        neq: (a, v) => a !== v,
         in: (a, v) => v.includes(a),
         notIn: (a, v) => !v.includes(a),
         lt: (a, v) => a != null && a < v,
@@ -87,6 +90,7 @@ function mockClient(uid) {
           const defaults = table === 'ento_ai_action_log' ? { status: 'proposed', result: null, undo: null } : {};
           const made = (Array.isArray(q.value) ? q.value : [q.value])
             .map((v) => ({ id: require('crypto').randomUUID(), created_at: mockTick(), updated_at: mockTick(), ...defaults, ...v }));
+          if (q.ignoreDuplicates && all.some((row) => q.conflicts.every((key) => row[key] === made[0][key]))) return { data: null, error: null };
           for (const row of made) {
             if (!mockPolicy(table, uid, 'insert', row)) return { data: null, error: { message: 'new row violates row-level security policy' } };
             const bad = mockTrigger(table, null, row);
@@ -119,9 +123,12 @@ function mockClient(uid) {
       const b = {
         select(_cols, opts) { q.opts = opts || {}; q.selected = true; return b; },
         insert(v) { q.op = 'insert'; q.value = v; return b; },
+        upsert(v, opts) { q.ignoreDuplicates = opts.ignoreDuplicates; q.conflicts = opts.onConflict.split(','); return b.insert(v); },
         update(v) { q.op = 'update'; q.value = v; return b; },
         delete() { q.op = 'delete'; return b; },
         eq(k, v) { q.filters.push([k, 'eq', v]); return b; },
+        neq(k, v) { q.filters.push([k, 'neq', v]); return b; },
+        match(v) { for (const [k, value] of Object.entries(v)) b.eq(k, value); return b; },
         in(k, v) { q.filters.push([k, 'in', v]); return b; },
         not(k, op, list) { q.filters.push([k, 'notIn', list.slice(1, -1).split(',').map((x) => x.replace(/"/g, ''))]); return b; },
         lt(k, v) { q.filters.push([k, 'lt', v]); return b; },
@@ -141,6 +148,7 @@ function mockClient(uid) {
 jest.mock('../config/supabase', () => ({
   supabase: { from: () => { throw new Error('service client used'); } },
   supabaseAdmin: { from: (table) => {
+    if (['ento_ai_brief_schedules', 'user_settings'].includes(table)) return mockClient('service').from(table);
     if (!['org_members', 'bot_sessions'].includes(table)) throw new Error('service client used');
     return mockClient('user-a').from(table);
   } },
@@ -188,13 +196,13 @@ const MEETING_A = '0000000a-0000-4000-8000-00000000a003';
 
 const sse = (text) => text.split('\n').filter((l) => l.startsWith('data: ')).map((l) => JSON.parse(l.slice(6)));
 const rows = (t) => mockDb.tables[t] || [];
-const ask = (question, token = 'token-a') => request(app).post('/api/ento-ai/query').set('Authorization', `Bearer ${token}`).send({ question });
+const ask = (question, token = 'token-a', context) => request(app).post('/api/ento-ai/query').set('Authorization', `Bearer ${token}`).send({ question, ...context });
 const act = (method, path, body, token = 'token-a') => request(app)[method](`/api/ento-ai/actions${path}`).set('Authorization', `Bearer ${token}`).send(body);
 
 /** Asks once with a scripted write call; returns the proposal the route emitted. */
-async function proposeVia(name, args) {
+async function proposeVia(name, args, token, context) {
   mockScript.push({ calls: [{ name, args }] }, { text: 'Proposed. It waits for your Confirm.' });
-  const res = await ask(`please ${name}`);
+  const res = await ask(`please ${name}`, token, context);
   const ev = sse(res.text);
   return { ev, proposal: ev.find((e) => e.type === 'proposal')?.proposal };
 }
@@ -341,6 +349,44 @@ test('Upcoming and Ask Entomate share typed confirmation for a single booking wh
     if (originalKey === undefined) delete process.env.RECALL_API_KEY;
     else process.env.RECALL_API_KEY = originalKey;
   }
+});
+
+test('Ask Entomate schedules and cancels the exact brief from the active workspace without changing the bot', async () => {
+  const calendar = require('../services/calendarService');
+  const occurrence = { id: 'series_987', summary: 'Friday review', start: { dateTime: new Date(Date.now() + 3_600_000).toISOString() } };
+  calendar.getEvent.mockResolvedValue(occurrence);
+  const eventKey = `${occurrence.id}@${occurrence.start.dateTime}`;
+  const calendarJson = { connected_at: 'original', tokens: { refresh_token: 'private' }, auto_join: { enabled: false, lead_minutes: 5 } };
+  mockDb.tables.user_settings = [{ user_id: 'user-b', calendar_json: calendarJson }];
+  const brief = (decision, leadMinutes) => proposeVia('change_calendar_brief_schedule', { eventKey, decision, leadMinutes }, 'token-b', { workspaceId: 'org-b' });
+  const upcoming = (method, body) => request(app)[method](`/api/ento-ai/meeting-briefs/${occurrence.id}?orgId=org-b`).set('Authorization', 'Bearer token-b').send(body);
+
+  expect((await brief('schedule', 10)).proposal).toBeUndefined();
+  const { proposal } = await brief('schedule');
+  expect(proposal).toMatchObject({ riskClass: 'write', confirmToken: null, payload: { leadMinutes: 15 } });
+  expect(proposal.summary).toMatch(/Friday review.*15 minutes before/);
+  expect(mockDb.tables.ento_ai_action_log[0].org_id).toBe('org-b');
+  expect(rows('ento_ai_brief_schedules')).toHaveLength(0);
+  expect((await act('post', `/${proposal.id}/confirm`, {}, 'token-a')).status).toBe(404);
+
+  calendar.getEvent.mockResolvedValueOnce({ ...occurrence, start: { dateTime: new Date(Date.now() + 7_200_000).toISOString() } });
+  expect((await act('post', `/${proposal.id}/confirm`, {}, 'token-b')).status).toBe(422);
+  const confirmed = await act('post', `/${proposal.id}/confirm`, {}, 'token-b');
+  expect(confirmed.body).toMatchObject({ ok: true, proposal: { result: { status: 'scheduled', leadMinutes: 15 }, view: { path: '/meetings?tab=upcoming&event=series_987' } } });
+  expect((await upcoming('get')).body.schedule).toMatchObject({ status: 'scheduled', leadMinutes: 15 });
+
+  const stale = (await brief('cancel')).proposal;
+  expect(stale.summary).toMatch(/Cancel the pending pre-meeting brief/);
+  await upcoming('delete').expect(200);
+  await upcoming('put', { orgId: 'org-b', leadMinutes: 30 }).expect(200);
+  expect((await act('post', `/${stale.id}/confirm`, {}, 'token-b')).status).toBe(422);
+  expect((await upcoming('get')).body.schedule.leadMinutes).toBe(30);
+
+  const cancel = (await brief('cancel')).proposal;
+  expect((await act('post', `/${cancel.id}/confirm`, {}, 'token-b')).body).toMatchObject({ ok: true, proposal: { result: { status: 'cancelled' } } });
+  expect((await upcoming('get')).body.schedule).toBeNull();
+  expect(mockDb.tables.user_settings[0].calendar_json.auto_join).toEqual({ enabled: false, lead_minutes: 5 });
+  expect(rows('bot_sessions')).toHaveLength(0);
 });
 
 test('a write call only proposes: one row, a proposal event, nothing created, no chip', async () => {
