@@ -15,6 +15,7 @@ import {
 
 export default function WorkflowToolbar({
   workflow,
+  draft = false,
   isDirty,
   canUndo,
   canRedo,
@@ -111,7 +112,7 @@ export default function WorkflowToolbar({
               ? 'bg-semantic-success-dim text-semantic-success'
               : 'bg-surface-muted text-content-secondary'
           }`}>
-            {isActive ? 'Active' : 'Inactive'}
+            {draft ? 'Unsaved draft' : isActive ? 'Active' : 'Inactive'}
           </span>
         </div>
       </div>
@@ -175,7 +176,7 @@ export default function WorkflowToolbar({
         </div>
 
         {/* Test & Execute */}
-        <div className="flex items-center gap-1">
+        {!draft && <div className="flex items-center gap-1">
           <button
             onClick={onTest}
             disabled={isExecuting}
@@ -196,7 +197,7 @@ export default function WorkflowToolbar({
             )}
             Execute
           </button>
-        </div>
+        </div>}
       </div>}
 
       {/* Right section */}
@@ -204,7 +205,7 @@ export default function WorkflowToolbar({
         {compact && <button type="button" onClick={onOpenNodes} aria-haspopup="dialog"
           className="min-h-9 mr-auto rounded bg-surface-muted px-3 text-sm text-content-primary">Nodes</button>}
         {/* Toggle Active */}
-        {!compact && <button
+        {!compact && !draft && <button
           onClick={onToggleActive}
           className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md ${
             isActive
@@ -223,7 +224,7 @@ export default function WorkflowToolbar({
         {/* Save button */}
         <button
           onClick={onSave}
-          disabled={isSaving || !isDirty}
+          disabled={isSaving || (!draft && !isDirty)}
           className="flex min-h-9 items-center gap-1.5 px-4 py-1.5 text-sm bg-accent-primary text-[color:var(--bs-on-brand,white)] rounded-md hover:opacity-90 disabled:opacity-50"
         >
           {isSaving ? (
@@ -265,8 +266,10 @@ export default function WorkflowToolbar({
                 {compact && [
                   ['Undo', onUndo, !canUndo], ['Redo', onRedo, !canRedo],
                   [showGrid ? 'Hide grid' : 'Show grid', onToggleGrid, false],
-                  ['Test', onTest, isExecuting], ['Execute', onExecute, isExecuting || !isActive],
-                  [isActive ? 'Deactivate workflow' : 'Activate workflow', onToggleActive, false],
+                  ...(!draft ? [
+                    ['Test', onTest, isExecuting], ['Execute', onExecute, isExecuting || !isActive],
+                    [isActive ? 'Deactivate workflow' : 'Activate workflow', onToggleActive, false],
+                  ] : []),
                 ].map(([label, action, disabled]) => (
                   <button key={label} type="button" disabled={disabled}
                     onClick={() => { setShowMenu(false); action?.(); moreButton.current?.focus() }}
@@ -279,14 +282,14 @@ export default function WorkflowToolbar({
                   <Settings className="w-4 h-4" />
                   Workflow Settings
                 </button>}
-                <button
+                {!draft && <button
                   onClick={() => { onOpenHistory?.(); setShowMenu(false); }}
                   className="w-full flex items-center gap-2 px-3 py-2 text-sm text-content-secondary hover:bg-surface-muted"
                 >
                   <History className="w-4 h-4" />
                   Version History
-                </button>
-                <hr className="my-1 border-line-subtle" />
+                </button>}
+                {!draft && <hr className="my-1 border-line-subtle" />}
                 <button
                   onClick={() => { onExport?.(); setShowMenu(false); }}
                   className="w-full flex items-center gap-2 px-3 py-2 text-sm text-content-secondary hover:bg-surface-muted"
@@ -301,21 +304,21 @@ export default function WorkflowToolbar({
                   <Upload className="w-4 h-4" />
                   Import Workflow
                 </button>
-                <hr className="my-1 border-line-subtle" />
-                <button
+                {!draft && <hr className="my-1 border-line-subtle" />}
+                {!draft && <button
                   onClick={() => { onDuplicate?.(); setShowMenu(false); }}
                   className="w-full flex items-center gap-2 px-3 py-2 text-sm text-content-secondary hover:bg-surface-muted"
                 >
                   <Copy className="w-4 h-4" />
                   Duplicate Workflow
-                </button>
-                <button
+                </button>}
+                {!draft && <button
                   onClick={() => { onDelete?.(); setShowMenu(false); }}
                   className="w-full flex items-center gap-2 px-3 py-2 text-sm text-semantic-error hover:bg-semantic-error-dim"
                 >
                   <Trash2 className="w-4 h-4" />
                   Delete Workflow
-                </button>
+                </button>}
               </div>
             </>
           )}

@@ -41,6 +41,7 @@ export default function Search(): React.ReactElement {
   const [params, setParams] = useSearchParams()
   const url = readUrlState(params)
   const [draft, setDraft] = useState(url.q)
+  const [meaningQuery, setMeaningQuery] = useState('')
   const [recentKey, setRecentKey] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -49,7 +50,9 @@ export default function Search(): React.ReactElement {
   }, [setParams])
 
   const q = url.q.trim()
-  const { data, loading, error, settledQuery } = useSearch(q, { limit: 25, debounceMs: 220 })
+  const canIncludeMeaning = url.filter === 'all' || url.filter === 'meetings'
+  const includeMeaning = canIncludeMeaning && q.length >= MIN_QUERY && meaningQuery === q
+  const { data, loading, error, settledQuery } = useSearch(q, { limit: 25, debounceMs: 220, meaning: includeMeaning })
   const recent = useRecentSearches(true, recentKey)
   const notes = useNotes(true)
 
@@ -62,7 +65,7 @@ export default function Search(): React.ReactElement {
     const t = query.trim()
     if (t.length < MIN_QUERY || logged.current === t) return
     logged.current = t
-    searchEverything(t, { limit: 1, log: true }).then(() => setRecentKey((k) => k + 1)).catch(() => undefined)
+    searchEverything(t, { limit: 1, log: true, meaning: false }).then(() => setRecentKey((k) => k + 1)).catch(() => undefined)
   }, [])
   useEffect(() => { if (q) logQuery(q) }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -81,6 +84,7 @@ export default function Search(): React.ReactElement {
 
   const onType = (value: string) => {
     setDraft(value)
+    if (value.trim() !== q) setMeaningQuery('')
     setUrl({ q: value, ask: false })
   }
 
@@ -151,6 +155,11 @@ export default function Search(): React.ReactElement {
       </form>
       <div className="bs-srch-status">
         <EngineLine data={currentData} />
+        {q.length >= MIN_QUERY && canIncludeMeaning && (
+          <Key size="sm" aria-pressed={includeMeaning} onClick={() => setMeaningQuery(includeMeaning ? '' : q)}>
+            Include related meetings
+          </Key>
+        )}
         <span className="bs-srch-count">{count == null ? '' : `${count} result${count === 1 ? '' : 's'}`}</span>
       </div>
 
@@ -235,16 +244,18 @@ function Results({ data, loading, error, filter, q, clipped, onClip, onOpen, onA
   if (!data) return <p className="bs-srch-empty" aria-live="polite">{loading ? 'Searching…' : ''}</p>
   const groups = GROUPS.filter((g) => (filter === 'all' || filter === g.key) && (data.groups[g.key] || []).length > 0)
   const commands = filter === 'all' ? matchCommands(q, 3) : []
+  const hasWordMatches = groups.some((g) => data.groups[g.key]?.some((row) => !row.meta.byMeaning))
   if (!groups.length && !commands.length) {
     return (
       <div className="bs-srch-empty">
-        <p>Nothing matches “{q}”{filter !== 'all' ? ' in this filter' : ''}.</p>
+        <p role="status">No word matches for “{q}”{filter !== 'all' ? ' in this filter' : ''}.</p>
         <Key size="sm" onClick={onAsk}>Ask Entomate instead</Key>
       </div>
     )
   }
   return (
     <div aria-live="polite">
+      {!hasWordMatches && <p className="bs-srch-empty">No word matches for “{q}”.</p>}
       {groups.map((g) => {
         const rows = data.groups[g.key] || []
         const count = groupCount(data, g.key)

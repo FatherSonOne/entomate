@@ -366,7 +366,10 @@ export default function Meetings() {
             ) : status.key === 'ready' || status.key === 'posted' ? (
               <p className="bs-mtg-dec bs-mut">No decisions recorded.</p>
             ) : null}
-            {mine > 0 && <p className="bs-mtg-mine bs-ph-only">{mine} on you</p>}
+            <div className="bs-mtg-mobile-status bs-ph-only">
+              <Signal tone={status.tone}>{status.word}</Signal>
+              {mine > 0 && <span className="bs-mtg-mine">{mine} on you</span>}
+            </div>
           </div>
         )
       },
@@ -398,6 +401,7 @@ export default function Meetings() {
     {
       key: 'status',
       header: 'Status',
+      secondary: true,
       className: 'bs-mtg-status',
       render: (m) => {
         const s = meetingStatus(m)

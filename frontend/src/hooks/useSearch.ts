@@ -19,6 +19,8 @@ export interface UseSearchOptions {
   log?: boolean
   /** Skip searching (palette closed). */
   enabled?: boolean
+  /** Include related meeting results. If omitted, use the shared engine default. */
+  meaning?: boolean
 }
 
 export interface UseSearchResult {
@@ -31,11 +33,11 @@ export interface UseSearchResult {
 
 /** Debounced shared search. Late responses for an older query are dropped. */
 export function useSearch(query: string, opts: UseSearchOptions = {}): UseSearchResult {
-  const { debounceMs = 180, limit = 8, log = false, enabled = true } = opts
+  const { debounceMs = 180, limit = 8, log = false, enabled = true, meaning } = opts
   const [data, setData] = useState<SearchResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [settledQuery, setSettledQuery] = useState('')
+  const [settledInput, setSettledInput] = useState<{ query: string; meaning?: boolean }>({ query: '' })
   const seq = useRef(0)
 
   useEffect(() => {
@@ -45,7 +47,7 @@ export function useSearch(query: string, opts: UseSearchOptions = {}): UseSearch
       setData(null)
       setLoading(false)
       setError(null)
-      setSettledQuery('')
+      setSettledInput({ query: '' })
       return undefined
     }
     const id = ++seq.current
@@ -53,16 +55,16 @@ export function useSearch(query: string, opts: UseSearchOptions = {}): UseSearch
     setError(null)
     setLoading(true)
     const t = window.setTimeout(() => {
-      searchEverything(q, { limit, log })
+      searchEverything(q, { limit, log, meaning })
         .then((resp) => {
           if (id !== seq.current) return
           setData(resp)
-          setSettledQuery(q)
+          setSettledInput({ query: q, meaning })
           setError(null)
         })
         .catch((e: unknown) => {
           if (id !== seq.current) return
-          setSettledQuery(q)
+          setSettledInput({ query: q, meaning })
           setError(e instanceof Error ? e.message : 'Search failed')
         })
         .finally(() => {
@@ -70,17 +72,17 @@ export function useSearch(query: string, opts: UseSearchOptions = {}): UseSearch
         })
     }, debounceMs)
     return () => { window.clearTimeout(t); seq.current += 1 }
-  }, [query, debounceMs, limit, log, enabled])
+  }, [query, debounceMs, limit, log, enabled, meaning])
 
   const current = enabled && query.trim().length >= 2
-  const settled = settledQuery === query.trim()
+  const settled = settledInput.query === query.trim() && settledInput.meaning === meaning
   return {
-    data: current && data?.query === query.trim() ? data : null,
+    data: current && settled && data?.query === query.trim() ? data : null,
     // A keystroke renders before useEffect marks the request loading. Include
     // that first render so Enter cannot run a transient Ask row during debounce.
     loading: current && (loading || !settled),
     error: current && settled ? error : null,
-    settledQuery,
+    settledQuery: settledInput.query,
   }
 }
 

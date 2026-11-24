@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import './BrandMotion.css'
 
 /** Decorative brand footage: still first, opt-in motion when reduced motion is set. */
-export default function BrandMotion({ clip = 'hands', className = '', controls = true, mediaDirectory = '/brand-lab/assets/motion' }) {
+export default function BrandMotion({ clip = 'hands', className = '', controls = true, mediaDirectory = '/brand-lab/assets/motion', responsive = false, priority = false }) {
   const ref = useRef(null)
   const [playing, setPlaying] = useState(() => !window.matchMedia('(prefers-reduced-motion: reduce)').matches)
   const [ready, setReady] = useState(false)
@@ -22,7 +22,10 @@ export default function BrandMotion({ clip = 'hands', className = '', controls =
     let visible = false
     const sync = () => {
       if (playing && visible && !document.hidden && !failed) {
-        if (!video.getAttribute('src')) video.src = `${base}.mp4`
+        if (!video.getAttribute('src')) {
+          const compact = responsive && window.matchMedia('(max-width: 760px)').matches
+          video.src = `${base}${compact ? '-mobile' : ''}.mp4`
+        }
         video.play().catch(() => setPlaying(false))
       } else video.pause()
     }
@@ -37,13 +40,17 @@ export default function BrandMotion({ clip = 'hands', className = '', controls =
       document.removeEventListener('visibilitychange', sync)
       video.pause()
     }
-  }, [base, playing, failed])
+  }, [base, playing, failed, responsive])
 
   return (
     <div className={`brand-motion ${ready && !failed ? 'brand-motion-ready' : ''} ${className}`}>
-      <img className="brand-motion-poster" src={`${base}.jpg`} alt="" aria-hidden="true" />
+      <picture>
+        {responsive && <source media="(max-width: 760px)" srcSet={`${base}-mobile.webp`} />}
+        <img className="brand-motion-poster" src={`${base}.jpg`} alt="" aria-hidden="true"
+          loading={priority ? 'eager' : 'lazy'} fetchpriority={priority ? 'high' : undefined} decoding="async" />
+      </picture>
       <video key={clip} ref={ref} className="brand-motion-video" muted loop playsInline
-        preload="none" poster={`${base}.jpg`} aria-hidden="true"
+        preload="none" aria-hidden="true"
         onLoadedData={() => { setReady(true); setFailed(false) }}
         onError={() => { setFailed(true); setReady(false) }} />
       {controls && !failed && (
