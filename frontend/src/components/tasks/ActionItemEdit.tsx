@@ -1,9 +1,11 @@
 import React, { useId, useState } from 'react'
 import { meetingsApi } from '../../services/api'
-import type { TaskActionRow, WorkItem } from '../../services/tasksView'
-import { Drawer, Key, TextArea, TextInput } from '../bench'
+import { priorityWord } from '../../services/tasksView'
+import type { TaskActionRow, WorkItem, WorkPriority } from '../../services/tasksView'
+import { Drawer, Key, Select, TextArea, TextInput } from '../bench'
 
-type Changes = Partial<Pick<TaskActionRow, 'task_description' | 'assigned_to_name' | 'assigned_to_email' | 'due_date'>>
+type Changes = Partial<Pick<TaskActionRow, 'task_description' | 'assigned_to_name' | 'assigned_to_email' | 'due_date' | 'priority'>>
+const PRIORITY_OPTIONS = (['low', 'medium', 'high'] as const).map(value => ({ value, label: priorityWord(value) }))
 
 export default function ActionItemEdit({ item, onSaved, onClose }: {
   item: WorkItem
@@ -17,6 +19,7 @@ export default function ActionItemEdit({ item, onSaved, onClose }: {
   const [owner, setOwner] = useState(item.owner ?? '')
   const [emailDraft, setEmailDraft] = useState<string | null>(null)
   const [due, setDue] = useState(item.due ?? '')
+  const [priority, setPriority] = useState(item.priority)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [conflict, setConflict] = useState(false)
@@ -36,6 +39,7 @@ export default function ActionItemEdit({ item, onSaved, onClose }: {
       changes.assigned_to_email = email.trim() || null
     }
     if ((due || null) !== original.due) changes.due_date = due || null
+    if (priority !== original.priority) changes.priority = priority
     if (!Object.keys(changes).length) { onClose(); return }
 
     setSaving(true)
@@ -79,6 +83,10 @@ export default function ActionItemEdit({ item, onSaved, onClose }: {
           <label className="bs-lbl" htmlFor={`${formId}-email`}>Owner email</label>
           <TextInput id={`${formId}-email`} type="email" maxLength={255} disabled={saving} value={email} onChange={(e) => setEmailDraft(e.target.value)} aria-describedby={`${formId}-email-help`} />
           <p className="bs-mut" id={`${formId}-email-help`}>Optional. Used when someone sends a reminder.</p>
+        </div>
+        <div className="bs-tasks-fl">
+          <label className="bs-lbl" htmlFor={`${formId}-priority`}>Priority</label>
+          <Select id={`${formId}-priority`} value={priority} options={PRIORITY_OPTIONS} disabled={saving} onChange={value => setPriority(value as WorkPriority)} />
         </div>
         {error && <p className="bs-tasks-err" role="alert">{error}</p>}
         <div className="bs-tasks-keys">

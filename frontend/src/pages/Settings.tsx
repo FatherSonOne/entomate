@@ -22,7 +22,7 @@ import TeamSettings from '../components/settings/TeamSettings'
 import PrivacySettings from '../components/settings/PrivacySettings'
 import BillingSettings from '../components/settings/BillingSettings'
 import DeleteOrgDialog from '../components/settings/DeleteOrgDialog'
-import OwnerPreferences from '../components/settings/OwnerPreferences'
+import AgentPreferences from '../components/settings/AgentPreferences'
 import { canAdmin } from '../components/settings/settingsTypes'
 import type { AuthCtx, OrgCtx } from '../components/settings/settingsTypes'
 import {
@@ -99,6 +99,7 @@ export default function Settings(): React.ReactElement {
     setParams((prev) => {
       const next = writeUrlState(prev, { drawer: d })
       next.delete('calendar_error')
+      if (d !== 'learning') next.delete('agent')
       return next
     }, { replace: true })
   }, [setParams])
@@ -349,7 +350,7 @@ export default function Settings(): React.ReactElement {
                 <div className="bs-set-row">
                   <div className="bs-set-l">
                     <b>What the agents learned</b>
-                    <span>Review Owner preferences suggested by repeated corrections in this workspace.</span>
+                    <span>Review preferences suggested by repeated Owner and Priority corrections in this workspace.</span>
                   </div>
                   <div className="bs-set-c"><Key size="sm" onClick={() => openDrawer('learning')}>Review</Key></div>
                 </div>
@@ -459,8 +460,8 @@ export default function Settings(): React.ReactElement {
       </Drawer>
 
       <Drawer open={url.drawer === 'learning'} onClose={() => openDrawer(null)} label="What the agents learned">
-        {org ? <OwnerPreferences key={org.id} workspaceId={org.id} canReview={admin} />
-          : <p className="bs-set-note">Select a workspace to see its Owner preferences.</p>}
+        {org ? <AgentPreferences key={org.id} workspaceId={org.id} canReview={admin} initialAgent={params.get('agent') === 'priority' ? 'Priority' : 'Owner'} />
+          : <p className="bs-set-note">Select a workspace to see its agent preferences.</p>}
       </Drawer>
 
       {org && (

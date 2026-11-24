@@ -21,6 +21,7 @@ const summaryTemplates = require('../services/summaryTemplates');
 const speakerNames = require('../services/speakerNames');
 const actionItemNudge = require('../services/actionItemNudge');
 const ownerPreferences = require('../services/ownerPreferences');
+const priorityPreferences = require('../services/priorityPreferences');
 
 const router = express.Router();
 
@@ -539,7 +540,7 @@ router.delete('/:id', authenticate, async (req, res) => {
 
 /**
  * PATCH /api/meetings/action-items/:id
- * Correct an action item's wording, owner or deadline, or toggle open/done.
+ * Correct an action item's wording, owner, priority or deadline, or toggle open/done.
  */
 router.patch('/action-items/:id', authenticate, validate(schemas.actionItemUpdate), async (req, res) => {
   try {
@@ -552,7 +553,7 @@ router.patch('/action-items/:id', authenticate, validate(schemas.actionItemUpdat
 
     const { data: existingItem, error: readError } = await supabase
       .from('action_items')
-      .select('meeting_id, org_id, assigned_to_name, assigned_to_email, updated_at, task_description, agent_notes, owner_correction')
+      .select('meeting_id, org_id, assigned_to_name, assigned_to_email, updated_at, task_description, priority, agent_notes, owner_correction, priority_correction')
       .eq('id', id)
       .maybeSingle();
     if (readError) throw readError;
@@ -582,6 +583,10 @@ router.patch('/action-items/:id', authenticate, validate(schemas.actionItemUpdat
       updates.owner_correction = await ownerPreferences.correctionForEdit(supabase, existingItem, changes, now);
     } else if (emailChanged && existingItem.owner_correction) {
       updates.owner_correction = null;
+    }
+    if (changes.priority !== undefined && changes.priority !== existingItem.priority &&
+        (existingItem.agent_notes?.priority?.applied || existingItem.priority_correction)) {
+      updates.priority_correction = await priorityPreferences.correctionForEdit(supabase, existingItem, changes, now);
     }
     const query = supabase
       .from('action_items')
