@@ -21,7 +21,7 @@ import TeamSettings from '../components/settings/TeamSettings'
 import PrivacySettings from '../components/settings/PrivacySettings'
 import BillingSettings from '../components/settings/BillingSettings'
 import DeleteOrgDialog from '../components/settings/DeleteOrgDialog'
-import LearningDashboard from '../components/learning/LearningDashboard'
+import OwnerPreferences from '../components/settings/OwnerPreferences'
 import { canAdmin } from '../components/settings/settingsTypes'
 import type { AuthCtx, OrgCtx } from '../components/settings/settingsTypes'
 import {
@@ -348,7 +348,7 @@ export default function Settings(): React.ReactElement {
                 <div className="bs-set-row">
                   <div className="bs-set-l">
                     <b>What the agents learned</b>
-                    <span>Patterns from the calls you overrode. Approve one and the agent uses it next time.</span>
+                    <span>Review Owner preferences suggested by repeated corrections in this workspace.</span>
                   </div>
                   <div className="bs-set-c"><Key size="sm" onClick={() => openDrawer('learning')}>Review</Key></div>
                 </div>
@@ -458,7 +458,8 @@ export default function Settings(): React.ReactElement {
       </Drawer>
 
       <Drawer open={url.drawer === 'learning'} onClose={() => openDrawer(null)} label="What the agents learned">
-        <div className="bs-skin"><LearningDashboard /></div>
+        {org ? <OwnerPreferences key={org.id} workspaceId={org.id} canReview={admin} />
+          : <p className="bs-set-note">Select a workspace to see its Owner preferences.</p>}
       </Drawer>
 
       {org && (

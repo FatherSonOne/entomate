@@ -279,8 +279,8 @@ class AgentOrchestrator {
       // the Deadline agent can weigh the likely owner's workload. A suggested
       // owner counts only if it would be applied (same bar as meetingEvents).
       const aggregated = {};
-      if (enabled.assignment && context.orgId && !item.assigned_to_name && !item.assigned_to_email) {
-        const assignment = await this.runAgent('assignment', context);
+      if (enabled.assignment && context.orgId && !item.assigned_to_name && !item.assigned_to_email && !item.assigned_to_id) {
+        const assignment = await this.runAgent('assignment', { ...context, useOwnerPreferences: true });
         if (assignment.success && assignment.suggestion) {
           aggregated.assignment = assignment.suggestion;
           const member = assignment.suggestion.recommendedMember;
