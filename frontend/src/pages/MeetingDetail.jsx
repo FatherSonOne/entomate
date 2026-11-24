@@ -615,6 +615,7 @@ export default function MeetingDetail() {
             meetingId={meeting.id}
             audioUrl={uploadedAudioUrl}
             durationMs={meeting.recording_job?.durationMs || lengthMs}
+            transcriptSegments={transcriptSegments}
             onTime={setPlayingAtMs}
             decisions={decisionMarks}
             actions={actionMarks}

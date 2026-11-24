@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useReducedMotion } from '../bench/motion'
 
 const CRIMSON = '#FF2D6B'
 const MINT    = '#00F5D4'
@@ -17,6 +18,7 @@ const PHOSPHOR = '#A0FF32'
  */
 export default function VCCanvas({ mode = 'neural', speed = 50, density = 95, opacity = 0.9 }) {
   const canvasRef = useRef(null)
+  const reduced = useReducedMotion()
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -292,9 +294,9 @@ export default function VCCanvas({ mode = 'neural', speed = 50, density = 95, op
       cancelAnimationFrame(raf)
       window.removeEventListener('resize', resize)
     }
-  }, [mode, speed, density])
+  }, [mode, speed, density, reduced])
 
-  return (
+  return reduced ? null : (
     <canvas
       ref={canvasRef}
       id="vc-canvas"

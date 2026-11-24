@@ -70,13 +70,13 @@
   color: #A8A8A2;
 }
 .en-loader-led { width: 8px; height: 8px; border-radius: 50%; flex: none; }
-.en-loader-led--live { background: #A0FF32; box-shadow: 0 0 6px #A0FF32; animation: en-loader-pulse 1.4s ease-in-out infinite; }
+.en-loader-led--live { background: #A0FF32; box-shadow: 0 0 6px #A0FF32; animation: var(--m-decorative-effect, en-loader-pulse 1.4s ease-in-out infinite); }
 .en-loader-led--mint { background: #00F5D4; box-shadow: 0 0 6px #00F5D4; }
 .en-loader-led--off { box-shadow: inset 0 0 0 1.5px #4E4E4A; }
 @keyframes en-loader-pulse { 50% { opacity: .45; } }
 
 .en-loader .en-signal-loader-track { height: 2px; margin-top: 12px; background: rgba(255, 255, 255, .1); }
-.en-loader .en-signal-loader-track span { display: block; height: 2px; background: #FF2D6B; transition: width 180ms linear; }
+.en-loader .en-signal-loader-track span { display: block; height: 2px; background: #FF2D6B; transition: var(--m-decorative-effect, width 180ms linear); }
 
 /* Keys: the Pause key from AnimatedLoadingLogo and the preview's Close key */
 .en-loader .en-app-loading-motion-control,
@@ -114,10 +114,6 @@
   .en-loader .en-app-loading-motion-control { right: 20px; bottom: auto; top: 62px; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .en-loader-led--live { animation: none; }
-  .en-loader .en-signal-loader-track span { transition: none; }
-}
 @media (max-width: 640px) {
   .en-loader--preview .en-app-loading-motion-control { top: 104px; }
 }

@@ -7,7 +7,7 @@
   border-radius: 4px;
   background: linear-gradient(90deg, var(--bs-rule) 0%, var(--bs-rule2) 40%, var(--bs-rule) 80%);
   background-size: 300% 100%;
-  animation: en-skel-sweep 1.4s ease-in-out infinite;
+  animation: var(--m-decorative-effect, en-skel-sweep 1.4s ease-in-out infinite);
 }
 .en-skel-title { width: min(320px, 60%); height: 44px; border-radius: 8px; }
 .en-skel-meta { width: 140px; height: 10px; flex: none; }
@@ -33,7 +33,6 @@
 .en-skel-side { width: 96px; justify-self: end; }
 .en-skel-rows li:nth-child(even) .en-skel-side { width: 72px; }
 @keyframes en-skel-sweep { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
-@media (prefers-reduced-motion: reduce) { .en-skel-bar { animation: none; } }
 @media (max-width: 640px) {
   .en-skel-title { height: 32px; }
   .en-skel-meta { display: none; }

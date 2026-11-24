@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { LOGO_MOTIONS, renderLogoMotion } from './logoMotion'
 import { CIRCUIT_FINISH, CIRCUIT_MARK_IDS, renderCircuitMark } from './circuitMarks'
 import { isLogoId, logoAsset, useLogoSystem } from '../services/logoSystem'
-import { prefersReducedMotion } from './bench/motion'
+import { useMotionPlayback } from './bench/motion'
 import './AnimatedLoadingLogo.css'
 
 /**
@@ -15,8 +15,7 @@ export default function AnimatedLoadingLogo({ logoId, size = 512, controls = tru
   const picked = useLogoSystem().id
   const id = isLogoId(logoId) ? logoId : picked
   const artRef = useRef(null)
-  const [playing, setPlaying] = useState(() => !prefersReducedMotion())
-  const [manual, setManual] = useState(false)
+  const [playing, setPlaying, reduced] = useMotionPlayback()
   const [supported, setSupported] = useState(true)
   const [failed, setFailed] = useState(false)
   // The circuit marks are drawn in vector; the rest animate cut-outs of their artwork
@@ -26,19 +25,7 @@ export default function AnimatedLoadingLogo({ logoId, size = 512, controls = tru
 
   useEffect(() => { setFailed(false) }, [id])
 
-  useEffect(() => {
-    const query = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const change = event => {
-      if (event.matches) {
-        setPlaying(false)
-        setManual(false)
-      }
-    }
-    query.addEventListener('change', change)
-    return () => query.removeEventListener('change', change)
-  }, [])
-
-  useEffect(() => {
+  useLayoutEffect(() => {
     const svg = artRef.current?.querySelector('svg')
     if (!svg || failed) return
     if (typeof svg.pauseAnimations !== 'function') {
@@ -47,7 +34,7 @@ export default function AnimatedLoadingLogo({ logoId, size = 512, controls = tru
     }
     let visible = false
     svg.pauseAnimations()
-    svg.classList.toggle('motion-opt-in', manual)
+    svg.classList.toggle('motion-opt-in', reduced && playing)
     // Paused (or reduced motion): show the whole still mark, not a frame with parts cut away
     svg.classList.toggle('motion-still', !playing)
     const sync = () => {
@@ -69,7 +56,7 @@ export default function AnimatedLoadingLogo({ logoId, size = 512, controls = tru
       image?.removeEventListener('error', error)
       svg.pauseAnimations()
     }
-  }, [playing, manual, failed, markup])
+  }, [playing, reduced, failed, markup])
 
   return (
     <div className={`en-app-loading-logo ${supported ? '' : 'en-app-loading-still'}`} data-loading-logo={id}>
@@ -81,10 +68,7 @@ export default function AnimatedLoadingLogo({ logoId, size = 512, controls = tru
       )}
       {controls && supported && !failed && (
         <button className="en-app-loading-motion-control" type="button"
-          onClick={() => {
-            if (!playing) setManual(true)
-            setPlaying(value => !value)
-          }}>
+          onClick={() => setPlaying(!playing)}>
           {playing ? 'Pause loading animation' : 'Play loading animation'}
         </button>
       )}

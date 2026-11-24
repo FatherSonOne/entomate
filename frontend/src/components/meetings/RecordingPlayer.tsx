@@ -1,9 +1,10 @@
-import React, { forwardRef, useEffect, useId, useImperativeHandle, useRef, useState } from 'react'
+import React, { forwardRef, useEffect, useId, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { ChevronDown, Loader2, Pause, Play, RotateCcw, RotateCw, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
-import { Display, Key, Tape, type TapeMarker } from '../bench'
-import { formatClock } from '../../services/meetingTranscriptService'
+import { Display, Key, Tape, Toggle, type TapeMarker } from '../bench'
+import { formatClock, type TranscriptSegment } from '../../services/meetingTranscriptService'
 import { loadRecordingAudio, removeRecordingAudio } from '../../services/meetingRecorderService'
 import { readRecordingWaveform } from '../../services/recordingWaveform'
+import { recordingSpeakers } from './recordingSpeakers'
 import './RecordingPlayer.css'
 
 export interface RecordingPlayerHandle {
@@ -18,6 +19,7 @@ export interface RecordingPlayerProps {
   /** Direct audio from a legacy meeting upload. Kept recordings use the playback service. */
   audioUrl?: string
   durationMs?: number | null
+  transcriptSegments?: ReadonlyArray<TranscriptSegment> | null
   decisions?: ReadonlyArray<TapeMarker>
   actions?: ReadonlyArray<TapeMarker>
   onMoment?: (atMs: number) => void
@@ -54,7 +56,7 @@ function rulerMarks(durationMs: number): number[] {
 }
 
 export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayerProps>(function RecordingPlayer(
-  { meetingId, audioUrl, durationMs, decisions = [], actions = [], onMoment, onStepMoment, onTime, onAudioRemoved },
+  { meetingId, audioUrl, durationMs, transcriptSegments, decisions = [], actions = [], onMoment, onStepMoment, onTime, onAudioRemoved },
   ref,
 ) {
   const [source, setSource] = useState<Source | null>(null)
@@ -70,6 +72,7 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
   const [speed, setSpeed] = useState(1)
   const [muted, setMuted] = useState(false)
   const [volume, setVolume] = useState(1)
+  const [showSpeakerColors, setShowSpeakerColors] = useState(false)
   const [waveform, setWaveform] = useState<string | null>(null)
   const [waveStatus, setWaveStatus] = useState<'idle' | 'drawing' | 'unavailable'>('idle')
   const audioRef = useRef<HTMLAudioElement>(null)
@@ -81,7 +84,13 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
   const lastSecond = useRef<number | null>(null)
   const savedWaveform = useRef<string | null>(null)
   const clipId = useId()
+  const speakerGradientId = `${clipId}-speakers`
   const effectiveDuration = mediaDuration || finiteDuration(source?.durationMs) || finiteDuration(durationMs)
+  const speakers = useMemo(() => recordingSpeakers(transcriptSegments ?? [], effectiveDuration), [transcriptSegments, effectiveDuration])
+  const speakerColorsVisible = showSpeakerColors && speakers.turns.length > 0
+  const currentSpeaker = speakerColorsVisible
+    ? speakers.turns.find(turn => turn.start <= position && position < turn.end)?.speaker
+    : undefined
   const fraction = effectiveDuration ? Math.min(position / effectiveDuration, 1) : 0
   const elapsed = formatClock(position)
   const total = effectiveDuration ? formatClock(effectiveDuration) : '–:––'
@@ -306,11 +315,29 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
           <span className="bs-recording-clock"><b>{elapsed}</b> <span aria-hidden="true">/</span> {total}</span>
         </div>
         <div className="bs-recording-scrub" style={{ '--position': `${fraction * 100}%` } as React.CSSProperties}>
-          {waveform !== null && (
-            <svg data-testid="recording-waveform" viewBox="0 0 1000 80" preserveAspectRatio="none" aria-hidden="true">
-              <defs><clipPath id={clipId}><rect width={fraction * 1000} height="80" /></clipPath></defs>
-              <path d={waveform} className="bs-recording-unplayed" />
-              <path d={waveform} className="bs-recording-played" clipPath={`url(#${clipId})`} />
+          {(waveform !== null || speakerColorsVisible) && (
+            <svg data-testid={waveform !== null ? 'recording-waveform' : undefined} viewBox="0 0 1000 80" preserveAspectRatio="none" aria-hidden="true">
+              <defs>
+                <clipPath id={clipId}><rect width={fraction * 1000} height="80" /></clipPath>
+                {speakerColorsVisible && (
+                  <linearGradient id={speakerGradientId} gradientUnits="userSpaceOnUse" x1="0" x2="1000" y1="0" y2="0">
+                    {speakers.stops.map(({ offset, color }, index) => <stop key={index} offset={offset} stopColor={color} />)}
+                  </linearGradient>
+                )}
+              </defs>
+              {waveform !== null && (
+                <>
+                  <path d={waveform} className="bs-recording-unplayed" />
+                  <path d={waveform} className={speakerColorsVisible ? 'bs-recording-played-neutral' : 'bs-recording-played'} clipPath={`url(#${clipId})`} />
+                  {speakerColorsVisible && (
+                    <>
+                      <path d={waveform} fill={`url(#${speakerGradientId})`} opacity="0.7" />
+                      <path d={waveform} fill={`url(#${speakerGradientId})`} clipPath={`url(#${clipId})`} />
+                    </>
+                  )}
+                </>
+              )}
+              {speakerColorsVisible && <rect y="76" width="1000" height="4" fill={`url(#${speakerGradientId})`} />}
             </svg>
           )}
           {effectiveDuration > 0 && <span className="bs-recording-head" aria-hidden="true" />}
@@ -322,7 +349,7 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
           <input
             type="range"
             aria-label="Playback position"
-            aria-valuetext={`${elapsed} of ${total}`}
+            aria-valuetext={`${elapsed} of ${total}${currentSpeaker ? `, ${currentSpeaker}` : ''}`}
             min={0}
             max={effectiveDuration / 1000 || 1}
             step="any"
@@ -349,6 +376,15 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
               <span key={at} style={{ left: `${at / effectiveDuration * 100}%` }}>{formatClock(at)}</span>
             ))}
           </div>
+        )}
+        {speakerColorsVisible && (
+          <ul className="bs-recording-speakers" role="list" aria-label="Waveform speakers">
+            {[...speakers.colors].map(([speaker, color]) => (
+              <li key={speaker} data-current={speaker === currentSpeaker} style={{ '--speaker-color': color } as React.CSSProperties}>
+                <span aria-hidden="true" />{speaker}
+              </li>
+            ))}
+          </ul>
         )}
         {hasMoments && effectiveDuration > 0 && (
           <div className="bs-recording-moments">
@@ -392,6 +428,12 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
           </div>
         )}
         <div className="bs-recording-settings">
+          {speakers.turns.length > 0 && (
+            <div className="bs-recording-speaker-toggle">
+              <span aria-hidden="true">Speaker colors</span>
+              <Toggle label="Speaker colors" checked={showSpeakerColors} onChange={setShowSpeakerColors} />
+            </div>
+          )}
           <div className="bs-recording-volume">
             <button type="button" aria-label={muted ? 'Unmute' : 'Mute'} title={muted ? 'Unmute' : 'Mute'} onClick={() => {
               if (audioRef.current) audioRef.current.muted = !muted

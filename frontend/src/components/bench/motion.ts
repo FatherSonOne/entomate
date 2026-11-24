@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { RefObject } from 'react'
 
 /**
@@ -25,6 +25,30 @@ export function prefersReducedMotion(): boolean {
   if (typeof window === 'undefined') return false
   if (document.documentElement.dataset.motion === 'reduce') return true
   return window.matchMedia?.(REDUCE_QUERY).matches ?? false
+}
+
+/** Watch both the system preference and the in-app setting, including changes mid-session. */
+export function subscribeReducedMotion(onChange: () => void): () => void {
+  const media = window.matchMedia?.(REDUCE_QUERY)
+  const observer = new MutationObserver(onChange)
+  observer.observe(document.documentElement, { attributeFilter: ['data-motion'] })
+  media?.addEventListener?.('change', onChange)
+  return () => {
+    observer.disconnect()
+    media?.removeEventListener?.('change', onChange)
+  }
+}
+
+export function useReducedMotion(): boolean {
+  return useSyncExternalStore(subscribeReducedMotion, prefersReducedMotion, () => false)
+}
+
+/** Start decorative media still in reduced motion while preserving its explicit Play control. */
+export function useMotionPlayback(): [boolean, (playing: boolean) => void, boolean] {
+  const reduced = useReducedMotion()
+  const [override, setOverride] = useState<boolean | null>(null)
+  useLayoutEffect(() => { setOverride(null) }, [reduced])
+  return [override ?? !reduced, setOverride, reduced]
 }
 
 /** Read both preferences at scroll time, including for nested scroll containers. */

@@ -13,6 +13,7 @@
  * than a texture.
  */
 import React, { useEffect, useRef } from 'react';
+import { useReducedMotion } from '../bench/motion';
 import { getVoiceSignal, readPulse, subscribeVoiceState } from './voiceSignal';
 
 interface DotMatrixProps {
@@ -29,6 +30,7 @@ const parseRgb = (css: string): [number, number, number] | null => {
 
 export const DotMatrix: React.FC<DotMatrixProps> = ({ rows = 4, pitch = 6, className }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -37,11 +39,6 @@ export const DotMatrix: React.FC<DotMatrixProps> = ({ rows = 4, pitch = 6, class
     if (!ctx) return;
 
     const dpr = Math.min(2, (typeof window !== 'undefined' && window.devicePixelRatio) || 1);
-    const reduceMotion =
-      typeof window !== 'undefined' &&
-      typeof window.matchMedia === 'function' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
     let width = 0;
     const height = rows * pitch;
     let cols = 0;
@@ -158,7 +155,7 @@ export const DotMatrix: React.FC<DotMatrixProps> = ({ rows = 4, pitch = 6, class
       ro?.disconnect();
       document.removeEventListener('visibilitychange', onVis);
     };
-  }, [rows, pitch]);
+  }, [rows, pitch, reduceMotion]);
 
   return <canvas ref={canvasRef} className={`lv-dotmatrix ${className ?? ''}`} aria-hidden="true" />;
 };
