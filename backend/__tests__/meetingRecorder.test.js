@@ -120,6 +120,10 @@ jest.mock('../config/supabase', () => {
 jest.mock('../utils/log', () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn(), http: jest.fn() }));
 jest.mock('../services/playbackFile', () => ({
   makeSeekable: jest.fn(async (buf, ext) => Buffer.concat([Buffer.from(`seekable.${ext}:`), buf])),
+  readWaveformPeaks: jest.fn(async () => [0, 0.6, 0.3]),
+}));
+jest.mock('../services/botRecording', () => ({
+  freshRecordingLink: jest.fn(async () => 'https://signed.test/recording.mp4?token=fresh'),
 }));
 jest.mock('../config/geminiRecording', () => ({ isConfigured: jest.fn(() => true), transcribeRecording: jest.fn() }));
 jest.mock('../config/ai', () => ({
@@ -429,6 +433,31 @@ describe('recorder routes', () => {
     meeting(id).recording_job.retentionDeletedAt = new Date().toISOString();
     const expired = await request(server).get(`/api/recordings/${id}/playback`).set(as(MEMBER));
     expect(expired.status).toBe(404);
+  });
+
+  test('a linked bot recording advertises server peaks, scoped to retained audio in the meeting org', async () => {
+    const server = app();
+    const id = '00000000-0000-4000-8000-000000000044';
+    const url = 'https://signed.test/recording.mp4?token=fresh';
+    const job = { status: 'done', source: 'bot', botSessionId: 'session-1', audioKept: true, durationMs: 3215044 };
+    mockDb.meetings.push({ id, org_id: ORG_A, created_by: MEMBER, recording_job: job });
+    const playback = await request(server).get(`/api/recordings/${id}/playback`).set(as(MEMBER));
+    expect(playback.body).toMatchObject({ url, serverWaveform: true, durationMs: 3215044 });
+
+    const endpoint = `/api/recordings/${id}/waveform`;
+    expect((await request(server).get(endpoint).set(as(OUTSIDER))).status).toBe(404);
+    expect(playbackFile.readWaveformPeaks).not.toHaveBeenCalled();
+    const results = await Promise.all([request(server).get(endpoint).set(as(MEMBER)), request(server).get(endpoint).set(as(MEMBER))]);
+    for (const result of results) {
+      expect(result.status).toBe(200);
+      expect(result.headers['cache-control']).toBe('no-store');
+      expect(result.body).toEqual({ success: true, peaks: [0, 0.6, 0.3] });
+    }
+    expect(playbackFile.readWaveformPeaks).toHaveBeenCalledTimes(1);
+    expect(playbackFile.readWaveformPeaks).toHaveBeenCalledWith(url);
+
+    job.audioRemovedAt = new Date().toISOString();
+    expect((await request(server).get(endpoint).set(as(MEMBER))).status).toBe(404);
   });
 
   test('a member can remove the audio and keep the transcript; outsiders cannot', async () => {

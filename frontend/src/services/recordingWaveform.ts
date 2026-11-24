@@ -60,10 +60,16 @@ export async function readRecordingWaveform(
     }
   }
 
-  const gain = Math.max(0.025, ...peaks)
+  return waveformFromPeaks(peaks)
+}
+
+export function waveformFromPeaks(peaks: ArrayLike<number>): string {
+  const levels = Array.from(peaks)
+  const gain = Math.max(0.025, ...levels)
+  const bars = levels.length
   const pitch = 1000 / bars
   const width = (pitch * 0.62).toFixed(2)
-  return Array.from(peaks, (peak, index) => {
+  return levels.map((peak, index) => {
     const height = Math.sqrt(peak / gain) * 35
     if (height < 0.2) return ''
     const x = ((index + 0.19) * pitch).toFixed(2)

@@ -615,6 +615,9 @@ async function transcribeMeeting(meetingId) {
 const PLAYBACK_URL_TTL_S = 10 * 60;
 /** The playback copy streams while it plays; the page asks for a new link if this one ends. */
 const PLAYBACK_FILE_TTL_S = 60 * 60;
+const WAVEFORM_CACHE_TTL_MS = 30 * 60 * 1000;
+const waveformCache = new Map();
+let activeWaveforms = 0;
 
 /**
  * A signed link to the seekable playback copy (`url`) when there is one. Otherwise signed
@@ -638,7 +641,7 @@ async function getPlayback({ orgId, meetingId }) {
   // A bot meeting without a saved copy plays from Recall's own (fresh) link.
   if (job.source === 'bot' && job.botSessionId) {
     const url = await require('./botRecording').freshRecordingLink(job.botSessionId).catch(() => null);
-    if (url) return { mimeType: 'video/mp4', durationMs: job.durationMs || 0, url };
+    if (url) return { mimeType: 'video/mp4', durationMs: job.durationMs || 0, url, serverWaveform: true };
     throw new RecorderError(404, 'The bot recording is no longer available.');
   }
   const pieces = (await listPieces(orgId, meetingId)).filter((p) => p.seq < (job.pieces || MAX_PIECES));
@@ -654,6 +657,41 @@ async function getPlayback({ orgId, meetingId }) {
     durationMs: pieces.reduce((sum, p) => sum + p.durationMs, 0),
     pieces: pieces.map((p) => ({ seq: p.seq, durationMs: p.durationMs, url: urls.get(p.path) })),
   };
+}
+
+/** Use the same authorized media source as playback. Coalesce simultaneous requests for it. */
+async function getRecordingWaveform({ orgId, meetingId }) {
+  const playback = await getPlayback({ orgId, meetingId });
+  if (!playback.url || playback.durationMs > 3 * 60 * 60 * 1000) {
+    throw new RecorderError(404, 'Waveform unavailable for this recording.');
+  }
+  // The file identity stays the same when a signed URL is renewed.
+  const key = `${orgId}/${meetingId}:${playback.url.split('?')[0]}`;
+  const cached = waveformCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.peaks;
+  if (activeWaveforms >= 2) throw new RecorderError(429, 'Waveform processing is busy. Try again.');
+  for (const [id, entry] of waveformCache) {
+    if (entry.expiresAt <= Date.now()) waveformCache.delete(id);
+  }
+  if (waveformCache.size >= 24) {
+    const completed = [...waveformCache].find(([, entry]) => Number.isFinite(entry.expiresAt));
+    if (completed) waveformCache.delete(completed[0]);
+  }
+
+  const peaks = playbackFile.readWaveformPeaks(playback.url);
+  const entry = { peaks, expiresAt: Infinity };
+  waveformCache.set(key, entry);
+  activeWaveforms++;
+  try {
+    const result = await peaks;
+    entry.expiresAt = Date.now() + WAVEFORM_CACHE_TTL_MS;
+    return result;
+  } catch {
+    waveformCache.delete(key);
+    throw new RecorderError(422, 'Waveform unavailable for this recording.');
+  } finally {
+    activeWaveforms--;
+  }
 }
 
 /**
@@ -684,6 +722,7 @@ module.exports = {
   discardRecording,
   purgeRecordingAudio,
   getPlayback,
+  getRecordingWaveform,
   removeAudio,
   transcribeMeeting,
   parseTimestampedTranscript,

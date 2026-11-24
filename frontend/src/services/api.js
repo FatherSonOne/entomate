@@ -87,7 +87,7 @@ api.interceptors.request.use(
     }
 
     // Check cache for GET requests (skip retries)
-    if (config.method === 'get' && config.responseType !== 'blob' && !config._retryCount) {
+    if (config.method === 'get' && config.responseType !== 'blob' && !config._noCache && !config._retryCount) {
       const cached = cache.get(config.url, config.params)
       if (cached !== null) {
         // Return cached data via a resolved adapter
@@ -131,13 +131,14 @@ api.interceptors.response.use(
     }
 
     // Cache GET responses
-    if (response.config?.method === 'get' && response.config.responseType !== 'blob' && response.config.url) {
+    if (response.config?.method === 'get' && response.config.responseType !== 'blob' && !response.config._noCache && response.config.url) {
       cache.set(response.config.url, response.config.params, response.data)
     }
 
     return response.data
   },
   async (error) => {
+    if (axios.isCancel(error)) return Promise.reject(error)
     const config = error.config
 
     // Handle network errors (backend unavailable)
@@ -252,6 +253,7 @@ export const recordingsApi = {
   discard: (meetingId) => api.delete(`/recordings/${meetingId}`),
   // Signed links to the saved audio, in order; they expire, so never read this from the cache.
   playback: (meetingId) => api.get(`/recordings/${meetingId}/playback`),
+  waveform: (meetingId, signal) => api.get(`/recordings/${meetingId}/waveform`, { signal, _noCache: true }),
 }
 
 // ========================================

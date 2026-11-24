@@ -82,6 +82,7 @@ interface PlaybackResponse {
   mimeType?: unknown
   durationMs?: unknown
   url?: unknown
+  serverWaveform?: unknown
   pieces?: Array<{ url?: unknown }>
 }
 
@@ -91,6 +92,7 @@ export interface RecordingAudio {
   /** Or, without that copy, the saved pieces joined in memory. */
   blob?: Blob
   durationMs: number
+  serverWaveform?: true
 }
 
 /**
@@ -115,7 +117,9 @@ export async function loadRecordingAudio(
   }
   signal?.throwIfAborted()
   const durationMs = typeof res?.durationMs === 'number' ? res.durationMs : 0
-  if (typeof res?.url === 'string') return { url: res.url, durationMs }
+  if (typeof res?.url === 'string') {
+    return { url: res.url, durationMs, ...(res.serverWaveform === true ? { serverWaveform: true } : {}) }
+  }
   const urls = (Array.isArray(res?.pieces) ? res.pieces : []).map((p) => p?.url)
   if (!urls.length || urls.some((u) => typeof u !== 'string')) throw new Error('The recording could not be loaded.')
   let downloaded = 0
@@ -133,6 +137,16 @@ export async function loadRecordingAudio(
   )
   const type = typeof res.mimeType === 'string' ? res.mimeType : 'audio/webm'
   return { blob: new Blob(parts, { type }), durationMs }
+}
+
+export async function loadRecordingWaveformPeaks(meetingId: string, signal: AbortSignal): Promise<number[]> {
+  const result = (await recordingsApi.waveform(meetingId, signal)) as unknown as { peaks?: unknown }
+  const peaks = result?.peaks
+  if (!Array.isArray(peaks) || !peaks.length || peaks.length > 160 ||
+      !peaks.every(value => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1)) {
+    throw new Error('Waveform unavailable')
+  }
+  return peaks
 }
 
 /** Remove a finished recording's audio for good; the transcript and notes stay. */

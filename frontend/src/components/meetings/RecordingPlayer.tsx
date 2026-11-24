@@ -2,8 +2,8 @@ import React, { forwardRef, useEffect, useId, useImperativeHandle, useMemo, useR
 import { ChevronDown, Loader2, Pause, Play, RotateCcw, RotateCw, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
 import { Display, Key, Tape, Toggle, type TapeMarker } from '../bench'
 import { formatClock, type TranscriptSegment } from '../../services/meetingTranscriptService'
-import { loadRecordingAudio, removeRecordingAudio } from '../../services/meetingRecorderService'
-import { readRecordingWaveform } from '../../services/recordingWaveform'
+import { loadRecordingAudio, loadRecordingWaveformPeaks, removeRecordingAudio, type RecordingAudio } from '../../services/meetingRecorderService'
+import { readRecordingWaveform, waveformFromPeaks } from '../../services/recordingWaveform'
 import { recordingSpeakers } from './recordingSpeakers'
 import './RecordingPlayer.css'
 
@@ -29,10 +29,8 @@ export interface RecordingPlayerProps {
   onAudioRemoved?: () => void
 }
 
-interface Source {
+interface Source extends RecordingAudio {
   url: string
-  blob?: Blob
-  durationMs: number
 }
 
 interface SeekRequest {
@@ -105,7 +103,10 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
     if (!source || savedWaveform.current !== null) return
     const controller = new AbortController()
     setWaveStatus('drawing')
-    void readRecordingWaveform(source.blob ?? source.url, source.durationMs || finiteDuration(durationMs), controller.signal)
+    const readWaveform = source.serverWaveform
+      ? loadRecordingWaveformPeaks(meetingId, controller.signal).then(waveformFromPeaks)
+      : readRecordingWaveform(source.blob ?? source.url, source.durationMs || finiteDuration(durationMs), controller.signal)
+    void readWaveform
       .then(path => {
         if (controller.signal.aborted) return
         savedWaveform.current = path
@@ -116,7 +117,7 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
         if (!controller.signal.aborted) setWaveStatus('unavailable')
       })
     return () => controller.abort()
-  }, [source, durationMs])
+  }, [source, durationMs, meetingId])
 
   const load = async (refresh = false): Promise<void> => {
     if (request.current || (source && !refresh)) return
