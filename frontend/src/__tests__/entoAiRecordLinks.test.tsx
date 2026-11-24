@@ -79,9 +79,9 @@ describe('record buttons in the panel', () => {
     api.meetingBriefs.status.mockResolvedValue({ schedule: null })
   })
 
-  const renderPanel = () => render(
+  const renderPanel = (workspaceId?: string) => render(
     <MemoryRouter initialEntries={['/meetings']}>
-      <EntoAssistant isOpen onClose={onClose} />
+      <EntoAssistant isOpen onClose={onClose} workspaceId={workspaceId} />
       <Routes><Route path="*" element={<Where />} /></Routes>
     </MemoryRouter>,
   )
@@ -118,11 +118,10 @@ describe('record buttons in the panel', () => {
   })
 
   test('a streamed answer takes its records from the complete event', async () => {
-    api.org.mockReturnValue({ org: { id: 'active-workspace' } })
     svc.streamQuery.mockImplementation(async (_q: string, _ctx: unknown, cb: { onComplete: (r: unknown) => void }) => {
       cb.onComplete({ answer: 'The Website relaunch is on track.', threadId: T.id, tools: [], proposals: [], recordLinks: [LINKS[1]] })
     })
-    renderPanel()
+    renderPanel('active-workspace')
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'how is the relaunch?' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
     const group = await screen.findByRole('group', { name: 'Records in this answer' })

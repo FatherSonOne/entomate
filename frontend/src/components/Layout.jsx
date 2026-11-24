@@ -267,6 +267,7 @@ export default function Layout() {
             onClose={() => setAssistantOpen(false)}
             signals={signals.signals}
             signalTotal={signals.total}
+            workspaceId={orgCtx?.org?.id}
           />
         </Suspense>
       )}
