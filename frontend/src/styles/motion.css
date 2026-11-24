@@ -42,9 +42,14 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root { scroll-behavior: auto; --m-rise: 0px; --m-slide: 0px; --m-pop-scale: 1; }
+  :root { scroll-behavior: auto; --m-rise: 0px; --m-slide: 0px; --m-pop-scale: 1; --m-decorative-effect: none; --m-theme-duration: 0ms; }
+  :is(.animate-spin, .animate-pulse, .animate-ping, .animate-bounce, .react-flow__edge.animated path) { animation: none; }
 }
-html[data-motion="reduce"] { scroll-behavior: auto; --m-rise: 0px; --m-slide: 0px; --m-pop-scale: 1; }
+html[data-motion="reduce"] { scroll-behavior: auto; --m-rise: 0px; --m-slide: 0px; --m-pop-scale: 1; --m-decorative-effect: none; --m-theme-duration: 0ms; }
+html[data-motion="reduce"] :is(.animate-spin, .animate-pulse, .animate-ping, .animate-bounce, .react-flow__edge.animated path) { animation: none; }
+
+/* Light and dark still switch immediately when either preference is active. */
+body, .app-shell { transition-duration: var(--m-theme-duration, 300ms); }
 
 /* ── Keyframes (mount-only entrances; toggled states use transitions) ── */
 @keyframes m-fade-in { from { opacity: 0; } }

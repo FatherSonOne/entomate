@@ -1,7 +1,8 @@
 import React, { StrictMode } from 'react'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AnimatedLoadingLogo from '../components/AnimatedLoadingLogo'
+import { applyReduceMotion } from '../components/bench/motion'
 
 let reduced, onVisibility, onPreference, pause, play, hiddenDescriptor
 const originalPause = Object.getOwnPropertyDescriptor(SVGSVGElement.prototype, 'pauseAnimations')
@@ -26,6 +27,7 @@ beforeEach(() => {
 })
 afterEach(() => {
   cleanup()
+  applyReduceMotion(false)
   window.localStorage.removeItem('entomate.loading.previous')
   if (originalPause) Object.defineProperty(SVGSVGElement.prototype, 'pauseAnimations', originalPause)
   else delete SVGSVGElement.prototype.pauseAnimations
@@ -84,8 +86,20 @@ describe('shared animated application logo', () => {
     act(() => onVisibility([{ isIntersecting: true }]))
     expect(container.querySelector('svg')).toHaveClass('motion-opt-in')
     expect(play).toHaveBeenCalled()
-    act(() => onPreference({ matches: true }))
+    reduced = false
+    act(() => onPreference())
+    reduced = true
+    act(() => onPreference())
     expect(container.querySelector('svg')).not.toHaveClass('motion-opt-in')
+    expect(screen.getByRole('button', { name: 'Play loading animation' })).toBeInTheDocument()
+  })
+
+  it('switches an already-open loader to a still mark when the in-app setting changes', async () => {
+    const { container } = render(<AnimatedLoadingLogo />)
+    act(() => onVisibility([{ isIntersecting: true }]))
+    expect(play).toHaveBeenCalledOnce()
+    applyReduceMotion(true)
+    await waitFor(() => expect(container.querySelector('svg')).toHaveClass('motion-still'))
     expect(screen.getByRole('button', { name: 'Play loading animation' })).toBeInTheDocument()
   })
 

@@ -8,7 +8,7 @@
  * tint comes from CSS (`.la-ai-orb[data-state]`), so the Logos tokens own every colour.
  */
 import React, { useEffect, useState } from 'react';
-import useReducedMotion from '../landing/useReducedMotion';
+import { useReducedMotion } from '../bench/motion';
 import { Orb, VARIANTS, type OrbLook } from '../ui/thinking-orbs';
 /** Tool steps arrive with the function-calling loop (EAI-04); until then the list is empty. */
 type ToolStep = { status: 'running' | 'done' | 'error' };

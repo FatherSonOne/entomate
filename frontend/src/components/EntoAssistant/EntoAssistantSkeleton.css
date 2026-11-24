@@ -127,7 +127,7 @@
     rgba(128, 128, 128, 0.10) 70%
   );
   background-size: 200% 100%;
-  animation: la-skel-sweep 1.4s ease-in-out infinite;
+  animation: var(--m-decorative-effect, la-skel-sweep 1.4s ease-in-out infinite);
 }
 
 @keyframes la-skel-sweep {
@@ -150,11 +150,6 @@ html.dark .la-skel-shimmer,
     rgba(255, 255, 255, 0.05) 70%
   );
   background-size: 200% 100%;
-}
-
-/* Respect reduced-motion: hold a static tint instead of sweeping. */
-@media (prefers-reduced-motion: reduce) {
-  .la-skel-shimmer { animation: none; }
 }
 
 /* Responsive — mirror the real panel's breakpoints so the frame width matches. */
@@ -191,7 +186,7 @@ html.dark .la-skel-shimmer,
     align-items: flex-end;
     justify-content: center;
     background: rgba(15, 12, 10, 0.32);
-    animation: la-skel-dim-in 400ms ease-out both;
+    animation: var(--m-decorative-effect, la-skel-dim-in 400ms ease-out both);
   }
 
   html.dark .la-skel {
@@ -205,7 +200,7 @@ html.dark .la-skel-shimmer,
     border-left: none;
     border-radius: 16px 16px 0 0;
     box-shadow: 0 -10px 40px -12px rgba(30, 27, 24, 0.28);
-    animation: la-skel-sheet-in 500ms cubic-bezier(0.32, 0.72, 0, 1) both;
+    animation: var(--m-decorative-effect, la-skel-sheet-in 500ms cubic-bezier(0.32, 0.72, 0, 1) both);
   }
 
   .la-skel-handle {
@@ -231,11 +226,4 @@ html.dark .la-skel-shimmer,
 @keyframes la-skel-dim-in {
   from { opacity: 0; }
   to   { opacity: 1; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .la-skel,
-  .la-skel-panel {
-    animation: none;
-  }
 }

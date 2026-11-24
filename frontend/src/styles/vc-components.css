@@ -157,7 +157,7 @@
       0 0 30px rgba(255, 45, 107, 0.35);
   }
 }
-.glow-pulse .vc { animation: vc-glow-pulse 2.5s ease-in-out infinite; }
+.glow-pulse .vc { animation: var(--m-decorative-effect, vc-glow-pulse 2.5s ease-in-out infinite); }
 
 /* ============================================================
    BUTTONS
@@ -269,7 +269,7 @@
   height: 5px;
   border-radius: 50%;
   background: currentColor;
-  animation: vc-flicker 4s infinite;
+  animation: var(--m-decorative-effect, vc-flicker 4s infinite);
 }
 
 @keyframes vc-flicker {
@@ -550,7 +550,7 @@ textarea.vinput { resize: vertical; min-height: 70px; }
   border-radius: 50%;
   background: var(--accent-phosphor, #A0FF32);
   box-shadow: 0 0 8px var(--accent-phosphor, #A0FF32);
-  animation: vc-flicker 1.5s ease-in-out infinite;
+  animation: var(--m-decorative-effect, vc-flicker 1.5s ease-in-out infinite);
 }
 .vc-chat-msgs { padding: 10px 14px; display: flex; flex-direction: column; gap: 8px; }
 .vc-chat-msg {
@@ -621,7 +621,7 @@ textarea.vinput { resize: vertical; min-height: 70px; }
   background: var(--accent-primary, #FF2D6B);
   box-shadow: 0 0 6px var(--accent-primary, #FF2D6B);
   display: inline-block;
-  animation: vc-flicker 3s infinite;
+  animation: var(--m-decorative-effect, vc-flicker 3s infinite);
 }
 
 /* ============================================================
@@ -660,7 +660,7 @@ textarea.vinput { resize: vertical; min-height: 70px; }
   0%, 100% { transform: scale(1);    box-shadow: 0 0 10px rgba(255,45,107,.3); }
   50%       { transform: scale(1.08); box-shadow: 0 0 30px rgba(255,45,107,.7); }
 }
-.logo-breathe { animation: vc-logo-breathe 2.5s ease-in-out infinite; }
+.logo-breathe { animation: var(--m-decorative-effect, vc-logo-breathe 2.5s ease-in-out infinite); }
 
 @keyframes vc-logo-pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(255,45,107,.6), 0 0 0 8px rgba(255,45,107,0); }
@@ -679,7 +679,7 @@ textarea.vinput { resize: vertical; min-height: 70px; }
 .wf-condition { background: var(--accent-tertiary-dim);  border: 1px solid var(--accent-tertiary); }
 
 @keyframes vc-flow-dot { from { stroke-dashoffset: 30 } to { stroke-dashoffset: 0 } }
-.wf-flow { stroke-dasharray: 5 5; animation: vc-flow-dot 1s linear infinite; }
+.wf-flow { stroke-dasharray: 5 5; animation: var(--m-decorative-effect, vc-flow-dot 1s linear infinite); }
 
 /* ============================================================
    TIMELINE  (.vc-tl)
@@ -689,7 +689,7 @@ textarea.vinput { resize: vertical; min-height: 70px; }
 .vc-tl-fill  { position: absolute; top: 0; left: 0; height: 100%; background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary)); }
 .vc-tl-dot   { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--bg-surface); flex-shrink: 0; }
 .vc-tl-done  { background: var(--accent-secondary); box-shadow: 0 0 6px var(--accent-secondary); }
-.vc-tl-now   { background: var(--accent-primary); animation: vc-now-pulse 1.5s ease-in-out infinite; }
+.vc-tl-now   { background: var(--accent-primary); animation: var(--m-decorative-effect, vc-now-pulse 1.5s ease-in-out infinite); }
 .vc-tl-future{ background: var(--border-strong); }
 
 @keyframes vc-now-pulse {
@@ -885,15 +885,15 @@ textarea.vinput { resize: vertical; min-height: 70px; }
 @keyframes floatBreathe { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-12px) scale(1.02); } }
 
 /* SVG circuit & node utility classes (apply as className in JSX) */
-.circuit-flow { stroke-dasharray: 20 10; animation: circuitFlow 2s linear infinite; }
-.node-glow    { animation: nodeGlow 2s ease-in-out infinite; }
+.circuit-flow { stroke-dasharray: 20 10; animation: var(--m-decorative-effect, circuitFlow 2s linear infinite); }
+.node-glow    { animation: var(--m-decorative-effect, nodeGlow 2s ease-in-out infinite); }
 .hand-svg     { transform-origin: center; }
 
 /* Logo animation modes — apply to parent wrapper */
-.logo-pulse   .hand-svg { animation: handPulse 2s ease-in-out infinite; }
-.logo-breathe .hand-svg { animation: handBreathe 2.5s ease-in-out infinite; }
-.logo-spin    .hand-svg { animation: handSpin 4s linear infinite; }
-.logo-wave    .hand-svg { animation: handWave 2s ease-in-out infinite; }
+.logo-pulse   .hand-svg { animation: var(--m-decorative-effect, handPulse 2s ease-in-out infinite); }
+.logo-breathe .hand-svg { animation: var(--m-decorative-effect, handBreathe 2.5s ease-in-out infinite); }
+.logo-spin    .hand-svg { animation: var(--m-decorative-effect, handSpin 4s linear infinite); }
+.logo-wave    .hand-svg { animation: var(--m-decorative-effect, handWave 2s ease-in-out infinite); }
 
 /* ============================================================
    HERO SECTION  (.hero-*)
@@ -985,7 +985,7 @@ textarea.vinput { resize: vertical; min-height: 70px; }
 .vc-fill-warning   { color: var(--a) !important; fill: var(--a) !important; }
 
 /* Spinner (legacy) */
-.vc-spinner { border-color: transparent; border-top-color: var(--c); animation: spin 0.6s linear infinite; }
+.vc-spinner { border-color: transparent; border-top-color: var(--c); animation: var(--m-decorative-effect, spin 0.6s linear infinite); }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ============================================
@@ -1003,7 +1003,7 @@ textarea.vinput { resize: vertical; min-height: 70px; }
 
 .en-loader-arc {
   transform-origin: center;
-  animation: en-arc-spin 0.9s linear infinite;
+  animation: var(--m-decorative-effect, en-arc-spin 0.9s linear infinite);
 }
 
 @keyframes en-arc-spin {
@@ -1018,7 +1018,7 @@ textarea.vinput { resize: vertical; min-height: 70px; }
 
 .en-loader-dot-item {
   border-radius: 50%;
-  animation: en-dot-bounce 1.4s ease-in-out infinite;
+  animation: var(--m-decorative-effect, en-dot-bounce 1.4s ease-in-out infinite);
 }
 
 /* ── Pulse variant ────────────────────────── */
@@ -1035,7 +1035,7 @@ textarea.vinput { resize: vertical; min-height: 70px; }
   border-radius: 50%;
   border: 1.5px solid;
   opacity: 0;
-  animation: en-pulse-expand 2s ease-out infinite;
+  animation: var(--m-decorative-effect, en-pulse-expand 2s ease-out infinite);
 }
 
 .en-loader-pulse-ring-2 {
@@ -1044,7 +1044,7 @@ textarea.vinput { resize: vertical; min-height: 70px; }
 
 .en-loader-pulse-core {
   border-radius: 50%;
-  animation: en-pulse-core 2s ease-in-out infinite;
+  animation: var(--m-decorative-effect, en-pulse-core 2s ease-in-out infinite);
 }
 
 @keyframes en-pulse-expand {
@@ -1077,7 +1077,7 @@ textarea.vinput { resize: vertical; min-height: 70px; }
   width: 20%;
   height: 20%;
   border-radius: 50%;
-  animation: en-orbit-rotate 1.8s linear infinite;
+  animation: var(--m-decorative-effect, en-orbit-rotate 1.8s linear infinite);
   /* The dot orbits around the center */
   offset-path: circle(40% at 50% 50%);
   offset-distance: 0%;
@@ -1086,7 +1086,7 @@ textarea.vinput { resize: vertical; min-height: 70px; }
 .en-loader-orbit-dot-2 {
   width: 14%;
   height: 14%;
-  animation: en-orbit-rotate 2.6s linear infinite reverse;
+  animation: var(--m-decorative-effect, en-orbit-rotate 2.6s linear infinite reverse);
   offset-distance: 50%;
 }
 
@@ -1100,13 +1100,13 @@ textarea.vinput { resize: vertical; min-height: 70px; }
     top: 0;
     left: 50%;
     transform-origin: 50% 250%;
-    animation: en-orbit-fallback 1.8s linear infinite;
+    animation: var(--m-decorative-effect, en-orbit-fallback 1.8s linear infinite);
   }
   .en-loader-orbit-dot-2 {
     bottom: 0;
     right: 50%;
     transform-origin: 50% -150%;
-    animation: en-orbit-fallback 2.6s linear infinite reverse;
+    animation: var(--m-decorative-effect, en-orbit-fallback 2.6s linear infinite reverse);
   }
   @keyframes en-orbit-fallback {
     to { transform: rotate(360deg); }

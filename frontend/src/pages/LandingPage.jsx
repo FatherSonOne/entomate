@@ -8,7 +8,7 @@ import { nextHeroClip } from '../components/heroRotation'
 import { Logo } from '../components/Logo'
 import ModuleJourney from '../components/landing/ModuleJourney'
 import LandingGuide from '../components/landing/LandingGuide'
-import useReducedMotion from '../components/landing/useReducedMotion'
+import { useReducedMotion } from '../components/bench/motion'
 import { AGENTS, BAND, CAPTURE, ECOSYSTEM_LINKS, LANDING_MEDIA_DIR, MEDIA, MODULES, NAV_LINKS } from '../components/landing/landingData'
 import '../styles/landing-c.css'
 
