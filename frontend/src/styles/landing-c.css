@@ -268,7 +268,8 @@
   .lc-band li:nth-child(-n+2) { border-bottom: 1px solid rgba(255,255,255,.22); }
   .lc-band .lc-v { font-size: 32px; }
   .lc-pad { padding-top: 64px; padding-bottom: 64px; }
-  .lc-sh { grid-template-columns: 1fr; gap: 10px; margin-bottom: 28px; }
+  .lc-sh { grid-template-columns: minmax(0, 1fr); gap: 10px; margin-bottom: 28px; }
+  .lc-sh h2 { font-size: clamp(28px, 8.5vw, 34px); overflow-wrap: anywhere; }
   .lc-sh > * { grid-column: auto; }
   .lc-sh .lc-n, .lc-sh h2, .lc-sh p { grid-column: auto; }
   .lc-minutes { grid-template-columns: 1fr; }
