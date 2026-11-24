@@ -368,9 +368,10 @@ export const guideSections = [
       },
       {
         id: 'md-share',
-        title: 'Share recap',
+        title: 'Export or share the recap',
         steps: [
-          'Press Share recap. Post it to a chat channel, or Download PDF. Email the people who were there opens the Follow-up tab.',
+          'Press Export to download the recap as a PDF or the transcript as a text file.',
+          'Press Share recap to post to a chat channel. Email the people who were there opens the Follow-up tab.',
           'Send to CRM pushes the action items to Logos Vision.',
           'More actions \u203a Add to calendar puts the meeting and its summary on your Google Calendar.',
         ],

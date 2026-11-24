@@ -87,7 +87,7 @@ api.interceptors.request.use(
     }
 
     // Check cache for GET requests (skip retries)
-    if (config.method === 'get' && !config._retryCount) {
+    if (config.method === 'get' && config.responseType !== 'blob' && !config._retryCount) {
       const cached = cache.get(config.url, config.params)
       if (cached !== null) {
         // Return cached data via a resolved adapter
@@ -131,7 +131,7 @@ api.interceptors.response.use(
     }
 
     // Cache GET responses
-    if (response.config?.method === 'get' && response.config?.url) {
+    if (response.config?.method === 'get' && response.config.responseType !== 'blob' && response.config.url) {
       cache.set(response.config.url, response.config.params, response.data)
     }
 
@@ -623,8 +623,10 @@ export const reportsApi = {
   getAvailable: () => api.get('/reports/available'),
 
   // Download meeting recap PDF
-  downloadMeetingPDF: (meetingId) =>
-    downloadFile(`/reports/meeting/${meetingId}/pdf`, 'meeting-recap.pdf'),
+  downloadMeetingPDF: (meetingId, filename = 'meeting-recap.pdf') =>
+    downloadFile(`/reports/meeting/${meetingId}/pdf`, filename, {
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+    }),
 
 
   // Download project report PDF

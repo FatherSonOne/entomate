@@ -41,35 +41,37 @@ router.get('/meeting/:id/pdf', async (req, res) => {
       return res.status(503).json({ error: 'Database not configured' });
     }
 
-    // Get meeting details (scoped to current user)
+    // Match Meeting Detail's workspace access, including meetings captured by the bot.
     const { data: meeting, error: meetingError } = await supabase
       .from('meetings')
       .select('*')
       .in('org_id', req.orgIds)
       .eq('id', id)
-      .eq('created_by', req.user.id)
-      .single();
+      .maybeSingle();
 
-    if (meetingError || !meeting) {
+    if (meetingError && meetingError.code !== '22P02') throw meetingError;
+    if (!meeting) {
       return res.status(404).json({ error: 'Meeting not found' });
     }
 
     // Get action items for this meeting
-    const { data: actionItems } = await supabase
+    const { data: actionItems, error: actionError } = await supabase
       .from('action_items')
       .select('*')
-      .in('org_id', req.orgIds)
+      .eq('org_id', meeting.org_id)
       .eq('meeting_id', id)
-      .order('priority', { ascending: true });
+      .order('priority', { ascending: false });
+    if (actionError) throw actionError;
 
     // Generate PDF
-    const pdfBuffer = await reportService.generateMeetingRecapPDF(meeting, actionItems || []);
+    const pdfBuffer = await reportService.generateMeetingRecapPDF(meeting, actionItems || [], req.query.timeZone);
 
     // Set response headers
     const filename = `meeting-recap-${meeting.title?.replace(/[^a-z0-9]/gi, '-').toLowerCase() || id}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Length', pdfBuffer.length);
+    res.setHeader('Cache-Control', 'private, no-store');
 
     res.send(pdfBuffer);
   } catch (error) {

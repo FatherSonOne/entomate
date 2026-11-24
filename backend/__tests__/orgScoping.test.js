@@ -108,6 +108,31 @@ function app(routerPath, prefix, userId = USER_A) {
 
 beforeEach(resetDb);
 
+test('meeting recap downloads include bot captures and stay in the meeting workspace', async () => {
+  const id = '0000000c-0000-4000-8000-00000000000c';
+  const meeting = { id, org_id: ORG_A, created_by: 'bot-owner', title: 'Bot capture' };
+  const action = { meeting_id: id, org_id: ORG_A, task_description: 'Send the minutes' };
+  mockDb.meetings.push(meeting);
+  mockDb.action_items.push(action, { ...action, org_id: ORG_B });
+  const reportService = require('../services/reportService');
+  const generate = jest.spyOn(reportService, 'generateMeetingRecapPDF');
+  const endpoint = `/api/reports/meeting/${id}/pdf`;
+  try {
+    const report = await request(app('../routes/reports', '/api/reports'))
+      .get(endpoint).query({ timeZone: 'America/New_York' }).expect(200);
+    expect(report.headers['content-type']).toBe('application/pdf');
+    expect(report.headers['cache-control']).toBe('private, no-store');
+    expect(report.body.subarray(0, 5).toString()).toBe('%PDF-');
+    expect(generate).toHaveBeenCalledWith(meeting, [action], 'America/New_York');
+
+    mockDb.org_members[0].org_id = ORG_B;
+    await request(app('../routes/reports', '/api/reports')).get(endpoint).expect(404);
+    expect(generate).toHaveBeenCalledTimes(1);
+  } finally {
+    generate.mockRestore();
+  }
+});
+
 describe('tasks are limited to the caller\'s org', () => {
   const tasks = () => app('../routes/tasks', '/api/tasks');
 
