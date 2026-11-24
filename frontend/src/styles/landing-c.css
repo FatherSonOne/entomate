@@ -102,13 +102,13 @@
 .lc-hero .lc-in { position: relative; z-index: 2; }
 .lc-page .lc-hero-film, .lc-page .lc-close-film { position: absolute; inset: 0; }
 .lc-hero .lc-scrim { z-index: 1; }
-.lc-page :is(.lc-hero-film, .lc-close-film) .brand-motion-control {
+.lc-page :is(.lc-hero-film, .lc-close-film, .lc-thumb) .brand-motion-control {
   right: clamp(20px, 5vw, 72px); bottom: 24px; z-index: 3; border-radius: 2px;
   color: var(--ink); background: #080808e8; border: 1px solid rgba(248,240,242,.35);
   font-family: var(--font-mono); font-size: 11px; letter-spacing: .06em; min-height: 36px;
 }
-.lc-page :is(.lc-hero-film, .lc-close-film) .brand-motion-control:hover { border-color: var(--accent); }
-.lc-page :is(.lc-hero-film, .lc-close-film) .brand-motion-control:focus-visible { outline-color: var(--accent); }
+.lc-page :is(.lc-hero-film, .lc-close-film, .lc-thumb) .brand-motion-control:hover { border-color: var(--accent); }
+.lc-page :is(.lc-hero-film, .lc-close-film, .lc-thumb) .brand-motion-control:focus-visible { outline-color: var(--accent); }
 .lc-hero .lc-eyebrow { color: var(--ink2); }
 .lc-hero .lc-rule { display: flex; gap: 24px; border-bottom: 2px solid var(--ink); padding-bottom: 12px; margin-bottom: 28px; max-width: 760px; }
 .lc-hero h1 { font-family: var(--font-display); font-weight: 800; font-size: clamp(46px, 6.6vw, 104px); line-height: .9; letter-spacing: -.035em; max-width: 12ch; }
@@ -167,8 +167,10 @@
 .lc-st { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
 .lc-st.ship { color: var(--ink2); } .lc-st.plan { color: var(--muted); }
 .lc-sheet .lc-src { margin-top: 14px; font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
-.lc-thumb { display: none; margin: 0 0 18px; aspect-ratio: 16 / 9; width: 100%; object-fit: cover; }
+.lc-thumb { position: relative; display: none; margin: 0 0 18px; aspect-ratio: 16 / 9; width: 100%; }
 .lc-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.lc-thumb > .brand-motion { position: absolute; inset: 0; }
+.lc-page .lc-thumb .brand-motion-control { right: 12px; bottom: 12px; min-height: 44px; }
 .lc-legend { position: absolute; right: max(72px, 5vw); bottom: 22px; z-index: 3; font-size: 11px; color: var(--muted); display: flex; gap: 16px; }
 
 /* static fallback: phone and reduced motion */
