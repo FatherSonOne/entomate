@@ -9,6 +9,7 @@ import { GUIDE_SHOTS } from './guideShots'
 import {
   Cell, Drawer, GroupHead, Grid, Key, PHONE_QUERY, Section, Signal, TextInput, TitleRule, useMediaQuery,
 } from '../bench'
+import { smoothScrollBehavior } from '../bench/motion'
 import {
   SECTION_LINKS, buildContents, chapterKey, changedSince, eyebrow, findEntry, flatten, highlight, prevNext,
   readUrlState, searchGuide, shortDate, writeUrlState,
@@ -299,7 +300,7 @@ export default function UsersGuide(): React.ReactElement {
   useEffect(() => {
     if (!scrollTo) return
     const el = scrollTo === 'top' ? topRef.current : document.getElementById(scrollTo)
-    el?.scrollIntoView({ block: 'start', behavior: scrollTo === 'top' ? 'auto' : 'smooth' })
+    el?.scrollIntoView({ block: 'start', behavior: scrollTo === 'top' ? 'auto' : smoothScrollBehavior() })
     setScrollTo(null)
   }, [scrollTo, url.section, url.news])
 

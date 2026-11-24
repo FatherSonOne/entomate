@@ -1,4 +1,4 @@
-import React, { Suspense, useState, useEffect, useCallback } from 'react'
+import React, { Suspense, useState, useEffect, useCallback, useRef } from 'react'
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import PageSkeleton from './PageSkeleton'
 import ErrorBoundary from './ErrorBoundary'
@@ -42,9 +42,12 @@ import { requestVoiceOnOpen } from './EntoAssistant/voiceSignal'
 import EntoAssistantButton from './EntoAssistant/EntoAssistantButton'
 import EntoAIProactiveChecker from './EntoAssistant/EntoAIProactiveChecker'
 import { BenchShell } from './bench/shell/BenchShell'
-import { Faceplate } from './bench'
+import { Drawer, Faceplate, Signal } from './bench'
+import { MOTION, useEnterOnChange } from './bench/motion'
 import { settingsApi } from '../services/api'
+import '../styles/meeting-recorder.css'
 const EntoAssistant = React.lazy(() => import('./EntoAssistant/EntoAssistant'))
+const MeetingRecorder = React.lazy(() => import('./meetings/MeetingRecorder'))
 
 // Grouped navigation structure — 4 sections
 // Items with adminOnly: true are filtered out at render time for non-admin
@@ -152,7 +155,15 @@ export default function Layout() {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [shortcutsHelpOpen, setShortcutsHelpOpen] = useState(false)
   const [assistantOpen, setAssistantOpen] = useState(false)
-  const assistantOutlet = { openAssistant: () => setAssistantOpen(true) }
+  const [recorderOpen, setRecorderOpen] = useState(false)
+  const [recorderLocked, setRecorderLocked] = useState(false)
+  const [recordingVersion, setRecordingVersion] = useState(0)
+  const [audioInputDeviceId, setAudioInputDeviceId] = useState('')
+  const openRecorder = () => setRecorderOpen(true)
+  const closeRecorder = () => setRecorderOpen(false)
+  const recorderRecorded = () => setRecordingVersion((version) => version + 1)
+  const recorderOutlet = { openRecorder, recorderOpen, recordingVersion }
+  const shellOutlet = { ...recorderOutlet, openAssistant: () => setAssistantOpen(true) }
   // The panel chunk loads on first open, then stays mounted so its conversation survives a close.
   const [assistantMounted, setAssistantMounted] = useState(false)
   useEffect(() => { if (assistantOpen) setAssistantMounted(true) }, [assistantOpen])
@@ -169,11 +180,13 @@ export default function Layout() {
   const proactiveCount = proactiveSuggestion ? signals.total : 0
   const location = useLocation()
   const navigate = useNavigate()
-  const { isDark, toggleMode, setThemeMode, isHeldLight, isBenchSwiss } = useTheme()
+  const { isDark, toggleMode, setThemeMode, isHeldLight, isBenchSwiss, designStyle } = useTheme()
+  const classicPageRef = useRef(null)
+  useEnterOnChange(classicPageRef, location.pathname, { rise: 0, duration: MOTION.fast })
   const { user, signOut } = useAuth()
   const orgCtx = useOrgSafe()
   const isAdmin = orgCtx?.myRole === 'owner' || orgCtx?.myRole === 'admin'
-  const shortcutsHeld = useNavigationShortcuts(navigate, isAdmin, !commandPaletteOpen && !shortcutsHelpOpen)
+  const shortcutsHeld = useNavigationShortcuts(navigate, isAdmin, !commandPaletteOpen && !shortcutsHelpOpen && !recorderOpen)
   // Announce a saved debrief without interrupting the current page.
   useBotDebriefWatch({ orgId: orgCtx?.org?.id, userId: user?.id || null, enabled: isAdmin })
 
@@ -192,9 +205,28 @@ export default function Layout() {
     'mod+k': { callback: () => setCommandPaletteOpen(prev => !prev), allowInInput: true },
     'mod+?': () => setShortcutsHelpOpen(true),
     'mod+/': () => setAssistantOpen(prev => !prev),
-    'mod+m': () => navigate('/meetings?new=true'),
+    'mod+m': openRecorder,
     'mod+,': () => navigate('/settings'),
-  })
+  }, !recorderOpen)
+
+  // Bookmarks and results in command search still use the existing recorder URL.
+  useEffect(() => {
+    if (location.pathname !== '/meetings') return
+    const params = new URLSearchParams(location.search)
+    if (params.get('new') !== 'true') return
+    setRecorderOpen(true)
+    params.delete('new')
+    navigate({ pathname: location.pathname, search: params.toString(), hash: location.hash }, { replace: true, state: location.state })
+  }, [location, navigate])
+
+  useEffect(() => {
+    if (!recorderOpen) return
+    let current = true
+    settingsApi.getUser().then((res) => {
+      if (current) setAudioInputDeviceId(res?.settings?.meetings_json?.audioInputDeviceId || '')
+    }).catch(() => {})
+    return () => { current = false }
+  }, [recorderOpen])
 
   useEffect(() => {
     document.title = getDocumentTitle(location.pathname)
@@ -239,6 +271,15 @@ export default function Layout() {
         </Suspense>
       )}
       <EntoAIProactiveChecker onSignals={onSignals} refreshKey={assistantOpen} />
+      <Drawer open={recorderOpen} onClose={closeRecorder} dismissible={!recorderLocked}
+        label="New meeting" className="bs-tokens bs-drawer-wide meeting-recorder-drawer" layer="top">
+        <div className="bs-skin meeting-recorder-body">
+          <Suspense fallback={<p role="status"><Signal tone="off">Loading recorder</Signal></p>}>
+            <MeetingRecorder audioInputDeviceId={audioInputDeviceId} onRecorded={recorderRecorded}
+              onCaptureChange={setRecorderLocked} onOpenMeeting={closeRecorder} />
+          </Suspense>
+        </div>
+      </Drawer>
     </>
   )
 
@@ -278,7 +319,7 @@ export default function Layout() {
           commandSearch={<CommandPalette toolbar isOpen={commandPaletteOpen} isAdmin={isAdmin}
             onOpen={() => setCommandPaletteOpen(true)} onClose={() => setCommandPaletteOpen(false)}
             onShowShortcuts={() => { setCommandPaletteOpen(false); setShortcutsHelpOpen(true) }} />}
-          onRecord={() => navigate('/meetings?new=true')}
+          onRecord={openRecorder}
           onSettings={() => goSettings()}
           settingsActive={isActive('/settings')}
           menuItems={[
@@ -304,7 +345,7 @@ export default function Layout() {
             {/* A page that breaks keeps the shell; navigating away clears it */}
             <ErrorBoundary scope="page" resetKey={location.pathname}>
               <Suspense fallback={<PageSkeleton />}>
-                <Outlet context={assistantOutlet} />
+                <Outlet context={shellOutlet} />
                 <BootMark stage="page" />
               </Suspense>
             </ErrorBoundary>
@@ -537,7 +578,7 @@ export default function Layout() {
             </button>
 
             {/* New Meeting CTA */}
-            <button className="btn btn-primary" onClick={() => navigate('/meetings?new=true')}>
+            <button className="btn btn-primary" onClick={openRecorder} aria-label="New meeting" aria-haspopup="dialog">
               <Mic className="w-4 h-4" />
               <span className="hidden sm:inline">New Meeting</span>
             </button>
@@ -545,10 +586,10 @@ export default function Layout() {
         </header>
 
         {/* Page content */}
-        <main className="p-4 lg:p-6" style={{ position: 'relative', zIndex: 1 }}>
+        <main ref={designStyle === 'classic' ? classicPageRef : undefined} className="p-4 lg:p-6" style={{ position: 'relative', zIndex: 1 }}>
           <ErrorBoundary scope="page" resetKey={location.pathname}>
             <Suspense fallback={<PageSkeleton />}>
-              <Outlet context={isActive('/meetings') ? assistantOutlet : undefined} />
+              <Outlet context={isActive('/meetings') ? shellOutlet : recorderOutlet} />
               <BootMark stage="page" />
             </Suspense>
           </ErrorBoundary>

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { smoothScrollBehavior } from './bench/motion'
 
 export default function BackToTop({ threshold = 400 }) {
   const [visible, setVisible] = useState(false)
@@ -11,8 +12,7 @@ export default function BackToTop({ threshold = 400 }) {
   }, [threshold])
 
   const handleClick = () => {
-    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    window.scrollTo({ top: 0, behavior: prefersReduced ? 'auto' : 'smooth' })
+    window.scrollTo({ top: 0, behavior: smoothScrollBehavior() })
   }
 
   return (
