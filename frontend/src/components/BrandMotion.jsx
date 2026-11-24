@@ -9,6 +9,7 @@ export default function BrandMotion({ clip = 'hands', className = '', controls =
   const [ready, setReady] = useState(false)
   const [failed, setFailed] = useState(false)
   const base = `${mediaDirectory}/${clip}`
+  const motionLabel = playing ? 'Pause motion' : 'Play motion'
 
   useEffect(() => {
     const video = ref.current
@@ -49,9 +50,9 @@ export default function BrandMotion({ clip = 'hands', className = '', controls =
         onError={() => { setFailed(true); setReady(false) }} />
       {controls && !failed && (
         <button type="button" className="brand-motion-control" onClick={() => setPlaying(!playing)}
-          aria-label={playing ? 'Pause background animation' : 'Play background animation'}>
+          aria-label={motionLabel}>
           <span aria-hidden="true">{playing ? 'Ⅱ' : '▷'}</span>{' '}
-          <span className="brand-motion-label">{playing ? 'Pause motion' : 'Play motion'}</span>
+          <span className="brand-motion-label">{motionLabel}</span>
         </button>
       )}
     </div>

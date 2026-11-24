@@ -201,6 +201,8 @@ export default function CommandPalette({ isOpen, onClose, onShowShortcuts, toolb
     <div className="bs-pal-group" role="presentation"><span>{label}</span>{count != null && <span>{count}</span>}</div>
   )
 
+  const searchKey = isOpen ? 'Esc' : `${MOD}K`
+  const searchAction = isOpen ? 'Close search' : 'Open search'
   const input = (
     <div className="bs-pal-in">
       <SearchIcon aria-hidden="true" strokeWidth={1.6} />
@@ -212,7 +214,7 @@ export default function CommandPalette({ isOpen, onClose, onShowShortcuts, toolb
         value={query} onFocus={() => { if (!isOpen) onOpen?.() }}
         onChange={(e) => { if (!isOpen) onOpen?.(); setQuery(e.target.value); setFlash(null) }} autoComplete="off" spellCheck={false} />
       {query && <button type="button" className="bs-pal-clear" aria-label="Clear search" onClick={() => { setQuery(''); inputRef.current?.focus() }}><X aria-hidden="true" /></button>}
-      <button type="button" className="bs-tag bs-pal-esc" onClick={() => isOpen ? onClose() : onOpen?.()} aria-label={isOpen ? 'Close search' : 'Open search'}>{isOpen ? 'esc' : `${MOD}K`}</button>
+      <button type="button" className="bs-tag bs-pal-esc" onClick={() => isOpen ? onClose() : onOpen?.()} aria-label={`${searchAction}, ${searchKey}`}>{searchKey}</button>
     </div>
   )
 

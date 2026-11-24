@@ -320,7 +320,8 @@ export default function Tasks() {
       ) : (
         <Switch label="Show" options={SHOW_OPTIONS} value={url.show} onChange={(v) => setUrl({ show: v })} />
       )}
-      <Key size="sm" onClick={() => setDrawer('filter')} aria-label="Filter and sort">
+      <Key size="sm" onClick={() => setDrawer('filter')} aria-haspopup="dialog"
+        aria-label={url.tag ? `Tag: ${url.tag}, filter and sort` : undefined}>
         {url.tag ? `Tag: ${url.tag}` : 'Filter · sort'}
       </Key>
     </div>

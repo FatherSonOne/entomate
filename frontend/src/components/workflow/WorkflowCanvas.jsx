@@ -44,6 +44,27 @@ const connectionLineStyle = {
 
 // Generate unique ID
 const generateId = () => `node_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+const MEETING_TRIGGER_LABEL = 'Meeting Processed'
+
+// The executor stores a trigger category and subtype. React Flow uses the subtype as its renderer key.
+function toCanvasNode(node) {
+  if (node.type !== 'trigger' || node.subtype !== 'meeting_processed') return node
+  return {
+    ...node,
+    type: 'meeting_processed',
+    data: { label: MEETING_TRIGGER_LABEL, config: node.config ?? {}, ...node.data },
+  }
+}
+
+function toStoredNode(node) {
+  if (node.type !== 'meeting_processed') return node
+  return {
+    ...node,
+    type: 'trigger',
+    subtype: 'meeting_processed',
+    config: node.data?.config ?? node.config ?? {},
+  }
+}
 
 // Inner component with flow instance access
 function WorkflowCanvasInner({
@@ -75,7 +96,11 @@ function WorkflowCanvasInner({
   }, []) // Only compute once on mount
 
   // State
-  const [nodes, setNodes, onNodesChange] = useNodesState(workflow?.nodes || [])
+  const initialNodes = useMemo(() => (workflow?.nodes || []).map(toCanvasNode), [workflow?.nodes])
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
+  const canvasNodes = useMemo(() => nodes.map(node => node.type === 'meeting_processed'
+    ? { ...node, ariaLabel: node.data?.label || MEETING_TRIGGER_LABEL }
+    : node), [nodes])
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
   const [selectedNode, setSelectedNode] = useState(null)
   const compact = useMediaQuery('(max-width: 1199px)')
@@ -361,7 +386,7 @@ function WorkflowCanvasInner({
         type: e.type || 'smoothstep'
       }))
       await onSave?.({
-        nodes,
+        nodes: nodes.map(toStoredNode),
         connections
       })
       setIsDirty(false)
@@ -457,7 +482,7 @@ function WorkflowCanvasInner({
       const text = await file.text()
       const data = JSON.parse(text)
 
-      if (data.nodes) setNodes(data.nodes)
+      if (data.nodes) setNodes(data.nodes.map(toCanvasNode))
       if (data.connections) setEdges(data.connections)
       markDirty()
       saveToHistory()
@@ -559,7 +584,7 @@ function WorkflowCanvasInner({
         {/* React Flow Canvas */}
         <div ref={reactFlowWrapper} className="min-h-0 flex-1">
           <ReactFlow
-            nodes={nodes}
+            nodes={canvasNodes}
             edges={edges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
