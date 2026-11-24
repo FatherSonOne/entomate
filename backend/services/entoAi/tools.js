@@ -61,6 +61,16 @@ function today(timeZone = 'UTC', now = new Date()) {
   return new Intl.DateTimeFormat('sv-SE', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
 }
 
+function localDateTime(value, timeZone) {
+  if (!value || /^\d{4}-\d{2}-\d{2}$/.test(value)) return value || null;
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return null;
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone, weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+    hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
+  }).format(timestamp);
+}
+
 function dayBoundary(date, timeZone) {
   const midnight = Date.parse(`${date}T00:00:00Z`);
   const formatter = new Intl.DateTimeFormat('en-US', { timeZone, timeZoneName: 'longOffset' });
@@ -195,7 +205,7 @@ const TOOLS = {
         required: ['meeting_id'],
       },
     },
-    async run(args, { db, orgIds, userId }) {
+    async run(args, { db, orgIds, userId, timeZone = 'UTC' }) {
       const id = uuidArg(args.meeting_id, 'meeting_id');
       const n = args.transcript_chars === 0 ? 0 : limitOf(args.transcript_chars, 3000, 12000);
       const { data: m, error } = await db.from('meetings')
@@ -219,6 +229,7 @@ const TOOLS = {
           id: m.id,
           title: m.title,
           date: m.start_time || m.created_at,
+          dateLocal: localDateTime(m.start_time || m.created_at, timeZone),
           endTime: m.end_time,
           durationMinutes: m.duration_minutes,
           projectId: m.project_id,
@@ -473,15 +484,20 @@ const TOOLS = {
         statusFilter(db.from('action_items').select('id, task_description, assigned_to_name, assigned_to_email, due_date, priority, status, meeting_id, meetings(title)')
           .in('org_id', orgIds), 'open').gte('due_date', from).lte('due_date', to)
           .order('due_date', { ascending: true }).limit(25).then(rows),
-        googleEvents(db, userId, timeMin, timeMax, query),
+        googleEvents(db, userId, timeMin, timeMax, query, timeZone),
       ]);
       return {
         from,
         to,
+        timeZone,
         googleCalendar: google.state,
         events: google.events,
         autoJoin: google.autoJoin || null,
-        meetings: meetings.map((m) => ({ id: m.id, title: m.title, start: m.start_time, end: m.end_time })),
+        meetings: meetings.map((m) => ({
+          id: m.id, title: m.title, start: m.start_time, end: m.end_time,
+          startLocal: localDateTime(m.start_time, timeZone),
+          endLocal: localDateTime(m.end_time, timeZone),
+        })),
         tasksDue: tasks.map(slimTask),
         actionItemsDue: items.map(slimActionItem),
       };
@@ -530,7 +546,7 @@ const TOOLS = {
 };
 
 /** The caller's own Google events, read with their own tokens (user_settings_self RLS). */
-async function googleEvents(db, userId, timeMin, timeMax, query) {
+async function googleEvents(db, userId, timeMin, timeMax, query, timeZone) {
   if (!calendarService.isConfigured()) return { state: 'not_configured', events: [] };
   let autoJoinSettings = null;
   try {
@@ -553,8 +569,8 @@ async function googleEvents(db, userId, timeMin, timeMax, query) {
       autoJoin: autoJoinSettings,
       events: (events || []).filter((e) => e.status !== 'cancelled').map((e) => ({
         title: e.summary,
-        start: e.start?.dateTime || e.start?.date,
-        end: e.end?.dateTime || e.end?.date,
+        startLocal: localDateTime(e.start?.dateTime || e.start?.date, timeZone),
+        endLocal: localDateTime(e.end?.dateTime || e.end?.date, timeZone),
         allDay: !e.start?.dateTime,
         location: trunc(e.location, 200),
         agenda: trunc(e.description, 720),

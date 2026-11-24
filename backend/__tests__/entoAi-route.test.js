@@ -475,11 +475,12 @@ describe('tools', () => {
     calendar.getEvents.mockResolvedValueOnce([
       {
         summary: 'Acme budget review',
-        start: { dateTime: '2026-03-08T18:00:00-04:00' },
+        start: { dateTime: '2026-03-08T15:00:00-07:00' },
+        end: { dateTime: '2026-03-08T15:30:00-07:00' },
         conferenceData: { entryPoints: [{ entryPointType: 'video', uri: 'https://meet.google.com/abc-defg-hij' }] },
         description: 'Bring the budget draft',
       },
-      { summary: 'Focus time' },
+      { summary: 'Focus time', start: { date: '2026-03-08' }, end: { date: '2026-03-09' } },
       { summary: 'Cancelled', status: 'cancelled' },
     ]);
     mockResults.user_settings = { data: { calendar_json: { tokens: { access_token: 'secret' } } } };
@@ -490,8 +491,12 @@ describe('tools', () => {
       timeMin: '2026-03-08T05:00:00.000Z', timeMax: '2026-03-09T04:00:00.000Z', query: 'Acme',
     }));
     expect(out.response.events).toEqual([
-      expect.objectContaining({ title: 'Acme budget review', meetingLink: 'https://meet.google.com/abc-defg-hij', agenda: 'Bring the budget draft' }),
-      expect.objectContaining({ title: 'Focus time', meetingLink: null }),
+      expect.objectContaining({
+        title: 'Acme budget review', meetingLink: 'https://meet.google.com/abc-defg-hij', agenda: 'Bring the budget draft',
+        startLocal: expect.stringMatching(/March 8, 2026.*6:00 PM EDT/),
+        endLocal: expect.stringMatching(/March 8, 2026.*6:30 PM EDT/),
+      }),
+      expect.objectContaining({ title: 'Focus time', meetingLink: null, startLocal: '2026-03-08', allDay: true }),
     ]);
     expect(JSON.stringify(out)).not.toContain('secret');
   });
