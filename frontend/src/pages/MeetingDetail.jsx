@@ -110,13 +110,14 @@ export default function MeetingDetail() {
   // Re-read when the attendee list changes (speaker rename turns "Speaker 1" into a name).
   const [carryForward, setCarryForward] = useState(null)
   const attendeeKey = JSON.stringify(meeting?.attendees || [])
+  const projectId = meeting?.project_id
   useEffect(() => {
     let cancelled = false
     meetingsApi.carryForward(id)
       .then((data) => { if (!cancelled) setCarryForward(data) })
       .catch(() => { if (!cancelled) setCarryForward(null) })
     return () => { cancelled = true }
-  }, [id, attendeeKey])
+  }, [id, attendeeKey, projectId])
 
   // ?t=<ms> (from Today's decision timecodes) jumps the transcript once the meeting has loaded.
   const [searchParams, setSearchParams] = useSearchParams()
@@ -664,6 +665,7 @@ export default function MeetingDetail() {
 
           {activeTab === 'minutes' && (
             <TabPanel idBase={TABS_ID} value="minutes">
+              {isPhone && <CarryForward data={carryForward} title="From earlier meetings" />}
               <div className="bs-mtg-block">
                 <Section
                   title="Summary"

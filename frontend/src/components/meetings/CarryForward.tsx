@@ -21,6 +21,8 @@ export interface CarryForwardItem {
 }
 
 export interface CarryForwardData {
+  projectContext?: { id: string; name: string; outcome: string; scope: string; successCriteria: string
+    nextMilestone?: { id: string; title: string; dueDate: string } }
   lastMeeting: { id: string; title: string; date: string; sharedPeople: string[]; sameSeries: boolean } | null
   relatedMeetings: number
   openCount: number
@@ -59,6 +61,7 @@ function normalize(raw: CarryForwardData | null | undefined): CarryForwardData |
   const done = Array.isArray(raw.done) ? raw.done : []
   const num = (v: unknown, fallback: number): number => (typeof v === 'number' && Number.isFinite(v) ? v : fallback)
   return {
+    projectContext: raw.projectContext,
     lastMeeting: raw.lastMeeting && typeof raw.lastMeeting === 'object' ? raw.lastMeeting : null,
     relatedMeetings: num(raw.relatedMeetings, 0),
     openCount: num(raw.openCount, open.length),
@@ -71,11 +74,12 @@ function normalize(raw: CarryForwardData | null | undefined): CarryForwardData |
 
 export default function CarryForward({ data: raw, title = 'From last time', limit }: CarryForwardProps): React.ReactElement | null {
   const data = normalize(raw)
-  if (!data || (data.openCount === 0 && data.doneCount === 0)) return null
+  if (!data || (!data.projectContext && data.openCount === 0 && data.doneCount === 0)) return null
 
   const open = typeof limit === 'number' ? data.open.slice(0, limit) : data.open
   const hidden = data.openCount - open.length
   const last = data.lastMeeting
+  const nextMilestone = data.projectContext?.nextMilestone
   const summary = [
     `${data.openCount} open`,
     data.overdueCount ? `${data.overdueCount} overdue` : null,
@@ -84,7 +88,24 @@ export default function CarryForward({ data: raw, title = 'From last time', limi
 
   return (
     <section className="bs-cf" aria-label={title}>
-      <Section title={title} level={3} aside={summary} />
+      <Section title={title} level={3} aside={data.openCount || data.doneCount ? summary : undefined} />
+      {data.projectContext && (
+        <div className="bs-cf-project">
+          <p className="bs-cf-src">
+            <span className="bs-lbl">Project context</span>{' '}
+            <Link to={'/projects/' + data.projectContext.id} className="bs-cf-link">{data.projectContext.name}</Link>
+          </p>
+          <dl className="bs-proj-brief-fields">
+            {data.projectContext.outcome && <div><dt className="bs-lbl">Outcome</dt><dd>{data.projectContext.outcome}</dd></div>}
+            {data.projectContext.scope && <div><dt className="bs-lbl">Scope</dt><dd>{data.projectContext.scope}</dd></div>}
+            {data.projectContext.successCriteria && <div><dt className="bs-lbl">Success criteria</dt><dd>{data.projectContext.successCriteria}</dd></div>}
+            {nextMilestone && <div>
+              <dt className="bs-lbl">Next milestone</dt>
+              <dd>{nextMilestone.title} ? <time dateTime={nextMilestone.dueDate}>{shortDate(nextMilestone.dueDate)}</time></dd>
+            </div>}
+          </dl>
+        </div>
+      )}
       {last && (
         <p className="bs-cf-src">
           <span className="bs-lbl">{last.sameSeries ? 'Last in this series' : 'Last met'}</span>{' '}

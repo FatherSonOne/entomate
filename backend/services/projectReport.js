@@ -9,13 +9,14 @@
 
 'use strict';
 
-const DONE = new Set(['done', 'completed', 'complete']);
+const { rollup, isDone } = require('./projectRollup');
+const { readProgress, summarizeMilestones } = require('./projectProgress');
 const ACTIVE = new Set(['in_progress', 'review']);
 
 /** Map task and action item statuses onto the PDF's three groups. */
 function reportStatus(status) {
   const s = String(status || '').toLowerCase();
-  if (DONE.has(s)) return 'done';
+  if (isDone(s)) return 'done';
   if (ACTIVE.has(s)) return 'in_progress';
   return 'open';
 }
@@ -25,9 +26,12 @@ function reportStatus(status) {
  * @returns {{ project: object, items: object[], teamWorkload: object[] }}
  */
 function buildProjectReport({ project, tasks = [], actionItems = [], now = new Date() }) {
-  const today = now.toISOString().slice(0, 10);
+  const topLevel = tasks.filter((task) => !task.parent_task_id);
+  const { total, done, late } = rollup(topLevel, [], actionItems, now);
+  const progress = readProgress(project);
+  const milestones = summarizeMilestones(progress.milestones);
   const items = [
-    ...tasks.map((t) => ({
+    ...topLevel.map((t) => ({
       task_description: t.title || t.description || 'Untitled task',
       status: reportStatus(t.status),
       owner: t.assigned_to || null,
@@ -40,9 +44,6 @@ function buildProjectReport({ project, tasks = [], actionItems = [], now = new D
       due_date: a.due_date || null,
     })),
   ];
-
-  const complete = items.filter((i) => i.status === 'done').length;
-  const overdue = items.filter((i) => i.status !== 'done' && i.due_date && String(i.due_date).slice(0, 10) < today).length;
 
   const byOwner = new Map();
   for (const item of items) {
@@ -57,10 +58,12 @@ function buildProjectReport({ project, tasks = [], actionItems = [], now = new D
     project: {
       id: project.id,
       title: project.name || 'Untitled project',
-      total_items: items.length,
-      complete_items: complete,
-      overdue_items: overdue,
-      progress_percent: items.length ? Math.round((complete / items.length) * 100) : 0,
+      total_items: total,
+      complete_items: done,
+      overdue_items: late,
+      progress_percent: total ? Math.round((done / total) * 100) : 0,
+      ...(milestones.total > 0 && { milestone_counts: { done: milestones.done, total: milestones.total } }),
+      ...(progress.updates.length > 0 && { latest_update: progress.updates[0] }),
     },
     items,
     teamWorkload: [...byOwner.values()].sort((a, b) => b.total_assigned - a.total_assigned),

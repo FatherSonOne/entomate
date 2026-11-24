@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useId, useState } from 'react'
 import { Drawer, Key, Section, Select, TextArea } from './bench'
 import { projectsApi } from '../services/api'
+import type { ProjectMeetingRow } from '../services/projectsView'
+import { meetingHref } from '../services/tasksView'
+import ProjectBriefSuggestions, { BRIEF_TEXT_FIELDS, type BriefField, type BriefSource } from './ProjectBriefSuggestions'
 
 interface Person { id: string; name: string }
 interface Brief {
@@ -9,6 +12,7 @@ interface Brief {
   successCriteria: string
   ownerId: string | null
   resources: string[]
+  sources?: Partial<Record<BriefField, BriefSource>>
 }
 interface BriefSnapshot {
   brief: Brief
@@ -18,12 +22,6 @@ interface BriefSnapshot {
   version: string | null
 }
 type Draft = Omit<Brief, 'resources'> & { resourceLines: string }
-
-const TEXT_FIELDS = [
-  { key: 'outcome', label: 'Outcome', length: 2000 },
-  { key: 'scope', label: 'Scope', length: 4000 },
-  { key: 'successCriteria', label: 'Success criteria', length: 4000 },
-] as const
 
 function draftFrom(brief: Brief): Draft {
   const { resources, ...text } = brief
@@ -35,7 +33,7 @@ interface ApiError extends Error {
   originalError?: { response?: { data?: { error?: string; details?: Array<{ message: string }> } } }
 }
 
-export default function ProjectBrief({ projectId }: { projectId: string }) {
+export default function ProjectBrief({ projectId, meetings }: { projectId: string; meetings: ProjectMeetingRow[] }) {
   const formId = useId()
   const [snapshot, setSnapshot] = useState<BriefSnapshot | null>(null)
   const [draft, setDraft] = useState<Draft | null>(null)
@@ -84,6 +82,7 @@ export default function ProjectBrief({ projectId }: { projectId: string }) {
       successCriteria: draft.successCriteria.trim(),
       ownerId: draft.ownerId,
       resources: draft.resourceLines.split('\n').map((line) => line.trim()).filter(Boolean),
+      sources: Object.fromEntries(Object.entries(draft.sources ?? {}).filter(([field]) => draft[field as BriefField].trim())),
     }
     setSaving(true)
     setSaveError('')
@@ -95,8 +94,7 @@ export default function ProjectBrief({ projectId }: { projectId: string }) {
     } catch (error) {
       const err = error as ApiError
       if (err.status === 409) {
-        setConflict(true)
-        setSaveError('This brief changed. Copy any edits you want to keep, then load the latest version.')
+        requireLatestBrief()
       } else {
         const data = err.originalError?.response?.data
         setSaveError(data?.details?.[0]?.message || data?.error || 'Could not save the brief. Try again.')
@@ -104,6 +102,20 @@ export default function ProjectBrief({ projectId }: { projectId: string }) {
     } finally {
       setSaving(false)
     }
+  }
+
+  const requireLatestBrief = () => {
+    setConflict(true)
+    setSaveError('This brief changed. Copy any edits you want to keep, then load the latest version.')
+  }
+
+  const applySuggestion = (field: BriefField, value: string, source: BriefSource) => {
+    setDraft((current) => current && { ...current, [field]: value, sources: { ...current.sources, [field]: source } })
+  }
+  const removeSource = (field: BriefField) => {
+    const sources = { ...draft?.sources }
+    delete sources[field]
+    setDraft((current) => current && { ...current, sources })
   }
 
   const brief = snapshot?.brief
@@ -118,7 +130,18 @@ export default function ProjectBrief({ projectId }: { projectId: string }) {
         <>
           <dl className="bs-proj-brief-fields">
             <div><dt className="bs-lbl">Project lead</dt><dd>{snapshot.owner?.name ?? (brief.ownerId ? 'Former workspace member' : 'Unassigned')}</dd></div>
-            {TEXT_FIELDS.map(({ key, label }) => brief[key] && <div key={key}><dt className="bs-lbl">{label}</dt><dd>{brief[key]}</dd></div>)}
+            {BRIEF_TEXT_FIELDS.map(({ key, label }) => {
+              const source = brief.sources?.[key]
+              return brief[key] && (
+                <div key={key}>
+                  <dt className="bs-lbl">{label}</dt>
+                  <dd>
+                    {brief[key]}
+                    {source && <a className="bs-tasks-link bs-brief-source" href={meetingHref({ ...source, title: null })} aria-label={'Source meeting for ' + label.toLowerCase()}>Source meeting</a>}
+                  </dd>
+                </div>
+              )
+            })}
             {brief.resources.length > 0 && (
               <div>
                 <dt className="bs-lbl">Resources</dt>
@@ -135,6 +158,10 @@ export default function ProjectBrief({ projectId }: { projectId: string }) {
         {draft && snapshot && (
           <form className="bs-tasks-form" onSubmit={save}>
             <p className="bs-proj-note">This brief is visible to members of this workspace.</p>
+            {meetings.length > 0 && (
+              <ProjectBriefSuggestions key={snapshot.version ?? 'new'} projectId={projectId} meetings={meetings} version={snapshot.version}
+                currentValues={snapshot.brief} disabled={saving || conflict} onConflict={requireLatestBrief} onUse={applySuggestion} />
+            )}
             <div className="bs-tasks-fl">
               <span className="bs-lbl">Project lead</span>
               <Select label="Project lead" value={draft.ownerId ?? ''} disabled={saving} onChange={(value) => setDraft({ ...draft, ownerId: value || null })}
@@ -144,10 +171,11 @@ export default function ProjectBrief({ projectId }: { projectId: string }) {
                   ...snapshot.members.map((p) => ({ value: p.id, label: p.name })),
                 ]} />
             </div>
-            {TEXT_FIELDS.map(({ key, label, length }) => (
+            {BRIEF_TEXT_FIELDS.map(({ key, label, length }) => (
               <div className="bs-tasks-fl" key={key}>
                 <label className="bs-lbl" htmlFor={`${formId}-${key}`}>{label}</label>
                 <TextArea id={`${formId}-${key}`} rows={3} maxLength={length} disabled={saving} value={draft[key]} onChange={(event) => setDraft({ ...draft, [key]: event.target.value })} />
+                {draft.sources?.[key] && <Key size="sm" className="bs-brief-remove" disabled={saving} onClick={() => removeSource(key)} aria-label={'Remove source for ' + label.toLowerCase()}>Remove source link</Key>}
               </div>
             ))}
             <div className="bs-tasks-fl">

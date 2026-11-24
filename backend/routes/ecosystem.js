@@ -278,6 +278,7 @@ router.get('/sync-status/:meetingId', async (req, res) => {
       .from('ecosystem_events')
       .select('target_app, event_type, status, created_at, error_message, id')
       .eq('entity_id', meetingId)
+      .eq('entity_type', 'meeting')
       .eq('direction', 'outbound')
       .order('created_at', { ascending: false });
 

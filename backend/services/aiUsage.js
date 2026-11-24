@@ -87,25 +87,31 @@ function addUsage(meta) {
  */
 async function meterAi(req, res, next) {
   let orgId = null;
-  if (supabase) {
-    try {
-      orgId = (await getOrgIdsForUser(req.user?.id))[0] || null;
-      if (orgId) {
-        const { used, limit } = await quotaFor(orgId);
-        if (used >= limit) {
-          return res.status(429).json({
-            code: 'ai_quota',
-            used,
-            limit,
-            error: `Your workspace has used all ${limit} AI questions for this month. The count starts again on the 1st.`,
-          });
-        }
-      }
-    } catch (err) {
-      log.warn(`[aiUsage] Quota check skipped: ${err.message || err}`);
-    }
+  try {
+    if (supabase) orgId = (await getOrgIdsForUser(req.user?.id))[0] || null;
+  } catch (err) {
+    log.warn('[aiUsage] Could not resolve workspace:', err.message || err);
   }
-  scope.run({ orgId, counted: false }, next);
+  return meterAiForOrg(orgId, res, next);
 }
 
-module.exports = { meterAi, addUsage, usageOf, limitFor, monthStart, PLAN_AI_LIMITS, PRICE_PER_MILLION };
+async function meterAiForOrg(orgId, res, next) {
+  if (orgId && supabase) {
+    try {
+      const { used, limit } = await quotaFor(orgId);
+      if (used >= limit) {
+        return res.status(429).json({
+          code: 'ai_quota',
+          used,
+          limit,
+          error: `Your workspace has used all ${limit} AI questions for this month. The count starts again on the 1st.`,
+        });
+      }
+    } catch (err) {
+      log.warn('[aiUsage] Quota check skipped:', err.message || err);
+    }
+  }
+  return scope.run({ orgId, counted: false }, next);
+}
+
+module.exports = { meterAi, meterAiForOrg, addUsage, usageOf, limitFor, monthStart, PLAN_AI_LIMITS, PRICE_PER_MILLION };

@@ -6,6 +6,7 @@
  */
 
 import type { SignalTone } from '../components/bench'
+import type { Milestone } from './projectProgress'
 import { asList } from './meetingView'
 import { toSummaryMoments } from './meetingTranscriptService'
 import { parseDay, startOfDay } from './todayView'
@@ -95,11 +96,11 @@ export function toTags(raw: unknown): string[] {
 
 // ── Status, dates, progress ─────────────────────────────────────
 
-export type ProjectFilter = 'active' | 'planning' | 'done' | 'all'
+export type ProjectFilter = 'active' | 'planning' | 'done' | 'archived' | 'all'
 
 export function filterGroup(p: ProjectRow): Exclude<ProjectFilter, 'all'> {
   const s = normalizeProjectStatus(p.status)
-  return s === 'completed' || s === 'archived' ? 'done' : s
+  return s === 'completed' ? 'done' : s
 }
 
 /** Whole days from today to the end date (negative once it has passed); null without an end date. */
@@ -151,7 +152,7 @@ export function plural(n: number, word: string): string {
 
 // ── List ────────────────────────────────────────────────────────
 
-const GROUP_ORDER: Record<Exclude<ProjectFilter, 'all'>, number> = { active: 0, planning: 1, done: 2 }
+const GROUP_ORDER: Record<Exclude<ProjectFilter, 'all'>, number> = { active: 0, planning: 1, done: 2, archived: 3 }
 
 /** Filtered, active first, then by the nearest end date (no date last). */
 export function shownProjects(list: ReadonlyArray<ProjectRow>, f: ProjectFilter, search = ''): ProjectRow[] {
@@ -169,7 +170,7 @@ export function shownProjects(list: ReadonlyArray<ProjectRow>, f: ProjectFilter,
 }
 
 export function filterCounts(list: ReadonlyArray<ProjectRow>): Record<ProjectFilter, number> {
-  const out: Record<ProjectFilter, number> = { active: 0, planning: 0, done: 0, all: list.length }
+  const out: Record<ProjectFilter, number> = { active: 0, planning: 0, done: 0, archived: 0, all: list.length }
   for (const p of list) out[filterGroup(p)] += 1
   return out
 }
@@ -400,6 +401,11 @@ export function owners(items: ReadonlyArray<WorkItem>, now = new Date()): OwnerL
 
 export interface WorkCounts { total: number; done: number; open: number; late: number; unowned: number }
 
+// Project reports and Ask Entomate compare date-only deadlines against the UTC day.
+export function projectWorkDay(now = new Date()): Date {
+  return new Date(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 12)
+}
+
 export function workCounts(items: ReadonlyArray<WorkItem>, now = new Date()): WorkCounts {
   const open = items.filter((i) => i.status !== 'done')
   return {
@@ -426,14 +432,18 @@ export interface ProjectTape {
   marks: TapeMark[]
   /** Upcoming linked meetings, drawn dim. */
   upcoming: TapeMark[]
+  milestones: { item: Milestone; pct: number }[]
 }
 
-export function projectTape(p: ProjectDetailRow, now = new Date(), schedule = projectSchedule(p, now)): ProjectTape | null {
+export function projectTape(p: ProjectDetailRow, now = new Date(), schedule = projectSchedule(p, now), milestones: Milestone[] = []): ProjectTape | null {
   const { start, end } = schedule
-  if (start == null && end == null) return null
-  const first = start ?? end!
-  const last = end ?? first
-  const scale = scheduleScale(Math.min(first, last), Math.max(first, last), calendarDay(now))
+  const datedMilestones = milestones.flatMap((item) => {
+    const day = storedDay(item.dueDate)
+    return day == null ? [] : [{ item, day }]
+  }).sort((a, b) => a.day - b.day)
+  const dates = [start, end, ...datedMilestones.map(({ day }) => day)].filter((day): day is number => day != null)
+  if (!dates.length) return null
+  const scale = scheduleScale(Math.min(...dates), Math.max(...dates), calendarDay(now))
   const at = (day: number) => scalePosition(day, scale.from, scale.to)
   const marks: TapeMark[] = []
   const upcoming: TapeMark[] = []
@@ -458,6 +468,7 @@ export function projectTape(p: ProjectDetailRow, now = new Date(), schedule = pr
     endPct: end == null ? null : at(end),
     marks,
     upcoming,
+    milestones: datedMilestones.map(({ item, day }) => ({ item, pct: at(day) })),
   }
 }
 
@@ -502,7 +513,7 @@ export interface ProjectsUrlState {
   layout: WorkLayout
 }
 
-const FILTERS: ReadonlyArray<ProjectFilter> = ['active', 'planning', 'done', 'all']
+const FILTERS: ReadonlyArray<ProjectFilter> = ['active', 'planning', 'done', 'archived', 'all']
 const DRAWERS: ReadonlyArray<ProjectDrawer> = ['new', 'edit', 'link', 'task']
 
 export function readUrl(params: URLSearchParams): ProjectsUrlState {

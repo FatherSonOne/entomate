@@ -9,6 +9,7 @@ const { supabase } = require('../config/supabase');
 const { authenticate } = require('../middleware/auth');
 const reportService = require('../services/reportService');
 const { buildProjectReport } = require('../services/projectReport');
+const { loadProjectWork } = require('../services/projectWork');
 const log = require('../utils/log');
 const { attachOrgIds } = require('../utils/orgContext');
 
@@ -89,42 +90,13 @@ router.get('/project/:id/pdf', async (req, res) => {
       return res.status(503).json({ error: 'Database not configured' });
     }
 
-    const { data: project } = await supabase
-      .from('projects')
-      .select('id, name')
-      .in('org_id', req.orgIds)
-      .eq('id', id)
-      .maybeSingle();
+    const { data: project, error } = await supabase.from('projects')
+      .select('id, name, org_id, settings').in('org_id', req.orgIds).eq('id', id).maybeSingle();
+    if (error) throw error;
+    if (!project) return res.status(404).json({ error: 'Project not found' });
 
-    if (!project) {
-      return res.status(404).json({ error: 'Project not found' });
-    }
-
-    const [{ data: tasks }, { data: meetings }] = await Promise.all([
-      supabase
-        .from('tasks')
-        .select('title, description, status, assigned_to, due_date')
-        .in('org_id', req.orgIds)
-        .eq('project_id', id),
-      supabase
-        .from('meetings')
-        .select('id')
-        .in('org_id', req.orgIds)
-        .eq('project_id', id),
-    ]);
-
-    const meetingIds = (meetings || []).map((m) => m.id);
-    let actionItems = [];
-    if (meetingIds.length) {
-      const { data } = await supabase
-        .from('action_items')
-        .select('task_description, status, assigned_to_name, due_date')
-        .in('org_id', req.orgIds)
-        .in('meeting_id', meetingIds);
-      actionItems = data || [];
-    }
-
-    const report = buildProjectReport({ project, tasks: tasks || [], actionItems });
+    const { tasks, actionItems } = await loadProjectWork(supabase, [project.id], [project.org_id]);
+    const report = buildProjectReport({ project, tasks, actionItems });
     const pdfBuffer = await reportService.generateProjectReportPDF(report.project, report.items, report.teamWorkload);
 
     const filename = `project-report-${id}.pdf`;

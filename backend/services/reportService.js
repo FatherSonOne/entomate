@@ -151,6 +151,10 @@ class ReportService {
         doc.text(`Total Items: ${project.total_items || 0}`);
         doc.text(`Completed: ${project.complete_items || 0}`);
         doc.text(`Overdue: ${project.overdue_items || 0}`);
+        if (project.milestone_counts) {
+          const { done, total } = project.milestone_counts;
+          doc.text('Milestones complete: ' + done + ' of ' + total);
+        }
         doc.moveDown();
 
         // Progress bar
@@ -159,6 +163,15 @@ class ReportService {
         doc.rect(50, doc.y, (300 * progress) / 100, 15)
           .fill(progress >= 70 ? BRAND.success : progress >= 40 ? BRAND.warning : BRAND.error);
         doc.moveDown(2);
+
+        if (project.latest_update) {
+          const { health, authorName, postedAt, note } = project.latest_update;
+          const label = ({ on_track: 'On track', at_risk: 'At risk', off_track: 'Off track' })[health];
+          doc.fontSize(14).fillColor(BRAND.primary).text('Latest Status Update');
+          doc.fontSize(11).fillColor(BRAND.muted).text([label, authorName, postedAt.slice(0, 10)].join(' | '));
+          doc.fontSize(11).fillColor(BRAND.dark).text(note);
+          doc.moveDown();
+        }
 
         // Team Workload
         if (teamWorkload.length > 0) {

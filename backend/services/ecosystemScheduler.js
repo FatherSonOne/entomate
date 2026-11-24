@@ -66,6 +66,7 @@ class EcosystemScheduler {
           next_retry_at: new Date(Date.now() + 60 * 1000).toISOString(),
         })
         .eq('direction', 'outbound')
+        .or('entity_type.is.null,entity_type.neq.project')
         .eq('status', 'pending')
         .lt('created_at', cutoff)
         .select('id');
@@ -98,6 +99,7 @@ class EcosystemScheduler {
         .from('ecosystem_events')
         .select('id, retry_count, event_type, target_app')
         .eq('direction', 'outbound')
+        .or('entity_type.is.null,entity_type.neq.project')
         .eq('status', 'failed')
         .not('next_retry_at', 'is', null)
         .lte('next_retry_at', new Date().toISOString())

@@ -94,7 +94,7 @@ function summarizeProjects(projects = [], tasks = [], meetings = [], actions = [
   const meetingsBy = byKey(meetings, 'project_id');
   const actionsBy = byKey(actions, 'meeting_id');
   const meetingById = new Map((meetings || []).map((m) => [m.id, m]));
-  const nameById = new Map(projects.map((p) => [p.id, p.name]));
+  const nameById = new Map(projects.filter((p) => p.status !== 'archived').map((p) => [p.id, p.name]));
 
   const out = projects.map((p) => {
     const ms = meetingsBy.get(p.id) || [];

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Search } from 'lucide-react'
 import { projectsApi } from '../services/api'
@@ -38,6 +38,8 @@ export default function Projects(): React.ReactElement {
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
   const url = useMemo(() => readUrl(params), [params])
+  const archived = url.show === 'archived'
+  const request = useRef(0)
 
   const [rows, setRows] = useState<ProjectRow[]>([])
   const [needs, setNeeds] = useState<NeedRow[]>([])
@@ -58,24 +60,30 @@ export default function Projects(): React.ReactElement {
   }, [params, setParams])
 
   const load = useCallback(async () => {
+    const token = ++request.current
     try {
       setError(null)
       setLoading(true)
-      const res = (await projectsApi.list({ limit: LOAD_LIMIT, offset })) as unknown as ListResponse
+      const res = (await projectsApi.list({ limit: LOAD_LIMIT, offset, status: archived ? 'archived' : undefined })) as unknown as ListResponse
+      if (token !== request.current) return
       setRows(res.projects ?? [])
       setNeeds(res.needsYou ?? [])
       setLateTotal(res.lateTotal ?? 0)
       setCount(res.count ?? 0)
       setHasMore(res.hasMore ?? false)
     } catch (err) {
+      if (token !== request.current) return
       console.error('[Projects] load error:', err)
       setError(err instanceof Error ? err.message : 'Failed to load projects')
     } finally {
-      setLoading(false)
+      if (token === request.current) setLoading(false)
     }
-  }, [offset])
+  }, [archived, offset])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    void load()
+    return () => { request.current++ }
+  }, [load])
 
   // The old portfolio Board (?view=board) is cut: its kanban lives in Tasks › Lanes.
   useEffect(() => {
@@ -123,15 +131,18 @@ export default function Projects(): React.ReactElement {
   )
 
   const filterOptions: Array<{ value: ProjectFilter; label: React.ReactNode }> = [
-    { value: 'active', label: <>Active <span className="bs-proj-n">{counts.active}</span></> },
-    { value: 'planning', label: <>Planning <span className="bs-proj-n">{counts.planning}</span></> },
-    { value: 'done', label: <>Done <span className="bs-proj-n">{counts.done}</span></> },
-    { value: 'all', label: <>All <span className="bs-proj-n">{counts.all}</span></> },
+    { value: 'active', label: <>Active {!archived && <span className="bs-proj-n">{counts.active}</span>}</> },
+    { value: 'planning', label: <>Planning {!archived && <span className="bs-proj-n">{counts.planning}</span>}</> },
+    { value: 'done', label: <>Done {!archived && <span className="bs-proj-n">{counts.done}</span>}</> },
+    { value: 'archived', label: 'Archived' },
+    { value: 'all', label: <>All {!archived && <span className="bs-proj-n">{counts.all}</span>}</> },
   ]
 
   const meta = loading
     ? <span>Loading</span>
-    : <span><b>{paged ? `${rows.length} of ${count} projects` : plural(rows.length, 'project')}</b> · {sum.active} active{lateTotal > 0 && <> · <span className="bs-proj-late">{plural(lateTotal, 'late item')}</span></>}{paged && ' · Totals for this page'}</span>
+    : archived
+      ? <span><b>{plural(count, 'archived project')}</b></span>
+      : <span><b>{paged ? `${rows.length} of ${count} projects` : plural(rows.length, 'project')}</b> · {sum.active} active{lateTotal > 0 && <> · <span className="bs-proj-late">{plural(lateTotal, 'late item')}</span></>}{paged && ' · Totals for this page'}</span>
 
   return (
     <div className="bs-proj">
@@ -141,7 +152,7 @@ export default function Projects(): React.ReactElement {
         actions={<Key variant="primary" onClick={() => setUrl({ drawer: 'new' })}>New project</Key>}
       />
 
-      <Grid>
+      {!archived && <Grid>
         <Cell span={8}>
           <Display className="bs-proj-disp" role="region" aria-label="Deadlines">
             <div className="bs-proj-disp-head">
@@ -204,12 +215,18 @@ export default function Projects(): React.ReactElement {
             <Readout label="Decisions" value={loading ? '—' : sum.decisions} context={`from ${plural(sum.meetings, 'linked meeting')}`} />
           </div>
         </Cell>
-      </Grid>
+      </Grid>}
 
-      <Grid className="bs-proj-row2">
-        <Cell span={8}>
+      <Grid className={archived ? undefined : 'bs-proj-row2'}>
+        <Cell span={archived ? 12 : 8}>
           <section aria-labelledby="proj-list">
-            <Section number="01" id="proj-list" title="Projects" aside={<Switch<ProjectFilter> label="Status" options={filterOptions} value={url.show} onChange={(v) => setUrl({ show: v })} className="bs-proj-filter" />} />
+            <Section number={archived ? undefined : '01'} id="proj-list" title={archived ? 'Archived projects' : 'Projects'} aside={<Switch<ProjectFilter> label="Status" options={filterOptions} value={url.show} onChange={(v) => {
+              if ((v === 'archived') !== archived) {
+                setLoading(true)
+                setOffset(0)
+              }
+              setUrl({ show: v })
+            }} className="bs-proj-filter" />} />
             <div className="bs-proj-search">
               <TextInput icon={<Search aria-hidden="true" />} placeholder={paged ? 'Search this page' : 'Search projects'} aria-label={paged ? 'Search projects on this page' : 'Search projects'} value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
@@ -261,7 +278,7 @@ export default function Projects(): React.ReactElement {
             )}
           </section>
         </Cell>
-        <Cell span={4} rule>
+        {!archived && <Cell span={4} rule>
           <section aria-labelledby="proj-needs">
             <Section number="02" id="proj-needs" title="Needs you" level={3} aside={lateTotal > needs.length ? `${needs.length} of ${lateTotal}` : undefined} />
             {loading ? <p className="bs-proj-empty">Loading</p> : needs.length === 0 ? (
@@ -282,7 +299,7 @@ export default function Projects(): React.ReactElement {
               </ul>
             )}
           </section>
-        </Cell>
+        </Cell>}
       </Grid>
 
       <Drawer open={url.drawer === 'new'} onClose={() => setUrl({ drawer: null })} label="New project">

@@ -290,7 +290,11 @@ export const meetingsApi = {
   // Ask question about meeting
   ask: (id, question) => api.post(`/meetings/${id}/ask`, { question }),
   // What was promised before this meeting (earlier meetings with the same people or series)
-  carryForward: (id) => api.get(`/meetings/${id}/carry-forward`),
+  carryForward: (id) => {
+    const path = `/meetings/${id}/carry-forward`
+    cache.invalidate(path)
+    return api.get(path)
+  },
   // Same, for an upcoming calendar event: { title, attendees, startsAt }
   carryForwardPreview: (event) => api.post('/meetings/carry-forward', event),
   // Finish pending minutes from the saved transcript and refresh linked work.
@@ -369,13 +373,34 @@ export const projectsApi = {
   },
 
   saveBrief: (id, data) => api.put(`/projects/${id}/brief`, data),
+  suggestBrief: (id, meetingId) => api.post(`/projects/${id}/brief/suggestions`, { meetingId }, { skipRetry: true }),
+  getProgress: (id) => {
+    const path = `/projects/${id}/progress`
+    cache.invalidate(path)
+    return api.get(path)
+  },
+  saveProgress: (id, data) => api.patch(`/projects/${id}/progress`, data, { skipRetry: true }),
 
   // Update project
   update: (id, data) => api.put(`/projects/${id}`, data),
 
-  // Delete project
-  delete: (id) => api.delete(`/projects/${id}`),
+  archive: async (id) => {
+    const result = await api.put(`/projects/${id}`, { status: 'archived' }, { skipRetry: true })
+    cache.invalidate('/projects')
+    return result
+  },
+  restore: async (id) => {
+    const result = await api.patch(`/projects/${id}/restore`, {}, { skipRetry: true })
+    cache.invalidate('/projects')
+    return result
+  },
 
+  getHandoff: (id) => {
+    const path = '/projects/' + id + '/handoff'
+    cache.invalidate(path)
+    return api.get(path)
+  },
+  sendHandoff: (id, channelId) => api.post('/projects/' + id + '/handoff', { channelId }, { skipRetry: true }),
   // Create from CRM deal
   createFromDeal: (data) => api.post('/projects/from-deal', data),
 
