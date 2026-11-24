@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 vi.mock('../services/supabaseClient', () => ({ supabase: {} }))
 import {
   daysLeft, endsLabel, filterCounts, linkCandidates, owners, projectDecisions, projectSchedule, projectSignal, projectTape,
-  projectWork, readUrl, shownProjects, timeline, workCounts, writeUrl,
+  projectWork, projectWorkDay, readUrl, shownProjects, timeline, workCounts, writeUrl,
   type ProjectDetailRow, type ProjectRow, type Rollup,
 } from '../services/projectsView'
 
@@ -47,12 +47,15 @@ describe('projectsView', () => {
       proj({ name: 'Portal', status: 'planning', end_date: '2027-03-30' }),
       proj({ name: 'Website', end_date: '2026-12-12' }),
       proj({ name: 'Migration', status: 'completed' }),
+      proj({ name: 'Retired pilot', status: 'archived' }),
       proj({ name: 'Northwind', end_date: '2026-12-01', description: 'seats rollout' }),
     ]
-    expect(shownProjects(list, 'all').map((p) => p.name)).toEqual(['Northwind', 'Website', 'Portal', 'Migration'])
+    expect(shownProjects(list, 'all').map((p) => p.name)).toEqual(['Northwind', 'Website', 'Portal', 'Migration', 'Retired pilot'])
     expect(shownProjects(list, 'done').map((p) => p.name)).toEqual(['Migration'])
     expect(shownProjects(list, 'all', 'seats').map((p) => p.name)).toEqual(['Northwind'])
-    expect(filterCounts(list)).toEqual({ active: 2, planning: 1, done: 1, all: 4 })
+    expect(shownProjects(list, 'archived').map((p) => p.name)).toEqual(['Retired pilot'])
+    expect(readUrl(new URLSearchParams('show=archived')).show).toBe('archived')
+    expect(filterCounts(list)).toEqual({ active: 2, planning: 1, done: 1, archived: 1, all: 5 })
   })
 
   it('lays out dates and keeps item counts separate from the schedule span', () => {
@@ -108,6 +111,7 @@ describe('projectsView', () => {
     expect(work.map((w) => w.key).sort()).toEqual(['action:a1', 'action:a2', 'task:t1', 'task:t2'])
     expect(work.every((w) => w.projectId === 'p1')).toBe(true)
     expect(workCounts(work, NOW)).toEqual({ total: 4, done: 1, open: 3, late: 2, unowned: 1 })
+    expect(projectWorkDay(new Date('2026-11-24T01:00:00Z')).getDate()).toBe(24)
     expect(owners(work, NOW)).toEqual([
       { name: null, open: 1, late: 1 },
       { name: 'Priya', open: 1, late: 1 },
@@ -132,6 +136,13 @@ describe('projectsView', () => {
     expect(t.scale.nowPct).toBeLessThan(80)
     expect(projectTape({ ...detail, end_date: null }, NOW)?.endPct).toBeNull()
     expect(projectTape({ ...detail, start_date: null, end_date: null }, NOW)).toBeNull()
+    const milestone = { id: 'm1', title: 'Pilot review', dueDate: '2026-12-15', ownerId: null, ownerName: null, completedAt: null }
+    const milestoneOnly = projectTape({ ...detail, start_date: null, end_date: null }, NOW, undefined, [milestone])!
+    expect(milestoneOnly.startPct).toBeNull()
+    expect(milestoneOnly.endPct).toBeNull()
+    expect(milestoneOnly.milestones).toEqual([{ item: milestone, pct: 100 }])
+    const extended = projectTape(detail, NOW, undefined, [milestone])!
+    expect(extended.endPct).toBeLessThan(extended.milestones[0]?.pct ?? -1)
   })
 
   it('ranks meetings to link by how often they mention the project', () => {

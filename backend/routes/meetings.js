@@ -669,14 +669,14 @@ router.get('/:id/carry-forward', authenticate, async (req, res) => {
 
     const { data: meeting, error } = await supabase
       .from('meetings')
-      .select('id, title, attendees, created_at')
+      .select('id, title, attendees, created_at, project_id')
       .eq('id', id)
       .eq('org_id', orgId)
       .single();
     if (error || !meeting) return res.status(404).json({ error: 'Meeting not found' });
 
     const result = await carryForward.load(
-      { id: meeting.id, title: meeting.title, attendees: meeting.attendees, at: meeting.created_at },
+      { id: meeting.id, projectId: meeting.project_id, title: meeting.title, attendees: meeting.attendees, at: meeting.created_at },
       [orgId]
     );
     res.json(result);

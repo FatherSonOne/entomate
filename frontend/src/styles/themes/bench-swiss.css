@@ -2414,6 +2414,18 @@ div.bs-proj-empty p { margin: 0; }
 .bs-proj-tape-mk.up { opacity: .55; }
 .bs-proj-tape-mk > span { position: absolute; top: 10px; left: 4px; max-width: 108px; overflow: hidden; text-overflow: ellipsis; font: 500 10px var(--bs-mono); color: var(--bs-d-mut); white-space: nowrap; }
 .bs-proj-tape-dec { position: absolute; left: 3px; height: 8px; width: 2px; background: var(--bs-d-brand); }
+.bs-proj-milestone-track { position: relative; margin: 3px 0 6px; height: 12px; }
+.bs-proj-milestone-track > span { position: absolute; top: 3px; width: 7px; height: 7px; background: var(--bs-d-ai); transform: translateX(-50%) rotate(45deg); }
+.bs-proj-milestone-track > span[data-done="true"] { background: var(--bs-d-live); }
+.bs-proj-milestone-legend { display: flex; flex-wrap: wrap; gap: 5px 12px; list-style: none; margin: 0; padding: 0; font-size: 12px; overflow-wrap: anywhere; }
+.bs-proj-milestone-legend a { display: inline-block; max-width: 100%; }
+.bs-proj-milestone-row { scroll-margin-top: 70px; flex-wrap: wrap; align-items: baseline; }
+.bs-proj-milestone-row:target { outline: 1px solid var(--bs-rule-ink); }
+.bs-proj-milestone-actions { display: flex; flex-wrap: wrap; gap: 4px; }
+.bs-proj-updates { list-style: none; margin: 10px 0; padding: 0; }
+.bs-proj-updates > li { border-bottom: 1px solid var(--bs-rule); padding: 10px 0; }
+.bs-proj-update-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 10px; }
+.bs-proj-update-note { margin: 6px 0; white-space: pre-line; overflow-wrap: anywhere; }
 @container (max-width: 480px) {
   .bs-proj-axis { margin-left: 0; }
   .bs-proj-axis-tick:nth-child(even):not(:last-child) > span { display: none; }
@@ -2429,6 +2441,19 @@ div.bs-proj-empty p { margin: 0; }
 .bs-proj-brief-fields ul { margin: 0; padding: 0; list-style: none; }
 .bs-proj-brief-fields li + li { margin-top: 4px; }
 .bs-proj-brief-error { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
+.bs-brief-source { display: block; width: fit-content; font-size: 13px; margin-top: 4px; }
+.bs-brief-remove { justify-self: start; }
+.bs-brief-review { display: grid; gap: 12px; min-width: 0; border-block: 1px solid var(--bs-rule); padding: 14px 0; }
+.bs-brief-review-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.bs-brief-review-controls > .bs-select { max-width: 100%; }
+.bs-brief-suggestion { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--bs-rule); min-width: 0; }
+.bs-brief-suggestion h4, .bs-brief-suggestion p, .bs-brief-suggestion blockquote { margin: 0; }
+.bs-brief-suggestion p { overflow-wrap: anywhere; white-space: pre-wrap; }
+.bs-brief-current { color: var(--bs-ink2); }
+.bs-brief-suggestion blockquote { border-inline-start: 2px solid var(--bs-rule); padding-inline-start: 10px; color: var(--bs-ink2); font-size: 13px; }
+.bs-brief-suggestion .bs-key { justify-self: start; }
+.bs-cf-project { padding: 8px 0; }
+
 
 /* Projects table */
 .bs-proj-filter button { white-space: nowrap; padding: 0 9px; }
@@ -2488,7 +2513,9 @@ a.bs-proj-pt:focus-visible { outline: 2px solid var(--bs-brand); outline-offset:
 .bs-proj-unlink { all: unset; cursor: pointer; font: 500 10.5px var(--bs-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--bs-muted); opacity: 0; }
 .bs-proj-mt:hover .bs-proj-unlink, .bs-proj-unlink:focus-visible { opacity: 1; }
 .bs-proj-unlink:focus-visible { outline: 2px solid var(--bs-brand); outline-offset: 2px; }
-.bs-proj-danger { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--bs-rule); font-size: 12.5px; }
+.bs-proj-handoff { margin-top: 22px; }
+.bs-proj-handoff-status { display: flex; align-items: baseline; flex-wrap: wrap; gap: 5px 12px; margin: 8px 0; overflow-wrap: anywhere; }
+.bs-proj-lifecycle { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--bs-rule); font-size: 12.5px; }
 .bs-proj-lk { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 12px; align-items: start; padding: 12px 0; border-bottom: 1px solid var(--bs-rule2); cursor: pointer; }
 .bs-proj-lk-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .bs-proj-lk-t { font-size: 13.5px; font-weight: 600; color: var(--bs-ink); overflow-wrap: anywhere; }

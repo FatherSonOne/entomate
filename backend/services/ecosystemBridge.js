@@ -113,12 +113,11 @@ class EcosystemBridge {
       logosVision: this.isConnected('logos_vision'),
       connectedApps: Array.from(this._config.entries())
         .filter(([, cfg]) => cfg.enabled)
-        .map(([name, cfg]) => ({
-          name,
-          displayName: cfg.display_name,
-          lastHeartbeat: cfg.last_heartbeat,
-          features: cfg.features || {}
-        }))
+        .map(([name, cfg]) => {
+          const features = { ...cfg.features };
+          delete features.project_handoff;
+          return { name, displayName: cfg.display_name, lastHeartbeat: cfg.last_heartbeat, features };
+        })
     };
   }
 
@@ -137,12 +136,21 @@ class EcosystemBridge {
    * Send an event to a specific app via HTTP
    * @returns {Promise<{success: boolean, eventLogId?: string, error?: string}>}
    */
-  async sendEvent(targetApp, event) {
-    if (!this.isConnected(targetApp)) {
-      return { success: false, error: `${targetApp} is not connected` };
-    }
-
+  async sendEvent(targetApp, event, projectAttempt = null) {
     const cfg = this._config.get(targetApp);
+    const destination = cfg?.features?.project_handoff;
+    const destinationChanged = projectAttempt && (
+      destination?.orgId !== projectAttempt.orgId ||
+      destination.workspaceId !== event.data.workspaceId ||
+      destination.channelId !== event.data.channelId
+    );
+    if (!this.isConnected(targetApp) || destinationChanged) {
+      const error = projectAttempt ? 'The Pulse destination changed' : `${targetApp} is not connected`;
+      if (projectAttempt) {
+        await this.finishEvent(projectAttempt.id, { status: 'failed', error_message: error, next_retry_at: null }, projectAttempt);
+      }
+      return { success: false, error };
+    }
     const eventId = event.id || uuidv4();
     const startTime = Date.now();
 
@@ -157,28 +165,30 @@ class EcosystemBridge {
       targetApp
     };
 
-    // Log the outbound attempt
-    let eventLogId = null;
-    try {
-      const { data: logEntry } = await supabaseAdmin
-        .from('ecosystem_events')
-        .insert({
-          event_id: eventId,
-          source: SOURCE_APP,
-          target_app: targetApp,
-          event_type: event.eventType,
-          entity_type: event.entityType || null,
-          entity_id: event.entityId || null,
-          direction: 'outbound',
-          status: 'pending',
-          payload: ecosystemEvent
-        })
-        .select('id')
-        .single();
+    // Project handoffs claim their event before calling the bridge.
+    let eventLogId = projectAttempt?.id ?? null;
+    if (!projectAttempt) {
+      try {
+        const { data: logEntry } = await supabaseAdmin
+          .from('ecosystem_events')
+          .insert({
+            event_id: eventId,
+            source: SOURCE_APP,
+            target_app: targetApp,
+            event_type: event.eventType,
+            entity_type: event.entityType || null,
+            entity_id: event.entityId || null,
+            direction: 'outbound',
+            status: 'pending',
+            payload: ecosystemEvent
+          })
+          .select('id')
+          .single();
 
-      eventLogId = logEntry?.id;
-    } catch (logErr) {
-      log.warn('[EcosystemBridge] Failed to log outbound event:', logErr.message);
+        eventLogId = logEntry?.id;
+      } catch (logErr) {
+        log.warn('[EcosystemBridge] Failed to log outbound event:', logErr.message);
+      }
     }
 
     // Send HTTP request
@@ -216,17 +226,19 @@ class EcosystemBridge {
       }
 
       const responseData = await response.json().catch(() => ({}));
+      if (projectAttempt && (responseData?.received !== true || responseData.eventId !== eventId)) {
+        throw new Error('Pulse did not confirm receipt of this handoff');
+      }
 
       // Update event log to delivered
       if (eventLogId) {
-        await supabaseAdmin
-          .from('ecosystem_events')
-          .update({
-            status: 'delivered',
-            response_data: responseData,
-            processing_time_ms: processingTime
-          })
-          .eq('id', eventLogId);
+        await this.finishEvent(eventLogId, {
+          status: 'delivered',
+          response_data: responseData,
+          error_message: null,
+          next_retry_at: null,
+          processing_time_ms: processingTime
+        }, projectAttempt);
       }
 
       // Update heartbeat
@@ -244,15 +256,12 @@ class EcosystemBridge {
       // Update event log to failed
       if (eventLogId) {
         try {
-          await supabaseAdmin
-            .from('ecosystem_events')
-            .update({
-              status: 'failed',
-              error_message: err.message,
-              processing_time_ms: processingTime,
-              next_retry_at: new Date(Date.now() + 5 * 60 * 1000).toISOString()  // retry in 5 min
-            })
-            .eq('id', eventLogId);
+          await this.finishEvent(eventLogId, {
+            status: 'failed',
+            error_message: err.message,
+            processing_time_ms: processingTime,
+            next_retry_at: projectAttempt ? null : new Date(Date.now() + 5 * 60 * 1000).toISOString()
+          }, projectAttempt);
         } catch {
           // Swallow — logging failure shouldn't mask the original error
         }
@@ -261,6 +270,13 @@ class EcosystemBridge {
       log.error(`[EcosystemBridge] Failed ${event.eventType} → ${targetApp}:`, err.message);
       return { success: false, error: err.message, eventLogId };
     }
+  }
+
+  async finishEvent(id, updates, projectAttempt) {
+    const query = supabaseAdmin.from('ecosystem_events').update(updates).eq('id', id);
+    if (projectAttempt) query.eq('retry_count', projectAttempt.retry_count).eq('status', 'pending');
+    const { error } = await query;
+    if (error) log.warn('[EcosystemBridge] Failed to save delivery status:', error.message);
   }
 
   /**
@@ -290,6 +306,10 @@ class EcosystemBridge {
 
     if (error || !event) {
       return { success: false, error: 'Event not found' };
+    }
+
+    if (event.entity_type === 'project') {
+      return { success: false, error: 'Retry project handoffs from the project' };
     }
 
     if (event.status !== 'failed') {

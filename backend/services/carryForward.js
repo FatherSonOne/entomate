@@ -14,6 +14,9 @@
 'use strict';
 
 const { supabase } = require('../config/supabase');
+const { storedBrief, briefText } = require('./projectBrief');
+const { readProgress, summarizeMilestones } = require('./projectProgress');
+const log = require('../utils/log');
 
 const DONE = new Set(['done', 'completed', 'complete', 'cancelled', 'canceled']);
 const MAX_OPEN = 12;
@@ -170,20 +173,24 @@ function buildCarryForward(target, meetings, items, now = new Date()) {
 
 /**
  * Org-scoped read + build. `orgIds` must be the caller's orgs (req.orgIds).
- * @param {{ id?: string, title?: string, attendees?: unknown[], at: Date|string }} target
+ * @param {{ id?: string, projectId?: string, title?: string, attendees?: unknown[], at: Date|string }} target
  * @param {string[]} orgIds
  */
 async function load(target, orgIds) {
   if (!supabase || !Array.isArray(orgIds) || orgIds.length === 0) return buildCarryForward(target, [], []);
 
-  const { data: meetings, error } = await supabase
+  const meetingsQuery = supabase
     .from('meetings')
     .select('id, title, attendees, created_at')
     .in('org_id', orgIds)
     .lt('created_at', new Date(target.at).toISOString())
     .order('created_at', { ascending: false })
     .limit(MAX_MEETINGS);
+  const projectQuery = target.projectId ? supabase.from('projects')
+    .select('id, name, owner_id, settings').eq('id', target.projectId).in('org_id', orgIds).maybeSingle() : null;
+  const [{ data: meetings, error }, project] = await Promise.all([meetingsQuery, projectQuery]);
   if (error) throw error;
+  if (project?.error) log.warn('Carry Forward: could not load the project brief', { projectId: target.projectId, error: project.error.message });
 
   const ids = (meetings || []).map(m => m.id).filter(id => id !== target.id);
   let items = [];
@@ -196,7 +203,15 @@ async function load(target, orgIds) {
     if (itemErr) throw itemErr;
     items = data || [];
   }
-  return buildCarryForward(target, meetings || [], items);
+  const result = buildCarryForward(target, meetings || [], items);
+  if (!project?.data) return result;
+  const brief = briefText(storedBrief(project.data));
+  const { next } = summarizeMilestones(readProgress(project.data).milestones);
+  if (!next && !Object.values(brief).some(Boolean)) return result;
+  const nextMilestone = next ? { id: next.id, title: next.title, dueDate: next.dueDate } : null;
+  return { ...result, projectContext: {
+    id: project.data.id, name: project.data.name, ...brief, ...(nextMilestone && { nextMilestone })
+  } };
 }
 
 module.exports = { buildCarryForward, load, personKey, seriesKey };

@@ -1,6 +1,6 @@
 # Entomate Projects — standalone tracker audit and roadmap
 
-Date: 2026-11-23 (America/New_York). The audit and first five implementation sweeps are complete in source.
+Date: 2026-11-23 (America/New_York). The audit and first five implementation sweeps are on GitHub main. PRJ-06 and PRJ-07 are complete locally.
 
 Prepared with `/app-dev` audit, Ponytail review/audit, and Huashu design critique. Scope: the whole Projects feature and direct dependencies, not an audit of unrelated Entomate modules.
 
@@ -231,13 +231,11 @@ No overall production-hardening score is assigned: live permissions, migrations,
 | PRJ-03 | Durable shared project brief and lead | Outcome, scope, success criteria, lead, and resource links save on the project. Workspace access and stale edits are checked. | DONE locally, 2026-11-23 |
 | PRJ-04 | Maintain every project commitment in place | Edit the original action owner, date, and wording. Verify the same record in Projects, Tasks, and its source meeting. | DONE locally, 2026-11-23 |
 | PRJ-05 | Safe repeated meeting extraction | Retrying extraction on the same meeting preserves saved commitments. Failed writes leave the transcript available for recovery. | DONE locally, 2026-11-23 |
-| PRJ-06 | Meeting-to-plan review and continuity | Existing AI planning/carry-forward reused; deliberate save to brief; sourced proposed changes; next-meeting context | NEXT |
-| PRJ-07 | Milestones and concise project updates | Milestone owner/date/completion and attributable status updates; align AI/report metric definitions | PROPOSED |
-| PRJ-08 | Safe retirement and optional integration handoff | Archive first; separately approved cleanup/deletion; explicit external status, verified destination behavior | LATER |
+| PRJ-06 | Meeting-to-plan review and continuity | Review linked-meeting evidence, save chosen changes in the brief, and see the approved text in the next linked meeting. | DONE locally, 2026-11-23 |
+| PRJ-07 | Milestones and concise project updates | Dated and owned milestones on the timeline, attributed status history, and consistent work counts in Projects, Ask Entomate, and the PDF. | DONE locally, 2026-11-23 |
+| PRJ-08 | Safe retirement and optional integration handoff | Archive and recover projects with their history intact. Verify optional Pulse delivery and its visible status. | DONE locally, 2026-11-23 |
 
 Decided as recommended for the proposal: standalone native storage, preserve navigation and existing records, measure calendar time first, reuse Ento AI/continuity tools, defer a full PM engine. These are design recommendations; application behavior is unchanged.
-
-PRJ-06 is next. Reuse Ento AI and Carry Forward to propose project brief changes from a linked meeting. Let the user inspect the source and approve what becomes part of the saved brief, then bring the relevant project context into the next meeting.
 
 ### PRJ-01 implementation and release state
 
@@ -291,6 +289,36 @@ PRJ-01 through PRJ-05 are local and uncommitted in `F:/entomate-projects-sweep` 
 
 The release combines all five sweeps on top of `a219aa637dcbf2fe10d91f1a4c9b55d1fb28c607`, including the upstream recorder changes. The scoped changes require no database migration. On this base, 528 focused backend tests and 57 frontend tests passed, together with type checking and the frontend build. Earlier sweep verification is recorded above.
 
+### PRJ-06 meeting-to-brief review
+
+Project owners and workspace admins can open the brief editor, choose a linked meeting, and ask Entomate for proposed updates to the outcome, scope, or success criteria. Each proposal shows existing text, proposed wording, and an excerpt from the selected meeting's shared minutes. Decision and key point links include the transcript time when available. Taking a suggestion fills the draft. Saving the brief stores the approved text and its source link. A stale proposal offers to reload the current brief.
+
+The suggestions use Entomate's configured Gemini model and count against the selected project's workspace quota. Shared meeting summaries, decisions, and key points supply the evidence. Carry Forward shows the saved brief on explicitly linked meeting records. Calendar previews continue to use their existing people and series matching.
+
+Verification passed 551 focused backend tests and 63 frontend tests, type checking, and the build. Fixture tests covered permissions, cross-workspace isolation, source validation, explicit save, and reading the resulting text on the next meeting. Chromium at 1440px and 390px covered a stale suggestion, source timecode, saving one of two proposed changes, and reading the approved context in the next meeting. The live AI provider and production database were outside verification.
+
+PRJ-06 is uncommitted in `F:/entomate-projects-publish` on top of `eb29d88ca4d9903368df8818a56bfcc8ede1edbe`. It uses the existing brief settings and requires no migration.
+
+### PRJ-07 milestones and status updates
+
+Project owners and workspace admins can add or edit a dated milestone, assign a workspace member, and mark it complete or reopen it. The project timeline includes milestone dates even when a project has no start or end date. Its dated links jump to the corresponding milestone. Carry Forward uses the earliest open milestone on explicitly linked meetings.
+
+Status updates save a health label, note, author, timestamp, and the work and milestone counts recorded at posting. Project work counts cover top-level tasks and the action items of linked meetings. Milestones have a separate completion count. Projects, Ask Entomate, and the project PDF use that definition and the same UTC date for overdue work. The PDF also includes milestone completion and the latest status update.
+
+Progress lives in the existing project settings and requires no migration. Concurrent edits return a conflict. A failed work read leaves the status update unpublished. A regular workspace member can read progress. Scope and storage were verified with fixtures.
+
+Local verification passed 602 backend tests, 63 frontend tests, type checking, and the build. The broader backend run also reproduced the pre-existing Ask Entomate search query-count failure. Chromium at 1440px and 390px verified milestone creation and timeline navigation, completion and reopening, attributed status history, stale draft recovery, and read-only access. The changes in PRJ-06 and PRJ-07 remain uncommitted on `eb29d88ca4d9903368df8818a56bfcc8ede1edbe`.
+
+### PRJ-08 reversible archive and Pulse handoff
+
+Project owners and workspace admins can archive a project from its Edit panel and restore it from the project page. Projects has a paged Archived view. Restoring recovers the saved Planning, Active, or Done status. Older archives without a saved status return to Planning. Archived projects drop out of the portfolio's Needs you queue and keep their own work counts, brief, milestones, attributed updates, tasks, meetings, decisions, and meeting action items. The old project DELETE endpoint returns 405.
+
+A platform admin can explicitly post the project name and link to Pulse when the bridge has a destination for that Entomate workspace. The existing Pulse bridge config accepts a `features.project_handoff` object with `orgId` for Entomate, `workspaceId` and `channelId` for Pulse, and `channelName` for the confirmation. The project panel shows whether the handoff is unavailable, unsent, awaiting a receipt, unconfirmed, or delivered. A retry reuses the same event and destination. Project reads, saves, archive, and restore work independently of the bridge.
+
+### Source release for PRJ-06 through PRJ-08
+
+The release combines PRJ-06 through PRJ-08 on top of `46610213f73a77d8f24ac75c6fa0452ddbee8939`. Verification passed 1,191 backend and 465 frontend tests, type checking, the frontend build, and Chromium fixtures at 1440px and 390px. The Ask Entomate search test passed on clean main during integration and with the release changes. External delivery was exercised with fixtures. The release uses the existing database schema.
+
 ## 11. Verification run and remaining checks
 
 Passed: 9 no-dependency Node assertions against the actual release-checkout `backend/services/projectRollup.js`: combined population, completion aliases, open count, overdue count, held-meeting decisions, next meeting, empty project, overdue ordering and late total. Fixed test time: `2026-11-23T17:00:00Z`. No DB calls or writes. This confirms helper behavior for those inputs, not route error handling or production behavior.
@@ -314,4 +342,4 @@ Next level: close the meeting -> reviewed commitment -> execution -> next-meetin
 Pro tip: define the population and units before drawing a progress chart.
 Suggested exercise: reopen one project without integrations and account for every displayed item by source and owner.
 
-PRJ-01 through PRJ-05 are included in this source release. Production release and runtime verification are separate.
+GitHub main contains PRJ-01 through PRJ-05 at `eb29d88ca4d9903368df8818a56bfcc8ede1edbe`. CI passed. The follow-up source release for PRJ-06 through PRJ-08 is recorded above.

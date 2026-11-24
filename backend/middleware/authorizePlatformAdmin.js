@@ -14,6 +14,10 @@
 const { supabaseAdmin } = require('../config/supabase');
 const log = require('../utils/log');
 
+function lookupPlatformAdmin(userId) {
+  return supabaseAdmin.from('platform_admins').select('user_id').eq('user_id', userId).maybeSingle();
+}
+
 async function authorizePlatformAdmin(req, res, next) {
   try {
     if (!req.user || !req.user.id || req.user.id === 'anonymous') {
@@ -30,11 +34,7 @@ async function authorizePlatformAdmin(req, res, next) {
       });
     }
 
-    const { data, error } = await supabaseAdmin
-      .from('platform_admins')
-      .select('user_id')
-      .eq('user_id', req.user.id)
-      .maybeSingle();
+    const { data, error } = await lookupPlatformAdmin(req.user.id);
 
     if (error) {
       log.error('platform_admins lookup failed', { error: error.message });
@@ -62,4 +62,4 @@ async function authorizePlatformAdmin(req, res, next) {
   }
 }
 
-module.exports = { authorizePlatformAdmin };
+module.exports = { authorizePlatformAdmin, lookupPlatformAdmin };

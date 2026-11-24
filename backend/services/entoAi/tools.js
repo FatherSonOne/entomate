@@ -14,6 +14,9 @@ const { SchemaType } = require('@google/generative-ai');
 const searchEverything = require('../searchEverything');
 const calendarService = require('../calendarService');
 const autoJoin = require('../calendarAutoJoin');
+const { loadProjectWork } = require('../projectWork');
+const { isDone, rollup, summarizeProjects } = require('../projectRollup');
+const { readProgress, summarizeMilestones } = require('../projectProgress');
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}/;
@@ -360,7 +363,7 @@ const TOOLS = {
   list_projects: {
     label: 'Checking projects',
     declaration: {
-      description: 'Projects with status, dates and open / finished task counts.',
+      description: 'Projects with dates and work counts matching Projects, including top-level tasks and linked meeting action items.',
       parameters: {
         type: SchemaType.OBJECT,
         properties: {
@@ -378,18 +381,18 @@ const TOOLS = {
       q = textFilter(q, ['name', 'description'], args.query);
       const res = await q.order('created_at', { ascending: false }).limit(limitOf(args.limit, 15));
       const projects = rows(res);
-      const counts = {};
-      if (projects.length) {
-        const tasks = rows(await db.from('tasks').select('project_id, status')
-          .in('org_id', orgIds).in('project_id', projects.map((p) => p.id)).limit(2000));
-        for (const t of tasks) {
-          const c = counts[t.project_id] || (counts[t.project_id] = { open: 0, finished: 0 });
-          if (CLOSED.includes(t.status)) c.finished += 1; else c.open += 1;
-        }
+      const { tasks, meetings, actionItems } = await loadProjectWork(db, projects.map((project) => project.id), orgIds);
+      const summary = summarizeProjects(projects, tasks, meetings, actionItems);
+      const counts = new Map();
+      for (const task of tasks) {
+        if (task.parent_task_id) continue;
+        const current = counts.get(task.project_id) || { open: 0, finished: 0 };
+        current[isDone(task.status) ? 'finished' : 'open'] += 1;
+        counts.set(task.project_id, current);
       }
       return {
         total: res.count ?? projects.length,
-        projects: projects.map((p) => ({
+        projects: summary.projects.map((p) => ({
           id: p.id,
           name: p.name,
           status: p.status,
@@ -397,7 +400,8 @@ const TOOLS = {
           endDate: p.end_date,
           dealValue: p.deal_value,
           description: trunc(p.description, 200),
-          tasks: counts[p.id] || { open: 0, finished: 0 },
+          tasks: counts.get(p.id) || { open: 0, finished: 0 },
+          work: p.rollup,
         })),
       };
     },
@@ -406,7 +410,7 @@ const TOOLS = {
   get_project: {
     label: 'Reading the project',
     declaration: {
-      description: 'One project in full: its tasks (with counts by status) and the meetings linked to it.',
+      description: 'One project with exact work counts, milestones, latest status update, and samples of its tasks and linked meetings.',
       parameters: {
         type: SchemaType.OBJECT,
         properties: { project_id: { ...STR, description: 'The project id.' } },
@@ -416,23 +420,19 @@ const TOOLS = {
     async run(args, { db, orgIds }) {
       const id = uuidArg(args.project_id, 'project_id');
       const { data: p, error } = await db.from('projects')
-        .select('id, name, description, status, start_date, end_date, deal_value, tags, created_at')
+        .select('id, org_id, name, description, status, start_date, end_date, deal_value, tags, created_at, settings')
         .eq('id', id).in('org_id', orgIds).maybeSingle();
       if (error) throw new Error(error.message);
       if (!p) return { found: false };
-      const [tasks, meetings] = await Promise.all([
-        db.from('tasks').select('id, title, status, priority, due_date, assigned_to, project_id')
-          .eq('project_id', id).in('org_id', orgIds).order('due_date', { ascending: true, nullsFirst: false }).limit(50).then(rows),
-        db.from('meetings').select('id, title, start_time, created_at')
-          .eq('project_id', id).in('org_id', orgIds).order('created_at', { ascending: false }).limit(10).then(rows),
-      ]);
+      const { tasks, meetings, actionItems } = await loadProjectWork(db, [id], [p.org_id]);
+      const topLevel = tasks.filter((task) => !task.parent_task_id);
       const byStatus = {};
-      let overdue = 0;
-      const now = today();
-      for (const t of tasks) {
-        byStatus[t.status || 'none'] = (byStatus[t.status || 'none'] || 0) + 1;
-        if (!CLOSED.includes(t.status) && t.due_date && t.due_date < now) overdue += 1;
-      }
+      for (const task of topLevel) byStatus[task.status || 'none'] = (byStatus[task.status || 'none'] || 0) + 1;
+      const now = new Date();
+      const work = rollup(topLevel, meetings, actionItems, now);
+      const progress = readProgress(p);
+      const milestones = summarizeMilestones(progress.milestones);
+      const latest = progress.updates[0];
       return {
         found: true,
         project: {
@@ -444,9 +444,14 @@ const TOOLS = {
           dealValue: p.deal_value,
           tags: p.tags,
           description: trunc(p.description, 2000),
-          taskCounts: { total: tasks.length, byStatus, overdue },
-          tasks: tasks.slice(0, 25).map(slimTask),
-          meetings: meetings.map((m) => ({ id: m.id, title: m.title, date: m.start_time || m.created_at })),
+          taskCounts: { total: topLevel.length, byStatus, overdue: rollup(topLevel, [], [], now).late },
+          work,
+          milestones,
+          latestUpdate: latest ? { health: latest.health, note: trunc(latest.note, 600), author: latest.authorName,
+            postedAt: latest.postedAt, counts: latest.counts } : null,
+          tasks: topLevel.sort((a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999')).slice(0, 25).map(slimTask),
+          meetings: meetings.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)).slice(0, 10)
+            .map((m) => ({ id: m.id, title: m.title, date: m.start_time || m.created_at })),
         },
       };
     },

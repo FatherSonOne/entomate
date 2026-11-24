@@ -17,6 +17,7 @@ describe('projectReport', () => {
       tasks: [
         { title: 'Draft brief', status: 'completed', assigned_to: 'Ana' },
         { title: 'Book venue', status: 'todo', assigned_to: 'Ben', due_date: '2026-11-20' },
+        { title: 'Hidden subtask', parent_task_id: 'parent', status: 'done' },
       ],
       actionItems: [
         { task_description: 'Send deck', status: 'open', assigned_to_name: 'Ana', due_date: '2026-11-30' },

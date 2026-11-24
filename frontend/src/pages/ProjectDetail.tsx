@@ -9,6 +9,9 @@ import { useConfirm } from '../components/vc/ConfirmDialog'
 import { useToast } from '../components/vc/ToastProvider'
 import ErrorState from '../components/vc/ErrorState'
 import ProjectBrief from '../components/ProjectBrief'
+import ProjectProgress from '../components/ProjectProgress'
+import ProjectHandoff from '../components/ProjectHandoff'
+import { useProjectProgress } from '../services/projectProgress'
 import { ScheduleAxis, ScheduleFacts, ScheduleTrack } from '../components/ProjectSchedule'
 import TaskEditModal from '../components/TaskEditModal'
 import TaskDetail from '../components/tasks/TaskDetail'
@@ -18,7 +21,7 @@ import {
 import type { TaskActionRow, TaskRow, WorkItem, WorkStatus } from '../services/tasksView'
 import {
   dayShort, decisionHref, heldMeetings, linkCandidates, meetingDay, nextMeeting, normalizeProjectStatus,
-  owners, plural, projectDecisions, projectName, projectSchedule, projectSignal, projectTape, projectWork, readUrl, toTags, workCounts, writeUrl,
+  owners, plural, projectDecisions, projectName, projectSchedule, projectSignal, projectTape, projectWork, projectWorkDay, readUrl, toTags, workCounts, writeUrl,
 } from '../services/projectsView'
 import type { LinkCandidate, ProjectDetailRow, ProjectStatus, ProjectsUrlState, WorkLayout } from '../services/projectsView'
 
@@ -40,7 +43,7 @@ interface MeetingListRow { id: string; title?: string | null; summary?: string |
 
 const LAYOUTS: ReadonlyArray<{ value: WorkLayout; label: string }> = [{ value: 'list', label: 'List' }, { value: 'lanes', label: 'Lanes' }]
 const STATUS_OPTIONS: ReadonlyArray<{ value: ProjectStatus; label: string }> = [
-  { value: 'planning', label: 'Planning' }, { value: 'active', label: 'Active' }, { value: 'completed', label: 'Done' }, { value: 'archived', label: 'Archived' },
+  { value: 'planning', label: 'Planning' }, { value: 'active', label: 'Active' }, { value: 'completed', label: 'Done' },
 ]
 const PRIORITIES = [{ value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }] as const
 type Priority = typeof PRIORITIES[number]['value']
@@ -63,6 +66,7 @@ function formOf(p: ProjectDetailRow): EditForm {
 
 export default function ProjectDetail(): React.ReactElement {
   const { id = '' } = useParams()
+  const progress = useProjectProgress(id)
   const navigate = useNavigate()
   const toast = useToast() as ToastApi
   const confirm = useConfirm() as ConfirmFn
@@ -124,11 +128,12 @@ export default function ProjectDetail(): React.ReactElement {
   }, [url.drawer, project])
 
   const now = new Date()
+  const workDay = projectWorkDay(now)
   const work = useMemo(() => (project ? projectWork(project) : []), [project])
-  const counts = workCounts(work, now)
-  const groups = groupByUrgency(work, now)
+  const counts = workCounts(work, workDay)
+  const groups = groupByUrgency(work, workDay)
   const byLane = lanes(work)
-  const ownerLines = owners(work, now)
+  const ownerLines = owners(work, workDay)
   const decisions = project ? projectDecisions(project, now) : []
   const held = project ? heldMeetings(project, now) : []
   const next = project ? nextMeeting(project, now) : null
@@ -218,7 +223,7 @@ export default function ProjectDetail(): React.ReactElement {
       await projectsApi.update(id, {
         name: edit.name.trim(),
         description: edit.description.trim() || null,
-        status: edit.status,
+        status: edit.status !== 'archived' && edit.status !== normalizeProjectStatus(project?.status) ? edit.status : undefined,
         start_date: edit.startDate || null,
         end_date: edit.endDate || null,
         tags: edit.tags.split(',').map((t) => t.trim()).filter(Boolean),
@@ -235,22 +240,26 @@ export default function ProjectDetail(): React.ReactElement {
     }
   }
 
-  const deleteProject = async (): Promise<void> => {
-    if (!project) return
-    const ok = await confirm({
-      title: 'Delete project',
-      message: `Delete "${projectName(project)}" and its ${plural((project.tasks ?? []).length, 'task')}? Linked meetings and their action items stay.`,
-      confirmLabel: 'Delete project',
-      variant: 'danger',
-    })
-    if (!ok) return
+  const changeArchive = async (archive: boolean): Promise<void> => {
+    if (!project || saving) return
+    setSaving(true)
     try {
-      await projectsApi.delete(id)
-      toast.success('Deleted', 'Project deleted')
-      navigate('/projects')
+      if (archive && !await confirm({
+        title: 'Archive project',
+        message: `Archive "${projectName(project)}"? Its brief, history, and linked work will stay available in Projects under Archived.`,
+        confirmLabel: 'Archive project',
+        variant: 'primary',
+      })) return
+
+      const result = await (archive ? projectsApi.archive(id) : projectsApi.restore(id)) as unknown as { status: ProjectStatus }
+      setProject((current) => current?.id === id ? { ...current, status: result.status } : current)
+      setUrl({ drawer: null })
+      toast.success(archive ? 'Project archived' : 'Project restored')
     } catch (err) {
-      console.error('[Project] delete error:', err)
-      toast.error('Error', 'Failed to delete project')
+      toast.error('Error', err instanceof Error ? err.message : 'Could not change the archive status')
+      if ((err as { status?: number })?.status === 409) void load()
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -305,7 +314,7 @@ export default function ProjectDetail(): React.ReactElement {
   const status = normalizeProjectStatus(project.status)
   const tags = toTags(project.tags)
   const schedule = projectSchedule(project, now)
-  const tape = projectTape(project, now, schedule)
+  const tape = projectTape(project, now, schedule, progress.data?.milestones)
 
   const meta = (
     <span>
@@ -317,6 +326,9 @@ export default function ProjectDetail(): React.ReactElement {
 
   const actions = (
     <>
+      {status === 'archived' && progress.data?.canEdit && (
+        <Key disabled={saving} onClick={() => void changeArchive(false)}>Restore project</Key>
+      )}
       <Key onClick={() => setUrl({ drawer: 'link' })}>Link meeting</Key>
       <Key onClick={() => setUrl({ drawer: 'edit' })}>Edit</Key>
       <Key variant="primary" onClick={() => setUrl({ drawer: 'task' })}>Add task</Key>
@@ -358,7 +370,7 @@ export default function ProjectDetail(): React.ReactElement {
         </div>
       </div>
       <span className="bs-dt bs-proj-own">{item.owner || <span className="bs-mut">No owner</span>}</span>
-      <span className={`bs-tasks-due${isOverdue(item, now) ? ' late' : ''}`}>{dueLabel(item.due, now)}</span>
+      <span className={`bs-tasks-due${isOverdue(item, workDay) ? ' late' : ''}`}>{dueLabel(item.due, workDay)}</span>
       <span className="bs-dt"><Signal tone={statusTone(item.status)}>{statusWord(item.status)}</Signal></span>
     </li>
   )
@@ -399,7 +411,7 @@ export default function ProjectDetail(): React.ReactElement {
                     <span className="bs-tasks-li-t">{item.title}</span>
                     <span className="bs-tasks-li-m">
                       <span>{item.owner || 'No owner'}</span>
-                      <span className={isOverdue(item, now) ? 'late' : ''}>{item.due ? dueLabel(item.due, now) : 'No date'}</span>
+                      <span className={isOverdue(item, workDay) ? 'late' : ''}>{item.due ? dueLabel(item.due, workDay) : 'No date'}</span>
                       {item.source && <span>{item.source.title || 'Meeting'}</span>}
                     </span>
                   </button>
@@ -442,6 +454,24 @@ export default function ProjectDetail(): React.ReactElement {
                   {tape.upcoming.map((m) => <b key={m.key} className="bs-proj-tape-mk up" style={{ left: `${m.pct}%` }}>{m.labelled && <span className="bs-dt">{m.label}</span>}</b>)}
                 </div>
               )}
+              {tape.milestones.length > 0 && (
+                <>
+                  <div className="bs-proj-milestone-track" aria-hidden="true">
+                    {tape.milestones.map(({ item, pct }) => (
+                      <span key={item.id} data-done={Boolean(item.completedAt)} style={{ left: pct + '%' }} />
+                    ))}
+                  </div>
+                  <ul className="bs-proj-milestone-legend" aria-label="Timeline milestones">
+                    {tape.milestones.map(({ item }) => (
+                      <li key={item.id}>
+                        <a className="bs-proj-display-link" href={'#project-milestone-' + item.id}>
+                          {item.title} ? {dayShort(item.dueDate)}{item.completedAt ? ' ? Done' : ''}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
               {(schedule.start == null || schedule.end == null || schedule.reversed) && (
                 <button type="button" className="bs-proj-display-link" onClick={() => setUrl({ drawer: 'edit' })}>Edit dates</button>
               )}
@@ -454,7 +484,8 @@ export default function ProjectDetail(): React.ReactElement {
             </div>
           )}
           {tape && project.description && <p className="bs-proj-desc">{project.description}</p>}
-          <ProjectBrief key={project.id} projectId={project.id} />
+          <ProjectBrief key={project.id} projectId={project.id} meetings={held} />
+          <ProjectHandoff key={project.id} projectId={project.id} />
         </Cell>
         <Cell span={4} rule>
           <div className="bs-proj-ro">
@@ -501,6 +532,8 @@ export default function ProjectDetail(): React.ReactElement {
           )}
         </Cell>
       </Grid>
+
+      <ProjectProgress key={project.id} progress={progress} />
 
       <Grid className="bs-proj-row2">
         <Cell span={8}>
@@ -609,7 +642,9 @@ export default function ProjectDetail(): React.ReactElement {
             </label>
             <div className="bs-tasks-fl">
               <span className="bs-lbl">Status</span>
-              <Switch<ProjectStatus> label="Status" className="bs-tasks-stsw" options={STATUS_OPTIONS} value={edit.status} onChange={(v) => setEdit({ ...edit, status: v })} />
+              {status === 'archived' ? <Signal tone="off">Archived</Signal> : (
+                <Switch<ProjectStatus> label="Status" className="bs-tasks-stsw" options={STATUS_OPTIONS} value={edit.status} onChange={(v) => setEdit({ ...edit, status: v })} />
+              )}
             </div>
             <div className="bs-tasks-f2">
               <label className="bs-tasks-fl">
@@ -636,10 +671,11 @@ export default function ProjectDetail(): React.ReactElement {
               <Link to="/analytics?export=project-pdf" className="bs-key">Export report</Link>
               <Key type="submit" variant="primary" disabled={saving}>{saving ? 'Saving' : 'Save'}</Key>
             </div>
-            <div className="bs-proj-danger">
-              <Key type="button" size="sm" onClick={() => void deleteProject()}>Delete project</Key>
-              <span className="bs-mut">Deletes its tasks. Linked meetings stay.</span>
-            </div>
+            {status !== 'archived' && progress.data?.canEdit && (
+              <div className="bs-proj-lifecycle">
+                <Key type="button" size="sm" disabled={saving} onClick={() => void changeArchive(true)}>Archive project</Key>
+              </div>
+            )}
           </form>
         )}
       </Drawer>

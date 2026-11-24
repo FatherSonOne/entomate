@@ -3,12 +3,21 @@ const { v4: uuidv4 } = require('uuid');
 const { supabase } = require('../config/supabase');
 const { validate } = require('../middleware/validate');
 const { authenticate } = require('../middleware/auth');
+const { authorizePlatformAdmin, lookupPlatformAdmin } = require('../middleware/authorizePlatformAdmin');
 const schemas = require('../schemas/projects');
+const gemini = require('../config/gemini');
+const { aiLimiter } = require('../middleware/rateLimiter');
+const { meterAiForOrg } = require('../services/aiUsage');
+const { storedBrief, evidenceFor, suggestChanges } = require('../services/projectBrief');
 const log = require('../utils/log');
 const { aggregateTeamWorkload } = require('../utils/teamWorkload');
 const { getOrgIdForUser } = require('../utils/orgContext');
 const { attachOrgIds } = require('../utils/orgContext');
 const { summarizeProjects, rollup, isDone } = require('../services/projectRollup');
+const { readAllRows, readMeetingActions, loadProjectWork } = require('../services/projectWork');
+const { readProgress, summarizeMilestones } = require('../services/projectProgress');
+const { getEcosystemBridge } = require('../services/ecosystemBridge');
+const { projectDestination, readEvent, describeHandoff, sendProjectHandoff } = require('../services/projectHandoff');
 
 const router = express.Router();
 
@@ -16,37 +25,9 @@ const router = express.Router();
 router.use(authenticate);
 router.use(attachOrgIds); // org-owned tables below are limited to req.orgIds (audit finding 3)
 
-const READ_PAGE_SIZE = 250;
-const MEETING_ID_BATCH_SIZE = 100;
-
-// Supporting reads must finish before the route can report a trustworthy total.
-async function readAllRows(makeQuery) {
-  const rows = [];
-  for (;;) {
-    const { data, error } = await makeQuery()
-      .order('id', { ascending: true })
-      .range(rows.length, rows.length + READ_PAGE_SIZE - 1);
-    if (error) throw error;
-    rows.push(...data);
-    if (data.length < READ_PAGE_SIZE) return rows;
-  }
-}
-
-async function readMeetingActions(meetings, orgIds, columns) {
-  const actions = [];
-  // Bound the length of the PostgREST URL even for projects with years of history.
-  for (let from = 0; from < meetings.length; from += MEETING_ID_BATCH_SIZE) {
-    const ids = meetings.slice(from, from + MEETING_ID_BATCH_SIZE).map((m) => m.id);
-    const batch = await readAllRows(() => supabase.from('action_items').select(columns)
-      .in('org_id', orgIds).in('meeting_id', ids));
-    actions.push(...batch);
-  }
-  return actions;
-}
-
 async function readBriefProject(id, orgIds) {
   const { data, error } = await supabase.from('projects')
-    .select('id, org_id, owner_id, settings, updated_at')
+    .select('id, org_id, owner_id, status, settings, updated_at')
     .eq('id', id).in('org_id', orgIds).maybeSingle();
   if (error) throw error;
   return data;
@@ -63,18 +44,19 @@ function canEditBrief(project, member) {
   return Boolean(member && (member.user_id === project.owner_id || ['owner', 'admin'].includes(member.role)));
 }
 
-function storedBrief(project) {
-  const parsed = schemas.brief.safeParse(project.settings?.brief);
-  return parsed.success ? parsed.data : { outcome: '', scope: '', successCriteria: '', ownerId: project.owner_id ?? null, resources: [] };
+function memberName({ user_id, user_name, user_email }) {
+  return user_name?.trim() || user_email || 'Workspace member ' + user_id.slice(0, 8);
+}
+
+function projectPeople(members) {
+  return members.map((member) => ({ id: member.user_id, name: memberName(member) }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function briefResponse(project, brief, members, editable) {
-  const people = members.map(({ user_id, user_name, user_email }) => ({
-    id: user_id,
-    name: user_name?.trim() || user_email || `Workspace member ${user_id.slice(0, 8)}`
-  }));
+  const people = projectPeople(members);
   return { brief, owner: people.find((person) => person.id === brief.ownerId) ?? null,
-    canEdit: editable, members: editable ? people.sort((a, b) => a.name.localeCompare(b.name)) : [], version: project.updated_at ?? null };
+    canEdit: editable, members: editable ? people : [], version: project.updated_at ?? null };
 }
 
 function matchProjectVersion(query, version) {
@@ -181,15 +163,8 @@ router.get('/', validate(schemas.list), async (req, res) => {
     const ids = (projects || []).map((p) => p.id);
     let summary = { projects: projects || [], needsYou: [], lateTotal: 0 };
     if (ids.length) {
-      const [tasks, meetings] = await Promise.all([
-        readAllRows(() => supabase.from('tasks').select('id, project_id, title, status, due_date, assigned_to, parent_task_id')
-          .in('org_id', req.orgIds).in('project_id', ids)),
-        readAllRows(() => supabase.from('meetings').select('id, project_id, title, start_time, created_at, decisions')
-          .in('org_id', req.orgIds).in('project_id', ids)),
-      ]);
-      const actions = await readMeetingActions(meetings, req.orgIds,
-        'id, meeting_id, task_description, status, due_date, assigned_to_name');
-      summary = summarizeProjects(projects, tasks, meetings, actions);
+      const { tasks, meetings, actionItems } = await loadProjectWork(supabase, ids, req.orgIds);
+      summary = summarizeProjects(projects, tasks, meetings, actionItems);
     }
 
     res.json({
@@ -232,12 +207,12 @@ router.get('/:id', async (req, res) => {
 
     const [tasks, meetings] = await Promise.all([
       readAllRows(() => supabase.from('tasks').select('*')
-        .in('org_id', req.orgIds).eq('project_id', id).order('created_at', { ascending: false })),
+        .eq('org_id', project.org_id).eq('project_id', id).order('created_at', { ascending: false })),
       readAllRows(() => supabase.from('meetings')
         .select('id, title, summary, created_at, start_time, duration_minutes, decisions, summary_moments, sentiment_label')
-        .in('org_id', req.orgIds).eq('project_id', id).order('created_at', { ascending: false })),
+        .eq('org_id', project.org_id).eq('project_id', id).order('created_at', { ascending: false })),
     ]);
-    const actionItems = await readMeetingActions(meetings, req.orgIds, '*, meetings:meeting_id ( title )');
+    const actionItems = await readMeetingActions(supabase, meetings, [project.org_id], '*, meetings:meeting_id ( title )');
     actionItems.sort((a, b) => (a.due_date ?? '9999-12-31').localeCompare(b.due_date ?? '9999-12-31'));
 
     // Legacy rows say todo / completed (see tasksView.normalizeStatus)
@@ -281,6 +256,38 @@ router.get('/:id/brief', validate(schemas.getBrief), async (req, res) => {
   }
 });
 
+/** Read shared minutes and propose a draft. This route never edits a brief. */
+router.post('/:id/brief/suggestions', aiLimiter, validate(schemas.suggestBrief), async (req, res) => {
+  try {
+    const project = await readBriefProject(req.params.id, req.orgIds);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    const [member] = await readProjectMembers(project.org_id, [req.user.id]);
+    if (!canEditBrief(project, member)) {
+      return res.status(403).json({ error: 'Only the project owner or a workspace admin can review brief suggestions' });
+    }
+    const { data: meeting, error } = await supabase.from('meetings')
+      .select('id, title, summary, key_points, decisions, summary_moments')
+      .eq('id', req.validated.body.meetingId).eq('org_id', project.org_id).eq('project_id', project.id)
+      .maybeSingle();
+    if (error) throw error;
+    if (!meeting) return res.status(404).json({ error: 'Linked meeting not found' });
+
+    const evidence = evidenceFor(meeting);
+    const source = { meetingId: meeting.id, meetingTitle: meeting.title || 'Untitled meeting' };
+    const version = project.updated_at ?? null;
+    if (!evidence.length) return res.json({ source, version, suggestions: [] });
+    if (!gemini.isConfigured()) return res.status(503).json({ error: 'Brief suggestions are unavailable. You can edit the brief yourself.' });
+
+    return await meterAiForOrg(project.org_id, res, async () => {
+      const suggestions = await suggestChanges(storedBrief(project), evidence);
+      return res.json({ source, version, suggestions });
+    });
+  } catch (error) {
+    log.error('Error suggesting project brief changes:', { error: error.message || error });
+    return res.status(500).json({ error: 'Could not suggest brief changes. Try again.' });
+  }
+});
+
 /** Save only the brief, retaining other project settings and rejecting stale edits. */
 router.put('/:id/brief', validate(schemas.updateBrief), async (req, res) => {
   try {
@@ -300,7 +307,23 @@ router.put('/:id/brief', validate(schemas.updateBrief), async (req, res) => {
     const conflict = () => res.status(409).json({ error: 'This project changed. Load the latest brief before saving.' });
     if ((project.updated_at ?? null) !== version) return conflict();
 
-    const update = { settings: { ...project.settings, brief }, updated_at: nextProjectVersion(version) };
+    const previous = storedBrief(project);
+    const sources = brief.sources ?? Object.fromEntries(
+      Object.entries(previous.sources ?? {}).filter(([field]) => brief[field] === previous[field])
+    );
+    const meetingIds = [...new Set(Object.entries(sources)
+      .filter(([field, source]) => previous.sources?.[field]?.meetingId !== source.meetingId)
+      .map(([, source]) => source.meetingId))];
+    if (meetingIds.length) {
+      const { data: meetings, error } = await supabase.from('meetings').select('id')
+        .eq('org_id', project.org_id).eq('project_id', project.id).in('id', meetingIds);
+      if (error) throw error;
+      if (meetings.length !== meetingIds.length) {
+        return res.status(400).json({ error: 'Choose a source meeting linked to this project' });
+      }
+    }
+    const savedBrief = Object.keys(sources).length ? { ...brief, sources } : brief;
+    const update = { settings: { ...project.settings, brief: savedBrief }, updated_at: nextProjectVersion(version) };
     const { data: saved, error } = await matchProjectVersion(supabase.from('projects')
       .update(update).eq('id', project.id).eq('org_id', project.org_id), version)
       .select('updated_at').maybeSingle();
@@ -313,14 +336,152 @@ router.put('/:id/brief', validate(schemas.updateBrief), async (req, res) => {
   }
 });
 
+function progressResponse(progress, members, canEdit) {
+  const people = projectPeople(members);
+  const names = new Map(people.map((person) => [person.id, person.name]));
+  return {
+    milestones: progress.milestones.map((item) => ({ ...item, ownerName: names.get(item.ownerId) ?? null })),
+    updates: progress.updates,
+    members: canEdit ? people : [],
+    canEdit,
+    version: progress.version
+  };
+}
+
+router.get('/:id/progress', validate(schemas.getProgress), async (req, res) => {
+  try {
+    const project = await readBriefProject(req.params.id, req.orgIds);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    const progress = readProgress(project);
+    const ids = [...new Set([req.user.id, ...progress.milestones.map((item) => item.ownerId)].filter(Boolean))];
+    const related = await readProjectMembers(project.org_id, ids);
+    const canEdit = canEditBrief(project, related.find((member) => member.user_id === req.user.id));
+    const members = canEdit ? await readProjectMembers(project.org_id) : related;
+    return res.json(progressResponse(progress, members, canEdit));
+  } catch (error) {
+    log.error('Error reading project progress:', error.message);
+    return res.status(500).json({ error: 'Could not load project progress' });
+  }
+});
+
+router.patch('/:id/progress', validate(schemas.updateProgress), async (req, res) => {
+  try {
+    const project = await readBriefProject(req.params.id, req.orgIds);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    const [author] = await readProjectMembers(project.org_id, [req.user.id]);
+    if (!canEditBrief(project, author)) {
+      return res.status(403).json({ error: 'Only the project owner or a workspace admin can change project progress' });
+    }
+
+    const change = req.validated.body;
+    const conflict = () => res.status(409).json({ error: 'Progress changed. Load the latest version before saving.' });
+    const progress = readProgress(project);
+    if (progress.version !== change.version) return conflict();
+
+    const members = await readProjectMembers(project.org_id);
+    const existing = progress.milestones.find((item) => item.id === change.id);
+    if (change.ownerId && change.ownerId !== existing?.ownerId && !members.some((member) => member.user_id === change.ownerId)) {
+      return res.status(400).json({ error: 'Choose a milestone owner from this workspace' });
+    }
+
+    const now = new Date();
+    if (change.operation === 'postUpdate') {
+      const { tasks, meetings, actionItems } = await loadProjectWork(supabase, [project.id], [project.org_id]);
+      const { total, done, late } = rollup(tasks, meetings, actionItems, now);
+      const milestoneCounts = summarizeMilestones(progress.milestones);
+      progress.updates.unshift({
+        id: uuidv4(), health: change.health, note: change.note,
+        authorId: req.user.id, authorName: memberName(author), postedAt: now.toISOString(),
+        counts: { total, done, late, milestones: milestoneCounts.total, milestonesDone: milestoneCounts.done }
+      });
+    } else if (change.operation === 'addMilestone') {
+      progress.milestones.push({ id: uuidv4(), title: change.title, dueDate: change.dueDate, ownerId: change.ownerId, completedAt: null });
+    } else {
+      const item = existing;
+      if (!item) return res.status(404).json({ error: 'Milestone not found' });
+      if (change.operation === 'editMilestone') {
+        Object.assign(item, { title: change.title, dueDate: change.dueDate, ownerId: change.ownerId });
+      } else {
+        item.completedAt = change.done ? item.completedAt ?? now.toISOString() : null;
+      }
+    }
+
+    const updatedAt = nextProjectVersion(project.updated_at);
+    progress.version = updatedAt;
+    const { data: saved, error } = await matchProjectVersion(
+      supabase.from('projects').update({ settings: { ...project.settings, progress }, updated_at: updatedAt })
+        .eq('id', project.id).eq('org_id', project.org_id), project.updated_at
+    ).select('updated_at').maybeSingle();
+    if (error) throw error;
+    if (!saved) return conflict();
+    return res.json(progressResponse(progress, members, true));
+  } catch (error) {
+    log.error('Error saving project progress:', error.message);
+    return res.status(500).json({ error: 'Could not save project progress' });
+  }
+});
+
+router.get('/:id/handoff', validate(schemas.getBrief), async (req, res) => {
+  try {
+    const project = await readBriefProject(req.params.id, req.orgIds);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    const [bridge, event] = await Promise.all([getEcosystemBridge(), readEvent(project.id)]);
+    const destination = projectDestination(bridge, project.org_id);
+    let canSend = false;
+    if (destination) {
+      const { data, error } = await lookupPlatformAdmin(req.user.id);
+      if (error) throw error;
+      canSend = Boolean(data);
+    }
+    return res.json(describeHandoff(destination, event, canSend));
+  } catch (error) {
+    log.error('Error reading project handoff:', error.message);
+    return res.status(500).json({ error: 'Could not load the Pulse handoff' });
+  }
+});
+
+router.post('/:id/handoff', validate(schemas.sendHandoff), authorizePlatformAdmin, async (req, res) => {
+  try {
+    const { data: project, error } = await supabase.from('projects').select('id, org_id, name')
+      .eq('id', req.params.id).in('org_id', req.orgIds).maybeSingle();
+    if (error) throw error;
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+
+    const bridge = await getEcosystemBridge();
+    const destination = projectDestination(bridge, project.org_id);
+    if (!destination || destination.channelId !== req.validated.body.channelId) {
+      return res.status(409).json({ error: 'The Pulse destination changed. Refresh the handoff and try again.' });
+    }
+
+    const event = await readEvent(project.id);
+    await sendProjectHandoff(bridge, project, destination, event);
+    const updated = await readEvent(project.id);
+    return res.json(describeHandoff(destination, updated, true));
+  } catch (error) {
+    log.error('Error sending project handoff:', error.message);
+    return res.status(500).json({ error: 'Could not confirm delivery. Refresh the Pulse handoff before retrying.' });
+  }
+});
+
+const RESTORABLE_STATUSES = ['planning', 'active', 'completed'];
+
+function restoreStatus(status) {
+  return RESTORABLE_STATUSES.includes(status) ? status : 'planning';
+}
+
+async function canArchiveProject(project, userId) {
+  const [member] = await readProjectMembers(project.org_id, [userId]);
+  return canEditBrief(project, member);
+}
+
 /**
  * PUT /api/projects/:id
- * Update project
+ * Update project. Entering or leaving the archive also preserves its previous status.
  */
 router.put('/:id', validate(schemas.update), async (req, res) => {
   try {
     const { id } = req.params;
-    const updates = req.body;
+    const updates = req.validated.body;
 
     if (!supabase) {
       return res.status(503).json({ error: 'Database not configured' });
@@ -334,30 +495,41 @@ router.put('/:id', validate(schemas.update), async (req, res) => {
         filteredUpdates[field] = updates[field];
       }
     }
-    let query = supabase.from('projects');
-    if (filteredUpdates.settings !== undefined) {
-      const current = await readBriefProject(id, req.orgIds);
+    let current;
+    if (filteredUpdates.settings !== undefined || filteredUpdates.status !== undefined) {
+      current = await readBriefProject(id, req.orgIds);
       if (!current) return res.status(404).json({ error: 'Project not found' });
-      if (Object.hasOwn(current.settings ?? {}, 'brief')) {
-        filteredUpdates.settings = { ...filteredUpdates.settings, brief: current.settings.brief };
+    }
+    const settings = current?.settings ?? {};
+    if (filteredUpdates.settings !== undefined) {
+      for (const key of ['brief', 'progress', 'archive']) {
+        if (Object.hasOwn(settings, key)) filteredUpdates.settings[key] = settings[key];
       }
-      filteredUpdates.updated_at = nextProjectVersion(current.updated_at);
-      query = matchProjectVersion(query.update(filteredUpdates), current.updated_at);
-    } else {
-      filteredUpdates.updated_at = new Date().toISOString();
-      query = query.update(filteredUpdates);
+    }
+    const status = filteredUpdates.status;
+    if (status !== undefined && (status === 'archived' || current.status === 'archived')) {
+      if (!await canArchiveProject(current, req.user.id)) {
+        return res.status(403).json({ error: 'Only the project owner or a workspace admin can archive or restore this project' });
+      }
+      if (status !== current.status) {
+        filteredUpdates.settings ??= { ...settings };
+        if (status === 'archived') {
+          filteredUpdates.settings.archive = { previousStatus: restoreStatus(current.status) };
+        } else {
+          delete filteredUpdates.settings.archive;
+        }
+      }
     }
 
-    const { data: project, error } = await query
-      .in('org_id', req.orgIds)
-      .eq('id', id)
-      .select()
-      .maybeSingle();
+    filteredUpdates.updated_at = nextProjectVersion(current?.updated_at);
+    let query = supabase.from('projects').update(filteredUpdates).eq('id', id);
+    query = current
+      ? matchProjectVersion(query.eq('org_id', current.org_id), current.updated_at)
+      : query.in('org_id', req.orgIds);
+    const { data: project, error } = await query.select().maybeSingle();
 
-    if (error) {
-      return res.status(404).json({ error: 'Project not found' });
-    }
-    if (!project) return filteredUpdates.settings !== undefined
+    if (error) throw error;
+    if (!project) return current
       ? res.status(409).json({ error: 'This project changed. Reload before saving.' })
       : res.status(404).json({ error: 'Project not found' });
 
@@ -365,53 +537,38 @@ router.put('/:id', validate(schemas.update), async (req, res) => {
 
   } catch (error) {
     log.error('Error updating project:', { error: error.message || error });
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Could not update this project. Try again.' });
   }
 });
 
-/**
- * DELETE /api/projects/:id
- * Delete project and its tasks
- */
-router.delete('/:id', async (req, res) => {
+router.patch('/:id/restore', validate(schemas.getBrief), async (req, res) => {
   try {
-    const { id } = req.params;
+    if (!supabase) return res.status(503).json({ error: 'Database not configured' });
 
-    if (!supabase) {
-      return res.status(503).json({ error: 'Database not configured' });
+    const current = await readBriefProject(req.params.id, req.orgIds);
+    if (!current) return res.status(404).json({ error: 'Project not found' });
+    if (!await canArchiveProject(current, req.user.id)) {
+      return res.status(403).json({ error: 'Only the project owner or a workspace admin can archive or restore this project' });
     }
+    if (current.status !== 'archived') return res.json({ status: current.status });
 
-    // Delete tasks first
-    await supabase
-      .from('tasks')
-      .delete()
-      .in('org_id', req.orgIds)
-      .eq('project_id', id);
-
-    // Unlink meetings (don't delete them)
-    await supabase
-      .from('meetings')
-      .update({ project_id: null })
-      .in('org_id', req.orgIds)
-      .eq('project_id', id);
-
-    // Delete project
-    const { error } = await supabase
-      .from('projects')
-      .delete()
-      .in('org_id', req.orgIds)
-      .eq('id', id);
-
-    if (error) {
-      return res.status(404).json({ error: 'Project not found' });
-    }
-
-    res.json({ success: true, message: 'Project deleted' });
-
+    const { archive, ...settings } = current.settings ?? {};
+    const { data: project, error } = await matchProjectVersion(
+      supabase.from('projects').update({
+        status: restoreStatus(archive?.previousStatus), settings, updated_at: nextProjectVersion(current.updated_at)
+      }).eq('id', current.id).eq('org_id', current.org_id), current.updated_at
+    ).select('status').maybeSingle();
+    if (error) throw error;
+    if (!project) return res.status(409).json({ error: 'This project changed. Reload before restoring.' });
+    return res.json({ status: project.status });
   } catch (error) {
-    log.error('Error deleting project:', { error: error.message || error });
-    res.status(500).json({ error: error.message });
+    log.error('Error restoring project:', error.message);
+    return res.status(500).json({ error: 'Could not restore this project. Try again.' });
   }
+});
+
+router.delete('/:id', (_req, res) => {
+  res.set('Allow', 'GET, PUT').status(405).json({ error: 'Archive the project to keep its work and history.' });
 });
 
 /**

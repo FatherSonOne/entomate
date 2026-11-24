@@ -22,6 +22,17 @@ const data: CarryForwardData = {
 const wrap = (ui: React.ReactElement) => render(<MemoryRouter>{ui}</MemoryRouter>)
 
 describe('CarryForward', () => {
+  test('shows a linked project brief even when there are no earlier commitments', () => {
+    wrap(<CarryForward data={{ ...data, openCount: 0, overdueCount: 0, doneCount: 0, open: [], done: [],
+      projectContext: { id: 'pilot', name: 'Clinic pilot', outcome: 'Pilot in two clinics', scope: '', successCriteria: '',
+        nextMilestone: { id: 'm1', title: 'Confirm clinic lead', dueDate: '2026-12-10' } }
+    }} />)
+    expect(screen.getByRole('link', { name: 'Clinic pilot' })).toHaveAttribute('href', '/projects/pilot')
+    expect(screen.getByText('Pilot in two clinics')).toBeInTheDocument()
+    expect(screen.getByText(/Confirm clinic lead/)).toBeInTheDocument()
+    expect(screen.queryByText('0 open')).not.toBeInTheDocument()
+  })
+
   test('lists open items with overdue first, the last meeting and what got done', () => {
     wrap(<CarryForward data={data} />)
     expect(screen.getByText('3 open · 1 overdue · 1 done')).toBeTruthy()
