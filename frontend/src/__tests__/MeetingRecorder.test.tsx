@@ -137,6 +137,8 @@ class FakeRecorder {
     recorders.push(this)
   }
   start(): void { this.state = 'recording' }
+  pause(): void { this.state = 'paused' }
+  resume(): void { this.state = 'recording' }
   emit(text: string): void { this.ondataavailable?.({ data: new Blob([text], { type: this.mimeType }) }) }
   addEventListener(type: string, fn: () => void): void { if (type === 'stop') this.stopFns.push(fn) }
   stop(): void {
@@ -210,6 +212,53 @@ describe('MeetingRecorder', () => {
     expect(api.uploadPiece).toHaveBeenCalledTimes(2)
     expect(api.finish).toHaveBeenCalledWith('m-1', 2)
     expect(onRecorded).toHaveBeenCalledWith('m-1')
+  })
+
+  test('pause stops the recorders, and paused time is not counted in the piece', async () => {
+    let now = 1_000_000
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now)
+    renderRecorder()
+    fireEvent.click(screen.getByRole('checkbox', { name: /knows it is being recorded/i }))
+    fireEvent.click(screen.getByRole('button', { name: /start recording/i }))
+    await screen.findByRole('button', { name: /stop recording/i })
+
+    now += 10_000
+    fireEvent.click(screen.getByRole('button', { name: /^pause$/i }))
+    expect(recorders[0]!.state).toBe('paused')
+    expect(screen.getByText(/nothing is recorded until you resume/i)).toBeInTheDocument()
+
+    now += 600_000 // ten minutes paused
+    fireEvent.click(screen.getByRole('button', { name: /resume/i }))
+    expect(recorders[0]!.state).toBe('recording')
+
+    now += 5_000
+    act(() => recorders[0]!.emit('piece-0'))
+    await waitFor(() => expect(api.uploadPiece).toHaveBeenCalledWith('m-1', 0, 15_000, expect.any(Blob), 'audio/webm'))
+    clock.mockRestore()
+  })
+
+  test('the pop-out window carries the controls and closes when the recording is handed over', async () => {
+    const popDoc = document.implementation.createHTMLDocument('pop')
+    const popWin = { document: popDoc, addEventListener: vi.fn(), close: vi.fn(), focus: vi.fn() }
+    const open = vi.spyOn(window, 'open').mockReturnValue(popWin as unknown as Window)
+    renderRecorder()
+    fireEvent.click(screen.getByRole('checkbox', { name: /knows it is being recorded/i }))
+    fireEvent.click(screen.getByRole('button', { name: /start recording/i }))
+    await screen.findByRole('button', { name: /stop recording/i })
+
+    fireEvent.click(screen.getByRole('button', { name: /pop out/i }))
+    await waitFor(() => expect(popDoc.querySelector('[data-testid="recorder-pop"]')).not.toBeNull())
+    const popButton = (name: string): HTMLButtonElement =>
+      [...popDoc.querySelectorAll('button')].find((b) => b.textContent?.trim() === name) as HTMLButtonElement
+
+    act(() => popButton('Pause').click())
+    expect(recorders[0]!.state).toBe('paused')
+    expect(screen.getByRole('button', { name: /resume/i })).toBeInTheDocument()
+
+    act(() => popButton('Stop').click())
+    await screen.findByRole('button', { name: /open the meeting/i })
+    expect(popWin.close).toHaveBeenCalled()
+    open.mockRestore()
   })
 
   test('a browser tab records its sound with the microphone, and keeps a video copy', async () => {

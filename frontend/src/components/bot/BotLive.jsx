@@ -47,12 +47,12 @@ export function useBotCaptions(sessionId, active) {
   return [state, setState]
 }
 
-const canPip = () => typeof window !== 'undefined' && 'documentPictureInPicture' in window
+export const canPip = () => typeof window !== 'undefined' && 'documentPictureInPicture' in window
 
 /** Copy the app's styles and theme into the pop-out window's document. */
-function dressWindow(win) {
+export function dressWindow(win, title = 'Entomate · bot') {
   const doc = win.document
-  doc.title = 'Entomate · bot'
+  doc.title = title
   for (const node of document.querySelectorAll('link[rel="stylesheet"], style')) {
     doc.head.appendChild(node.cloneNode(true))
   }

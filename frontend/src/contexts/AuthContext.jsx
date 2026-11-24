@@ -68,11 +68,11 @@ export const AuthProvider = ({ children }) => {
           return
         }
 
-        if (session?.user) {
-          setUser(authService.toAuthUser(session.user))
-        } else {
-          setUser(null)
-        }
+        // Supabase re-sends SIGNED_IN when the tab regains focus and TOKEN_REFRESHED about
+        // hourly. Keep the same object for the same person: a new one reloads the workspace,
+        // which unmounts the app (and stops a meeting being recorded in the browser).
+        const next = authService.toAuthUser(session?.user)
+        setUser((prev) => (prev && next && JSON.stringify(prev) === JSON.stringify(next) ? prev : next))
 
         setLoading(false)
       }
