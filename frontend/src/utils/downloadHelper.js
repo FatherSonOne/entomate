@@ -14,7 +14,7 @@ export async function downloadFile(apiPath, filename, params = {}) {
   saveDownload(blob, filename)
 }
 
-export function saveDownload(blob, filename) {
+function saveDownload(blob, filename) {
   if (!(blob instanceof Blob) || !blob.size) throw new Error('The download is empty or invalid.')
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')

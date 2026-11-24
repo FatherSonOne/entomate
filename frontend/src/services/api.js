@@ -620,15 +620,22 @@ export const dashboardApi = {
 // ========================================
 // REPORTS API (Phase 5 - Week 6)
 // ========================================
+function downloadMeetingDocument(meetingId, kind, format, filename) {
+  const path = kind === 'transcript' ? `/${kind}/${format}` : `/${format}`
+  return downloadFile(`/reports/meeting/${meetingId}${path}`, filename, {
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+  })
+}
+
 export const reportsApi = {
   // Get available reports
   getAvailable: () => api.get('/reports/available'),
 
   // Download meeting recap PDF
   downloadMeetingPDF: (meetingId, filename = 'meeting-recap.pdf') =>
-    downloadFile(`/reports/meeting/${meetingId}/pdf`, filename, {
-      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
-    }),
+    downloadMeetingDocument(meetingId, 'recap', 'pdf', filename),
+
+  downloadMeetingDocument,
 
 
   // Download project report PDF

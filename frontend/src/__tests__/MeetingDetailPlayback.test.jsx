@@ -5,7 +5,8 @@ import { vi, describe, test, expect, beforeEach } from 'vitest'
 
 const api = vi.hoisted(() => ({ get: vi.fn(), carryForward: vi.fn(() => Promise.resolve(null)) }))
 const player = vi.hoisted(() => ({ ready: false, playFrom: vi.fn() }))
-vi.mock('../services/api', () => ({ default: {}, meetingsApi: api, integrationsApi: {}, calendarApi: {}, reportsApi: {}, searchApi: {} }))
+const reports = vi.hoisted(() => ({ downloadMeetingDocument: vi.fn(async () => {}) }))
+vi.mock('../services/api', () => ({ default: {}, meetingsApi: api, integrationsApi: {}, calendarApi: {}, reportsApi: reports, searchApi: {} }))
 vi.mock('../components/vc/ToastProvider', () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn() }) }))
 vi.mock('../components/intelligence/MeetingIntelligencePanel', () => ({ default: () => null }))
 vi.mock('../components/EcosystemSyncStatus', () => ({ default: () => null }))
@@ -89,5 +90,17 @@ describe('a pressed timecode plays the recording', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Jump to 0:22 in the transcript: Ship/ }))
     expect(screen.queryByTestId('player-stub')).toBeNull()
     expect(player.playFrom).not.toHaveBeenCalled()
+  })
+
+  test.each([
+    ['Recap PDF', 'recap', 'pdf', 'Planning - Recap.pdf'],
+    ['Recap Word (.docx)', 'recap', 'docx', 'Planning - Recap.docx'],
+    ['Transcript PDF', 'transcript', 'pdf', 'Planning - Transcript.pdf'],
+    ['Transcript Word (.docx)', 'transcript', 'docx', 'Planning - Transcript.docx'],
+  ])('downloads %s from the meeting header', async (option, kind, format, filename) => {
+    renderPage({ status: 'done' })
+    fireEvent.click(await screen.findByRole('button', { name: 'Export meeting' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: option }))
+    expect(reports.downloadMeetingDocument).toHaveBeenCalledWith('m1', kind, format, filename)
   })
 })

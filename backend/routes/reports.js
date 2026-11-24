@@ -8,6 +8,7 @@ const router = express.Router();
 const { supabase } = require('../config/supabase');
 const { authenticate } = require('../middleware/auth');
 const reportService = require('../services/reportService');
+const { generateMeetingDocument } = require('../services/meetingDocument');
 const { buildProjectReport } = require('../services/projectReport');
 const { loadProjectWork } = require('../services/projectWork');
 const log = require('../utils/log');
@@ -30,10 +31,9 @@ async function getUserMeetingIds(userId) {
 }
 
 /**
- * GET /api/reports/meeting/:id/pdf
- * Generate PDF recap for a specific meeting
+ * Generate a recap or transcript attachment for a specific meeting.
  */
-router.get('/meeting/:id/pdf', async (req, res) => {
+async function exportMeeting(req, res, kind, format) {
   try {
     const { id } = req.params;
 
@@ -54,31 +54,45 @@ router.get('/meeting/:id/pdf', async (req, res) => {
       return res.status(404).json({ error: 'Meeting not found' });
     }
 
-    // Get action items for this meeting
-    const { data: actionItems, error: actionError } = await supabase
-      .from('action_items')
-      .select('*')
-      .eq('org_id', meeting.org_id)
-      .eq('meeting_id', id)
-      .order('priority', { ascending: false });
-    if (actionError) throw actionError;
+    let actionItems = [];
+    if (kind === 'recap') {
+      const { data, error } = await supabase
+        .from('action_items')
+        .select('*')
+        .eq('org_id', meeting.org_id)
+        .eq('meeting_id', id)
+        .order('priority', { ascending: false });
+      if (error) throw error;
+      actionItems = data || [];
+    }
 
-    // Generate PDF
-    const pdfBuffer = await reportService.generateMeetingRecapPDF(meeting, actionItems || [], req.query.timeZone);
+    const { timeZone } = req.query;
+    const buffer = kind === 'recap' && format === 'pdf'
+      ? await reportService.generateMeetingRecapPDF(meeting, actionItems, timeZone)
+      : await generateMeetingDocument(meeting, { kind, format, actionItems, timeZone });
+    if (!buffer) return res.status(404).json({ error: 'No transcript is available for this meeting' });
 
     // Set response headers
-    const filename = `meeting-recap-${meeting.title?.replace(/[^a-z0-9]/gi, '-').toLowerCase() || id}.pdf`;
-    res.setHeader('Content-Type', 'application/pdf');
+    const slug = meeting.title?.replace(/[^a-z0-9]/gi, '-').toLowerCase() || id;
+    const filename = `meeting-${kind}-${slug}.${format}`;
+    res.setHeader('Content-Type', format === 'pdf'
+      ? 'application/pdf'
+      : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.setHeader('Content-Length', pdfBuffer.length);
+    res.setHeader('Content-Length', buffer.length);
     res.setHeader('Cache-Control', 'private, no-store');
 
-    res.send(pdfBuffer);
+    res.send(buffer);
   } catch (error) {
-    log.error('Error generating meeting PDF:', { error: error.message || error });
-    res.status(500).json({ error: 'Failed to generate PDF', details: error.message });
+    log.error('Error generating meeting export:', { error: error.message || error });
+    res.status(500).json({ error: 'Failed to generate meeting export' });
   }
-});
+}
+
+router.get('/meeting/:id/pdf', (req, res) => exportMeeting(req, res, 'recap', 'pdf'));
+router.get('/meeting/:id/docx', (req, res) => exportMeeting(req, res, 'recap', 'docx'));
+router.get('/meeting/:id/transcript/pdf', (req, res) => exportMeeting(req, res, 'transcript', 'pdf'));
+router.get('/meeting/:id/transcript/docx', (req, res) => exportMeeting(req, res, 'transcript', 'docx'));
 
 /**
  * GET /api/reports/project/:id/pdf

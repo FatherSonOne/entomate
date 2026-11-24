@@ -133,6 +133,39 @@ test('meeting recap downloads include bot captures and stay in the meeting works
   }
 });
 
+test.each([
+  ['/docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'PK'],
+  ['/transcript/pdf', 'application/pdf', '%PDF-'],
+  ['/transcript/docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'PK'],
+])('meeting export %s returns the requested file and enforces workspace access', async (path, contentType, signature) => {
+  const id = '0000000c-0000-4000-8000-00000000000c';
+  mockDb.meetings.push({
+    id, org_id: ORG_A, title: 'Bot capture',
+    transcript_segments: [{ speaker: 'Ana Rivera', atMs: 0, text: 'Welcome to the meeting.' }]
+  });
+  const reports = request(app('../routes/reports', '/api/reports'));
+  const endpoint = `/api/reports/meeting/${id}${path}`;
+  const response = await reports.get(endpoint).buffer(true).parse((res, callback) => {
+    const chunks = [];
+    res.on('data', chunk => chunks.push(chunk));
+    res.on('end', () => callback(null, Buffer.concat(chunks)));
+  }).expect(200);
+  expect(response.headers['content-type']).toBe(contentType);
+  expect(response.headers['cache-control']).toBe('private, no-store');
+  expect(response.body.subarray(0, signature.length).toString()).toBe(signature);
+
+  mockDb.org_members[0].org_id = ORG_B;
+  await reports.get(endpoint).expect(404);
+});
+
+test('transcript export reports when a meeting has no transcript', async () => {
+  const id = '0000000c-0000-4000-8000-00000000000c';
+  mockDb.meetings.push({ id, org_id: ORG_A, title: 'Waiting for transcript' });
+  const reports = request(app('../routes/reports', '/api/reports'));
+  const response = await reports.get(`/api/reports/meeting/${id}/transcript/docx`).expect(404);
+  expect(response.body.error).toBe('No transcript is available for this meeting');
+});
+
 describe('tasks are limited to the caller\'s org', () => {
   const tasks = () => app('../routes/tasks', '/api/tasks');
 
