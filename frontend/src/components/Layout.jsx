@@ -25,6 +25,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import useBotDebriefWatch from './bot/useBotDebriefWatch'
+import useReadyBriefNotifications from './EntoAssistant/useReadyBriefNotifications'
 import MissedBotAlert from './bot/MissedBotAlert'
 import { useOrgSafe } from '../contexts/OrgContext'
 import { useKeyboardShortcuts, getModKey } from '../hooks/useKeyboardShortcuts'
@@ -163,7 +164,8 @@ export default function Layout() {
   const closeRecorder = () => setRecorderOpen(false)
   const recorderRecorded = () => setRecordingVersion((version) => version + 1)
   const recorderOutlet = { openRecorder, recorderOpen, recordingVersion }
-  const shellOutlet = { ...recorderOutlet, openAssistant: () => setAssistantOpen(true) }
+  const openAssistant = useCallback(() => setAssistantOpen(true), [])
+  const shellOutlet = { ...recorderOutlet, openAssistant }
   // The panel chunk loads on first open, then stays mounted so its conversation survives a close.
   const [assistantMounted, setAssistantMounted] = useState(false)
   useEffect(() => { if (assistantOpen) setAssistantMounted(true) }, [assistantOpen])
@@ -189,6 +191,7 @@ export default function Layout() {
   const shortcutsHeld = useNavigationShortcuts(navigate, isAdmin, !commandPaletteOpen && !shortcutsHelpOpen && !recorderOpen)
   // Announce a saved debrief without interrupting the current page.
   useBotDebriefWatch({ orgId: orgCtx?.org?.id, userId: user?.id || null, enabled: isAdmin })
+  useReadyBriefNotifications({ orgId: orgCtx?.org?.id, userId: user?.id, openAssistant })
 
   const handleSignOut = async () => {
     await signOut()

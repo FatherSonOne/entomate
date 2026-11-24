@@ -15,6 +15,7 @@ const LEADS = [5, 15, 30, 60];
 const DEFAULT_LEAD = 15;
 const CHECK_EVERY = 5 * MINUTE;
 const MAX_AHEAD = 62 * 24 * 60 * MINUTE;
+const BRIEF_TITLE_PREFIX = 'Pre-meeting brief for ';
 
 class BriefError extends Error {
   constructor(status, message) {
@@ -117,6 +118,21 @@ async function manage(userId, orgId, eventId, method, body) {
   return saveSchedule(data, old, event, leadMinutes, body?.timeZone);
 }
 
+async function listReadyBriefs(userId, orgId) {
+  if (!db) throw new BriefError(503, 'Brief scheduling is unavailable.');
+  if (!(await getOrgIdsForUser(userId)).includes(orgId)) throw new BriefError(403, 'This workspace is unavailable.');
+  // Leave a short window for a browser that comes back just after the meeting starts.
+  const recent = new Date(Date.now() - 15 * MINUTE).toISOString();
+  const rows = unwrap(await db.from(TABLE).select('thread_id, thread:ento_ai_threads!inner(title)')
+    .eq('user_id', userId).eq('org_id', orgId).eq('status', 'ready')
+    .eq('thread.user_id', userId).eq('thread.org_id', orgId)
+    .gt('starts_at', recent).order('starts_at').limit(20));
+  return rows.map(({ thread_id: threadId, thread }) => ({
+    threadId,
+    title: thread.title?.startsWith(BRIEF_TITLE_PREFIX) ? thread.title.slice(BRIEF_TITLE_PREFIX.length) : thread.title,
+  }));
+}
+
 async function prepareChange(userId, orgId, { eventKey, decision, leadMinutes = DEFAULT_LEAD, guard }) {
   if (!['schedule', 'cancel'].includes(decision)) throw new BriefError(400, 'Choose schedule or cancel.');
   if (decision === 'schedule') validateLead(leadMinutes);
@@ -198,7 +214,7 @@ async function prepare(job, event) {
   const time = Date.now();
   const recordLinks = recordLinksForAnswer(summary, meetings.map((meeting) => ({ kind: 'meeting', id: meeting.id, label: meeting.title })));
   return {
-    title: `Pre-meeting brief for ${title}`,
+    title: BRIEF_TITLE_PREFIX + title,
     messages: [
       { role: 'user', content: `Prepare a pre-meeting brief for ${JSON.stringify(title)}.`, ts: time, section: 'meetings' },
       { role: 'assistant', content, recordLinks, ts: time, section: 'meetings' },
@@ -266,4 +282,4 @@ function stop() {
   timer = undefined;
 }
 
-module.exports = { BriefError, manage, prepareChange, confirmChange, LEADS, DEFAULT_LEAD, runScheduledBriefs, initialize, stop };
+module.exports = { BriefError, manage, listReadyBriefs, prepareChange, confirmChange, LEADS, DEFAULT_LEAD, runScheduledBriefs, initialize, stop };

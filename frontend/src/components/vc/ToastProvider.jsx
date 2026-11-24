@@ -97,7 +97,7 @@ export function ToastProvider({ children }) {
     <ToastContext.Provider value={toast}>
       {children}
       {createPortal(
-        <div className="vc-toast-stack">
+        <div className="vc-toast-stack" aria-live="polite" aria-relevant="additions">
           {toasts.map(t => (
             <div
               key={t.id}
