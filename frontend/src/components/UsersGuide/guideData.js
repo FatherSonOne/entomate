@@ -836,7 +836,7 @@ export const guideSections = [
         steps: [
           'Turn the Owner, Priority, Deadline and Follow-up agents on or off.',
           'Set how sure an agent must be before it applies a change.',
-          'What the agents learned: review suggested and approved Owner preferences for this workspace.',
+          'What the agents learned: review suggested and approved Owner and Priority preferences for this workspace.',
         ],
       },
       {
@@ -963,13 +963,13 @@ export const guideSections = [
       },
       {
         id: 'faq-ai-learn',
-        title: 'How does the Owner agent learn?',
-        scenario: 'You keep changing the owner Entomate assigns to a recurring action item.',
+        title: 'How do meeting agents learn?',
+        scenario: 'You keep changing the owner or priority Entomate assigns to a recurring action item.',
         steps: [
-          'Edit the action item to replace an agent-assigned owner with a workspace member.',
+          'Edit the action item to change the priority an agent set or replace an agent-assigned owner with a workspace member.',
           'Repeated corrections across at least three meetings with the same title and action-item wording can suggest a preference.',
           'A workspace owner or admin can approve it in Settings \u203a Meeting agents \u203a What the agents learned, or from the Learning row on Today.',
-          'The Owner agent uses the approved preference for future matching action items that need an owner.',
+          'On matching action items, Priority uses the approved priority and Owner uses the approved owner when the item is unassigned.',
         ],
       },
       {

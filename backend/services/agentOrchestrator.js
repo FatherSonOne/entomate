@@ -292,7 +292,7 @@ class AgentOrchestrator {
 
       // Priority and deadline don't depend on each other.
       const parallel = parallelAgents.length > 0
-        ? await this.orchestrateParallel(parallelAgents, context)
+        ? await this.orchestrateParallel(parallelAgents, { ...context, usePriorityPreferences: true })
         : { aggregated: {} };
       const suggestions = { aggregated: { ...aggregated, ...parallel.aggregated } };
 

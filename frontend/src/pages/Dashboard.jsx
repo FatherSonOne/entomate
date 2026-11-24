@@ -52,7 +52,7 @@ export default function Today() {
   const [taskCount, setTaskCount] = useState(0)
   const [upcoming, setUpcoming] = useState([])
   const [calendarOn, setCalendarOn] = useState(null)
-  const [ownerPreferences, setOwnerPreferences] = useState(null)
+  const [agentPreferences, setAgentPreferences] = useState(null)
   const [loading, setLoading] = useState(true)
   const [completing, setCompleting] = useState(() => new Set())
   const [briefOpen, setBriefOpen] = useState(false)
@@ -89,9 +89,13 @@ export default function Today() {
   useEffect(() => {
     if (!workspaceId || loading) return undefined
     let cancelled = false
-    settingsApi.getOwnerPreferences(workspaceId).then(({ suggested }) => {
-      if (!cancelled) setOwnerPreferences({ workspaceId, count: suggested.length })
-    }).catch(() => {})
+    Promise.allSettled([
+      settingsApi.getOwnerPreferences(workspaceId),
+      settingsApi.getPriorityPreferences(workspaceId),
+    ]).then(results => {
+      const [owner, priority] = results.map(result => result.status === 'fulfilled' ? result.value?.suggested?.length || 0 : 0)
+      if (!cancelled) setAgentPreferences({ workspaceId, count: owner + priority, priorityOnly: !owner && priority > 0 })
+    })
     return () => { cancelled = true }
   }, [workspaceId, loading])
 
@@ -342,7 +346,7 @@ export default function Today() {
   ]
   const openItems = groups.reduce((n, g) => n + g.total, 0)
 
-  const pendingPreferences = ownerPreferences?.workspaceId === workspaceId ? ownerPreferences?.count || 0 : 0
+  const pendingPreferences = agentPreferences?.workspaceId === workspaceId ? agentPreferences?.count || 0 : 0
 
   return (
     <div className="bs-today">
@@ -402,9 +406,9 @@ export default function Today() {
                   <Led tone="ai" />
                   <div className="bs-row-text">
                     <div className="bs-today-call-head"><span className="bs-h3">Learning</span><span className="bs-lbl">Awaiting review</span></div>
-                    <span className="bs-today-call-what">{pendingPreferences} suggested Owner {pendingPreferences === 1 ? 'preference' : 'preferences'}</span>
+                    <span className="bs-today-call-what">{pendingPreferences} suggested agent {pendingPreferences === 1 ? 'preference' : 'preferences'}</span>
                   </div>
-                  <Key size="sm" onClick={() => navigate('/settings?s=agents&dr=learning')}>Review</Key>
+                  <Key size="sm" onClick={() => navigate(`/settings?s=agents&dr=learning${agentPreferences.priorityOnly ? '&agent=priority' : ''}`)}>Review</Key>
                 </li>
               )}
             </ul>

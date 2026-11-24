@@ -118,6 +118,7 @@ const actionItemUpdate = z.object({
     task_description: z.string().trim().min(1, 'Enter an action item').max(4000).optional(),
     assigned_to_name: z.string().trim().min(1).max(255).nullable().optional(),
     assigned_to_email: z.string().trim().email().max(255).nullable().optional(),
+    priority: z.enum(['high', 'medium', 'low']).optional(),
     due_date: z.iso.date().nullable().optional(),
     version: z.iso.datetime({ offset: true }).nullable().optional(),
   }).strict().refine(({ version, ...changes }) => Object.keys(changes).length > 0, 'Enter at least one change'),

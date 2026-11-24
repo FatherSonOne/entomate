@@ -87,6 +87,7 @@ beforeEach(() => {
   ];
   tables.users = [];
   tables.owner_preferences = [];
+  tables.priority_preferences = [];
   tables.action_items = [
     { org_id: 'org-a', assigned_to_name: 'Priya S.', status: 'open' },
     { org_id: 'org-b', assigned_to_name: 'Jon B.', status: 'open' },
@@ -289,6 +290,75 @@ it('records corrections through the action item API, approves in Settings, and w
   const [after, disabledItem] = createMeeting();
   await events.handleMeetingProcessed(after, [disabledItem]);
   expect(disabledItem.assigned_to_name).toBe('Alex');
+});
+
+it('learns a Priority correction through the action item API and uses the approved priority on the next matching meeting', async () => {
+  const app = express().use(express.json());
+  app.use('/meetings', require('../../routes/meetings'));
+  app.use('/settings', require('../../routes/settings'));
+  const { MeetingEvents } = require('../meetingEvents');
+  const events = new MeetingEvents({ db: mockDb });
+  const [orgId, admin, member] = Array.from({ length: 3 }, () => randomUUID());
+  tables.org_members = [{ org_id: orgId, user_id: admin, role: 'admin' }, { org_id: orgId, user_id: member, role: 'member' }];
+  tables.tenant_organizations = [{ id: orgId, settings: { meeting_agents: {
+    assignment: { enabled: false }, priority: { enabled: true }, deadline: { enabled: false }
+  } } }];
+  tables.meetings = [];
+  tables.action_items = [];
+  const meetingWithItem = (title = 'Weekly Finance', task = 'Urgent: review invoices') => {
+    const meeting = { id: randomUUID(), org_id: orgId, title };
+    const item = { id: randomUUID(), org_id: orgId, meeting_id: meeting.id, task_description: task, priority: 'medium' };
+    tables.meetings.push(meeting);
+    tables.action_items.push(item);
+    return [meeting, item];
+  };
+  const list = () => request(app).get('/settings/priority-preferences').query({ workspaceId: orgId }).set('X-Test-User', admin);
+  const review = (user, preference, decision) => request(app).patch('/settings/priority-preferences').set('X-Test-User', user)
+    .send({ workspaceId: orgId, scopeKey: preference.scopeKey, value: preference.value, decision });
+
+  const [, manualItem] = meetingWithItem();
+  const manualEdit = await request(app).patch(`/meetings/action-items/${manualItem.id}`).set('X-Test-User', member)
+    .send({ priority: 'low' }).expect(200);
+  expect(manualEdit.body.priority).toBe('low');
+  expect(manualEdit.body.priority_correction).toBeUndefined();
+
+  for (let i = 0; i < 3; i++) {
+    const [meeting, item] = meetingWithItem();
+    await events.handleMeetingProcessed(meeting, [item]);
+    expect(item.priority).toBe('high');
+    const saved = await request(app).patch(`/meetings/action-items/${item.id}`).set('X-Test-User', member)
+      .send({ priority: 'low', version: item.updated_at }).expect(200);
+    expect(saved.body).toMatchObject({ priority: 'low', priority_correction: { from: 'high', to: 'low' } });
+    if (i < 2) expect((await list().expect(200)).body.suggested).toEqual([]);
+  }
+
+  const { body: { suggested, active } } = await list().expect(200);
+  expect(active).toEqual([]);
+  expect(suggested).toHaveLength(1);
+  const [preference] = suggested;
+  expect(preference.value).toBe('low');
+  expect(preference.evidence).toHaveLength(3);
+  await review(member, preference, 'approve').expect(403);
+
+  const [before, pending] = meetingWithItem();
+  await events.handleMeetingProcessed(before, [pending]);
+  expect(pending.priority).toBe('high');
+  await review(admin, preference, 'approve').expect(200);
+  expect((await list().expect(200)).body).toMatchObject({ suggested: [], active: [preference] });
+
+  const [next, item] = meetingWithItem(' weekly  finance ', 'Urgent:  review invoices');
+  await events.handleMeetingProcessed(next, [item]);
+  expect(item).toMatchObject({ priority: 'low', agent_notes: {
+    priority: { applied: true, reason: expect.stringMatching(/approved priority preference/i) }
+  } });
+  const [unmatched, different] = meetingWithItem('Weekly Operations');
+  await events.handleMeetingProcessed(unmatched, [different]);
+  expect(different.priority).toBe('high');
+
+  await review(admin, preference, 'disable').expect(200);
+  const [after, disabled] = meetingWithItem();
+  await events.handleMeetingProcessed(after, [disabled]);
+  expect(disabled.priority).toBe('high');
 });
 
 describe('deadline agent weighs the owner workload', () => {

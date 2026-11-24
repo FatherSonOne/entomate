@@ -6,7 +6,9 @@
 
 const BaseAgent = require('./baseAgent');
 const ai = require('../../config/ai');
+const { supabase } = require('../../config/supabase');
 const LearningEngine = require('../learning/LearningEngine');
+const priorityPreferences = require('../priorityPreferences');
 
 class PriorityAgent extends BaseAgent {
   constructor() {
@@ -57,6 +59,18 @@ class PriorityAgent extends BaseAgent {
       this.log('Generating priority suggestion');
 
       const analysis = await this.analyze(context, automation);
+
+      const preferred = context.usePriorityPreferences
+        ? await priorityPreferences.approved(supabase, context.orgId, analysis.meetingTitle, analysis.taskDescription)
+        : null;
+      if (preferred) {
+        return {
+          recommended: preferred,
+          reason: 'Approved Priority preference for matching meetings and action items.',
+          confidence: 1,
+          factors: ['workspace_preference']
+        };
+      }
 
       // Quick heuristic check first
       if (analysis.keywords.hasHighPriorityIndicators) {
