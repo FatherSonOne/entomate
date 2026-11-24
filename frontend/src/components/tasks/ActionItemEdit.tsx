@@ -2,10 +2,10 @@ import React, { useId, useState } from 'react'
 import { meetingsApi } from '../../services/api'
 import { priorityWord } from '../../services/tasksView'
 import type { TaskActionRow, WorkItem, WorkPriority } from '../../services/tasksView'
-import { Drawer, Key, Select, TextArea, TextInput } from '../bench'
+import { Drawer, Key, TextArea, TextInput } from '../bench'
 
 type Changes = Partial<Pick<TaskActionRow, 'task_description' | 'assigned_to_name' | 'assigned_to_email' | 'due_date' | 'priority'>>
-const PRIORITY_OPTIONS = (['low', 'medium', 'high'] as const).map(value => ({ value, label: priorityWord(value) }))
+const PRIORITIES = ['low', 'medium', 'high'] as const
 
 export default function ActionItemEdit({ item, onSaved, onClose }: {
   item: WorkItem
@@ -86,7 +86,9 @@ export default function ActionItemEdit({ item, onSaved, onClose }: {
         </div>
         <div className="bs-tasks-fl">
           <label className="bs-lbl" htmlFor={`${formId}-priority`}>Priority</label>
-          <Select id={`${formId}-priority`} value={priority} options={PRIORITY_OPTIONS} disabled={saving} onChange={value => setPriority(value as WorkPriority)} />
+          <select id={`${formId}-priority`} className="bs-input" value={priority} disabled={saving} onChange={event => setPriority(event.target.value as WorkPriority)}>
+            {PRIORITIES.map(value => <option key={value} value={value}>{priorityWord(value)}</option>)}
+          </select>
         </div>
         {error && <p className="bs-tasks-err" role="alert">{error}</p>}
         <div className="bs-tasks-keys">
