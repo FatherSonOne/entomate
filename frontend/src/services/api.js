@@ -1203,6 +1203,12 @@ export const entoAiApi = {
     edit: (id, patch) => entoAiAction('PATCH', `/${id}`, patch),
   },
 
+  calendarBookings: {
+    propose: (booking) => entoAiAction('POST', '', booking, 'calendar-bookings'),
+    confirm: (id, confirmationText) => entoAiAction('POST', `/${id}/confirm`, { confirmationText }, 'calendar-bookings'),
+    reject: (id) => entoAiAction('POST', `/${id}/reject`, {}, 'calendar-bookings'),
+  },
+
   // EAI-06: a plan is confirmed, dismissed and undone as a whole; each resolves to
   // { ok, proposals (every step, in order), error?, failedStep? }.
   plans: {

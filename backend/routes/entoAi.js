@@ -67,7 +67,7 @@ const writesEnabled = () => process.env.ENTO_AI_WRITE_TOOLS === 'true';
 
 const READ_ONLY_RULE = 'You can only read. If the user asks you to create, change or send something, say that you cannot do that yet and tell them where in Entomate to do it. You may write a draft (an email, an agenda) as text in your answer.';
 const WRITE_RULE = `You can propose changes with your write tools (create or update tasks, action items and projects, assign tasks, add meeting notes, and configure the calendar recording bot). A write tool never changes anything by itself: it puts a card in the panel, and the change happens only when the user presses Confirm. After proposing, say in one line what you proposed and that it waits for their Confirm. Never say it is done.
-Look records up first so you pass real ids. Propose only what the user asked for, one card per change. When the user asks for several changes that belong together (a new project and its tasks, or the same change to several records), use propose_plan so they confirm once. Use configure_bot_auto_join only for an explicit recurring calendar bot request, on its own card. It configures the user's rule; it does not guarantee that a particular bot has joined. You cannot send email or messages, or create calendar meetings; say so, and you may write a draft as text in your answer.`;
+Look records up first so you pass real ids. Propose only what the user asked for, one card per change. When the user asks for several changes that belong together (a new project and its tasks, or the same change to several records), use propose_plan so they confirm once. For a request about one calendar meeting, find its exact occurrence with get_calendar and use change_calendar_bot_booking for scheduling or cancellation. If multiple events match, ask which one. Use configure_bot_auto_join only for an explicit recurring calendar bot request, on its own card. It configures the user's rule; it does not guarantee that a particular bot has joined. You cannot send email or messages, or create calendar meetings; say so, and you may write a draft as text in your answer.`;
 
 function systemInstruction(sectionLabel, userName, writes = false, timeZone = 'UTC') {
   const now = new Date();
@@ -420,12 +420,15 @@ async function actionCtx(req) {
   const db = createUserClient(req.headers.authorization.split(' ')[1]);
   if (!db) return null;
   const orgIds = await getOrgIdsForUser(req.user.id);
-  return { db, orgIds: Array.isArray(orgIds) ? orgIds : [], userId: req.user.id, userName: req.user.name || req.user.email || null };
+  return {
+    db, orgIds: Array.isArray(orgIds) ? orgIds : [], userId: req.user.id,
+    userName: req.user.name || req.user.email || null, timeZone: calendarTimeZone(req.body?.timeZone),
+  };
 }
 
-function actionRoute(handler) {
+function actionRoute(handler, { manualBooking = false } = {}) {
   return async (req, res) => {
-    if (!writesEnabled()) return res.status(404).json({ error: 'Not found' });
+    if (!manualBooking && !writesEnabled()) return res.status(404).json({ error: 'Not found' });
     try {
       const ctx = await actionCtx(req);
       if (!ctx) return res.status(503).json({ error: 'Database not configured' });
@@ -440,6 +443,22 @@ function actionRoute(handler) {
     }
   };
 }
+
+// The Upcoming view uses the same proposal and confirmation engine. These routes
+// accept only a calendar booking even when conversational writes are disabled.
+const CALENDAR_BOOKING = 'change_calendar_bot_booking';
+const manualBooking = { manualBooking: true };
+router.post('/calendar-bookings', authenticate, actionRoute(async (ctx, req) => {
+  const { eventKey, decision, leadMinutes, orgId } = req.body || {};
+  const out = await actionLog.propose(CALENDAR_BOOKING, { eventKey, decision, leadMinutes, orgId }, ctx);
+  return out.ok ? { ok: true, proposal: out.proposal } : { ok: false, error: out.response.error };
+}, manualBooking));
+router.post('/calendar-bookings/:id/confirm', authenticate, actionRoute((ctx, req) => (
+  actionLog.confirm(ctx, req.params.id, { confirmationText: req.body?.confirmationText, toolName: CALENDAR_BOOKING })
+), manualBooking));
+router.post('/calendar-bookings/:id/reject', authenticate, actionRoute((ctx, req) => (
+  actionLog.reject(ctx, req.params.id, CALENDAR_BOOKING)
+), manualBooking));
 
 router.get('/actions', authenticate, actionRoute(async (ctx, req) => ({
   proposals: await actionLog.list(ctx, String(req.query.ids || '').split(',')),

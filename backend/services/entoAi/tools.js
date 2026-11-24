@@ -569,6 +569,8 @@ async function googleEvents(db, userId, timeMin, timeMax, query, timeZone) {
       autoJoin: autoJoinSettings,
       events: (events || []).filter((e) => e.status !== 'cancelled').map((e) => ({
         title: e.summary,
+        eventKey: e.start?.dateTime && Number.isFinite(Date.parse(e.start.dateTime)) ? autoJoin.eventKey(e) : null,
+        botBooking: Object.hasOwn(settings.bookings, e.id) ? settings.bookings[e.id].decision : null,
         startLocal: localDateTime(e.start?.dateTime || e.start?.date, timeZone),
         endLocal: localDateTime(e.end?.dateTime || e.end?.date, timeZone),
         allDay: !e.start?.dateTime,
@@ -664,4 +666,4 @@ async function runTool(name, args, ctx, timeoutMs = 10000) {
   }
 }
 
-module.exports = { calendarTimeZone, today, TOOLS, declarations, runTool, resultCount, recordLinksOf, recordLinksForAnswer, CLOSED, ToolInputError, uuidArg, dateArg, trunc };
+module.exports = { calendarTimeZone, localDateTime, today, TOOLS, declarations, runTool, resultCount, recordLinksOf, recordLinksForAnswer, CLOSED, ToolInputError, uuidArg, dateArg, trunc };

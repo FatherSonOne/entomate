@@ -38,6 +38,8 @@ const log = require('../utils/log');
 // Twelve hours ahead: Recall holds a scheduled bot and joins at join_at on its own, so
 // one run any time in the half-day before a meeting is enough. GitHub's schedule and a
 // sleeping server both skip runs; a short lookahead turned each skip into a missed meeting.
+const DAY_MS = 86_400_000;
+const MAX_BOOKINGS = 60;
 const LOOKAHEAD_MS = 12 * 60 * 60 * 1000;
 const GRACE_MS = 5 * 60 * 1000; // still join a meeting that started up to 5 min ago
 // Google Meet caps the waiting room at 10 minutes. Leave time for a late host.
@@ -100,6 +102,49 @@ function eventKey(event) {
   return `${event.id}@${start ? start.toISOString() : 'none'}`;
 }
 
+function eventIdOf(key) {
+  return typeof key === 'string' ? key.slice(0, key.lastIndexOf('@')) : '';
+}
+
+function eventMissing(error) {
+  return [404, 410].includes(Number(error.response?.status ?? error.code));
+}
+
+function validEventId(id) {
+  return typeof id === 'string' && /^[a-z0-9_-]{1,1024}$/i.test(id) &&
+    !['__proto__', 'constructor', 'prototype'].includes(id);
+}
+
+function normalizeBookings(raw, now) {
+  const bookings = {};
+  for (const [id, value] of Object.entries(raw || {})) {
+    if (!validEventId(id) || !value || !['schedule', 'cancel'].includes(value.decision) ||
+      !validLeadMinutes(value.leadMinutes) || Date.parse(value.start) < now.getTime() - DAY_MS ||
+      !Number.isFinite(Date.parse(value.start))) continue;
+    bookings[id] = { decision: value.decision, leadMinutes: value.leadMinutes, start: value.start };
+    if (Object.keys(bookings).length >= MAX_OVERRIDES) break;
+  }
+  return bookings;
+}
+
+function hasBookingRoom(bookings, id) {
+  if (bookings[id]?.decision === 'schedule') return true;
+  const choices = Object.values(bookings);
+  return (Object.hasOwn(bookings, id) || choices.length < MAX_OVERRIDES) &&
+    choices.filter((choice) => choice.decision === 'schedule').length < MAX_BOOKINGS;
+}
+
+function settingsForStorage({ bookings, ...settings }) {
+  return Object.keys(bookings).length ? { ...settings, bookings } : settings;
+}
+
+function chosenMeeting(event) {
+  const start = startOf(event);
+  if (!start || !Number.isFinite(start.getTime()) || event.status === 'cancelled' ||
+    event.attendees?.some((a) => a.self && a.responseStatus === 'declined')) return null;
+  return meetingLink(event);
+}
+
 /**
  * Decide whether auto-join should take this event.
  * @returns {{ join: boolean, reason?: string, link?: { platform: string, url: string } }}
@@ -134,6 +179,7 @@ function normalizeSettings(raw, now = new Date()) {
     org_id: typeof s.org_id === 'string' ? s.org_id : null,
     consent_at: typeof s.consent_at === 'string' ? s.consent_at : null,
     overrides: normalizeOverrides(s.overrides, now),
+    bookings: normalizeBookings(s.bookings, now),
   };
 }
 
@@ -223,6 +269,9 @@ async function nextSettings(userId, orgIds, json, { enabled, scope, orgId, leadM
   if (!target || !orgIds.includes(target)) {
     throw new SettingsError(403, 'org_not_allowed', 'Pick a workspace you belong to.');
   }
+  if (prev.org_id && target !== prev.org_id && Object.values(prev.bookings).some((b) => b.decision === 'schedule')) {
+    throw new SettingsError(409, 'booking_workspace', 'Cancel the calendar’s one-off bookings before switching its workspace.');
+  }
   if (!ADMIN_ROLES.includes(await orgRole(userId, target))) {
     throw new SettingsError(403, 'admin_required', 'Only workspace owners and admins can send the bot.');
   }
@@ -235,7 +284,7 @@ async function nextSettings(userId, orgIds, json, { enabled, scope, orgId, leadM
 async function configure(userId, orgIds, changes, client = db()) {
   const json = await updateCalendarSettings(userId, async (current) => ({
     ...current,
-    auto_join: await nextSettings(userId, orgIds, current, changes),
+    auto_join: settingsForStorage(await nextSettings(userId, orgIds, current, changes)),
   }), { client });
   const settings = normalizeSettings(json?.auto_join);
   if (settings.enabled && process.env.RECALL_API_KEY && calendar().isConfigured()) {
@@ -243,6 +292,95 @@ async function configure(userId, orgIds, changes, client = db()) {
       log.warn('[AutoJoin] run after settings change failed', { userId, error: err.message }));
   }
   return settings;
+}
+
+/** Resolve a concrete calendar occurrence under the caller's account. */
+async function prepareBooking(ctx, args, now = new Date()) {
+  const id = eventIdOf(args.eventKey);
+  if (!validEventId(id) || !['schedule', 'cancel'].includes(args.decision)) {
+    throw new SettingsError(400, 'invalid_booking', 'Choose a calendar meeting and a booking action.');
+  }
+  const row = await readCalendarSettings(ctx.userId, ctx.db);
+  const json = row?.calendar_json;
+  if (!json?.tokens || !calendar().isConfigured() || !process.env.RECALL_API_KEY) {
+    throw new SettingsError(400, 'calendar_not_ready', 'Connect Google Calendar and set up the recording bot first.');
+  }
+  const settings = normalizeSettings(json.auto_join, now);
+  const orgId = args.orgId || settings.org_id || (ctx.orgIds.length === 1 ? ctx.orgIds[0] : null);
+  if (!ctx.orgIds.includes(orgId) || !ADMIN_ROLES.includes(await orgRole(ctx.userId, orgId))) {
+    throw new SettingsError(403, 'booking_role', 'Choose a workspace where you are an owner or admin.');
+  }
+  if (settings.org_id && orgId !== settings.org_id &&
+    (settings.enabled || Object.keys(settings.bookings).length)) {
+    throw new SettingsError(409, 'booking_workspace', 'Use the workspace selected for this calendar in Recording settings.');
+  }
+  const tokens = json.tokens;
+  const event = await calendar().getEvent({ ...tokens, _onRefresh: (t) => persistTokens(ctx.userId, t, tokens, ctx.db) }, id)
+    .catch((err) => {
+      if (eventMissing(err)) return null;
+      throw err;
+    });
+  const start = startOf(event);
+  if (!start || !Number.isFinite(start.getTime()) || event.status === 'cancelled' || event.recurrence?.length ||
+    args.eventKey !== eventKey(event) || (args.revision !== undefined && args.revision !== (event.etag || null))) {
+    throw new SettingsError(409, 'event_changed', 'This meeting has changed in Google Calendar. Refresh it and review the new details.');
+  }
+  const existing = settings.bookings[id];
+  const leadMinutes = args.leadMinutes ?? existing?.leadMinutes ?? settings.lead_minutes;
+  if (!validLeadMinutes(leadMinutes)) throw new SettingsError(400, 'invalid_lead', 'Choose a lead time from 0 to 5 whole minutes.');
+  const joinAt = targetArrival(event, { lead_minutes: leadMinutes });
+  if (args.decision === 'schedule') {
+    if (!chosenMeeting(event)) throw new SettingsError(400, 'unavailable_link', 'This meeting needs a supported video link and an accepted or pending invitation.');
+    if (joinAt.getTime() <= now.getTime() + RECALL_SCHEDULE_NOTICE_MS) {
+      throw new SettingsError(400, 'insufficient_notice', 'Choose an arrival time more than 10 minutes away. For a meeting about to start, use Bot to send it now.');
+    }
+    if (!hasBookingRoom(settings.bookings, id)) {
+      throw new SettingsError(409, 'booking_limit', 'This calendar has reached its one-off booking limit.');
+    }
+  } else {
+    const recurring = settings.enabled && decide(event, {
+      scope: settings.scope, now, lookaheadMs: Infinity, overrides: settings.overrides,
+    }).join;
+    if (start <= now || (existing?.decision !== 'schedule' && !recurring)) {
+      throw new SettingsError(409, 'no_booking', 'There is no upcoming bot booking to cancel for this meeting.');
+    }
+    const { data: session, error } = await db().from('bot_sessions').select('status')
+      .eq('org_id', orgId).eq('consent_acknowledged_by', ctx.userId).eq('calendar_event_key', args.eventKey)
+      .in('status', ['in_call', 'completed']).maybeSingle();
+    if (error) throw error;
+    if (session) throw new SettingsError(409, 'bot_started', 'The bot has already started. Use the Bot page to manage it.');
+  }
+  return { id, orgId, event, start, joinAt, leadMinutes, connection: json.connected_at || null };
+}
+
+async function saveBooking(ctx, args) {
+  const booking = await prepareBooking(ctx, args);
+  const json = await updateCalendarSettings(ctx.userId, (current) => {
+    if (!current.tokens || (current.connected_at || null) !== booking.connection) {
+      throw new SettingsError(409, 'calendar_changed', 'Your calendar connection changed. Open the meeting and try again.');
+    }
+    const settings = normalizeSettings(current.auto_join);
+    if (settings.org_id && settings.org_id !== booking.orgId &&
+      (settings.enabled || Object.keys(settings.bookings).length)) {
+      throw new SettingsError(409, 'booking_workspace', 'The calendar workspace changed. Open the meeting and try again.');
+    }
+    if (args.decision === 'schedule' && !hasBookingRoom(settings.bookings, booking.id)) {
+      throw new SettingsError(409, 'booking_limit', 'This calendar has reached its one-off booking limit.');
+    }
+    settings.org_id = booking.orgId;
+    settings.bookings[booking.id] = {
+      decision: args.decision, leadMinutes: booking.leadMinutes, start: booking.start.toISOString(),
+    };
+    return { ...current, auto_join: settingsForStorage(settings) };
+  }, { client: ctx.db });
+  if (!json) throw new SettingsError(409, 'calendar_changed', 'Your calendar connection changed. Reconnect it and try again.');
+  // The intent is durable even when this run fails or the meeting is outside the reservation window.
+  try {
+    await runForUser({ user_id: ctx.userId, calendar_json: json });
+  } catch (error) {
+    log.warn('[AutoJoin] booking saved; calendar sync will retry', { userId: ctx.userId, error: error.message });
+  }
+  return { eventId: booking.id, decision: args.decision, joinAt: booking.joinAt.toISOString() };
 }
 
 async function userIdentity(userId) {
@@ -265,7 +403,15 @@ async function runForUser(row, now = new Date()) {
   const settings = normalizeSettings(row.calendar_json?.auto_join, now);
   const out = { scheduled: 0, withdrawn: 0, skipped: 0, errors: 0 };
   const tokens = row.calendar_json?.tokens;
-  if (!settings.enabled || !tokens) return out;
+  if (!tokens) return out;
+  if (!settings.enabled && !Object.keys(settings.bookings).length) {
+    if (row.calendar_json?.auto_join?.bookings) {
+      await updateCalendarSettings(userId, (json) => json.tokens ? {
+        ...json, auto_join: settingsForStorage(normalizeSettings(json.auto_join, now)),
+      } : null, { client: db() });
+    }
+    return out;
+  }
   if (!ADMIN_ROLES.includes(await orgRole(userId, settings.org_id))) {
     log.warn('[AutoJoin] user is no longer an owner or admin of the org; skipping', { userId, orgId: settings.org_id });
     return out;
@@ -284,12 +430,39 @@ async function runForUser(row, now = new Date()) {
     allPages: true,
   });
 
+  const seen = new Set(events.map((event) => event.id));
+  const removed = new Set();
+  // A booked occurrence can move outside the polling window. Resolve its stable
+  // Google id before treating an absent event as cancelled.
+  for (const [id, booking] of Object.entries(settings.bookings)) {
+    if (seen.has(id) || Date.parse(booking.start) > now.getTime() + LOOKAHEAD_MS) continue;
+    try {
+      const event = await calendar().getEvent(live, id);
+      if (!event || event.status === 'cancelled') removed.add(id);
+      else events.push(event);
+    } catch (err) {
+      if (eventMissing(err)) removed.add(id);
+      else throw err; // A failed Calendar read is not evidence of a cancellation.
+    }
+  }
+
   const wanted = new Map();
+  const plannedById = new Map();
+  const starts = new Map();
   for (const event of events) {
-    const q = decide(event, { scope: settings.scope, now, overrides: settings.overrides });
-    if (q.join) {
-      const joinAt = targetArrival(event, settings);
-      wanted.set(eventKey(event), { event, link: q.link, joinAt });
+    const booking = Object.hasOwn(settings.bookings, event.id) ? settings.bookings[event.id] : null;
+    const start = startOf(event);
+    if (booking && start && Number.isFinite(start.getTime())) starts.set(event.id, start.toISOString());
+    const rule = settings.enabled && !booking
+      ? decide(event, { scope: settings.scope, now, overrides: settings.overrides })
+      : null;
+    const link = booking?.decision === 'schedule' ? chosenMeeting(event) : rule?.join ? rule.link : null;
+    if (link && start && start.getTime() >= now.getTime() - GRACE_MS && start.getTime() <= now.getTime() + LOOKAHEAD_MS) {
+      const key = eventKey(event);
+      const lead = booking?.leadMinutes ?? settings.lead_minutes;
+      const target = { event, key, link, lead, oneOff: Boolean(booking), joinAt: targetArrival(event, { lead_minutes: lead }) };
+      wanted.set(key, target);
+      plannedById.set(event.id, target);
     } else {
       out.skipped += 1;
     }
@@ -297,7 +470,7 @@ async function runForUser(row, now = new Date()) {
 
   const { data: existing, error } = await db()
     .from('bot_sessions')
-    .select('id, calendar_event_key, status, join_at, recall_bot_id')
+    .select('id, calendar_event_key, status, join_at, recall_bot_id, meeting_url')
     .eq('org_id', settings.org_id)
     .eq('consent_acknowledged_by', userId)
     .not('calendar_event_key', 'is', null)
@@ -310,31 +483,44 @@ async function runForUser(row, now = new Date()) {
   // Keep an imminent bot at its booked time. Recall may already be dispatching it.
   const canSchedule = (at) => at.getTime() > now.getTime() + RECALL_SCHEDULE_NOTICE_MS;
   for (const s of existing || []) {
-    if (!LIVE_STATUSES.includes(s.status) || !s.join_at) continue;
+    const id = eventIdOf(s.calendar_event_key);
+    const explicit = Object.hasOwn(settings.bookings, id) ? settings.bookings[id] : null;
+    const cancel = explicit?.decision === 'cancel';
+    if ((!LIVE_STATUSES.includes(s.status) && !(cancel && s.status === 'joining')) || !s.join_at) continue;
     const oldTime = new Date(s.join_at);
-    if (oldTime <= now) continue;
-    const planned = wanted.get(s.calendar_event_key);
-    if (planned && (planned.joinAt.getTime() === oldTime.getTime() ||
+    if (oldTime <= now && !cancel) continue;
+    const planned = wanted.get(s.calendar_event_key) || (explicit ? plannedById.get(id) : null);
+    const moved = planned && (planned.key !== s.calendar_event_key || (s.meeting_url && planned.link.url !== s.meeting_url));
+    if (planned && !moved && (planned.joinAt.getTime() === oldTime.getTime() ||
       !canSchedule(oldTime) || !canSchedule(planned.joinAt))) continue;
     try {
       if (!(await stillCurrent())) return out;
-      if (planned) {
-        await orchestrator().rescheduleBotSession(s, planned.joinAt.toISOString());
+      if (planned && (!moved || (canSchedule(oldTime) && canSchedule(planned.joinAt)))) {
+        if (!s.recall_bot_id) {
+          have.add(planned.key);
+          continue;
+        }
+        const changes = moved ? [{ calendarEventKey: planned.key, meetingUrl: planned.link.url, platform: planned.link.platform }] : [];
+        await orchestrator().rescheduleBotSession(s, planned.joinAt.toISOString(), ...changes);
+        have.add(planned.key);
       } else {
-        await orchestrator().stopBotSession(s.id, 'calendar_changed');
+        await orchestrator().stopBotSession(s.id, cancel ? 'calendar_booking_cancelled' : 'calendar_changed');
+        have.delete(s.calendar_event_key);
         out.withdrawn += 1;
       }
     } catch (err) {
+      if (planned) have.add(planned.key); // Keep the existing reservation as the only bot on a provider failure.
+      removed.delete(id); // Preserve the cancellation intent until the provider has withdrawn the old bot.
       out.errors += 1;
       log.warn('[AutoJoin] could not update scheduled bot', { sessionId: s.id, error: err.message });
     }
   }
 
   const me = await userIdentity(userId);
-  for (const [key, { event, link, joinAt }] of wanted) {
+  for (const [key, { event, link, joinAt, lead, oneOff }] of wanted) {
     if (have.has(key)) continue;
-    // With an early-join rule, an ad hoc bot must not arrive before the selected time.
-    if (settings.lead_minutes && joinAt > now && !canSchedule(joinAt)) continue;
+    // A selected bot must not launch ad hoc before its confirmed arrival.
+    if ((oneOff || lead) && joinAt > now && !canSchedule(joinAt)) continue;
     try {
       if (!(await stillCurrent())) return out;
       const bot = await orchestrator().launchBotSession({
@@ -347,6 +533,7 @@ async function runForUser(row, now = new Date()) {
         consentAcknowledgedByEmail: me.email,
         participantEmails: otherInvitees(event).map((a) => a.email),
         joinAt: joinAt.toISOString(),
+        requireScheduled: oneOff && joinAt > now,
         calendarEventKey: key,
         title: event.summary || null,
       });
@@ -365,8 +552,25 @@ async function runForUser(row, now = new Date()) {
     }
   }
 
-  await recordHealth(userId, missedEvents(events, existing || [], settings.scope, now, settings.overrides), now, me)
-    .catch((err) => log.warn('[AutoJoin] could not save the run', { userId, error: err.message }));
+  if (Object.keys(settings.bookings).length || row.calendar_json?.auto_join?.bookings) {
+    await updateCalendarSettings(userId, (json) => {
+      if (!json.tokens || json.connected_at !== row.calendar_json.connected_at) return null;
+      const current = normalizeSettings(json.auto_join, now);
+      for (const [id, start] of starts) {
+        if (isDeepStrictEqual(current.bookings[id], settings.bookings[id])) current.bookings[id].start = start;
+      }
+      for (const id of removed) {
+        if (isDeepStrictEqual(current.bookings[id], settings.bookings[id])) delete current.bookings[id];
+      }
+      const next = settingsForStorage(current);
+      return isDeepStrictEqual(next, json.auto_join) ? null : { ...json, auto_join: next };
+    }, { client: db() }).catch((err) => log.warn('[AutoJoin] could not refresh booking dates', { userId, error: err.message }));
+  }
+  if (settings.enabled) {
+    const recurringEvents = events.filter((e) => !Object.hasOwn(settings.bookings, e.id));
+    await recordHealth(userId, missedEvents(recurringEvents, existing || [], settings.scope, now, settings.overrides), now, me)
+      .catch((err) => log.warn('[AutoJoin] could not save the run', { userId, error: err.message }));
+  }
   return out;
 }
 
@@ -449,17 +653,19 @@ function healthOf(calendarJson) {
  * Withdraw every bot auto-join scheduled for this user that has not joined
  * yet. Used when they switch auto-join off or disconnect the calendar.
  */
-async function withdrawScheduled(userId, now = new Date()) {
+async function withdrawScheduled(userId, now = new Date(), { keepBookings = false } = {}) {
   const { data, error } = await db()
     .from('bot_sessions')
-    .select('id')
+    .select('id, org_id, calendar_event_key')
     .eq('consent_acknowledged_by', userId)
     .not('calendar_event_key', 'is', null)
     .in('status', LIVE_STATUSES)
     .gt('join_at', now.toISOString());
   if (error) throw error;
+  const settings = keepBookings ? normalizeSettings((await readCalendarSettings(userId, db()))?.calendar_json?.auto_join, now) : null;
   let withdrawn = 0;
   for (const s of data || []) {
+    if (settings?.org_id === s.org_id && settings?.bookings[eventIdOf(s.calendar_event_key)]?.decision === 'schedule') continue;
     try {
       await orchestrator().stopBotSession(s.id, 'auto_join_off');
       withdrawn += 1;
@@ -542,6 +748,9 @@ async function upcoming(userId, tokens, settings, { days = 60, now = new Date() 
       const d = allDay ? { join: false, reason: 'all_day', override: null, canJoin: false }
         : decide(e, { scope: s.scope, now, lookaheadMs: span * 24 * 60 * 60 * 1000, overrides: s.overrides });
       const key = allDay ? null : eventKey(e);
+      const booking = Object.hasOwn(s.bookings, e.id) ? s.bookings[e.id] : null;
+      const link = e.start?.dateTime ? chosenMeeting(e) : null;
+      const scheduledAt = link ? targetArrival(e, { lead_minutes: booking?.leadMinutes ?? s.lead_minutes }) : null;
       const session = key ? byKey.get(key) : null;
       const organizer = e.organizer?.self ? 'you' : (e.organizer?.displayName || e.organizer?.email || null);
       return {
@@ -556,17 +765,19 @@ async function upcoming(userId, tokens, settings, { days = 60, now = new Date() 
         reason: d.join ? null : d.reason,
         override: d.override,
         canJoin: d.canJoin,
+        booking: booking?.decision || null,
+        canSchedule: Boolean(scheduledAt && startOf(e).getTime() > now.getTime() + RECALL_SCHEDULE_NOTICE_MS),
         organizer,
         attendees: (e.attendees || []).filter((a) => !a.resource).map((a) => ({ name: a.displayName || null, email: a.email || null, self: Boolean(a.self) })),
         botStatus: session?.status || null,
-        joinAt: session?.join_at || (d.join ? targetArrival(e, s).toISOString() : null),
+        joinAt: session?.join_at || (booking?.decision === 'schedule' ? scheduledAt?.toISOString() || null : (d.join ? targetArrival(e, s).toISOString() : null)),
         htmlLink: typeof e.htmlLink === 'string' ? e.htmlLink : null,
         meetingLink: meetingLink(e)?.url || null,
       };
     });
 }
 
-/** One pass over everyone with auto-join on. Idempotent. */
+/** Reconcile recurring rules and one-off bookings, including pending cancellations. */
 async function runAutoJoin(now = new Date()) {
   if (!db()) return { users: 0, skipped: 'no_database' };
   if (!calendar().isConfigured() || !process.env.RECALL_API_KEY) {
@@ -575,7 +786,7 @@ async function runAutoJoin(now = new Date()) {
   const { data: rows, error } = await db()
     .from('user_settings')
     .select('user_id, calendar_json')
-    .eq('calendar_json->auto_join->>enabled', 'true');
+    .or('calendar_json->auto_join->>enabled.eq.true,calendar_json->auto_join->bookings.not.is.null');
   if (error) throw error;
 
   const totals = { users: 0, scheduled: 0, withdrawn: 0, skipped: 0, errors: 0 };
@@ -624,6 +835,8 @@ module.exports = {
   validLeadMinutes,
   SettingsError,
   nextSettings,
+  prepareBooking,
+  saveBooking,
   configure,
   persistTokens,
   SCOPES,

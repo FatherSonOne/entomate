@@ -6,8 +6,9 @@ const mockLaunch = jest.fn(async () => ({ sessionId: 's-new' }));
 const mockReschedule = jest.fn(async () => {});
 const mockStop = jest.fn(async () => ({}));
 const mockGetEvents = jest.fn();
+const mockGetEvent = jest.fn();
 jest.mock('../services/botOrchestrator', () => ({ launchBotSession: mockLaunch, stopBotSession: mockStop, rescheduleBotSession: mockReschedule }));
-jest.mock('../services/calendarService', () => ({ initialize: () => {}, isConfigured: () => true, getEvents: mockGetEvents }));
+jest.mock('../services/calendarService', () => ({ initialize: () => {}, isConfigured: () => true, getEvents: mockGetEvents, getEvent: mockGetEvent }));
 
 // Minimal fake of the supabase query builder for the tables the job reads.
 let mockTables;
@@ -158,6 +159,59 @@ describe('runForUser', () => {
     });
     expect((await aj.runForUser(row, now)).scheduled).toBe(0);
     expect(mockLaunch).not.toHaveBeenCalled();
+  });
+
+  test('only books the selected Google occurrence when recurring auto-join is off', async () => {
+    const selected = { ...row, calendar_json: { ...row.calendar_json, auto_join: {
+      enabled: false, org_id: 'o1', bookings: { ev1: { decision: 'schedule', leadMinutes: 5, start: inMin(30) } },
+    } } };
+    mockTables.user_settings = [selected];
+    mockGetEvents.mockResolvedValue([event(), event({ id: 'ev2' })]);
+
+    expect(await aj.runForUser(selected, now)).toMatchObject({ scheduled: 1, skipped: 1 });
+    expect(mockLaunch).toHaveBeenCalledTimes(1);
+    expect(mockLaunch).toHaveBeenCalledWith(expect.objectContaining({
+      calendarEventKey: aj.eventKey(event()), joinAt: inMin(25), requireScheduled: true,
+    }));
+
+    selected.calendar_json.auto_join.bookings.ev1.decision = 'cancel';
+    mockTables.bot_sessions = [{ id: 'selected-bot', org_id: 'o1', consent_acknowledged_by: 'u1',
+      calendar_event_key: aj.eventKey(event()), status: 'launching', join_at: inMin(25) }];
+    expect(await aj.runForUser(selected, now)).toMatchObject({ scheduled: 0, withdrawn: 1 });
+    expect(mockStop).toHaveBeenCalledWith('selected-bot', 'calendar_booking_cancelled');
+    expect(mockLaunch).toHaveBeenCalledTimes(1);
+  });
+
+  test('retimes a selected occurrence and updates its changed video link in place', async () => {
+    const selected = { ...row, calendar_json: { ...row.calendar_json, auto_join: {
+      enabled: false, org_id: 'o1', bookings: { ev1: { decision: 'schedule', leadMinutes: 5, start: inMin(30) } },
+    } } };
+    mockTables.user_settings = [selected];
+    mockTables.bot_sessions = [{ id: 'selected-bot', org_id: 'o1', consent_acknowledged_by: 'u1',
+      calendar_event_key: aj.eventKey(event()), recall_bot_id: 'recall-1', status: 'launching',
+      join_at: inMin(25), meeting_url: event().hangoutLink }];
+    const moved = event({ start: { dateTime: inMin(45) }, hangoutLink: 'https://meet.google.com/xyz-abcd-efg' });
+    mockGetEvents.mockResolvedValue([moved]);
+    await aj.runForUser(selected, now);
+    expect(mockReschedule).toHaveBeenCalledWith(expect.objectContaining({ id: 'selected-bot' }), inMin(40), {
+      calendarEventKey: aj.eventKey(moved), meetingUrl: moved.hangoutLink, platform: 'meet',
+    });
+    expect(mockLaunch).not.toHaveBeenCalled();
+    expect(mockStop).not.toHaveBeenCalled();
+  });
+
+  test('withdraws a reservation when Google reports a cancelled one-off occurrence', async () => {
+    const selected = { ...row, calendar_json: { ...row.calendar_json, auto_join: {
+      enabled: false, org_id: 'o1', bookings: { ev1: { decision: 'schedule', leadMinutes: 5, start: inMin(30) } },
+    } } };
+    mockTables.user_settings = [selected];
+    mockTables.bot_sessions = [{ id: 'selected-bot', org_id: 'o1', consent_acknowledged_by: 'u1',
+      calendar_event_key: aj.eventKey(event()), status: 'launching', join_at: inMin(25) }];
+    mockGetEvents.mockResolvedValue([]);
+    mockGetEvent.mockResolvedValueOnce(event({ status: 'cancelled' }));
+
+    expect(await aj.runForUser(selected, now)).toMatchObject({ scheduled: 0, withdrawn: 1 });
+    expect(mockStop).toHaveBeenCalledWith('selected-bot', 'calendar_changed');
   });
 
   test('does not schedule the same event twice', async () => {

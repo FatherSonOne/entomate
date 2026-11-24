@@ -116,8 +116,9 @@ async function propose(name, args, ctx) {
   }
 }
 
-async function confirm(ctx, id, { confirmationText } = {}) {
+async function confirm(ctx, id, { confirmationText, toolName } = {}) {
   const row = await loadRow(ctx, id);
+  if (toolName && row.tool_name !== toolName) throw new ActionError(404, 'Proposal not found');
   const verb = VERBS[row.tool_name];
   if (!verb) throw new ActionError(422, 'This kind of action can no longer run');
   notAPlanStep(row);
@@ -156,8 +157,9 @@ async function confirm(ctx, id, { confirmationText } = {}) {
   return { ok: true, proposal: toProposal(done) };
 }
 
-async function reject(ctx, id) {
+async function reject(ctx, id, toolName) {
   const row = await loadRow(ctx, id);
+  if (toolName && row.tool_name !== toolName) throw new ActionError(404, 'Proposal not found');
   notAPlanStep(row);
   if (row.status !== 'proposed') throw new ActionError(409, `This proposal is already ${row.status}`, toProposal(row));
   const moved = await moveRow(ctx, id, 'proposed', { status: 'rejected', resolved_at: now() });

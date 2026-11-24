@@ -229,7 +229,7 @@ async function launchBotSession(p) {
     participantEmails,
     // Calendar auto-join (services/calendarAutoJoin.js): when the bot should
     // join, which calendar event it is for, and the event's title.
-    joinAt, calendarEventKey, title
+    joinAt, requireScheduled, calendarEventKey, title
   } = p || {};
   if (!workspaceId || !meetingId || !meetingUrl || !platform) {
     throw new Error('launchBotSession: workspaceId, meetingId, meetingUrl, platform are required');
@@ -237,6 +237,13 @@ async function launchBotSession(p) {
   if (!['meet', 'zoom', 'teams'].includes(platform)) {
     throw new Error(`Unsupported platform: ${platform}`);
   }
+
+  const checkReservationTime = () => {
+    if (requireScheduled && Date.parse(joinAt) <= Date.now() + 10 * 60_000) {
+      throw new Error('There is too little time to reserve this bot.');
+    }
+  };
+  checkReservationTime();
 
   await assertBotHoursLeft(workspaceId);
 
@@ -327,6 +334,7 @@ async function launchBotSession(p) {
     // live captions.
     for (let attempt = 0; ; attempt++) {
       try {
+        checkReservationTime();
         bot = await recallFetch('/bot', {
           method: 'POST',
           body: JSON.stringify(recallPayload)
@@ -616,14 +624,32 @@ function latestRecallStatusCode(bot) {
 }
 
 /** Change only the arrival time, preserving the bot and its invitees’ opt-outs. */
-async function rescheduleBotSession(session, joinAt) {
+async function rescheduleBotSession(session, joinAt, change) {
   if (!session.recall_bot_id) return;
-  await recallFetch(`/bot/${session.recall_bot_id}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ join_at: joinAt }),
-  });
-  const { error } = await db().from('bot_sessions')
-    .update({ join_at: joinAt }).eq('id', session.id);
+  const previousKey = session.calendar_event_key;
+  const nextKey = change?.calendarEventKey;
+  const moved = Boolean(nextKey && nextKey !== previousKey);
+  if (moved) {
+    // Claim the existing unique key for the new occurrence time before touching Recall.
+    const { data, error } = await db().from('bot_sessions').update({ calendar_event_key: nextKey })
+      .eq('id', session.id).eq('calendar_event_key', previousKey).select('id').maybeSingle();
+    if (error || !data) throw new Error(error?.message || 'The reservation changed while rescheduling.');
+  }
+  try {
+    await recallFetch(`/bot/${session.recall_bot_id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ join_at: joinAt, ...(change ? { meeting_url: change.meetingUrl } : {}) }),
+    });
+  } catch (error) {
+    if (moved) {
+      const rollback = await db().from('bot_sessions').update({ calendar_event_key: previousKey })
+        .eq('id', session.id).eq('calendar_event_key', nextKey);
+      if (rollback.error) log.warn('Could not restore the calendar reservation key', { sessionId: session.id });
+    }
+    throw error;
+  }
+  const calendar = change ? { meeting_url: change.meetingUrl, platform: change.platform } : {};
+  const { error } = await db().from('bot_sessions').update({ join_at: joinAt, ...calendar }).eq('id', session.id);
   if (error) throw error;
 }
 
@@ -637,16 +663,18 @@ async function rescheduleBotSession(session, joinAt) {
 async function stopBotSession(sessionId, reason = 'manual_stop') {
   const { data: session, error } = await db()
     .from('bot_sessions')
-    .select('recall_bot_id, status')
+    .select('recall_bot_id, status, join_at')
     .eq('id', sessionId)
     .single();
   if (error || !session) throw new Error(`Session not found: ${sessionId}`);
   if (!session.recall_bot_id) throw new Error(`Session ${sessionId} has no recall_bot_id`);
 
   let recallStatus = null;
+  let undispatched = false;
   try {
     const bot = await recallFetch(`/bot/${session.recall_bot_id}`);
     recallStatus = latestRecallStatusCode(bot);
+    undispatched = Boolean(bot && !recallStatus && session.join_at);
   } catch (err) {
     // If Recall doesn't know about the bot anymore, treat as terminal — nothing
     // to stop. Any other failure should surface; don't blindly try /leave_call.
@@ -659,8 +687,10 @@ async function stopBotSession(sessionId, reason = 'manual_stop') {
     }
   }
 
-  if (recallStatus && PRE_CALL_STATUSES.has(recallStatus)) {
-    await recallFetch(`/bot/${session.recall_bot_id}`, { method: 'DELETE' });
+  if (undispatched || PRE_CALL_STATUSES.has(recallStatus)) {
+    await recallFetch(`/bot/${session.recall_bot_id}`, { method: 'DELETE' }).catch((error) => {
+      if (!/\b404\b/.test(error.message)) throw error;
+    });
   } else if (recallStatus && IN_CALL_STATUSES.has(recallStatus)) {
     await recallFetch(`/bot/${session.recall_bot_id}/leave_call`, { method: 'POST' });
   } else if (recallStatus && !TERMINAL_STATUSES.has(recallStatus)) {

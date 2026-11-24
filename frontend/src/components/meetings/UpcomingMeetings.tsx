@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
-import { Cell, Drawer, Grid, Key, Section, Signal, Switch, useMediaQuery, PHONE_QUERY, cx } from '../bench'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
+import { Cell, Drawer, Grid, Key, Section, Select, Signal, Switch, TextInput, useMediaQuery, PHONE_QUERY, cx } from '../bench'
 import CarryForward, { type CarryForwardData } from './CarryForward'
-import { calendarApi, meetingsApi } from '../../services/api'
+import { calendarApi, entoAiApi, meetingsApi } from '../../services/api'
+import { tokensMatch, type EntoProposal } from '../EntoAssistant/ProposalCard'
+import { useOrgSafe } from '../../contexts/OrgContext'
 import { useToast } from '../vc/ToastProvider'
 import {
   PLATFORM_LABEL, addDays, botPlan, dayKey, dotsByDay, durationLabel, durationMin, fromDayKey, groupByDay,
@@ -196,7 +198,102 @@ function WeekGrid({ events, monday, today, autoJoinOn, selectedId, onOpen }: {
   )
 }
 
-function Prep({ event, autoJoinOn, busy, onDecide }: { event: UpcomingEvent; autoJoinOn: boolean; busy: boolean; onDecide: (e: UpcomingEvent, d: 'skip' | 'join' | null) => void }): React.ReactElement {
+const ARRIVAL_OPTIONS = Array.from({ length: 6 }, (_, n) => ({
+  value: String(n),
+  label: n === 0 ? 'At meeting start' : `${n} minute${n === 1 ? '' : 's'} early`,
+}))
+
+function BookingControls({ event, defaultLead, onBooked }: {
+  event: UpcomingEvent; defaultLead: number; onBooked: () => void
+}): React.ReactElement | null {
+  const workspace = useOrgSafe() as { org: { id: string } | null; myRole: string | null } | null
+  const [lead, setLead] = useState(String(defaultLead))
+  const [proposal, setProposal] = useState<EntoProposal | null>(null)
+  const [confirmation, setConfirmation] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const cancelling = event.booking === 'schedule'
+
+  if (!event.key || (workspace?.myRole && !['owner', 'admin'].includes(workspace.myRole))) return null
+  if (['joining', 'in_call', 'completed', 'recording', 'in_waiting_room'].includes(event.botStatus ?? '')) return null
+  if (event.booking === 'cancel' && ['pending', 'launching'].includes(event.botStatus ?? '')) return null
+  if (!cancelling && !event.canSchedule) {
+    return event.meetingLink && !event.allDay && startDate(event).getTime() > Date.now() && event.reason !== 'declined'
+      ? <p className="bs-up-booking-note">To reserve a bot, its arrival time needs to be more than 10 minutes away.</p>
+      : null
+  }
+
+  const prepare = async (): Promise<void> => {
+    if (busy) return
+    setBusy(true)
+    setError('')
+    try {
+      const res = await entoAiApi.calendarBookings.propose({
+        eventKey: event.key,
+        orgId: workspace?.org?.id,
+        decision: cancelling ? 'cancel' : 'schedule',
+        ...(!cancelling ? { leadMinutes: Number(lead) } : {}),
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      })
+      if (!res.ok || !res.proposal) throw new Error(res.error || 'Could not prepare that change.')
+      setConfirmation('')
+      setProposal(res.proposal)
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const resolve = async (confirm: boolean): Promise<void> => {
+    if (busy || !proposal || (confirm && !tokensMatch(proposal.confirmToken, confirmation))) return
+    setBusy(true)
+    setError('')
+    try {
+      const res = confirm
+        ? await entoAiApi.calendarBookings.confirm(proposal.id, confirmation)
+        : await entoAiApi.calendarBookings.reject(proposal.id)
+      if (!res.ok) {
+        if (res.proposal?.status && res.proposal.status !== 'proposed') setProposal(null)
+        throw new Error(res.error || 'Could not save that change.')
+      }
+      setProposal(null)
+      if (confirm) onBooked()
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="bs-up-booking">
+      {proposal ? (
+        <form className="bs-up-booking" onSubmit={(e) => { e.preventDefault(); void resolve(true) }}>
+          <p>{proposal.summary}</p>
+          <label className="bs-up-booking">
+            <span>Type <strong>{proposal.confirmToken}</strong> to confirm</span>
+            <TextInput value={confirmation} onChange={(e) => setConfirmation(e.target.value)} disabled={busy} />
+          </label>
+          <div className="bs-title-keys">
+            <Key type="submit" variant="primary" disabled={busy || !tokensMatch(proposal.confirmToken, confirmation)}>Confirm</Key>
+            <Key onClick={() => { void resolve(false) }} disabled={busy}>Dismiss</Key>
+          </div>
+        </form>
+      ) : (
+        <div className="bs-title-keys">
+          {!cancelling && <Select label="Bot arrival" value={lead} onChange={setLead} options={ARRIVAL_OPTIONS} disabled={busy} />}
+          <Key variant={cancelling ? undefined : 'primary'} disabled={busy} onClick={() => { void prepare() }}>
+            {cancelling ? 'Cancel bot' : 'Schedule bot'}
+          </Key>
+        </div>
+      )}
+      {error && <p className="bs-up-booking-note" role="alert">{error}</p>}
+    </div>
+  )
+}
+
+function Prep({ event, autoJoinOn, busy, onDecide, defaultLead, onBooked }: { event: UpcomingEvent; autoJoinOn: boolean; busy: boolean; onDecide: (e: UpcomingEvent, d: 'skip' | 'join' | null) => void; defaultLead: number; onBooked: () => void }): React.ReactElement {
   const [carry, setCarry] = useState<CarryForwardData | null>(null)
   const plan = botPlan(event, autoJoinOn)
   const d = startDate(event)
@@ -220,10 +317,13 @@ function Prep({ event, autoJoinOn, busy, onDecide }: { event: UpcomingEvent; aut
       <div className="bs-up-botbox">
         <div>
           <Signal tone={plan.tone}>{plan.word}</Signal>
-          <p>{plan.goes && plan.tone !== 'live' ? `The bot is set to join at ${timeOf({ ...event, start: event.joinAt || event.start })} and writes the minutes after.` : plan.why}</p>
+          <p>{plan.goes && plan.tone !== 'live' && event.joinAt
+            ? `${event.booking === 'schedule' && plan.word === 'Booking queued' ? 'Requested arrival' : 'Bot arrival'} · ${timeOf({ ...event, start: event.joinAt })}`
+            : plan.why}</p>
         </div>
         <BotKey event={event} autoJoinOn={autoJoinOn} busy={busy} onDecide={onDecide} />
       </div>
+      <BookingControls key={event.key ?? event.id} event={event} defaultLead={defaultLead} onBooked={onBooked} />
       <CarryForward data={carry} title="Open from last time" limit={5} />
       {event.attendees.length > 0 && (
         <section className="bs-up-prep-sec">
@@ -245,6 +345,7 @@ export default function UpcomingMeetings(): React.ReactElement {
   const toast = useToast() as ToastApi
   const isPhone = useMediaQuery(PHONE_QUERY)
   const [params, setParams] = useSearchParams()
+  const { key: locationKey } = useLocation()
   const view: View = !isPhone && params.get('view') === 'week' ? 'week' : 'agenda'
   const today = dayKey(new Date())
   const [data, setData] = useState<UpcomingData | null>(null)
@@ -252,7 +353,12 @@ export default function UpcomingMeetings(): React.ReactElement {
   const [selectedDay, setSelectedDay] = useState(today)
   const [cursor, setCursor] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1))
   const [stripFrom, setStripFrom] = useState(today)
-  const [openId, setOpenId] = useState<string | null>(null)
+  const openId = params.get('event')
+  const setOpenId = (id: string | null): void => {
+    const next = new URLSearchParams(params)
+    if (id) next.set('event', id); else next.delete('event')
+    setParams(next, { replace: true })
+  }
   const [busyKey, setBusyKey] = useState<string | null>(null)
   const [carry, setCarry] = useState<Record<string, string>>({})
 
@@ -266,10 +372,18 @@ export default function UpcomingMeetings(): React.ReactElement {
       setLoading(false)
     }
   }, [])
-  useEffect(() => { load() }, [load])
+  useEffect(() => { void load() }, [load, locationKey])
 
   const events = useMemo(() => data?.events ?? [], [data])
   const autoJoinOn = Boolean(data?.autoJoin.enabled)
+  const pendingBookings = events.some((e) => (e.booking === 'schedule' && !e.botStatus) ||
+    (e.booking === 'cancel' && ['pending', 'launching', 'joining'].includes(e.botStatus ?? '')))
+  useEffect(() => {
+    if (!pendingBookings) return undefined
+    const timer = window.setInterval(load, 30_000)
+    return () => window.clearInterval(timer)
+  }, [load, pendingBookings])
+
 
   // "Open from last time" on the next week's meetings with guests (one request each, at most 8).
   useEffect(() => {
@@ -377,7 +491,7 @@ export default function UpcomingMeetings(): React.ReactElement {
 
   const prep = (
     <Drawer open={Boolean(open)} onClose={() => setOpenId(null)} label="Upcoming meeting">
-      {open && <Prep event={open} autoJoinOn={autoJoinOn} busy={busyKey === open.key} onDecide={decide} />}
+      {open && <Prep event={open} autoJoinOn={autoJoinOn} busy={busyKey === open.key} onDecide={decide} defaultLead={data?.autoJoin.leadMinutes ?? 0} onBooked={load} />}
     </Drawer>
   )
 
