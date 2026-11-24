@@ -88,12 +88,19 @@ export default function Settings(): React.ReactElement {
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [profileName, setProfileName] = useState('')
   const [profileMsg, setProfileMsg] = useState<string | null>(null)
+  const [calendarVersion, setCalendarVersion] = useState(0)
   const findRef = useRef<HTMLInputElement>(null)
 
   const setUrl = useCallback((next: Partial<UrlState>) => {
     setParams((prev) => writeUrlState(prev, next), { replace: true })
   }, [setParams])
-  const openDrawer = useCallback((d: DrawerId | null) => setUrl({ drawer: d }), [setUrl])
+  const openDrawer = useCallback((d: DrawerId | null) => {
+    setParams((prev) => {
+      const next = writeUrlState(prev, { drawer: d })
+      next.delete('calendar_error')
+      return next
+    }, { replace: true })
+  }, [setParams])
 
   // Load user settings, merged over defaults so nothing is ever undefined.
   useEffect(() => {
@@ -130,7 +137,7 @@ export default function Settings(): React.ReactElement {
 
   // Back from Google Calendar sign-in (started on Bot auto-join).
   useEffect(() => {
-    if (params.get('connected') === 'true' && url.section !== 'recording') setUrl({ section: 'recording' })
+    if (params.get('connected') === 'true' && !url.section) setUrl({ section: 'recording' })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Scroll on arrival. A style switch remounts this page: put the style picker back in view
@@ -328,6 +335,8 @@ export default function Settings(): React.ReactElement {
                 <Section number="03" title="Recording" />
                 <RecordingSettings
                   meetingsJson={settings.meetings_json}
+                  calendarVersion={calendarVersion}
+                  onManageCalendar={() => jump('connections', 'calendar')}
                   onUpdate={(key, value) => updateJson('meetings_json', key, value)}
                 />
               </section>
@@ -348,7 +357,12 @@ export default function Settings(): React.ReactElement {
               {/* ── 05 Connections ── */}
               <section id="set-connections" className="bs-set-sec" aria-label="Connections">
                 <Section number="05" title="Connections" />
-                <ConnectionsSettings drawer={url.drawer} onDrawer={openDrawer} onJump={(s) => jump(s)} />
+                <ConnectionsSettings
+                  drawer={url.drawer}
+                  onDrawer={openDrawer}
+                  onCalendarChange={() => setCalendarVersion((current) => current + 1)}
+                  calendarError={params.get('calendar_error')}
+                />
               </section>
 
               {/* ── 06 Workspace ── */}

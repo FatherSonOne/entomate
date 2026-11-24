@@ -646,10 +646,18 @@ export const calendarApi = {
   getStatus: () => api.get('/calendar/status'),
 
   // Get auth URL
-  getAuthUrl: (returnUrl) => api.get('/calendar/auth', { params: { returnUrl } }),
+  /** @returns {Promise<{ authUrl?: string }>} */
+  getAuthUrl: (returnUrl) => {
+    cache.invalidate('/calendar/auth')
+    return api.get('/calendar/auth', { params: { returnUrl } })
+  },
 
   // Disconnect calendar
-  disconnect: () => api.post('/calendar/disconnect'),
+  disconnect: async () => {
+    const result = await api.post('/calendar/disconnect')
+    cache.invalidate('/calendar/')
+    return result
+  },
 
   // Bot auto-join for calendar meetings
   getAutoJoin: () => api.get('/calendar/auto-join'),
@@ -663,6 +671,7 @@ export const calendarApi = {
   dismissMissedBot: (key) => api.post('/calendar/auto-join/missed/dismiss', { key }),
 
   // Get user's calendars
+  /** @returns {Promise<{ calendars?: { id?: string, summary?: string, primary?: boolean }[] }>} */
   getCalendars: () => api.get('/calendar/calendars'),
 
   // Get events

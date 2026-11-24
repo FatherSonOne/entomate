@@ -22,6 +22,7 @@ function mockQuery(table) {
     in: (c, vs) => { filters.push((r) => vs.includes(r[c])); return q; },
     gte: (c, v) => { filters.push((r) => r[c] && r[c] >= v); return q; },
     gt: (c, v) => { filters.push((r) => r[c] && r[c] > v); return q; },
+    lt: (c, v) => { filters.push((r) => r[c] && r[c] < v); return q; },
     update: () => q,
     maybeSingle: async () => ({ data: rows()[0] || null, error: null }),
     then: (ok, bad) => Promise.resolve({ data: rows(), error: null }).then(ok, bad),
@@ -299,4 +300,16 @@ describe('per-meeting skip and join', () => {
     expect(r.scheduled).toBe(0);
     expect(mockStop).toHaveBeenCalledWith('s1', 'calendar_changed');
   });
+});
+
+test('switching calendars withdraws old bookings while keeping new bookings', async () => {
+  const switchedAt = new Date('2026-11-22T14:00:00Z');
+  const common = { consent_acknowledged_by: 'u1', calendar_event_key: 'calendar-event', status: 'pending', join_at: '2026-11-22T15:00:00Z' };
+  mockTables = { bot_sessions: [
+    { ...common, id: 'old', created_at: '2026-11-22T13:55:00Z' },
+    { ...common, id: 'new', created_at: '2026-11-22T14:01:00Z' },
+  ] };
+  mockStop.mockClear();
+  expect(await aj.withdrawScheduled('u1', switchedAt, { createdBefore: switchedAt })).toBe(1);
+  expect(mockStop.mock.calls).toEqual([['old', 'auto_join_off']]);
 });

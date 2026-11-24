@@ -55,7 +55,7 @@ function rowSignal(e, enabled) {
   return enabled ? { tone: 'ai', text: 'Bot will join' } : { tone: 'off', text: 'Would join' }
 }
 
-export default function CalendarAutoJoinSettings() {
+export default function CalendarAutoJoinSettings({ onManageCalendar }) {
   const { org, myRole } = useOrg()
   const canSend = myRole === 'owner' || myRole === 'admin'
   const [state, setState] = useState(null)
@@ -75,15 +75,6 @@ export default function CalendarAutoJoinSettings() {
   }, [])
 
   useEffect(() => { load() }, [load])
-
-  const connect = async () => {
-    try {
-      const res = await calendarApi.getAuthUrl('/settings')
-      if (res?.authUrl) window.location.href = res.authUrl
-    } catch (err) {
-      setError(err.message || 'Could not start Google sign-in')
-    }
-  }
 
   const save = async (patch) => {
     setSaving(true)
@@ -145,9 +136,9 @@ export default function CalendarAutoJoinSettings() {
               <span className="bs-h3">Google Calendar</span>
               <Signal tone={connected ? 'mint' : 'off'}>{connected ? 'Connected' : 'Not connected'}</Signal>
             </div>
-            <p className="bs-agents-what">Auto-join reads your primary calendar. It never changes your events.</p>
+            <p className="bs-agents-what">Auto-join reads the primary calendar of your connected account.</p>
           </div>
-          {!connected && <Key variant="primary" onClick={connect}>Connect</Key>}
+          <Key onClick={onManageCalendar}>{connected ? 'Manage Google Calendar' : 'Connect'}</Key>
         </li>
 
         <li className="bs-agents-row">
