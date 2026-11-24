@@ -151,6 +151,11 @@ class CalendarService {
     return events;
   }
 
+  async getEvent(tokens, eventId) {
+    const { data } = await this.getCalendar(tokens).events.get({ calendarId: 'primary', eventId });
+    return data;
+  }
+
   /**
    * Create a calendar event
    */

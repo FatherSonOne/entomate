@@ -116,7 +116,8 @@ router.get('/callback', async (req, res) => {
     // Redirect to frontend (the return path was checked when the state was made).
     const returnUrl = verified ? verified.returnUrl : '/calendar';
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    res.redirect(`${frontendUrl}${returnUrl}?connected=true`);
+    const separator = returnUrl.includes('?') ? '&' : '?';
+    res.redirect(`${frontendUrl}${returnUrl}${separator}connected=true`);
   } catch (error) {
     log.error('Calendar OAuth error:', { error: error.message || error });
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -682,7 +683,7 @@ router.put('/auto-join', authenticate, validate(schemas.autoJoin), async (req, r
     let withdrawn = 0;
     if (!enabled) {
       // The setting is saved; a failed withdraw must not report it as failed.
-      withdrawn = await autoJoin.withdrawScheduled(req.user.id).catch((err) => {
+      withdrawn = await autoJoin.withdrawScheduled(req.user.id, new Date(), { keepBookings: true }).catch((err) => {
         log.warn('Auto-join withdraw failed:', err.message);
         return 0;
       });
@@ -716,7 +717,7 @@ router.get('/upcoming-meetings', authenticate, async (req, res) => {
     const base = {
       configured: calendarService.isConfigured(),
       connected: Boolean(tokens),
-      autoJoin: { enabled: settings.enabled, scope: settings.scope },
+      autoJoin: { enabled: settings.enabled, scope: settings.scope, leadMinutes: settings.lead_minutes },
       health: autoJoin.healthOf(calendarJson),
       events: [],
       error: null

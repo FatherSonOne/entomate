@@ -141,7 +141,7 @@ function mockClient(uid) {
 jest.mock('../config/supabase', () => ({
   supabase: { from: () => { throw new Error('service client used'); } },
   supabaseAdmin: { from: (table) => {
-    if (table !== 'org_members') throw new Error('service client used');
+    if (!['org_members', 'bot_sessions'].includes(table)) throw new Error('service client used');
     return mockClient('user-a').from(table);
   } },
   createUserClient: jest.fn((token) => mockClient(USERS[token])),
@@ -170,7 +170,7 @@ jest.mock('../utils/orgContext', () => ({ getOrgIdsForUser: jest.fn(async (uid) 
 jest.mock('../utils/log', () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() }));
 // EAI-07 metering reads billing tables on the service client; it has its own test (aiUsage.test.js).
 jest.mock('../services/aiUsage', () => ({ meterAi: jest.fn((req, res, next) => next()), addUsage: jest.fn() }));
-jest.mock('../services/calendarService', () => ({ initialize: jest.fn(), isConfigured: jest.fn(() => false), getEvents: jest.fn() }));
+jest.mock('../services/calendarService', () => ({ initialize: jest.fn(), isConfigured: jest.fn(() => false), getEvents: jest.fn(), getEvent: jest.fn() }));
 
 const express = require('express');
 const request = require('supertest');
@@ -286,6 +286,56 @@ test('a calendar bot proposal requires typed consent and updates only the caller
       auto_join: { enabled: true, scope: 'organized', lead_minutes: 5, org_id: 'org-a', consent_at: expect.any(String) },
     });
     expect(other.calendar_json.auto_join).toBeUndefined();
+  } finally {
+    calendar.isConfigured.mockReturnValue(false);
+    if (originalKey === undefined) delete process.env.RECALL_API_KEY;
+    else process.env.RECALL_API_KEY = originalKey;
+  }
+});
+
+test('Upcoming and Ask Entomate share typed confirmation for a single booking while recurring auto-join is off', async () => {
+  const calendar = require('../services/calendarService');
+  const originalKey = process.env.RECALL_API_KEY;
+  process.env.RECALL_API_KEY = 'fake-key';
+  calendar.isConfigured.mockReturnValue(true);
+  calendar.getEvents.mockRejectedValue(new Error('fake provider'));
+  const occurrence = {
+    id: 'series_123', etag: 'initial', summary: 'Thursday review',
+    start: { dateTime: new Date(Date.now() + 3_600_000).toISOString() },
+    hangoutLink: 'https://meet.google.com/abc-defg-hij',
+  };
+  calendar.getEvent.mockResolvedValue(occurrence);
+  const eventKey = `${occurrence.id}@${occurrence.start.dateTime}`;
+  const existing = { user_id: 'user-a', updated_at: mockTick(), calendar_json: { tokens: { access_token: 'fake' } } };
+  mockDb.tables.user_settings = [existing];
+  mockDb.tables.org_members = [{ org_id: 'org-a', user_id: 'user-a', role: 'owner' }];
+  const manual = (path, body) => request(app).post('/api/ento-ai/calendar-bookings' + path)
+    .set('Authorization', 'Bearer token-a').send(body);
+  try {
+    const { proposal: task } = await proposeVia('create_task', { title: 'Unrelated task' });
+    process.env.ENTO_AI_WRITE_TOOLS = 'false';
+    expect((await manual(`/${task.id}/confirm`, {})).status).toBe(404);
+    expect(rows('tasks').some((row) => row.title === 'Unrelated task')).toBe(false);
+    const proposed = await manual('', { eventKey, decision: 'schedule', leadMinutes: 5, timeZone: 'America/New_York' });
+    expect(proposed.body).toMatchObject({ ok: true, proposal: { confirmToken: 'I will notify attendees', payload: { leadMinutes: 5 } } });
+    const p = proposed.body.proposal;
+    expect(existing.calendar_json.auto_join).toBeUndefined();
+    expect((await manual(`/${p.id}/confirm`, { confirmationText: 'wrong' })).status).toBe(400);
+    calendar.getEvent.mockResolvedValueOnce({ ...occurrence, etag: 'changed' });
+    expect((await manual(`/${p.id}/confirm`, { confirmationText: p.confirmToken })).status).toBe(422);
+    expect(existing.calendar_json.auto_join).toBeUndefined();
+
+    const result = await manual(`/${p.id}/confirm`, { confirmationText: p.confirmToken });
+    expect(result.body).toMatchObject({ ok: true, proposal: { status: 'executed', view: { path: '/meetings?tab=upcoming&event=series_123' } } });
+    expect(existing.calendar_json.auto_join).toMatchObject({
+      enabled: false, bookings: { series_123: { decision: 'schedule', leadMinutes: 5 } },
+    });
+
+    process.env.ENTO_AI_WRITE_TOOLS = 'true';
+    const { proposal } = await proposeVia('change_calendar_bot_booking', { eventKey, decision: 'cancel' });
+    expect(proposal).toMatchObject({ confirmToken: 'Cancel this bot' });
+    expect((await act('post', `/${proposal.id}/confirm`, { confirmationText: proposal.confirmToken })).body.ok).toBe(true);
+    expect(existing.calendar_json.auto_join).toMatchObject({ enabled: false, bookings: { series_123: { decision: 'cancel' } } });
   } finally {
     calendar.isConfigured.mockReturnValue(false);
     if (originalKey === undefined) delete process.env.RECALL_API_KEY;

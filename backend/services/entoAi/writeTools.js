@@ -28,7 +28,7 @@ const { SchemaType } = require('@google/generative-ai');
 const calendarService = require('../calendarService');
 const autoJoin = require('../calendarAutoJoin');
 const { readCalendarSettings } = require('../calendarSettings');
-const { uuidArg, dateArg, trunc, ToolInputError } = require('./tools');
+const { uuidArg, dateArg, trunc, calendarTimeZone, localDateTime, ToolInputError } = require('./tools');
 
 const STR = { type: SchemaType.STRING };
 const DATE = (description) => ({ type: SchemaType.STRING, description });
@@ -96,6 +96,11 @@ async function updateColumns(ctx, table, id, set, columns) {
     .maybeSingle(), 'The update');
   // prevUpdatedAt lets an older action's undo see that this one was undone exactly (actionLog.undo).
   return { id: row.id, updatedAt: row.updated_at, prevUpdatedAt: prev.updated_at, previous };
+}
+
+function bookingError(error) {
+  if (error instanceof autoJoin.SettingsError) throw new ToolInputError(error.message);
+  throw error;
 }
 
 const VERBS = {
@@ -516,6 +521,47 @@ const VERBS = {
       return { result: { projectId: u.id }, undo: u };
     },
     view: (r) => (r?.projectId ? { path: `/projects/${r.projectId}`, label: 'the project' } : null),
+  },
+
+  change_calendar_bot_booking: {
+    risk: 'sensitive',
+    editable: [],
+    confirmToken: (p) => p.decision === 'cancel' ? 'Cancel this bot' : 'I will notify attendees',
+    declaration: {
+      description: 'Propose scheduling or cancelling the recording bot for one Google Calendar occurrence. First use get_calendar to find the exact eventKey. Works independently of recurring auto-join. The user must review and confirm.',
+      parameters: {
+        type: SchemaType.OBJECT,
+        properties: {
+          eventKey: { ...STR, description: 'The exact eventKey from get_calendar.' },
+          decision: enumOf(['schedule', 'cancel'], 'Schedule or cancel the bot for this occurrence.'),
+          leadMinutes: {
+            type: SchemaType.INTEGER,
+            description: 'Whole minutes before the meeting start (0–5). Omit to use the calendar setting.',
+          },
+        },
+        required: ['eventKey', 'decision'],
+      },
+    },
+    async prepare(args, ctx) {
+      const timeZone = calendarTimeZone(args.timeZone ?? ctx.timeZone);
+      const booking = await autoJoin.prepareBooking(ctx, args).catch(bookingError);
+      const payload = {
+        eventKey: args.eventKey, decision: args.decision, leadMinutes: booking.leadMinutes,
+        orgId: booking.orgId, revision: booking.event.etag || null, timeZone,
+      };
+      const title = quote(booking.event.summary || 'Untitled meeting');
+      const summary = args.decision === 'cancel'
+        ? `Cancel the bot for ${title} on ${localDateTime(booking.start.toISOString(), timeZone)}.`
+        : `Schedule the recording bot for ${title} at ${localDateTime(booking.joinAt.toISOString(), timeZone)}. Confirm that you’ll tell invitees the meeting is recorded.`;
+      return { orgId: booking.orgId, payload, summary };
+    },
+    async execute(payload, ctx) {
+      const result = await autoJoin.saveBooking(ctx, payload).catch(bookingError);
+      return { result, undo: null };
+    },
+    view: (r) => r?.eventId ? {
+      path: `/meetings?tab=upcoming&event=${encodeURIComponent(r.eventId)}`, label: 'upcoming meeting',
+    } : null,
   },
 
   configure_bot_auto_join: {

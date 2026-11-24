@@ -33,12 +33,14 @@ export interface UpcomingEvent {
   htmlLink: string | null
   meetingLink?: string | null
   joinAt?: string | null
+  booking?: 'schedule' | 'cancel' | null
+  canSchedule?: boolean
 }
 
 export interface UpcomingData {
   configured: boolean
   connected: boolean
-  autoJoin: { enabled: boolean; scope: 'organized' | 'all' }
+  autoJoin: { enabled: boolean; scope: 'organized' | 'all'; leadMinutes?: number }
   events: UpcomingEvent[]
   error: string | null
 }
@@ -76,6 +78,8 @@ function readEvent(raw: unknown): UpcomingEvent | null {
     htmlLink: str(r.htmlLink),
     meetingLink: platform && typeof r.meetingLink === 'string' && r.meetingLink.startsWith('https://') ? r.meetingLink : null,
     joinAt: str(r.joinAt),
+    booking: r.booking === 'schedule' || r.booking === 'cancel' ? r.booking : null,
+    canSchedule: r.canSchedule === true,
   }
 }
 
@@ -88,7 +92,10 @@ export function normalizeUpcoming(raw: unknown): UpcomingData {
   return {
     configured: r.configured !== false,
     connected: r.connected === true,
-    autoJoin: { enabled: aj.enabled === true, scope: aj.scope === 'all' ? 'all' : 'organized' },
+    autoJoin: {
+      enabled: aj.enabled === true, scope: aj.scope === 'all' ? 'all' : 'organized',
+      leadMinutes: typeof aj.leadMinutes === 'number' && Number.isInteger(aj.leadMinutes) && aj.leadMinutes >= 0 && aj.leadMinutes <= 5 ? aj.leadMinutes : 0,
+    },
     events,
     error: str(r.error),
   }
@@ -147,8 +154,32 @@ const BOOKED = ['pending', 'launching']
 
 /** What the bot will do for this meeting, and the one key that changes it. */
 export function botPlan(e: UpcomingEvent, autoJoinOn: boolean): BotPlan {
+  if (e.booking === 'cancel' && e.botStatus === 'joining') {
+    return { tone: 'brand', word: 'Cancelling bot', why: 'This occurrence only', key: null, goes: false }
+  }
   if (e.botStatus && LIVE.includes(e.botStatus)) return { tone: 'live', word: 'Bot in call', why: 'Recording now', key: null, goes: true }
   if (e.allDay) return { tone: 'off', word: 'No bot', why: 'All-day event', key: null, goes: false }
+  if (e.booking && e.botStatus === 'completed') {
+    return { tone: 'mint', word: 'Recorded', why: 'The bot finished this meeting', key: null, goes: false }
+  }
+  if (e.booking === 'cancel') {
+    const withdrawing = Boolean(e.botStatus && BOOKED.includes(e.botStatus))
+    return { tone: withdrawing ? 'brand' : 'off', word: withdrawing ? 'Cancelling bot' : 'Bot cancelled', why: 'This occurrence only', key: null, goes: false }
+  }
+  if (e.booking === 'schedule') {
+    if (e.reason === 'declined') {
+      return { tone: 'off', word: 'Declined', why: 'You declined this invitation', key: null, goes: false }
+    }
+    if (!e.meetingLink) return { tone: 'off', word: 'Needs video link', why: 'Add a Meet, Zoom or Teams link in Google Calendar', key: null, goes: false }
+    if (e.botStatus === 'failed' || e.botStatus === 'timeout') {
+      return { tone: 'brand', word: 'Bot failed', why: 'Check the Bot page for details', key: null, goes: false }
+    }
+    const booked = Boolean(e.botStatus && BOOKED.includes(e.botStatus))
+    return { tone: 'brand', word: booked ? 'Bot booked' : 'Booking queued', why: booked ? 'This occurrence only' : 'Entomate will reserve the bot ahead of the meeting', key: null, goes: true }
+  }
+  if (e.canSchedule === false && !e.meetingLink && e.reason !== 'declined') {
+    return { tone: 'off', word: 'Needs video link', why: 'Add a Meet, Zoom or Teams link in Google Calendar', key: null, goes: false }
+  }
   if (!autoJoinOn) {
     return { tone: 'off', word: 'Auto-join off', why: e.platform ? 'Send a bot by hand, or turn auto-join on' : 'No video link', key: null, goes: false }
   }

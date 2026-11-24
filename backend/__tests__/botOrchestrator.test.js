@@ -134,6 +134,22 @@ test('reschedules the same Recall bot without changing the recording or its cons
   }
 });
 
+test('cancels an undispatched reservation at Recall before marking its session stopped', async () => {
+  mockSupabase.__queueTerminal({ data: {
+    recall_bot_id: 'recall', status: 'launching', join_at: '2026-12-01T15:55:00Z',
+  }, error: null });
+  const fetch = jest.spyOn(global, 'fetch')
+    .mockResolvedValueOnce(Response.json({ id: 'recall', status_changes: [] }))
+    .mockResolvedValueOnce(new Response(null, { status: 204 }));
+  try {
+    await orchestrator.stopBotSession('session', 'calendar_booking_cancelled');
+    expect(fetch).toHaveBeenNthCalledWith(2, expect.stringMatching(/\/bot\/recall$/), expect.objectContaining({ method: 'DELETE' }));
+    expect(mockSupabase.update).toHaveBeenCalledWith(expect.objectContaining({ status: 'stopped', failure_reason: 'calendar_booking_cancelled' }));
+  } finally {
+    fetch.mockRestore();
+  }
+});
+
 describe('mapRecallStatus', () => {
   test.each([
     ['ready', 'pending'],
