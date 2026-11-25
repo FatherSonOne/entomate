@@ -159,11 +159,16 @@ export default function Layout() {
   const [recorderOpen, setRecorderOpen] = useState(false)
   const [recorderLocked, setRecorderLocked] = useState(false)
   const [recordingVersion, setRecordingVersion] = useState(0)
+  const [quickRecordRequest, setQuickRecordRequest] = useState(0)
   const [audioInputDeviceId, setAudioInputDeviceId] = useState('')
   const openRecorder = () => setRecorderOpen(true)
+  const quickRecord = () => {
+    setQuickRecordRequest(request => request + 1)
+    openRecorder()
+  }
   const closeRecorder = () => setRecorderOpen(false)
   const recorderRecorded = () => setRecordingVersion((version) => version + 1)
-  const recorderOutlet = { openRecorder, recorderOpen, recordingVersion }
+  const recorderOutlet = { openRecorder, quickRecord, recorderOpen, recorderActive: recorderLocked, recordingVersion }
   const shellOutlet = { ...recorderOutlet, openAssistant: () => setAssistantOpen(true) }
   // The panel chunk loads on first open, then stays mounted so its conversation survives a close.
   const [assistantMounted, setAssistantMounted] = useState(false)
@@ -278,7 +283,8 @@ export default function Layout() {
         <div className="bs-skin meeting-recorder-body">
           <Suspense fallback={<p role="status"><Signal tone="off">Loading recorder</Signal></p>}>
             <MeetingRecorder audioInputDeviceId={audioInputDeviceId} onRecorded={recorderRecorded}
-              onCaptureChange={setRecorderLocked} onOpenMeeting={closeRecorder} />
+              onCaptureChange={setRecorderLocked} onOpenMeeting={closeRecorder}
+              quickRecordRequest={quickRecordRequest} onQuickRecordConsumed={() => setQuickRecordRequest(0)} />
           </Suspense>
         </div>
       </Drawer>

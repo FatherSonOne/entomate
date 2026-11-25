@@ -23,6 +23,8 @@ export interface NavLocation {
 export const SECTION_LABELS: Readonly<Record<string, string>> = {
   '/dashboard': 'Today',
   '/meetings': 'Meetings',
+  '/meetings/workspace': 'Meeting workspace',
+  '/meetings/upcoming': 'Upcoming',
   '/projects': 'Projects',
   '/tasks': 'Tasks',
   '/automations': 'Automations',
@@ -35,7 +37,7 @@ export const SECTION_LABELS: Readonly<Record<string, string>> = {
 
 /** Detail routes and the section each one belongs to. */
 const DETAIL_ROUTES: ReadonlyArray<{ pattern: RegExp; section: string; noun: string }> = [
-  { pattern: /^\/meetings\/[^/]+$/, section: '/meetings', noun: 'Meeting' },
+  { pattern: /^\/meetings\/(?!workspace$|upcoming$|room$)[^/]+$/, section: '/meetings/workspace', noun: 'Meeting' },
   { pattern: /^\/projects\/[^/]+$/, section: '/projects', noun: 'Project' },
 ]
 
@@ -161,6 +163,7 @@ export function trailFor(pathname: string): Crumb[] {
   if (!origin) return [sectionCrumb(route.section)]
 
   const { pathname: oPath, search: oSearch } = splitPath(origin)
+  if (oPath === '/meetings/workspace') return [sectionCrumb('/meetings'), sectionCrumb(oPath, oSearch)]
   if (isSectionPath(oPath)) return [sectionCrumb(oPath, oSearch)]
 
   const oRoute = detailRoute(oPath)

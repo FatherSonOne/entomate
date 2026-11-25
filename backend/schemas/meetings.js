@@ -29,9 +29,10 @@ const list = z.object({
     limit: z.string().regex(/^\d+$/).optional(),
     offset: z.string().regex(/^\d+$/).optional(),
     projectId: z.string().uuid().optional(),
-    search: z.string().optional(),
+    search: z.string().max(300).optional(),
     startDate: z.string().optional(),
     endDate: z.string().optional(),
+    beforeDate: z.string().datetime({ offset: true }).optional(),
     status: z.enum(['all', 'live', 'ready', 'attention']).optional()
   }).passthrough(),
   params: z.object({}).passthrough()
@@ -124,4 +125,16 @@ const actionItemUpdate = z.object({
   }).strict().refine(({ version, ...changes }) => Object.keys(changes).length > 0, 'Enter at least one change'),
 });
 
-module.exports = { process, transcript, list, update, ask, carryForwardPreview, followUpUpdate, followUpAction, followUpAutoSend, actionItemUpdate };
+const createAction = z.object({
+  params: z.object({ id: z.uuid() }),
+  body: z.object({
+    requestId: z.uuid(),
+    title: z.string().trim().min(1).max(500),
+    context: z.string().trim().max(2000).optional(),
+    owner: z.string().trim().max(120).optional(),
+    dueDate: z.iso.date().optional(),
+    atMs: z.number().int().min(0).max(2147483647).optional(),
+  }),
+});
+
+module.exports = { process, transcript, list, update, ask, carryForwardPreview, followUpUpdate, followUpAction, followUpAutoSend, actionItemUpdate, createAction };

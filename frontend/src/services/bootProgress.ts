@@ -47,7 +47,7 @@ const SHELL_SECTIONS = new Set([
 
 /** Public pages: the boot loader never covers these. */
 export function isPublicPath(path: string): boolean {
-  return ['/', '/privacy', '/terms', '/sign-in', '/data-deletion'].includes(path) || path.startsWith('/opt-out/')
+  return ['/', '/privacy', '/terms', '/sign-in', '/data-deletion'].includes(path) || path.startsWith('/opt-out/') || path.startsWith('/meet/')
 }
 
 /** The stages a first load into `path` goes through, or null when it is not an app page. */

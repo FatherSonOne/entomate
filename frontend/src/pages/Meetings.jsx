@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { Link, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
-import { Search, Loader2 } from 'lucide-react'
+import { Search, Loader2, Mic } from 'lucide-react'
 import { ExternalLinkIcon } from '../components/icons/ExternalLinkIcon'
 import InlineRename from '../components/meetings/InlineRename'
 import MeetingPreview from '../components/meetings/MeetingPreview'
@@ -16,18 +16,13 @@ import {
   meetingDate, meetingLengthMs, meetingStatus, plural, isAutoTitle } from '../services/meetingView'
 import SendBotKey from '../components/bot/SendBotKey'
 import UpcomingMeetings from '../components/meetings/UpcomingMeetings'
+import { MeetingNavigation, MeetingTrail, START } from '../components/meetings/MeetingNavigation'
 
 const PAGE_SIZE = 20
 /** How long a delete can be undone before it reaches the server. */
 const UNDO_MS = 8000
 
 const meetingsWord = (n) => `${n} ${n === 1 ? 'meeting' : 'meetings'}`
-
-// Past: what was recorded. Upcoming: the calendar ahead, with the bot's plan per meeting.
-const TABS = [
-  { value: 'past', label: 'Past' },
-  { value: 'upcoming', label: 'Upcoming' },
-]
 
 const FILTERS = [
   { value: 'all', label: 'All' },
@@ -43,7 +38,12 @@ const isThisWeek = (d) => {
   return d.getTime() >= start.getTime()
 }
 
-export default function Meetings() {
+function monthStart(month) {
+  const [year, value] = month.split('-').map(Number)
+  return new Date(year, value - 1, 1)
+}
+
+export default function Meetings({ upcoming = false }) {
   const toast = useToast()
   const navigate = useNavigate()
   const { openRecorder, recordingVersion } = useOutletContext()
@@ -57,76 +57,109 @@ export default function Meetings() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(false)
   const [error, setError] = useState(null)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [filter, setFilter] = useState('all')
-  const tab = searchParams.get('tab') === 'upcoming' ? 'upcoming' : 'past'
+  const searchQuery = searchParams.get('q') || ''
+  const filter = FILTERS.some(f => f.value === searchParams.get('status')) ? searchParams.get('status') : 'all'
+  const monthParam = searchParams.get('month') || ''
+  const month = /^[1-9]\d{3}-(0[1-9]|1[0-2])$/.test(monthParam) ? monthParam : ''
+  const [months, setMonths] = useState([])
+  const [monthsError, setMonthsError] = useState(false)
+  const searchRef = useRef(null)
   const viewRef = useRef(null)
-  useEnterOnChange(viewRef, tab, { rise: 0, duration: MOTION.fast })
-  const setTab = (v) => {
+  useEnterOnChange(viewRef, upcoming, { rise: 0, duration: MOTION.fast })
+  const setBrowseParam = (key, value) => {
     const next = new URLSearchParams(searchParams)
-    if (v === 'upcoming') next.set('tab', 'upcoming')
-    else { next.delete('tab'); next.delete('view') }
+    if (value) next.set(key, value)
+    else next.delete(key)
     setSearchParams(next, { replace: true })
   }
-  // Same slot, same width in both views, so switching never moves it.
-  const tabSwitch = (
-    <div className="bs-mtg-tabs">
-      <Switch label="Past or upcoming meetings" options={TABS} value={tab} onChange={setTab} />
-    </div>
-  )
+  const setSearchQuery = (value) => setBrowseParam('q', value)
+  const setFilter = (value) => setBrowseParam('status', value === 'all' ? '' : value)
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState(new Set())
   // Deletes wait UNDO_MS before reaching the server: { rows, timer, toastId }
   const pendingDelete = useRef(null)
 
   const searchTimer = useRef(null)
+  const requestVersion = useRef(0)
+  const filtersFor = (search) => {
+    const params = {}
+    if (search.trim()) params.search = search.trim()
+    if (filter !== 'all') params.status = filter
+    if (month) {
+      const start = monthStart(month)
+      const end = new Date(start.getFullYear(), start.getMonth() + 1, 1)
+      params.startDate = start.toISOString()
+      params.beforeDate = end.toISOString()
+    }
+    return params
+  }
+
+  useEffect(() => {
+    if (upcoming) return undefined
+    let active = true
+    meetingsApi.months(Intl.DateTimeFormat().resolvedOptions().timeZone).then(({ months: next }) => {
+      if (active) { setMonths(next); setMonthsError(false) }
+    }).catch(() => { if (active) setMonthsError(true) })
+    return () => { active = false }
+  }, [recordingVersion, upcoming])
+
   // Debounced server-side search (also the first load)
   useEffect(() => {
+    if (upcoming) return undefined
+    requestVersion.current += 1
+    setLoading(true)
+    setLoadingMore(false)
+    setPreviewId(null)
     if (searchTimer.current) clearTimeout(searchTimer.current)
     searchTimer.current = setTimeout(() => {
       loadMeetings(searchQuery)
     }, searchQuery ? 300 : 0)
-    return () => clearTimeout(searchTimer.current)
-  }, [searchQuery, filter, recordingVersion])
+    return () => {
+      clearTimeout(searchTimer.current)
+      requestVersion.current += 1
+    }
+  }, [searchQuery, filter, month, recordingVersion, upcoming]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadMeetings = async (search = '') => {
+    const version = ++requestVersion.current
     try {
       setLoading(true)
       // A delete still in its undo window is on the server until it commits: send it first,
       // or the reload brings the row back and it stays as a ghost after the delete lands.
       await commitDelete()
       setError(null)
-      const params = { limit: PAGE_SIZE, offset: 0 }
-      if (search.trim()) params.search = search.trim()
-      if (filter !== 'all') params.status = filter
+      const params = { limit: PAGE_SIZE, offset: 0, ...filtersFor(search) }
       const data = await meetingsApi.list(params)
+      if (version !== requestVersion.current) return
       setMeetings(data.meetings || [])
       setTotal(data.count || (data.meetings || []).length)
       setHasMore(data.hasMore || false)
     } catch (err) {
+      if (version !== requestVersion.current) return
       console.error('Failed to load meetings:', err)
       setError('The meetings could not be loaded.')
     } finally {
-      setLoading(false)
+      if (version === requestVersion.current) setLoading(false)
     }
   }
 
   const loadMoreMeetings = async () => {
+    const version = requestVersion.current
     try {
       setLoadingMore(true)
       // Same reason, and the offset counts only rows the server still has.
       await commitDelete()
-      const params = { limit: PAGE_SIZE, offset: meetings.length }
-      if (searchQuery.trim()) params.search = searchQuery.trim()
-      if (filter !== 'all') params.status = filter
+      const params = { limit: PAGE_SIZE, offset: meetings.length, ...filtersFor(searchQuery) }
       const data = await meetingsApi.list(params)
+      if (version !== requestVersion.current) return
       setMeetings(prev => [...prev, ...(data.meetings || [])])
       setHasMore(data.hasMore || false)
     } catch (err) {
+      if (version !== requestVersion.current) return
       console.error('Failed to load more meetings:', err)
       toast.error('Error', 'More meetings could not be loaded')
     } finally {
-      setLoadingMore(false)
+      if (version === requestVersion.current) setLoadingMore(false)
     }
   }
 
@@ -407,41 +440,49 @@ export default function Meetings() {
     }] : []),
   ]
 
-  const actions = selectionMode ? (
-    <>
-      <Key onClick={toggleSelectAll}>{allSelected ? 'Clear all' : 'Select all'}</Key>
-      <Key onClick={handleBulkExport} disabled={selectedIds.size === 0}>Export {selectedIds.size}</Key>
-      <Key variant="danger" onClick={handleBulkDelete} disabled={selectedIds.size === 0}>
-        Delete {selectedIds.size}
-      </Key>
-      <Key onClick={exitSelectionMode}>Done</Key>
-    </>
-  ) : (
-    <>
-      {tabSwitch}
-      <div className="bs-title-keys">
-        {meetings.length > 0 && <Key onClick={startSelectionMode}>Select</Key>}
-        <SendBotKey variant="primary" />
-        <Key onClick={openRecorder} aria-haspopup="dialog">Record</Key>
-      </div>
-    </>
-  )
-
   const pastContent = (
     <>
+      <nav aria-label="Browse by month" className="bs-meeting-months">
+        <span className="bs-lbl">Browse by month</span>
+        <div className="bs-meeting-month-links">
+          <Key size="sm" aria-pressed={!month} onClick={() => setBrowseParam('month', '')}>All dates</Key>
+          {months.map(value => (
+            <Key key={value} size="sm" aria-pressed={month === value} onClick={() => setBrowseParam('month', value)}>
+              {monthStart(value).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}
+            </Key>
+          ))}
+          {monthsError && <label className="bs-meeting-month-input">
+            <span className="bs-sr">Choose a month</span>
+            <input type="month" value={month} onChange={event => setBrowseParam('month', event.target.value)} />
+          </label>}
+        </div>
+      </nav>
       <div className="bs-mtg-search">
         <TextInput
+          ref={searchRef}
           type="search"
           icon={<Search />}
           placeholder="Search titles, summaries and transcripts"
           aria-label="Search meetings"
           value={searchQuery}
+          maxLength={300}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
-        {searchQuery && <Key onClick={() => setSearchQuery('')}>Clear</Key>}
+        <Key disabled={!searchQuery} onClick={() => {
+          setSearchQuery('')
+          searchRef.current?.focus()
+        }}>Clear</Key>
         <Switch label="Filter meetings" options={FILTERS} value={filter} onChange={setFilter} />
       </div>
 
+      {selectionMode && (
+        <div className="bs-bulk-actions" role="toolbar" aria-label="Bulk actions">
+          <Key onClick={toggleSelectAll}>{allSelected ? 'Clear all' : 'Select all'}</Key>
+          <Key onClick={handleBulkExport} disabled={selectedIds.size === 0}>Export {selectedIds.size}</Key>
+          <Key variant="danger" onClick={handleBulkDelete} disabled={selectedIds.size === 0}>Delete {selectedIds.size}</Key>
+          <Key onClick={exitSelectionMode}>Done</Key>
+        </div>
+      )}
       <div className="bs-mtg-list" aria-busy={loading || undefined}>
         {loading ? (
           <div className="bs-mtg-empty">
@@ -455,15 +496,15 @@ export default function Meetings() {
           </div>
         ) : visible.length === 0 ? (
           <div className="bs-mtg-empty">
-            <Signal tone="off">{searchQuery || filter !== 'all' ? 'No matches' : 'No meetings yet'}</Signal>
+            <Signal tone="off">{searchQuery || filter !== 'all' || month ? 'No matches' : 'No meetings yet'}</Signal>
             <p className="bs-h3">
               {searchQuery
                 ? 'Nothing matches that search.'
                 : filter !== 'all'
                   ? 'No meeting has this status.'
-                  : 'Record one in this browser, or send a bot to a call.'}
+                  : month ? 'There are no meetings for this month.' : 'Record one in this browser, or send a bot to a call.'}
             </p>
-            {!searchQuery && filter === 'all' && (
+            {!searchQuery && filter === 'all' && !month && (
               <div className="bs-title-keys">
                 <SendBotKey />
                 <Key onClick={openRecorder} aria-haspopup="dialog">Record now</Key>
@@ -496,14 +537,23 @@ export default function Meetings() {
     </>
   )
 
-  const upcoming = tab === 'upcoming'
   return (
-    <div className="bs-mtg">
+    <div className="bs-mtg bs-meeting-workspace">
+      <MeetingNavigation back={{ to: START, label: 'Start' }} />
       <TitleRule
-        title="Meetings"
+        title={upcoming ? 'Upcoming' : 'Meeting workspace'}
+        crumbs={<MeetingTrail current={upcoming ? 'Upcoming' : 'Meeting workspace'} />}
         meta={upcoming ? <><b>Upcoming</b> · from your calendar</> : <><b>{total} meetings</b> · {week.length} this week · {formatLength(weekMs)} recorded</>}
-        actions={upcoming ? <>{tabSwitch}<div className="bs-title-keys"><SendBotKey variant="primary" /></div></> : actions}
+        actions={(
+          <div className="bs-mtg-actions">
+            <Key onClick={openRecorder} aria-haspopup="dialog" icon={<Mic aria-hidden="true" />}>Record</Key>
+            <SendBotKey variant="primary" />
+          </div>
+        )}
       />
+      {!upcoming && <div className="bs-meeting-list-actions">
+        <Key size="sm" disabled={!meetings.length && !selectionMode} aria-pressed={selectionMode} onClick={selectionMode ? exitSelectionMode : startSelectionMode}>Select meetings</Key>
+      </div>}
       <div ref={viewRef} className="bs-mtg-view">{upcoming ? <UpcomingMeetings /> : pastContent}</div>
     </div>
   )

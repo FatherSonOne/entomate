@@ -195,7 +195,8 @@ router.get('/status', async (req, res) => {
   ]);
 
   const recall = checkRecall();
-  const services = { database, ai, crm, chat, recall };
+  const daily = { status: process.env.DAILY_API_KEY?.trim() ? 'configured' : 'not_configured', latency: 0 };
+  const services = { database, ai, crm, chat, recall, daily };
 
   // Determine overall health
   const criticalServices = [database];

@@ -129,8 +129,10 @@ function startOfWeek(d: Date): Date {
 
 /** This week, Last week, then one group per month ("October 2026"). Keeps the input order. */
 export function groupByTime<T extends MeetingRow>(rows: ReadonlyArray<T>, now = new Date()): Array<MeetingGroup<T>> {
-  const thisWeek = startOfWeek(now).getTime()
-  const lastWeek = thisWeek - 7 * 86_400_000
+  const start = startOfWeek(now)
+  const thisWeek = start.getTime()
+  start.setDate(start.getDate() - 7)
+  const lastWeek = start.getTime()
   const groups: Array<MeetingGroup<T>> = []
   const byKey = new Map<string, MeetingGroup<T>>()
   for (const row of rows) {

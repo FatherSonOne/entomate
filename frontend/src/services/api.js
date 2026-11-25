@@ -266,6 +266,12 @@ function invalidateActionItemViews() {
 }
 
 export const meetingsApi = {
+  months: (timezone) => api.get('/meetings/workspace-months', { params: { timezone }, _noCache: true }),
+  createAction: async (id, data) => {
+    const result = await api.post(`/meetings/${id}/actions`, data)
+    invalidateActionItemViews()
+    return result
+  },
   // Process audio file
   processAudio: async (formData) => {
     return api.post('/meetings/process', formData, {
@@ -416,6 +422,21 @@ export const projectsApi = {
 // ========================================
 // TASKS API
 // ========================================
+export const liveRoomsApi = {
+  status: () => api.get('/live-meeting-rooms/status', { _noCache: true, skipRetry: true }),
+  hosted: () => api.get('/live-meeting-rooms/host', { _noCache: true, skipRetry: true }),
+  create: (data) => api.post('/live-meeting-rooms', data, { skipRetry: true }),
+  host: (id) => api.get(`/live-meeting-rooms/${id}/host`, { _noCache: true, skipRetry: true }),
+  guest: (id, inviteKey) => api.post(`/live-meeting-rooms/${id}/guest`, { inviteKey }, { skipRetry: true }),
+  join: (id, host, data) => api.post(`/live-meeting-rooms/${id}/${host ? 'host' : 'guest'}/join`, data, { skipRetry: true }),
+  lines: (id, lines) => api.post(`/live-meeting-rooms/${id}/lines`, { lines }, { skipRetry: true }),
+  end: async (id) => {
+    const result = await api.post(`/live-meeting-rooms/${id}/end`, {}, { skipRetry: true })
+    cache.invalidate('/meetings')
+    return result
+  },
+}
+
 export const tasksApi = {
   // Create task
   create: (data) => api.post('/tasks', data),

@@ -1,13 +1,15 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { useParams, Link, useSearchParams } from 'react-router-dom'
-import { Loader2, Send } from 'lucide-react'
+import React, { useState, useEffect, useCallback, useMemo, useRef, useSyncExternalStore } from 'react'
+import { useLocation, useParams, useSearchParams } from 'react-router-dom'
+import { Loader2, Plus, Send } from 'lucide-react'
 import { meetingsApi, integrationsApi, calendarApi, reportsApi } from '../services/api'
 import ActionItemsList from '../components/ActionItemsList'
 import ChatChannelSelector from '../components/ChatChannelSelector'
 import { useToast } from '../components/vc/ToastProvider'
 import EcosystemSyncStatus from '../components/EcosystemSyncStatus'
 import MeetingNotesPanel from '../components/meetings/MeetingNotesPanel'
-import TranscriptPanel from '../components/meetings/TranscriptPanel'
+import TranscriptPanel, { lineAt } from '../components/meetings/TranscriptPanel'
+import { MeetingNavigation, WORKSPACE } from '../components/meetings/MeetingNavigation'
+import { subscribeTrail, trailFor, trailVersion } from '../services/navTrail'
 import TimecodeButton from '../components/meetings/TimecodeButton'
 import CarryForward from '../components/meetings/CarryForward'
 import RecordingStatus from '../components/meetings/RecordingStatus'
@@ -18,7 +20,7 @@ import { sendBlocker, sendingView } from '../services/followUpView'
 import { canPlay, toRecordingJob } from '../services/meetingRecorderService'
 import cache from '../services/apiCache'
 import { clipToNotes } from '../services/searchNotesService'
-import { formatClock, toSegments, toSummaryMoments } from '../services/meetingTranscriptService'
+import { formatClock, speakersOf, toSegments, toSummaryMoments } from '../services/meetingTranscriptService'
 import MeetingIntelligencePanel from '../components/intelligence/MeetingIntelligencePanel'
 import { BotDebrief, BotMeetingPending } from '../components/bot/BotDebrief'
 import {
@@ -32,9 +34,24 @@ const TABS_ID = 'meeting'
 
 export default function MeetingDetail() {
   const { id } = useParams()
+  const { pathname, state } = useLocation()
+  useSyncExternalStore(subscribeTrail, trailVersion, trailVersion)
+  const parent = trailFor(pathname).at(-1) || { to: WORKSPACE, label: 'Meeting workspace' }
+  const back = { ...parent, label: parent.label === 'Meeting workspace' ? 'workspace' : parent.label }
   const toast = useToast()
 
   const [meeting, setMeeting] = useState(null)
+  const [task, setTask] = useState(null)
+  const [taskSaving, setTaskSaving] = useState(false)
+  const [taskError, setTaskError] = useState('')
+  const openTask = (line) => {
+    setTaskError('')
+    setTask({
+      requestId: crypto.randomUUID(), title: '', owner: '', dueDate: '',
+      context: line ? `${line.speaker}: ${line.text}`.slice(0, 2000) : '',
+      atMs: line?.atMs,
+    })
+  }
 
   // Clip a decision or a transcript line to the Notes column on the Search page.
   const clipToSearchNotes = useCallback(async (note) => {
@@ -63,7 +80,7 @@ export default function MeetingDetail() {
     setFocusAtMs(atMs)
     if (playerRef.current?.isReady()) playerRef.current.playFrom(atMs)
     // The transcript sits beside the content on desktop; on phone it is its own tab.
-    if (window.matchMedia(PHONE_QUERY).matches) setTab('transcript')
+    if (window.matchMedia(PHONE_QUERY).matches) setTab('room')
   }, [])
   // A ▶ timecode or tape mark the user pressed: also loads the recording if needed, then plays from there.
   const playMoment = useCallback((atMs) => {
@@ -134,13 +151,18 @@ export default function MeetingDetail() {
 
   // ?tab=followup|notes opens that tab (links from Today and the Share recap drawer).
   const tabParam = searchParams.get('tab')
+  const meetingLoaded = Boolean(meeting)
   useEffect(() => {
-    if (['followup', 'notes', 'minutes'].includes(tabParam)) setTab(tabParam)
-  }, [tabParam])
+    if (tabParam === 'notes' && meetingLoaded) {
+      setTab('minutes')
+      requestAnimationFrame(() => document.getElementById('meeting-notes-heading')?.scrollIntoView({ block: 'start' }))
+    } else if (tabParam === 'transcript') setTab('room')
+    else if (['followup', 'room', 'minutes'].includes(tabParam)) setTab(tabParam)
+  }, [tabParam, meetingLoaded])
   const chooseTab = useCallback((value) => {
     setTab(value)
     const next = new URLSearchParams(searchParams)
-    if (value === 'followup' || value === 'notes') next.set('tab', value)
+    if (value === 'followup' || value === 'room') next.set('tab', value)
     else next.delete('tab')
     setSearchParams(next, { replace: true })
   }, [searchParams, setSearchParams])
@@ -176,6 +198,35 @@ export default function MeetingDetail() {
       console.error('Failed to refresh meeting:', error)
     }
   }, [id])
+
+  const minutesRequest = useRef(null)
+  const [writingLiveMinutes, setWritingLiveMinutes] = useState(false)
+  const shouldWrite = state?.writeMinutes === true
+  useEffect(() => {
+    if (!shouldWrite || meeting?.id !== id || !meeting.transcript || meeting.summary || minutesRequest.current === id) return
+    minutesRequest.current = id
+    setWritingLiveMinutes(true)
+    meetingsApi.reprocess(id).then(refreshMeeting).catch(() => {
+      toast.error('Minutes are pending', 'The transcript was saved. Use Write the summary to try again.')
+    }).finally(() => setWritingLiveMinutes(false))
+  }, [id, meeting?.id, meeting?.summary, meeting?.transcript, refreshMeeting, shouldWrite, toast])
+
+  const saveTask = async (event) => {
+    event.preventDefault()
+    if (!task?.title.trim() || taskSaving) return
+    setTaskSaving(true)
+    setTaskError('')
+    try {
+      await meetingsApi.createAction(id, { ...task, dueDate: task.dueDate || undefined })
+      setTask(null)
+      await refreshMeeting()
+      toast.success('Task created')
+    } catch (error) {
+      setTaskError(error.message)
+    } finally {
+      setTaskSaving(false)
+    }
+  }
 
   const handleAskQuestion = async (e) => {
     e.preventDefault()
@@ -398,12 +449,12 @@ export default function MeetingDetail() {
   if (!meeting) {
     const notFound = (
       <div>
-        <TitleRule title="Meeting not found" meta={<Link to="/meetings"><b>Meetings</b></Link>} />
+        <MeetingNavigation back={back} />
+        <TitleRule title="Meeting not found" />
         <div className="bs-mtg-empty">
           <p className="bs-h3">It may have been deleted, or it belongs to another workspace.</p>
           <div className="flex flex-wrap gap-3">
             <Key onClick={refreshMeeting}>Check again</Key>
-            <Link to="/meetings" className="bs-key">Back to meetings</Link>
           </div>
         </div>
       </div>
@@ -450,20 +501,20 @@ export default function MeetingDetail() {
   // On phone the transcript column becomes its own tab.
   const tabs = [
     { value: 'minutes', label: 'Minutes' },
-    ...(isPhone ? [{ value: 'transcript', label: 'Transcript' }] : []),
+    { value: 'room', label: 'Virtual room' },
     {
       value: 'followup',
       label: (
         <>Follow-up{followUpWord && <span className="bs-k bs-dt bs-fu-tabword">{followUpWord}</span>}</>
       ),
     },
-    { value: 'notes', label: 'Notes' },
   ]
-  const activeTab = !isPhone && tab === 'transcript' ? 'minutes' : tab
+  const activeTab = tab
   // The bot debrief links "action items" here: they now live in Minutes.
   const openTab = (value) => {
-    chooseTab(value === 'actions' ? 'minutes' : value)
+    chooseTab(value === 'actions' || value === 'notes' ? 'minutes' : value === 'transcript' ? 'room' : value)
     if (value === 'actions') requestAnimationFrame(() => document.getElementById('meeting-actions')?.scrollIntoView({ behavior: smoothScrollBehavior(), block: 'start' }))
+    if (value === 'notes') requestAnimationFrame(() => document.getElementById('meeting-notes-heading')?.scrollIntoView({ block: 'start' }))
   }
 
   // On the Follow-up tab the primary key is Send now, until it has gone out.
@@ -584,6 +635,7 @@ export default function MeetingDetail() {
               playingAtMs={playable ? playingAtMs : null}
               onPlayFrom={playable ? (atMs) => playerRef.current?.playFrom(atMs) : undefined}
               onClip={(line) => clipToSearchNotes({ kind: 'transcript', body: line.speaker ? `${line.speaker}: ${line.text}` : line.text, atMs: line.atMs })}
+              onCreateTask={openTask}
               suggestions={meeting.recording_job?.speakerSuggestions}
               onRenamed={({ segments, transcript }) => {
                 setMeeting(prev => ({ ...prev, transcript_segments: segments, transcript }))
@@ -606,8 +658,13 @@ export default function MeetingDetail() {
     </div>
   )
 
+  const voices = transcriptSegments ? speakersOf(transcriptSegments) : []
+  const at = playingAtMs ?? focusAtMs
+  const currentLine = at != null && transcriptSegments ? transcriptSegments[lineAt(transcriptSegments, at)] : null
+
   return (
-    <div className="bs-mtg bs-mtg-detail">
+    <div className="bs-mtg bs-mtg-detail bs-meeting-workspace">
+      <MeetingNavigation back={back} />
       <TitleRule title={title} crumbs={<Breadcrumbs current={meeting.title || 'Untitled meeting'} />} meta={meta} actions={actions} />
 
       {/* While the minutes are written, RecordingStatus shows the loader with real stages for both engines. */}
@@ -616,7 +673,8 @@ export default function MeetingDetail() {
       )}
 
       <div className="bs-mtg-status-row">
-        <RecordingStatus meetingId={meeting.id} recordingJob={meeting.recording_job} onRefresh={refreshMeeting} hasSummary={!!meeting.summary} hasTranscript={!!meeting.transcript} title={meeting.title} attendees={meeting.attendees} />
+        {writingLiveMinutes ? <Signal tone="brand">Writing meeting minutes</Signal>
+          : <RecordingStatus meetingId={meeting.id} recordingJob={meeting.recording_job} onRefresh={refreshMeeting} hasSummary={!!meeting.summary} hasTranscript={!!meeting.transcript} title={meeting.title} attendees={meeting.attendees} />}
       </div>
 
       {playable && (
@@ -671,7 +729,7 @@ export default function MeetingDetail() {
       )}
 
       <Grid>
-        <Cell span={8}>
+        <Cell span={activeTab === 'room' ? 12 : 8}>
           <Tabs label="Meeting sections" idBase={TABS_ID} items={tabs} value={activeTab} onChange={chooseTab} />
 
           {activeTab === 'minutes' && (
@@ -739,7 +797,7 @@ export default function MeetingDetail() {
               </div>
 
               <section id="meeting-actions" className="bs-mtg-block" aria-labelledby="meeting-actions-heading">
-                <Section id="meeting-actions-heading" title="Action items" level={3} aside={actionItems.length ? String(actionItems.length) : undefined} />
+                <Section id="meeting-actions-heading" title="Action items" level={3} aside={<Key size="sm" onClick={() => openTask()} icon={<Plus aria-hidden="true" />}>New task</Key>} />
                 {actionItems.length === 0 ? (
                   <p className="bs-mtg-none">{minutesPending ? 'Being written.' : 'No action items were recorded.'}</p>
                 ) : (
@@ -789,12 +847,29 @@ export default function MeetingDetail() {
                 </div>
               )}
 
+              <section className="bs-mtg-block" aria-labelledby="meeting-notes-heading">
+                <Section id="meeting-notes-heading" title="Notes" level={3} aside="Private unless you share with the team" />
+                <div className="bs-skin bs-mtg-notes"><MeetingNotesPanel meetingId={id} /></div>
+              </section>
             </TabPanel>
           )}
 
-          {activeTab === 'transcript' && (
-            <TabPanel idBase={TABS_ID} value="transcript">
-              {context}
+          {activeTab === 'room' && (
+            <TabPanel idBase={TABS_ID} value="room">
+              <div className="bs-meeting-playback">
+                <section aria-label="Meeting speakers">
+                  <Section title="Speakers" level={3} />
+                  <div className="bs-meeting-voices">{voices.map(voice => (
+                    <Key key={voice.name} aria-pressed={currentLine?.speaker === voice.name} onClick={() => {
+                      const first = transcriptSegments.find(line => line.speaker === voice.name)
+                      if (first) playMoment(first.atMs)
+                    }}><span>{voice.name}</span><span className="bs-lbl">{voice.lines} {voice.lines === 1 ? 'line' : 'lines'}</span></Key>
+                  ))}</div>
+                  {!voices.length && <p className="bs-mut">Speaker timestamps are unavailable for this meeting.</p>}
+                  {currentLine && <p className="bs-meeting-caption"><b>{currentLine.speaker}</b> {currentLine.text}</p>}
+                </section>
+                {context}
+              </div>
             </TabPanel>
           )}
 
@@ -806,23 +881,23 @@ export default function MeetingDetail() {
             </TabPanel>
           )}
 
-          {activeTab === 'notes' && (
-            <TabPanel idBase={TABS_ID} value="notes">
-              <section className="bs-mtg-block" aria-labelledby="meeting-notes-heading">
-                <Section id="meeting-notes-heading" title="Notes" level={3} aside="Private unless you share with the team" />
-                <div className="bs-skin bs-mtg-notes">
-                  <MeetingNotesPanel meetingId={id} />
-                </div>
-              </section>
-            </TabPanel>
-          )}
-
         </Cell>
 
-        <Cell span={4} rule>
+        {activeTab !== 'room' && <Cell span={4} rule>
           {!isPhone && (activeTab === 'followup' ? <FollowUpContext state={followUp} /> : context)}
-        </Cell>
+        </Cell>}
       </Grid>
+
+      <Drawer open={!!task} onClose={() => setTask(null)} dismissible={!taskSaving} label="New meeting task">
+        {task && <form className="bs-meeting-lobby" onSubmit={saveTask}>
+          <label className="bs-meeting-field"><span>Task</span><TextInput autoFocus value={task.title} onChange={e => setTask({ ...task, title: e.target.value })} maxLength={500} required /></label>
+          <label className="bs-meeting-field"><span>Owner</span><TextInput value={task.owner} onChange={e => setTask({ ...task, owner: e.target.value })} maxLength={120} placeholder="Unassigned" /></label>
+          <label className="bs-meeting-field"><span>Due date</span><TextInput type="date" value={task.dueDate} onChange={e => setTask({ ...task, dueDate: e.target.value })} /></label>
+          {task.context && <p className="bs-meeting-caption"><b>{formatClock(task.atMs)}</b> {task.context}</p>}
+          {taskError && <p role="alert" className="bs-meeting-error">{taskError}</p>}
+          <Key variant="primary" type="submit" disabled={taskSaving || !task.title.trim()}>{taskSaving ? 'Creating task…' : 'Create task'}</Key>
+        </form>}
+      </Drawer>
 
       <CrmSendDrawer
         open={showCrm}
