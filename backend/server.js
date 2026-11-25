@@ -237,6 +237,7 @@ app.get('/api/health', async (req, res) => {
 // Notes first: its own router, scoped to one meeting (private-or-team rule in the service).
 app.use('/api/meetings/:meetingId/notes', require('./routes/meetingNotes'));
 app.use('/api/meetings', require('./routes/meetings'));
+app.use('/api/live-meeting-rooms', require('./routes/liveMeetingRooms'));
 // In-browser recorder (no bot): audio pieces in, transcript out.
 app.use('/api/recordings', require('./routes/recordings'));
 

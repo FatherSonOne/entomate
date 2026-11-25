@@ -46,6 +46,8 @@ import {
 } from '../../services/meetingRecorderService'
 
 export interface MeetingRecorderProps {
+  quickRecordRequest?: number
+  onQuickRecordConsumed?: () => void
   /** A microphone chosen in Settings; the default one when empty. */
   audioInputDeviceId?: string
   /** Called once the recording is handed to the server for its transcript. */
@@ -162,7 +164,7 @@ function Preview({ stream }: { stream: MediaStream }): React.ReactElement {
   return <video ref={ref} autoPlay muted playsInline aria-label="Recording preview" className="aspect-video w-full rounded-lg bg-black object-contain" />
 }
 
-export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChange, onOpenMeeting }: MeetingRecorderProps): React.ReactElement {
+export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChange, onOpenMeeting, quickRecordRequest, onQuickRecordConsumed }: MeetingRecorderProps): React.ReactElement {
   const navigate = useNavigate()
   // Unique per recorder, so two on one page (or a test harness) never share a radio group.
   const uid = useId()
@@ -274,7 +276,7 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChang
   useEffect(() => () => pop?.win.close(), [pop])
 
   /** Ask the browser for the devices the chosen mode needs. */
-  const openStreams = async (): Promise<{ streams: MediaStream[]; video: MediaStreamTrack | null }> => {
+  const openStreams = async (captureMode: RecorderMode): Promise<{ streams: MediaStream[]; video: MediaStreamTrack | null }> => {
     const md = navigator.mediaDevices
     if (!md?.getUserMedia) throw new Error('This browser cannot record. Try a current Chrome, Edge, Firefox or Safari.')
     const micConstraints: MediaTrackConstraints = {
@@ -282,8 +284,8 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChang
       noiseSuppression: true,
       ...(audioInputDeviceId ? { deviceId: { exact: audioInputDeviceId } } : {}),
     }
-    if (mode === 'mic') return { streams: [await md.getUserMedia({ audio: micConstraints })], video: null }
-    if (mode === 'camera') {
+    if (captureMode === 'mic') return { streams: [await md.getUserMedia({ audio: micConstraints })], video: null }
+    if (captureMode === 'camera') {
       const s = await md.getUserMedia({ audio: micConstraints, video: { width: { ideal: 1280 }, height: { ideal: 720 } } })
       return { streams: [s], video: s.getVideoTracks()[0] ?? null }
     }
@@ -311,8 +313,9 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChang
     return { streams, video: tab.getVideoTracks()[0] ?? null }
   }
 
-  const start = async (): Promise<void> => {
-    if (phase !== 'setup' || !consent) return
+  const start = async (quick = false): Promise<void> => {
+    if (phase !== 'setup' || (!consent && !quick)) return
+    const captureMode = quick ? 'mic' : mode
     setError(null)
     if (typeof MediaRecorder === 'undefined') {
       setError('This browser cannot record. Try a current Chrome, Edge, Firefox or Safari.')
@@ -327,9 +330,9 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChang
 
     let opened: { streams: MediaStream[]; video: MediaStreamTrack | null }
     try {
-      opened = await openStreams()
+      opened = await openStreams(captureMode)
     } catch (err) {
-      setError(captureErrorMessage(err, mode))
+      setError(captureErrorMessage(err, captureMode))
       setPhase('setup')
       return
     }
@@ -344,11 +347,11 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChang
 
     let id: string
     try {
-      const beside = bot && sameAsBot ? { botSessionId: bot.sessionId } : { separate: true }
+      const beside = quick ? {} : bot && sameAsBot ? { botSessionId: bot.sessionId } : { separate: true }
       // The server's clock is UTC: name an untitled recording by this device's date, or an
       // evening meeting gets tomorrow's. Beside a bot, an empty title keeps the bot's title.
-      const named = title.trim() || (bot && sameAsBot ? '' : `Recording, ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`)
-      ;({ meetingId: id } = await startRecording({ title: named, attendees, mode, mimeType: audioMime, ...beside }))
+      const named = title.trim() || (!quick && bot && sameAsBot ? '' : `Recording, ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`)
+      ;({ meetingId: id } = await startRecording({ title: named, attendees, mode: captureMode, mimeType: audioMime, ...beside }))
     } catch (err) {
       opened.streams.forEach((s) => s.getTracks().forEach((t) => t.stop()))
       void audioContext.close()
@@ -363,7 +366,7 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChang
       setPhase('setup')
       return
     }
-    setHandedToBot(Boolean(bot && sameAsBot))
+    setHandedToBot(!quick && Boolean(bot && sameAsBot))
 
     const pieces = new PieceUploader(sendPieceTo(id, baseMime(audioMime)), setUpload)
     uploader.current = pieces
@@ -409,6 +412,24 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChang
     setElapsedMs(0)
     setPhase('recording')
   }
+
+  const handledQuickRequest = useRef(false)
+  useEffect(() => {
+    if (!quickRecordRequest) {
+      handledQuickRequest.current = false
+      return
+    }
+    if (handledQuickRequest.current) return
+    handledQuickRequest.current = true
+    onQuickRecordConsumed?.()
+    if (phase === 'setup') {
+      setMode('mic')
+      setConsent(true)
+      void start(true)
+    }
+  // Start once per explicit launcher click. Capture uses settings from that render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quickRecordRequest])
 
   /** Resolve once a recorder has handed over its last piece. */
   const stopRecorder = (recorder: MediaRecorder | null): Promise<void> =>

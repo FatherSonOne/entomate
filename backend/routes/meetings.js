@@ -303,7 +303,7 @@ router.post('/transcript', authenticate, validate(schemas.transcript), async (re
  */
 router.get('/', authenticate, validate(schemas.list), async (req, res) => {
   try {
-    const { limit = 20, offset = 0, projectId, search, startDate, endDate, status } = req.query;
+    const { limit = 20, offset = 0, projectId, search, startDate, endDate, beforeDate, status } = req.query;
 
     if (!supabase) {
       return res.json({ meetings: [], count: 0, hasMore: false });
@@ -318,15 +318,16 @@ router.get('/', authenticate, validate(schemas.list), async (req, res) => {
       .from('meetings')
       .select('*', { count: 'exact' })
       .in('org_id', orgIds)
-      .order('created_at', { ascending: false });
+      .order('meeting_at', { ascending: false, nullsFirst: false })
+      .order('id', { ascending: false });
 
     if (projectId) {
       query = query.eq('project_id', projectId);
     }
 
     if (search) {
-      const sanitized = search.replace(/[%_\\]/g, '\\$&');
-      query = query.or(`title.ilike.%${sanitized}%,summary.ilike.%${sanitized}%`);
+      const literal = JSON.stringify('%' + search.replace(/[%_\\*]/g, '\\$&') + '%');
+      query = query.or(['title', 'summary', 'transcript'].map(field => field + '.ilike.' + literal).join(','));
     }
 
     // Status filter: a coarse superset of the list's status words (frontend
@@ -340,12 +341,13 @@ router.get('/', authenticate, validate(schemas.list), async (req, res) => {
     }
 
     if (startDate) {
-      query = query.gte('created_at', startDate);
+      query = query.gte('meeting_at', startDate);
     }
 
     if (endDate) {
-      query = query.lte('created_at', endDate);
+      query = query.lte('meeting_at', endDate);
     }
+    if (beforeDate) query = query.lt('meeting_at', beforeDate);
 
     query = query.range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
 
@@ -377,12 +379,53 @@ router.get('/', authenticate, validate(schemas.list), async (req, res) => {
     res.json({
       meetings: rows,
       count: count || 0,
-      hasMore: (meetings?.length || 0) === parseInt(limit)
+      hasMore: Number(offset) + rows.length < (count || 0)
     });
 
   } catch (error) {
     log.error('Error listing meetings:', { error: error.message || error });
     res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/workspace-months', authenticate, async (req, res) => {
+  let timezone;
+  try {
+    if (typeof req.query.timezone !== 'string' || req.query.timezone.length > 80) throw new Error('Invalid timezone');
+    timezone = new Intl.DateTimeFormat('en', { timeZone: req.query.timezone }).resolvedOptions().timeZone;
+  } catch {
+    return res.status(400).json({ error: 'Invalid time zone.' });
+  }
+  if (!supabase) return res.json({ months: [] });
+  try {
+    const orgIds = await orgIdsForUser(req.user.id);
+    if (!orgIds.length) return res.json({ months: [] });
+    const { data, error } = await supabase.rpc('meeting_workspace_months', { p_org_ids: orgIds, p_timezone: timezone });
+    if (error) throw error;
+    res.json({ months: data.map(row => row.month) });
+  } catch (error) {
+    log.warn('Could not load meeting months', { code: error.code });
+    res.status(500).json({ error: 'Meeting months could not be loaded.' });
+  }
+});
+
+router.post('/:id/actions', authenticate, validate(schemas.createAction), async (req, res) => {
+  try {
+    const { id } = req.validated.params;
+    const orgId = await meetingOrgOrRespond(req, res, id);
+    if (!orgId) return;
+    const { requestId, title, context, owner, dueDate, atMs } = req.validated.body;
+    const actionId = uuidv5(`urn:entomate:manual-meeting-action:${id}:${requestId}`, uuidv5.URL);
+    const { error } = await supabase.from('action_items').upsert({
+      id: actionId, meeting_id: id, org_id: orgId, task_description: title,
+      context: context || null, assigned_to_name: owner || null, due_date: dueDate || null,
+      transcript_at_ms: atMs ?? null, manually_created: true,
+    }, { onConflict: 'id', ignoreDuplicates: true });
+    if (error) throw error;
+    res.status(201).json({ id: actionId });
+  } catch (error) {
+    log.warn('Could not create meeting action', { code: error.code });
+    res.status(500).json({ error: 'The meeting task could not be created.' });
   }
 });
 
@@ -995,7 +1038,7 @@ async function saveActionItems(meeting, actionItems) {
   if (!meeting.org_id) throw new Error('Cannot save actions without a meeting workspace');
   const { data: existing, error: readError } = await read();
   if (readError) throw readError;
-  if (existing.length || !actionItems.length) return { items: existing, created: false };
+  if (existing.some((item) => !item.manually_created) || !actionItems.length) return { items: existing, created: false };
 
   const now = new Date().toISOString();
   const rows = actionItems.map((item, index) => ({
@@ -1018,7 +1061,7 @@ async function saveActionItems(meeting, actionItems) {
       ? item.transcriptAtMs : null,
   }));
   const { data, error } = await supabase.from('action_items').insert(rows).select();
-  if (!error) return { items: data, created: true };
+  if (!error) return { items: [...existing, ...data], created: true };
   if (error.code === '23505') {
     const { data: committed, error: retryError } = await read();
     if (retryError) throw retryError;

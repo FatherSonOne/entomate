@@ -15,7 +15,7 @@ beforeEach(() => sessionStorage.clear())
 
 describe('navTrail', () => {
   test('a detail page with no trail leads to its section', () => {
-    expect(trailFor('/meetings/m1')).toEqual([{ to: '/meetings', label: 'Meetings' }])
+    expect(trailFor('/meetings/m1')).toEqual([{ to: '/meetings/workspace', label: 'Meeting workspace' }])
     expect(trailFor('/projects/p1')).toEqual([{ to: '/projects', label: 'Projects' }])
     expect(trailFor('/tasks')).toEqual([])
   })
@@ -23,6 +23,15 @@ describe('navTrail', () => {
   test('a meeting opened from Tasks leads back to Tasks, keeping its filters', () => {
     recordNavigation(loc('/tasks?view=lanes'), loc('/meetings/m1'), 'PUSH', false)
     expect(trailFor('/meetings/m1')).toEqual([{ to: '/tasks?view=lanes', label: 'Tasks' }])
+  })
+
+  test('the workspace trail preserves the month and status', () => {
+    const workspace = '/meetings/workspace?month=2026-09&status=ready'
+    recordNavigation(loc(workspace), loc('/meetings/m1'), 'PUSH', false)
+    expect(trailFor('/meetings/m1')).toEqual([
+      { to: '/meetings', label: 'Meetings' },
+      { to: workspace, label: 'Meeting workspace' },
+    ])
   })
 
   test('a meeting opened from a project shows Projects / project', () => {
@@ -47,7 +56,7 @@ describe('navTrail', () => {
   test('an origin that is not a page in the trail falls back to the section', () => {
     recordNavigation(loc('/tasks'), loc('/meetings/m1'), 'PUSH', false)
     recordNavigation(loc('/settings'), loc('/meetings/m1'), 'PUSH', false)
-    expect(trailFor('/meetings/m1')).toEqual([{ to: '/meetings', label: 'Meetings' }])
+    expect(trailFor('/meetings/m1')).toEqual([{ to: '/meetings/workspace', label: 'Meeting workspace' }])
   })
 })
 

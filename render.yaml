@@ -89,6 +89,10 @@ services:
       - key: RECALL_WEBHOOK_SIGNING_SECRET
         sync: false  # Svix whsec_... secret from Recall dashboard > Webhooks. Without it every bot status webhook is rejected (GET /health/status shows recall: error).
 
+      # ----- Live meeting rooms (Daily) -----
+      - key: DAILY_API_KEY
+        sync: false  # set manually (secret)
+
       # ----- Billing (Stripe) -----
       # Prices are found by lookup key; create them with backend/scripts/stripe-bootstrap-prices.js.
       - key: STRIPE_SECRET_KEY

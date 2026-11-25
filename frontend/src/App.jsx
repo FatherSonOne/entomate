@@ -10,7 +10,9 @@ import NavTrailRecorder from './components/NavTrailRecorder'
 // Lazy-loaded pages (code splitting)
 const Dashboard = React.lazy(() => import('./pages/Dashboard'))
 const Meetings = React.lazy(() => import('./pages/Meetings'))
+const MeetingStart = React.lazy(() => import('./pages/MeetingStart'))
 const MeetingDetail = React.lazy(() => import('./pages/MeetingDetail'))
+const LiveMeetingRoom = React.lazy(() => import('./pages/LiveMeetingRoom'))
 const Projects = React.lazy(() => import('./pages/Projects'))
 const ProjectDetail = React.lazy(() => import('./pages/ProjectDetail'))
 const Tasks = React.lazy(() => import('./pages/Tasks'))
@@ -40,6 +42,17 @@ function CalendarMoved() {
   return <Navigate to={{ pathname: '/dashboard', search: location.search }} replace />
 }
 
+function MeetingsEntry() {
+  const { search } = useLocation()
+  const query = new URLSearchParams(search)
+  const legacyTab = query.get('tab')
+  if (legacyTab === 'upcoming' || legacyTab === 'past') {
+    query.delete('tab')
+    return <Navigate replace to={{ pathname: '/meetings/' + (legacyTab === 'upcoming' ? 'upcoming' : 'workspace'), search: query.toString() }} />
+  }
+  return <MeetingStart />
+}
+
 export default function App() {
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
@@ -56,11 +69,16 @@ export default function App() {
           <Route path="/sign-in" element={<SignIn />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/meet/:id" element={<LiveMeetingRoom guest />} />
 
           {/* Protected routes */}
           <Route path="/" element={<ProtectedRoute><OrgSetupGate><Layout /></OrgSetupGate></ProtectedRoute>}>
             <Route path="dashboard" element={<Dashboard />} />
-            <Route path="meetings" element={<Meetings />} />
+            <Route path="meetings" element={<MeetingsEntry />} />
+            <Route path="meetings/workspace" element={<Meetings />} />
+            <Route path="meetings/upcoming" element={<Meetings upcoming />} />
+            <Route path="meetings/room" element={<LiveMeetingRoom />} />
+            <Route path="meetings/room/:id" element={<LiveMeetingRoom />} />
             <Route path="meetings/:id" element={<MeetingDetail />} />
             <Route path="projects" element={<Projects />} />
             <Route path="projects/:id" element={<ProjectDetail />} />
