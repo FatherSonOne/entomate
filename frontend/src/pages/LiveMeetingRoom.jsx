@@ -220,7 +220,11 @@ export default function LiveMeetingRoom({ guest = false }) {
         .on('nonfatal-error', event => {
           if (event.type === 'screen-share-error') setError('Screen sharing could not start. Check your browser permissions.')
         })
-        .on('error', () => setError('The video service reported a connection problem. You can rejoin if you were disconnected.'))
+        .on('error', () => {
+          if (!endingCall.current && !intentionalLeave.current) {
+            setError('The video service reported a connection problem. You can rejoin if you were disconnected.')
+          }
+        })
         .on('left-meeting', () => {
           if (call.current !== connection) return
           call.current = null
@@ -233,6 +237,7 @@ export default function LiveMeetingRoom({ guest = false }) {
             else void liveRoomsApi.guest(id, inviteKey).catch(err => {
               if (mounted.current && !call.current && [404, 410].includes(err.status)) {
                 setRoom(previous => ({ ...previous, available: false }))
+                setError('')
                 setNotice('The host ended this room.')
               }
             })
@@ -286,6 +291,7 @@ export default function LiveMeetingRoom({ guest = false }) {
       }
       await flush()
       const { meetingId } = await liveRoomsApi.end(id)
+      setError('')
       const connection = call.current
       call.current = null
       if (connection) void connection.destroy().catch(() => {})
