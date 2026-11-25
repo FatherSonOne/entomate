@@ -34,8 +34,8 @@ export interface DrawerProps {
   modal?: boolean
   /** Extra class on the panel (width variants). */
   className?: string
-  /** 'top': sits above legacy modals (z 10000), for pickers opened from inside them. */
-  layer?: 'base' | 'top'
+  /** Underlay puts Settings section sheets below their detail drawers. Top clears legacy modals. */
+  layer?: 'underlay' | 'base' | 'top'
 }
 
 /** Open modal drawers; the page stays locked until the last one closes. */
@@ -111,6 +111,7 @@ export function Drawer({ open, onClose, label, children, footer, hideEscHint = f
   }, [open, modal, dismiss])
 
   const onKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!panelRef.current?.contains(e.target as Node)) return
     if (e.key === 'Escape') {
       e.stopPropagation()
       dismiss()
@@ -174,14 +175,14 @@ export function Drawer({ open, onClose, label, children, footer, hideEscHint = f
 
   return createPortal(
     <>
-      {modal && <div className="bs-scrim" data-open={shown} data-layer={layer === 'top' ? 'top' : undefined} onClick={dismiss} aria-hidden="true" />}
+      {modal && <div className="bs-scrim" data-open={shown} data-layer={layer === 'base' ? undefined : layer} onClick={dismiss} aria-hidden="true" />}
       <div
         ref={panelRef}
         className={className ? `bs-drawer ${className}` : 'bs-drawer'}
         role={modal ? 'dialog' : 'complementary'}
         aria-modal={modal ? 'true' : undefined}
         data-modal={modal}
-        data-layer={layer === 'top' ? 'top' : undefined}
+        data-layer={layer === 'base' ? undefined : layer}
         aria-labelledby={labelId}
         tabIndex={-1}
         data-open={shown}

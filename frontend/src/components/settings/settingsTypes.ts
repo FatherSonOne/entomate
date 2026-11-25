@@ -46,6 +46,9 @@ export interface AuthUser {
 
 export interface AuthCtx {
   user: AuthUser | null
+  profilePhotoUrl: string | null
+  hasUploadedProfilePhoto: boolean | null
+  setProfilePhotoUrl: (url: string | null) => void
   signOut: () => Promise<void>
 }
 

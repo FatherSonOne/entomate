@@ -17,6 +17,7 @@ const orgs = vi.hoisted(() => ({
 }))
 
 vi.mock('../services/monitoring', () => ({ setMonitoringUser: vi.fn() }))
+vi.mock('../services/profilePhotos', () => ({ getProfilePhotoUrls: vi.fn(async () => ({})), PROFILE_PHOTO_REFRESH_MS: 2700000 }))
 vi.mock('../services/tenantOrgService', () => ({ tenantOrgService: orgs }))
 vi.mock('../services/authService', () => {
   const toAuthUser = (u: { id: string; email?: string; user_metadata?: { name?: string } } | null | undefined) =>
@@ -37,7 +38,7 @@ function session(name: string) {
   return { access_token: `t-${Math.random()}`, user: { id: 'u-1', email: 'f@example.com', user_metadata: { name } } }
 }
 
-import { AuthProvider } from '../contexts/AuthContext'
+import { AuthProvider, useAuth } from '../contexts/AuthContext'
 import { OrgProvider } from '../contexts/OrgContext'
 import OrgSetupGate from '../components/teams/OrgSetupGate'
 
@@ -46,7 +47,8 @@ function Page(): React.ReactElement {
   React.useEffect(() => {
     mounts += 1
   }, [])
-  return <p>Meetings page</p>
+  const { user } = useAuth() as unknown as { user: { name: string } }
+  return <><p>Meetings page</p><p>{user.name}</p></>
 }
 
 beforeEach(() => {
@@ -79,8 +81,10 @@ describe('an auth re-check for the same person', () => {
     expect(mounts).toBe(1)
     expect(orgs.getCurrentOrg).toHaveBeenCalledTimes(1)
 
-    // A real change to the person (their name) still reaches the app.
+    // Settings can change the person's name without reloading their workspace.
     await act(async () => auth.cb!('USER_UPDATED', session('Frank M')))
-    await waitFor(() => expect(orgs.getCurrentOrg).toHaveBeenCalledTimes(2))
+    expect(screen.getByText('Frank M')).toBeInTheDocument()
+    expect(orgs.getCurrentOrg).toHaveBeenCalledTimes(1)
+    expect(mounts).toBe(1)
   })
 })

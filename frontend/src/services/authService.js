@@ -111,7 +111,9 @@ export const authService = {
       id: user.id,
       email: user.email || '',
       name: user.user_metadata?.name || user.user_metadata?.full_name,
-      avatar_url: user.user_metadata?.avatar_url || user.user_metadata?.picture,
+      avatar_url: user.user_metadata?.entomate_avatar_hidden === true
+        ? undefined
+        : user.user_metadata?.avatar_url || user.user_metadata?.picture,
       role: user.user_metadata?.role || 'member'
     }
   }

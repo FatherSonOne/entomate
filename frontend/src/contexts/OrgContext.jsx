@@ -22,6 +22,7 @@ export const useOrgSafe = () => {
 
 export const OrgProvider = ({ children }) => {
   const { user, loading: authLoading } = useAuth()
+  const userId = user?.id
 
   const [org, setOrg] = useState(null)
   const [orgMembers, setOrgMembers] = useState([])
@@ -31,7 +32,7 @@ export const OrgProvider = ({ children }) => {
   const [loading, setLoading] = useState(true)
 
   const fetchOrg = useCallback(async () => {
-    if (!user) {
+    if (!userId) {
       setOrg(null)
       setOrgMembers([])
       setMyRole(null)
@@ -78,7 +79,7 @@ export const OrgProvider = ({ children }) => {
       setOrgMembers(members)
 
       // Determine current user's role
-      const myMembership = members.find(m => m.userId === user.id)
+      const myMembership = members.find(m => m.userId === userId)
       setMyRole(myMembership?.role ?? null)
     } catch (error) {
       console.error('OrgContext: Failed to fetch org data', error)
@@ -89,7 +90,7 @@ export const OrgProvider = ({ children }) => {
     } finally {
       setLoading(false)
     }
-  }, [user])
+  }, [userId])
 
   useEffect(() => {
     if (authLoading) return

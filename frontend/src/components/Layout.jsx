@@ -1,3 +1,4 @@
+import ProfileAvatar from './ProfileAvatar'
 import React, { Suspense, useState, useEffect, useCallback, useRef } from 'react'
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import PageSkeleton from './PageSkeleton'
@@ -183,7 +184,7 @@ export default function Layout() {
   const { isDark, toggleMode, setThemeMode, isHeldLight, isBenchSwiss, designStyle } = useTheme()
   const classicPageRef = useRef(null)
   useEnterOnChange(classicPageRef, location.pathname, { rise: 0, duration: MOTION.fast })
-  const { user, signOut } = useAuth()
+  const { user, profilePhotoUrl, signOut } = useAuth()
   const orgCtx = useOrgSafe()
   const isAdmin = orgCtx?.myRole === 'owner' || orgCtx?.myRole === 'admin'
   const shortcutsHeld = useNavigationShortcuts(navigate, isAdmin, !commandPaletteOpen && !shortcutsHelpOpen && !recorderOpen)
@@ -301,7 +302,7 @@ export default function Layout() {
     const shellUser = {
       name: user?.name || user?.email || 'Workspace',
       detail: workspace ? `${role} · ${workspace}` : (user?.email || role),
-      avatarUrl: user?.avatar_url || null,
+      avatarUrl: profilePhotoUrl,
     }
     const changeTheme = (next) => {
       setThemeMode(next)
@@ -324,8 +325,8 @@ export default function Layout() {
           onSettings={() => goSettings()}
           settingsActive={isActive('/settings')}
           menuItems={[
-            { label: 'Profile', onSelect: () => goSettings('you') },
-            { label: 'Workspace and team', onSelect: () => goSettings('workspace') },
+            { label: 'Profile', onSelect: () => goSettings('profile') },
+            { label: 'Workspace and team', onSelect: () => goSettings('people') },
             { label: 'Connected calendars', onSelect: () => goSettings('recording') },
             { label: 'Keyboard shortcuts', onSelect: () => setShortcutsHelpOpen(true), kbd: '?' },
           ]}
@@ -487,10 +488,7 @@ export default function Layout() {
 
             <div className="nl-avatar-card">
               <div className="nl-avatar">
-                {user?.avatar_url
-                  ? <img src={user.avatar_url} alt="User avatar" />
-                  : <User className="w-4 h-4" />
-                }
+                <ProfileAvatar src={profilePhotoUrl} fallback={<User className="w-4 h-4" />} />
                 <span className="nl-avatar-status" />
               </div>
               <div className="nl-avatar-info">

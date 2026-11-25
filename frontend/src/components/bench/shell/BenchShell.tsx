@@ -9,6 +9,7 @@ import { cx } from '../cx'
 import { drawIcon } from '../iconDraw'
 import { prefersReducedMotion } from '../motion'
 import { logoAsset, useLogoSystem } from '../../../services/logoSystem'
+import ProfileAvatar from '../../ProfileAvatar'
 import { RippleCircles } from '../../ui/ripple-circles'
 import { navigationShortcut, shortcutLabel } from '../../../hooks/useNavigationShortcuts'
 
@@ -241,9 +242,7 @@ function ProfileMenu({ user, items, onSignOut, onSettings, modKey }: {
         aria-label={`Account menu for ${user.name}`}
         onClick={() => setOpen((v) => !v)}
       >
-        <span className="bs-avi" aria-hidden="true">
-          {user.avatarUrl ? <img src={user.avatarUrl} alt="" /> : initials(user.name)}
-        </span>
+        <ProfileAvatar className="bs-avi" src={user.avatarUrl} fallback={initials(user.name)} />
         <span className="bs-av-name">{user.name}</span>
         <span className="bs-car" aria-hidden="true">▾</span>
       </button>

@@ -8,6 +8,8 @@ import { tenantOrgService } from '../../services/tenantOrgService'
 import { useOrg } from '../../contexts/OrgContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { Drawer, Key, Select, Signal, Switch, TextInput } from '../bench'
+import ProfileAvatar from '../ProfileAvatar'
+import { getProfilePhotoUrls, PROFILE_PHOTO_REFRESH_MS } from '../../services/profilePhotos'
 import { initials } from '../../services/settingsView'
 import { ago, canAdmin } from './settingsTypes'
 import type { AuthCtx, OrgCtx, OrgInvite, OrgMember, OrgRole } from './settingsTypes'
@@ -35,7 +37,8 @@ export interface TeamSettingsProps {
 
 export default function TeamSettings({ inviteOpen, onInviteOpen }: TeamSettingsProps): React.ReactElement {
   const { org, orgMembers, myRole, refreshOrg } = useOrg() as unknown as OrgCtx
-  const { user } = useAuth() as unknown as AuthCtx
+  const { user, profilePhotoUrl } = useAuth() as unknown as AuthCtx
+  const [photos, setPhotos] = useState<Record<string, string>>({})
   const admin = canAdmin(myRole)
   const [invites, setInvites] = useState<OrgInvite[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -50,6 +53,20 @@ export default function TeamSettings({ inviteOpen, onInviteOpen }: TeamSettingsP
   }, [org?.id, admin])
 
   useEffect(() => { void loadInvites() }, [loadInvites])
+
+  useEffect(() => {
+    const ids = orgMembers.filter((member) => member.userId !== user?.id).map((member) => member.userId)
+    let live = true
+    const load = async () => {
+      try {
+        const urls = await getProfilePhotoUrls(ids)
+        if (live) setPhotos(urls)
+      } catch { /* the roster can still show initials */ }
+    }
+    void load()
+    const timer = window.setInterval(load, PROFILE_PHOTO_REFRESH_MS)
+    return () => { live = false; window.clearInterval(timer) }
+  }, [orgMembers, user?.id])
 
   const run = async (key: string, fn: () => Promise<unknown>): Promise<boolean> => {
     setBusy(key)
@@ -78,11 +95,13 @@ export default function TeamSettings({ inviteOpen, onInviteOpen }: TeamSettingsP
         {orgMembers.map((m) => {
           const me = m.userId === user?.id
           const editable = admin && m.role !== 'owner' && !me
+          const memberName = (me && user?.name) || m.userName
           return (
             <li key={m.id} className="bs-set-mem">
-              <span className="bs-set-ava" aria-hidden="true">{initials(m.userName, m.userEmail)}</span>
+              <ProfileAvatar className="bs-set-ava" src={me ? profilePhotoUrl : photos[m.userId]}
+                fallback={initials(memberName, m.userEmail)} />
               <div className="bs-set-mem-who">
-                <b>{m.userName || m.userEmail || 'Member'}{me && <span className="bs-mut"> · you</span>}</b>
+                <b>{memberName || m.userEmail || 'Member'}{me && <span className="bs-mut"> · you</span>}</b>
                 {m.userEmail && <span className="bs-set-mem-mail">{m.userEmail}</span>}
               </div>
               <div className="bs-set-mem-role">

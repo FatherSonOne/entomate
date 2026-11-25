@@ -1,7 +1,7 @@
 // ─── Entomate User Guide Data ─────────────────────────────────────────────
 // Version tracking — update these when guide content changes
 
-export const guideVersion = '2026-11-23c'
+export const guideVersion = '2026-11-25'
 export const guideUpdated = '2026-11-23'
 
 // ─── Version key for localStorage new-feature detection ───────────────────
@@ -22,6 +22,7 @@ export const CATEGORIES = [
 // Add a line here (and bump guideVersion) whenever a section changes.
 
 export const GUIDE_CHANGES = [
+  { date: '2026-11-25', section: 'settings', text: 'Settings now has a grouped sidebar on desktop and a directory on phones. Profile can upload, replace or remove your photo.' },
   { date: '2026-11-23', section: 'ento-assistant', text: 'History in Ask Entomate: View all conversations opens a page with every chat, search and delete.' },
   { date: '2026-11-23', section: 'meeting-details', text: 'Follow-up tab: an email to the people who were there, sent on its own 20 minutes after the meeting unless you edit or stop it.' },
   { date: '2026-11-23', section: 'upcoming', text: 'Upcoming in Meetings replaces Calendar: 60 days, a month calendar and Skip or Join per meeting.' },
@@ -144,7 +145,7 @@ export const guideSections = [
     summary: 'Create your workspace, invite your team, set roles, and archive or delete a workspace.',
     steps: [
       'After your first sign-in, give your workspace a name and press Create workspace. It starts on the Free plan.',
-      'Invite people from Settings \u203a Workspace \u203a Team. They see an Invite waiting card when they sign in.',
+      'Invite people from Settings \u203a Workspace \u203a People & access. They see an Invite waiting card when they sign in.',
       'Each member is an Owner, Admin or Member. Owners and admins can send the bot, change retention and consent, and manage billing.',
     ],
     subsections: [
@@ -162,7 +163,7 @@ export const guideSections = [
         title: 'Archiving & Deleting',
         description: 'Archive first, with a 30-day window to change your mind.',
         steps: [
-          'Owners archive the workspace from Settings \u203a Workspace.',
+          'Owners and admins can archive the workspace in Settings \u203a Workspace \u203a General.',
           'Members lose access at once and open invitations stop working.',
           'A recovery screen shows the days left. Restore it, delete it for good, or start fresh.',
           'Deleting for good asks you to type the workspace name to confirm.',
@@ -180,7 +181,7 @@ export const guideSections = [
     title: 'Billing & Plans',
     summary: 'Your plan, its bot hours, and invoices.',
     steps: [
-      'Open Settings \u203a Workspace and press Plan and billing to see your plan, usage and invoices.',
+      'Open Settings \u203a Workspace \u203a Plan & billing to see your plan, usage and invoices.',
       'Every new workspace starts on Free, which includes 2 bot hours a month.',
       'Paid plans add more bot hours: Solo has 15 a month and Team has 75, shared by the workspace.',
       'When the bot hours run out, the bot will not join until they reset at the start of the next period, or you upgrade.',
@@ -699,7 +700,7 @@ export const guideSections = [
     title: 'Ecosystem Integration',
     summary: 'Connect Entomate with Pulse and Logos Vision for cross-app meeting sync and intelligence sharing.',
     steps: [
-      'Open Settings \u203a Connections and press Manage on Logos Vision and Pulse.',
+      'Open Settings \u203a Integrations and press Manage on Logos Vision and Pulse.',
       'Connect Pulse and/or Logos Vision by entering the API URL and service token.',
       'Click Test Connection to verify the link is working.',
       'Once connected, meeting recaps and action items sync automatically.',
@@ -749,7 +750,7 @@ export const guideSections = [
       },
     ],
     tips: [
-      'Press Test all in Settings \u203a Connections to catch issues early.',
+      'Press Test all in Settings \u203a Integrations to catch issues early.',
       'The event log is your best tool for diagnosing sync failures.',
     ],
   },
@@ -796,18 +797,18 @@ export const guideSections = [
   {
     id: 'settings',
     title: 'Settings',
-    summary: 'Six sections on one page: You, Appearance, Recording, Meeting agents, Connections and Workspace.',
+    summary: 'Settings groups Personal, Meetings & integrations, and Workspace.',
     steps: [
       'Open Settings from the toolbar, or press \u2318,.',
       'Type in Find a setting to jump straight to one.',
-      'The sections are numbered 01 to 06. Some parts open in a drawer.',
+      'On desktop, choose a section from the sidebar. On phones, choose a section from the directory to open it in a bottom sheet.',
     ],
     subsections: [
       {
         id: 'set-you',
-        title: '01 You',
+        title: 'Profile and notifications',
         steps: [
-          'Edit profile changes your name.',
+          'Open Profile to edit your display name. Choose Upload photo to add a photo, or use Replace photo or Remove photo, then choose Save profile.',
           'Overdue task emails: one email a morning listing tasks assigned to you that are past due.',
           'Browser alerts: desktop alerts from this browser when Entomate is not in front.',
           'Sign out.',
@@ -815,7 +816,7 @@ export const guideSections = [
       },
       {
         id: 'set-appearance',
-        title: '02 Appearance',
+        title: 'Appearance',
         steps: [
           'Theme: Light, Dark or System.',
           'Design style and palette for this browser.',
@@ -824,7 +825,7 @@ export const guideSections = [
       },
       {
         id: 'set-recording',
-        title: '03 Recording',
+        title: 'Recording',
         steps: [
           'Pick your microphone and allow it in the browser.',
           'Add meetings to Google Calendar after they are processed, with the summary.',
@@ -833,7 +834,7 @@ export const guideSections = [
       },
       {
         id: 'set-agents',
-        title: '04 Meeting agents',
+        title: 'Meeting agents',
         steps: [
           'Turn the Owner, Priority, Deadline and Follow-up agents on or off.',
           'Set how sure an agent must be before it applies a change.',
@@ -842,7 +843,7 @@ export const guideSections = [
       },
       {
         id: 'set-connections',
-        title: '05 Connections',
+        title: 'Integrations',
         steps: [
           'The status of each service: AI, database, Google Calendar, Logos Vision, Pulse and Slack.',
           'Press Test all to check them at once, or Set up / Manage on one.',
@@ -851,12 +852,12 @@ export const guideSections = [
       },
       {
         id: 'set-workspace',
-        title: '06 Workspace',
+        title: 'Workspace',
         steps: [
-          'Team: invite people, change roles, revoke invites and remove members.',
-          'Plan and billing.',
-          'Data and privacy: how long recordings are kept, and the consent rules the bot follows.',
-          'Archive the workspace (owners only).',
+          'People & access is where you invite people, change roles, revoke invites and remove members.',
+          'Plan & billing shows your subscription and usage.',
+          'Data & privacy sets how long recordings are kept and which consent rules the bot follows.',
+          'In General, owners and admins can archive the workspace. Owners can permanently delete it.',
         ],
       },
     ],
@@ -882,7 +883,7 @@ export const guideSections = [
     summary: 'Common issues, fixes, and frequently asked questions.',
     steps: [
       'Check this section when something does not work as expected.',
-      'Most issues can be found by pressing Test all in Settings \u203a Connections.',
+      'Most issues can be found by pressing Test all in Settings \u203a Integrations.',
     ],
     subsections: [
       {
@@ -899,7 +900,7 @@ export const guideSections = [
         id: 'ts-meetings',
         title: 'Meeting & Transcription Issues',
         steps: [
-          'Open Settings \u203a Connections and press Test all. AI must show Up.',
+          'Open Settings \u203a Integrations and press Test all. AI must show Up.',
           'Check that the microphone is Allowed in Settings \u203a Recording.',
           'If no action items appear, the meeting may not have a transcript yet. It shows Being written until it lands.',
           'If the bot did not record, the meeting page says why: for example it was not let in, or the bot hours ran out.',
@@ -939,14 +940,14 @@ export const guideSections = [
         title: 'Slack Issues',
         steps: [
           'Two-way Slack is on hold until each workspace can connect its own Slack.',
-          'Settings \u203a Connections shows its status.',
+          'Settings \u203a Integrations shows its status.',
         ],
       },
       {
         id: 'ts-notifications',
         title: 'Notification Issues',
         steps: [
-          'In Settings \u203a You, check Browser alerts says Allowed. If it is blocked, allow it in your browser\u2019s site settings.',
+          'In Settings \u203a Notifications, check that Browser alerts says Allowed. If it is blocked, allow it in your browser\u2019s site settings.',
           'Overdue task emails are on the same section.',
         ],
       },
@@ -989,7 +990,7 @@ export const guideSections = [
         steps: [
           'Each workspace only sees its own data, enforced by the database itself.',
           'All connections are encrypted.',
-          'Settings \u203a Workspace sets how long recordings are kept and the consent rules the bot follows.',
+          'Settings \u203a Workspace \u203a Data & privacy sets how long recordings are kept and the consent rules the bot follows.',
         ],
       },
       {
@@ -1017,12 +1018,12 @@ export const guideSections = [
         title: 'Can I change my plan later?',
         scenario: 'You want to upgrade, downgrade, or switch billing cycles.',
         steps: [
-          'Owners and admins can change it from Settings \u203a Workspace \u203a Plan and billing.',
+          'Owners and admins can change it from Settings \u203a Workspace \u203a Plan & billing.',
         ],
       },
     ],
     tips: [
-      'Most issues show up when you press Test all in Settings \u203a Connections.',
+      'Most issues show up when you press Test all in Settings \u203a Integrations.',
     ],
   },
 ]

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { authService } from '../services/authService'
 import { setMonitoringUser } from '../services/monitoring'
+import { getProfilePhotoUrls, PROFILE_PHOTO_REFRESH_MS } from '../services/profilePhotos'
 
 const AuthContext = createContext(undefined)
 
@@ -16,6 +17,38 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [uploadedPhoto, setUploadedPhoto] = useState(null)
+  const photoRevision = useRef(0)
+  const userId = user?.id
+  const ownPhoto = uploadedPhoto?.userId === userId ? uploadedPhoto : null
+  const profilePhotoUrl = ownPhoto?.url ?? (ownPhoto?.useInitials ? null : user?.avatar_url) ?? null
+  const hasUploadedProfilePhoto = ownPhoto ? !!ownPhoto.url : null
+
+  const setProfilePhotoUrl = useCallback((url) => {
+    // An older storage lookup must not overwrite a successful edit.
+    photoRevision.current += 1
+    setUploadedPhoto({ userId, url, useInitials: !url })
+  }, [userId])
+
+  useEffect(() => {
+    if (!userId) {
+      setUploadedPhoto(null)
+      return
+    }
+    let live = true
+    const load = async () => {
+      const revision = ++photoRevision.current
+      try {
+        const urls = await getProfilePhotoUrls([userId])
+        if (live && revision === photoRevision.current) {
+          setUploadedPhoto({ userId, url: urls[userId] ?? null })
+        }
+      } catch { /* the provider photo or initials remain available */ }
+    }
+    void load()
+    const timer = window.setInterval(load, PROFILE_PHOTO_REFRESH_MS)
+    return () => { live = false; window.clearInterval(timer) }
+  }, [userId])
 
   // Track user-initiated sign-out vs session expiry
   const isUserSignOut = useRef(false)
@@ -127,6 +160,9 @@ export const AuthProvider = ({ children }) => {
 
   const value = useMemo(() => ({
     user,
+    profilePhotoUrl,
+    hasUploadedProfilePhoto,
+    setProfilePhotoUrl,
     session,
     loading,
     isSignedIn: !!user,
@@ -137,7 +173,7 @@ export const AuthProvider = ({ children }) => {
     updatePassword,
     signOut,
     getToken
-  }), [user, session, loading, signIn, signInWithOAuth, signUp, resetPassword, updatePassword, signOut, getToken])
+  }), [user, profilePhotoUrl, hasUploadedProfilePhoto, setProfilePhotoUrl, session, loading, signIn, signInWithOAuth, signUp, resetPassword, updatePassword, signOut, getToken])
 
   return (
     <AuthContext.Provider value={value}>

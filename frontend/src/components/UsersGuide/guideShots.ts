@@ -99,7 +99,7 @@ export const GUIDE_SHOTS: Readonly<Record<string, GuideShot>> = {
     w: 1200, h: 857,
   },
   settings: {
-    caption: 'Settings keeps everything on one page, with a contents list on the right.',
+    caption: 'Settings brings together your account preferences, meeting setup and workspace administration.',
     alt: 'The Settings screen showing the You section with notifications and appearance, and an On this page list of sections.',
     w: 1200, h: 857,
   },
@@ -109,7 +109,7 @@ export const GUIDE_SHOTS: Readonly<Record<string, GuideShot>> = {
     w: 1200, h: 920,
   },
   organizations: {
-    caption: 'Workspace in Settings lists your team and roles, with Invite to add people.',
+    caption: 'Use People & access in Settings to view your team and invite people.',
     alt: 'The Workspace section of Settings showing the Quantum Ecosystems workspace, a Team list with Owner and Admin roles, and data and privacy options.',
     w: 1200, h: 902,
   },

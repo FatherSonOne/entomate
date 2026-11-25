@@ -1,47 +1,52 @@
-/**
- * Settings view logic (pure). Direction A "Ledger" from the Settings Slate pass (2026-11-22):
- * one page, six numbered sections (Appearance got its own on 2026-11-22), every control inline, drawers for the long detail.
- * URL state: ?s=<section> scrolls to a section, ?dr=<drawer> opens a drawer, ?q= filters.
- */
+/** Shared Settings navigation and URL compatibility. */
+export const SETTINGS_GROUPS = [
+  {
+    id: 'personal',
+    title: 'Personal',
+    sections: [
+      { id: 'profile', title: 'Profile', summary: 'Display name, photo and sign-in' },
+      { id: 'notifications', title: 'Notifications', summary: 'Overdue task emails and browser alerts' },
+      { id: 'appearance', title: 'Appearance', summary: 'Theme, motion and visual style' },
+    ],
+  },
+  {
+    id: 'meetings',
+    title: 'Meetings & integrations',
+    sections: [
+      { id: 'recording', title: 'Recording', summary: 'Microphone, calendar sync and bot auto-join' },
+      { id: 'agents', title: 'Meeting agents', summary: 'Agent rules and learned preferences' },
+      { id: 'connections', title: 'Integrations', summary: 'Calendar, connected services and system status' },
+    ],
+  },
+  {
+    id: 'workspace',
+    title: 'Workspace',
+    sections: [
+      { id: 'workspace', title: 'General', summary: 'Workspace details, archive and deletion' },
+      { id: 'people', title: 'People & access', summary: 'Members, roles and invitations' },
+      { id: 'billing', title: 'Plan & billing', summary: 'Subscription, usage and invoices' },
+      { id: 'privacy', title: 'Data & privacy', summary: 'Recording retention and consent' },
+    ],
+  },
+] as const
 
-export type SectionId = 'you' | 'appearance' | 'recording' | 'agents' | 'connections' | 'workspace'
-export type DrawerId = 'profile' | 'invite' | 'billing' | 'learning' | 'ecosystem' | 'slack' | 'calendar'
+type SettingsGroup = (typeof SETTINGS_GROUPS)[number]
+export type SectionId = SettingsGroup['sections'][number]['id']
+export type DrawerId = 'invite' | 'learning' | 'ecosystem' | 'slack' | 'calendar'
+type SectionDef = SettingsGroup['sections'][number]
 
-export interface SectionDef {
-  id: SectionId
-  number: string
-  title: string
-  summary: string
+export const SECTIONS = SETTINGS_GROUPS.flatMap<SectionDef>((group) => group.sections)
+const DRAWER_SECTIONS: Readonly<Record<DrawerId, SectionId>> = {
+  invite: 'people', learning: 'agents', ecosystem: 'connections', slack: 'connections', calendar: 'connections',
 }
 
-export const SECTIONS: ReadonlyArray<SectionDef> = [
-  { id: 'you', number: '01', title: 'You', summary: 'Profile, notifications' },
-  { id: 'appearance', number: '02', title: 'Appearance', summary: 'Theme, style, palette, logo and loading screen' },
-  { id: 'recording', number: '03', title: 'Recording', summary: 'Microphone, calendar, bot auto-join' },
-  { id: 'agents', number: '04', title: 'Meeting agents', summary: 'Which agents act, how sure they must be' },
-  { id: 'connections', number: '05', title: 'Connections', summary: 'Logos Vision, Pulse, calendar, bot, AI' },
-  { id: 'workspace', number: '06', title: 'Workspace', summary: 'Team, plan, data and privacy' },
-]
-
-const SECTION_IDS: ReadonlyArray<string> = SECTIONS.map((s) => s.id)
-const DRAWER_IDS: ReadonlyArray<string> = ['profile', 'invite', 'billing', 'learning', 'ecosystem', 'slack', 'calendar']
-
-export function isSectionId(v: string | null | undefined): v is SectionId {
-  return typeof v === 'string' && SECTION_IDS.includes(v)
-}
-export function isDrawerId(v: string | null | undefined): v is DrawerId {
-  return typeof v === 'string' && DRAWER_IDS.includes(v)
+export function isDrawerId(value: string | null): value is DrawerId {
+  return value !== null && Object.prototype.hasOwnProperty.call(DRAWER_SECTIONS, value)
 }
 
-/**
- * The old Settings had 13 tabs. Links into it (location.state.section, ?section=, the
- * profile menu, Today, the guide) still name those tabs. Map each to where it lives now.
- */
-export const LEGACY_SECTIONS: Readonly<Record<string, { section: SectionId; drawer?: DrawerId }>> = {
+const LEGACY_SECTIONS: Readonly<Record<string, { section: SectionId; drawer?: DrawerId }>> = {
+  you: { section: 'profile' },
   organization: { section: 'workspace' },
-  profile: { section: 'you' },
-  appearance: { section: 'appearance' },
-  notifications: { section: 'you' },
   audio: { section: 'recording' },
   permissions: { section: 'recording' },
   'auto-join': { section: 'recording' },
@@ -52,14 +57,14 @@ export const LEGACY_SECTIONS: Readonly<Record<string, { section: SectionId; draw
   integrations: { section: 'connections' },
   system: { section: 'connections' },
   about: { section: 'connections' },
-  'data-retention': { section: 'workspace' },
-  billing: { section: 'workspace', drawer: 'billing' },
-  team: { section: 'workspace' },
+  'data-retention': { section: 'privacy' },
+  team: { section: 'people' },
 }
 
 export function resolveSection(name: string | null | undefined): { section: SectionId; drawer?: DrawerId } | null {
-  if (!name) return null
-  if (isSectionId(name)) return { section: name }
+  const section = SECTIONS.find((entry) => entry.id === name)
+  if (section) return { section: section.id }
+  if (!name || !Object.prototype.hasOwnProperty.call(LEGACY_SECTIONS, name)) return null
   return LEGACY_SECTIONS[name] ?? null
 }
 
@@ -70,13 +75,19 @@ export interface UrlState {
 }
 
 export function readUrlState(params: URLSearchParams): UrlState {
-  const fromS = resolveSection(params.get('s') ?? params.get('section'))
-  const dr = params.get('dr')
+  const resolved = resolveSection(params.get('s') ?? params.get('section'))
+  const requestedDrawer = params.get('dr')
+  const drawer = isDrawerId(requestedDrawer) ? requestedDrawer : resolved?.drawer ?? null
+  const legacyPage = requestedDrawer === 'profile' || requestedDrawer === 'billing' ? requestedDrawer : null
   return {
-    section: fromS?.section ?? null,
-    drawer: isDrawerId(dr) ? dr : (fromS?.drawer ?? null),
+    section: legacyPage ?? (drawer ? DRAWER_SECTIONS[drawer] : resolved?.section ?? null),
+    drawer: legacyPage ? null : drawer,
     query: params.get('q') ?? '',
   }
+}
+
+export function sectionGroup(id: SectionId): SettingsGroup {
+  return SETTINGS_GROUPS.find((group) => group.sections.some((section) => section.id === id)) ?? SETTINGS_GROUPS[0]
 }
 
 /** Returns new params; keeps unrelated keys (e.g. ?connected=true from Google sign-in). */
@@ -98,13 +109,13 @@ export interface FindEntry {
 }
 
 export const FIND_INDEX: ReadonlyArray<FindEntry> = [
-  { label: 'Profile', section: 'you', drawer: 'profile', words: 'name email photo avatar account sign out' },
+  { label: 'Profile', section: 'profile', words: 'name email photo picture avatar account upload replace remove sign out' },
   { label: 'Theme', section: 'appearance', words: 'appearance light dark system mode' },
   { label: 'Reduce motion', section: 'appearance', words: 'appearance animation accessibility motion' },
   { label: 'Design style and palette', section: 'appearance', words: 'appearance style palette bench swiss void crimson orbital look' },
   { label: 'Logo and loading screen', section: 'appearance', words: 'appearance logo mark brand wordmark loading screen animation icon' },
-  { label: 'Overdue task emails', section: 'you', words: 'notifications email overdue reminders alerts' },
-  { label: 'Browser alerts', section: 'you', words: 'notifications push desktop permission' },
+  { label: 'Overdue task emails', section: 'notifications', words: 'notifications email overdue reminders alerts' },
+  { label: 'Browser alerts', section: 'notifications', words: 'notifications push desktop permission' },
   { label: 'Microphone', section: 'recording', words: 'mic audio input device permission record' },
   { label: 'Add meetings to Google Calendar', section: 'recording', words: 'calendar sync google auto-sync' },
   { label: 'Bot auto-join', section: 'recording', words: 'bot recall calendar join meet zoom teams connected calendars' },
@@ -115,10 +126,10 @@ export const FIND_INDEX: ReadonlyArray<FindEntry> = [
   { label: 'Slack', section: 'connections', drawer: 'slack', words: 'slack channel' },
   { label: 'Google Calendar', section: 'connections', drawer: 'calendar', words: 'connect switch account work personal oauth' },
   { label: 'System status', section: 'connections', words: 'health status database ai provider gemini openai test' },
-  { label: 'Team members', section: 'workspace', words: 'team members invite role admin owner remove people' },
-  { label: 'Plan and billing', section: 'workspace', drawer: 'billing', words: 'plan billing invoice stripe subscription upgrade' },
-  { label: 'Keep recordings for', section: 'workspace', words: 'retention data privacy days delete media' },
-  { label: 'Consent rules', section: 'workspace', words: 'consent gdpr two-party jurisdiction privacy' },
+  { label: 'Team members', section: 'people', words: 'team members invite role admin owner remove people' },
+  { label: 'Plan and billing', section: 'billing', words: 'plan billing invoice stripe subscription upgrade' },
+  { label: 'Keep recordings for', section: 'privacy', words: 'retention data privacy days delete media' },
+  { label: 'Consent rules', section: 'privacy', words: 'consent gdpr two-party jurisdiction privacy' },
   { label: 'Archive or delete workspace', section: 'workspace', words: 'danger archive delete organization' },
 ]
 
@@ -132,7 +143,7 @@ export function findSettings(query: string, index: ReadonlyArray<FindEntry> = FI
 }
 
 export function sectionDef(id: SectionId): SectionDef {
-  return SECTIONS.find((s) => s.id === id) ?? (SECTIONS[0] as SectionDef)
+  return SECTIONS.find((s) => s.id === id) ?? SETTINGS_GROUPS[0].sections[0]
 }
 
 export type ServiceState = 'up' | 'down' | 'unset' | 'hold' | 'unknown'
