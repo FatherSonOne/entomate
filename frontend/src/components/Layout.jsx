@@ -1,6 +1,6 @@
 import ProfileAvatar from './ProfileAvatar'
-import React, { Suspense, useState, useEffect, useCallback, useRef } from 'react'
-import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
+import React, { Suspense, useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react'
+import { Outlet, NavLink, matchPath, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
 import PageSkeleton from './PageSkeleton'
 import ErrorBoundary from './ErrorBoundary'
 import { BootMark } from './BootLoader'
@@ -14,6 +14,8 @@ import {
   Search,
   Settings,
   Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
   X,
   ChevronRight,
   Command,
@@ -43,12 +45,13 @@ import { requestVoiceOnOpen } from './EntoAssistant/voiceSignal'
 import EntoAssistantButton from './EntoAssistant/EntoAssistantButton'
 import EntoAIProactiveChecker from './EntoAssistant/EntoAIProactiveChecker'
 import { BenchShell } from './bench/shell/BenchShell'
-import { Drawer, Faceplate, Signal } from './bench'
+import { Drawer, Faceplate, Key, Signal } from './bench'
 import { MOTION, useEnterOnChange } from './bench/motion'
 import { settingsApi } from '../services/api'
 import '../styles/meeting-recorder.css'
 const EntoAssistant = React.lazy(() => import('./EntoAssistant/EntoAssistant'))
 const MeetingRecorder = React.lazy(() => import('./meetings/MeetingRecorder'))
+const RAIL_STORAGE_KEY = 'entomate-navrail-collapsed'
 
 // Grouped navigation structure — 4 sections
 // Items with adminOnly: true are filtered out at render time for non-admin
@@ -153,6 +156,13 @@ function getDocumentTitle(pathname) {
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [railCollapsed, setRailCollapsed] = useState(() => {
+    try { return localStorage.getItem(RAIL_STORAGE_KEY) === 'true' } catch { return false }
+  })
+  useEffect(() => {
+    try { localStorage.setItem(RAIL_STORAGE_KEY, String(railCollapsed)) } catch { /* storage unavailable */ }
+  }, [railCollapsed])
+  const toggleRail = () => setRailCollapsed((collapsed) => !collapsed)
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [shortcutsHelpOpen, setShortcutsHelpOpen] = useState(false)
   const [assistantOpen, setAssistantOpen] = useState(false)
@@ -195,6 +205,35 @@ export default function Layout() {
   const proactiveCount = proactiveSuggestion ? signals.total : 0
   const location = useLocation()
   const navigate = useNavigate()
+  const navigationType = useNavigationType()
+  const settingsOpen = Boolean(matchPath('/settings', location.pathname))
+  const previousPage = useRef(null)
+  const settingsReturn = useRef(null)
+  // Track Settings entries so Close can skip the section and drawer history.
+  useLayoutEffect(() => {
+    const previous = previousPage.current
+    previousPage.current = { location, settingsOpen }
+    if (!settingsOpen) return
+    const origin = settingsReturn.current
+    if (previous && !previous.settingsOpen) {
+      if (navigationType !== 'POP') window.scrollTo(0, 0)
+      if (navigationType === 'POP' && origin?.location.key === previous.location.key && origin.entries.includes(location.key)) return
+      settingsReturn.current = getBreadcrumb(previous.location.pathname)
+        ? { location: previous.location, entries: navigationType === 'PUSH' ? [location.key] : [] }
+        : null
+    } else if (origin && previous?.location.key !== location.key) {
+      const index = origin.entries.indexOf(previous?.location.key)
+      if (index < 0) return
+      if (navigationType === 'PUSH') origin.entries.splice(index + 1, origin.entries.length, location.key)
+      if (navigationType === 'REPLACE') origin.entries[index] = location.key
+    }
+  }, [location, navigationType, settingsOpen])
+  const closeSettings = () => {
+    const origin = settingsReturn.current
+    const index = origin?.entries.indexOf(location.key) ?? -1
+    if (index >= 0) navigate(-(index + 1))
+    else navigate(origin?.location ?? '/dashboard', { replace: true, state: origin?.location.state })
+  }
   const { isDark, toggleMode, setThemeMode, isHeldLight, isBenchSwiss, designStyle } = useTheme()
   const classicPageRef = useRef(null)
   useEnterOnChange(classicPageRef, location.pathname, { rise: 0, duration: MOTION.fast })
@@ -214,6 +253,7 @@ export default function Layout() {
 
   const isActive = (href) => location.pathname.startsWith(href)
   const breadcrumb = getBreadcrumb(location.pathname)
+  const goSettings = (section) => navigate('/settings', section ? { state: { section } } : undefined)
 
   // Global keyboard shortcuts
   useKeyboardShortcuts({
@@ -221,8 +261,12 @@ export default function Layout() {
     'mod+?': () => setShortcutsHelpOpen(true),
     'mod+/': () => setAssistantOpen(prev => !prev),
     'mod+m': openRecorder,
-    'mod+,': () => navigate('/settings'),
+    'mod+,': () => { if (!settingsOpen) goSettings() },
   }, !recorderOpen)
+
+  useEffect(() => {
+    if (settingsOpen) setSidebarOpen(false)
+  }, [settingsOpen])
 
   // Bookmarks and results in command search still use the existing recorder URL.
   useEffect(() => {
@@ -257,12 +301,22 @@ export default function Layout() {
   // The launcher's mic: open the panel if needed and ask it to start (or stop) listening.
   const voiceAssistant = () => { requestVoiceOnOpen(); if (!assistantOpen) toggleAssistant() }
 
+  const outletContext = isBenchSwiss || isActive('/meetings') ? shellOutlet : recorderOutlet
+  const page = (
+    <ErrorBoundary scope="page" resetKey={location.pathname}>
+      <Suspense fallback={<PageSkeleton />}>
+        <Outlet context={settingsOpen ? { ...shellOutlet, closeSettings } : outletContext} />
+        <BootMark stage="page" />
+      </Suspense>
+    </ErrorBoundary>
+  )
+
   // Overlays shared by both shells
   const overlays = (
     <>
       {/* Auto-join missed a calendar meeting: say so on every page (and re-check the calendar). */}
       {isAdmin && <MissedBotAlert />}
-      {!isBenchSwiss && <CommandPalette
+      {(!isBenchSwiss || settingsOpen) && <CommandPalette
         isOpen={commandPaletteOpen}
         isAdmin={isAdmin}
         onClose={() => setCommandPaletteOpen(false)}
@@ -302,9 +356,24 @@ export default function Layout() {
     </>
   )
 
+  if (settingsOpen) {
+    return (
+      <>
+        <div className="bs-app bs-tokens bs-settings-shell">
+          <header className="bs-settings-bar">
+            <Key autoFocus onClick={closeSettings} icon={<X size={16} aria-hidden="true" />}>Close Settings</Key>
+          </header>
+          <main className="bs-plate bs-settings-page">
+            {page}
+          </main>
+        </div>
+        {overlays}
+      </>
+    )
+  }
+
   /* ── Bench Swiss shell (default style) ── */
   if (isBenchSwiss) {
-    const goSettings = (section) => navigate('/settings', section ? { state: { section } } : undefined)
     const groups = [
       ...benchModules,
       { label: 'Tools', items: [
@@ -341,7 +410,8 @@ export default function Layout() {
           onRecord={openRecorder}
           recorderLabel={recorderLabel}
           onSettings={() => goSettings()}
-          settingsActive={isActive('/settings')}
+          railCollapsed={railCollapsed}
+          onToggleRail={toggleRail}
           menuItems={[
             { label: 'Profile', onSelect: () => goSettings('profile') },
             { label: 'Workspace and team', onSelect: () => goSettings('people') },
@@ -360,23 +430,14 @@ export default function Layout() {
             />
           }
         >
-          <Faceplate>
-            {/* Pages reach shell overlays through the outlet context (Today's Ask Entomate key). */}
-            {/* A page that breaks keeps the shell; navigating away clears it */}
-            <ErrorBoundary scope="page" resetKey={location.pathname}>
-              <Suspense fallback={<PageSkeleton />}>
-                <Outlet context={shellOutlet} />
-                <BootMark stage="page" />
-              </Suspense>
-            </ErrorBoundary>
-          </Faceplate>
+          <Faceplate>{page}</Faceplate>
         </BenchShell>
         {overlays}
       </>
     )
   }
 
-  return (
+  const appShell = (
     <div className="app-shell min-h-screen transition-colors duration-300 hover-glow trans-slow" data-shortcuts-held={shortcutsHeld || undefined}>
       {/* Ambient background — Held Light: static crimson bloom (CSS, no rAF).
           Legacy: the animated neural canvas. */}
@@ -394,9 +455,11 @@ export default function Layout() {
 
       {/* Sidebar */}
       <aside
+        id="classic-navrail"
+        aria-label="Main navigation"
         className={`nl-sidebar z-50 transform transition-transform duration-200 lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        } ${railCollapsed ? 'lg:!hidden' : ''}`}
         style={{ isolation: 'isolate' }}
       >
         <div className="flex flex-col h-full">
@@ -405,6 +468,8 @@ export default function Layout() {
           <div className="flex items-center justify-between" style={{ padding: '16px 14px 12px' }}>
             <Logo variant="mark" size="sm" withText={true} />
             <button
+              type="button"
+              aria-label="Close navigation"
               className="lg:hidden p-1 text-content-secondary hover:text-content-primary transition-colors"
               onClick={() => setSidebarOpen(false)}
             >
@@ -530,7 +595,7 @@ export default function Layout() {
       </aside>
 
       {/* Main content */}
-      <div className="lg:pl-64">
+      <div className={railCollapsed ? undefined : 'lg:pl-64'}>
         {/* Top bar */}
         <header
           className="vc-topbar"
@@ -544,10 +609,25 @@ export default function Layout() {
           }}
         >
           <button
+            type="button"
+            aria-label="Open navigation"
+            aria-controls="classic-navrail"
+            aria-expanded={sidebarOpen}
             className="p-2 -ml-2 text-content-secondary hover:text-content-primary lg:hidden"
             onClick={() => setSidebarOpen(true)}
           >
-            <Menu className="w-6 h-6" />
+            <Menu className="w-6 h-6" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            aria-label={railCollapsed ? 'Expand navigation' : 'Collapse navigation'}
+            title={railCollapsed ? 'Expand navigation' : 'Collapse navigation'}
+            aria-controls="classic-navrail"
+            aria-expanded={!railCollapsed}
+            className="hidden p-2 -ml-2 text-content-secondary hover:text-content-primary lg:inline-flex"
+            onClick={toggleRail}
+          >
+            {railCollapsed ? <PanelLeftOpen size={18} aria-hidden="true" /> : <PanelLeftClose size={18} aria-hidden="true" />}
           </button>
 
           {/* Breadcrumb */}
@@ -563,6 +643,12 @@ export default function Layout() {
 
           {/* Right side actions */}
           <div className="flex items-center gap-2">
+            {railCollapsed && (
+              <button type="button" className="hidden p-2 text-content-secondary hover:text-content-primary lg:inline-flex"
+                aria-label="Settings" title="Settings" onClick={() => goSettings()}>
+                <Settings size={18} aria-hidden="true" />
+              </button>
+            )}
             {/* Command palette trigger */}
             <button
               onClick={() => setCommandPaletteOpen(true)}
@@ -604,16 +690,10 @@ export default function Layout() {
 
         {/* Page content */}
         <main ref={designStyle === 'classic' ? classicPageRef : undefined} className="p-4 lg:p-6" style={{ position: 'relative', zIndex: 1 }}>
-          <ErrorBoundary scope="page" resetKey={location.pathname}>
-            <Suspense fallback={<PageSkeleton />}>
-              <Outlet context={isActive('/meetings') ? shellOutlet : recorderOutlet} />
-              <BootMark stage="page" />
-            </Suspense>
-          </ErrorBoundary>
+          {page}
         </main>
       </div>
-
-      {overlays}
     </div>
   )
+  return <>{appShell}{overlays}</>
 }

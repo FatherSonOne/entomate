@@ -436,6 +436,12 @@ html[data-motion="reduce"] :is(.bs-recbox, .bs-dock-rec) .animate-ripple { anima
 /* Main column: toolbar on the case, then the faceplate */
 .bs-main { padding: 12px 18px 18px 0; min-width: 0; display: flex; flex-direction: column; }
 
+.bs-app[data-rail-collapsed] { grid-template-columns: minmax(0, 1fr); }
+.bs-app[data-rail-collapsed] .bs-rail { display: none; }
+@media (min-width: 1024px) {
+  .bs-app[data-rail-collapsed] .bs-main { padding-left: 18px; }
+}
+
 .bs-tbar {
   display: flex;
   align-items: center;
@@ -1008,6 +1014,7 @@ html[data-motion="reduce"] :is(.bs-key, .bs-av) { transition-duration: 1ms !impo
 @media (max-width: 1023.98px) {
   .bs-app { grid-template-columns: minmax(0, 1fr); }
   .bs-rail { display: none; }
+  .bs-tbar .bs-tbar-desktop { display: none; }
   .bs-main { padding: 8px 10px calc(104px + env(safe-area-inset-bottom)); }
   .bs-tbar { height: 44px; margin: 0 2px 8px; gap: 8px; }
   .bs-tbar-stat { display: none; }
@@ -2661,6 +2668,24 @@ a.bs-proj-pt:focus-visible { outline: 2px solid var(--bs-brand); outline-offset:
 
 /* ── 17. Settings · Ledger (2026-11-22) ─────────────────────── */
 /* One page, five numbered sections, every control inline (pages/Settings.tsx). */
+.bs-settings-shell {
+  --bs-settings-bar-height: 56px;
+  display: block;
+  background: var(--bs-plate);
+}
+.bs-settings-bar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  height: var(--bs-settings-bar-height);
+  padding-inline: 32px;
+  background: var(--bs-plate);
+  border-bottom: 1px solid var(--bs-rule);
+}
+.bs-settings-page { border-radius: 0; box-shadow: none; }
 .bs-set { min-width: 0; }
 .bs-set-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 24px; align-items: center; padding: 13px 0; border-bottom: 1px solid var(--bs-rule2); }
 .bs-set-l { min-width: 0; }
@@ -2734,7 +2759,7 @@ a.bs-proj-pt:focus-visible { outline: 2px solid var(--bs-brand); outline-offset:
   align-items: start;
   margin-top: 24px;
 }
-.bs-set-nav { position: sticky; top: 12px; padding-right: 16px; border-right: 1px solid var(--bs-rule2); }
+.bs-set-nav { position: sticky; top: calc(var(--bs-settings-bar-height, 0px) + 12px); padding-right: 16px; border-right: 1px solid var(--bs-rule2); }
 .bs-set-nav-group + .bs-set-nav-group { margin-top: 20px; }
 .bs-set-nav-group h2 {
   margin: 0 0 5px;
@@ -2850,6 +2875,7 @@ a.bs-proj-pt:focus-visible { outline: 2px solid var(--bs-brand); outline-offset:
   .bs-bill-now { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 767.98px) {
+  .bs-settings-bar { padding-inline: 18px; }
   .bs-set-find { width: 100%; }
   .bs-set-row, .bs-set-danger { grid-template-columns: minmax(0, 1fr); gap: 10px; }
   .bs-set-row--tg { grid-template-columns: minmax(0, 1fr) auto; }
