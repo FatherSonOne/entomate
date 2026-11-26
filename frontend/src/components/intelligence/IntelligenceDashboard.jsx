@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
-import { RefreshCw, Settings } from 'lucide-react'
+import { Check, RefreshCw, Settings } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import api, { meetingsApi } from '../../services/api'
 import { Key } from '../bench'
@@ -54,11 +54,13 @@ export default function IntelligenceDashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [showCustomize, setShowCustomize] = useState(false)
+  const [preferencesSaved, setPreferencesSaved] = useState(false)
   const [quickAction, setQuickAction] = useState(null)
   const [brief, setBrief] = useState(null)
   const requestRef = useRef(null)
   const viewHeading = useRef(null)
   const customizeKey = useRef(null)
+  const saveConfirmation = useRef(null)
   const restoreCustomizeFocus = useRef(false)
 
   const loadIntelligence = useCallback(async () => {
@@ -94,14 +96,21 @@ export default function IntelligenceDashboard() {
     if (showCustomize || brief) viewHeading.current?.focus()
     else if (restoreCustomizeFocus.current) {
       restoreCustomizeFocus.current = false
-      customizeKey.current?.focus()
+      const target = saveConfirmation.current ?? customizeKey.current
+      target?.focus()
     }
   }, [showCustomize, brief])
 
   const savePreferences = (next) => {
-    try { localStorage.setItem(PREFS_KEY, JSON.stringify(next)) } catch { /* Apply for this visit. */ }
+    try {
+      localStorage.setItem(PREFS_KEY, JSON.stringify(next))
+    } catch {
+      return false
+    }
     setPreferences(next)
+    setPreferencesSaved(true)
     setShowCustomize(false)
+    return true
   }
 
   const handleMeetingAction = async (action, meeting) => {
@@ -177,9 +186,19 @@ export default function IntelligenceDashboard() {
         <div className="bs-briefings-keys">
           <Key size="sm" iconOnly icon={<RefreshCw aria-hidden="true" />} aria-label="Refresh briefings" title="Refresh briefings" disabled={loading} onClick={loadIntelligence} />
           <Key size="sm" iconOnly icon={<Settings aria-hidden="true" />} aria-label="Customize briefings" title="Customize briefings" ref={customizeKey}
-            onClick={() => { restoreCustomizeFocus.current = true; setShowCustomize(true) }} />
+            onClick={() => {
+              restoreCustomizeFocus.current = true
+              setPreferencesSaved(false)
+              setShowCustomize(true)
+            }} />
         </div>
       </div>
+
+      {preferencesSaved && (
+        <p className="bs-briefings-saved" ref={saveConfirmation} tabIndex={-1} role="status">
+          <Check size={16} aria-hidden="true" /> Preferences saved on this device.
+        </p>
+      )}
 
       {error && (
         <div className="bs-briefings-bar">
@@ -216,43 +235,50 @@ export default function IntelligenceDashboard() {
 function BriefingPreferences({ headingRef, preferences, onSave, onCancel }) {
   const hoursId = useId()
   const [draft, setDraft] = useState(preferences)
+  const [saveFailed, setSaveFailed] = useState(false)
   const updateRisk = (level, checked) => setDraft(current => ({
     ...current,
     dealRiskFilter: checked ? [...current.dealRiskFilter, level] : current.dealRiskFilter.filter(risk => risk !== level),
   }))
 
   return (
-    <form className="bs-briefings" onSubmit={event => {
+    <form className="bs-briefings-preferences" onSubmit={event => {
       event.preventDefault()
-      onSave({ ...draft, timeHorizon: { ...draft.timeHorizon, meetings: Number(draft.timeHorizon.meetings) } })
+      const saved = onSave({ ...draft, timeHorizon: { ...draft.timeHorizon, meetings: Number(draft.timeHorizon.meetings) } })
+      if (!saved) setSaveFailed(true)
     }}>
-      <h2 ref={headingRef} tabIndex={-1}>Briefing preferences</h2>
-      <fieldset>
-        <legend className="bs-lbl">Show cards</legend>
-        {CARD_OPTIONS.map(([name, label]) => (
-          <label key={name}>
-            <input type="checkbox" checked={draft[name]} onChange={event => setDraft({ ...draft, [name]: event.target.checked })} />
-            {label}
-          </label>
-        ))}
-      </fieldset>
-      <fieldset>
-        <legend className="bs-lbl">Deal risk levels</legend>
-        {RISK_LEVELS.map(level => (
-          <label key={level} className="capitalize">
-            <input type="checkbox" checked={draft.dealRiskFilter.includes(level)} onChange={event => updateRisk(level, event.target.checked)} />
-            {level}
-          </label>
-        ))}
-      </fieldset>
-      <div className="bs-briefings-hours">
-        <label htmlFor={hoursId}>Meetings (hours ahead)</label>
-        <input id={hoursId} className="bs-input" type="number" required min="1" max="168" value={draft.timeHorizon.meetings}
-          onChange={event => setDraft({ ...draft, timeHorizon: { ...draft.timeHorizon, meetings: event.target.value } })} />
+      <div className="bs-briefings bs-briefings-fields">
+        <h2 ref={headingRef} tabIndex={-1}>Briefing preferences</h2>
+        <fieldset>
+          <legend className="bs-lbl">Show cards</legend>
+          {CARD_OPTIONS.map(([name, label]) => (
+            <label key={name}>
+              <input type="checkbox" checked={draft[name]} onChange={event => setDraft({ ...draft, [name]: event.target.checked })} />
+              {label}
+            </label>
+          ))}
+        </fieldset>
+        <fieldset>
+          <legend className="bs-lbl">Deal risk levels</legend>
+          {RISK_LEVELS.map(level => (
+            <label key={level} className="capitalize">
+              <input type="checkbox" checked={draft.dealRiskFilter.includes(level)} onChange={event => updateRisk(level, event.target.checked)} />
+              {level}
+            </label>
+          ))}
+        </fieldset>
+        <div className="bs-briefings-hours">
+          <label htmlFor={hoursId}>Meetings (hours ahead)</label>
+          <input id={hoursId} className="bs-input" type="number" required min="1" max="168" value={draft.timeHorizon.meetings}
+            onChange={event => setDraft({ ...draft, timeHorizon: { ...draft.timeHorizon, meetings: event.target.value } })} />
+        </div>
       </div>
-      <div className="bs-briefings-keys">
-        <Key onClick={onCancel}>Cancel</Key>
-        <Key type="submit" variant="primary">Save preferences</Key>
+      <div className="bs-briefings-actions">
+        {saveFailed && <p role="alert">Couldn’t save preferences. Your changes are still here. Try again.</p>}
+        <div className="bs-briefings-keys">
+          <Key onClick={onCancel}>Cancel</Key>
+          <Key type="submit" variant="primary">Save preferences</Key>
+        </div>
       </div>
     </form>
   )

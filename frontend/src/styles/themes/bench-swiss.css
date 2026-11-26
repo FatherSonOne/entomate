@@ -1806,6 +1806,39 @@ a.bs-today-call-what:hover, .bs-today-link:hover, .bs-today-dec-src:hover { text
 .bs-briefings-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .bs-briefings-bar p { margin: 0; }
 .bs-briefings-keys { display: flex; justify-content: flex-end; gap: 8px; }
+.bs-briefings-saved {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--bs-mint);
+}
+.bs-drawer-body:has(.bs-briefings-preferences),
+.bs-drawer-body > .bs-skin:has(> .bs-briefings-preferences),
+.bs-briefings-preferences {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.bs-drawer-body:has(.bs-briefings-preferences) { overflow: hidden; }
+.bs-drawer-body > .bs-skin:has(> .bs-briefings-preferences),
+.bs-briefings-preferences { flex: 1; }
+.bs-briefings-fields {
+  flex: 1 1 auto;
+  min-height: 0;
+  align-content: start;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 14px 2px 16px;
+  margin-inline: -2px;
+}
+.bs-briefings-actions {
+  flex-shrink: 0;
+  border-top: 1px solid var(--bs-rule);
+  padding-top: 12px;
+}
+.bs-briefings-actions p { margin: 0 0 8px; color: var(--bs-brand); }
+.bs-briefings-actions .bs-briefings-keys { flex-wrap: wrap; }
 .bs-briefings-section { display: grid; gap: 8px; min-width: 0; }
 .bs-briefings-empty { padding: 16px 0; border-block: 1px solid var(--bs-rule); color: var(--bs-muted); }
 .bs-briefings fieldset { display: grid; gap: 8px; padding: 8px 0 0; }
