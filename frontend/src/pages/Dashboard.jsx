@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useOutletContext } from 'react-router-dom'
+import { ChevronRight } from 'lucide-react'
 import IntelligenceDashboard from '../components/intelligence/IntelligenceDashboard'
 import CarryForward from '../components/meetings/CarryForward'
 import { meetingsApi, tasksApi, dashboardApi, calendarApi, settingsApi } from '../services/api'
@@ -285,6 +286,15 @@ export default function Today() {
   ]
 
   // ── Action items table ──────────────────────────────────────
+  const itemOwner = (item) => item.assigned_to_name || <span className="bs-mut">Unassigned</span>
+  const itemDue = (item) => {
+    const due = parseDay(item.due_date)
+    return due ? dayLabel(due, now) : <span className="bs-mut">No date</span>
+  }
+  const itemPriority = (item) => {
+    const priority = priorityTone(item.priority)
+    return <Signal tone={priority.tone}>{priority.word}</Signal>
+  }
   const columns = [
     {
       key: 'done',
@@ -305,33 +315,42 @@ export default function Today() {
       key: 'item',
       header: 'Item',
       render: (item) => {
+        const title = itemTitle(item)
         const why = agentWhy(item)
         return (
           <div className="bs-today-item">
-            <div className="bs-today-item-title">{itemTitle(item)}</div>
-            {why && <div className="bs-why"><Led tone="ai" />{why.reason}</div>}
+            <div className="bs-today-item-title">{title}</div>
             {item.meetings?.title && <div className="bs-today-item-src">{item.meetings.title}</div>}
+            <dl className="bs-today-item-meta">
+              <div><dt>Owner</dt><dd>{itemOwner(item)}</dd></div>
+              <div><dt>Due</dt><dd>{itemDue(item)}</dd></div>
+              <div><dt>Priority</dt><dd>{itemPriority(item)}</dd></div>
+            </dl>
+            {why && (
+              <details className="bs-today-item-why">
+                <summary aria-label={`AI explanation for ${title}`}>
+                  <ChevronRight size={14} aria-hidden="true" /> AI explanation
+                </summary>
+                <p>{why.reason}</p>
+              </details>
+            )}
           </div>
         )
       },
     },
-    { key: 'owner', header: 'Owner', secondary: true, render: (item) => item.assigned_to_name || <span className="bs-mut">—</span> },
+    { key: 'owner', header: 'Owner', secondary: true, render: itemOwner },
     {
       key: 'due',
       header: 'Due',
+      secondary: true,
       className: 'bs-mono bs-today-due',
-      render: (item) => {
-        const d = parseDay(item.due_date)
-        return d ? dayLabel(d, now) : <span className="bs-mut">—</span>
-      },
+      render: itemDue,
     },
     {
       key: 'pri',
       header: 'Priority',
-      render: (item) => {
-        const p = priorityTone(item.priority)
-        return <Signal tone={p.tone}>{p.word}</Signal>
-      },
+      secondary: true,
+      render: itemPriority,
     },
     {
       key: 'agent',

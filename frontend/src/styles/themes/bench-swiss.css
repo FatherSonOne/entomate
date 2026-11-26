@@ -1773,6 +1773,31 @@ html[data-motion="reduce"] :is(.bs-tabs [role="tab"]::after, .bs-tape-head) { tr
 .bs-today-item { min-width: 0; }
 .bs-today-item-title { font-weight: 600; color: var(--bs-ink); overflow-wrap: anywhere; }
 .bs-today-item-src { margin-top: 3px; font-size: 12px; color: var(--bs-muted); overflow-wrap: anywhere; }
+.bs-today-item-meta { display: none; flex-wrap: wrap; gap: 4px 14px; margin: 6px 0 0; }
+.bs-today-item-meta > div { min-width: 0; }
+.bs-today-item-meta dt { font: 500 10px var(--bs-mono); text-transform: uppercase; letter-spacing: 0.08em; color: var(--bs-muted); }
+.bs-today-item-meta dd { margin: 1px 0 0; font-size: 12px; color: var(--bs-ink2); overflow-wrap: anywhere; }
+.bs-today-item-why { margin-top: 2px; }
+.bs-today-item-why summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  color: var(--bs-ai);
+  font-size: 12px;
+  font-weight: 600;
+  list-style: none;
+  cursor: pointer;
+}
+.bs-today-item-why summary::-webkit-details-marker { display: none; }
+.bs-today-item-why[open] summary svg { transform: rotate(90deg); }
+.bs-today-item-why p { margin: 0 0 4px; color: var(--bs-ink2); font-size: 12px; line-height: 1.55; overflow-wrap: anywhere; cursor: text; }
+@media (max-width: 767.98px) {
+  .bs-today-item-meta { display: flex; }
+}
+@container (max-width: 520px) {
+  .bs-today-item-meta { display: flex; }
+}
 .bs-today .bs-tbl td.bs-today-due { font-size: 12px; white-space: nowrap; }
 .bs-today-foot { display: flex; justify-content: flex-end; padding-top: 14px; }
 .bs-today-empty { margin: 14px 0 0; font-size: 13.5px; line-height: 1.55; color: var(--bs-muted); }

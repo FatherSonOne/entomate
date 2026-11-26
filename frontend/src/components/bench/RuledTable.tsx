@@ -36,10 +36,10 @@ export interface RuledTableProps<Row> {
   empty?: React.ReactNode
 }
 
-/** Clicks and keys on a link, key or field inside a row belong to that control, not the row. */
+/** Interactive content inside a row handles its own clicks and keys. */
 function fromControl(e: React.SyntheticEvent): boolean {
   const target = e.target as HTMLElement
-  return Boolean(target.closest('a, button, input, select, textarea, label')) && target !== e.currentTarget
+  return Boolean(target.closest('a, button, input, select, textarea, label, details')) && target !== e.currentTarget
 }
 
 /** Ruled table: mono caps headers, no row numbers, hairline rows. */
