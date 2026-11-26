@@ -528,11 +528,13 @@
 .app-layout { display: grid; --app-rail-width: 16rem; }
 .app-layout[data-bench] { --app-rail-width: 248px; }
 .app-layout-view, .app-layout-settings { grid-area: 1 / 1; min-width: 0; align-self: start; }
-/* Keep the rail visible during the slide while Settings owns the page. */
-.app-layout-view[inert] { z-index: 0; }
+/* Settings and its exit layer sit above the app toolbar while the rail moves. */
+.app-layout-view[inert],
+.app-layout:has(.app-layout-settings-exit:not([hidden])) > .app-layout-view { z-index: 0; }
 .app-layout-view[inert] :is(.bs-main, .bs-dock, .nl-main) { visibility: hidden; }
 .app-layout-settings { z-index: 1; pointer-events: none; }
 .app-layout-settings > .bs-settings-shell { pointer-events: auto; }
+.app-layout-settings-exit { position: fixed; inset: 0; overflow: hidden; }
 
 @media (min-width: 1024px) {
   .app-layout-settings { margin-left: var(--app-rail-width); transition: margin-left var(--m-navrail); }

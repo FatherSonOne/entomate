@@ -46,12 +46,13 @@ import EntoAssistantButton from './EntoAssistant/EntoAssistantButton'
 import EntoAIProactiveChecker from './EntoAssistant/EntoAIProactiveChecker'
 import { BenchShell } from './bench/shell/BenchShell'
 import { Drawer, Faceplate, Key, Signal, useMediaQuery } from './bench'
-import { MOTION, useEnterOnChange } from './bench/motion'
+import { MOTION, prefersReducedMotion, useEnterOnChange } from './bench/motion'
 import { settingsApi } from '../services/api'
 import '../styles/meeting-recorder.css'
 const EntoAssistant = React.lazy(() => import('./EntoAssistant/EntoAssistant'))
 const MeetingRecorder = React.lazy(() => import('./meetings/MeetingRecorder'))
 const RAIL_STORAGE_KEY = 'entomate-navrail-collapsed'
+const DESKTOP_QUERY = '(min-width: 1024px)'
 
 // Grouped navigation structure — 4 sections
 // Items with adminOnly: true are filtered out at render time for non-admin
@@ -154,9 +155,57 @@ function getDocumentTitle(pathname) {
   return crumb ? `${crumb} · Entomate` : 'Entomate'
 }
 
+function SettingsPane({ exitRef, onClose, children }) {
+  const paneRef = useRef(null)
+  const scrollRef = useRef(0)
+
+  useLayoutEffect(() => {
+    const pane = paneRef.current
+    const exit = exitRef.current
+    if (!pane || !exit) return
+
+    const clearExit = () => {
+      exit.hidden = true
+      exit.replaceChildren()
+    }
+    exit.getAnimations?.().forEach((animation) => animation.cancel())
+    clearExit()
+
+    const rememberScroll = () => { scrollRef.current = window.scrollY }
+    rememberScroll()
+    window.addEventListener('scroll', rememberScroll, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', rememberScroll)
+      if (!exit.isConnected || !window.matchMedia?.(DESKTOP_QUERY).matches ||
+          prefersReducedMotion() || typeof exit.animate !== 'function') return
+
+      // Keep a visual copy for the slide while the router unmounts the Settings page.
+      exit.append(pane.cloneNode(true))
+      exit.hidden = false
+      exit.scrollTop = scrollRef.current
+      const animation = exit.animate(
+        [{ transform: 'translateX(0)' }, { transform: 'translateX(100%)' }],
+        { duration: MOTION.navrail, easing: MOTION.easeInOut, fill: 'both' },
+      )
+      animation.onfinish = () => { clearExit(); animation.cancel() }
+    }
+  }, [exitRef])
+
+  return (
+    <div className="bs-app bs-tokens bs-settings-shell" ref={paneRef}>
+      <header className="bs-settings-bar">
+        <Key autoFocus onClick={() => { scrollRef.current = window.scrollY; onClose() }}
+          icon={<X size={16} aria-hidden="true" />}>Close Settings</Key>
+      </header>
+      <main className="bs-plate bs-settings-page">{children}</main>
+    </div>
+  )
+}
+
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const isDesktop = useMediaQuery('(min-width: 1024px)')
+  const isDesktop = useMediaQuery(DESKTOP_QUERY)
+  const settingsExitRef = useRef(null)
   const [railCollapsed, setRailCollapsed] = useState(() => {
     try { return localStorage.getItem(RAIL_STORAGE_KEY) === 'true' } catch { return false }
   })
@@ -686,15 +735,9 @@ export default function Layout() {
           {appShell}
         </div>
         <div className="app-layout-settings">
+          <div className="app-layout-settings-exit" ref={settingsExitRef} inert="" aria-hidden="true" hidden />
           {settingsOpen && (
-            <div className="bs-app bs-tokens bs-settings-shell">
-              <header className="bs-settings-bar">
-                <Key autoFocus onClick={closeSettings} icon={<X size={16} aria-hidden="true" />}>Close Settings</Key>
-              </header>
-              <main className="bs-plate bs-settings-page">
-                {page}
-              </main>
-            </div>
+            <SettingsPane exitRef={settingsExitRef} onClose={closeSettings}>{page}</SettingsPane>
           )}
         </div>
       </div>

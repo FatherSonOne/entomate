@@ -13,6 +13,7 @@ export const MOTION = {
   slow: 300,
   exit: 160,
   spring: 460,
+  navrail: 260,
   easeOut: 'cubic-bezier(0.23, 1, 0.32, 1)',
   easeInOut: 'cubic-bezier(0.77, 0, 0.175, 1)',
 } as const
