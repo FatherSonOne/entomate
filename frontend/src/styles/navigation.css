@@ -48,6 +48,7 @@
   display: flex;
   flex-direction: column;
   z-index: 50;
+  transition: transform var(--m-navrail), visibility 0s;
 
   /* Neo+Cinema surface */
   background: var(--neo-base, #141414);
@@ -524,13 +525,24 @@
 /* ═══════════════════════════════════════════════
    RESPONSIVE
    ═══════════════════════════════════════════════ */
-@media (max-width: 1023px) {
+@media (min-width: 1024px) {
+  .nl-main { padding-left: 16rem; transition: padding-left var(--m-navrail); }
+  .app-shell[data-rail-collapsed] .nl-main { padding-left: 0; }
+  .app-shell[data-rail-collapsed] .nl-sidebar {
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition-delay: 0s, var(--m-navrail-duration);
+  }
+}
+
+@media (max-width: 1023.98px) {
   .nl-sidebar {
     transform: translateX(-100%);
-    transition: transform 220ms cubic-bezier(.4,0,.2,1);
+    visibility: hidden;
+    transition-delay: 0s, var(--m-navrail-duration);
     box-shadow: 8px 0 40px rgba(0,0,0,.7), 0 0 60px rgba(255,45,107,.06);
   }
-  .nl-sidebar.open { transform: translateX(0); }
+  .nl-sidebar.open { transform: translateX(0); visibility: visible; transition-delay: 0s; }
 }
 
 @media (max-height: 700px) {

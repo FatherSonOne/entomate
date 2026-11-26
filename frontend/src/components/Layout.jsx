@@ -45,7 +45,7 @@ import { requestVoiceOnOpen } from './EntoAssistant/voiceSignal'
 import EntoAssistantButton from './EntoAssistant/EntoAssistantButton'
 import EntoAIProactiveChecker from './EntoAssistant/EntoAIProactiveChecker'
 import { BenchShell } from './bench/shell/BenchShell'
-import { Drawer, Faceplate, Key, Signal } from './bench'
+import { Drawer, Faceplate, Key, Signal, useMediaQuery } from './bench'
 import { MOTION, useEnterOnChange } from './bench/motion'
 import { settingsApi } from '../services/api'
 import '../styles/meeting-recorder.css'
@@ -156,6 +156,7 @@ function getDocumentTitle(pathname) {
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const isDesktop = useMediaQuery('(min-width: 1024px)')
   const [railCollapsed, setRailCollapsed] = useState(() => {
     try { return localStorage.getItem(RAIL_STORAGE_KEY) === 'true' } catch { return false }
   })
@@ -438,7 +439,8 @@ export default function Layout() {
   }
 
   const appShell = (
-    <div className="app-shell min-h-screen transition-colors duration-300 hover-glow trans-slow" data-shortcuts-held={shortcutsHeld || undefined}>
+    <div className="app-shell min-h-screen transition-colors duration-300 hover-glow trans-slow"
+      data-rail-collapsed={railCollapsed || undefined} data-shortcuts-held={shortcutsHeld || undefined}>
       {/* Ambient background — Held Light: static crimson bloom (CSS, no rAF).
           Legacy: the animated neural canvas. */}
       {isHeldLight
@@ -457,9 +459,8 @@ export default function Layout() {
       <aside
         id="classic-navrail"
         aria-label="Main navigation"
-        className={`nl-sidebar z-50 transform transition-transform duration-200 lg:translate-x-0 ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        } ${railCollapsed ? 'lg:!hidden' : ''}`}
+        className={sidebarOpen ? 'nl-sidebar open' : 'nl-sidebar'}
+        ref={(el) => { if (el) el.inert = isDesktop ? railCollapsed : !sidebarOpen }}
         style={{ isolation: 'isolate' }}
       >
         <div className="flex flex-col h-full">
@@ -595,7 +596,7 @@ export default function Layout() {
       </aside>
 
       {/* Main content */}
-      <div className={railCollapsed ? undefined : 'lg:pl-64'}>
+      <div className="nl-main">
         {/* Top bar */}
         <header
           className="vc-topbar"

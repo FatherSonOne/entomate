@@ -284,6 +284,7 @@ html[data-style="bench-swiss"] :focus-visible { outline: 2px solid var(--bs-bran
 /* ── 4. Shell: case, rail, toolbar, faceplate, dock ─────────── */
 
 .bs-app {
+  --bs-rail-width: 248px;
   min-height: 100vh;
   min-height: 100dvh;
   background: var(--bs-case);
@@ -294,7 +295,7 @@ html[data-style="bench-swiss"] :focus-visible { outline: 2px solid var(--bs-bran
   font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
   display: grid;
-  grid-template-columns: 248px minmax(0, 1fr);
+  grid-template-columns: var(--bs-rail-width) minmax(0, 1fr);
   overflow-x: clip;
 }
 
@@ -302,6 +303,8 @@ html[data-style="bench-swiss"] :focus-visible { outline: 2px solid var(--bs-bran
 .bs-rail {
   position: sticky;
   top: 0;
+  width: var(--bs-rail-width);
+  justify-self: end;
   height: 100vh;
   height: 100dvh;
   padding: 12px 16px 18px 22px;
@@ -436,9 +439,11 @@ html[data-motion="reduce"] :is(.bs-recbox, .bs-dock-rec) .animate-ripple { anima
 /* Main column: toolbar on the case, then the faceplate */
 .bs-main { padding: 12px 18px 18px 0; min-width: 0; display: flex; flex-direction: column; }
 
-.bs-app[data-rail-collapsed] { grid-template-columns: minmax(0, 1fr); }
-.bs-app[data-rail-collapsed] .bs-rail { display: none; }
 @media (min-width: 1024px) {
+  /* The rail stays full width and follows the moving end of its grid track. */
+  .bs-app { transition: grid-template-columns var(--m-navrail); }
+  .bs-main { transition: padding-left var(--m-navrail); }
+  .bs-app[data-rail-collapsed] { grid-template-columns: 0px minmax(0, 1fr); }
   .bs-app[data-rail-collapsed] .bs-main { padding-left: 18px; }
 }
 
