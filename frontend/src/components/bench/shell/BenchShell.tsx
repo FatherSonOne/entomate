@@ -486,15 +486,17 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
       </nav>
 
       {/* Phone: full nav as a sheet */}
-      <Drawer open={navOpen && !settingsOpen} onClose={() => setNavOpen(false)} label="All modules" hideEscHint>
-        <nav className="bs-navsheet bs-patch" aria-label="All modules">
-          <PatchPanel groups={groups} isActive={isActive} onNavigate={() => setNavOpen(false)} />
-          <div role="group" aria-label="Account">
-            <div className="bs-lbl" aria-hidden="true">Account</div>
-            <PatchRow item={{ no: '00', name: 'Settings', href: '/settings' }} active={false} onNavigate={() => setNavOpen(false)} />
-          </div>
-        </nav>
-      </Drawer>
+      {!settingsOpen && (
+        <Drawer open={navOpen} onClose={() => setNavOpen(false)} label="All modules" hideEscHint>
+          <nav className="bs-navsheet bs-patch" aria-label="All modules">
+            <PatchPanel groups={groups} isActive={isActive} onNavigate={() => setNavOpen(false)} />
+            <div role="group" aria-label="Account">
+              <div className="bs-lbl" aria-hidden="true">Account</div>
+              <PatchRow item={{ no: '00', name: 'Settings', href: '/settings' }} active={false} onNavigate={() => setNavOpen(false)} />
+            </div>
+          </nav>
+        </Drawer>
+      )}
     </div>
   )
 }
