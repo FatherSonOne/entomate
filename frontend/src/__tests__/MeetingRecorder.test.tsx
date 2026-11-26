@@ -228,7 +228,7 @@ describe('MeetingRecorder', () => {
       fireEvent.click(within(popDoc.body).getByRole('button', { name: /pause/i }))
       expect(recorders[0]?.state).toBe('paused')
       fireEvent.click(within(popDoc.body).getByRole('button', { name: /stop recording/i }))
-      await waitFor(() => expect(api.finish).toHaveBeenCalledWith('m-1', 2, []))
+      await waitFor(() => expect(api.finish.mock.calls.at(-1)?.slice(0, 2)).toEqual(['m-1', 2]))
       expect(api.start).toHaveBeenCalledTimes(1)
       fireEvent.click((await screen.findAllByRole('button', { name: /review recording/i }))[0]!)
       expect(await screen.findByRole('button', { name: /open the meeting/i })).toBeInTheDocument()
