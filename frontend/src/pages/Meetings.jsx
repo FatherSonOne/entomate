@@ -476,7 +476,7 @@ export default function Meetings({ upcoming = false }) {
       </div>
 
       {selectionMode && (
-        <div className="bs-bulk-actions" role="toolbar" aria-label="Bulk actions">
+        <div className="bs-meeting-bulk-actions" role="toolbar" aria-label="Bulk actions">
           <Key onClick={toggleSelectAll}>{allSelected ? 'Clear all' : 'Select all'}</Key>
           <Key onClick={handleBulkExport} disabled={selectedIds.size === 0}>Export {selectedIds.size}</Key>
           <Key variant="danger" onClick={handleBulkDelete} disabled={selectedIds.size === 0}>Delete {selectedIds.size}</Key>
