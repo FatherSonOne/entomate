@@ -208,6 +208,7 @@ export default function Layout() {
   const navigate = useNavigate()
   const navigationType = useNavigationType()
   const settingsOpen = Boolean(matchPath('/settings', location.pathname))
+  const appRailCollapsed = railCollapsed || settingsOpen
   const previousPage = useRef(null)
   const settingsReturn = useRef(null)
   // Track Settings entries so Close can skip the section and drawer history.
@@ -357,24 +358,8 @@ export default function Layout() {
     </>
   )
 
-  if (settingsOpen) {
-    return (
-      <>
-        <div className="bs-app bs-tokens bs-settings-shell">
-          <header className="bs-settings-bar">
-            <Key autoFocus onClick={closeSettings} icon={<X size={16} aria-hidden="true" />}>Close Settings</Key>
-          </header>
-          <main className="bs-plate bs-settings-page">
-            {page}
-          </main>
-        </div>
-        {overlays}
-      </>
-    )
-  }
-
   /* ── Bench Swiss shell (default style) ── */
-  if (isBenchSwiss) {
+  const renderBenchShell = () => {
     const groups = [
       ...benchModules,
       { label: 'Tools', items: [
@@ -396,59 +381,57 @@ export default function Layout() {
       settingsApi.updateUser({ theme_mode: next }).catch(() => { /* saved locally; DB sync is best-effort */ })
     }
     return (
-      <>
-        <BenchShell
-          groups={groups}
-          isActive={isActive}
-          user={shellUser}
-          isDark={isDark}
-          onThemeChange={changeTheme}
-          onSearch={() => setCommandPaletteOpen(true)}
-          shortcutsHeld={shortcutsHeld}
-          commandSearch={<CommandPalette toolbar isOpen={commandPaletteOpen} isAdmin={isAdmin}
-            onOpen={() => setCommandPaletteOpen(true)} onClose={() => setCommandPaletteOpen(false)}
-            onShowShortcuts={() => { setCommandPaletteOpen(false); setShortcutsHelpOpen(true) }} />}
-          onRecord={openRecorder}
-          recorderLabel={recorderLabel}
-          onSettings={() => goSettings()}
-          railCollapsed={railCollapsed}
-          onToggleRail={toggleRail}
-          menuItems={[
-            { label: 'Profile', onSelect: () => goSettings('profile') },
-            { label: 'Workspace and team', onSelect: () => goSettings('people') },
-            { label: 'Connected calendars', onSelect: () => goSettings('recording') },
-            { label: 'Keyboard shortcuts', onSelect: () => setShortcutsHelpOpen(true), kbd: '?' },
-          ]}
-          onSignOut={handleSignOut}
-          modKey={getModKey()}
-          dock={benchDock}
-          assistant={
-            <EntoAssistantButton
-              onClick={toggleAssistant}
-              onVoice={voiceAssistant}
-              isOpen={assistantOpen}
-              proactiveCount={proactiveCount}
-            />
-          }
-        >
-          <Faceplate>{page}</Faceplate>
-        </BenchShell>
-        {overlays}
-      </>
+      <BenchShell
+        groups={groups}
+        isActive={isActive}
+        user={shellUser}
+        isDark={isDark}
+        onThemeChange={changeTheme}
+        onSearch={() => setCommandPaletteOpen(true)}
+        shortcutsHeld={shortcutsHeld}
+        commandSearch={<CommandPalette toolbar isOpen={!settingsOpen && commandPaletteOpen} isAdmin={isAdmin}
+          onOpen={() => setCommandPaletteOpen(true)} onClose={() => setCommandPaletteOpen(false)}
+          onShowShortcuts={() => { setCommandPaletteOpen(false); setShortcutsHelpOpen(true) }} />}
+        onRecord={openRecorder}
+        recorderLabel={recorderLabel}
+        onSettings={() => goSettings()}
+        railCollapsed={appRailCollapsed}
+        settingsOpen={settingsOpen}
+        onToggleRail={toggleRail}
+        menuItems={[
+          { label: 'Profile', onSelect: () => goSettings('profile') },
+          { label: 'Workspace and team', onSelect: () => goSettings('people') },
+          { label: 'Connected calendars', onSelect: () => goSettings('recording') },
+          { label: 'Keyboard shortcuts', onSelect: () => setShortcutsHelpOpen(true), kbd: '?' },
+        ]}
+        onSignOut={handleSignOut}
+        modKey={getModKey()}
+        dock={benchDock}
+        assistant={
+          <EntoAssistantButton
+            onClick={toggleAssistant}
+            onVoice={voiceAssistant}
+            isOpen={assistantOpen}
+            proactiveCount={proactiveCount}
+          />
+        }
+      >
+        {!settingsOpen && <Faceplate>{page}</Faceplate>}
+      </BenchShell>
     )
   }
 
-  const appShell = (
+  const appShell = isBenchSwiss ? renderBenchShell() : (
     <div className="app-shell min-h-screen transition-colors duration-300 hover-glow trans-slow"
-      data-rail-collapsed={railCollapsed || undefined} data-shortcuts-held={shortcutsHeld || undefined}>
+      data-rail-collapsed={appRailCollapsed || undefined} data-shortcuts-held={shortcutsHeld || undefined}>
       {/* Ambient background — Held Light: static crimson bloom (CSS, no rAF).
           Legacy: the animated neural canvas. */}
-      {isHeldLight
+      {!settingsOpen && (isHeldLight
         ? <div className="hl-bg" aria-hidden="true" />
-        : <VCCanvas mode="neural" speed={50} density={95} opacity={0.9} />}
+        : <VCCanvas mode="neural" speed={50} density={95} opacity={0.9} />)}
 
       {/* Mobile sidebar backdrop */}
-      {sidebarOpen && (
+      {sidebarOpen && !settingsOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
@@ -460,7 +443,7 @@ export default function Layout() {
         id="classic-navrail"
         aria-label="Main navigation"
         className={sidebarOpen ? 'nl-sidebar open' : 'nl-sidebar'}
-        ref={(el) => { if (el) el.inert = isDesktop ? railCollapsed : !sidebarOpen }}
+        ref={(el) => { if (el) el.inert = isDesktop ? appRailCollapsed : !sidebarOpen }}
         style={{ isolation: 'isolate' }}
       >
         <div className="flex flex-col h-full">
@@ -691,10 +674,31 @@ export default function Layout() {
 
         {/* Page content */}
         <main ref={designStyle === 'classic' ? classicPageRef : undefined} className="p-4 lg:p-6" style={{ position: 'relative', zIndex: 1 }}>
-          {page}
+          {!settingsOpen && page}
         </main>
       </div>
     </div>
   )
-  return <>{appShell}{overlays}</>
+  return (
+    <>
+      <div className="app-layout" data-bench={isBenchSwiss || undefined} data-rail-collapsed={appRailCollapsed || undefined}>
+        <div className="app-layout-view" ref={(el) => { if (el) el.inert = settingsOpen }}>
+          {appShell}
+        </div>
+        <div className="app-layout-settings">
+          {settingsOpen && (
+            <div className="bs-app bs-tokens bs-settings-shell">
+              <header className="bs-settings-bar">
+                <Key autoFocus onClick={closeSettings} icon={<X size={16} aria-hidden="true" />}>Close Settings</Key>
+              </header>
+              <main className="bs-plate bs-settings-page">
+                {page}
+              </main>
+            </div>
+          )}
+        </div>
+      </div>
+      {overlays}
+    </>
+  )
 }
