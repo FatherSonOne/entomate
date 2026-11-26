@@ -284,7 +284,6 @@ html[data-style="bench-swiss"] :focus-visible { outline: 2px solid var(--bs-bran
 /* ── 4. Shell: case, rail, toolbar, faceplate, dock ─────────── */
 
 .bs-app {
-  --bs-rail-width: 248px;
   min-height: 100vh;
   min-height: 100dvh;
   background: var(--bs-case);
@@ -295,7 +294,7 @@ html[data-style="bench-swiss"] :focus-visible { outline: 2px solid var(--bs-bran
   font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
   display: grid;
-  grid-template-columns: var(--bs-rail-width) minmax(0, 1fr);
+  grid-template-columns: var(--app-rail-width) minmax(0, 1fr);
   overflow-x: clip;
 }
 
@@ -303,7 +302,7 @@ html[data-style="bench-swiss"] :focus-visible { outline: 2px solid var(--bs-bran
 .bs-rail {
   position: sticky;
   top: 0;
-  width: var(--bs-rail-width);
+  width: var(--app-rail-width);
   justify-self: end;
   height: 100vh;
   height: 100dvh;

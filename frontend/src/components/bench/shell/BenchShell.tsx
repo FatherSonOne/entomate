@@ -62,6 +62,7 @@ export interface BenchShellProps {
   onRecord: () => void
   recorderLabel?: string
   onSettings: () => void
+  settingsOpen: boolean
   railCollapsed: boolean
   onToggleRail: () => void
   /** Profile menu items, top block. */
@@ -355,10 +356,11 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
   const brandMark = logoAsset(useLogoSystem().id, 'small')
   const {
     groups, isActive, user, isDark, onThemeChange, onSearch, onRecord, recorderLabel,
-    onSettings, railCollapsed, onToggleRail, menuItems, onSignOut, modKey, dock, assistant, commandSearch, shortcutsHeld, children,
+    onSettings, settingsOpen, railCollapsed, onToggleRail, menuItems, onSignOut, modKey, dock, assistant, commandSearch, shortcutsHeld, children,
   } = props
   const railToggleLabel = railCollapsed ? 'Expand navigation' : 'Collapse navigation'
   const [navOpen, setNavOpen] = useState<boolean>(false)
+  useEffect(() => { if (settingsOpen) setNavOpen(false) }, [settingsOpen])
   const now = useClock()
   const online = useOnline()
   const railPress = usePress()
@@ -484,7 +486,7 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
       </nav>
 
       {/* Phone: full nav as a sheet */}
-      <Drawer open={navOpen} onClose={() => setNavOpen(false)} label="All modules" hideEscHint>
+      <Drawer open={navOpen && !settingsOpen} onClose={() => setNavOpen(false)} label="All modules" hideEscHint>
         <nav className="bs-navsheet bs-patch" aria-label="All modules">
           <PatchPanel groups={groups} isActive={isActive} onNavigate={() => setNavOpen(false)} />
           <div role="group" aria-label="Account">
