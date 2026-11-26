@@ -309,7 +309,7 @@ export default function Layout() {
   const page = (
     <ErrorBoundary scope="page" resetKey={location.pathname}>
       <Suspense fallback={<PageSkeleton />}>
-        <Outlet context={settingsOpen ? { ...shellOutlet, closeSettings } : outletContext} />
+        <Outlet context={{ ...(settingsOpen ? { ...shellOutlet, closeSettings } : outletContext), liveRoomHostId: user?.id }} />
         <BootMark stage="page" />
       </Suspense>
     </ErrorBoundary>

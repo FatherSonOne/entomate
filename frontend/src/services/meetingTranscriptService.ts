@@ -13,6 +13,7 @@ import cache from './apiCache'
 export interface TranscriptSegment {
   /** Milliseconds from the start of the recording. */
   atMs: number
+  eventId?: string
   endMs?: number
   speaker: string
   text: string
@@ -35,6 +36,7 @@ export function toSegments(raw: unknown): TranscriptSegment[] | null {
     const atMs = typeof r.atMs === 'number' && Number.isFinite(r.atMs) ? Math.max(0, r.atMs) : 0
     const seg: TranscriptSegment = {
       atMs,
+      ...(typeof r.eventId === 'string' && r.eventId ? { eventId: r.eventId } : {}),
       speaker: typeof r.speaker === 'string' && r.speaker.trim() ? r.speaker : 'Speaker',
       text: r.text,
     }

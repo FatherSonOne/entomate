@@ -1002,7 +1002,7 @@ router.get('/:id/recap', authenticate, async (req, res) => {
  *
  * @param {string} transcript - The meeting transcript text
  * @param {string} title - Meeting title (used for embedding context and template choice)
- * @param {{ attendees?: unknown[], template?: string|null }} [opts]
+ * @param {{ attendees?: unknown[], template?: string|null, extractActions?: boolean }} [opts]
  * @returns {{ summaryData, actionItems, embedding }}
  */
 async function runAIPipeline(transcript, title, opts = {}) {
@@ -1014,7 +1014,7 @@ async function runAIPipeline(transcript, title, opts = {}) {
   }
   summaryData.template = template;
   summaryData.sections = summaryTemplates.normalizeSections(summaryData.sections, template);
-  const actionItems = await ai.extractActionItems(transcript);
+  const actionItems = opts.extractActions === false ? [] : await ai.extractActionItems(transcript);
 
   let embedding = null;
   try {
@@ -1038,7 +1038,9 @@ async function saveActionItems(meeting, actionItems) {
   if (!meeting.org_id) throw new Error('Cannot save actions without a meeting workspace');
   const { data: existing, error: readError } = await read();
   if (readError) throw readError;
-  if (existing.some((item) => !item.manually_created) || !actionItems.length) return { items: existing, created: false };
+  if (meeting.action_items_require_approval || existing.some((item) => !item.manually_created) || !actionItems.length) {
+    return { items: existing, created: false };
+  }
 
   const now = new Date().toISOString();
   const rows = actionItems.map((item, index) => ({
@@ -1317,7 +1319,10 @@ router.post('/:id/reprocess', userOrServiceAuth, async (req, res) => {
     }
 
     // Run AI pipeline
-    const { summaryData, actionItems: rawActionItems, embedding } = await runAIPipeline(transcript, meeting.title, { attendees: meeting.attendees, template: meeting.summary_template });
+    const { summaryData, actionItems: rawActionItems, embedding } = await runAIPipeline(transcript, meeting.title, {
+      attendees: meeting.attendees, template: meeting.summary_template,
+      extractActions: meeting.action_items_require_approval !== true,
+    });
     const segments = Array.isArray(meeting.transcript_segments) ? meeting.transcript_segments : null;
     const actionItems = transcriptMoments.withActionItemMoments(segments, rawActionItems);
 

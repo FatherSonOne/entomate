@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef, useSyncExternalStore } from 'react'
-import { useLocation, useParams, useSearchParams } from 'react-router-dom'
+import { useLocation, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import { Loader2, Plus, Send } from 'lucide-react'
 import { meetingsApi, integrationsApi, calendarApi, reportsApi } from '../services/api'
 import ActionItemsList from '../components/ActionItemsList'
@@ -14,6 +14,7 @@ import TimecodeButton from '../components/meetings/TimecodeButton'
 import CarryForward from '../components/meetings/CarryForward'
 import RecordingStatus from '../components/meetings/RecordingStatus'
 import RecordingPlayer from '../components/meetings/RecordingPlayer'
+import { LiveMeetingInsights } from '../components/meetings/LiveMeetingInsights'
 import CrmSendDrawer from '../components/meetings/CrmSendDrawer'
 import { useFollowUp, FollowUpLetter, FollowUpContext, FollowUpSending, FollowUpOptions } from '../components/meetings/FollowUpPanel'
 import { sendBlocker, sendingView } from '../services/followUpView'
@@ -34,6 +35,7 @@ const TABS_ID = 'meeting'
 
 export default function MeetingDetail() {
   const { id } = useParams()
+  const { liveRoomHostId } = useOutletContext() || {}
   const { pathname, state } = useLocation()
   useSyncExternalStore(subscribeTrail, trailVersion, trailVersion)
   const parent = trailFor(pathname).at(-1) || { to: WORKSPACE, label: 'Meeting workspace' }
@@ -68,6 +70,7 @@ export default function MeetingDetail() {
   const summaryMoments = useMemo(() => toSummaryMoments(meeting?.summary_moments), [meeting?.summary_moments])
   // Timecodes next to decisions, key points and action items jump the transcript here.
   const [focusAtMs, setFocusAtMs] = useState(null)
+  const [focusEventId, setFocusEventId] = useState(null)
   // A pressed playback timecode or recording marker loads the audio and plays from there.
   const playerRef = useRef(null)
   const [playingAtMs, setPlayingAtMs] = useState(null)
@@ -76,9 +79,10 @@ export default function MeetingDetail() {
   const playable = keptRecording || Boolean(uploadedAudioUrl)
   // A browser recording whose minutes are still being written: empty sections say so instead of "none".
   const minutesPending = ['transcribing', 'backup'].includes(toRecordingJob(meeting?.recording_job)?.status)
-  const jumpToTranscript = useCallback((atMs) => {
+  const jumpToTranscript = useCallback((atMs, play = true, eventId = null) => {
     setFocusAtMs(atMs)
-    if (playerRef.current?.isReady()) playerRef.current.playFrom(atMs)
+    setFocusEventId(eventId)
+    if (play && playerRef.current?.isReady()) playerRef.current.playFrom(atMs)
     // The transcript sits beside the content on desktop; on phone it is its own tab.
     if (window.matchMedia(PHONE_QUERY).matches) setTab('room')
   }, [])
@@ -141,10 +145,11 @@ export default function MeetingDetail() {
 
   // ?t=<ms> (from Today's decision timecodes) jumps the transcript once the meeting has loaded.
   const [searchParams, setSearchParams] = useSearchParams()
-  const startAtMs = Number(searchParams.get('t'))
+  const requestedTime = searchParams.get('t')
+  const startAtMs = requestedTime === null ? NaN : Number(requestedTime)
   const jumpedRef = useRef(false)
   useEffect(() => {
-    if (jumpedRef.current || !transcriptSegments || !Number.isFinite(startAtMs) || startAtMs <= 0) return
+    if (jumpedRef.current || !transcriptSegments || !Number.isFinite(startAtMs) || startAtMs < 0) return
     jumpedRef.current = true
     requestAnimationFrame(() => jumpToTranscript(startAtMs))
   }, [transcriptSegments, startAtMs, jumpToTranscript])
@@ -632,6 +637,7 @@ export default function MeetingDetail() {
               meetingId={meeting.id}
               segments={transcriptSegments}
               focusAtMs={focusAtMs}
+              focusEventId={focusEventId}
               playingAtMs={playable ? playingAtMs : null}
               onPlayFrom={playable ? (atMs) => playerRef.current?.playFrom(atMs) : undefined}
               onClip={(line) => clipToSearchNotes({ kind: 'transcript', body: line.speaker ? `${line.speaker}: ${line.text}` : line.text, atMs: line.atMs })}
@@ -694,6 +700,10 @@ export default function MeetingDetail() {
             onAudioRemoved={keptRecording ? refreshMeeting : undefined}
           />
         </div>
+      )}
+      {meeting.action_items_require_approval && transcriptSegments && meeting.created_by === liveRoomHostId && (
+        <LiveMeetingInsights key={meeting.id} roomId={meeting.id}
+          onSource={line => jumpToTranscript(line.atMs, false, line.id)} onTask={refreshMeeting} />
       )}
       {showTape && (
         <div className="bs-cell">

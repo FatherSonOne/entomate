@@ -6,6 +6,9 @@ const { z } = require('zod');
 const { supabaseAdmin } = require('../config/supabase');
 const { authenticate } = require('../middleware/auth');
 const { getOrgIdForUser, getOrgIdsForUser } = require('../utils/orgContext');
+const ai = require('../config/ai');
+const { meterAiForOrg } = require('../services/aiUsage');
+const { generateInsights, transcriptKey, viewInsights } = require('../services/liveMeetingInsights');
 const log = require('../utils/log');
 
 const router = express.Router();
@@ -31,11 +34,11 @@ function parse(schema, data) {
   return checked.data;
 }
 
-function route(handler) {
+function route(handler, { needsDaily = true } = {}) {
   return async (req, res) => {
     res.set('Cache-Control', 'no-store');
     try {
-      if (!configured()) throw fail(503, 'Live rooms are not configured for this Entomate installation.');
+      if (!supabaseAdmin || (needsDaily && !configured())) throw fail(503, 'Live rooms are not configured for this Entomate installation.');
       if (req.params.id && !z.uuid().safeParse(req.params.id).success) throw fail(404, 'Room not found.');
       await handler(req, res);
     } catch (error) {
@@ -188,6 +191,82 @@ router.post('/:id/lines', authenticate, route(async (req, res) => {
     if (!accepted) throw fail(409, 'This room is no longer accepting transcript lines.');
   }
   res.sendStatus(204);
+}));
+
+async function readInsights(room) {
+  const { data, error } = await table().select('insights').eq('id', room.id).maybeSingle();
+  if (error) throw error;
+  return data?.insights ?? null;
+}
+
+async function readInsightLines(room) {
+  if (room.ended_at) {
+    if (!room.meeting_id) return [];
+    const { data, error } = await supabaseAdmin.from('meetings').select('transcript_segments')
+      .eq('id', room.meeting_id).eq('org_id', room.org_id).maybeSingle();
+    if (error) throw error;
+    return (data?.transcript_segments ?? []).filter(line => line?.eventId)
+      .map(({ eventId, atMs, speaker, text }) => ({ id: eventId, atMs, speaker, text }));
+  }
+  const pageSize = 500;
+  const lines = new Map();
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabaseAdmin.from('live_meeting_lines').select('event_id, at_ms, speaker, text')
+      .eq('room_id', room.id).order('at_ms').order('event_id').range(offset, offset + pageSize - 1);
+    if (error) throw error;
+    for (const line of data) lines.set(line.event_id, { id: line.event_id, atMs: line.at_ms, speaker: line.speaker, text: line.text });
+    if (data.length < pageSize) break;
+  }
+  return [...lines.values()];
+}
+
+async function insightsRoom(req) {
+  const room = await getRoom(req.params.id, req.user.id);
+  if (!room.with_notes) throw fail(404, 'Live transcript insights are unavailable for this room.');
+  return room;
+}
+
+const insightsRoute = handler => route(handler, { needsDaily: false });
+
+router.get('/:id/insights', authenticate, insightsRoute(async (req, res) => {
+  const room = await insightsRoom(req);
+  res.json(viewInsights(await readInsights(room)));
+}));
+
+router.post('/:id/insights/refresh', authenticate, insightsRoute(async (req, res) => {
+  const room = await insightsRoom(req);
+  if (room.ending_at && !room.ended_at) throw fail(409, 'The room is saving its transcript. Try again from the meeting recap.');
+  const previous = await readInsights(room);
+  const lines = await readInsightLines(room);
+  if (!lines.length || previous?.transcriptKey === transcriptKey(lines)) return res.json(viewInsights(previous));
+  if (!ai.isConfigured()) throw fail(503, 'Live summaries are unavailable because AI is not configured.');
+  await meterAiForOrg(room.org_id, res, async () => {
+    let next;
+    try {
+      next = await generateInsights(room, lines, previous);
+    } catch {
+      throw fail(502, 'Could not update the live summary. The transcript and existing drafts are saved.');
+    }
+    let query = table().update({ insights: next }).eq('id', room.id).eq('host_id', room.host_id);
+    query = previous?.revision ? query.eq('insights->>revision', previous.revision) : query.is('insights->>revision', null);
+    query = room.ended_at ? query.eq('ended_at', room.ended_at) : query.is('ending_at', null).is('ended_at', null);
+    const { data, error } = await query.select('insights').maybeSingle();
+    if (error) throw error;
+    if (!data) throw fail(409, 'The room or its drafts changed. Refresh the summary to continue.');
+    res.json(viewInsights(data.insights));
+  });
+}));
+
+router.post('/:id/insights/actions/:draftId/approve', authenticate, insightsRoute(async (req, res) => {
+  const room = await insightsRoom(req);
+  const draftId = parse(z.uuid(), req.params.draftId);
+  const { data, error } = await supabaseAdmin.rpc('approve_live_meeting_action', {
+    p_room: room.id, p_host: req.user.id, p_draft: draftId,
+  });
+  if (error) throw error;
+  if (data?.roomEnding) throw fail(409, 'The room is saving its transcript. Approve this draft from the meeting recap.');
+  if (!data?.taskId) throw fail(404, 'Action draft not found.');
+  res.json({ taskId: data.taskId, insights: viewInsights(data.insights) });
 }));
 
 router.post('/:id/end', authenticate, route(async (req, res) => {

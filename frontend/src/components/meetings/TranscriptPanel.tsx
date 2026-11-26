@@ -38,6 +38,7 @@ export interface TranscriptPanelProps {
    * action-item timecodes elsewhere on the page; a new value scrolls and marks the line.
    */
   focusAtMs?: number | null
+  focusEventId?: string | null
   /** Where playback is (ms from the start): marks that line and keeps it in view. */
   playingAtMs?: number | null
   /** Given when there is audio to play: each line's time plays from that moment. */
@@ -89,7 +90,7 @@ function Highlighted({ text, query }: { text: string; query: string }): React.Re
   )
 }
 
-export function TranscriptPanel({ meetingId, segments, onRenamed, suggestions, focusAtMs, playingAtMs, onPlayFrom, onClip, onCreateTask }: TranscriptPanelProps): React.ReactElement {
+export function TranscriptPanel({ meetingId, segments, onRenamed, suggestions, focusAtMs, focusEventId, playingAtMs, onPlayFrom, onClip, onCreateTask }: TranscriptPanelProps): React.ReactElement {
   const [lines, setLines] = useState<TranscriptSegment[]>(segments)
   const [query, setQuery] = useState('')
   const [current, setCurrent] = useState(0)
@@ -108,8 +109,9 @@ export function TranscriptPanel({ meetingId, segments, onRenamed, suggestions, f
   const speakers = useMemo(() => speakersOf(lines), [lines])
   const unnamed = speakers.some((s) => isGenericSpeaker(s.name))
   const hits = useMemo(() => matchingLines(lines, query), [lines, query])
-  const focusLine =
-    typeof focusAtMs === 'number' && Number.isFinite(focusAtMs) && lines.length ? lineAt(lines, focusAtMs) : undefined
+  const citedLine = focusEventId ? lines.findIndex(line => line.eventId === focusEventId) : -1
+  const focusLine = citedLine >= 0 ? citedLine
+    : typeof focusAtMs === 'number' && Number.isFinite(focusAtMs) && lines.length ? lineAt(lines, focusAtMs) : undefined
   // A search in progress wins; otherwise the line a timecode jumped to is the active one.
   const activeLine = hits.length ? hits[Math.min(current, hits.length - 1)] : query.trim() ? undefined : focusLine
 
@@ -130,6 +132,12 @@ export function TranscriptPanel({ meetingId, segments, onRenamed, suggestions, f
 
   // A new query starts at its first match.
   useEffect(() => setCurrent(0), [query])
+
+  useEffect(() => {
+    if (citedLine < 0) return
+    setQuery('')
+    lineRefs.current[citedLine]?.focus({ preventScroll: true })
+  }, [citedLine])
 
   useEffect(() => {
     if (activeLine === undefined) return
@@ -324,6 +332,8 @@ export function TranscriptPanel({ meetingId, segments, onRenamed, suggestions, f
             ref={(el) => {
               lineRefs.current[i] = el
             }}
+            id={line.eventId ? `transcript-line-${line.eventId}` : undefined}
+            tabIndex={line.eventId ? -1 : undefined}
             data-testid="transcript-line"
             data-at-ms={line.atMs}
             aria-current={i === activeLine ? 'true' : undefined}

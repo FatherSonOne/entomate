@@ -242,6 +242,23 @@ describe('parseTimestampedTranscript', () => {
 });
 
 describe('recorder routes', () => {
+  test('writing final live-room minutes keeps approved tasks and skips automatic action creation', async () => {
+    const id = '00000000-0000-4000-8000-000000000047';
+    mockDb.meetings.push({
+      id, org_id: ORG_A, created_by: MEMBER, title: 'Live review', action_items_require_approval: true,
+      transcript: 'Priya: I will send the checklist.',
+      transcript_segments: [{ atMs: 14000, speaker: 'Priya', text: 'I will send the checklist.' }],
+    });
+    const approved = { id: 'approved', meeting_id: id, org_id: ORG_A, task_description: 'Send the checklist', manually_created: true };
+    mockDb.action_items.push(approved);
+    const ai = require('../config/ai');
+    ai.extractActionItems.mockClear();
+    await request(app()).post(`/api/meetings/${id}/reprocess`).set(as(MEMBER)).expect(200);
+    expect(ai.extractActionItems).not.toHaveBeenCalled();
+    expect(mockDb.action_items).toEqual([approved]);
+    expect(meeting(id).summary).toBeTruthy();
+  });
+
   test('start needs consent and a workspace, and makes an org-scoped meeting', async () => {
     const server = app();
     const noConsent = await request(server).post('/api/recordings').set(as(MEMBER)).send({ mode: 'mic', mimeType: 'audio/webm' });
