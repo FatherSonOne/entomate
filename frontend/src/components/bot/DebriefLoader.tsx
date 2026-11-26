@@ -112,7 +112,7 @@ function lifeCanvas(canvas: HTMLCanvasElement) {
       seed()
       for (let i = 0; i < grid.length; i++) alpha[i] = at(grid, i)
     }
-    color = getComputedStyle(canvas).color || 'rgb(255,184,0)'
+    color = getComputedStyle(canvas).color
   }
   function step() {
     let alive = 0
@@ -336,7 +336,7 @@ export function DebriefLoader({ view, source, plain = false }: DebriefLoaderProp
             {Array.from({ length: 8 }, (_, i) => <i key={i} />)}
           </span>
           <div className="bs-dl-title">
-            <span className="bs-lbl bs-dl-state"><Led tone="ai" /> {src.headline}</span>
+            <span className="bs-lbl bs-dl-state"><Led tone="brand" /> {src.headline}</span>
             <strong>{sub}</strong>
           </div>
           <div className="bs-dl-watch" aria-hidden="true">
