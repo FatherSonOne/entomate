@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { AudioLines, House, LayoutGrid, ListChecks, Moon, Search, Settings, Sun } from 'lucide-react'
+import { AudioLines, House, LayoutGrid, ListChecks, Mic, Moon, PanelLeftClose, PanelLeftOpen, Search, Settings, Sun } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { Drawer } from '../Drawer'
 import { Key } from '../Key'
@@ -62,7 +62,8 @@ export interface BenchShellProps {
   onRecord: () => void
   recorderLabel?: string
   onSettings: () => void
-  settingsActive: boolean
+  railCollapsed: boolean
+  onToggleRail: () => void
   /** Profile menu items, top block. */
   menuItems: ReadonlyArray<ShellMenuItem>
   onSignOut: () => void
@@ -354,8 +355,9 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
   const brandMark = logoAsset(useLogoSystem().id, 'small')
   const {
     groups, isActive, user, isDark, onThemeChange, onSearch, onRecord, recorderLabel,
-    onSettings, settingsActive, menuItems, onSignOut, modKey, dock, assistant, commandSearch, shortcutsHeld, children,
+    onSettings, railCollapsed, onToggleRail, menuItems, onSignOut, modKey, dock, assistant, commandSearch, shortcutsHeld, children,
   } = props
+  const railToggleLabel = railCollapsed ? 'Expand navigation' : 'Collapse navigation'
   const [navOpen, setNavOpen] = useState<boolean>(false)
   const now = useClock()
   const online = useOnline()
@@ -399,11 +401,11 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
     : groups
 
   return (
-    <div className="bs-app" data-shortcuts-held={shortcutsHeld || undefined}>
+    <div className="bs-app" data-rail-collapsed={railCollapsed || undefined} data-shortcuts-held={shortcutsHeld || undefined}>
       <a href="#bs-page" className="bs-sr">Skip to content</a>
 
       {/* Rail: the patch panel (desktop) */}
-      <aside className="bs-rail" aria-label="Main navigation">
+      <aside id="bench-navrail" className="bs-rail" aria-label="Main navigation">
         <Link to="/dashboard" className="bs-brand" aria-label="Entomate, go to Today">
           <img src={brandMark} alt="" width={28} height={28} data-brand-mark="" />
           entomate
@@ -431,6 +433,9 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
       {/* Main: toolbar on the case, then the faceplate */}
       <div className="bs-main">
         <div className="bs-tbar">
+          <Key className="bs-tbar-desktop" iconOnly onClick={onToggleRail} aria-label={railToggleLabel} title={railToggleLabel}
+            aria-controls="bench-navrail" aria-expanded={!railCollapsed}
+            icon={railCollapsed ? <PanelLeftOpen aria-hidden="true" /> : <PanelLeftClose aria-hidden="true" />} />
           <Link to="/dashboard" className="bs-tbar-brand" aria-label="Entomate, go to Today">
             <img src={brandMark} alt="" width={22} height={22} data-brand-mark="" />
             entomate
@@ -443,11 +448,12 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
           </div>
           {commandSearch || <Key className="bs-ph-only" iconOnly onClick={onSearch} aria-label="Search or Ask Entomate" icon={<Search aria-hidden="true" strokeWidth={1.6} />} />}
           <ThemeSwitch isDark={isDark} onChange={onThemeChange} />
+          {railCollapsed && <Key className="bs-tbar-desktop" iconOnly onClick={onRecord} aria-label={recorderLabel || 'Record a meeting'}
+            title={recorderLabel || 'Record a meeting'} aria-haspopup="dialog" icon={<Mic aria-hidden="true" strokeWidth={1.6} />} />}
           <Key
             iconOnly
             onClick={onSettings}
             aria-label="Settings"
-            aria-current={settingsActive ? 'page' : undefined}
             icon={<Settings aria-hidden="true" strokeWidth={1.6} />}
           ><kbd className="bs-nav-peek">{shortcutLabel('mod+,')}</kbd></Key>
           <ProfileMenu user={user} items={menuItems} onSignOut={onSignOut} onSettings={onSettings} modKey={modKey} />
@@ -482,7 +488,7 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
           <PatchPanel groups={groups} isActive={isActive} onNavigate={() => setNavOpen(false)} />
           <div role="group" aria-label="Account">
             <div className="bs-lbl" aria-hidden="true">Account</div>
-            <PatchRow item={{ no: '00', name: 'Settings', href: '/settings' }} active={settingsActive} onNavigate={() => setNavOpen(false)} />
+            <PatchRow item={{ no: '00', name: 'Settings', href: '/settings' }} active={false} onNavigate={() => setNavOpen(false)} />
           </div>
         </nav>
       </Drawer>

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { ChevronRight } from 'lucide-react'
+import { useLocation, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
+import { ChevronRight, X } from 'lucide-react'
 import { settingsApi } from '../services/api'
 import { useOrg } from '../contexts/OrgContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -11,7 +11,7 @@ import { version } from '../../package.json'
 import {
   Drawer, Key, PHONE_QUERY, Signal, Tag, TextInput, TitleRule, Toggle, applyReduceMotion, useMediaQuery,
 } from '../components/bench'
-import AppearanceSettings, { STYLE_SCROLL_KEY } from '../components/settings/AppearanceSettings'
+import AppearanceSettings from '../components/settings/AppearanceSettings'
 import RecordingSettings from '../components/settings/RecordingSettings'
 import type { MeetingsJson } from '../components/settings/RecordingSettings'
 import MeetingAgentsSettings from '../components/settings/MeetingAgentsSettings'
@@ -56,6 +56,7 @@ const PLAN_LABELS = TENANT_PLAN_LABELS as Record<string, string>
 export default function Settings(): React.ReactElement {
   const location = useLocation()
   const navigate = useNavigate()
+  const { closeSettings } = useOutletContext<{ closeSettings: () => void }>()
   const [params, setParams] = useSearchParams()
   const url = readUrlState(params)
   const state = location.state as NavState | null
@@ -165,16 +166,6 @@ export default function Settings(): React.ReactElement {
   useLayoutEffect(() => {
     const page = pageRef.current
     if (page && page.getBoundingClientRect().top < 70) page.scrollIntoView({ block: 'start' })
-  }, [active])
-
-  useLayoutEffect(() => {
-    if (active !== 'appearance') return
-    try {
-      if (sessionStorage.getItem(STYLE_SCROLL_KEY) !== '1') return
-      sessionStorage.removeItem(STYLE_SCROLL_KEY)
-    } catch { return }
-    const frame = requestAnimationFrame(() => document.querySelector('[data-style-picker]')?.scrollIntoView({ block: 'center' }))
-    return () => cancelAnimationFrame(frame)
   }, [active])
 
   // "/" focuses Find a setting while no sheet or dialog is open.
@@ -363,7 +354,8 @@ export default function Settings(): React.ReactElement {
       )}
       {isPhone && (
         <Drawer open={!!url.section && !url.query.trim()} onClose={closeSection} label={activeDef.title}
-          className="bs-set-section-sheet" layer="underlay">
+          className="bs-set-section-sheet" layer="underlay"
+          footer={<Key onClick={closeSettings} icon={<X size={16} aria-hidden="true" />}>Close Settings</Key>}>
           <div className="bs-set" key={active}>
             <p className="bs-set-help bs-set-section-intro">{activeDef.summary}</p>
             {sections[active]}

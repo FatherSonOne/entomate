@@ -5,17 +5,11 @@
  * (Ledger, 2026-11-22). Owned by the Appearance / logo-system pass: theme,
  * Reduce motion, design style (Bench Swiss up front, the rest behind
  * "+ More styles"), the Bench Swiss palette, and the logo system picker.
- *
- * Switching to or from Bench Swiss swaps the app shell, which remounts Settings.
- * chooseStyle() leaves STYLE_SCROLL_KEY in sessionStorage; Settings reads it on
- * mount and scrolls [data-style-picker] back into view.
  */
 import React, { useState } from 'react'
 import { useTheme, THEME_MODES, DEFAULT_DESIGN_STYLE } from '../../context/ThemeContext'
 import LogoSystemPicker from './LogoSystemPicker'
 import { Section, Switch, Toggle } from '../bench'
-
-export const STYLE_SCROLL_KEY = 'entomate-settings-style-scroll'
 
 export default function AppearanceSettings({ reduceMotion, onReduceMotion, onThemeChange }) {
   const { mode, designStyle, designStyles, setDesignStyle, palette, palettes, setPalette } = useTheme()
@@ -26,7 +20,6 @@ export default function AppearanceSettings({ reduceMotion, onReduceMotion, onThe
 
   const chooseStyle = (id) => {
     if (id === designStyle) return
-    try { sessionStorage.setItem(STYLE_SCROLL_KEY, '1') } catch { /* storage blocked */ }
     setDesignStyle(id, { animate: !reduceMotion })
   }
 
@@ -81,7 +74,7 @@ export default function AppearanceSettings({ reduceMotion, onReduceMotion, onThe
       </div>
 
       {/* Design style picker (2026-11-21) */}
-      <div data-style-picker className="ap-row ap-row--stack">
+      <div className="ap-row ap-row--stack">
         <div>
           <div id="design-style-label" className="ap-row-title">Design style</div>
           <div className="ap-row-help">Changes the whole app's look in this browser. Light and dark mode still apply.</div>
