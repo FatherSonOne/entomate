@@ -22,6 +22,7 @@ import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, Bot, Camera, Download, ExternalLink, Loader2, Mic, MonitorUp, Pause, Play, Square, Trash2 } from 'lucide-react'
 import { canPip, dressWindow } from '../bot/BotLive'
+import { protectRecordingFromReload } from '../../services/chunkReload'
 import { formatClock } from '../../services/meetingTranscriptService'
 import { SilenceWatch, levelOf, silenceMessage } from '../../services/silenceWatch'
 import LiveCaptions, { speechRecognitionCtor } from './LiveCaptions'
@@ -198,6 +199,10 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChang
   const savedStatus = useRef<HTMLParagraphElement | null>(null)
   const previousPhase = useRef(phase)
   const captureActive = phase === 'starting' || phase === 'recording' || phase === 'finishing'
+
+  useLayoutEffect(() => {
+    if (captureActive) return protectRecordingFromReload()
+  }, [captureActive])
 
   useLayoutEffect(() => {
     onCaptureChange?.(captureActive)

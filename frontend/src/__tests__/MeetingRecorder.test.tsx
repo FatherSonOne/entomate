@@ -27,6 +27,8 @@ vi.mock('../components/CommandPalette', () => ({ default: () => null }))
 import MeetingRecorder from '../components/meetings/MeetingRecorder'
 import RecordingStatus from '../components/meetings/RecordingStatus'
 import Layout from '../components/Layout'
+import ErrorBoundary from '../components/ErrorBoundary'
+import { installChunkReload } from '../services/chunkReload'
 import {
   PieceUploader,
   canRetry,
@@ -244,6 +246,46 @@ describe('MeetingRecorder', () => {
     expect(start).toBeDisabled()
     fireEvent.click(screen.getByRole('checkbox', { name: /knows it is being recorded/i }))
     expect(start).toBeEnabled()
+  })
+
+  test('a missing lazy page cannot reload the tab before the recording is saved', async () => {
+    const originalLocation = window.location
+    const reload = vi.fn()
+    vi.stubGlobal('location', { pathname: '/tasks', reload })
+    const quietConsole = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const staleChunk = new TypeError('Failed to fetch dynamically imported module: /assets/Tasks-old.js')
+    function MissingPage(): never { throw staleChunk }
+
+    try {
+      installChunkReload()
+      renderRecorder()
+      fireEvent.click(screen.getByRole('checkbox', { name: /knows it is being recorded/i }))
+      fireEvent.click(screen.getByRole('button', { name: /start recording/i }))
+      const stop = await screen.findByRole('button', { name: /stop recording/i })
+
+      window.dispatchEvent(new Event('vite:preloadError'))
+      expect(reload).not.toHaveBeenCalled()
+      render(<ErrorBoundary scope="page"><MissingPage /></ErrorBoundary>)
+      expect(screen.getByText(/your recording is still running/i)).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Reload' })).not.toBeInTheDocument()
+      expect(recorders[0]?.state).toBe('recording')
+
+      let finish!: (result: { status: string }) => void
+      api.finish.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+      fireEvent.click(stop)
+      await waitFor(() => expect(api.finish).toHaveBeenCalledTimes(1))
+      window.dispatchEvent(new Event('vite:preloadError'))
+      expect(reload).not.toHaveBeenCalled()
+      expect(screen.queryByRole('button', { name: 'Reload' })).not.toBeInTheDocument()
+      await act(async () => finish({ status: 'transcribing' }))
+      await screen.findByRole('button', { name: /open the meeting/i })
+      expect(reload).not.toHaveBeenCalled()
+      fireEvent.click(screen.getByRole('button', { name: 'Reload' }))
+      expect(reload).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.stubGlobal('location', originalLocation)
+      quietConsole.mockRestore()
+    }
   })
 
   test('the drawer can only dismiss once the recording is handed over', async () => {
