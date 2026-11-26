@@ -538,7 +538,7 @@ export default function Meetings({ upcoming = false }) {
   )
 
   return (
-    <div className="bs-mtg bs-meeting-workspace">
+    <div className="bs-mtg bs-meeting-workspace bs-meeting-index">
       <MeetingNavigation back={{ to: START, label: 'Start' }} />
       <TitleRule
         title={upcoming ? 'Upcoming' : 'Meeting workspace'}

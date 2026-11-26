@@ -53,7 +53,7 @@ export default function WorkflowToolbar({
   return (
     <div className={`relative z-10 min-h-14 shrink-0 bg-surface border-b border-line-default flex flex-wrap items-center justify-between py-2 ${compact ? 'gap-2 px-3' : 'gap-x-3 gap-y-1 px-4'}`}>
       {/* Left section */}
-      <div className={`flex min-w-0 items-center gap-3 ${compact ? 'w-full' : ''}`}>
+      <div className={`flex min-w-0 items-center gap-3 ${compact ? 'w-full' : 'flex-[1_1_12rem]'}`}>
         {/* Back button */}
         <button
           onClick={onBack}
@@ -64,7 +64,7 @@ export default function WorkflowToolbar({
         </button>
 
         {/* Workflow name — click to edit */}
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2">
           {isEditingName ? (
             <input
               type="text"
@@ -89,7 +89,7 @@ export default function WorkflowToolbar({
                 }
               }}
               autoFocus
-              className="min-w-0 w-full text-lg font-semibold text-content-primary max-w-xs bg-transparent border-b-2 border-accent-primary focus:outline-none"
+              className="w-full min-w-0 text-lg font-semibold text-content-primary max-w-xs bg-transparent border-b-2 border-accent-primary focus:outline-none"
             />
           ) : (
             <h1 className="min-w-0 max-w-xs text-lg font-semibold text-content-primary">
@@ -104,10 +104,8 @@ export default function WorkflowToolbar({
               </button>
             </h1>
           )}
-          {isDirty && (
-            <span className="w-2 h-2 vc-bg-warning rounded-full" title="Unsaved changes" />
-          )}
-          <span className={`px-2 py-0.5 text-xs rounded-full ${
+          <span className={`w-2 h-2 shrink-0 vc-bg-warning rounded-full ${isDirty ? '' : 'invisible'}`} title={isDirty ? 'Unsaved changes' : undefined} />
+          <span className={`min-w-16 shrink-0 whitespace-nowrap px-2 py-0.5 text-center text-xs rounded-full ${
             isActive
               ? 'bg-semantic-success-dim text-semantic-success'
               : 'bg-surface-muted text-content-secondary'
@@ -207,7 +205,7 @@ export default function WorkflowToolbar({
         {/* Toggle Active */}
         {!compact && !draft && <button
           onClick={onToggleActive}
-          className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md ${
+          className={`flex w-28 items-center justify-center gap-1.5 px-3 py-1.5 text-sm rounded-md ${
             isActive
               ? 'bg-semantic-success-dim text-semantic-success hover:bg-semantic-success-dim'
               : 'bg-surface-muted text-content-secondary hover:bg-surface-muted'

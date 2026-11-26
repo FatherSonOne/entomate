@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useOutletContext, useSearchParams } from 'react-router-dom'
-import { Cell, Drawer, Grid, Key, Section, Select, Signal, Switch, TextInput, useMediaQuery, PHONE_QUERY, cx } from '../bench'
+import { Drawer, Key, Section, Select, Signal, Switch, TextInput, useMediaQuery, PHONE_QUERY, cx } from '../bench'
 import CarryForward, { type CarryForwardData } from './CarryForward'
 import BriefControls from './BriefControls'
 import { calendarApi, entoAiApi, meetingsApi } from '../../services/api'
@@ -521,26 +521,25 @@ export default function UpcomingMeetings(): React.ReactElement {
   return (
     <div className="bs-up">
       {note}
-      <Grid>
-        <Cell span={8}>
+      <div className="bs-up-layout">
+        <div className="bs-up-tools">
           <div className="bs-up-bar">
             <Switch label="Upcoming view" options={VIEWS} value={view} onChange={setView} />
-            {view === 'week' ? (
-              <>
-                <span className="bs-lbl bs-up-range">{monday.getDate()} {MO[monday.getMonth()]} – {addDays(monday, 6).getDate()} {MO[addDays(monday, 6).getMonth()]} · {weekEvents.length} meetings · bot joins {joinsCount(weekEvents, autoJoinOn)}</span>
+            {view === 'week' && (
+              <div className="bs-up-week-keys">
                 <Key size="sm" onClick={() => pickDay(dayKey(addDays(monday, -7)))} aria-label="Previous seven days">‹</Key>
                 <Key size="sm" onClick={goToday}>Today</Key>
                 <Key size="sm" onClick={() => pickDay(dayKey(addDays(monday, 7)))} aria-label="Next seven days">›</Key>
-              </>
-            ) : (
-              <span className="bs-lbl bs-up-range">{selectedDay === today ? `Next ${DAYS} days` : `From ${fromDayKey(selectedDay).toDateString()}`} · {events.length} meetings · bot joins {joins}</span>
+              </div>
             )}
           </div>
-          {view === 'week'
-            ? <WeekGrid events={events} monday={monday} today={today} autoJoinOn={autoJoinOn} selectedId={openId} onOpen={(e) => setOpenId(e.id)} />
-            : list}
-        </Cell>
-        <Cell span={4} rule>
+          <div className="bs-lbl bs-up-range">
+            {view === 'week'
+              ? <>{monday.getDate()} {MO[monday.getMonth()]} – {addDays(monday, 6).getDate()} {MO[addDays(monday, 6).getMonth()]} · {weekEvents.length} meetings · bot joins {joinsCount(weekEvents, autoJoinOn)}</>
+              : <>{selectedDay === today ? `Next ${DAYS} days` : `From ${fromDayKey(selectedDay).toDateString()}`} · {events.length} meetings · bot joins {joins}</>}
+          </div>
+        </div>
+        <div className="bs-up-context">
           <MiniMonth
             cursor={cursor}
             selected={selectedDay}
@@ -556,8 +555,13 @@ export default function UpcomingMeetings(): React.ReactElement {
             <div className="bs-up-ln"><span>Joins</span><span>{data?.autoJoin.scope === 'all' ? 'Every meeting with a link' : 'Meetings you organize'}</span></div>
             <div className="bs-up-ln"><span>Next {DAYS} days</span><span className="bs-mono">{joins} of {events.length}</span></div>
           </section>
-        </Cell>
-      </Grid>
+        </div>
+        <div className="bs-up-events">
+          {view === 'week'
+            ? <WeekGrid events={events} monday={monday} today={today} autoJoinOn={autoJoinOn} selectedId={openId} onOpen={(e) => setOpenId(e.id)} />
+            : list}
+        </div>
+      </div>
       {prep}
     </div>
   )

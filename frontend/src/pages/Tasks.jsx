@@ -283,8 +283,6 @@ export default function Tasks() {
     if (item) setStatus(item, status)
   }
 
-  if (error) return <ErrorState message={error} onRetry={load} />
-
   const meta = (
     <span>
       <b>{summary.open} open</b>
@@ -297,9 +295,7 @@ export default function Tasks() {
   const actions = (
     <>
       <Switch label="Layout" options={LAYOUT_OPTIONS} value={layout} onChange={(v) => setUrl({ layout: v })} />
-      {layout === 'list' && (
-        <Key onClick={() => (picking ? stopPicking() : setPicking(true))} aria-pressed={picking}>{picking ? 'Done selecting' : 'Select'}</Key>
-      )}
+      <Key className="bs-tasks-select" disabled={layout !== 'list'} onClick={() => (picking ? stopPicking() : setPicking(true))} aria-pressed={picking}>Select</Key>
       <Key variant="primary" kbd={isPhone ? undefined : 'N'} onClick={() => setDrawer('new')}>New task</Key>
     </>
   )
@@ -315,15 +311,15 @@ export default function Tasks() {
         onChange={(e) => setSearch(e.target.value)}
         className="bs-tasks-search"
       />
+      <Key size="sm" className="bs-tasks-filter-key" onClick={() => setDrawer('filter')} aria-haspopup="dialog"
+        aria-label={url.tag ? `Tag: ${url.tag}, filter and sort` : undefined}>
+        <span>{url.tag ? `Tag: ${url.tag}` : 'Filter · sort'}</span>
+      </Key>
       {layout === 'lanes' ? (
         <Switch label="Source" options={SOURCE_OPTIONS} value={url.show === 'meetings' ? 'meetings' : 'all'} onChange={(v) => setUrl({ show: v === 'meetings' ? 'meetings' : 'open' })} />
       ) : (
         <Switch label="Show" options={SHOW_OPTIONS} value={url.show} onChange={(v) => setUrl({ show: v })} />
       )}
-      <Key size="sm" onClick={() => setDrawer('filter')} aria-haspopup="dialog"
-        aria-label={url.tag ? `Tag: ${url.tag}, filter and sort` : undefined}>
-        {url.tag ? `Tag: ${url.tag}` : 'Filter · sort'}
-      </Key>
     </div>
   )
 
@@ -366,9 +362,8 @@ export default function Tasks() {
 
   const listView = (
     <div className="bs-tasks-list">
-      {filterBar}
       {picking && (
-        <div className="bs-tasks-bulk" role="toolbar" aria-label="Bulk actions">
+        <div className="bs-bulk-actions" role="toolbar" aria-label="Bulk actions">
           <b>{picked.size} selected</b>
           <Key size="sm" onClick={() => handleBulkStatus('done')} disabled={!picked.size}>Mark done</Key>
           <Key size="sm" onClick={() => handleBulkStatus('in_progress')} disabled={!picked.size}>In progress</Key>
@@ -407,7 +402,6 @@ export default function Tasks() {
 
   const lanesView = (
     <div className="bs-tasks-lanes-wrap">
-      {filterBar}
       {isPhone && (
         <Tabs
           label="Status"
@@ -469,7 +463,8 @@ export default function Tasks() {
   return (
     <div className="bs-tasks">
       <TitleRule title="Tasks" meta={meta} actions={actions} />
-      {layout === 'lanes' ? lanesView : (
+      {filterBar}
+      {error ? <ErrorState message={error} onRetry={load} /> : layout === 'lanes' ? lanesView : (
         <div className={`bs-tasks-split${inlineInspector ? ' with-insp' : ''}`}>
           {listView}
           {inlineInspector && (

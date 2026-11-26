@@ -124,9 +124,7 @@ export default function Automations() {
 
   const newBlank = () => navigate('/workflows/new')
 
-  if (error && rows.length === 0) {
-    return <ErrorState message={error} onRetry={load} />
-  }
+  const unavailable = Boolean(error && rows.length === 0)
 
   const meta = (
     <>
@@ -154,9 +152,10 @@ export default function Automations() {
             <Switch label="Show" options={SHOW_OPTIONS} value={show} onChange={(v) => setParam('show', v === 'all' ? null : v)} />
           </div>
 
+          {unavailable && <ErrorState message={error} onRetry={load} />}
           {loading && <p className="bs-auto-empty">Loading…</p>}
 
-          {!loading && described.length === 0 && (
+          {!unavailable && !loading && described.length === 0 && (
             <div className="bs-auto-empty">
               <p>No automations yet. Start with a meeting recipe: it runs every time a meeting is processed.</p>
               <Key onClick={() => setParam('new', '1')}>Browse recipes</Key>
@@ -213,7 +212,7 @@ export default function Automations() {
           ))}
         </Cell>
 
-        <Cell span={4} rule className="bs-auto-ctx">
+        {!unavailable && <Cell span={4} rule className="bs-auto-ctx">
           <Section level={3} title="Recent runs" aside={<span className="bs-lbl">{runs.filter((r) => r.mode !== 'test').length} latest</span>} />
           {runGroups.length === 0 && (
             <p className="bs-auto-empty">Nothing has run yet. Runs show here after the next meeting is processed.</p>
@@ -273,7 +272,7 @@ export default function Automations() {
             </ul>
             <p className="bs-auto-fold">Branching, webhooks and AI steps open in the builder from any automation.</p>
           </div>
-        </Cell>
+        </Cell>}
       </Grid>
 
       <AutomationDrawer

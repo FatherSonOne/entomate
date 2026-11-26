@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { Loader2, Search } from 'lucide-react'
 import { Key, RuledTable, Signal, TextInput, TitleRule } from '../../bench'
@@ -25,6 +25,7 @@ export default function EntoAiHistoryPage(): React.ReactElement {
   const outlet = useOutletContext<OutletCtx | undefined>()
   const [params, setParams] = useSearchParams()
   const [query, setQuery] = useState(params.get('q') ?? '')
+  const searchRef = useRef<HTMLInputElement>(null)
   const history = useThreadHistory(query)
   const { rows, total, loading, loadingMore, error, searching } = history
   const term = query.trim()
@@ -132,24 +133,17 @@ export default function EntoAiHistoryPage(): React.ReactElement {
     }] : []),
   ]
 
-  const actions = selecting ? (
-    confirmingBulk ? (
-      <div className="bs-title-keys">
+  const bulkActions = (
+    <div className="bs-bulk-actions" role="toolbar" aria-label="Bulk actions">
+      {confirmingBulk ? <>
         <span className="bs-th-warn">Delete {selected.size} for good?</span>
         <Key variant="danger" disabled={busy} onClick={() => void bulkDelete()}>Delete</Key>
         <Key disabled={busy} onClick={() => setConfirmingBulk(false)}>Cancel</Key>
-      </div>
-    ) : (
-      <div className="bs-title-keys">
+      </> : <>
         <Key onClick={() => setSelected(allSelected ? new Set() : new Set(rows.map((r) => r.id)))}>{allSelected ? 'Clear all' : 'Select all'}</Key>
         <Key variant="danger" disabled={selected.size === 0} onClick={() => setConfirmingBulk(true)}>Delete {selected.size}</Key>
         <Key onClick={stopSelecting}>Done</Key>
-      </div>
-    )
-  ) : (
-    <div className="bs-title-keys">
-      {rows.length > 0 && <Key onClick={() => { setConfirmingId(null); setSelecting(true) }}>Select</Key>}
-      <Key variant="primary" onClick={() => open(null)}>New conversation</Key>
+      </>}
     </div>
   )
 
@@ -161,10 +155,19 @@ export default function EntoAiHistoryPage(): React.ReactElement {
 
   return (
     <div className="bs-th">
-      <TitleRule title="AI conversations" meta={meta} actions={actions} />
+      <TitleRule title="AI conversations" meta={meta} actions={
+        <>
+          <Key disabled={(!rows.length && !selecting) || busy} aria-pressed={selecting} onClick={() => {
+            if (selecting) stopSelecting()
+            else { setConfirmingId(null); setSelecting(true) }
+          }}>Select</Key>
+          <Key variant="primary" onClick={() => open(null)}>New conversation</Key>
+        </>
+      } />
 
       <div className="bs-th-search">
         <TextInput
+          ref={searchRef}
           type="search"
           icon={<Search />}
           placeholder="Search titles and messages"
@@ -172,10 +175,14 @@ export default function EntoAiHistoryPage(): React.ReactElement {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        {query && <Key onClick={() => setQuery('')}>Clear</Key>}
-        {(searching || (loading && rows.length > 0)) && <Signal tone="off">Searching</Signal>}
+        <Key disabled={!query} onClick={() => {
+          setQuery('')
+          searchRef.current?.focus()
+        }}>Clear</Key>
+        <span className="sr-only" role="status">{(searching || (loading && rows.length > 0)) && 'Searching'}</span>
       </div>
 
+      {selecting && bulkActions}
       {error && (
         <div className="bs-th-error" role="alert">
           <span>{error}</span>

@@ -201,26 +201,16 @@ export default function WorkflowBuilder() {
     )
   }
 
+  const notice = saveError && (
+    <div className="flex items-center gap-2 rounded-md border border-line-default bg-surface px-4 py-2 text-accent-primary">
+      <AlertCircle className="w-4 h-4 shrink-0" aria-hidden="true" />
+      <span className="min-w-0 flex-1 break-words text-sm" role="alert">{saveError}</span>
+      <VCButton variant="ghost" size="sm" onClick={() => setSaveError(null)}>Dismiss</VCButton>
+    </div>
+  )
+
   return (
     <div className="h-dvh flex flex-col overflow-hidden" style={{ background: 'var(--bg0, #080808)' }}>
-      {/* Error banner */}
-      {saveError && (
-        <div style={{
-          background: 'rgba(255,45,107,.10)',
-          borderBottom: '1px solid rgba(255,45,107,.40)',
-          padding: '8px 16px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-        }}>
-          <AlertCircle className="w-4 h-4" style={{ color: 'var(--accent-primary, #FF2D6B)', flexShrink: 0 }} />
-          <span style={{ fontSize: 14, color: 'var(--accent-primary, #FF2D6B)', flex: 1 }}>{saveError}</span>
-          <VCButton variant="ghost" size="sm" onClick={() => setSaveError(null)}>
-            Dismiss
-          </VCButton>
-        </div>
-      )}
-
       {/* Canvas */}
       <div className="flex-1 overflow-hidden">
         <WorkflowCanvas
@@ -236,6 +226,7 @@ export default function WorkflowBuilder() {
           onDuplicate={draft ? undefined : handleDuplicate}
           onDelete={draft ? undefined : handleDelete}
           onNameChange={handleNameChange}
+          notice={notice}
         />
       </div>
     </div>

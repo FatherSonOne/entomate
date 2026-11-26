@@ -78,7 +78,8 @@ function WorkflowCanvasInner({
   onDuplicate,
   onDelete,
   onToggleActive,
-  onNameChange
+  onNameChange,
+  notice
 }) {
   const reactFlowWrapper = useRef(null)
   const { fitView, zoomIn, zoomOut, getZoom, setViewport, screenToFlowPosition } = useReactFlow()
@@ -582,7 +583,7 @@ function WorkflowCanvasInner({
         />
 
         {/* React Flow Canvas */}
-        <div ref={reactFlowWrapper} className="min-h-0 flex-1">
+        <div ref={reactFlowWrapper} className="relative min-h-0 flex-1">
           <ReactFlow
             nodes={canvasNodes}
             edges={edges}
@@ -634,6 +635,7 @@ function WorkflowCanvasInner({
               </Panel>
             )}
           </ReactFlow>
+          {notice && <div className="absolute inset-x-3 top-3 z-10">{notice}</div>}
         </div>
         {!compact && debugPanel}
       </div>
