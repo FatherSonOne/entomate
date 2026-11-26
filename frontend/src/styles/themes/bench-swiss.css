@@ -200,6 +200,10 @@ html[data-style="bench-swiss"][data-brand] body:not(:has(.lc-page)) {
   --shadow-glow: none;
 }
 
+html[data-style="bench-swiss"]:has(.bs-plate) {
+  scrollbar-gutter: stable;
+}
+
 html[data-style="bench-swiss"] body:not(:has(.lc-page)) {
   background: var(--bs-case);
   background-image: none;
@@ -611,9 +615,9 @@ html[data-motion="reduce"] :is(.bs-recbox, .bs-dock-rec) .animate-ripple { anima
 /* Title rule */
 .bs-title {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 18px;
-  align-items: end;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: 12px 18px;
+  align-items: start;
   padding-bottom: 14px;
   border-bottom: 2px solid var(--bs-rule-ink);
 }
@@ -627,6 +631,7 @@ html[data-motion="reduce"] :is(.bs-recbox, .bs-dock-rec) .animate-ripple { anima
   overflow-wrap: anywhere;
 }
 .bs-title-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; min-width: 0; }
+.bs-title-meta > .bs-crumb { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bs-crumb {
   font: 500 11px var(--bs-mono);
   letter-spacing: 0.08em;
@@ -1275,16 +1280,14 @@ html[data-motion="reduce"] :is(.bs-key, .bs-av) { transition-duration: 1ms !impo
 .bs-title-keys { display: flex; flex-wrap: wrap; gap: 8px; }
 .bs-title-acts { align-items: center; }
 
-/* Past | Upcoming: its own row in the title, fixed width, so it holds still across views. */
-.bs-mtg .bs-title-meta { min-width: 0; }
-.bs-mtg .bs-title-meta > .bs-crumb { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bs-mtg-tabs { flex: 0 0 100%; display: flex; justify-content: flex-end; }
-.bs-mtg-tabs .bs-switch { display: flex; width: 240px; }
-.bs-mtg-tabs .bs-switch button { flex: 1 1 0; }
+/* Workspace and Upcoming share the same header action positions. */
+.bs-mtg .bs-title-acts { width: 100%; }
+.bs-mtg-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; width: 100%; }
 
 /* Index list: search, then the status filter */
 .bs-mtg-search { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-top: 22px; }
-.bs-mtg-search .bs-input-wrap { flex: 1 1 260px; max-width: 560px; }
+.bs-mtg-search .bs-input-wrap { flex: 1 1 180px; min-width: 0; max-width: 560px; }
+.bs-mtg-search > .bs-key:disabled { visibility: hidden; }
 .bs-mtg-search .bs-switch { margin-left: auto; }
 .bs-mtg-list { padding-top: 6px; }
 .bs-mtg .bs-tbl td { vertical-align: middle; }
@@ -1706,11 +1709,8 @@ html[data-motion="reduce"] :is(.bs-tabs [role="tab"]::after, .bs-tape-head) { tr
 @media (max-width: 767.98px) {
   .bs-tabs { gap: 0; }
   .bs-tabs [role="tab"] { flex: 1 1 0; min-width: 0; justify-content: center; padding: 12px 2px 11px; font-size: 13px; }
-  .bs-mtg-search .bs-input-wrap { max-width: none; }
-  .bs-mtg-search .bs-switch { margin-left: 0; }
-  .bs-mtg .bs-title-acts { align-self: stretch; }
-  .bs-mtg-tabs { justify-content: stretch; }
-  .bs-mtg-tabs .bs-switch { width: 100%; }
+  .bs-mtg-search .bs-input-wrap { flex-basis: 0; max-width: none; }
+  .bs-mtg-search .bs-switch { flex-basis: 100%; margin-left: 0; }
   .bs-mtg .bs-tbl td.bs-mtg-date { width: 52px; }
   .bs-mtg .bs-tbl td.bs-mtg-status { width: auto; text-align: right; padding-right: 0; }
   .bs-mtg .bs-tbl th:last-child { text-align: right; }
@@ -1811,12 +1811,16 @@ a.bs-today-call-what:hover, .bs-today-link:hover, .bs-today-dec-src:hover { text
 .bs-tasks-insp > .bs-tasks-detail { position: sticky; top: 18px; }
 
 /* Filter bar */
-.bs-tasks-fbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 18px 0 4px; }
-.bs-tasks-fbar > .bs-input-wrap { flex: 1 1 220px; }
+.bs-tasks-fbar { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 8rem) minmax(0, 17rem); gap: 10px; align-items: center; padding: 18px 0 4px; }
+.bs-tasks-fbar .bs-switch { display: flex; width: 100%; }
+.bs-tasks-fbar .bs-switch button { flex: 1 1 auto; }
+.bs-tasks-filter-key { width: 100%; justify-content: center; }
+.bs-tasks-filter-key span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.bs-tasks-select:disabled { visibility: hidden; }
 
 /* Bulk bar */
-.bs-tasks-bulk { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 14px; padding: 10px 12px; border-radius: 10px; background: var(--bs-sunk); box-shadow: inset 0 1px 2px var(--bs-lo); }
-.bs-tasks-bulk b { margin-right: auto; font: 500 12px var(--bs-mono); color: var(--bs-ink); }
+.bs-bulk-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 14px; padding: 10px 12px; border-radius: 10px; background: var(--bs-sunk); box-shadow: inset 0 1px 2px var(--bs-lo); }
+.bs-bulk-actions b { margin-right: auto; font: 500 12px var(--bs-mono); color: var(--bs-ink); }
 
 /* Rows */
 .bs-tasks-row {
@@ -1917,10 +1921,9 @@ div.bs-tasks-empty p { margin: 0; }
   .bs-tasks-row { grid-template-columns: 22px minmax(0, 1fr) auto; gap: 12px; }
   .bs-tasks-row.head { display: none; }
   .bs-tasks-due { font-size: 11.5px; }
-  .bs-tasks-fbar .bs-switch { flex: 1 1 100%; }
   .bs-tasks-lanes { display: block; margin-top: 4px; border-top: 0; }
   .bs-tasks-lane { padding: 0; border: 0; }
-  .bs-tasks-bulk { position: sticky; bottom: 96px; z-index: 5; background: var(--bs-plate); box-shadow: inset 0 0 0 1px var(--bs-rule), 0 16px 30px -12px rgba(0, 0, 0, 0.5); }
+  .bs-bulk-actions { position: sticky; bottom: 96px; z-index: 5; background: var(--bs-plate); box-shadow: inset 0 0 0 1px var(--bs-rule), 0 16px 30px -12px rgba(0, 0, 0, 0.5); }
   .bs-tasks-f2 { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 767.98px) {
@@ -2133,7 +2136,7 @@ mark.bs-hit { background: color-mix(in srgb, var(--bs-brand) 16%, transparent); 
 .bs-srch-filter select:hover { background: var(--bs-key); }
 .bs-srch-filter select:focus-visible { outline: 2px solid var(--bs-brand); outline-offset: -2px; }
 .bs-srch-filter svg { position: absolute; right: 9px; top: 15px; width: 14px; height: 14px; color: var(--bs-ink2); pointer-events: none; }
-.bs-srch-status { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
+.bs-srch-status { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; min-height: 26px; }
 .bs-srch-engine { display: flex; margin: 0; }
 .bs-srch-engine .bs-sig { color: var(--bs-ink2); }
 .bs-srch-count { font: 500 11px var(--bs-mono); color: var(--bs-ink2); font-variant-numeric: tabular-nums; }
@@ -2365,7 +2368,7 @@ html:not([data-style="bench-swiss"]) .bs-pal-wrap {
 .bs-proj-late { color: var(--bs-brand); }
 .bs-proj-z { color: var(--bs-faint); }
 .bs-proj-r { text-align: right; }
-.bs-proj-n { font-family: var(--bs-mono); opacity: 0.6; margin-left: 4px; }
+.bs-proj-n { display: inline-block; inline-size: 3ch; font-family: var(--bs-mono); opacity: 0.6; }
 .bs-proj-crumb { color: inherit; text-decoration: none; }
 .bs-proj-crumb:hover { text-decoration: underline; text-underline-offset: 2px; }
 .bs-proj-empty { margin: 14px 0 0; font-size: 13.5px; line-height: 1.55; color: var(--bs-muted); }
@@ -2459,7 +2462,7 @@ div.bs-proj-empty p { margin: 0; }
 
 /* Projects table */
 .bs-proj-filter button { white-space: nowrap; padding: 0 9px; }
-.bs-proj-search { padding: 14px 0 2px; }
+.bs-proj-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; padding-top: 18px; }
 .bs-proj-pt {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 92px 124px 48px 48px 108px;
@@ -2981,14 +2984,20 @@ html.dark .bs-guide-shot img.is-dark { display: block; }
 html[data-style="bench-swiss"] .bs-plate { container: bs-plate / inline-size; }
 html[data-style="bench-swiss"] :is(.bs-cell, .bs-tasks-split > *) { container-type: inline-size; }
 
-/* Title rule: the name never breaks mid-word; meta and keys drop under it when tight. */
-.bs-title { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; column-gap: 18px; row-gap: 12px; }
-.bs-title > h1 { flex: 1 0 auto; max-width: 100%; overflow-wrap: break-word; }
-.bs-title > .bs-title-crumbs { flex: 1 0 100%; }
-.bs-title > .bs-title-meta { flex: 0 1 auto; margin-left: auto; }
-@media (max-width: 767.98px) {
-  .bs-title { flex-direction: column; align-items: stretch; }
-  .bs-title > .bs-title-meta { margin-left: 0; }
+/* The available column width decides when the header stacks. */
+.bs-title > h1:last-child { grid-column: 1 / -1; }
+@container bs-plate (max-width: 640px) {
+  .bs-title { grid-template-columns: minmax(0, 1fr); }
+  .bs-title-meta { align-items: flex-start; }
+  .bs-title-acts { justify-content: flex-start; }
+  :is(.bs-mtg, .bs-tasks) .bs-title-meta { align-items: stretch; }
+  .bs-meeting-index > .bs-title h1 { font-size: clamp(26px, 9cqi, 38px); }
+  .bs-tasks-fbar { grid-template-columns: minmax(0, 1fr) minmax(0, 8rem); }
+  .bs-tasks-fbar .bs-switch { grid-column: 1 / -1; grid-row: 2; }
+  .bs-proj-toolbar { grid-template-columns: minmax(0, 1fr); }
+}
+@container bs-plate (max-width: 380px) {
+  .bs-proj-toolbar .bs-proj-n { display: none; }
 }
 
 /* 8/4 split: below ~880px of plate the context column is too narrow to read; stack it. */
@@ -3098,12 +3107,12 @@ html[data-style="bench-swiss"] :is(.bs-cell, .bs-tasks-split > *) { container-ty
    still, so typing in a search never makes the list flicker. */
 :is(.bs-rows > li, .bs-tasks-row:not(.head), .bs-auto-row:not(.head), .bs-tbl tbody tr, .bs-srch-row,
   .bs-proj-need, .bs-tasks-li, .bs-proj-mt, .bs-set-cnx:not(.bs-set-cnx--head), .bs-set-mem, .bs-row,
-  .bs-tasks-empty, .bs-proj-empty, .bs-auto-empty, .bs-tasks-bulk, .bs-tasks-err, .bs-set-note, .bs-auto-note,
+  .bs-tasks-empty, .bs-proj-empty, .bs-auto-empty, .bs-bulk-actions, .bs-tasks-err, .bs-set-note, .bs-auto-note,
   .bs-agents-note, .bs-bot-note, .bs-srch-snip, .bs-why, .bs-guide-note, .bs-tasks-desc) {
   animation: m-fade-in var(--m-fast) var(--m-ease-out) backwards;
 }
 /* Bulk bars and inline editors also rise into place. */
-.bs-tasks-bulk { animation-name: m-rise-in; }
+.bs-bulk-actions { animation-name: m-rise-in; }
 
 /* ── Select: the bench's dropdown (replaces every native <select>) ── */
 /* Trigger: a sunk field with the value flush left and a chevron. */
@@ -3173,8 +3182,25 @@ html[data-motion="reduce"] .bs-select-chev { transition: none; }
 /* ── Meetings › Upcoming (Slate pick 2026-11-22: A agenda + B week on desktop) ── */
 .bs-up-note { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 12px 0; border-bottom: 1px solid var(--bs-rule); font-size: 13px; color: var(--bs-ink2); }
 .bs-up-note > span:nth-child(2) { flex: 1 1 260px; min-width: 0; }
-.bs-up-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-bottom: 4px; }
-.bs-up-range { margin-left: auto; }
+.bs-up-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); grid-template-rows: auto 1fr; grid-template-areas: "tools calendar" "events calendar"; column-gap: 24px; padding-top: 22px; }
+.bs-up-tools { grid-area: tools; }
+.bs-up-context { grid-area: calendar; padding-left: 24px; border-left: 1px solid var(--bs-rule); }
+.bs-up-events { grid-area: events; container: bs-up-events / inline-size; }
+@container bs-plate (max-width: 759.98px) {
+  .bs-up-layout { grid-template-columns: minmax(0, 1fr) minmax(0, 15rem); }
+  .bs-up-context { padding-left: 16px; }
+}
+@container bs-plate (max-width: 640px) {
+  .bs-up-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; grid-template-areas: "tools" "calendar" "events"; }
+  .bs-up-context { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; column-gap: 20px; padding: 12px 0 0; border-left: 0; }
+  .bs-up-layout .bs-up-ctx { padding-top: 0; }
+}
+@container bs-plate (max-width: 510px) {
+  .bs-up-context { grid-template-columns: minmax(0, 1fr); row-gap: 10px; }
+}
+.bs-up-bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.bs-up-week-keys { display: flex; gap: 8px; }
+.bs-up-range { padding: 8px 0 4px; }
 .bs-up-day + .bs-up-day { margin-top: 4px; }
 .bs-up-dayh { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 22px 0 8px; border-bottom: 2px solid var(--bs-rule-ink); }
 .bs-up-dayd { display: flex; align-items: baseline; gap: 10px; }
@@ -3257,6 +3283,11 @@ html[data-motion="reduce"] .bs-select-chev { transition: none; }
 .bs-up-prep-people { margin: 8px 0 0; font-size: 13.5px; }
 /* phone */
 @media (max-width: 767.98px) {
+  .bs-up-row { grid-template-columns: 52px minmax(0, 1fr) auto; gap: 12px; }
+  .bs-up-plat, .bs-up-sig { display: none; }
+  .bs-up-ph-sig { display: flex; margin-top: 5px; }
+}
+@container bs-up-events (max-width: 510px) {
   .bs-up-row { grid-template-columns: 52px minmax(0, 1fr) auto; gap: 12px; }
   .bs-up-plat, .bs-up-sig { display: none; }
   .bs-up-ph-sig { display: flex; margin-top: 5px; }

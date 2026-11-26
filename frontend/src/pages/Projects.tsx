@@ -123,19 +123,12 @@ export default function Projects(): React.ReactElement {
     }
   }
 
-  if (error) return (
-    <>
-      <ErrorState message={error} onRetry={load} />
-      {offset > 0 && <Key onClick={() => setOffset(offset - LOAD_LIMIT)}>Previous page</Key>}
-    </>
-  )
-
   const filterOptions: Array<{ value: ProjectFilter; label: React.ReactNode }> = [
-    { value: 'active', label: <>Active {!archived && <span className="bs-proj-n">{counts.active}</span>}</> },
-    { value: 'planning', label: <>Planning {!archived && <span className="bs-proj-n">{counts.planning}</span>}</> },
-    { value: 'done', label: <>Done {!archived && <span className="bs-proj-n">{counts.done}</span>}</> },
+    { value: 'active', label: <>Active <span className="bs-proj-n">{archived ? null : counts.active}</span></> },
+    { value: 'planning', label: <>Planning <span className="bs-proj-n">{archived ? null : counts.planning}</span></> },
+    { value: 'done', label: <>Done <span className="bs-proj-n">{archived ? null : counts.done}</span></> },
     { value: 'archived', label: 'Archived' },
-    { value: 'all', label: <>All {!archived && <span className="bs-proj-n">{counts.all}</span>}</> },
+    { value: 'all', label: <>All <span className="bs-proj-n">{archived ? null : counts.all}</span></> },
   ]
 
   const meta = loading
@@ -152,7 +145,25 @@ export default function Projects(): React.ReactElement {
         actions={<Key variant="primary" onClick={() => setUrl({ drawer: 'new' })}>New project</Key>}
       />
 
-      {!archived && <Grid>
+      <div className="bs-proj-toolbar">
+        <TextInput icon={<Search aria-hidden="true" />} placeholder={paged ? 'Search this page' : 'Search projects'} aria-label={paged ? 'Search projects on this page' : 'Search projects'} value={search} onChange={(e) => setSearch(e.target.value)} />
+        <Switch<ProjectFilter> label="Status" options={filterOptions} value={url.show} onChange={(v) => {
+          if ((v === 'archived') !== archived) {
+            setLoading(true)
+            setOffset(0)
+          }
+          setUrl({ show: v })
+        }} className="bs-proj-filter" />
+      </div>
+
+      {error && (
+        <>
+          <ErrorState message={error} onRetry={load} />
+          {offset > 0 && <Key onClick={() => setOffset(offset - LOAD_LIMIT)}>Previous page</Key>}
+        </>
+      )}
+
+      {!error && !archived && <Grid>
         <Cell span={8}>
           <Display className="bs-proj-disp" role="region" aria-label="Deadlines">
             <div className="bs-proj-disp-head">
@@ -217,19 +228,10 @@ export default function Projects(): React.ReactElement {
         </Cell>
       </Grid>}
 
-      <Grid className={archived ? undefined : 'bs-proj-row2'}>
+      {!error && <Grid className={archived ? undefined : 'bs-proj-row2'}>
         <Cell span={archived ? 12 : 8}>
           <section aria-labelledby="proj-list">
-            <Section number={archived ? undefined : '01'} id="proj-list" title={archived ? 'Archived projects' : 'Projects'} aside={<Switch<ProjectFilter> label="Status" options={filterOptions} value={url.show} onChange={(v) => {
-              if ((v === 'archived') !== archived) {
-                setLoading(true)
-                setOffset(0)
-              }
-              setUrl({ show: v })
-            }} className="bs-proj-filter" />} />
-            <div className="bs-proj-search">
-              <TextInput icon={<Search aria-hidden="true" />} placeholder={paged ? 'Search this page' : 'Search projects'} aria-label={paged ? 'Search projects on this page' : 'Search projects'} value={search} onChange={(e) => setSearch(e.target.value)} />
-            </div>
+            <Section number={archived ? undefined : '01'} id="proj-list" title={archived ? 'Archived projects' : 'Projects'} />
             <div className="bs-proj-pt head bs-lbl" aria-hidden="true">
               <span>Project</span><span className="bs-dt bs-proj-c-end">Ends</span><span className="bs-dt bs-proj-c-prog">Progress</span><span className="bs-dt bs-proj-c-num bs-proj-r">Open</span><span className="bs-dt bs-proj-c-num bs-proj-r">Late</span><span>Status</span>
             </div>
@@ -300,7 +302,7 @@ export default function Projects(): React.ReactElement {
             )}
           </section>
         </Cell>}
-      </Grid>
+      </Grid>}
 
       <Drawer open={url.drawer === 'new'} onClose={() => setUrl({ drawer: null })} label="New project">
         <form className="bs-tasks-form" onSubmit={create} noValidate>
