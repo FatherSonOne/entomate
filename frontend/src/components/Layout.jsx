@@ -47,12 +47,13 @@ import EntoAIProactiveChecker from './EntoAssistant/EntoAIProactiveChecker'
 import { BenchShell } from './bench/shell/BenchShell'
 import { Drawer, Faceplate, Signal, useMediaQuery } from './bench'
 import { MOTION, useEnterOnChange } from './bench/motion'
-import SettingsTransition, { DESKTOP_QUERY } from './settings/SettingsTransition'
+import SettingsTransition from './settings/SettingsTransition'
 import { settingsApi } from '../services/api'
 import '../styles/meeting-recorder.css'
 const EntoAssistant = React.lazy(() => import('./EntoAssistant/EntoAssistant'))
 const MeetingRecorder = React.lazy(() => import('./meetings/MeetingRecorder'))
 const RAIL_STORAGE_KEY = 'entomate-navrail-collapsed'
+const DESKTOP_QUERY = '(min-width: 1024px)'
 
 // Grouped navigation structure — 4 sections
 // Items with adminOnly: true are filtered out at render time for non-admin

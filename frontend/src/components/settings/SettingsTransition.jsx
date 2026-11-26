@@ -3,20 +3,44 @@ import { X } from 'lucide-react'
 import { Key } from '../bench'
 import { MOTION, prefersReducedMotion } from '../bench/motion'
 
-export const DESKTOP_QUERY = '(min-width: 1024px)'
-
 const slide = { duration: MOTION.navrail, easing: MOTION.easeInOut, fill: 'both' }
 const move = (x) => ({ transform: `translateX(${x})` })
 
 function canSlide() {
-  return window.matchMedia?.(DESKTOP_QUERY).matches && !prefersReducedMotion() &&
-    typeof Element.prototype.animate === 'function'
+  return !prefersReducedMotion() && typeof Element.prototype.animate === 'function'
 }
 
 function clearPreview(preview) {
   preview.hidden = true
   preview.getAnimations?.().forEach((animation) => animation.cancel())
   preview.replaceChildren()
+}
+
+function showExitPreview(pane, exit, pageScroll) {
+  const page = document.createElement('div')
+  page.className = 'app-layout-settings-exit-page'
+  page.append(pane.cloneNode(true))
+  exit.append(page)
+
+  // Mobile section sheets live in a portal. Keep the visible sheet and its scrim in the exit frame.
+  const sheet = document.querySelector('.bs-set-section-sheet[data-open="true"]')
+  const scrim = sheet?.previousElementSibling
+  const sheetCopy = sheet?.cloneNode(true)
+  if (scrim?.matches('.bs-scrim[data-layer="underlay"]')) {
+    const scrimCopy = scrim.cloneNode(true)
+    scrimCopy.style.opacity = getComputedStyle(scrim).opacity
+    exit.append(scrimCopy)
+  }
+  if (sheetCopy) {
+    sheetCopy.style.transform = getComputedStyle(sheet).transform
+    exit.append(sheetCopy)
+  }
+
+  exit.hidden = false
+  page.scrollTop = pageScroll
+  if (sheetCopy) {
+    sheetCopy.querySelector('.bs-drawer-body').scrollTop = sheet.querySelector('.bs-drawer-body').scrollTop
+  }
 }
 
 function SettingsPane({ exitRef, onClose, children }) {
@@ -37,9 +61,7 @@ function SettingsPane({ exitRef, onClose, children }) {
 
       // Keep the visible Settings content after its route unmounts.
       const left = pane.getBoundingClientRect().left
-      exit.append(pane.cloneNode(true))
-      exit.hidden = false
-      exit.scrollTop = scrollRef.current
+      showExitPreview(pane, exit, scrollRef.current)
       exit.animate([move(`${left}px`), move('100%')], slide).onfinish = () => clearPreview(exit)
     }
   }, [exitRef])
