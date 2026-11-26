@@ -532,13 +532,12 @@
 .app-layout-view[inert],
 .app-layout:has(.app-layout-settings-exit:not([hidden])) > .app-layout-view { z-index: 0; }
 .app-layout-view[inert] :is(.bs-main, .bs-dock, .nl-main) { visibility: hidden; }
-.app-layout-settings { z-index: 1; pointer-events: none; }
-.app-layout-settings > .bs-settings-shell { pointer-events: auto; }
+.app-layout-settings { z-index: 1; pointer-events: none; overflow-x: clip; }
+.app-layout-settings > .bs-settings-shell { position: relative; z-index: 1; pointer-events: auto; }
+.app-layout-settings-underlay,
 .app-layout-settings-exit { position: fixed; inset: 0; overflow: hidden; }
 
 @media (min-width: 1024px) {
-  .app-layout-settings { margin-left: var(--app-rail-width); transition: margin-left var(--m-navrail); }
-  .app-layout[data-rail-collapsed] > .app-layout-settings { margin-left: 0; }
   .nl-main { padding-left: var(--app-rail-width); transition: padding-left var(--m-navrail); }
   .app-shell[data-rail-collapsed] .nl-main { padding-left: 0; }
   .app-shell[data-rail-collapsed] .nl-sidebar {
