@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useSyncExternalStore } from 'react'
 import { Key } from './bench/Key'
 import { cx } from './bench/cx'
+import { isChunkError, isReloadProtected, subscribeToReloadProtection } from '../services/chunkReload'
 import { ACTION_LABEL, classifyError, errorCopy, errorReport } from '../services/errorKinds'
 import type { ErrorAction } from '../services/errorKinds'
 import './ErrorScreen.css'
@@ -22,9 +23,13 @@ export interface ErrorScreenProps {
 export default function ErrorScreen({ error, componentStack, scope, onRetry }: ErrorScreenProps): React.ReactElement {
   const [online, setOnline] = useState(() => navigator.onLine)
   const [copied, setCopied] = useState(false)
+  const reloadProtected = useSyncExternalStore(subscribeToReloadProtection, isReloadProtected)
   const kind = classifyError(error, online)
   const copy = errorCopy(kind)
   const report = errorReport(error, kind, componentStack)
+  const pageNeedsRefresh = isChunkError(error)
+  const canRun = (action: ErrorAction): boolean =>
+    !reloadProtected || (action === 'retry' && scope === 'page' && !pageNeedsRefresh)
 
   // Offline: try again by itself once the connection is back
   useEffect(() => {
@@ -41,6 +46,7 @@ export default function ErrorScreen({ error, componentStack, scope, onRetry }: E
   }, [online, onRetry])
 
   const run = (action: ErrorAction): void => {
+    if (isReloadProtected() && (action !== 'retry' || scope === 'app' || pageNeedsRefresh)) return
     if (action === 'reload') window.location.reload()
     else if (action === 'sign-in') window.location.assign('/sign-in')
     else if (action === 'home') window.location.assign('/dashboard')
@@ -63,10 +69,12 @@ export default function ErrorScreen({ error, componentStack, scope, onRetry }: E
       <div className="en-err-card">
         <div className="en-err-code"><span className="en-err-led" data-kind={kind} aria-hidden="true" />{copy.code}</div>
         <h1 className="en-err-title">{copy.title}</h1>
-        <p className="en-err-body">{copy.body}</p>
+        <p className="en-err-body">{reloadProtected && pageNeedsRefresh
+          ? 'Your recording is still running or saving. Finish it before reloading this page.'
+          : copy.body}</p>
         <div className="en-err-keys">
-          <Key variant="primary" onClick={() => run(copy.primary)}>{ACTION_LABEL[copy.primary]}</Key>
-          {copy.secondary && <Key onClick={() => run(copy.secondary as ErrorAction)}>{ACTION_LABEL[copy.secondary]}</Key>}
+          {canRun(copy.primary) && <Key variant="primary" onClick={() => run(copy.primary)}>{ACTION_LABEL[copy.primary]}</Key>}
+          {copy.secondary && canRun(copy.secondary) && <Key onClick={() => run(copy.secondary as ErrorAction)}>{ACTION_LABEL[copy.secondary]}</Key>}
         </div>
         <details className="en-err-details">
           <summary>Error details</summary>

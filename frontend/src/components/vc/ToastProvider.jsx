@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useRef, useEff
 import { createPortal } from 'react-dom'
 import { VCToast } from './index'
 import { X } from 'lucide-react'
+import { isReloadProtected } from '../../services/chunkReload'
 import { ACTION_LABEL, classifyError, toastForError } from '../../services/errorKinds'
 import { breadcrumb, reportError } from '../../services/monitoring'
 
@@ -83,10 +84,18 @@ export function ToastProvider({ children }) {
       breadcrumb('toast.error', `${copy.title}: ${copy.message}`)
       // Server and network failures are reported by the API client; unknown causes from here
       if (err && classifyError(err) === 'render') reportError(err, { source: 'toast', extra: { route: window.location.pathname } })
-      const action = copy.action && copy.action !== 'retry' && copy.action !== 'home'
-        ? { label: ACTION_LABEL[copy.action], onClick: () => runErrorAction(copy.action) }
+      const refreshDeferred = copy.action === 'reload' && isReloadProtected()
+      const recordingNotice = 'Finish saving the recording before reloading Entomate.'
+      const action = !refreshDeferred && copy.action && copy.action !== 'retry' && copy.action !== 'home'
+        ? { label: ACTION_LABEL[copy.action], onClick: () => {
+          if (copy.action === 'reload' && isReloadProtected()) {
+            addToast({ title: copy.title, message: recordingNotice, color: 'amber' })
+            return
+          }
+          runErrorAction(copy.action)
+        } }
         : undefined
-      return addToast({ title: copy.title, message: copy.message, color: 'crimson', action, duration: action ? 8000 : 5000 })
+      return addToast({ title: copy.title, message: refreshDeferred ? recordingNotice : copy.message, color: 'crimson', action, duration: action ? 8000 : 5000 })
     },
     warning: (title, message) => addToast({ title, message, color: 'amber' }),
     info: (title, message) => addToast({ title, message, color: 'phosphor' }),

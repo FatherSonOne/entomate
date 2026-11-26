@@ -17,6 +17,29 @@ const RELOAD_WINDOW_MS = 10000
 const CHUNK_ERROR = /Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed|Unable to preload CSS|is not a valid JavaScript MIME type|ChunkLoadError|Loading chunk [\w-]+ failed/i
 
 let pending = false
+const reloadBlockers = new Set<symbol>()
+const reloadListeners = new Set<() => void>()
+
+export function isReloadProtected(): boolean {
+  return reloadBlockers.size > 0
+}
+
+export function subscribeToReloadProtection(listener: () => void): () => void {
+  reloadListeners.add(listener)
+  return () => { reloadListeners.delete(listener) }
+}
+
+/** Releasing protection makes a refresh available without scheduling one. */
+export function protectRecordingFromReload(): () => void {
+  const recording = Symbol()
+  reloadBlockers.add(recording)
+  if (reloadBlockers.size === 1) reloadListeners.forEach(listener => listener())
+  return () => {
+    if (reloadBlockers.delete(recording) && reloadBlockers.size === 0) {
+      reloadListeners.forEach(listener => listener())
+    }
+  }
+}
 
 export function isChunkError(error: unknown): boolean {
   if (!error) return false
@@ -33,8 +56,9 @@ export function chunkReloadPending(): boolean {
   return pending
 }
 
-/** Reloads once for a stale chunk. Returns false when it already tried just now. */
+/** Reloads once for a stale chunk if no recording needs the page to stay open. */
 export function reloadForStaleChunk(): boolean {
+  if (isReloadProtected()) return false
   if (pending) return true
   if (Date.now() - lastReloadAt() < RELOAD_WINDOW_MS) return false
   pending = true
