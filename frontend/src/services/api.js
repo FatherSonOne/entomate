@@ -1013,7 +1013,7 @@ export const learningApi = {
 // ========================================
 export const intelligenceApi = {
   // Get comprehensive dashboard intelligence
-  getDashboard: (options = {}) => api.get('/intelligence/dashboard', { params: options }),
+  getDashboard: (options = {}, signal) => api.get('/intelligence/dashboard', { params: options, signal, _noCache: true }),
 
   // Get meeting prep for specific meeting
   getMeetingPrep: (meetingId) => api.get(`/intelligence/meeting-prep/${meetingId}`),

@@ -21,7 +21,7 @@ import SendBotKey from '../components/bot/SendBotKey'
 /**
  * 01 Today (Bench Swiss, direction A "Bench"): what's live or next, the action items
  * your meetings produced, the calls agents made on them, this week's decisions and
- * today's schedule. Meeting prep, deal risks and relationship briefs open in a drawer.
+ * today's schedule. Meeting prep, deal risks and action item briefings open in a drawer.
  */
 
 const ITEM_ROWS = 8
@@ -456,8 +456,7 @@ export default function Today() {
       </Grid>
 
       <Drawer open={briefOpen} onClose={() => setBriefOpen(false)} label="Briefings">
-        <p className="bs-today-empty">Meeting prep, deal risks and relationship notes, written by Entomate’s intelligence agents.</p>
-        <div className="bs-skin bs-today-brief">
+        <div className="bs-skin">
           {briefOpen && <IntelligenceDashboard />}
         </div>
       </Drawer>

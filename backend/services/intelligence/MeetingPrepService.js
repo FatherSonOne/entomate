@@ -9,6 +9,13 @@ const ai = require('../../config/ai');
 const log = require('../../utils/log');
 const { requestOrgIds } = require('../../utils/orgContext'); // audit finding 3: limit queries to the caller's orgs
 
+function attendeeEmails(meeting) {
+  return (Array.isArray(meeting.attendees) ? meeting.attendees : [])
+    .map(attendee => typeof attendee === 'string' ? attendee : attendee?.email)
+    .filter(email => typeof email === 'string' && email.includes('@'))
+    .map(email => email.trim().toLowerCase());
+}
+
 class MeetingPrepService {
   constructor() {
     // AI is handled by the shared ai module (supports Gemini + OpenAI)
@@ -31,8 +38,7 @@ class MeetingPrepService {
 
       // Calculate time window
       const now = new Date();
-      const futureDate = new Date();
-      futureDate.setHours(futureDate.getHours() + hours);
+      const futureDate = new Date(now.getTime() + hours * 60 * 60 * 1000);
 
       // Get upcoming meetings
       const { data: meetings, error } = await supabase
@@ -45,7 +51,7 @@ class MeetingPrepService {
           start_time,
           end_time,
           duration_minutes,
-          participants,
+          attendees,
           sentiment_label,
           sentiment_score,
           created_at,
@@ -58,10 +64,7 @@ class MeetingPrepService {
         .order('start_time', { ascending: true })
         .limit(10);
 
-      if (error) {
-        log.error('[MeetingPrepService] Error fetching meetings:', { error: error.message || error });
-        return [];
-      }
+      if (error) throw error;
 
       if (!meetings || meetings.length === 0) {
         return [];
@@ -75,7 +78,7 @@ class MeetingPrepService {
       return enrichedMeetings.filter(Boolean);
     } catch (error) {
       log.error('[MeetingPrepService] getUpcomingMeetingPrep error:', { error: error.message || error });
-      return [];
+      throw error;
     }
   }
 
@@ -142,7 +145,9 @@ class MeetingPrepService {
           scheduledAt: meeting.start_time,
           endTime: meeting.end_time,
           duration: meeting.duration_minutes,
-          attendees: meeting.participants || [],
+          attendees: Array.isArray(meeting.attendees)
+            ? meeting.attendees.filter(Boolean).map(attendee => typeof attendee === 'string' ? { name: attendee } : attendee)
+            : [],
           location: meeting.location,
           meetingLink: meeting.meeting_link,
           description: meeting.description
@@ -226,18 +231,16 @@ class MeetingPrepService {
   async getSentimentHistory(meeting) {
     try {
       // Extract attendee emails
-      const attendeeEmails = (meeting.participants || [])
-        .map(p => p.email)
-        .filter(Boolean);
+      const emails = new Set(attendeeEmails(meeting));
 
-      if (attendeeEmails.length === 0) {
+      if (!emails.size) {
         return [];
       }
 
       // Find recent meetings with overlapping participants
       const { data: pastMeetings, error } = await supabase
         .from('meetings')
-        .select('id, created_at, sentiment_label, sentiment_score, participants')
+        .select('id, created_at, sentiment_label, sentiment_score, attendees')
         .in('org_id', requestOrgIds())
         .lt('created_at', meeting.created_at || new Date().toISOString())
         .not('sentiment_label', 'is', null)
@@ -249,10 +252,7 @@ class MeetingPrepService {
       }
 
       // Filter to meetings with overlapping participants
-      const relevantMeetings = pastMeetings.filter(pm => {
-        const pmEmails = (pm.participants || []).map(p => p.email).filter(Boolean);
-        return pmEmails.some(email => attendeeEmails.includes(email));
-      });
+      const relevantMeetings = pastMeetings.filter(past => attendeeEmails(past).some(email => emails.has(email)));
 
       return relevantMeetings.slice(0, 5);
     } catch (error) {

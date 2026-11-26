@@ -60,6 +60,7 @@ export interface BenchShellProps {
   onThemeChange: (mode: 'light' | 'dark') => void
   onSearch: () => void
   onRecord: () => void
+  recorderLabel?: string
   onSettings: () => void
   settingsActive: boolean
   /** Profile menu items, top block. */
@@ -352,7 +353,7 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
   // The logo system picked in Settings > Appearance (tight-cropped small mark).
   const brandMark = logoAsset(useLogoSystem().id, 'small')
   const {
-    groups, isActive, user, isDark, onThemeChange, onSearch, onRecord,
+    groups, isActive, user, isDark, onThemeChange, onSearch, onRecord, recorderLabel,
     onSettings, settingsActive, menuItems, onSignOut, modKey, dock, assistant, commandSearch, shortcutsHeld, children,
   } = props
   const [navOpen, setNavOpen] = useState<boolean>(false)
@@ -421,8 +422,8 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
             <span className="bs-rec" />
           </span>
           <span>
-            <b>Record</b>
-            <span className="bs-lbl">{modKey}M to set up</span>
+            <b>{recorderLabel || 'Record'}</b>
+            <span className="bs-lbl">{modKey}M to {recorderLabel ? 'open' : 'set up'}</span>
           </span>
         </button>
       </aside>
@@ -461,7 +462,7 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
       <nav className="bs-dock" aria-label="Quick navigation" ref={dockRef}>
         {d0 && dockItem(d0)}
         {d1 && dockItem(d1)}
-        <button type="button" className="bs-dock-rec group" onClick={onRecord} aria-label="Record a meeting" aria-haspopup="dialog" {...dockPress}>
+        <button type="button" className="bs-dock-rec group" onClick={onRecord} aria-label={recorderLabel || 'Record a meeting'} aria-haspopup="dialog" {...dockPress}>
           {/* The rail's hover ripple, here on press: touch has no hover. */}
           <span className="relative isolate inline-flex" aria-hidden="true">
             <RippleCircles className="-inset-[9px] -z-10 opacity-0 transition-opacity duration-300 [&_*]:[animation-play-state:paused] group-focus-visible:opacity-100 group-focus-visible:[&_*]:[animation-play-state:running] group-data-[lit=true]:opacity-100 group-data-[lit=true]:[&_*]:[animation-play-state:running]" />

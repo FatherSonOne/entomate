@@ -1,581 +1,259 @@
-import React, { useState, useEffect, useCallback } from 'react'
-import { useAuth } from '../../contexts/AuthContext'
-import {
-  Zap,
-  RefreshCw,
-  Settings,
-  Calendar,
-  AlertTriangle,
-  CheckCircle2,
-  Users,
-  X
-} from 'lucide-react'
-import api from '../../services/api'
+import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { RefreshCw, Settings } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import api, { meetingsApi } from '../../services/api'
+import { Key } from '../bench'
 import { useToast } from '../vc/ToastProvider'
 import MeetingPrepCard from './MeetingPrepCard'
 import DealRiskAlertCard from './DealRiskAlertCard'
 import ActionItemStatusCard from './ActionItemStatusCard'
-import RelationshipInsightCard from './RelationshipInsightCard'
 import QuickScheduleModal from './QuickScheduleModal'
 import QuickTaskModal from './QuickTaskModal'
 import ReassignModal from './ReassignModal'
 
-/**
- * IntelligenceDashboard - Enhanced Intelligence Dashboard
- *
- * Orchestrates all 4 intelligence card types:
- * 1. Meeting Prep Cards
- * 2. Deal Risk Alerts
- * 3. Action Item Tracking
- * 4. Relationship Insights
- *
- * Features:
- * - Auto-refresh every 5 minutes
- * - Customizable preferences
- * - Loading states with skeleton
- * - Error handling with retry
- * - Responsive grid layout
- */
-export default function IntelligenceDashboard() {
-  const { getToken } = useAuth()
-  const toast = useToast()
-  const [intelligence, setIntelligence] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [error, setError] = useState(null)
-  const [showCustomize, setShowCustomize] = useState(false)
+const PREFS_KEY = 'entomate_intelligence_prefs'
+const CARD_OPTIONS = [
+  ['showMeetingPrep', 'Meeting preparation'],
+  ['showDealRisks', 'Deal risk alerts'],
+  ['showActionItems', 'Action item tracking'],
+]
+const RISK_LEVELS = ['low', 'medium', 'high', 'critical']
+const DEFAULT_PREFS = {
+  showMeetingPrep: true,
+  showDealRisks: true,
+  showActionItems: true,
+  dealRiskFilter: ['medium', 'high', 'critical'],
+  timeHorizon: { meetings: 24 },
+}
 
-  // User preferences (persisted to localStorage)
-  const [preferences, setPreferences] = useState(() => {
-    try {
-      const saved = localStorage.getItem('entomate_intelligence_prefs')
-      if (saved) return JSON.parse(saved)
-    } catch {}
-    return {
-      showMeetingPrep: true,
-      showDealRisks: true,
-      showActionItems: true,
-      showRelationships: true,
-      dealRiskFilter: ['medium', 'high', 'critical'],
-      timeHorizon: {
-        meetings: 24, // hours
-        risks: 7 // days
+function readPreferences() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(PREFS_KEY))
+    if (saved && typeof saved === 'object') {
+      const hours = saved.timeHorizon?.meetings
+      return {
+        ...DEFAULT_PREFS,
+        ...saved,
+        dealRiskFilter: Array.isArray(saved.dealRiskFilter)
+          ? RISK_LEVELS.filter(level => saved.dealRiskFilter.includes(level))
+          : DEFAULT_PREFS.dealRiskFilter,
+        timeHorizon: {
+          ...saved.timeHorizon,
+          meetings: Number.isInteger(hours) && hours >= 1 && hours <= 168 ? hours : DEFAULT_PREFS.timeHorizon.meetings,
+        },
       }
     }
-  })
+  } catch { /* An unreadable preference can use the defaults. */ }
+  return DEFAULT_PREFS
+}
 
-  // Modal state
-  const [scheduleModal, setScheduleModal] = useState({ open: false, context: null })
-  const [taskModal, setTaskModal] = useState({ open: false, context: null })
-  const [reassignModal, setReassignModal] = useState({ open: false, itemId: null, currentAssignee: null })
+export default function IntelligenceDashboard() {
+  const toast = useToast()
+  const [preferences, setPreferences] = useState(readPreferences)
+  const [intelligence, setIntelligence] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [showCustomize, setShowCustomize] = useState(false)
+  const [quickAction, setQuickAction] = useState(null)
+  const [brief, setBrief] = useState(null)
+  const requestRef = useRef(null)
+  const viewHeading = useRef(null)
+  const customizeKey = useRef(null)
+  const restoreCustomizeFocus = useRef(false)
 
-  // Load intelligence data
-  const loadIntelligence = useCallback(async (isRefresh = false) => {
+  const loadIntelligence = useCallback(async () => {
+    requestRef.current?.abort()
+    const request = new AbortController()
+    requestRef.current = request
+    setLoading(true)
+    setError(null)
     try {
-      if (isRefresh) setRefreshing(true)
-      else setLoading(true)
-      setError(null)
-
-      const data = await api.intelligence.getDashboard({
+      const result = await api.intelligence.getDashboard({
         riskFilter: preferences.dealRiskFilter.join(','),
         meetingHours: preferences.timeHorizon.meetings,
-        riskDays: preferences.timeHorizon.risks
-      })
-
-      setIntelligence(data)
+      }, request.signal)
+      if (!result?.success || !result.data) throw new Error(result?.error || 'Could not load briefings.')
+      if (!request.signal.aborted) setIntelligence(result.data)
     } catch (err) {
-      console.error('Failed to load intelligence:', err)
-      setError(err.message)
+      if (!request.signal.aborted) setError(err.message || 'Could not load briefings.')
     } finally {
-      setLoading(false)
-      setRefreshing(false)
+      if (!request.signal.aborted) setLoading(false)
     }
   }, [preferences])
 
-  // Initial load and auto-refresh
   useEffect(() => {
-    loadIntelligence()
-
-    // Refresh every 5 minutes
-    const interval = setInterval(() => {
-      loadIntelligence(true)
-    }, 5 * 60 * 1000)
-
-    return () => clearInterval(interval)
+    void loadIntelligence()
+    const interval = setInterval(loadIntelligence, 5 * 60 * 1000)
+    return () => {
+      clearInterval(interval)
+      requestRef.current?.abort()
+    }
   }, [loadIntelligence])
 
-  // Handle quick actions
-  const handleMeetingAction = async (action, meetingId) => {
-    console.log('Meeting action:', action, meetingId)
-    try {
-      switch (action) {
-        case 'prepareBrief':
-          // Generate meeting brief
-          await api.intelligence.generateMeetingBrief(meetingId)
-          toast.success('Success', 'Meeting brief generated successfully!')
-          break
-        case 'reschedule':
-          setScheduleModal({ open: true, context: { title: `Reschedule meeting`, relatedId: meetingId } })
-          break
-        default:
-          console.warn('Unknown meeting action:', action)
+  useLayoutEffect(() => {
+    if (showCustomize || brief) viewHeading.current?.focus()
+    else if (restoreCustomizeFocus.current) {
+      restoreCustomizeFocus.current = false
+      customizeKey.current?.focus()
+    }
+  }, [showCustomize, brief])
+
+  const savePreferences = (next) => {
+    try { localStorage.setItem(PREFS_KEY, JSON.stringify(next)) } catch { /* Apply for this visit. */ }
+    setPreferences(next)
+    setShowCustomize(false)
+  }
+
+  const handleMeetingAction = async (action, meeting) => {
+    if (action === 'scheduleFollowUp') {
+      setQuickAction({ type: 'schedule', context: { title: `Follow-up: ${meeting.title}`, relatedId: meeting.id } })
+    } else if (action === 'prepareBrief') {
+      const pending = { loading: true }
+      setBrief(pending)
+      try {
+        const result = await api.intelligence.generateMeetingBrief(meeting.id)
+        if (!result?.success || !result.data?.brief) throw new Error('Could not prepare this meeting brief.')
+        setBrief(current => current === pending ? { content: result.data.brief } : current)
+      } catch (err) {
+        setBrief(current => current === pending ? { error: err.message } : current)
       }
-    } catch (err) {
-      console.error('Meeting action failed:', err)
-      toast.error('Error', `Failed to ${action}: ${err.message}`)
     }
   }
 
-  const handleRiskAction = async (action, dealId) => {
-    console.log('Risk action:', action, dealId)
-    try {
-      switch (action) {
-        case 'scheduleCall':
-          setScheduleModal({ open: true, context: { title: `Follow-up call — Deal ${dealId}`, relatedId: dealId } })
-          break
-        case 'createTask':
-          setTaskModal({ open: true, context: { title: '', description: `Follow-up task for deal ${dealId}`, priority: 'high', source: 'deal_risk', relatedId: dealId } })
-          break
-        default:
-          console.warn('Unknown risk action:', action)
-      }
-    } catch (err) {
-      console.error('Risk action failed:', err)
-      toast.error('Error', `Failed to ${action}: ${err.message}`)
+  const handleRiskAction = (action, dealId) => {
+    if (action === 'scheduleCall') {
+      setQuickAction({ type: 'schedule', context: { title: 'Follow-up call', relatedId: dealId } })
+    } else if (action === 'createTask') {
+      setQuickAction({ type: 'task', context: { description: `Follow-up task for deal ${dealId}`, priority: 'high', source: 'deal_risk', relatedId: dealId } })
     }
   }
 
-  const handleActionItemAction = async (action, itemId) => {
-    console.log('Action item action:', action, itemId)
+  const handleActionItemAction = async (action, itemId, currentAssignee) => {
+    if (action === 'reassign') {
+      setQuickAction({ type: 'reassign', itemId, currentAssignee })
+      return
+    }
     try {
-      switch (action) {
-        case 'nudge':
-          // Send nudge to owner
-          await api.intelligence.sendNudge(itemId, 'in_app')
-          toast.success('Success', 'Nudge sent successfully!')
-          loadIntelligence(true)
-          break
-        case 'reassign':
-          setReassignModal({ open: true, itemId, currentAssignee: null })
-          break
-        case 'complete':
-          // Mark as complete
-          await api.tasks.complete(itemId)
-          toast.success('Success', 'Task marked as complete!')
-          loadIntelligence(true)
-          break
-        default:
-          console.warn('Unknown action item action:', action)
+      if (action === 'nudge') {
+        await meetingsApi.nudgeActionItem(itemId)
+        toast.success('Nudge sent')
+      } else if (action === 'complete') {
+        await meetingsApi.updateActionItem(itemId, { status: 'done' })
+        toast.success('Action item completed')
+        void loadIntelligence()
       }
     } catch (err) {
-      console.error('Action item action failed:', err)
-      toast.error('Error', `Failed to ${action}: ${err.message}`)
+      toast.error('Could not update the action item', err.message)
     }
   }
 
-  const handleRelationshipAction = async (action, stakeholderId) => {
-    console.log('Relationship action:', action, stakeholderId)
-    try {
-      switch (action) {
-        case 'addToCRM':
-          try {
-            await api.integrations.syncActionItems([stakeholderId])
-            toast.success('Synced', 'Contact synced to CRM')
-          } catch (err) {
-            toast.error('Error', err.message || 'Failed to sync to CRM')
-          }
-          break
-        case 'scheduleMeeting':
-          setScheduleModal({ open: true, context: { title: `Meeting with stakeholder`, relatedId: stakeholderId } })
-          break
-        case 'getIntroduction':
-          setTaskModal({ open: true, context: { title: `Request introduction`, description: `Set up introduction for stakeholder ${stakeholderId}`, priority: 'medium', source: 'relationship', type: 'introduction', relatedId: stakeholderId } })
-          break
-        default:
-          console.warn('Unknown relationship action:', action)
-      }
-    } catch (err) {
-      console.error('Relationship action failed:', err)
-      toast.error('Error', `Failed to ${action}: ${err.message}`)
-    }
+  if (showCustomize) {
+    return <BriefingPreferences headingRef={viewHeading} preferences={preferences} onSave={savePreferences} onCancel={() => setShowCustomize(false)} />
   }
 
-  // Loading skeleton
-  if (loading && !intelligence) {
+  if (brief) {
     return (
-      <div className="card">
-        <div className="intel-brief-header p-6" style={{ background: 'linear-gradient(90deg, var(--accent-tertiary-dim), transparent 62%)', borderBottom: '1px solid var(--border-subtle)' }}>
-          <div className="flex items-center gap-2 mb-1">
-            <Zap className="w-5 h-5" style={{ color: 'var(--accent-tertiary)' }} />
-            <span className="text-content-tertiary text-sm">Loading...</span>
-          </div>
-          <h2 className="text-2xl font-bold text-content-primary">Today's Intelligence</h2>
+      <section className="bs-briefings">
+        <div className="bs-briefings-bar">
+          <h2 ref={viewHeading} tabIndex={-1}>Meeting brief</h2>
+          <Key size="sm" onClick={() => setBrief(null)}>Back</Key>
         </div>
-        <div className="p-6 space-y-4">
-          <div className="animate-pulse space-y-4">
-            <div className="h-32 bg-surface-muted rounded-lg"></div>
-            <div className="h-32 bg-surface-muted rounded-lg"></div>
-            <div className="h-32 bg-surface-muted rounded-lg"></div>
-          </div>
-        </div>
-      </div>
+        {brief.loading && <p className="bs-today-empty" role="status">Preparing brief…</p>}
+        {brief.error && <p role="alert">{brief.error}</p>}
+        {brief.content && <div className="bs-briefings-document"><ReactMarkdown>{brief.content}</ReactMarkdown></div>}
+      </section>
     )
   }
 
-  // Error state
-  if (error) {
-    return (
-      <div className="card">
-        <div className="intel-brief-header p-6" style={{ background: 'linear-gradient(90deg, var(--accent-tertiary-dim), transparent 62%)', borderBottom: '1px solid var(--border-subtle)' }}>
-          <h2 className="text-2xl font-bold text-content-primary">Today's Intelligence</h2>
-        </div>
-        <div className="p-6">
-          <div className="text-center py-8">
-            <AlertTriangle className="w-12 h-12 vc-text-warning mx-auto mb-3" />
-            <p className="text-content-secondary font-medium">Failed to load intelligence dashboard</p>
-            <p className="text-sm text-content-tertiary mt-1">{error}</p>
-            <button
-              onClick={() => loadIntelligence()}
-              className="mt-4 px-4 py-2 bg-accent-primary text-white rounded-lg hover:opacity-90 transition-colors"
-            >
-              Retry
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (!intelligence) return null
+  const meetings = preferences.showMeetingPrep ? intelligence?.meetingPrep?.cards || [] : []
+  const risks = preferences.showDealRisks ? intelligence?.dealRisks?.cards || [] : []
+  const actionItems = preferences.showActionItems ? intelligence?.actionItems : null
+  const showActionItems = actionItems?.summary?.total > 0
 
   return (
-    <div className="card overflow-hidden">
-      {/* AI briefing header — amber signal (AI/prediction), calm wash */}
-      <div className="intel-brief-header p-6" style={{ background: 'linear-gradient(90deg, var(--accent-tertiary-dim), transparent 62%)', borderBottom: '1px solid var(--border-subtle)' }}>
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <Zap className="w-5 h-5" style={{ color: 'var(--accent-tertiary)' }} />
-              <span className="text-content-tertiary text-sm">
-                {new Date().toLocaleDateString('en-US', {
-                  weekday: 'long',
-                  month: 'long',
-                  day: 'numeric',
-                  year: 'numeric'
-                })}
-              </span>
-            </div>
-            <h2 className="text-2xl font-bold text-content-primary">Today's Intelligence</h2>
-            <p className="text-content-tertiary mt-1 text-sm">
-              AI-powered insights for your meetings, deals, and relationships
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => loadIntelligence(true)}
-              disabled={refreshing}
-              className="p-2 text-content-secondary hover:bg-accent-primary-dim hover:text-content-primary rounded-lg transition-colors"
-              title="Refresh intelligence"
-              aria-label="Refresh intelligence"
-            >
-              <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
-            </button>
-            <button
-              onClick={() => setShowCustomize(true)}
-              className="p-2 text-content-secondary hover:bg-accent-primary-dim hover:text-content-primary rounded-lg transition-colors"
-              title="Customize dashboard"
-              aria-label="Customize dashboard"
-            >
-              <Settings className="w-5 h-5" />
-            </button>
-          </div>
+    <div className="bs-briefings">
+      <div className="bs-briefings-bar">
+        <p className="bs-today-empty">Meeting prep, deal risks, and action items.</p>
+        <div className="bs-briefings-keys">
+          <Key size="sm" iconOnly icon={<RefreshCw aria-hidden="true" />} aria-label="Refresh briefings" title="Refresh briefings" disabled={loading} onClick={loadIntelligence} />
+          <Key size="sm" iconOnly icon={<Settings aria-hidden="true" />} aria-label="Customize briefings" title="Customize briefings" ref={customizeKey}
+            onClick={() => { restoreCustomizeFocus.current = true; setShowCustomize(true) }} />
         </div>
       </div>
 
-      {/* Intelligence Cards */}
-      <div className="p-6 space-y-6">
-        {/* Meeting Prep Cards */}
-        {preferences.showMeetingPrep && intelligence.meetingPrep?.count > 0 && (
-          <section>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-content-primary flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-accent-primary" />
-                Upcoming Meetings
-                <span className="px-2 py-0.5 bg-accent-primary-dim text-accent-primary text-sm rounded-full">
-                  {intelligence.meetingPrep.count}
-                </span>
-              </h3>
-            </div>
-            <div className="space-y-3">
-              {intelligence.meetingPrep.cards.map((meeting) => (
-                <MeetingPrepCard
-                  key={meeting.meeting.id}
-                  data={meeting}
-                  onAction={handleMeetingAction}
-                />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Deal Risk Alerts */}
-        {preferences.showDealRisks && intelligence.dealRisks?.count > 0 && (
-          <section>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-content-primary flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-semantic-error" />
-                Deal Risk Alerts
-                <span className="px-2 py-0.5 bg-semantic-error-dim text-semantic-error text-sm rounded-full">
-                  {intelligence.dealRisks.count}
-                </span>
-              </h3>
-            </div>
-            <div className="space-y-3">
-              {intelligence.dealRisks.cards.map((risk) => (
-                <DealRiskAlertCard
-                  key={risk.deal.id}
-                  data={risk}
-                  onAction={handleRiskAction}
-                />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Action Item Status */}
-        {preferences.showActionItems && intelligence.actionItems && (
-          <section>
-            <ActionItemStatusCard
-              data={intelligence.actionItems}
-              onAction={handleActionItemAction}
-            />
-          </section>
-        )}
-
-        {/* Relationship Insights */}
-        {preferences.showRelationships && intelligence.relationships?.count > 0 && (
-          <section>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-content-primary flex items-center gap-2">
-                <Users className="w-5 h-5 text-semantic-success" />
-                Relationship Insights
-                <span className="px-2 py-0.5 bg-semantic-success-dim text-semantic-success text-sm rounded-full">
-                  {intelligence.relationships.count}
-                </span>
-              </h3>
-            </div>
-            <div className="space-y-3">
-              {intelligence.relationships.insights.map((insight, index) => (
-                <RelationshipInsightCard
-                  key={index}
-                  data={insight}
-                  onAction={handleRelationshipAction}
-                />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Empty state */}
-        {(!intelligence.meetingPrep?.count &&
-          !intelligence.dealRisks?.count &&
-          !intelligence.actionItems &&
-          !intelligence.relationships?.count) && (
-          <div className="text-center py-12">
-            {/* Phosphor = live/real-time: Entomate is actively watching, all clear now */}
-            <CheckCircle2 className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--accent-phosphor)', filter: 'drop-shadow(0 0 12px var(--accent-phosphor-dim))' }} />
-            <h3 className="text-lg font-semibold text-content-primary mb-2">All clear.</h3>
-            <p className="text-content-secondary">
-              No critical items need you right now. Entomate is watching in the background.
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* Customization Modal */}
-      {showCustomize && (
-        <CustomizationModal
-          preferences={preferences}
-          onSave={(newPrefs) => {
-            setPreferences(newPrefs)
-            setShowCustomize(false)
-            loadIntelligence(true)
-          }}
-          onClose={() => setShowCustomize(false)}
-        />
+      {error && (
+        <div className="bs-briefings-bar">
+          <p role="alert">{error}</p>
+          <Key size="sm" onClick={loadIntelligence}>Retry</Key>
+        </div>
       )}
+      {loading && !intelligence && <p className="bs-today-empty" role="status">Loading briefings…</p>}
+      {!loading && !error && !meetings.length && !risks.length && !showActionItems && (
+        <p className="bs-briefings-empty" role="status">No briefings match your preferences.</p>
+      )}
+      {meetings.length > 0 && (
+        <section className="bs-briefings-section">
+          <h2>Meeting preparation</h2>
+          {meetings.map(meeting => <MeetingPrepCard key={meeting.meeting.id} data={meeting} onAction={handleMeetingAction} />)}
+        </section>
+      )}
+      {risks.length > 0 && (
+        <section className="bs-briefings-section">
+          <h2>Deal risk alerts</h2>
+          {risks.map(risk => <DealRiskAlertCard key={risk.deal.id} data={risk} onAction={handleRiskAction} />)}
+        </section>
+      )}
+      {showActionItems && <ActionItemStatusCard data={actionItems} onAction={handleActionItemAction} />}
 
-      {/* Quick action modals */}
-      <QuickScheduleModal
-        isOpen={scheduleModal.open}
-        onClose={() => setScheduleModal({ open: false, context: null })}
-        context={scheduleModal.context}
-      />
-      <QuickTaskModal
-        isOpen={taskModal.open}
-        onClose={() => { setTaskModal({ open: false, context: null }); loadIntelligence(true) }}
-        context={taskModal.context}
-      />
-      <ReassignModal
-        isOpen={reassignModal.open}
-        onClose={() => setReassignModal({ open: false, itemId: null, currentAssignee: null })}
-        itemId={reassignModal.itemId}
-        currentAssignee={reassignModal.currentAssignee}
-        onReassigned={() => loadIntelligence(true)}
-      />
+      {quickAction?.type === 'schedule' && <QuickScheduleModal isOpen context={quickAction.context} onClose={() => setQuickAction(null)} />}
+      {quickAction?.type === 'task' && <QuickTaskModal isOpen context={quickAction.context} onClose={() => setQuickAction(null)} />}
+      {quickAction?.type === 'reassign' && <ReassignModal isOpen itemId={quickAction.itemId} currentAssignee={quickAction.currentAssignee}
+        onClose={() => setQuickAction(null)} onReassigned={loadIntelligence} />}
     </div>
   )
 }
 
-/**
- * Customization Modal Component
- */
-function CustomizationModal({ preferences, onSave, onClose }) {
-  const [localPrefs, setLocalPrefs] = useState(preferences)
-
-  const handleSave = () => {
-    try { localStorage.setItem('entomate_intelligence_prefs', JSON.stringify(localPrefs)) } catch {}
-    onSave(localPrefs)
-  }
+function BriefingPreferences({ headingRef, preferences, onSave, onCancel }) {
+  const hoursId = useId()
+  const [draft, setDraft] = useState(preferences)
+  const updateRisk = (level, checked) => setDraft(current => ({
+    ...current,
+    dealRiskFilter: checked ? [...current.dealRiskFilter, level] : current.dealRiskFilter.filter(risk => risk !== level),
+  }))
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-surface rounded-lg max-w-md w-full shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-line-default">
-          <h3 className="text-lg font-semibold text-content-primary flex items-center gap-2">
-            <Settings className="w-5 h-5" />
-            Customize Intelligence Dashboard
-          </h3>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-surface-muted rounded transition-colors"
-            aria-label="Close"
-          >
-            <X className="w-5 h-5 text-content-tertiary" />
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="p-4 space-y-4">
-          {/* Show Cards */}
-          <div>
-            <h4 className="text-sm font-semibold text-content-secondary mb-2">Show Cards</h4>
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={localPrefs.showMeetingPrep}
-                  onChange={(e) => setLocalPrefs({ ...localPrefs, showMeetingPrep: e.target.checked })}
-                  className="w-4 h-4 text-accent-primary rounded"
-                />
-                <span className="text-sm text-content-secondary">Meeting Preparation</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={localPrefs.showDealRisks}
-                  onChange={(e) => setLocalPrefs({ ...localPrefs, showDealRisks: e.target.checked })}
-                  className="w-4 h-4 text-accent-primary rounded"
-                />
-                <span className="text-sm text-content-secondary">Deal Risk Alerts</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={localPrefs.showActionItems}
-                  onChange={(e) => setLocalPrefs({ ...localPrefs, showActionItems: e.target.checked })}
-                  className="w-4 h-4 text-accent-primary rounded"
-                />
-                <span className="text-sm text-content-secondary">Action Item Tracking</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={localPrefs.showRelationships}
-                  onChange={(e) => setLocalPrefs({ ...localPrefs, showRelationships: e.target.checked })}
-                  className="w-4 h-4 text-accent-primary rounded"
-                />
-                <span className="text-sm text-content-secondary">Relationship Insights</span>
-              </label>
-            </div>
-          </div>
-
-          {/* Deal Risk Filter */}
-          <div>
-            <h4 className="text-sm font-semibold text-content-secondary mb-2">Deal Risk Filter</h4>
-            <div className="space-y-2">
-              {['low', 'medium', 'high', 'critical'].map((level) => (
-                <label key={level} className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={localPrefs.dealRiskFilter.includes(level)}
-                    onChange={(e) => {
-                      const newFilter = e.target.checked
-                        ? [...localPrefs.dealRiskFilter, level]
-                        : localPrefs.dealRiskFilter.filter(l => l !== level)
-                      setLocalPrefs({ ...localPrefs, dealRiskFilter: newFilter })
-                    }}
-                    className="w-4 h-4 text-accent-primary rounded"
-                  />
-                  <span className="text-sm text-content-secondary capitalize">{level}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* Time Horizon */}
-          <div>
-            <h4 className="text-sm font-semibold text-content-secondary mb-2">Time Horizon</h4>
-            <div className="space-y-2">
-              <div>
-                <label className="text-xs text-content-secondary">Meetings (hours ahead)</label>
-                <input
-                  type="number"
-                  value={localPrefs.timeHorizon.meetings}
-                  onChange={(e) => setLocalPrefs({
-                    ...localPrefs,
-                    timeHorizon: { ...localPrefs.timeHorizon, meetings: parseInt(e.target.value) }
-                  })}
-                  className="w-full mt-1 px-3 py-2 border border-line-strong rounded-lg text-sm"
-                  min="1"
-                  max="168"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-content-secondary">Deal Risks (days ahead)</label>
-                <input
-                  type="number"
-                  value={localPrefs.timeHorizon.risks}
-                  onChange={(e) => setLocalPrefs({
-                    ...localPrefs,
-                    timeHorizon: { ...localPrefs.timeHorizon, risks: parseInt(e.target.value) }
-                  })}
-                  className="w-full mt-1 px-3 py-2 border border-line-strong rounded-lg text-sm"
-                  min="1"
-                  max="90"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-2 p-4 border-t border-line-default">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-content-secondary bg-surface border border-line-strong rounded-lg hover:bg-surface-muted transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            className="px-4 py-2 text-sm font-medium text-white bg-accent-primary rounded-lg hover:opacity-90 transition-colors"
-          >
-            Save Preferences
-          </button>
-        </div>
+    <form className="bs-briefings" onSubmit={event => {
+      event.preventDefault()
+      onSave({ ...draft, timeHorizon: { ...draft.timeHorizon, meetings: Number(draft.timeHorizon.meetings) } })
+    }}>
+      <h2 ref={headingRef} tabIndex={-1}>Briefing preferences</h2>
+      <fieldset>
+        <legend className="bs-lbl">Show cards</legend>
+        {CARD_OPTIONS.map(([name, label]) => (
+          <label key={name}>
+            <input type="checkbox" checked={draft[name]} onChange={event => setDraft({ ...draft, [name]: event.target.checked })} />
+            {label}
+          </label>
+        ))}
+      </fieldset>
+      <fieldset>
+        <legend className="bs-lbl">Deal risk levels</legend>
+        {RISK_LEVELS.map(level => (
+          <label key={level} className="capitalize">
+            <input type="checkbox" checked={draft.dealRiskFilter.includes(level)} onChange={event => updateRisk(level, event.target.checked)} />
+            {level}
+          </label>
+        ))}
+      </fieldset>
+      <div className="bs-briefings-hours">
+        <label htmlFor={hoursId}>Meetings (hours ahead)</label>
+        <input id={hoursId} className="bs-input" type="number" required min="1" max="168" value={draft.timeHorizon.meetings}
+          onChange={event => setDraft({ ...draft, timeHorizon: { ...draft.timeHorizon, meetings: event.target.value } })} />
       </div>
-    </div>
+      <div className="bs-briefings-keys">
+        <Key onClick={onCancel}>Cancel</Key>
+        <Key type="submit" variant="primary">Save preferences</Key>
+      </div>
+    </form>
   )
 }

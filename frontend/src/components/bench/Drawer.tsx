@@ -26,6 +26,8 @@ export interface DrawerProps {
   hideEscHint?: boolean
   /** Keep the drawer open while its task cannot safely be interrupted. */
   dismissible?: boolean
+  /** Preserve the contents in a hidden panel after the close animation. */
+  keepMounted?: boolean
   /**
    * false: a side panel that leaves the page usable (no scrim, no scroll lock,
    * no focus trap, focus stays where it was). Esc still closes it. Desktop
@@ -48,7 +50,7 @@ let scrollLocks = 0
  * in and returns on close. On phone, drag the grip down past 90px (or flick
  * it) to close; dragging up meets friction.
  */
-export function Drawer({ open, onClose, label, children, footer, hideEscHint = false, dismissible = true, modal: modalProp = true, className, layer = 'base' }: DrawerProps): React.ReactPortal | null {
+export function Drawer({ open, onClose, label, children, footer, hideEscHint = false, dismissible = true, keepMounted = false, modal: modalProp = true, className, layer = 'base' }: DrawerProps): React.ReactPortal | null {
   const isPhone = useMediaQuery(PHONE_QUERY)
   const modal = modalProp || isPhone
   const [mounted, setMounted] = useState<boolean>(open)
@@ -84,7 +86,7 @@ export function Drawer({ open, onClose, label, children, footer, hideEscHint = f
 
   useLayoutEffect(() => {
     panelRef.current?.toggleAttribute('inert', !open)
-  }, [open, mounted])
+  }, [open, mounted, keepMounted])
 
   // Focus in on open, back to the opener on close. Lock page scroll.
   useEffect(() => {
@@ -164,7 +166,7 @@ export function Drawer({ open, onClose, label, children, footer, hideEscHint = f
     requestAnimationFrame(() => setDrag(0))
   }
 
-  if (!mounted || typeof document === 'undefined') return null
+  if ((!mounted && !keepMounted) || typeof document === 'undefined') return null
 
   const dragHandlers = {
     onPointerDown,
@@ -175,7 +177,7 @@ export function Drawer({ open, onClose, label, children, footer, hideEscHint = f
 
   return createPortal(
     <>
-      {modal && <div className="bs-scrim" data-open={shown} data-layer={layer === 'base' ? undefined : layer} onClick={dismiss} aria-hidden="true" />}
+      {mounted && modal && <div className="bs-scrim" data-open={shown} data-layer={layer === 'base' ? undefined : layer} onClick={dismiss} aria-hidden="true" />}
       <div
         ref={panelRef}
         className={className ? `bs-drawer ${className}` : 'bs-drawer'}
@@ -185,6 +187,7 @@ export function Drawer({ open, onClose, label, children, footer, hideEscHint = f
         data-layer={layer === 'base' ? undefined : layer}
         aria-labelledby={labelId}
         tabIndex={-1}
+        hidden={!mounted}
         data-open={shown}
         data-dragging={dragging || undefined}
         onKeyDown={onKeyDown}

@@ -1,6 +1,6 @@
 import React from 'react'
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { vi, describe, test, expect, beforeEach, afterEach } from 'vitest'
 
 const api = vi.hoisted(() => ({
@@ -14,11 +14,19 @@ const api = vi.hoisted(() => ({
 }))
 const cacheMock = vi.hoisted(() => ({ invalidate: vi.fn() }))
 const meetings = vi.hoisted(() => ({ reprocess: vi.fn() }))
-vi.mock('../services/api', () => ({ recordingsApi: api, meetingsApi: meetings }))
+vi.mock('../services/api', () => ({ default: {}, recordingsApi: api, meetingsApi: meetings, settingsApi: { getUser: async () => ({}) } }))
 vi.mock('../services/apiCache', () => ({ default: cacheMock }))
+vi.mock('../contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 'u-1', name: 'Test User' } }) }))
+vi.mock('../contexts/OrgContext', () => ({ useOrgSafe: () => null }))
+vi.mock('../context/ThemeContext', () => ({ useTheme: () => ({ isBenchSwiss: true }) }))
+vi.mock('../components/EntoAssistant/EntoAIProactiveChecker', () => ({ default: () => null }))
+vi.mock('../components/bot/MissedBotAlert', () => ({ default: () => null }))
+vi.mock('../components/bot/useBotDebriefWatch', () => ({ default: () => {} }))
+vi.mock('../components/CommandPalette', () => ({ default: () => null }))
 
 import MeetingRecorder from '../components/meetings/MeetingRecorder'
 import RecordingStatus from '../components/meetings/RecordingStatus'
+import Layout from '../components/Layout'
 import {
   PieceUploader,
   canRetry,
@@ -186,6 +194,50 @@ function renderRecorder(onRecorded = vi.fn()) {
 }
 
 describe('MeetingRecorder', () => {
+  test('pop-out frees the app for navigation and stops the same recording from the popup', async () => {
+    const frame = document.createElement('iframe')
+    document.body.append(frame)
+    const popDoc = frame.contentDocument!
+    const popWin = { document: popDoc, addEventListener: vi.fn(), close: vi.fn(), focus: vi.fn() }
+    const open = vi.spyOn(window, 'open').mockReturnValue(popWin as unknown as Window)
+    try {
+      render(<MemoryRouter initialEntries={['/dashboard']}>
+        <Routes><Route element={<Layout />}>
+          <Route path="/dashboard" element={<h1>Dashboard</h1>} />
+          <Route path="/tasks" element={<h1>Tasks page</h1>} />
+        </Route></Routes>
+      </MemoryRouter>)
+      fireEvent.click(screen.getByRole('button', { name: /^record.*to set up/i }))
+      const drawer = within(await screen.findByRole('dialog', { name: 'New meeting' }))
+      fireEvent.click(await drawer.findByRole('checkbox', { name: /knows it is being recorded/i }))
+      fireEvent.click(drawer.getByRole('button', { name: /start recording/i }))
+      const popOut = await drawer.findByRole('button', { name: /pop out/i })
+      expect(drawer.getByRole('button', { name: 'Close' })).toBeDisabled()
+      fireEvent.click(popOut)
+
+      await waitFor(() => expect(document.documentElement).not.toHaveClass('bs-scroll-lock'))
+      fireEvent.click(screen.getAllByRole('link', { name: /tasks/i })[0]!)
+      expect(await screen.findByRole('heading', { name: 'Tasks page' })).toBeInTheDocument()
+      expect(recorders[0]?.state).toBe('recording')
+      act(() => recorders[0]!.emit('piece while hidden'))
+      await waitFor(() => expect(api.uploadPiece).toHaveBeenCalledTimes(1))
+
+      fireEvent.click(screen.getAllByRole('button', { name: /recorder active/i })[0]!)
+      expect(await drawer.findByRole('button', { name: 'Close' })).toBeEnabled()
+      fireEvent.click(drawer.getByRole('button', { name: 'Close' }))
+      fireEvent.click(within(popDoc.body).getByRole('button', { name: /pause/i }))
+      expect(recorders[0]?.state).toBe('paused')
+      fireEvent.click(within(popDoc.body).getByRole('button', { name: /stop recording/i }))
+      await waitFor(() => expect(api.finish).toHaveBeenCalledWith('m-1', 2, []))
+      expect(api.start).toHaveBeenCalledTimes(1)
+      fireEvent.click((await screen.findAllByRole('button', { name: /review recording/i }))[0]!)
+      expect(await screen.findByRole('button', { name: /open the meeting/i })).toBeInTheDocument()
+    } finally {
+      open.mockRestore()
+      frame.remove()
+    }
+  })
+
   test('start waits for the consent tick', () => {
     renderRecorder()
     const start = screen.getByRole('button', { name: /start recording/i })

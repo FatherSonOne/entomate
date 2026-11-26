@@ -19,7 +19,10 @@ export default function MeetingPrepCard({ data, onAction }) {
   const { meeting, dealContext, history, sentiment, actionItems, insights, talkingPoints } = data
 
   // Format time
-  const meetingTime = new Date(meeting.scheduledAt).toLocaleTimeString('en-US', {
+  const meetingTime = new Date(meeting.scheduledAt).toLocaleString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
     hour12: true
@@ -55,7 +58,7 @@ export default function MeetingPrepCard({ data, onAction }) {
           <div className="text-right flex-shrink-0">
             <p className="text-sm font-medium text-content-primary">{dealContext.name}</p>
             <p className="text-xs text-content-tertiary">
-              ${dealContext.value.toLocaleString()} • {dealContext.stage}
+              ${(dealContext.value ?? 0).toLocaleString()} • {dealContext.stage}
             </p>
           </div>
         )}
@@ -205,12 +208,12 @@ export default function MeetingPrepCard({ data, onAction }) {
   const actions = [
     {
       label: 'Prepare Brief',
-      handler: () => onAction('prepareBrief', meeting.id),
+      handler: () => onAction('prepareBrief', meeting),
       primary: true
     },
     {
-      label: 'Reschedule',
-      handler: () => onAction('reschedule', meeting.id)
+      label: 'Schedule follow-up',
+      handler: () => onAction('scheduleFollowUp', meeting)
     }
   ]
 

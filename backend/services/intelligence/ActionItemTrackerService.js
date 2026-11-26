@@ -57,7 +57,7 @@ class ActionItemTrackerService {
       };
     } catch (error) {
       log.error('[ActionItemTrackerService] getActionItemStatus error:', { error: error.message || error });
-      return this.getEmptyStatus();
+      throw error;
     }
   }
 
@@ -66,23 +66,25 @@ class ActionItemTrackerService {
    */
   async getUserActionItems(userId) {
     try {
+      const orgIds = requestOrgIds();
       const { data: items, error } = await supabase
         .from('action_items')
         .select(`
           *,
-          meetings:meeting_id (
+          meetings:meetings!action_items_meeting_id_fkey (
             title,
             crm_deal_id
-          )
+          ),
+          owned_meeting:meetings!action_items_meeting_id_fkey()
         `)
-        .in('org_id', requestOrgIds())
-        .or(`assigned_to_id.eq.${userId},meeting_id.in.(SELECT id FROM meetings WHERE created_by = '${userId}')`)
+        .in('org_id', orgIds)
+        .in('meetings.org_id', orgIds)
+        .in('owned_meeting.org_id', orgIds)
+        .eq('owned_meeting.created_by', userId)
+        .or(`assigned_to_id.eq.${userId},owned_meeting.not.is.null`)
         .order('due_date', { ascending: true });
 
-      if (error) {
-        log.error('[ActionItemTrackerService] Error fetching items:', { error: error.message || error });
-        return [];
-      }
+      if (error) throw error;
 
       const now = new Date();
       return (items || []).map(item => ({
@@ -98,7 +100,7 @@ class ActionItemTrackerService {
       }));
     } catch (error) {
       log.error('[ActionItemTrackerService] getUserActionItems error:', { error: error.message || error });
-      return [];
+      throw error;
     }
   }
 
@@ -314,7 +316,7 @@ class ActionItemTrackerService {
     const priorityOrder = { high: 0, medium: 1, low: 2 };
 
     overdue.sort((a, b) => {
-      const priorityDiff = (priorityOrder[a.priority] || 2) - (priorityOrder[b.priority] || 2);
+      const priorityDiff = (priorityOrder[a.priority] ?? 2) - (priorityOrder[b.priority] ?? 2);
       if (priorityDiff !== 0) return priorityDiff;
       return b.daysOverdue - a.daysOverdue;
     });

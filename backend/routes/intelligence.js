@@ -210,7 +210,7 @@ router.get('/dashboard', async (req, res) => {
     }
 
     const options = {
-      dealRiskFilter: req.query.riskFilter?.split(',') || ['medium', 'high', 'critical'],
+      dealRiskFilter: req.query.riskFilter?.split(',').filter(Boolean) || ['medium', 'high', 'critical'],
       timeHorizon: {
         meetings: parseInt(req.query.meetingHours) || 24,
         risks: parseInt(req.query.riskDays) || 7
