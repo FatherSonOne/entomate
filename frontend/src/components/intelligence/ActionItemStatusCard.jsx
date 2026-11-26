@@ -15,14 +15,14 @@ import BlockingChainDiagram from './BlockingChainDiagram'
 export default function ActionItemStatusCard({ data, onAction }) {
   if (!data) return null
 
-  const { summary, trends, benchmarks, criticalOverdue, blockingChains } = data
+  const { summary, trends, benchmarks, criticalOverdue = data.criticalItems, blockingChains } = data
 
   // Compact content
   const compactContent = (
     <div className="space-y-4">
       {/* Summary metrics */}
       <div>
-        <h4 className="font-semibold text-content-primary mb-3">From Last Week's Meetings</h4>
+        <h4 className="font-semibold text-content-primary mb-3">Your action items</h4>
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-semantic-success-dim border border-semantic-success rounded-lg p-3">
             <div className="flex items-center gap-2 mb-1">
@@ -35,11 +35,11 @@ export default function ActionItemStatusCard({ data, onAction }) {
             <div className="w-full h-1.5 vc-bg-success-dim rounded-full mt-2 overflow-hidden">
               <div
                 className="h-full bg-semantic-success rounded-full transition-all"
-                style={{ width: `${(summary.completionRate * 100).toFixed(0)}%` }}
+                style={{ width: `${summary.completionRate}%` }}
               />
             </div>
             <p className="text-xs text-semantic-success mt-1">
-              {(summary.completionRate * 100).toFixed(0)}%
+              {summary.completionRate.toFixed(0)}%
             </p>
           </div>
 
@@ -102,7 +102,7 @@ export default function ActionItemStatusCard({ data, onAction }) {
                 </div>
                 <div className="flex items-center gap-2 text-xs text-content-secondary">
                   <Users className="w-3 h-3" />
-                  <span>Assigned: {item.assignedTo}</span>
+                <span>{item.owner || 'Unassigned'}</span>
                 </div>
                 {item.isBlocking && item.blockedTasks && item.blockedTasks.length > 0 && (
                   <div className="mt-2 bg-semantic-error-dim border border-semantic-error rounded px-2 py-1 text-xs text-semantic-error">
@@ -111,18 +111,18 @@ export default function ActionItemStatusCard({ data, onAction }) {
                 )}
                 {item.relatedDeal && (
                   <div className="mt-2 text-xs text-content-secondary">
-                    Deal: {item.relatedDeal.name} (${item.relatedDeal.value.toLocaleString()})
+                    {item.relatedDeal.name}
                   </div>
                 )}
-                <div className="flex items-center gap-2 mt-3">
+                <div className="flex flex-wrap items-center gap-2 mt-3">
                   <button
                     onClick={() => onAction('nudge', item.id)}
                     className="px-2 py-1 text-xs font-medium bg-surface border border-semantic-error text-semantic-error rounded hover:bg-semantic-error-dim transition-colors"
                   >
-                    Nudge Owner
+                    Email owner
                   </button>
                   <button
-                    onClick={() => onAction('reassign', item.id)}
+                    onClick={() => onAction('reassign', item.id, item.owner)}
                     className="px-2 py-1 text-xs font-medium bg-surface border border-line-strong text-content-secondary rounded hover:bg-surface-muted transition-colors"
                   >
                     Reassign
@@ -155,7 +155,7 @@ export default function ActionItemStatusCard({ data, onAction }) {
               <span className={`font-semibold flex items-center gap-1 ${
                 trends.weekOverWeek.completionRate >= 0 ? 'text-semantic-success' : 'text-semantic-error'
               }`}>
-                {(summary.completionRate * 100).toFixed(0)}%
+                {summary.completionRate.toFixed(0)}%
                 {trends.weekOverWeek.completionRate !== 0 && (
                   <span className="text-xs">
                     ({trends.weekOverWeek.completionRate > 0 ? '+' : ''}

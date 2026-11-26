@@ -746,7 +746,7 @@ class IntelligenceService {
         // Relationships are deal-specific, so we'll get them on-demand
       ] = await Promise.all([
         this.meetingPrepService.getUpcomingMeetingPrep(userId, { hours: timeHorizon.meetings }),
-        this.dealRiskService.getAtRiskDeals(userId, { riskLevel: dealRiskFilter, limit: 10 }),
+        dealRiskFilter.length ? this.dealRiskService.getAtRiskDeals(userId, { riskLevel: dealRiskFilter, limit: 10 }) : [],
         this.actionItemService.getActionItemStatus(userId),
       ]);
 

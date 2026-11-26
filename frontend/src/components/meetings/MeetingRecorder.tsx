@@ -52,8 +52,11 @@ export interface MeetingRecorderProps {
   audioInputDeviceId?: string
   /** Called once the recording is handed to the server for its transcript. */
   onRecorded?: (meetingId: string) => void
-  /** Locks the containing drawer while capture or audio handoff is in progress. */
+  /** Reports whether capture or audio handoff is in progress. */
   onCaptureChange?: (active: boolean) => void
+  /** Called when the pop-out is ready to take over the visible controls. */
+  onPopOut?: () => void
+  onReset?: () => void
   onOpenMeeting?: () => void
 }
 
@@ -164,7 +167,7 @@ function Preview({ stream }: { stream: MediaStream }): React.ReactElement {
   return <video ref={ref} autoPlay muted playsInline aria-label="Recording preview" className="aspect-video w-full rounded-lg bg-black object-contain" />
 }
 
-export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChange, onOpenMeeting, quickRecordRequest, onQuickRecordConsumed }: MeetingRecorderProps): React.ReactElement {
+export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChange, onOpenMeeting, onPopOut, onReset, quickRecordRequest, onQuickRecordConsumed }: MeetingRecorderProps): React.ReactElement {
   const navigate = useNavigate()
   // Unique per recorder, so two on one page (or a test harness) never share a radio group.
   const uid = useId()
@@ -462,21 +465,26 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChang
   const openPop = async (): Promise<void> => {
     if (pop) {
       pop.win.focus()
+      onPopOut?.()
       return
     }
+    let win: Window | null = null
     try {
       const pip = (window as unknown as { documentPictureInPicture?: { requestWindow: (o: { width: number; height: number }) => Promise<Window> } })
         .documentPictureInPicture
       const height = capture.current?.preview ? 420 : 230
-      const win = canPip() && pip ? await pip.requestWindow({ width: 360, height }) : window.open('', 'entomate-recorder', `popup,width=360,height=${height}`)
+      win = canPip() && pip ? await pip.requestWindow({ width: 360, height }) : window.open('', 'entomate-recorder', `popup,width=360,height=${height}`)
       if (!win) {
         setError('Your browser blocked the pop-out. Allow pop-ups for Entomate.')
         return
       }
       const root = dressWindow(win, 'Entomate · recording') as HTMLElement
-      win.addEventListener('pagehide', () => setPop(null), { once: true })
+      win.addEventListener('pagehide', () => setPop(current => current?.win === win ? null : current), { once: true })
       setPop({ win, root })
+      setError(null)
+      onPopOut?.()
     } catch {
+      win?.close()
       setError('The pop-out could not open in this browser.')
     }
   }
@@ -528,6 +536,7 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChang
   }
 
   const reset = (): void => {
+    onReset?.()
     setPaused(false)
     capture.current = null
     uploader.current = null

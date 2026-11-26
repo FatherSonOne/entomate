@@ -1,36 +1,23 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { UserPlus, X, Search } from 'lucide-react'
 import { VCButton, VCInput } from '../vc'
-import api from '../../services/api'
+import { meetingsApi } from '../../services/api'
+import { useOrgSafe } from '../../contexts/OrgContext'
 import { useToast } from '../vc/ToastProvider'
 
 export default function ReassignModal({ isOpen, onClose, itemId, currentAssignee, onReassigned }) {
   const toast = useToast()
+  const members = useOrgSafe()?.orgMembers || []
   const [submitting, setSubmitting] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [contacts, setContacts] = useState([])
   const [selectedUser, setSelectedUser] = useState(null)
-
-  useEffect(() => {
-    if (isOpen) {
-      loadContacts()
-    }
-  }, [isOpen])
-
-  const loadContacts = async () => {
-    try {
-      const data = await api.intelligence.getRecentContacts()
-      setContacts(data.contacts || [])
-    } catch (err) {
-      console.error('Failed to load contacts:', err)
-    }
-  }
 
   if (!isOpen) return null
 
-  const filtered = contacts.filter(c =>
-    (c.name || c.email || '').toLowerCase().includes(searchQuery.toLowerCase())
+  const search = searchQuery.trim().toLowerCase()
+  const filtered = members.filter(member =>
+    [member.userName, member.userEmail].some(value => value && value.toLowerCase().includes(search))
   )
 
   const handleSubmit = async () => {
@@ -41,12 +28,13 @@ export default function ReassignModal({ isOpen, onClose, itemId, currentAssignee
 
     setSubmitting(true)
     try {
-      await api.tasks.update(itemId, {
-        assigned_to: selectedUser.id,
-        assigned_to_name: selectedUser.name || selectedUser.email
+      const name = selectedUser.userName || selectedUser.userEmail
+      await meetingsApi.updateActionItem(itemId, {
+        assigned_to_name: name,
+        assigned_to_email: selectedUser.userEmail || null,
       })
 
-      toast.success('Reassigned', `Task reassigned to ${selectedUser.name || selectedUser.email}`)
+      toast.success('Reassigned', `Action item reassigned to ${name}`)
       onReassigned?.()
       onClose()
     } catch (err) {
@@ -86,18 +74,19 @@ export default function ReassignModal({ isOpen, onClose, itemId, currentAssignee
         <div style={{ maxHeight: 200, overflowY: 'auto', marginTop: 12 }} className="space-y-1">
           {filtered.length === 0 ? (
             <p style={{ color: 'var(--t2)', fontSize: 13, textAlign: 'center', padding: 16 }}>
-              No contacts found
+              No team members found
             </p>
           ) : (
-            filtered.slice(0, 10).map(contact => (
+            filtered.slice(0, 10).map(member => (
               <button
-                key={contact.id}
+                key={member.userId}
                 type="button"
-                onClick={() => setSelectedUser(contact)}
+                onClick={() => setSelectedUser(member)}
+                aria-pressed={selectedUser?.userId === member.userId}
                 className="w-full flex items-center gap-3 p-2 rounded-lg transition-colors"
                 style={{
-                  background: selectedUser?.id === contact.id ? 'var(--cd)' : 'transparent',
-                  border: selectedUser?.id === contact.id ? '1px solid var(--c)' : '1px solid transparent',
+                  background: selectedUser?.userId === member.userId ? 'var(--cd)' : 'transparent',
+                  border: selectedUser?.userId === member.userId ? '1px solid var(--c)' : '1px solid transparent',
                   cursor: 'pointer',
                   textAlign: 'left'
                 }}
@@ -106,14 +95,14 @@ export default function ReassignModal({ isOpen, onClose, itemId, currentAssignee
                   className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
                   style={{ background: 'var(--cd)', color: 'var(--c)', fontSize: 11, fontWeight: 700 }}
                 >
-                  {(contact.name || contact.email || '?')[0].toUpperCase()}
+                  {(member.userName || member.userEmail)[0].toUpperCase()}
                 </div>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--t0)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {contact.name || contact.email}
+                    {member.userName || member.userEmail}
                   </div>
-                  {contact.job_title && (
-                    <div style={{ fontSize: 11, color: 'var(--t2)' }}>{contact.job_title}</div>
+                  {member.userName && member.userEmail && (
+                    <div style={{ fontSize: 11, color: 'var(--t2)' }}>{member.userEmail}</div>
                   )}
                 </div>
               </button>

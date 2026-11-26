@@ -158,15 +158,24 @@ export default function Layout() {
   const [assistantOpen, setAssistantOpen] = useState(false)
   const [recorderOpen, setRecorderOpen] = useState(false)
   const [recorderLocked, setRecorderLocked] = useState(false)
+  const [recorderBackgrounded, setRecorderBackgrounded] = useState(false)
   const [recordingVersion, setRecordingVersion] = useState(0)
   const [quickRecordRequest, setQuickRecordRequest] = useState(0)
   const [audioInputDeviceId, setAudioInputDeviceId] = useState('')
   const openRecorder = () => setRecorderOpen(true)
   const quickRecord = () => {
-    setQuickRecordRequest(request => request + 1)
+    if (!recorderLocked && !recorderBackgrounded) setQuickRecordRequest(request => request + 1)
     openRecorder()
   }
-  const closeRecorder = () => setRecorderOpen(false)
+  const closeRecorder = () => {
+    if (!recorderLocked) setRecorderBackgrounded(false)
+    setRecorderOpen(false)
+  }
+  const backgroundRecorder = () => {
+    setRecorderBackgrounded(true)
+    setRecorderOpen(false)
+  }
+  const recorderLabel = recorderLocked ? 'Recorder active' : recorderBackgrounded ? 'Review recording' : undefined
   const recorderRecorded = () => setRecordingVersion((version) => version + 1)
   const recorderOutlet = { openRecorder, quickRecord, recorderOpen, recorderActive: recorderLocked, recordingVersion }
   const shellOutlet = { ...recorderOutlet, openAssistant: () => setAssistantOpen(true) }
@@ -278,12 +287,14 @@ export default function Layout() {
         </Suspense>
       )}
       <EntoAIProactiveChecker onSignals={onSignals} refreshKey={assistantOpen} />
-      <Drawer open={recorderOpen} onClose={closeRecorder} dismissible={!recorderLocked}
+      <Drawer open={recorderOpen} onClose={closeRecorder} dismissible={!recorderLocked || recorderBackgrounded}
+        keepMounted={recorderBackgrounded}
         label="New meeting" className="bs-tokens bs-drawer-wide meeting-recorder-drawer" layer="top">
         <div className="bs-skin meeting-recorder-body">
           <Suspense fallback={<p role="status"><Signal tone="off">Loading recorder</Signal></p>}>
             <MeetingRecorder audioInputDeviceId={audioInputDeviceId} onRecorded={recorderRecorded}
-              onCaptureChange={setRecorderLocked} onOpenMeeting={closeRecorder}
+              onCaptureChange={setRecorderLocked} onOpenMeeting={closeRecorder} onPopOut={backgroundRecorder}
+              onReset={() => setRecorderBackgrounded(false)}
               quickRecordRequest={quickRecordRequest} onQuickRecordConsumed={() => setQuickRecordRequest(0)} />
           </Suspense>
         </div>
@@ -328,6 +339,7 @@ export default function Layout() {
             onOpen={() => setCommandPaletteOpen(true)} onClose={() => setCommandPaletteOpen(false)}
             onShowShortcuts={() => { setCommandPaletteOpen(false); setShortcutsHelpOpen(true) }} />}
           onRecord={openRecorder}
+          recorderLabel={recorderLabel}
           onSettings={() => goSettings()}
           settingsActive={isActive('/settings')}
           menuItems={[
@@ -583,9 +595,9 @@ export default function Layout() {
             </button>
 
             {/* New Meeting CTA */}
-            <button className="btn btn-primary" onClick={openRecorder} aria-label="New meeting" aria-haspopup="dialog">
+            <button className="btn btn-primary" onClick={openRecorder} aria-label={recorderLabel || 'New meeting'} aria-haspopup="dialog">
               <Mic className="w-4 h-4" />
-              <span className="hidden sm:inline">New Meeting</span>
+              <span className="hidden sm:inline">{recorderLabel || 'New Meeting'}</span>
             </button>
           </div>
         </header>

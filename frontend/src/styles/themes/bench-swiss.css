@@ -965,6 +965,7 @@ html.bs-scroll-lock, html.bs-scroll-lock body { overflow: hidden; }
   outline: none;
 }
 .bs-drawer[data-open="true"] { transform: translate3d(0, var(--bs-drag, 0px), 0); transition: transform 460ms var(--bs-spring); }
+.bs-drawer[hidden] { display: none; }
 .bs-drawer[data-dragging="true"] { transition: none !important; }
 .bs-drawer-grip { display: none; }
 .bs-drawer-head {
@@ -1789,7 +1790,20 @@ a.bs-today-call-what:hover, .bs-today-link:hover, .bs-today-dec-src:hover { text
 .bs-today-keyhint { margin-top: 18px; padding: 0; border: 0; background: none; cursor: pointer; }
 .bs-today-keyhint:hover { color: var(--bs-ink); }
 .bs-today-keys .bs-field { grid-template-columns: 56px minmax(0, 1fr); align-items: center; }
-.bs-today-brief { margin-top: 14px; }
+.bs-briefings { display: grid; gap: 16px; padding-top: 14px; }
+.bs-briefings h2 { margin: 0; font-size: 16px; font-weight: 650; }
+.bs-briefings-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.bs-briefings-bar p { margin: 0; }
+.bs-briefings-keys { display: flex; justify-content: flex-end; gap: 8px; }
+.bs-briefings-section { display: grid; gap: 8px; min-width: 0; }
+.bs-briefings-empty { padding: 16px 0; border-block: 1px solid var(--bs-rule); color: var(--bs-muted); }
+.bs-briefings fieldset { display: grid; gap: 8px; padding: 8px 0 0; }
+.bs-briefings fieldset label { display: flex; align-items: center; gap: 8px; }
+.bs-briefings input[type="checkbox"] { accent-color: var(--bs-brand); }
+.bs-briefings-hours { display: grid; gap: 6px; }
+.bs-briefings-hours .bs-input { max-width: 120px; }
+.bs-briefings-document { display: grid; gap: 8px; line-height: 1.55; overflow-wrap: anywhere; }
+.bs-briefings-document :is(ul, ol) { padding-inline-start: 20px; list-style: revert; }
 
 @media (max-width: 767.98px) {
   .bs-today .bs-g12 > .bs-cell:nth-child(n+3) { padding-top: 30px; }

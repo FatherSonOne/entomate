@@ -42,14 +42,18 @@ class DealRiskService {
     const { riskLevel = ['medium', 'high', 'critical'], limit = 10 } = options;
 
     try {
+      const deals = await this.getUserDeals(userId);
+      if (!deals.length || !riskLevel.length) return [];
+      const dealsById = new Map(deals.map(deal => [deal.id, deal]));
+
       // Get cached risk scores from database
-      const { data: cachedScores, error } = await supabaseAdmin
+      const cached = supabaseAdmin && await supabaseAdmin
         .from('deal_risk_scores')
         .select('*')
         .eq('user_id', userId)
         .in('risk_level', riskLevel)
-        .order('score', { ascending: false })
-        .limit(limit);
+        .order('score', { ascending: false });
+      const { data: cachedScores, error } = cached || {};
 
       if (error) {
         log.error('[DealRiskService] Error fetching cached scores:', { error: error.message || error });
@@ -61,18 +65,18 @@ class DealRiskService {
         fourHoursAgo.setHours(fourHoursAgo.getHours() - 4);
 
         const freshScores = cachedScores.filter(
-          score => new Date(score.calculated_at) > fourHoursAgo
+          score => dealsById.has(score.deal_id) && new Date(score.calculated_at) > fourHoursAgo
         );
 
         if (freshScores.length > 0) {
           log.info('[DealRiskService] Using cached risk scores');
-          return freshScores.map(score => this.formatRiskAlert(score));
+          return freshScores.slice(0, limit).map(score => this.formatRiskAlert({ ...score, deal: dealsById.get(score.deal_id) }));
         }
       }
 
       // Otherwise, calculate fresh scores
       log.info('[DealRiskService] Calculating fresh risk scores');
-      return await this.calculateAndCacheRiskScores(userId, options);
+      return (await this.calculateAndCacheRiskScores(userId, deals, riskLevel)).slice(0, limit);
     } catch (error) {
       log.error('[DealRiskService] getAtRiskDeals error:', { error: error.message || error });
       return [];
@@ -82,15 +86,8 @@ class DealRiskService {
   /**
    * Calculate risk scores for all user's deals and cache them
    */
-  async calculateAndCacheRiskScores(userId, options = {}) {
+  async calculateAndCacheRiskScores(userId, deals, riskLevel) {
     try {
-      // Get all deals for this user from shared hub or local projects
-      const deals = await this.getUserDeals(userId);
-
-      if (deals.length === 0) {
-        return [];
-      }
-
       // Calculate risk score for each deal
       const riskScores = await Promise.all(
         deals.map(deal => this.calculateRiskScore(deal, userId))
@@ -98,7 +95,6 @@ class DealRiskService {
 
       // Filter out nulls and filter by requested risk levels
       const validScores = riskScores.filter(Boolean);
-      const { riskLevel = ['medium', 'high', 'critical'] } = options;
       const filteredScores = validScores.filter(score =>
         riskLevel.includes(score.risk_level)
       );
@@ -117,55 +113,48 @@ class DealRiskService {
    * Get user's deals from shared hub or projects
    */
   async getUserDeals(userId) {
-    const deals = [];
-
     try {
-      // Try to get deals from shared hub first
+      const { data: projects, error } = await supabase
+        .from('projects')
+        .select('id, name, crm_deal_id, deal_value, status')
+        .in('org_id', requestOrgIds())
+        .eq('owner_id', userId)
+        .not('crm_deal_id', 'is', null)
+        .limit(50);
+      if (error) throw error;
+
+      const deals = new Map((projects || []).map(project => [project.crm_deal_id, {
+        id: project.crm_deal_id,
+        name: project.name,
+        value: project.deal_value ?? 0,
+        stage: project.status,
+        projectId: project.id,
+        owner: userId
+      }]));
+      if (!deals.size) return [];
+
+      // Only enrich CRM deals linked to projects the caller owns in their workspaces.
       if (this.hubClient) {
         const { data: hubDeals } = await this.hubClient
           .from('cross_app_events')
           .select('payload')
           .eq('source_app', 'logos_crm')
           .eq('event_category', 'deal')
+          .in('payload->deal->>id', [...deals.keys()])
           .order('created_at', { ascending: false })
           .limit(100);
 
-        if (hubDeals && hubDeals.length > 0) {
-          // Extract unique deals
-          const dealMap = new Map();
-          hubDeals.forEach(event => {
-            const deal = event.payload?.deal;
-            if (deal && deal.id) {
-              dealMap.set(deal.id, deal);
-            }
-          });
-
-          deals.push(...Array.from(dealMap.values()));
+        const enriched = new Set();
+        for (const { payload } of hubDeals || []) {
+          const deal = payload?.deal;
+          const local = deals.get(deal?.id);
+          if (!local || enriched.has(deal.id)) continue;
+          deals.set(deal.id, { ...local, ...deal });
+          enriched.add(deal.id);
         }
       }
 
-      // Also get local projects with CRM deal IDs
-      const { data: projects } = await supabase
-        .from('projects')
-        .select('*')
-        .in('org_id', requestOrgIds())
-        .eq('owner_id', userId)
-        .not('crm_deal_id', 'is', null)
-        .limit(50);
-
-      if (projects && projects.length > 0) {
-        projects.forEach(project => {
-          deals.push({
-            id: project.crm_deal_id,
-            name: project.name,
-            value: project.deal_value,
-            stage: project.status,
-            projectId: project.id
-          });
-        });
-      }
-
-      return deals;
+      return [...deals.values()];
     } catch (error) {
       log.error('[DealRiskService] getUserDeals error:', { error: error.message || error });
       return [];

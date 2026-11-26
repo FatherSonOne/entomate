@@ -76,7 +76,7 @@ export default function DealRiskAlertCard({ data, onAction }) {
         <div className="flex-1 min-w-0">
           <h4 className="font-semibold text-content-primary truncate mb-1">{deal.name}</h4>
           <p className="text-sm text-content-tertiary">
-            ${deal.value.toLocaleString()} • {deal.stage}
+            ${(deal.value ?? 0).toLocaleString()} • {deal.stage}
           </p>
         </div>
         <div className={`px-3 py-1.5 rounded-lg border font-medium text-sm flex items-center gap-2 ${getRiskColor(riskScore.level)}`}>
