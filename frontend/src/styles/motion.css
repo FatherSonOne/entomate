@@ -8,7 +8,7 @@
    move    things changing place on screen: ease-in-out
    spring  drawers and sheets (Bench Swiss --bs-spring), 460ms
 
-   Only transform and opacity move. Nothing grows from scale(0):
+   Entrances use transform and opacity. Nothing grows from scale(0):
    popovers start at 0.97 from their trigger, modals at 0.97 from
    centre, panels and toasts slide a short way in.
 
@@ -34,6 +34,8 @@
   --m-slow: 300ms;
   --m-exit: 160ms;
   --m-stagger: 40ms;
+  --m-navrail-duration: 260ms;
+  --m-navrail: var(--m-navrail-duration) var(--m-ease-in-out);
 
   /* Travel. Reduced motion zeroes these. */
   --m-rise: 6px;
@@ -42,10 +44,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root { scroll-behavior: auto; --m-rise: 0px; --m-slide: 0px; --m-pop-scale: 1; --m-decorative-effect: none; --m-theme-duration: 0ms; }
+  :root { scroll-behavior: auto; --m-rise: 0px; --m-slide: 0px; --m-pop-scale: 1; --m-decorative-effect: none; --m-theme-duration: 0ms; --m-navrail-duration: 0ms; }
   :is(.animate-spin, .animate-pulse, .animate-ping, .animate-bounce, .react-flow__edge.animated path) { animation: none; }
 }
-html[data-motion="reduce"] { scroll-behavior: auto; --m-rise: 0px; --m-slide: 0px; --m-pop-scale: 1; --m-decorative-effect: none; --m-theme-duration: 0ms; }
+html[data-motion="reduce"] { scroll-behavior: auto; --m-rise: 0px; --m-slide: 0px; --m-pop-scale: 1; --m-decorative-effect: none; --m-theme-duration: 0ms; --m-navrail-duration: 0ms; }
 html[data-motion="reduce"] :is(.animate-spin, .animate-pulse, .animate-ping, .animate-bounce, .react-flow__edge.animated path) { animation: none; }
 
 /* Light and dark still switch immediately when either preference is active. */

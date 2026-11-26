@@ -405,7 +405,8 @@ export function BenchShell(props: BenchShellProps): React.ReactElement {
       <a href="#bs-page" className="bs-sr">Skip to content</a>
 
       {/* Rail: the patch panel (desktop) */}
-      <aside id="bench-navrail" className="bs-rail" aria-label="Main navigation">
+      <aside id="bench-navrail" className="bs-rail" aria-label="Main navigation"
+        ref={(el) => { if (el) el.inert = railCollapsed }}>
         <Link to="/dashboard" className="bs-brand" aria-label="Entomate, go to Today">
           <img src={brandMark} alt="" width={28} height={28} data-brand-mark="" />
           entomate
