@@ -27,7 +27,11 @@ beforeEach(() => {
 })
 
 function renderBriefings() {
-  render(<Drawer open onClose={() => {}} label="Briefings"><IntelligenceDashboard /></Drawer>)
+  render(
+    <Drawer open onClose={() => {}} label="Briefings">
+      <div className="bs-skin"><IntelligenceDashboard /></div>
+    </Drawer>
+  )
 }
 
 describe('Briefings', () => {
@@ -46,7 +50,32 @@ describe('Briefings', () => {
     await waitFor(() => expect(getDashboard.mock.calls.at(-1)[0]).toMatchObject({ meetingHours: 48 }))
     expect(getDashboard).toHaveBeenCalledTimes(2)
     expect(await screen.findByText(/no briefings match/i)).toBeInTheDocument()
+    expect(screen.getByText('Preferences saved on this device.')).toHaveFocus()
     expect(JSON.parse(localStorage.getItem('entomate_intelligence_prefs')).showActionItems).toBe(false)
+  })
+
+  test('keeps edits available to retry if browser storage rejects the save', async () => {
+    renderBriefings()
+    fireEvent.click(await screen.findByRole('button', { name: /customize/i }))
+    const hours = screen.getByRole('spinbutton', { name: /meetings/i })
+    fireEvent.change(hours, { target: { value: '72' } })
+    const save = screen.getByRole('button', { name: /save preferences/i })
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementationOnce(() => {
+      throw new DOMException('Storage unavailable', 'QuotaExceededError')
+    })
+    try {
+      fireEvent.click(save)
+      expect(screen.getByRole('alert')).toHaveTextContent('Couldn’t save preferences')
+      expect(hours).toHaveValue(72)
+      expect(getDashboard).toHaveBeenCalledTimes(1)
+      expect(localStorage.getItem('entomate_intelligence_prefs')).toBeNull()
+    } finally {
+      setItem.mockRestore()
+    }
+
+    fireEvent.click(save)
+    expect(await screen.findByText('Preferences saved on this device.')).toBeInTheDocument()
+    await waitFor(() => expect(getDashboard.mock.calls.at(-1)[0]).toMatchObject({ meetingHours: 72 }))
   })
 
   test('offers retry when the service returns a failure response', async () => {
