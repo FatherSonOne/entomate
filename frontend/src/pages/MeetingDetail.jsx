@@ -18,7 +18,7 @@ import { LiveMeetingInsights } from '../components/meetings/LiveMeetingInsights'
 import CrmSendDrawer from '../components/meetings/CrmSendDrawer'
 import { useFollowUp, FollowUpLetter, FollowUpContext, FollowUpSending, FollowUpOptions } from '../components/meetings/FollowUpPanel'
 import { sendBlocker, sendingView } from '../services/followUpView'
-import { canPlay, toRecordingJob } from '../services/meetingRecorderService'
+import { canPlay, isRebuildingTranscript, rebuildRecordingTranscript, toRecordingJob, toWaveformPeaks } from '../services/meetingRecorderService'
 import cache from '../services/apiCache'
 import { clipToNotes } from '../services/searchNotesService'
 import { formatClock, speakersOf, toSegments, toSummaryMoments } from '../services/meetingTranscriptService'
@@ -77,8 +77,14 @@ export default function MeetingDetail() {
   const keptRecording = canPlay(meeting?.recording_job)
   const uploadedAudioUrl = keptRecording ? undefined : meeting?.audio_file_url || undefined
   const playable = keptRecording || Boolean(uploadedAudioUrl)
+  const recordingJob = toRecordingJob(meeting?.recording_job)
+  const browserRecording = recordingJob && (recordingJob.source === 'browser'
+    || (!recordingJob.source && !meeting?.recording_job?.botSessionId && recordingJob.mode))
+  const canRebuildTranscript = keptRecording && browserRecording
+    && (!transcriptSegments?.length || transcriptSegments.some(line => line.endMs == null))
+  const [requestingTranscriptRebuild, setRequestingTranscriptRebuild] = useState(false)
   // A browser recording whose minutes are still being written: empty sections say so instead of "none".
-  const minutesPending = ['transcribing', 'backup'].includes(toRecordingJob(meeting?.recording_job)?.status)
+  const minutesPending = ['transcribing', 'backup'].includes(recordingJob?.status)
   const jumpToTranscript = useCallback((atMs, play = true, eventId = null) => {
     setFocusAtMs(atMs)
     setFocusEventId(eventId)
@@ -203,6 +209,18 @@ export default function MeetingDetail() {
       console.error('Failed to refresh meeting:', error)
     }
   }, [id])
+
+  const handleRebuildTranscript = async () => {
+    setRequestingTranscriptRebuild(true)
+    try {
+      await rebuildRecordingTranscript(id)
+      await refreshMeeting()
+    } catch (error) {
+      toast.error('Could not rebuild the transcript', error.message)
+    } finally {
+      setRequestingTranscriptRebuild(false)
+    }
+  }
 
   const minutesRequest = useRef(null)
   const [writingLiveMinutes, setWritingLiveMinutes] = useState(false)
@@ -540,6 +558,10 @@ export default function MeetingDetail() {
         label="More actions"
         entries={[
           { key: 'rename', label: 'Rename', onSelect: startEditTitle },
+          ...(canRebuildTranscript ? [{
+            key: 'rebuild-transcript', label: 'Rebuild transcript from audio',
+            disabled: requestingTranscriptRebuild || isRebuildingTranscript(recordingJob), onSelect: handleRebuildTranscript,
+          }] : []),
           { key: 'cal', label: calendarSyncing ? 'Adding to calendar' : 'Add to calendar', disabled: calendarSyncing, onSelect: handleAddToCalendar },
           ...(meeting.transcript && templates.length > 0 ? [
             { kind: 'label', key: 'rw', label: rewriting ? 'Rewriting the summary' : 'Rewrite the summary as' },
@@ -691,6 +713,7 @@ export default function MeetingDetail() {
             meetingId={meeting.id}
             audioUrl={uploadedAudioUrl}
             durationMs={meeting.recording_job?.durationMs || lengthMs}
+            waveformPeaks={keptRecording ? toWaveformPeaks(meeting.recording_job?.waveformPeaks) : null}
             transcriptSegments={transcriptSegments}
             onTime={setPlayingAtMs}
             decisions={decisionMarks}

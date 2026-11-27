@@ -6,7 +6,8 @@ import { vi, describe, test, expect, beforeEach } from 'vitest'
 const api = vi.hoisted(() => ({ get: vi.fn(), carryForward: vi.fn(() => Promise.resolve(null)) }))
 const player = vi.hoisted(() => ({ ready: false, playFrom: vi.fn() }))
 const reports = vi.hoisted(() => ({ downloadMeetingDocument: vi.fn(async () => {}) }))
-vi.mock('../services/api', () => ({ default: {}, meetingsApi: api, integrationsApi: {}, calendarApi: {}, reportsApi: reports, searchApi: {} }))
+const recordings = vi.hoisted(() => ({ rebuildTranscript: vi.fn() }))
+vi.mock('../services/api', () => ({ default: {}, meetingsApi: api, recordingsApi: recordings, integrationsApi: {}, calendarApi: {}, reportsApi: reports, searchApi: {} }))
 vi.mock('../components/vc/ToastProvider', () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn() }) }))
 vi.mock('../components/intelligence/MeetingIntelligencePanel', () => ({ default: () => null }))
 vi.mock('../components/EcosystemSyncStatus', () => ({ default: () => null }))
@@ -77,6 +78,15 @@ describe('a pressed timecode plays the recording', () => {
     renderPage({ status: 'done', audioKept: true, durationMs: 60_000 })
     fireEvent.click(await screen.findByRole('button', { name: 'Decision: Ship on the fourteenth' }))
     expect(player.playFrom).toHaveBeenCalledWith(22_000)
+  })
+
+  test('offers to rebuild an older browser transcript from its kept audio', async () => {
+    recordings.rebuildTranscript.mockResolvedValue({ success: true })
+    renderPage({ status: 'done', source: 'browser', audioKept: true, durationMs: 60_000 })
+    fireEvent.click(await screen.findByRole('button', { name: 'More actions' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Rebuild transcript from audio' }))
+    expect(recordings.rebuildTranscript).toHaveBeenCalledWith('m1')
+    expect(screen.getByTestId('player-stub')).toBeInTheDocument()
   })
 
   test('a Virtual room speaker button includes its line count and plays from the first line', async () => {

@@ -7,7 +7,10 @@ const mockBot = jest.fn();
 const mockExtract = jest.fn(async (input, output) => { require('fs').writeFileSync(output, Buffer.from('opus')); return 50000; });
 
 jest.mock('../services/botOrchestrator', () => ({ getRecallBotState: (...a) => mockBot(...a) }));
-jest.mock('../services/playbackFile', () => ({ extractSpeechAudio: (...a) => mockExtract(...a) }));
+jest.mock('../services/playbackFile', () => ({
+  extractSpeechAudio: (...a) => mockExtract(...a),
+  readWaveformPeaksFromAudio: jest.fn(async () => [0.25, 0.5]),
+}));
 jest.mock('../config/supabase', () => ({
   supabase: null,
   supabaseAdmin: {
@@ -46,6 +49,7 @@ test('saves speech audio as the meeting playback file', async () => {
   expect(mockState.uploads[0]).toEqual({ p: 'o1/m1/playback.webm', opts: { contentType: 'audio/webm', upsert: true } });
   expect(mockState.updates.at(-1).recording_job).toMatchObject({
     status: 'done', source: 'bot', botSessionId: 's1', audioKept: true, playbackFile: 'o1/m1/playback.webm', durationMs: 50000,
+    waveformPeaks: [0.25, 0.5],
   });
 });
 

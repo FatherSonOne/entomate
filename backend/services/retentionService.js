@@ -183,7 +183,7 @@ async function sweepRecordings(workspaceId, retentionDays) {
       const now = new Date().toISOString();
       const { error: updErr } = await db()
         .from('meetings')
-        .update({ recording_job: { ...row.recording_job, retentionDeletedAt: now, retentionError: null } })
+        .update({ recording_job: { ...row.recording_job, waveformPeaks: null, retentionDeletedAt: now, retentionError: null } })
         .eq('id', row.id)
         .eq('org_id', row.org_id);
       if (updErr) throw new Error(`meetings update failed: ${updErr.message}`);

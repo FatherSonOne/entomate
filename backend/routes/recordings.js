@@ -10,9 +10,10 @@
  *   POST   /api/recordings/:id/finish         all pieces sent: transcribe in the background
  *                                             ({ salvage: true }: the tab closed; use what was saved)
  *   POST   /api/recordings/:id/retry          transcribe again after a failure
+ *   POST   /api/recordings/:id/rebuild-transcript   regenerate a saved browser transcript
  *   DELETE /api/recordings/:id                discard an unfinished recording
  *   GET    /api/recordings/:id/playback       a signed link to the seekable copy, or to the pieces in order
- *   GET    /api/recordings/:id/waveform       audio peaks for a linked recording
+ *   GET    /api/recordings/:id/waveform       audio peaks for a saved or linked recording
  *   DELETE /api/recordings/:id/audio          remove a finished recording's audio; keep the transcript
  *
  * Progress is read from the meeting itself (`recording_job` on GET /api/meetings/:id).
@@ -114,6 +115,16 @@ router.post('/:id/retry', authenticate, async (req, res) => {
     res.status(202).json({ success: true, ...result });
   } catch (err) {
     sendError(res, err, 'retry');
+  }
+});
+
+router.post('/:id/rebuild-transcript', authenticate, async (req, res) => {
+  try {
+    const orgId = await meetingNotes.assertMeetingAccess(req.user?.id, req.params.id);
+    const result = await recorder.rebuildTranscript({ orgId, meetingId: req.params.id });
+    res.status(202).json({ success: true, ...result });
+  } catch (err) {
+    sendError(res, err, 'rebuild transcript');
   }
 });
 

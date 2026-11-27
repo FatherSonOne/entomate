@@ -11,6 +11,8 @@ import { Loader2, RotateCcw } from 'lucide-react'
 import { Key, Signal } from '../bench'
 import {
   canRetry,
+  canPlay,
+  isRebuildingTranscript,
   retryRecording,
   rewriteSummary,
   salvageRecording,
@@ -43,13 +45,19 @@ export function RecordingStatus({ meetingId, recordingJob, onRefresh, hasSummary
   const [error, setError] = useState<string | null>(null)
   const retryable = canRetry(job)
   const writing = job?.status === 'transcribing' && !retryable
-  const waiting = writing || job?.status === 'backup'
+  const rebuilding = canPlay(recordingJob) && isRebuildingTranscript(job)
+  const waiting = writing || rebuilding || job?.status === 'backup'
 
   useEffect(() => {
     if (!waiting) return
     const timer = window.setInterval(onRefresh, POLL_MS)
     return () => window.clearInterval(timer)
   }, [waiting, onRefresh])
+
+  if (rebuilding) return <Signal tone="brand">Rebuilding transcript</Signal>
+  if (canPlay(recordingJob) && job?.transcriptRebuildError) {
+    return <p role="alert" className="bs-recstat-err">{job.transcriptRebuildError}</p>
+  }
 
   const summaryMissing = !hasSummary && ((!job && hasTranscript) || (job?.status === 'done' && !!job.summaryError))
   if (!summaryMissing && (!job || job.status === 'done')) return null
