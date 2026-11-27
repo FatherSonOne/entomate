@@ -25,7 +25,7 @@ import {
 } from '../services/searchEngine'
 import type { Filter, SearchMode, SearchResponse, SearchResult } from '../services/searchEngine'
 import { readSearchVisit, rememberSearchVisit } from '../services/searchReturn'
-import type { AskClaim, AskMeeting, CompletedAnswer, MonthlyRecap } from '../services/searchReturn'
+import type { AskCitation, AskClaim, AskMeeting, CompletedAnswer, MonthComparison, MonthlyRecap } from '../services/searchReturn'
 import { meetingSourceHref } from '../services/meetingSourceLink'
 import {
   clipFromResult, clipKey, kindLabel, noteHref, notesToMarkdown, originLabel, sourceLine,
@@ -421,6 +421,7 @@ function AskAnswer({ question, workspaceId, workspaceName, showQuestion, initial
   const [citations, setCitations] = useState<AskMeeting[]>(initial?.meetings ?? [])
   const [claims, setClaims] = useState<AskClaim[] | undefined>(initial?.claims)
   const [recap, setRecap] = useState(initial?.recap)
+  const [comparison, setComparison] = useState(initial?.comparison)
   const [state, setState] = useState<'asking' | 'done' | 'failed'>(initial ? 'done' : 'asking')
   const [attempt, setAttempt] = useState(0)
 
@@ -439,7 +440,7 @@ function AskAnswer({ question, workspaceId, workspaceName, showQuestion, initial
         signal: AbortSignal
         onChunk: (c: string) => void
         onCitations: (c: AskMeeting[]) => void
-        onComplete: (r: { answer?: string; citations?: AskMeeting[]; claims?: AskClaim[]; recap?: MonthlyRecap }) => void
+        onComplete: (r: { answer?: string; citations?: AskMeeting[]; claims?: AskClaim[]; recap?: MonthlyRecap; comparison?: MonthComparison }) => void
         onError: () => void
       }) => Promise<void>
     }).askStream
@@ -454,6 +455,7 @@ function AskAnswer({ question, workspaceId, workspaceName, showQuestion, initial
         if (Array.isArray(r.citations)) setCitations(r.citations)
         if (Array.isArray(r.claims)) setClaims(r.claims)
         setRecap(r.recap)
+        setComparison(r.comparison)
         finished = true
         setState('done')
       },
@@ -465,7 +467,7 @@ function AskAnswer({ question, workspaceId, workspaceName, showQuestion, initial
   const meetings = claims ? [] : citations.filter((c) => c.type === 'meeting' && c.id)
   const meetingCount = new Set((claims ? claims.flatMap((claim) => claim.citations) : meetings).map((c) => c.id)).size
   const leave = (event: React.MouseEvent, id: string) => {
-    if (ordinaryClick(event)) onLeave(id, { question, text, meetings, claims, recap })
+    if (ordinaryClick(event)) onLeave(id, { question, text, meetings, claims, recap, comparison })
   }
   const note: NewNote = {
     kind: 'answer', body: text.trim() || ' ', origin: 'ask', query: question,
@@ -491,6 +493,7 @@ function AskAnswer({ question, workspaceId, workspaceName, showQuestion, initial
         )}
       </div>
       {showQuestion && <p className="bs-srch-answer-question">{question}</p>}
+      {state === 'done' && comparison && <ComparisonCoverage comparison={comparison} workspaceName={workspaceName} />}
       {state === 'done' && recap && <RecapCoverage recap={recap} workspaceName={workspaceName} />}
       {state === 'failed' ? (
         <div className="bs-srch-empty">
@@ -500,6 +503,7 @@ function AskAnswer({ question, workspaceId, workspaceName, showQuestion, initial
             setCitations([])
             setClaims(undefined)
             setRecap(undefined)
+            setComparison(undefined)
             setState('asking')
             setAttempt((n) => n + 1)
           }}>Try again</Key>
@@ -517,12 +521,12 @@ function AskAnswer({ question, workspaceId, workspaceName, showQuestion, initial
                       const id = `search-answer-claim-${claimIndex}-${sourceIndex}`
                       const time = timecode(source.atMs)
                       const moment = time ?? (source.passage.kind === 'segment' ? `Line ${source.passage.position}` : 'Transcript excerpt')
-                      const label = source.role === 'before' ? 'Before · ' : source.role === 'after' ? 'After · ' : ''
+                      const label = citationLead(source)
                       return (
                         <li key={id}>
                           <Link id={id} className="bs-srch-claim-source"
                             to={meetingSourceHref(source.id, source.atMs, source.passage)} state={linkState} onClick={(e) => leave(e, id)}>
-                            <span>{label}{source.title} · {moment}{source.speaker ? ` · ${source.speaker}` : ''}{source.date ? ` · ${shortDate(source.date)}` : ''}</span>
+                            <span>{label ? `${label} · ` : ''}{source.title} · {moment}{source.speaker ? ` · ${source.speaker}` : ''}{source.date ? ` · ${shortDate(source.date)}` : ''}</span>
                             <q>{source.quote}</q>
                           </Link>
                         </li>
@@ -555,7 +559,15 @@ function AskAnswer({ question, workspaceId, workspaceName, showQuestion, initial
   )
 }
 
-function RecapCoverage({ recap, workspaceName }: { recap: MonthlyRecap; workspaceName?: string }): React.ReactElement {
+function citationLead(source: AskCitation): string {
+  if (source.role === 'before') return 'Before'
+  if (source.role === 'after') return 'After'
+  if (source.period === 'previous') return 'Last month'
+  if (source.period === 'current') return 'This month'
+  return ''
+}
+
+function RecapPeriod({ recap, showTimeZone }: { recap: MonthlyRecap; showTimeZone?: boolean }): React.ReactElement {
   // These are calendar dates in the recap's time zone. Format them without shifting them.
   const calendar = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
   const start = new Date(`${recap.startDate}T00:00:00Z`)
@@ -568,11 +580,39 @@ function RecapCoverage({ recap, workspaceName }: { recap: MonthlyRecap; workspac
     recap.unsampledMeetings ? `${recap.unsampledMeetings} beyond the review limit` : '',
   ].filter(Boolean).join(' · ')
   return (
+    <>
+      <p>{dateRange}{showTimeZone ? ` · ${recap.timeZone}` : ''}</p>
+      <p>{coverage}</p>
+    </>
+  )
+}
+
+function RecapCoverage({ recap, workspaceName }: { recap: MonthlyRecap; workspaceName?: string }): React.ReactElement {
+  return (
     <section className="bs-srch-recap" aria-label="Monthly recap scope">
       <h2>Monthly recap{workspaceName ? ` · ${workspaceName}` : ''}</h2>
-      <p>{dateRange} · {recap.timeZone}</p>
-      <p>{coverage}</p>
+      <RecapPeriod recap={recap} showTimeZone />
       {recap.reviewedMeetings > 0 && <p>Based on selected transcript passages.</p>}
+    </section>
+  )
+}
+
+function ComparisonCoverage({ comparison, workspaceName }: { comparison: MonthComparison; workspaceName?: string }): React.ReactElement {
+  return (
+    <section className="bs-srch-recap" aria-label="Month-over-month coverage">
+      <h2>Month-over-month comparison{workspaceName ? ` · ${workspaceName}` : ''}</h2>
+      <p>{comparison.current.timeZone}</p>
+      <div className="bs-srch-recap-periods">
+        <section aria-label="Last month">
+          <h3>Last month</h3>
+          <RecapPeriod recap={comparison.previous} />
+        </section>
+        <section aria-label="This month to date">
+          <h3>This month to date</h3>
+          <RecapPeriod recap={comparison.current} />
+        </section>
+      </div>
+      {comparison.previous.reviewedMeetings + comparison.current.reviewedMeetings > 0 && <p>Based on selected transcript passages.</p>}
     </section>
   )
 }

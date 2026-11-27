@@ -288,3 +288,89 @@ test('monthly Ask returns coverage without generation when transcripts are unava
   expect(res.body).toMatchObject({ recap: emptyRecap, claims: [], answer: expect.stringContaining("couldn't verify") });
   expect(ai.chat).not.toHaveBeenCalled();
 });
+
+const monthComparison = {
+  previous: { ...recap, startDate: '2026-10-01', endDate: '2026-10-31' },
+  current: recap,
+};
+const october = { ...oldPlan, meeting_at: '2026-10-22T19:00:00Z' };
+const unchanged = { ...newPlan, source_line: 94, body: october.body };
+const octoberEarlier = { ...oldPlan, meeting_id: 'aaaa0000-aaaa-4aaa-aaaa-aaaaaaaaaaaa', meeting_at: '2026-10-01T19:00:00Z' };
+
+test('month-over-month Ask keeps coverage for both periods and validates each quote and period', async () => {
+  orgMemberships = [orgId, monthlyWorkspace];
+  supabase.rpc.mockResolvedValue({ data: {
+    comparison: monthComparison,
+    previousPassages: [october, octoberEarlier],
+    currentPassages: [newPlan, unchanged],
+  } });
+  const old = ref('p1', october, 'before');
+  const revised = ref('p3', newPlan, 'after');
+  ai.chat.mockResolvedValue(modelAnswer([
+    { topic: 'Launch', kind: 'comparison', text: 'Launch moved from Monday to Friday.', evidence: [revised, old] },
+    { topic: 'Launch', kind: 'conflict', text: 'One record lists Monday and the other lists Friday. The records disagree.', evidence: [old, revised] },
+    { topic: 'Launch', kind: 'comparison', text: 'Both citations are from October.', evidence: [
+      ref('p2', octoberEarlier, 'before'), { ...old, role: 'after' },
+    ] },
+    { topic: 'Launch', kind: 'comparison', text: 'The same decision changed.', evidence: [old, ref('p4', unchanged, 'after')] },
+    { topic: 'Launch', kind: 'recorded', text: 'Both periods narrated as a single source.', evidence: [
+      { ...old, role: 'source' }, { ...revised, role: 'source' },
+    ] },
+    { topic: 'Launch', kind: 'comparison', text: 'Invented later phrasing.', evidence: [old, { ...revised, quote: 'Launch was cancelled.' }] },
+  ]));
+  const res = await request(app).post('/search/ask/stream').send({
+    question: 'Compare this month to date with all of last month.',
+    workspaceId: monthlyWorkspace, timeZone: 'America/New_York',
+  });
+  expect(res.status).toBe(200);
+  expect(meterAiForOrg).toHaveBeenCalledWith(monthlyWorkspace, expect.anything(), expect.any(Function));
+  expect(supabase.rpc).toHaveBeenCalledTimes(1);
+  expect(supabase.rpc).toHaveBeenCalledWith('get_ask_monthly_comparison', {
+    p_org_id: monthlyWorkspace, p_time_zone: 'America/New_York', p_meeting_ids: null,
+  });
+  const result = extractEvents(res).at(-1);
+  expect(result.comparison).toEqual(monthComparison);
+  expect(result.claims).toHaveLength(2);
+  expect(result.claims[0].citations).toMatchObject([
+    { role: 'before', period: 'previous', id: october.meeting_id, date: october.meeting_at, quote: october.body,
+      passage: { kind: 'segment', revision: october.revision, position: 92 } },
+    { role: 'after', period: 'current', id: newPlan.meeting_id, date: newPlan.meeting_at, quote: newPlan.body,
+      passage: { kind: 'segment', revision: newPlan.revision, position: 93 } },
+  ]);
+  expect(result.claims[1].text).toMatch(/records disagree/);
+  expect(ai.chat).toHaveBeenCalledTimes(1);
+  const prompt = ai.chat.mock.calls[0][0];
+  expect(JSON.parse(prompt.slice(prompt.indexOf('\n{') + 1)).passages.map((passage) => passage.period))
+    .toEqual(['previous', 'previous', 'current', 'current']);
+});
+
+test('month-over-month Ask displays an empty prior period and accepts only current recorded evidence', async () => {
+  const comparison = {
+    ...monthComparison,
+    previous: { ...monthComparison.previous, totalMeetings: 1, reviewedMeetings: 0, unindexedMeetings: 0 },
+  };
+  supabase.rpc.mockResolvedValue({ data: { comparison, previousPassages: [], currentPassages: [newPlan, unchanged] } });
+  ai.chat.mockResolvedValue(modelAnswer([
+    { topic: 'Launch', kind: 'comparison', text: 'Current records guessed a change.', evidence: [
+      ref('p1', newPlan, 'before'), ref('p2', unchanged, 'after'),
+    ] },
+    { topic: 'Launch', kind: 'recorded', text: 'Friday was recorded this month.', evidence: [ref('p1', newPlan, 'source')] },
+  ]));
+  const res = await request(app).post('/search/ask').send({ question: 'How does this month compare to last month?' });
+  expect(res.status).toBe(200);
+  expect(res.body).toMatchObject({ comparison, answer: 'Friday was recorded this month.' });
+  expect(res.body.citations).toHaveLength(1);
+  expect(res.body.citations[0]).toMatchObject({ role: 'source', period: 'current', passage: { position: 93 } });
+});
+
+test.each([
+  'What changed from last month to this month?',
+  'What changed this month compared to last month?',
+  'This month vs. last month',
+])('month-over-month Ask requires workspace access for "%s"', async (question) => {
+  await request(app).post('/search/ask/stream').send({
+    question, workspaceId: monthlyWorkspace,
+  }).expect(403);
+  expect(supabase.rpc).not.toHaveBeenCalled();
+  expect(ai.chat).not.toHaveBeenCalled();
+});

@@ -8,7 +8,7 @@ const { supabase } = require('../config/supabase');
 const ai = require('../config/ai');
 const embeddingService = require('../services/embeddingService');
 const askService = require('../services/askService');
-const { isMonthlyRecap } = require('../services/askMonthlyRecap');
+const { monthlyRecapMode } = require('../services/askMonthlyRecap');
 const { searchCache, suggestionCache, withCache } = require('../utils/cache');
 const { authenticate } = require('../middleware/auth');
 const log = require('../utils/log');
@@ -290,7 +290,7 @@ function validAskMeetingIds(ids) {
 }
 
 function meterAsk(req, res, next) {
-  if (!isMonthlyRecap(req.body?.question)) return meterAi(req, res, next);
+  if (!monthlyRecapMode(req.body?.question)) return meterAi(req, res, next);
   const { workspaceId, timeZone = 'UTC' } = req.body;
   const orgIds = req.orgIds || [];
   const orgId = workspaceId ?? (orgIds.length === 1 ? orgIds[0] : null);

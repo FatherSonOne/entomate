@@ -12,6 +12,7 @@ export interface AskCitation {
   atMs: number | null
   passage: PassageAnchor
   role?: 'before' | 'after' | 'source'
+  period?: 'previous' | 'current'
 }
 
 export interface AskClaim { text: string; citations: AskCitation[]; topic?: string }
@@ -27,12 +28,18 @@ export interface MonthlyRecap {
   unsampledMeetings: number
 }
 
+export interface MonthComparison {
+  previous: MonthlyRecap
+  current: MonthlyRecap
+}
+
 export interface CompletedAnswer {
   question: string
   text: string
   meetings: AskMeeting[]
   claims?: AskClaim[]
   recap?: MonthlyRecap
+  comparison?: MonthComparison
 }
 
 export interface SearchVisit {

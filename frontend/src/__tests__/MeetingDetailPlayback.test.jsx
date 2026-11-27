@@ -228,15 +228,20 @@ describe('a pressed timecode plays the recording', () => {
     expect(search.askStream).toHaveBeenCalledWith({ question, workspaceId: 'playback-org', timeZone: expect.any(String) }, expect.any(Object))
   })
 
-  test('monthly recap restores coverage and the exact Before and After links without a second Ask request', async () => {
-    const question = 'What changed this month?'
+  test.each([
+    { label: 'monthly recap', question: 'What changed this month?', comparing: false, coverageName: 'Monthly recap scope' },
+    { label: 'month-over-month comparison', question: 'Compare this month to date with all of last month',
+      comparing: true, coverageName: 'Month-over-month coverage' },
+  ])('$label restores coverage and the exact Before and After links without a second Ask request', async ({ question, comparing, coverageName }) => {
     const beforeQuote = 'We agreed to launch on Monday.'
     const afterQuote = 'The launch is now scheduled for Friday.'
     const laterRevision = 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb'
     const sources = [
-      { id: 'before-m1', title: 'Launch planning', date: '2026-11-06T18:00:00Z', speaker: 'Ana', quote: beforeQuote, role: 'before',
+      { id: 'before-m1', title: 'Launch planning', date: comparing ? '2026-10-06T18:00:00Z' : '2026-11-06T18:00:00Z',
+        speaker: 'Ana', quote: beforeQuote, role: 'before', period: comparing ? 'previous' : undefined,
         atMs: 22_000, passage: { revision: REVISION, kind: 'segment', position: 2 } },
-      { id: 'after-m2', title: 'Launch follow-up', date: '2026-11-20T18:00:00Z', speaker: 'Pat', quote: afterQuote, role: 'after',
+      { id: 'after-m2', title: 'Launch follow-up', date: '2026-11-20T18:00:00Z', speaker: 'Pat', quote: afterQuote,
+        role: 'after', period: comparing ? 'current' : undefined,
         atMs: 22_000, passage: { revision: laterRevision, kind: 'segment', position: 2 } },
     ]
     api.get.mockImplementation(async (id) => {
@@ -254,9 +259,12 @@ describe('a pressed timecode plays the recording', () => {
     })
     const recap = { startDate: '2026-11-01', endDate: '2026-11-27', timeZone: 'America/New_York',
       totalMeetings: 4, reviewedMeetings: 2, meetingsWithoutTranscripts: 1, unindexedMeetings: 1, unsampledMeetings: 0 }
+    const previous = { ...recap, startDate: '2026-10-01', endDate: '2026-10-31',
+      totalMeetings: 5, reviewedMeetings: 3, unindexedMeetings: 0, unsampledMeetings: 1 }
+    const answerScope = comparing ? { comparison: { previous, current: recap } } : { recap }
     const answer = 'Launch moved from Monday to Friday.'
     search.askStream.mockImplementation(async (_data, callbacks) => {
-      callbacks.onComplete({ answer, recap, claims: [{ topic: 'Launch', text: answer, citations: sources }] })
+      callbacks.onComplete({ answer, ...answerScope, claims: [{ topic: 'Launch', text: answer, citations: sources }] })
     })
     render(
       <MemoryRouter initialEntries={[{ pathname: '/search', search: `?q=${encodeURIComponent(question)}&ask=1`, key: crypto.randomUUID() }]}>
@@ -269,9 +277,16 @@ describe('a pressed timecode plays the recording', () => {
       </MemoryRouter>,
     )
 
-    const coverage = await screen.findByRole('region', { name: 'Monthly recap scope' })
-    expect(coverage).toHaveTextContent(/Nov 1.\D*27, 2026 · America\/New_York/)
-    expect(coverage).toHaveTextContent('2 of 4 meetings reviewed · 1 without transcripts · 1 awaiting indexing')
+    const coverage = await screen.findByRole('region', { name: coverageName })
+    const current = comparing ? within(coverage).getByRole('region', { name: 'This month to date' }) : coverage
+    expect(current).toHaveTextContent(/Nov 1.\D*27, 2026/)
+    expect(coverage).toHaveTextContent('America/New_York')
+    expect(current).toHaveTextContent('2 of 4 meetings reviewed · 1 without transcripts · 1 awaiting indexing')
+    if (comparing) {
+      const lastMonth = within(coverage).getByRole('region', { name: 'Last month' })
+      expect(lastMonth).toHaveTextContent(/Oct 1.\D*31, 2026/)
+      expect(lastMonth).toHaveTextContent('3 of 5 meetings reviewed · 1 without transcripts · 1 beyond the review limit')
+    }
     expect(screen.getByRole('heading', { name: 'Launch', exact: true })).toBeInTheDocument()
     fireEvent.change(screen.getByRole('textbox', { name: 'Question about your meetings' }), { target: { value: 'Unsubmitted draft' } })
 
@@ -289,7 +304,7 @@ describe('a pressed timecode plays the recording', () => {
       else fireEvent.click(screen.getByRole('button', { name: 'Browser back' }))
       await waitFor(() => expect(screen.getByRole('link', { name: linkName })).toHaveFocus())
       expect(screen.getByText(answer)).toBeInTheDocument()
-      expect(screen.getByRole('region', { name: 'Monthly recap scope' }).textContent).toBe(coverage.textContent)
+      expect(screen.getByRole('region', { name: coverageName }).textContent).toBe(coverage.textContent)
       expect(screen.getByRole('textbox', { name: 'Question about your meetings' })).toHaveValue('Unsubmitted draft')
     }
     expect(player.cueAt).toHaveBeenCalledWith(22_000)
