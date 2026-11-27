@@ -98,4 +98,28 @@ describe('logo system picker', () => {
     expect(gallery.querySelector('[data-loading-logo="relay"] svg')).toHaveClass('motion-opt-in')
     expect(within(gallery).getByRole('button', { name: 'Play Relay Orbits loading animation' })).toBeInTheDocument()
   })
+
+  it('applies a logo from its gallery card and keeps that preview under the user’s control', () => {
+    const { container } = render(<LogoSystemPicker />)
+    fireEvent.click(screen.getByRole('button', { name: 'Preview all 18' }))
+    const gallery = within(screen.getByRole('region', { name: 'Logo and animation gallery' }))
+    expect(gallery.getAllByRole('button', { name: /^Use this logo:/ })).toHaveLength(17)
+    expect(gallery.getByRole('button', { name: 'Relay Orbits in use' })).toHaveAttribute('aria-disabled', 'true')
+
+    fireEvent.click(gallery.getByRole('button', { name: 'Pause Aperture loading animation' }))
+    const useAperture = gallery.getByRole('button', { name: 'Use this logo: Aperture' })
+    useAperture.focus()
+    fireEvent.click(useAperture)
+
+    expect(window.localStorage.getItem(LOGO_KEY)).toBe('aperture')
+    expect(container.querySelector('.lp-bar')).toHaveTextContent('Aperture')
+    expect(container.querySelector('.lp-bar img[data-brand-mark]')).toHaveAttribute('src', logoAsset('aperture', 'small'))
+    expect(screen.getByRole('button', { name: 'Close gallery' })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('button', { name: 'Show preview' })).toHaveAttribute('aria-expanded', 'false')
+    expect(gallery.getByRole('button', { name: 'Play Aperture loading animation' })).toBeInTheDocument()
+    expect(gallery.getByRole('button', { name: 'Use this logo: Relay Orbits' })).toBeInTheDocument()
+    expect(useAperture).toHaveAccessibleName('Aperture in use')
+    expect(useAperture).toHaveAttribute('aria-disabled', 'true')
+    expect(useAperture).toHaveFocus()
+  })
 })

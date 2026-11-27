@@ -4,7 +4,12 @@ import { useMotionPlayback } from '../bench/motion'
 import AnimatedLoadingLogo from '../AnimatedLoadingLogo'
 import { LOGO_FAMILIES, logoAsset, logosInFamily } from '../../services/logoSystem'
 
-export default function LogoMotionGallery(): React.ReactElement {
+interface LogoMotionGalleryProps {
+  activeLogoId: string
+  onSelectLogo: (id: string) => void
+}
+
+export default function LogoMotionGallery({ activeLogoId, onSelectLogo }: LogoMotionGalleryProps): React.ReactElement {
   const [playAll, setPlayAll, reduced] = useMotionPlayback()
   const [choices, setChoices] = useState<Partial<Record<string, boolean>>>({})
 
@@ -27,6 +32,7 @@ export default function LogoMotionGallery(): React.ReactElement {
           <ul className="lp-gallery-cards">
             {logosInFamily(family.id).map((logo) => {
               const playing = choices[logo.id] ?? playAll
+              const selected = logo.id === activeLogoId
               return (
                 <li key={logo.id} className="lp-gallery-card">
                   <div className="lp-gallery-views">
@@ -43,14 +49,18 @@ export default function LogoMotionGallery(): React.ReactElement {
                       <figcaption className="bs-lbl">Loading animation</figcaption>
                     </figure>
                   </div>
-                  <div className="lp-gallery-caption">
-                    <div>
-                      <h6 className="bs-h3">{logo.name}</h6>
-                      <p className="lp-note">{logo.motion}</p>
-                    </div>
+                  <h6 className="bs-h3">{logo.name}</h6>
+                  <p className="lp-note">{logo.motion}</p>
+                  <div className="lp-gallery-actions">
                     <Key aria-label={`${playing ? 'Pause' : 'Play'} ${logo.name} loading animation`}
                       onClick={() => setChoices((current) => ({ ...current, [logo.id]: !playing }))}>
                       {playing ? 'Pause' : 'Play'}
+                    </Key>
+                    <Key className="lp-gallery-use" variant={selected ? 'primary' : 'plain'}
+                      aria-label={selected ? `${logo.name} in use` : `Use this logo: ${logo.name}`}
+                      aria-disabled={selected}
+                      onClick={() => { if (!selected) onSelectLogo(logo.id) }}>
+                      {selected ? 'In use' : 'Use this logo'}
                     </Key>
                   </div>
                 </li>
