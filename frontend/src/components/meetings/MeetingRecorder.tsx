@@ -20,8 +20,9 @@
 import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { lockRecording, recordingJournal, type SavedRecording } from '../../services/recordingJournal'
-import type { IsolatedAudioTrack } from '../../services/recordingAudioTracks'
+import { lockRecording, recordingJournal, savedTrackCoverage, type SavedRecording } from '../../services/recordingJournal'
+import { ISOLATED_AUDIO_TRACKS, type IsolatedAudioTrack, type RecordingGaps } from '../../services/recordingAudioTracks'
+import { TrackSaveStatus, type TrackSaveStates } from './TrackSaveStatus'
 import { AlertTriangle, Bot, Camera, Download, ExternalLink, Loader2, Mic, MonitorUp, Pause, Play, Square, Trash2 } from 'lucide-react'
 import { canPip, dressWindow } from '../bot/BotLive'
 import { protectRecordingFromReload } from '../../services/chunkReload'
@@ -32,6 +33,7 @@ import {
   BotInCallError,
   EMPTY_UPLOAD,
   recoverRecording,
+  receivedRecordingTracks,
   PIECE_MS,
   PieceUploader,
   baseMime,
@@ -73,14 +75,17 @@ interface Capture {
   audioContext: AudioContext
   audioRecorder: MediaRecorder
   sourceTracks: SourceTrackCapture[]
-  splitInputs: Partial<Record<IsolatedAudioTrack, SplitInput>>
+  splitAudio: boolean
+  gaps: RecordingGaps
+  unwatch: Partial<Record<IsolatedAudioTrack, () => void>>
+  inputs: Partial<Record<IsolatedAudioTrack, AudioInput>>
   mix: MediaStreamAudioDestinationNode
   videoRecorder: MediaRecorder | null
   videoChunks: Blob[]
   preview: MediaStream | null
 }
 
-interface SplitInput {
+interface AudioInput {
   stream: MediaStream
   track: MediaStreamTrack
   node: MediaStreamAudioSourceNode
@@ -115,44 +120,67 @@ interface DisplayMediaOptionsWithAudio extends DisplayMediaStreamOptions {
 }
 
 /** Level meter: bars drawn from the mixed audio. Colour comes from the theme's accent. */
-function LevelMeter({ context, stream }: { context: AudioContext; stream: MediaStream }): React.ReactElement {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+function hasAudio(track: MediaStreamTrack | undefined): boolean {
+  return track?.readyState === 'live' && track.enabled && !track.muted
+}
+
+const QUIET_INPUT_MS = 3000
+const CLIP_HOLD_MS = 1500
+
+function LevelMeter({ context, source, label, paused }: {
+  context: AudioContext
+  source: AudioInput | null
+  label: string
+  paused: boolean
+}): React.ReactElement {
+  const ref = useRef<HTMLMeterElement | null>(null)
+  const [signal, setSignal] = useState<'On' | 'Quiet' | 'Near clipping'>('On')
+  const track = source?.track
+  const state = !track ? 'Off' : track.readyState === 'ended' ? 'Disconnected' : !track.enabled ? 'Muted'
+    : track.muted ? 'Interrupted' : paused ? 'Paused' : 'On'
 
   useEffect(() => {
-    const canvas = canvasRef.current
-    const ctx = canvas?.getContext('2d')
-    if (!canvas || !ctx) return
+    const meter = ref.current
+    if (!meter) return
+    meter.value = 0
+    setSignal('On')
+    if (!source || state !== 'On') return
     const analyser = context.createAnalyser()
-    analyser.fftSize = 256
-    const source = context.createMediaStreamSource(stream)
-    source.connect(analyser)
-    const data = new Uint8Array(analyser.frequencyBinCount)
-    // The window showing the canvas: in the pop-out it keeps animating while the app's tab is hidden.
-    const view = canvas.ownerDocument.defaultView ?? window
-    const accent = view.getComputedStyle(canvas).color || '#888'
-    let frame = 0
-    const draw = (): void => {
-      frame = view.requestAnimationFrame(draw)
-      analyser.getByteFrequencyData(data)
-      ctx.clearRect(0, 0, canvas.width, canvas.height)
-      const bars = 32
-      const width = canvas.width / bars
-      const step = Math.floor(data.length / bars)
-      for (let i = 0; i < bars; i++) {
-        const level = (data[i * step] ?? 0) / 255
-        ctx.globalAlpha = 0.15 + level * 0.85
-        ctx.fillStyle = accent
-        ctx.fillRect(i * width, canvas.height * (1 - level), width - 1, canvas.height * level)
-      }
+    analyser.fftSize = 1024
+    source.node.connect(analyser)
+    const data = new Uint8Array(analyser.fftSize)
+    const view = meter.ownerDocument.defaultView ?? window
+    const watch = new SilenceWatch(performance.now())
+    let clipUntil = 0
+    const update = (): void => {
+      analyser.getByteTimeDomainData(data)
+      const level = levelOf(data)
+      const now = performance.now()
+      const quiet = watch.push(level, now) >= QUIET_INPUT_MS
+      if (data.some(sample => sample <= 2 || sample >= 254)) clipUntil = now + CLIP_HOLD_MS
+      setSignal(now < clipUntil ? 'Near clipping' : quiet ? 'Quiet' : 'On')
+      // Use a decibel scale so normal speech is visible without jumping to full scale.
+      meter.value = Math.max(0, 1 + (20 * Math.log10(level)) / 60)
     }
-    draw()
+    const timer = view.setInterval(update, 100)
+    update()
     return () => {
-      view.cancelAnimationFrame(frame)
-      source.disconnect()
+      view.clearInterval(timer)
+      source.node.disconnect(analyser)
     }
-  }, [context, stream])
+  }, [context, source, state])
 
-  return <canvas ref={canvasRef} width={300} height={32} aria-hidden="true" className="h-8 w-full text-accent-primary" />
+  const health = state === 'On' ? signal : state
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-2 text-xs">
+        <span className="min-w-0 break-words font-medium">{label}{track?.label && label === 'Microphone' ? <span className="font-normal text-content-secondary"> · {track.label}</span> : null}</span>
+        <span role="status" aria-label={`${label} health`}
+          className={['Disconnected', 'Interrupted', 'Near clipping'].includes(health) ? 'text-semantic-error' : 'text-content-secondary'}>{health}</span>
+      </div>
+      <meter ref={ref} min={0} max={1} aria-label={`${label} level`} className="meeting-source-meter h-2 w-full text-accent-primary" />
+    </div>
+  )
 }
 
 /** A loud warning while the recording hears nothing (muted mic, tab shared without sound). */
@@ -201,9 +229,13 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
   const [audioInputs, setAudioInputs] = useState<MediaDeviceInfo[]>([])
   const [changingInput, setChangingInput] = useState(false)
   const pendingInput = useRef(false)
-  const [sourceTrackWarning, setSourceTrackWarning] = useState(false)
+  const [sourceUploads, setSourceUploads] = useState<Partial<Record<IsolatedAudioTrack, UploaderState>>>({})
+  const [failedSources, setFailedSources] = useState<IsolatedAudioTrack[]>([])
+  const [recoveryProgress, setRecoveryProgress] = useState<Partial<Record<string, TrackSaveStates>>>({})
+  const [finishedTracks, setFinishedTracks] = useState<TrackSaveStates | null>(null)
+  const [, setSourceRevision] = useState(0)
   const [savedRecordings, setSavedRecordings] = useState<SavedRecording[]>([])
-  const [recovering, setRecovering] = useState(false)
+  const [recovering, setRecovering] = useState<string | null>(null)
   const journal = useRef<{ id: string; release: () => void } | null>(null)
   const mounted = useRef(false)
   const [title, setTitle] = useState('')
@@ -230,7 +262,7 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
   const liveStatus = useRef<HTMLSpanElement | null>(null)
   const savedStatus = useRef<HTMLParagraphElement | null>(null)
   const previousPhase = useRef(phase)
-  const captureActive = phase === 'starting' || phase === 'recording' || phase === 'finishing'
+  const captureActive = Boolean(recovering) || phase === 'starting' || phase === 'recording' || phase === 'finishing'
 
   useLayoutEffect(() => {
     if (captureActive) return protectRecordingFromReload()
@@ -271,7 +303,8 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
   const releaseDevices = useCallback((): void => {
     const c = capture.current
     if (!c) return
-    c.streams.forEach((s) => s.getTracks().forEach((t) => t.stop()))
+    Object.values(c.unwatch).forEach(unwatch => unwatch())
+    c.streams.forEach(s => s.getTracks().forEach(t => t.stop()))
     void c.audioContext.close().catch(() => {})
   }, [])
 
@@ -308,46 +341,25 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
     return () => { disposed = true }
   }, [phase, userId])
 
-  const recover = async (id: string): Promise<void> => {
-    if (!userId || recovering) return
-    setRecovering(true)
+  const recover = async (saved: SavedRecording): Promise<void> => {
+    if (!userId || recovering || phase !== 'setup') return
     setError(null)
+    setRecovering(saved.id)
     try {
-      await recoverRecording(id, userId)
-      setSavedRecordings(rows => rows.filter(row => row.id !== id))
-      openMeeting(id)
+      const tracks = await recoverRecording(saved.id, userId, next => {
+        setRecoveryProgress(current => ({ ...current, [saved.id]: next }))
+      })
+      setFinishedTracks(tracks)
+      setTitle(saved.title)
+      setMeetingId(saved.id)
+      setPhase('done')
+      onRecorded?.(saved.id)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'The saved recording could not be recovered.')
     } finally {
-      setRecovering(false)
+      setRecovering(null)
     }
   }
-  useEffect(() => {
-    if (phase !== 'recording' && phase !== 'finishing') return
-    const warn = (e: BeforeUnloadEvent): void => {
-      e.preventDefault()
-    }
-    window.addEventListener('beforeunload', warn)
-    return () => window.removeEventListener('beforeunload', warn)
-  }, [phase])
-  useEffect(() => () => {
-    if (videoUrl) URL.revokeObjectURL(videoUrl)
-  }, [videoUrl])
-
-  useEffect(() => {
-    if (phase !== 'recording') return
-    const timer = window.setInterval(() => setElapsedMs(recordedMs()), 500)
-    return () => window.clearInterval(timer)
-  }, [phase])
-
-  // The pop-out closes once the recording is handed over, or when this recorder goes away.
-  useEffect(() => {
-    if (pop && phase !== 'recording' && phase !== 'finishing') {
-      pop.win.close()
-      setPop(null)
-    }
-  }, [phase, pop])
-  useEffect(() => () => pop?.win.close(), [pop])
 
   /** Ask the browser for the devices the chosen mode needs. */
   const openStreams = async (captureMode: RecorderMode): Promise<{ streams: MediaStream[]; video: MediaStreamTrack | null }> => {
@@ -387,9 +399,62 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
     return { streams, video: tab.getVideoTracks()[0] ?? null }
   }
 
-  const changeInput = async (kind: IsolatedAudioTrack, deviceId?: string): Promise<void> => {
+  const syncGap = (current: Capture, kind: IsolatedAudioTrack): void => {
+    const track = current.inputs[kind]?.track
+    if (!track || capture.current !== current || stopping.current) return
+    setSourceRevision(revision => revision + 1)
+    // Manual mic mute is intentional, even if the browser reports silence.
+    const unavailable = (kind === 'tab' || track.enabled) && !hasAudio(track)
+    const field = kind === 'mic' ? 'micAudioGaps' : 'tabAudioGaps'
+    const gaps = current.gaps[field] ?? []
+    const last = gaps.at(-1)
+    const atMs = Math.round(recordedMs())
+    if (unavailable && last?.endMs !== null) {
+      current.gaps = { ...current.gaps, [field]: [...gaps, { startMs: atMs, endMs: null }] }
+    } else if (!unavailable && last?.endMs === null) {
+      const closed = atMs > last.startMs ? [{ startMs: last.startMs, endMs: atMs }] : []
+      current.gaps = { ...current.gaps, [field]: [...gaps.slice(0, -1), ...closed] }
+    } else return
+    if (journal.current) void recordingJournal.saveGaps(journal.current.id, current.gaps).catch(() => {})
+  }
+
+  const watchInput = (current: Capture, kind: IsolatedAudioTrack): void => {
+    current.unwatch[kind]?.()
+    const input = current.inputs[kind]
+    if (!input) return
+    const track = input.track
+    const video = kind === 'tab' ? input.stream.getVideoTracks()[0] : undefined
+    const update = (): void => {
+      if (current.inputs[kind] === input) syncGap(current, kind)
+    }
+    const shareEnded = (): void => {
+      if (capture.current !== current || current.inputs[kind] !== input || stopping.current) return
+      track.stop()
+      if (video && current.preview?.getVideoTracks().includes(video)) current.preview = null
+      update()
+    }
+    const events = ['mute', 'unmute', 'ended']
+    events.forEach(event => track.addEventListener(event, update))
+    video?.addEventListener('ended', shareEnded)
+    current.unwatch[kind] = () => {
+      events.forEach(event => track.removeEventListener(event, update))
+      video?.removeEventListener('ended', shareEnded)
+    }
+    if (video?.readyState === 'ended') shareEnded()
+    else update()
+  }
+
+  const toggleMic = (): void => {
     const current = capture.current
-    const previous = current?.splitInputs[kind]
+    const track = current?.inputs.mic?.track
+    if (!current || !track || stopping.current || track.readyState === 'ended') return
+    track.enabled = !track.enabled
+    syncGap(current, 'mic')
+  }
+
+  const changeInput = async (kind: IsolatedAudioTrack, deviceId?: string, view?: Window | null): Promise<void> => {
+    const current = capture.current
+    const previous = current?.inputs[kind]
     if (!current || !previous || pendingInput.current || stopping.current) return
     pendingInput.current = true
     setChangingInput(true)
@@ -403,25 +468,31 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
         })
       } else {
         const options: DisplayMediaOptionsWithAudio = { video: true, audio: true, selfBrowserSurface: 'exclude', systemAudio: 'include' }
-        replacement = await mediaDevices.getDisplayMedia(options)
+        const popup = navigator.userActivation?.isActive === false && view !== window ? view?.navigator.mediaDevices : undefined
+        replacement = await (popup?.getDisplayMedia ? popup : mediaDevices).getDisplayMedia(options)
       }
       if (capture.current !== current || stopping.current) return
       const track = replacement.getAudioTracks()[0]
       if (!track || track.readyState !== 'live') {
         throw new Error(kind === 'tab' ? 'Choose a browser tab and turn on “Also share tab audio”.' : 'The microphone did not provide audio.')
       }
+      if (kind === 'mic') track.enabled = previous.track.enabled
       const node = current.audioContext.createMediaStreamSource(new MediaStream([track]))
       node.connect(current.mix)
-      const source = current.sourceTracks.find(side => side.track === kind && !side.failed)
-      if (source) node.connect(source.destination)
-      previous.node.disconnect()
+      const source = current.sourceTracks.find(side => side.track === kind)
+      if (source) {
+        node.connect(source.destination)
+        previous.node.disconnect(source.destination)
+      }
+      previous.node.disconnect(current.mix)
       // The original tab may still be writing a local video preview. Replacing
       // audio leaves its video track alone until the user stops that share.
       previous.track.stop()
       current.streams = current.streams.filter(stream => stream !== previous.stream || stream.getVideoTracks().length > 0)
       current.streams.push(replacement)
-      current.splitInputs[kind] = { stream: replacement, track, node }
+      current.inputs[kind] = { stream: replacement, track, node }
       replacement = undefined
+      watchInput(current, kind)
     } catch (err) {
       if (capture.current === current && !stopping.current) setError(captureErrorMessage(err, kind))
     } finally {
@@ -459,12 +530,13 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
     const audioContext = new AudioContext()
     const mix = audioContext.createMediaStreamDestination()
     const saveSourceTracks = captureMode === 'tab' && splitAudio && withMic && !(bot && sameAsBot)
-    const splitInputs: Capture['splitInputs'] = {}
+    const inputs: Capture['inputs'] = {}
     opened.streams.forEach((stream, index) => {
       for (const track of stream.getAudioTracks()) {
         const node = audioContext.createMediaStreamSource(new MediaStream([track]))
         node.connect(mix)
-        if (saveSourceTracks) splitInputs[index === 0 ? 'tab' : 'mic'] ??= { stream, track, node }
+        const kind = captureMode === 'tab' && index === 0 ? 'tab' : 'mic'
+        inputs[kind] ??= { stream, track, node }
       }
     })
     void audioContext.resume()
@@ -498,7 +570,7 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
       try {
         release = await lockRecording(id)
         if (release) {
-          await recordingJournal.create({ id, userId, title: title.trim() || 'Meeting recording', mimeType })
+          await recordingJournal.create({ id, userId, title: title.trim() || 'Meeting recording', mimeType, splitAudio: true })
           if (mounted.current) journal.current = { id, release }
         }
       } catch { /* A browser that denies local storage can still upload during capture. */ }
@@ -509,27 +581,32 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
       await audioContext.close().catch(() => {})
       return
     }
-    setSourceTrackWarning(false)
+    setFailedSources([])
+    setSourceUploads({})
+    setFinishedTracks(null)
     setHandedToBot(!quick && Boolean(bot && sameAsBot))
 
     const pieces = new PieceUploader(sendPieceTo(id, mimeType), setUpload, undefined, journal.current?.id)
     uploader.current = pieces
     const audioRecorder = new MediaRecorder(mix.stream, recorderOptions('audio', audioMime))
     const sourceTracks: SourceTrackCapture[] = []
+    const markSourceFailed = (track: IsolatedAudioTrack): void => {
+      if (mounted.current) setFailedSources(failed => failed.includes(track) ? failed : [...failed, track])
+    }
     const failSourceTrack = (source: SourceTrackCapture): void => {
       if (source.failed) return
       source.failed = true
       if (source.recorder.state !== 'inactive') source.recorder.stop()
-      if (mounted.current) setSourceTrackWarning(true)
+      markSourceFailed(source.track)
     }
-    for (const track of Object.keys(splitInputs) as IsolatedAudioTrack[]) {
-      const input = splitInputs[track]!
+    for (const track of (saveSourceTracks ? ISOLATED_AUDIO_TRACKS : [])) {
+      const input = inputs[track]!
       try {
         const destination = audioContext.createMediaStreamDestination()
         const recorder = new MediaRecorder(destination.stream, recorderOptions('audio', audioMime))
         const uploader = new PieceUploader(sendPieceTo(id, mimeType, track), state => {
+          if (mounted.current) setSourceUploads(current => ({ ...current, [track]: state }))
           if (state.failed) failSourceTrack(source)
-          else if (state.localSaveFailed && mounted.current) setSourceTrackWarning(true)
         }, undefined, journal.current?.id, track)
         const source = { track, destination, recorder, uploader, pendingDurations: [] as number[], failed: false }
         recorder.ondataavailable = ({ data }): void => {
@@ -542,7 +619,7 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
         input.node.connect(destination)
         sourceTracks.push(source)
       } catch {
-        setSourceTrackWarning(true)
+        markSourceFailed(track)
       }
     }
     audioRecorder.ondataavailable = (e: BlobEvent): void => {
@@ -577,20 +654,21 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
       audioContext,
       audioRecorder,
       sourceTracks,
-      splitInputs,
+      splitAudio: saveSourceTracks,
+      gaps: {},
+      unwatch: {},
+      inputs,
       mix,
       videoRecorder,
       videoChunks,
       preview: opened.video ? new MediaStream([opened.video]) : null,
     }
-    // "Stop sharing" in the browser's own bar, or a camera unplugged, ends the recording.
-    if (saveSourceTracks) {
+    if (inputs.mic) {
       void navigator.mediaDevices.enumerateDevices?.().then(devices => {
         if (mounted.current) setAudioInputs(devices.filter(device => device.kind === 'audioinput'))
       }).catch(() => {})
-    } else {
-      opened.streams.forEach(stream => stream.getTracks().forEach(track => track.addEventListener('ended', () => void stop())))
     }
+    if (captureMode === 'camera') opened.video?.addEventListener('ended', () => void stop(), { once: true })
 
     startedAt.current = Date.now()
     bankedMs.current = 0
@@ -604,6 +682,7 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
     }
     videoRecorder?.start(10_000)
     meetingRef.current = id
+    for (const track of ISOLATED_AUDIO_TRACKS) watchInput(capture.current, track)
     setMeetingId(id)
     setElapsedMs(0)
     setPhase('recording')
@@ -696,6 +775,9 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
     const pieces = uploader.current
     if (!c || !pieces || !meetingRef.current || stopping.current) return
     stopping.current = true
+    bankedMs.current = recordedMs()
+    activeSince.current = null
+    setElapsedMs(bankedMs.current)
     setPhase('finishing')
     await Promise.all([stopAudio(c), stopRecorder(c.videoRecorder)])
     releaseDevices()
@@ -714,11 +796,11 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
     setPhase('finishing')
     try {
       await pieces.drain()
-      await Promise.all((capture.current?.sourceTracks ?? []).map(source => source.uploader.drain().catch(() => {
-        if (mounted.current) setSourceTrackWarning(true)
-      })))
+      await Promise.all((capture.current?.sourceTracks ?? []).map(source => source.uploader.drain().catch(() => {})))
+      if (!mounted.current || uploader.current !== pieces) return
       if (pieces.state.recorded === 0) throw new Error('Nothing was recorded. Check the microphone and try again.')
-      await finishRecording(id, pieces.state.recorded)
+      const coverage = await finishRecording(id, pieces.state.recorded, capture.current?.gaps)
+      if (coverage) setFinishedTracks(receivedRecordingTracks(coverage))
       if (journal.current) {
         await recordingJournal.remove(id).catch(() => {})
         journal.current.release()
@@ -761,7 +843,10 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
     meetingRef.current = null
     setMeetingId(null)
     setUpload(EMPTY_UPLOAD)
-    setSourceTrackWarning(false)
+    setFailedSources([])
+    setSourceUploads({})
+    setRecoveryProgress({})
+    setFinishedTracks(null)
     setElapsedMs(0)
     setError(null)
     setHandedToBot(false)
@@ -771,25 +856,62 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
 
   const c = capture.current
   const waiting = upload.recorded - upload.sent
-  const locked = phase !== 'setup'
+  const locked = phase !== 'setup' || Boolean(recovering)
   const showSetup = phase === 'setup' || phase === 'starting'
-  const inputControls = capture.current?.splitInputs.tab && phase === 'recording' && (
-    <div className="flex flex-wrap items-center gap-2">
-      {audioInputs.length > 0 && (
-        <label className="flex items-center gap-2 text-sm">
-          Microphone
-          <select className={INPUT} aria-label="Recording microphone" disabled={changingInput}
-            value={capture.current.splitInputs.mic?.track.getSettings?.().deviceId ?? 'default'}
-            onChange={event => void changeInput('mic', event.currentTarget.value)}>
-            <option value="default">System default</option>
-            {audioInputs.filter(device => device.deviceId && device.deviceId !== 'default').map((device, index) => (
-              <option key={device.deviceId} value={device.deviceId}>{device.label || 'Microphone ' + (index + 1)}</option>
-            ))}
-          </select>
-        </label>
-      )}
-      <button type="button" className={SECONDARY} disabled={changingInput}
-        onClick={() => void changeInput('tab')}>Re-share tab audio</button>
+  const mic = c?.inputs.mic
+  const tab = c?.inputs.tab
+  const tabGap = c?.gaps.tabAudioGaps?.at(-1)
+  const micGap = c?.gaps.micAudioGaps?.at(-1)
+  const micAvailable = hasAudio(mic?.track)
+  const tabAvailable = hasAudio(tab?.track)
+  const currentMic = mic?.track.readyState === 'live' ? mic.track.getSettings?.().deviceId ?? 'default' : ''
+  const selectedMic = currentMic === 'default' || audioInputs.some(device => device.deviceId === currentMic) ? currentMic : ''
+  const inputControls = c && phase === 'recording' && (
+    <div className="space-y-2 rounded-lg border border-line px-3 py-2">
+      <LevelMeter context={c.audioContext} source={mic ?? null} label="Microphone" paused={paused} />
+      {tab && <LevelMeter context={c.audioContext} source={tab} label="Tab audio" paused={paused} />}
+      {tabGap?.endMs === null && <p role="status" className="text-xs text-semantic-error">
+        Tab audio interrupted at {formatClock(tabGap.startMs)}. {paused ? 'Recording is paused.'
+          : micAvailable ? 'Microphone is still recording.' : 'No audio source is available.'}
+      </p>}
+      {micGap?.endMs === null && <p role="status" className="text-xs text-semantic-error">
+        Microphone interrupted at {formatClock(micGap.startMs)}. {paused ? 'Recording is paused.'
+          : tabAvailable ? 'Tab audio is still recording.' : 'Choose an available microphone.'}
+      </p>}
+      <div className="flex flex-wrap items-center gap-2">
+        {mic && (
+          <label className="flex items-center gap-2 text-sm">
+            Microphone
+            <select className={INPUT} aria-label="Recording microphone" disabled={changingInput} value={selectedMic}
+              onChange={event => void changeInput('mic', event.currentTarget.value)}>
+              <option value="" disabled>Choose a microphone</option>
+              <option value="default">System default</option>
+              {audioInputs.filter(device => device.deviceId && device.deviceId !== 'default').map((device, index) => (
+                <option key={device.deviceId} value={device.deviceId}>{device.label || 'Microphone ' + (index + 1)}</option>
+              ))}
+            </select>
+          </label>
+        )}
+        {tab && <button type="button" className={SECONDARY} disabled={changingInput}
+          onClick={event => void changeInput('tab', undefined, event.currentTarget.ownerDocument.defaultView)}>Re-share tab audio</button>}
+        {tab && mic && <button type="button" className={SECONDARY} disabled={mic.track.readyState === 'ended'} onClick={toggleMic}>
+          {mic.track.enabled ? 'Mute mic' : 'Unmute mic'}
+        </button>}
+      </div>
+    </div>
+  )
+  const liveTracks: TrackSaveStates = { mix: upload }
+  if (c?.splitAudio) {
+    for (const track of ISOLATED_AUDIO_TRACKS) {
+      const state = sourceUploads[track] ?? EMPTY_UPLOAD
+      liveTracks[track] = { ...state, failed: failedSources.includes(track) || state.failed }
+    }
+  }
+  const saveStatus = (
+    <div aria-live="polite" className="space-y-1 text-xs text-content-secondary">
+      {upload.failed && <p role="alert">{upload.failed}</p>}
+      <TrackSaveStatus tracks={liveTracks} sending />
+      {c?.splitAudio && userId && !journal.current && <p>Device storage is unavailable. Keep this tab open until uploads finish.</p>}
     </div>
   )
   const status = phase === 'finishing' ? (error ? 'Audio needs attention' : 'Sending the last of the audio') : paused ? 'Paused' : 'Recording'
@@ -808,9 +930,9 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
 
       {phase === 'done' && meetingId ? (
         <div className="space-y-3" aria-live="polite">
-          {sourceTrackWarning && <p className="text-xs text-content-secondary">Some separate audio may be unavailable in the recap.</p>}
+          <TrackSaveStatus tracks={finishedTracks ?? liveTracks} final />
           <p ref={savedStatus} tabIndex={-1} className="text-sm text-content-primary">
-            {handedToBot
+            {!capture.current ? 'Recording recovered. Open the meeting to see its transcript status.' : handedToBot
               ? 'Recording saved with the bot’s meeting. The bot writes the minutes; your recording is kept as a backup and is written up on its own if the bot cannot finish.'
               : 'Recording saved. The transcript, speakers, summary and action items are being written now. This takes about a minute for every ten minutes recorded.'}
           </p>
@@ -831,13 +953,31 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
         </div>
       ) : showSetup ? (
         <>
-          {savedRecordings.length > 0 && (
-            <section aria-label="Recover separate audio" className="space-y-2">
-              {savedRecordings.map(saved => (
-                <button type="button" className={SECONDARY} key={saved.id} disabled={recovering} onClick={() => void recover(saved.id)}>
-                  Recover recording · {saved.title}
-                </button>
-              ))}
+          {savedRecordings.some(saved => saved.userId === userId) && (
+            <section aria-label="Interrupted recordings" className="space-y-2 rounded-lg border border-line p-3">
+              <h4 className="text-sm font-medium text-content-primary">Interrupted recordings</h4>
+              {savedRecordings.filter(saved => saved.userId === userId).map(saved => {
+                const tracks: TrackSaveStates = {}
+                for (const track of (saved.splitAudio ? ['mix', ...ISOLATED_AUDIO_TRACKS] as const : ['mix'] as const)) {
+                  tracks[track] = {
+                    savedMs: savedTrackCoverage(saved, track).durationMs,
+                    sentMs: saved.receivedTracks && (saved.receivedTracks[track]?.durationMs ?? 0),
+                  }
+                }
+                const visible = recoveryProgress[saved.id] ?? tracks
+                const hasPendingUpload = Object.values(visible).some(state => state.sentMs !== undefined && state.savedMs > state.sentMs)
+                return (
+                  <div key={saved.id} className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="min-w-0 break-words text-sm">
+                      <p>{saved.title}</p>
+                      <TrackSaveStatus tracks={visible} sending={recovering === saved.id} />
+                    </div>
+                    <button type="button" className={SECONDARY} disabled={locked} onClick={() => void recover(saved)}>
+                      {recovering === saved.id ? 'Recovering…' : hasPendingUpload ? 'Resume upload' : 'Recover and save'}
+                    </button>
+                  </div>
+                )
+              })}
             </section>
           )}
           {bot && (
@@ -942,16 +1082,17 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
             <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} disabled={locked} className="mt-0.5 h-4 w-4 accent-accent-primary" />
             Everyone in this meeting knows it is being recorded and has agreed.
           </label>
-          <button type="button" className={`${PRIMARY} w-full`} onClick={() => void start()} disabled={!consent || recovering || phase === 'starting'}>
+          <button type="button" className={`${PRIMARY} w-full`} onClick={() => void start()} disabled={!consent || Boolean(recovering) || phase === 'starting'}>
             {phase === 'starting' ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Mic className="h-4 w-4" aria-hidden="true" />}
             {phase === 'starting' ? 'Starting' : 'Start recording'}
           </button>
         </>
       ) : (
         <div className="m-enter space-y-3">
+          {inputControls}
+          {saveStatus}
           {c?.preview && phase === 'recording' && <Preview stream={c.preview} />}
           <div className="flex items-center justify-between gap-3">
-            {inputControls}
             <span ref={liveStatus} tabIndex={-1} role="status" className="flex items-center gap-2 text-sm font-medium text-content-primary">
               {phase === 'recording' && !paused && <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-accent-primary" aria-hidden="true" />}
               {status}
@@ -960,11 +1101,8 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
               {formatClock(elapsedMs)}
             </span>
           </div>
-          {c && phase === 'recording' && !paused && (
-            <LevelMeter context={c.audioContext} stream={c.audioRecorder.stream} />
-          )}
           {c && phase === 'recording' && !paused && <SilenceAlert context={c.audioContext} stream={c.audioRecorder.stream} mode={mode} />}
-          {c && phase === 'recording' && !paused && captions && (
+          {c && phase === 'recording' && !paused && captions && micAvailable && (
             <LiveCaptions
               track={c.audioRecorder.stream.getAudioTracks()[0] ?? null}
               startedAt={startedAt.current}
@@ -1046,18 +1184,10 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
               <span className="font-mono text-2xl tabular-nums" aria-label={`Recorded ${formatClock(elapsedMs)}`}>{formatClock(elapsedMs)}</span>
             </div>
             {c?.preview && phase === 'recording' && <Preview stream={c.preview} />}
-            {c && phase === 'recording' && !paused && <LevelMeter context={c.audioContext} stream={c.audioRecorder.stream} />}
             {c && phase === 'recording' && !paused && <SilenceAlert context={c.audioContext} stream={c.audioRecorder.stream} mode={mode} />}
             {inputControls}
-            {sourceTrackWarning && <p role="status" className="text-xs text-content-secondary">Some separate audio may be unavailable in the recap.</p>}
-            {phase === 'finishing' && error ? <p role="alert" className="text-sm text-semantic-error">{error}</p> : (
-              <p className="text-xs text-content-secondary" aria-live="polite">
-                {upload.failed ?? (paused ? 'Nothing is recorded until you resume.'
-                  : upload.retrying ? 'Connection lost. The audio is kept and sent when it is back.'
-                    : upload.sent > 0 ? `Saved up to ${formatClock(upload.sent * PIECE_MS)}.`
-                      : 'Audio is saved every 30 seconds.')}
-              </p>
-            )}
+            {saveStatus}
+            {error && <p role="alert" className="text-sm text-semantic-error">{error}</p>}
             {phase === 'recording' && (
               <div className="flex flex-wrap gap-2">
                 <button type="button" className={`${PRIMARY} flex-1`} onClick={() => void stop()}>

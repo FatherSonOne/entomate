@@ -117,6 +117,8 @@ router.post('/:id/finish', authenticate, async (req, res) => {
       meetingId: req.params.id,
       pieces: Number(req.body?.pieces),
       salvage: req.body?.salvage === true,
+      micAudioGaps: req.body?.micAudioGaps,
+      tabAudioGaps: req.body?.tabAudioGaps,
     });
     res.status(202).json({ success: true, ...result });
   } catch (err) {
@@ -158,7 +160,7 @@ router.get('/:id/playback', authenticate, async (req, res) => {
 router.get('/:id/waveform', authenticate, async (req, res) => {
   try {
     const orgId = await meetingNotes.assertMeetingAccess(req.user?.id, req.params.id);
-    const peaks = await recorder.getRecordingWaveform({ orgId, meetingId: req.params.id });
+    const peaks = await recorder.getRecordingWaveform({ orgId, meetingId: req.params.id, track: req.query.track });
     res.set('Cache-Control', 'no-store');
     res.json({ success: true, peaks });
   } catch (err) {

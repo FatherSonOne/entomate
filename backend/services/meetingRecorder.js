@@ -426,7 +426,14 @@ async function recordingRecovery(meetingId) {
   const meeting = await loadMeeting(meetingId);
   const job = meeting?.recording_job;
   if (!job) throw new RecorderError(409, 'This meeting was not recorded here.');
-  if (job.status !== 'recording') return { status: job.status };
+  if (job.status !== 'recording') {
+    return {
+      status: job.status,
+      ...(job.splitAudio && !job.audioRemovedAt && !job.retentionDeletedAt ? {
+        pieces: job.pieces, durationMs: job.durationMs, audioTracks: job.audioTracks,
+      } : {}),
+    };
+  }
   const files = await listFolder(meeting.org_id, meetingId);
   const saved = piecesForTrack(files);
   const pieces = contiguousCount(saved);
@@ -438,12 +445,26 @@ async function recordingRecovery(meetingId) {
   };
 }
 
+function recordingAudioGaps(gaps, durationMs) {
+  const interruptions = [];
+  for (const gap of Array.isArray(gaps) ? gaps : []) {
+    const startMs = gap?.startMs;
+    const endMs = gap?.endMs;
+    if (!Number.isSafeInteger(startMs) || startMs < 0 || startMs >= durationMs) continue;
+    if (endMs !== null && (!Number.isSafeInteger(endMs) || endMs <= startMs)) continue;
+    const previous = interruptions.at(-1);
+    if (previous && (previous.endMs === null || startMs < previous.endMs)) continue;
+    interruptions.push({ startMs, endMs: endMs !== null && endMs <= durationMs ? endMs : null });
+  }
+  return interruptions;
+}
+
 /**
  * Close the recording and start transcribing it in the background.
  * @param {{ pieces?: number, salvage?: boolean }} opts  `pieces`: how many the browser
  *   recorded. `salvage`: the browser closed mid-recording; transcribe what was saved.
  */
-async function finishRecording({ meetingId, pieces, salvage = false, now = Date.now() }) {
+async function finishRecording({ meetingId, pieces, salvage = false, micAudioGaps, tabAudioGaps, now = Date.now() }) {
   if (!salvage && (!Number.isInteger(pieces) || pieces < 1 || pieces > MAX_PIECES)) throw new RecorderError(400, 'Nothing was recorded.');
   const meeting = await loadMeeting(meetingId);
   const job = meeting?.recording_job;
@@ -479,12 +500,17 @@ async function finishRecording({ meetingId, pieces, salvage = false, now = Date.
       return { status: handOff };
     }
   }
+  const micGaps = salvage ? [] : recordingAudioGaps(micAudioGaps, durationMs);
+  const tabGaps = !salvage && job.mode === 'tab' ? recordingAudioGaps(tabAudioGaps, durationMs) : [];
+  const audioTracks = job.splitAudio ? trackCoverage(files, mixed) : null;
   await setJob(meeting, {
+    ...(micGaps.length ? { micAudioGaps: micGaps } : {}),
+    ...(tabGaps.length ? { tabAudioGaps: tabGaps } : {}),
     status: 'transcribing', source: 'browser', pieces, durationMs, finishedAt, error: null, stage: null, stageAt: null,
-    ...(job.splitAudio ? { audioTracks: trackCoverage(files, mixed) } : {}),
+    ...(audioTracks ? { audioTracks } : {}),
   });
   runInBackground(meetingId);
-  return { status: 'transcribing' };
+  return { status: 'transcribing', pieces, durationMs, ...(audioTracks ? { audioTracks } : {}) };
 }
 
 /**
@@ -778,13 +804,19 @@ async function loadPlaybackMeeting(orgId, meetingId) {
   return meeting;
 }
 
+function playbackTrackCoverage(job, track) {
+  if (track === 'mix') return null;
+  const coverage = ISOLATED_TRACKS.includes(track) && job.audioTracks?.[track];
+  if (job.source !== 'browser' || !coverage?.pieces || !coverage.durationMs) {
+    throw new RecorderError(404, 'This audio track is unavailable.');
+  }
+  return coverage;
+}
+
 async function getPlayback({ orgId, meetingId, track = 'mix' }) {
   const meeting = await loadPlaybackMeeting(orgId, meetingId);
   const job = meeting.recording_job;
-  const coverage = track === 'mix' ? null : ISOLATED_TRACKS.includes(track) && job.audioTracks?.[track];
-  if (track !== 'mix' && (job.source !== 'browser' || !coverage?.pieces || !coverage.durationMs)) {
-    throw new RecorderError(404, 'This audio track is unavailable.');
-  }
+  const coverage = playbackTrackCoverage(job, track);
   const file = coverage ? coverage.playbackFile : job.playbackFile;
   if (typeof file === 'string' && file.startsWith(`${recordingFolder(orgId, meetingId)}/`)) {
     const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(file, PLAYBACK_FILE_TTL_S);
@@ -826,11 +858,13 @@ async function signedPieces(pieces, mimeType, expectedCount) {
 }
 
 /** Use the same authorized media source as playback. Coalesce simultaneous requests for it. */
-async function getRecordingWaveform({ orgId, meetingId }) {
+async function getRecordingWaveform({ orgId, meetingId, track = 'mix' }) {
   const meeting = await loadPlaybackMeeting(orgId, meetingId);
   const job = meeting.recording_job;
-  if (Array.isArray(job.waveformPeaks) && job.waveformPeaks.length) return job.waveformPeaks;
-  const key = `${orgId}/${meetingId}:${job.playbackFile ?? job.finishedAt ?? job.botSessionId ?? ''}`;
+  const coverage = playbackTrackCoverage(job, track);
+  if (!coverage && Array.isArray(job.waveformPeaks) && job.waveformPeaks.length) return job.waveformPeaks;
+  const file = coverage ? coverage.playbackFile : job.playbackFile;
+  const key = `${orgId}/${meetingId}:${track}:${file ?? job.finishedAt ?? job.botSessionId ?? ''}`;
   const cached = waveformCache.get(key);
   if (cached && cached.expiresAt > Date.now()) return cached.peaks;
   if (activeWaveforms >= 2) throw new RecorderError(429, 'Waveform processing is busy. Try again.');
@@ -842,7 +876,7 @@ async function getRecordingWaveform({ orgId, meetingId }) {
     if (completed) waveformCache.delete(completed[0]);
   }
 
-  const peaks = measureSavedRecording(meeting);
+  const peaks = measureSavedRecording(meeting, track, file, coverage?.pieces);
   const entry = { peaks, expiresAt: Infinity };
   waveformCache.set(key, entry);
   activeWaveforms++;
@@ -858,10 +892,10 @@ async function getRecordingWaveform({ orgId, meetingId }) {
   }
 }
 
-async function measureSavedRecording(meeting) {
+async function measureSavedRecording(meeting, track, file, expectedCount) {
   const { org_id: orgId, id: meetingId, recording_job: job } = meeting;
-  if (typeof job.playbackFile === 'string' && job.playbackFile.startsWith(`${recordingFolder(orgId, meetingId)}/`)) {
-    const { data, error } = await supabase.storage.from(BUCKET).download(job.playbackFile);
+  if (typeof file === 'string' && file.startsWith(`${recordingFolder(orgId, meetingId)}/`)) {
+    const { data, error } = await supabase.storage.from(BUCKET).download(file);
     if (!error && data) return playbackFile.readWaveformPeaksFromAudio(Buffer.from(await data.arrayBuffer()));
   }
   if (job.source === 'bot' && job.botSessionId) {
@@ -869,8 +903,12 @@ async function measureSavedRecording(meeting) {
     if (!url) throw new Error('Bot recording unavailable');
     return playbackFile.readWaveformPeaks(url);
   }
-  const pieces = (await listPieces(orgId, meetingId)).filter((piece) => piece.seq < (job.pieces || MAX_PIECES));
+  const pieces = piecesForTrack(await listFolder(orgId, meetingId), track)
+    .filter(piece => piece.seq < (expectedCount ?? (job.pieces || MAX_PIECES)));
   if (!pieces.length || pieces[0].seq !== 0) throw new Error('Recording unavailable');
+  if (expectedCount && (pieces.length !== expectedCount || pieces.some((piece, i) => piece.seq !== i))) {
+    throw new Error('Incomplete audio track');
+  }
   return playbackFile.readWaveformPeaksFromAudio(recordingPieceBytes(pieces));
 }
 

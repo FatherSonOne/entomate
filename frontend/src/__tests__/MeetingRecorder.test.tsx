@@ -99,7 +99,7 @@ describe('meetingRecorderService', () => {
     await up.drain()
     expect(sent).toEqual([0, 1, 2])
     expect(send).toHaveBeenCalledTimes(4)
-    expect(up.state).toEqual({ recorded: 3, sent: 3, retrying: false, failed: null })
+    expect(up.state).toMatchObject({ recorded: 3, sent: 3, sentMs: 72_345, retrying: false, failed: null })
   })
 
   test('PieceUploader stops on a refusal that a retry cannot fix', async () => {
@@ -122,9 +122,13 @@ class FakeTrack {
   kind: string
   listeners: Record<string, Array<() => void>> = {}
   stopped = false
+  enabled = true
+  muted = false
+  get readyState() { return this.stopped ? 'ended' : 'live' }
   constructor(kind: string) { this.kind = kind }
   stop(): void { this.stopped = true }
   addEventListener(type: string, fn: () => void): void { (this.listeners[type] ||= []).push(fn) }
+  removeEventListener(type: string, fn: () => void): void { this.listeners[type] = (this.listeners[type] ?? []).filter(handler => handler !== fn) }
 }
 class FakeStream {
   tracks: FakeTrack[]
@@ -369,7 +373,7 @@ describe('MeetingRecorder', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /pop out/i }))
     await waitFor(() => expect(popDoc.querySelector('[data-testid="recorder-pop"]')).not.toBeNull())
-    expect(popDoc.querySelector('canvas')).not.toBeNull() // the level meter
+    expect(popDoc.querySelector('meter[aria-label="Microphone level"]')).not.toBeNull()
     expect(popDoc.querySelector('video')).toBeNull() // a microphone has no picture
     const popButton = (name: string): HTMLButtonElement =>
       [...popDoc.querySelectorAll('button')].find((b) => b.textContent?.trim() === name) as HTMLButtonElement
@@ -380,7 +384,7 @@ describe('MeetingRecorder', () => {
 
     act(() => popButton('Stop recording').click())
     await screen.findByRole('button', { name: /open the meeting/i })
-    expect(popWin.close).toHaveBeenCalled()
+    await waitFor(() => expect(popWin.close).toHaveBeenCalled())
     open.mockRestore()
   })
 
@@ -417,7 +421,8 @@ describe('MeetingRecorder', () => {
     await waitFor(() => expect(popDoc.querySelector('[data-testid="recorder-pop"]')).not.toBeNull())
     expect(open).toHaveBeenCalledWith('', 'entomate-recorder', expect.stringContaining('height=420'))
     expect(popDoc.querySelector('video[aria-label="Recording preview"]')).not.toBeNull()
-    expect(popDoc.querySelector('canvas')).not.toBeNull()
+    expect(popDoc.querySelector('meter[aria-label="Microphone level"]')).not.toBeNull()
+    expect(popDoc.querySelector('meter[aria-label="Tab audio level"]')).not.toBeNull()
     open.mockRestore()
   })
 

@@ -758,7 +758,7 @@ export default function MeetingDetail() {
 
       <div className="bs-mtg-status-row">
         {writingLiveMinutes ? <Signal tone="brand">Writing meeting minutes</Signal>
-          : <RecordingStatus meetingId={meeting.id} recordingJob={meeting.recording_job} onRefresh={refreshMeeting} hasSummary={!!meeting.summary} hasTranscript={!!meeting.transcript} title={meeting.title} attendees={meeting.attendees} />}
+          : <RecordingStatus meetingId={meeting.id} recordingJob={meeting.recording_job} recoveryUserId={liveRoomHostId} onRefresh={refreshMeeting} hasSummary={!!meeting.summary} hasTranscript={!!meeting.transcript} title={meeting.title} attendees={meeting.attendees} />}
         {showRebuildCompletion && (
           <div className="bs-recstat" data-tone="live">
             <div role="status"><Signal tone="live">Transcript rebuilt · {transcriptSegments.length.toLocaleString()} {transcriptSegments.length === 1 ? 'line' : 'lines'}</Signal></div>
@@ -782,6 +782,7 @@ export default function MeetingDetail() {
             audioUrl={uploadedAudioUrl}
             durationMs={meeting.recording_job?.durationMs || lengthMs}
             audioTracks={keptRecording && browserRecording ? recordingJob.audioTracks : undefined}
+            gaps={keptRecording && browserRecording ? recordingJob.audioGaps : undefined}
             waveformPeaks={keptRecording ? toWaveformPeaks(meeting.recording_job?.waveformPeaks) : null}
             waveformReplacement={rebuildingTranscript
               ? <DebriefLoader source={recordingRebuildSource(recordingJob, meeting.title, meeting.attendees)} />

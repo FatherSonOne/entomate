@@ -600,6 +600,17 @@ describe('recorder routes', () => {
     expect(mockStorage.get(`meeting-recordings/${ORG_A}/${id}/mic-playback.webm`).toString()).toBe('seekable.webm:mic-0|mic-1|');
     const indexedTab = await request(server).get(path).query({ track: 'tab' }).set(as(MEMBER)).expect(200);
     expect(indexedTab.body).toMatchObject({ durationMs: 30000, url: expect.stringContaining('/tab-playback.webm') });
+    const waveform = `/api/recordings/${id}/waveform`;
+    playbackFile.readWaveformPeaksFromAudio.mockClear();
+    const micWaveform = await request(server).get(waveform).query({ track: 'mic' }).set(as(MEMBER)).expect(200);
+    const tabWaveform = await request(server).get(waveform).query({ track: 'tab' }).set(as(MEMBER)).expect(200);
+    expect(micWaveform.body.peaks).toEqual([0.1, 0.6, 0.3]);
+    expect(tabWaveform.body.peaks).toEqual([0.1, 0.6, 0.3]);
+    expect(playbackFile.readWaveformPeaksFromAudio.mock.calls.map(([bytes]) => bytes.toString())).toEqual([
+      'seekable.webm:mic-0|mic-1|', 'seekable.webm:tab-0|',
+    ]);
+    await request(server).get(waveform).query({ track: 'invalid' }).set(as(MEMBER)).expect(404);
+    await request(server).get(waveform).query({ track: 'mic' }).set(as(OUTSIDER)).expect(404);
     meeting(id).recording_job.audioTracks.tab.playbackFile = null;
     const tab = await request(server).get(path).query({ track: 'tab' }).set(as(MEMBER)).expect(200);
     expect(tab.body.pieces).toEqual([{ seq: 0, durationMs: 30000, url: expect.stringContaining('/tab-000000-30000.webm') }]);
@@ -607,6 +618,7 @@ describe('recorder routes', () => {
     await request(server).delete(`/api/recordings/${id}/audio`).set(as(MEMBER)).expect(200);
     expect(mockStorage.size).toBe(0);
     await request(server).get(path).query({ track: 'tab' }).set(as(MEMBER)).expect(404);
+    await request(server).get(waveform).query({ track: 'tab' }).set(as(MEMBER)).expect(404);
   });
 
   test('deleting a meeting also deletes leftover recording audio', async () => {

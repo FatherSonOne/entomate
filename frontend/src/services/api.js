@@ -244,7 +244,7 @@ export const recordingsApi = {
       headers: { 'Content-Type': contentType },
       timeout: 60000,
     }),
-  finish: (meetingId, pieces) => api.post(`/recordings/${meetingId}/finish`, { pieces }),
+  finish: (meetingId, pieces, gaps) => api.post(`/recordings/${meetingId}/finish`, { pieces, ...gaps }),
   recovery: (meetingId) => {
     cache.invalidate(`/recordings/${meetingId}/recovery`)
     return api.get(`/recordings/${meetingId}/recovery`, { _noCache: true })
@@ -258,7 +258,9 @@ export const recordingsApi = {
   discard: (meetingId) => api.delete(`/recordings/${meetingId}`),
   // Signed links to the saved audio, in order; they expire, so never read this from the cache.
   playback: (meetingId, track) => api.get(`/recordings/${meetingId}/playback`, track ? { params: { track }, _noCache: true } : undefined),
-  waveform: (meetingId, signal) => api.get(`/recordings/${meetingId}/waveform`, { signal, _noCache: true }),
+  waveform: (meetingId, signal, track) => api.get(`/recordings/${meetingId}/waveform`, {
+    signal, _noCache: true, ...(track ? { params: { track } } : {}),
+  }),
 }
 
 // ========================================

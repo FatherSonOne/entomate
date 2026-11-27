@@ -8,7 +8,7 @@
  */
 
 import { meetingsApi, recordingsApi } from './api'
-import { ISOLATED_AUDIO_TRACKS, type IsolatedAudioTrack } from './recordingAudioTracks'
+import { ISOLATED_AUDIO_TRACKS, readRecordingGaps, type AudioGap, type AudioTracks, type IsolatedAudioTrack, type RecordingGaps, type RecordingTrack, type TrackCoverage } from './recordingAudioTracks'
 import { lockRecording, recordingJournal, type RecordingPiece } from './recordingJournal'
 import cache from './apiCache'
 
@@ -45,14 +45,16 @@ export interface RecordingJob {
   /** Length of the recording, ms. */
   durationMs: number
   audioTracks?: AudioTracks
+  audioGaps?: AudioGap[]
   transcriptRebuildAt?: string
   transcriptRebuildError?: string
   transcriptRebuiltAt?: string
   transcriptRebuildProgress?: TranscriptRebuildProgress
 }
 
-interface TrackCoverage { pieces: number; durationMs: number }
-export type AudioTracks = Partial<Record<IsolatedAudioTrack, TrackCoverage>>
+export type { AudioTracks } from './recordingAudioTracks'
+interface RecordingCoverage extends TrackCoverage { audioTracks?: AudioTracks }
+export type RecoveryProgress = Partial<Record<RecordingTrack, { savedMs: number; sentMs: number }>>
 
 function readAudioTracks(raw: unknown): AudioTracks {
   const tracks: AudioTracks = {}
@@ -84,6 +86,7 @@ export function toRecordingJob(raw: unknown): RecordingJob | null {
   const r = raw as Record<string, unknown>
   const status = STATUSES.find((s) => s === r.status)
   if (!status) return null
+  const audioGaps = readRecordingGaps(r, typeof r.durationMs === 'number' ? r.durationMs : 0)
   const progress = r.transcriptRebuildProgress as Partial<TranscriptRebuildProgress> | null | undefined
   const validProgress = progress && (progress.stage === 'transcribing' || progress.stage === 'saving')
     && typeof progress.totalMs === 'number' && Number.isFinite(progress.totalMs) && progress.totalMs >= 0
@@ -104,7 +107,8 @@ export function toRecordingJob(raw: unknown): RecordingJob | null {
     ...(typeof r.transcriptRebuiltAt === 'string' ? { transcriptRebuiltAt: r.transcriptRebuiltAt } : {}),
     ...(validProgress ? { transcriptRebuildProgress: progress as TranscriptRebuildProgress } : {}),
     durationMs: typeof r.durationMs === 'number' && r.durationMs > 0 ? r.durationMs : 0,
-    ...(r.audioTracks ? { audioTracks: readAudioTracks(r.audioTracks) } : {}),
+    ...(r.audioTracks || r.splitAudio === true ? { audioTracks: readAudioTracks(r.audioTracks) } : {}),
+    ...(audioGaps.length ? { audioGaps } : {}),
   }
 }
 
@@ -177,8 +181,8 @@ export async function loadRecordingAudio(
   return { blob: new Blob(parts, { type }), durationMs }
 }
 
-export async function loadRecordingWaveformPeaks(meetingId: string, signal: AbortSignal): Promise<number[]> {
-  const result = (await recordingsApi.waveform(meetingId, signal)) as unknown as { peaks?: unknown }
+export async function loadRecordingWaveformPeaks(meetingId: string, signal: AbortSignal, track?: IsolatedAudioTrack): Promise<number[]> {
+  const result = (await (track ? recordingsApi.waveform(meetingId, signal, track) : recordingsApi.waveform(meetingId, signal))) as unknown as { peaks?: unknown }
   const peaks = toWaveformPeaks(result?.peaks)
   if (!peaks) throw new Error('Waveform unavailable')
   return peaks
@@ -340,53 +344,88 @@ export async function startRecording(input: StartInput): Promise<{ meetingId: st
   }
 }
 
-export async function finishRecording(meetingId: string, pieces: number): Promise<void> {
+export async function finishRecording(meetingId: string, pieces: number, gaps?: RecordingGaps): Promise<RecordingCoverage | undefined> {
   try {
-    await recordingsApi.finish(meetingId, pieces)
+    const response = (gaps?.micAudioGaps?.length || gaps?.tabAudioGaps?.length
+      ? await recordingsApi.finish(meetingId, pieces, gaps) : await recordingsApi.finish(meetingId, pieces)) as unknown as RecordingCoverage | undefined
     cache.invalidate('/meetings')
+    return typeof response?.durationMs === 'number' ? response : undefined
   } catch (err) {
-    throw new Error(errorText(err, 'The recording could not be finished.'))
+    throw new Error(errorText(err, 'The recording could not be sent.'))
   }
 }
 
-export async function recoverRecording(id: string, userId: string): Promise<void> {
+export function receivedRecordingTracks(coverage: RecordingCoverage): RecoveryProgress {
+  const result: RecoveryProgress = { mix: { savedMs: 0, sentMs: coverage.durationMs } }
+  if (coverage.audioTracks) {
+    for (const track of ISOLATED_AUDIO_TRACKS) {
+      result[track] = { savedMs: 0, sentMs: coverage.audioTracks[track]?.durationMs ?? 0 }
+    }
+  }
+  return result
+}
+
+export async function recoverRecording(
+  id: string, userId: string, onProgress?: (tracks: RecoveryProgress) => void,
+): Promise<RecoveryProgress> {
   const release = await lockRecording(id)
   if (!release) throw new Error('This recording is open in another tab. Finish it there or close that tab.')
   try {
     const saved = await recordingJournal.read(id)
     if (!saved || saved.recording.userId !== userId) throw new Error('This recording is no longer available on this device.')
-    const cloud = (await recordingsApi.recovery(id)) as unknown as {
-      status: RecordingStatus; pieces: number; durationMs: number; audioTracks?: AudioTracks
-    }
+    const cloud = (await recordingsApi.recovery(id)) as unknown as RecordingCoverage & { status: RecordingStatus }
+    let progress: RecoveryProgress = {}
     if (cloud.status === 'recording') {
-      const uploadMissing = async (coverage: TrackCoverage, track?: IsolatedAudioTrack, maxPieces = Infinity): Promise<number> => {
-        const send = sendPieceTo(id, saved.recording.mimeType, track)
-        let count = coverage.pieces
-        let durationMs = coverage.durationMs
+      const makePlan = (coverage: TrackCoverage, track?: IsolatedAudioTrack, maxPieces = Infinity) => {
+        const pending: RecordingPiece[] = []
+        let next = coverage.pieces
         for (const piece of saved.pieces) {
-          if (piece.track !== track || piece.seq < count) continue
-          if (piece.seq !== count || count >= maxPieces) break
+          if (piece.track !== track || piece.seq < next) continue
+          if (piece.seq !== next || next >= maxPieces) break
+          pending.push(piece)
+          next += 1
+        }
+        const name: RecordingTrack = track ?? 'mix'
+        progress[name] = {
+          savedMs: pending.reduce((total, piece) => total + piece.durationMs, coverage.durationMs),
+          sentMs: coverage.durationMs,
+        }
+        return { coverage, pending, name, track }
+      }
+      const mix = makePlan(cloud)
+      const count = cloud.pieces + mix.pending.length
+      if (!count) throw new Error('No continuous audio could be recovered.')
+      const tracks = readAudioTracks(cloud.audioTracks)
+      const sides = cloud.audioTracks ? ISOLATED_AUDIO_TRACKS.map(track =>
+        makePlan(tracks[track] ?? { pieces: 0, durationMs: 0 }, track, count)) : []
+      onProgress?.({ ...progress })
+      const uploadMissing = async ({ coverage, pending, name, track }: ReturnType<typeof makePlan>): Promise<void> => {
+        const send = sendPieceTo(id, saved.recording.mimeType, track)
+        let durationMs = coverage.durationMs
+        for (const piece of pending) {
           try { await send(piece.seq, piece.durationMs, piece.blob) } catch (err) {
             if (track && isPermanent(err)) break
             throw err
           }
-          count += 1
           durationMs += piece.durationMs
           const acknowledged = track ? recordingJournal.acknowledge(id, piece.seq, durationMs, track)
             : recordingJournal.acknowledge(id, piece.seq, durationMs)
           await acknowledged.catch(() => {})
+          progress[name] = { savedMs: progress[name]!.savedMs, sentMs: durationMs }
+          onProgress?.({ ...progress })
         }
-        return count
       }
-      const count = await uploadMissing(cloud)
-      if (!count) throw new Error('No continuous audio could be recovered.')
-      if (cloud.audioTracks) {
-        const tracks = readAudioTracks(cloud.audioTracks)
-        await Promise.all(ISOLATED_AUDIO_TRACKS.map(track => uploadMissing(tracks[track] ?? { pieces: 0, durationMs: 0 }, track, count)))
-      }
-      await finishRecording(id, count)
+      await uploadMissing(mix)
+      const uploaded = await Promise.allSettled(sides.map(uploadMissing))
+      for (const result of uploaded) if (result.status === 'rejected') throw result.reason
+      const { micAudioGaps, tabAudioGaps } = saved.recording
+      const finished = await finishRecording(id, count, { micAudioGaps, tabAudioGaps })
+      if (finished) progress = receivedRecordingTracks(finished)
+    } else if (typeof cloud.durationMs === 'number') {
+      progress = receivedRecordingTracks(cloud)
     }
     await recordingJournal.remove(id).catch(() => {})
+    return progress
   } catch (err) {
     throw new Error(errorText(err, 'The saved recording could not be recovered.'))
   } finally {
@@ -394,9 +433,14 @@ export async function recoverRecording(id: string, userId: string): Promise<void
   }
 }
 
-export async function salvageRecording(meetingId: string): Promise<void> {
+export async function salvageRecording(meetingId: string, recoveryUserId?: string, onProgress?: (tracks: RecoveryProgress) => void): Promise<void> {
   try {
-    await recordingsApi.salvage(meetingId)
+    const saved = recoveryUserId ? await recordingJournal.list(recoveryUserId).catch(() => []) : []
+    if (recoveryUserId && saved.some(recording => recording.id === meetingId)) {
+      await recoverRecording(meetingId, recoveryUserId, onProgress)
+    } else {
+      await recordingsApi.salvage(meetingId)
+    }
     cache.invalidate(`/meetings/${meetingId}`)
   } catch (err) {
     throw new Error(errorText(err, 'The saved audio could not be sent for a transcript.'))

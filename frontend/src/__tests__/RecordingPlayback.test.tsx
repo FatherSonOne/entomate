@@ -99,6 +99,59 @@ describe('RecordingPlayer', () => {
   })
 
 
+  test('draws each track on the shared clock and plays the available source when a gap is clicked', async () => {
+    api.playback.mockImplementation((_id, track) => Promise.resolve({
+      url: `https://signed.test/${track ?? 'combined'}`,
+      durationMs: track === 'mic' ? 25_000 : 60_000,
+    }))
+    api.waveform.mockImplementation((_id, _signal, track) => Promise.resolve({
+      peaks: track === 'mic' ? [0.2, 0.4, 0.2] : [0.1, 0.9, 0.1],
+    }))
+    const pause = vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {})
+    const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined)
+    try {
+      render(<RecordingPlayer meetingId={MEETING} durationMs={60_000} waveformPeaks={[0.1, 0.3, 0.1]} audioTracks={{
+        mic: { pieces: 1, durationMs: 25_000 }, tab: { pieces: 2, durationMs: 60_000 },
+      }} gaps={[
+        { track: 'tab', startMs: 10_000, endMs: 15_000 },
+        { track: 'mic', startMs: 33_000, endMs: null },
+        { track: 'tab', startMs: 50_000, endMs: 52_000 },
+      ]} />)
+      const combined = screen.getByTestId('recording-waveform').querySelector('path')?.getAttribute('d')
+      fireEvent.click(screen.getByRole('button', { name: 'Tab audio gap from 0:10 to 0:15. Play Microphone.' }))
+      let audio = await screen.findByTestId('recording-player') as HTMLAudioElement
+      expect(audio.src).toBe('https://signed.test/mic')
+      Object.defineProperty(audio, 'duration', { configurable: true, value: 25 })
+      fireEvent.loadedMetadata(audio)
+      expect(audio.currentTime).toBe(10)
+      expect(play).toHaveBeenCalledTimes(1)
+      const micPath = (await screen.findByTestId('recording-waveform')).querySelector('path')
+      expect(micPath?.getAttribute('d')).not.toBe(combined)
+      expect(micPath?.getAttribute('transform')).toContain('scale(0.416')
+      expect(screen.getByRole('slider', { name: 'Playback position' })).toHaveAttribute('max', '25')
+      expect(screen.getByRole('list', { name: 'Track save status' })).toHaveTextContent('Microphone · Partial through 0:25')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Microphone gap from 0:33 to the end. Play Tab audio.' }))
+      audio = await screen.findByTestId('recording-player') as HTMLAudioElement
+      expect(audio.src).toBe('https://signed.test/tab')
+      Object.defineProperty(audio, 'duration', { configurable: true, value: 60 })
+      fireEvent.loadedMetadata(audio)
+      expect(audio.currentTime).toBe(33)
+      expect(play).toHaveBeenCalledTimes(2)
+      expect(api.waveform).toHaveBeenCalledWith(MEETING, expect.any(AbortSignal), 'mic')
+      expect(api.waveform).toHaveBeenCalledWith(MEETING, expect.any(AbortSignal), 'tab')
+      fireEvent.click(screen.getByRole('button', { name: 'Tab audio gap from 0:50 to 0:52. Play Combined.' }))
+      audio = await screen.findByTestId('recording-player') as HTMLAudioElement
+      expect(audio.src).toBe('https://signed.test/combined')
+      Object.defineProperty(audio, 'duration', { configurable: true, value: 60 })
+      fireEvent.loadedMetadata(audio)
+      expect(audio.currentTime).toBe(50)
+    } finally {
+      play.mockRestore()
+      pause.mockRestore()
+    }
+  })
+
   test('downloads nothing until asked, then seeks with the Slate slider without starting playback', async () => {
     const onTime = vi.fn()
     render(<RecordingPlayer meetingId={MEETING} durationMs={754_000} onTime={onTime} />)

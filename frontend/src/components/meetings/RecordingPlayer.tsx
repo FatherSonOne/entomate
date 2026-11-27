@@ -3,7 +3,8 @@ import { ChevronDown, Loader2, Pause, Play, RotateCcw, RotateCw, SkipBack, SkipF
 import { Display, Key, Tape, Toggle, type TapeMarker } from '../bench'
 import { formatClock, type TranscriptSegment } from '../../services/meetingTranscriptService'
 import { loadRecordingAudio, loadRecordingWaveformPeaks, removeRecordingAudio, type AudioTracks, type RecordingAudio } from '../../services/meetingRecorderService'
-import { ISOLATED_AUDIO_TRACKS, type IsolatedAudioTrack } from '../../services/recordingAudioTracks'
+import { ISOLATED_AUDIO_TRACKS, TRACK_LABELS, type AudioGap, type IsolatedAudioTrack, type RecordingTrack } from '../../services/recordingAudioTracks'
+import { TrackSaveStatus, type TrackSaveStates } from './TrackSaveStatus'
 import { readRecordingWaveform, waveformFromPeaks } from '../../services/recordingWaveform'
 import { recordingSpeakers } from './recordingSpeakers'
 import './RecordingPlayer.css'
@@ -21,6 +22,7 @@ export interface RecordingPlayerProps {
   /** Direct audio from a legacy meeting upload. Kept recordings use the playback service. */
   audioUrl?: string
   audioTracks?: AudioTracks
+  gaps?: ReadonlyArray<AudioGap>
   durationMs?: number | null
   waveformPeaks?: ReadonlyArray<number> | null
   /** Progress shown in place of the waveform while the transcript is rebuilt. */
@@ -60,10 +62,8 @@ function rulerMarks(durationMs: number): number[] {
   return [...marks, durationMs]
 }
 
-const TRACK_LABELS = { mic: 'Microphone', tab: 'Tab audio' }
-
 export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayerProps>(function RecordingPlayer(
-  { meetingId, audioUrl, audioTracks, durationMs, waveformPeaks, waveformReplacement, transcriptSegments, decisions = [], actions = [], onMoment, onStepMoment, onTime, onAudioRemoved },
+  { meetingId, audioUrl, audioTracks, gaps = [], durationMs, waveformPeaks, waveformReplacement, transcriptSegments, decisions = [], actions = [], onMoment, onStepMoment, onTime, onAudioRemoved },
   ref,
 ) {
   const [source, setSource] = useState<Source | null>(null)
@@ -82,7 +82,7 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
   const [muted, setMuted] = useState(false)
   const [volume, setVolume] = useState(1)
   const [showSpeakerColors, setShowSpeakerColors] = useState(false)
-  const [loadedWaveform, setLoadedWaveform] = useState<string | null>(null)
+  const [waveforms, setWaveforms] = useState<Partial<Record<RecordingTrack, string>>>({})
   const [waveStatus, setWaveStatus] = useState<'idle' | 'drawing' | 'unavailable'>('idle')
   const audioRef = useRef<HTMLAudioElement>(null)
   const request = useRef<AbortController | null>(null)
@@ -96,17 +96,27 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
   const speakerGradientId = `${clipId}-speakers`
   const trackDuration = track ? audioTracks?.[track]?.durationMs : durationMs
   const effectiveDuration = mediaDuration || finiteDuration(source?.durationMs) || finiteDuration(trackDuration)
-  const speakers = useMemo(() => recordingSpeakers(transcriptSegments ?? [], effectiveDuration), [transcriptSegments, effectiveDuration])
+  // An incomplete track still uses the full recorded timeline.
+  const timelineDuration = track ? Math.max(effectiveDuration, finiteDuration(durationMs)) : effectiveDuration
+  const isPartial = Boolean(track && finiteDuration(trackDuration) < finiteDuration(durationMs))
+  const coverageFraction = isPartial && timelineDuration ? Math.min(effectiveDuration / timelineDuration, 1) : 1
+  const waveformScale = coverageFraction < 1 ? `scale(${coverageFraction} 1)` : undefined
+  const speakers = useMemo(() => recordingSpeakers(transcriptSegments ?? [], timelineDuration), [transcriptSegments, timelineDuration])
   const speakerColorsVisible = showSpeakerColors && speakers.turns.length > 0
   const currentSpeaker = speakerColorsVisible
     ? speakers.turns.find(turn => turn.start <= position && position < turn.end)?.speaker
     : undefined
-  const fraction = effectiveDuration ? Math.min(position / effectiveDuration, 1) : 0
+  const fraction = timelineDuration ? Math.min(position / timelineDuration, 1) : 0
   const elapsed = formatClock(position)
-  const total = effectiveDuration ? formatClock(effectiveDuration) : '–:––'
+  const total = timelineDuration ? formatClock(timelineDuration) : '–:––'
   const savedWaveform = useMemo(() => waveformPeaks?.length ? waveformFromPeaks(waveformPeaks) : null, [waveformPeaks])
-  const waveform = audioRemoved || track ? null : savedWaveform ?? loadedWaveform
+  const trackKey = track ?? 'mix'
+  const waveform = audioRemoved ? null : ((!track ? savedWaveform : null) ?? waveforms[trackKey] ?? null)
   const availableTracks = ISOLATED_AUDIO_TRACKS.filter(name => (audioTracks?.[name]?.durationMs ?? 0) > 0)
+  const trackSaveStates: TrackSaveStates = { mix: { savedMs: 0, sentMs: finiteDuration(durationMs) } }
+  for (const name of ISOLATED_AUDIO_TRACKS) {
+    trackSaveStates[name] = { savedMs: 0, sentMs: audioTracks?.[name]?.durationMs ?? 0 }
+  }
 
   useEffect(() => () => request.current?.abort(), [])
   useEffect(() => {
@@ -115,25 +125,23 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
   }, [source])
 
   useEffect(() => {
-    if (track) { setWaveStatus('idle'); return }
-    if (savedWaveform !== null || audioRemoved) return
+    if (waveform !== null || audioRemoved) return
     const controller = new AbortController()
-    setLoadedWaveform(null)
     setWaveStatus('drawing')
     const readWaveform = audioUrl
       ? readRecordingWaveform(audioUrl, finiteDuration(durationMs), controller.signal)
-      : loadRecordingWaveformPeaks(meetingId, controller.signal).then(waveformFromPeaks)
+      : loadRecordingWaveformPeaks(meetingId, controller.signal, track).then(waveformFromPeaks)
     void readWaveform
       .then(path => {
         if (controller.signal.aborted) return
-        setLoadedWaveform(path)
+        setWaveforms(previous => ({ ...previous, [trackKey]: path }))
         setWaveStatus('idle')
       })
       .catch(() => {
         if (!controller.signal.aborted) setWaveStatus('unavailable')
       })
     return () => controller.abort()
-  }, [audioRemoved, audioUrl, durationMs, meetingId, savedWaveform, track])
+  }, [audioRemoved, audioUrl, durationMs, meetingId, track, trackKey, waveform])
 
   const load = async (playbackTrack: IsolatedAudioTrack | undefined, refresh = false): Promise<void> => {
     if (request.current || (source && playbackTrack === track && !refresh)) return
@@ -165,13 +173,10 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
     }
   }
 
-  const selectTrack = (nextTrack: IsolatedAudioTrack | undefined): void => {
-    if (nextTrack === track) return
+  const switchTrack = (nextTrack: IsolatedAudioTrack | undefined, atMs: number, shouldPlay: boolean, endAtMs?: number): void => {
     const audio = audioRef.current
-    const shouldPlay = audio ? !audio.paused : Boolean(pending.current?.play)
-    const atMs = audio && mediaReady.current ? Math.round(audio.currentTime * 1000) : position
     const endMs = nextTrack ? audioTracks?.[nextTrack]?.durationMs : durationMs
-    pending.current = { atMs: Math.min(atMs, endMs || Infinity), play: shouldPlay, endMs: pending.current?.endMs ?? previewEnd.current }
+    pending.current = { atMs: Math.min(atMs, endMs || Infinity), play: shouldPlay, endMs: endAtMs }
     audio?.pause()
     request.current?.abort()
     request.current = null
@@ -184,6 +189,28 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
     setSource(null)
     setTrack(nextTrack)
     void load(nextTrack, true)
+  }
+
+  const selectTrack = (nextTrack: IsolatedAudioTrack | undefined): void => {
+    if (nextTrack === track) return
+    const audio = audioRef.current
+    const ready = audio && mediaReady.current
+    switchTrack(nextTrack, ready ? Math.round(audio.currentTime * 1000) : position,
+      ready ? !audio.paused : Boolean(pending.current?.play), pending.current?.endMs ?? previewEnd.current)
+  }
+
+  const gapPlaybackTrack = (gap: AudioGap): IsolatedAudioTrack | undefined => {
+    const other = gap.track === 'mic' ? 'tab' : 'mic'
+    const otherIsAvailable = (audioTracks?.[other]?.durationMs ?? 0) > gap.startMs
+      && !gaps.some(point => point.track === other && point.startMs <= gap.startMs
+        && (point.endMs === null || point.endMs > gap.startMs))
+    return otherIsAvailable ? other : undefined
+  }
+
+  const playGap = (gap: AudioGap): void => {
+    const nextTrack = gapPlaybackTrack(gap)
+    if (nextTrack === track) seek(gap.startMs, true)
+    else switchTrack(nextTrack, gap.startMs, true)
   }
 
   const updatePosition = (audio: HTMLAudioElement): void => {
@@ -362,6 +389,7 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
           </select>
         </label>
       )}
+      {!audioRemoved && audioTracks && <TrackSaveStatus tracks={trackSaveStates} final />}
       {source && (
         <audio
           ref={audioRef}
@@ -388,6 +416,7 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
           <span className="bs-recording-clock"><b>{elapsed}</b> <span aria-hidden="true">/</span> {total}</span>
         </div>
         <div className="bs-recording-scrub" style={{ '--position': `${fraction * 100}%` } as React.CSSProperties}>
+          {isPartial && <span className="bs-recording-unavailable" style={{ left: `${coverageFraction * 100}%` }} aria-hidden="true" />}
           {(waveform !== null || speakerColorsVisible) && (
             <svg data-testid={waveform !== null ? 'recording-waveform' : undefined} viewBox="0 0 1000 80" preserveAspectRatio="none" aria-hidden="true">
               <defs>
@@ -400,9 +429,11 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
               </defs>
               {waveform !== null && (
                 <>
-                  <path d={waveform} className="bs-recording-unplayed" />
-                  <path d={waveform} className={speakerColorsVisible ? 'bs-recording-played-neutral' : 'bs-recording-played'} clipPath={`url(#${clipId})`} />
-                  {speakerColorsVisible && (
+                  <path d={waveform} transform={waveformScale} className="bs-recording-unplayed" />
+                  <g clipPath={`url(#${clipId})`}>
+                    <path d={waveform} transform={waveformScale} className={speakerColorsVisible && !track ? 'bs-recording-played-neutral' : 'bs-recording-played'} />
+                  </g>
+                  {speakerColorsVisible && !track && (
                     <>
                       <path d={waveform} fill={`url(#${speakerGradientId})`} opacity="0.7" />
                       <path d={waveform} fill={`url(#${speakerGradientId})`} clipPath={`url(#${clipId})`} />
@@ -421,6 +452,7 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
           )}
           <input
             type="range"
+            style={coverageFraction < 1 ? { width: `${coverageFraction * 100}%` } : undefined}
             aria-label="Playback position"
             aria-valuetext={`${elapsed} of ${total}${currentSpeaker ? `, ${currentSpeaker}` : ''}`}
             min={0}
@@ -443,13 +475,34 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
             }}
           />
         </div>
-        {effectiveDuration > 0 && (
+        {timelineDuration > 0 && (
           <div className="bs-recording-ruler" aria-hidden="true">
-            {rulerMarks(effectiveDuration).map(at => (
-              <span key={at} style={{ left: `${at / effectiveDuration * 100}%` }}>{formatClock(at)}</span>
+            {rulerMarks(timelineDuration).map(at => (
+              <span key={at} style={{ left: `${at / timelineDuration * 100}%` }}>{formatClock(at)}</span>
             ))}
           </div>
         )}
+        {!audioRemoved && timelineDuration > 0 && ISOLATED_AUDIO_TRACKS.map(name => {
+          const trackGaps = gaps.filter(gap => gap.track === name && gap.startMs < timelineDuration)
+          if (!trackGaps.length) return null
+          return (
+            <div className="bs-recording-gaps" key={name} role="group" aria-label={`${TRACK_LABELS[name]} gaps`}>
+              <span>{TRACK_LABELS[name]} gaps</span>
+              <div className="bs-recording-gap-lane">
+                {trackGaps.map(gap => {
+                  const left = gap.startMs / timelineDuration * 100
+                  const end = Math.min(gap.endMs ?? timelineDuration, timelineDuration)
+                  const until = gap.endMs === null ? 'the end' : formatClock(end)
+                  const label = `${TRACK_LABELS[name]} gap from ${formatClock(gap.startMs)} to ${until}. Play ${TRACK_LABELS[gapPlaybackTrack(gap) ?? 'mix']}.`
+                  return (
+                    <button type="button" key={gap.startMs} aria-label={label} title={label} onClick={() => playGap(gap)}
+                      style={{ left: `min(${left}%, calc(100% - 24px))`, width: `${(end - gap.startMs) / timelineDuration * 100}%` }} />
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
         {speakerColorsVisible && (
           <ul className="bs-recording-speakers" role="list" aria-label="Waveform speakers">
             {[...speakers.colors].map(([speaker, color]) => (

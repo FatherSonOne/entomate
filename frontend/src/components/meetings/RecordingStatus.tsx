@@ -17,12 +17,15 @@ import {
   rewriteSummary,
   salvageRecording,
   toRecordingJob,
+  type RecoveryProgress,
 } from '../../services/meetingRecorderService'
 import { DebriefLoader } from '../bot/DebriefLoader'
 import { recordingSource } from '../../services/recordingProgress'
+import { TrackSaveStatus } from './TrackSaveStatus'
 
 export interface RecordingStatusProps {
   meetingId: string
+  recoveryUserId?: string
   /** `meetings.recording_job`, as the server sent it. */
   recordingJob: unknown
   /** Reload the meeting (fresh, not cached). */
@@ -39,10 +42,11 @@ export interface RecordingStatusProps {
 export const POLL_MS = 5000
 
 
-export function RecordingStatus({ meetingId, recordingJob, onRefresh, hasSummary = false, hasTranscript = false, title, attendees }: RecordingStatusProps): React.ReactElement | null {
+export function RecordingStatus({ meetingId, recordingJob, recoveryUserId, onRefresh, hasSummary = false, hasTranscript = false, title, attendees }: RecordingStatusProps): React.ReactElement | null {
   const job = toRecordingJob(recordingJob)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [recovery, setRecovery] = useState<RecoveryProgress | null>(null)
   const retryable = canRetry(job)
   const writing = job?.status === 'transcribing' && !retryable
   const rebuilding = canPlay(recordingJob) && isRebuildingTranscript(job)
@@ -114,7 +118,8 @@ export function RecordingStatus({ meetingId, recordingJob, onRefresh, hasSummary
             This recording was not stopped, so it has no transcript yet. If the recording tab was closed, the audio saved up to
             then can still be transcribed.
           </p>
-          <Key disabled={busy} onClick={() => void act(salvageRecording)} icon={icon}>
+          {recovery && <TrackSaveStatus tracks={recovery} sending={busy} />}
+          <Key disabled={busy} onClick={() => void act(id => salvageRecording(id, recoveryUserId, setRecovery))} icon={icon}>
             Transcribe the saved audio
           </Key>
         </>

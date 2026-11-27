@@ -1,4 +1,4 @@
-import type { IsolatedAudioTrack } from './recordingAudioTracks'
+import type { AudioTracks, IsolatedAudioTrack, RecordingGaps, RecordingTrack, TrackCoverage } from './recordingAudioTracks'
 
 export interface RecordingPiece {
   seq: number
@@ -7,7 +7,7 @@ export interface RecordingPiece {
   track?: IsolatedAudioTrack
 }
 
-export interface SavedRecording {
+export interface SavedRecording extends Partial<RecordingGaps> {
   id: string
   userId: string
   title: string
@@ -15,6 +15,23 @@ export interface SavedRecording {
   savedPieces: number
   savedMs: number
   startedAt: number
+  splitAudio?: boolean
+  savedAudioTracks?: AudioTracks
+  receivedTracks?: Partial<Record<RecordingTrack, TrackCoverage>>
+}
+
+export function savedTrackCoverage(recording: SavedRecording, track: RecordingTrack): TrackCoverage {
+  if (track === 'mix') return { pieces: recording.savedPieces, durationMs: recording.savedMs }
+  return recording.savedAudioTracks?.[track] ?? { pieces: 0, durationMs: 0 }
+}
+
+function setSavedCoverage(recording: SavedRecording, track: RecordingTrack, coverage: TrackCoverage): void {
+  if (track === 'mix') {
+    recording.savedPieces = coverage.pieces
+    recording.savedMs = coverage.durationMs
+  } else {
+    recording.savedAudioTracks = { ...recording.savedAudioTracks, [track]: coverage }
+  }
 }
 
 let database: Promise<IDBDatabase> | undefined
@@ -53,9 +70,11 @@ const pieceRange = (id: string): IDBKeyRange => IDBKeyRange.bound([id, 0], [id, 
 const pieceKey = (id: string, seq: number, track?: IsolatedAudioTrack) => track ? [id, seq, track] : [id, seq]
 
 export const recordingJournal = {
-  create(input: Pick<SavedRecording, 'id' | 'userId' | 'title' | 'mimeType'>): Promise<void> {
+  create(input: Pick<SavedRecording, 'id' | 'userId' | 'title' | 'mimeType' | 'splitAudio'>): Promise<void> {
     return transact(['recordings'], 'readwrite', tx => {
-      tx.objectStore('recordings').add({ ...input, savedPieces: 0, savedMs: 0, startedAt: Date.now() })
+      tx.objectStore('recordings').add({
+        ...input, savedPieces: 0, savedMs: 0, receivedTracks: {}, startedAt: Date.now(),
+      })
     })
   },
   list(userId: string): Promise<SavedRecording[]> {
@@ -86,12 +105,13 @@ export const recordingJournal = {
         const entry = request.result as SavedRecording | undefined
         if (!entry) { result(0); return }
         tx.objectStore('pieces').put(piece, pieceKey(id, piece.seq, piece.track))
-        if (!piece.track && entry.savedPieces === piece.seq) {
-          entry.savedPieces = piece.seq + 1
-          entry.savedMs = throughMs
+        const track = piece.track ?? 'mix'
+        const coverage = savedTrackCoverage(entry, track)
+        if (coverage.pieces === piece.seq) {
+          setSavedCoverage(entry, track, { pieces: piece.seq + 1, durationMs: throughMs })
           sessions.put(entry)
         }
-        result(piece.track ? throughMs : entry.savedMs)
+        result(savedTrackCoverage(entry, track).durationMs)
       }
     })
   },
@@ -103,7 +123,22 @@ export const recordingJournal = {
         const entry = request.result as SavedRecording | undefined
         if (!entry) return
         tx.objectStore('pieces').delete(pieceKey(id, seq, track))
-        if (!track && entry.savedPieces <= seq) sessions.put({ ...entry, savedPieces: seq + 1, savedMs: throughMs })
+        const name = track ?? 'mix'
+        const coverage = { pieces: seq + 1, durationMs: throughMs }
+        if (savedTrackCoverage(entry, name).pieces < coverage.pieces) setSavedCoverage(entry, name, coverage)
+        if ((entry.receivedTracks?.[name]?.pieces ?? 0) < coverage.pieces) {
+          entry.receivedTracks = { ...entry.receivedTracks, [name]: coverage }
+        }
+        sessions.put(entry)
+      }
+    })
+  },
+  saveGaps(id: string, gaps: RecordingGaps): Promise<void> {
+    return transact(['recordings'], 'readwrite', tx => {
+      const sessions = tx.objectStore('recordings')
+      const request = sessions.get(id)
+      request.onsuccess = () => {
+        if (request.result) sessions.put({ ...request.result, ...gaps })
       }
     })
   },
