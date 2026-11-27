@@ -1,5 +1,6 @@
 import type { SearchResponse } from './searchEngine'
 import type { PassageAnchor } from './meetingSourceLink'
+import type { ComparisonRanges } from './askDateRanges'
 
 export interface AskMeeting { type?: string; id?: string; title?: string; date?: string }
 
@@ -33,12 +34,7 @@ export interface PeriodComparison {
   current: MonthlyRecap
 }
 
-export interface DateRange { startDate: string; endDate: string }
-
-export interface ComparisonRanges {
-  previous: DateRange
-  current: DateRange
-}
+export interface ComparisonDraft { ranges: ComparisonRanges; question?: string }
 
 export interface CompletedAnswer {
   question: string
@@ -53,7 +49,7 @@ export interface SearchVisit {
   owner: string
   search: string
   draft: string
-  rangeDraft: ComparisonRanges | null
+  rangeDraft: ComparisonDraft | null
   results: SearchResponse | null
   meaning: boolean
   answer: CompletedAnswer | null

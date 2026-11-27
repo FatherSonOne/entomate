@@ -310,6 +310,9 @@ test.each([
   { label: 'Custom date comparison', custom: true },
 ])('$label keeps coverage for both periods and validates each quote and period', async ({ custom }) => {
   const comparison = custom ? dateComparison : monthComparison;
+  const question = custom
+    ? 'Compare October 1–24, 2026 with November 19–21, 2026. What changed about launch?'
+    : 'Compare this month to date with all of last month.';
   orgMemberships = [orgId, monthlyWorkspace];
   supabase.rpc.mockResolvedValue({ data: {
     comparison,
@@ -331,7 +334,7 @@ test.each([
     { topic: 'Launch', kind: 'comparison', text: 'Invented later phrasing.', evidence: [old, { ...revised, quote: 'Launch was cancelled.' }] },
   ]));
   const res = await request(app).post('/search/ask/stream').send({
-    question: custom ? 'What changed between these periods?' : 'Compare this month to date with all of last month.',
+    question,
     workspaceId: monthlyWorkspace, timeZone: 'America/New_York',
     ...(custom ? { comparisonRanges } : {}),
   });
@@ -357,8 +360,12 @@ test.each([
   expect(result.claims[1].text).toMatch(/records disagree/);
   expect(ai.chat).toHaveBeenCalledTimes(1);
   const prompt = ai.chat.mock.calls[0][0];
-  expect(JSON.parse(prompt.slice(prompt.indexOf('\n{') + 1)).passages.map((passage) => passage.period))
-    .toEqual(['previous', 'previous', 'current', 'current']);
+  const promptData = JSON.parse(prompt.slice(prompt.indexOf('\n{') + 1));
+  expect(promptData.passages.map((passage) => passage.period)).toEqual(['previous', 'previous', 'current', 'current']);
+  if (custom) {
+    expect(prompt).toContain('Use the confirmed dates in the comparison coverage as the scope');
+    expect(promptData).toMatchObject({ question, comparison: { current: { endDate: '2026-11-20' } } });
+  }
 });
 
 test.each([

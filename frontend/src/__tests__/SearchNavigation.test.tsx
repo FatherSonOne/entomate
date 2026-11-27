@@ -113,6 +113,32 @@ describe('Search and Ask navigation', () => {
     expect(api.post).toHaveBeenCalledTimes(searches)
   })
 
+  test('a palette Ask with a missing year waits for the dates to be corrected and confirmed', async () => {
+    const question = 'Compare Oct 4–7 and Nov 18–25, 2026.'
+    setup('/search?q=' + encodeURIComponent(question) + '&ask=1')
+    const form = await screen.findByRole('form', { name: 'Confirm date ranges' })
+    const earlier = within(form).getByRole('group', { name: 'Earlier period' })
+    const later = within(form).getByRole('group', { name: 'Later period' })
+    const confirm = within(form).getByRole('button', { name: 'Compare periods' })
+    expect(within(earlier).getByLabelText('Start date')).toHaveValue('')
+    expect(within(later).getByLabelText('End date')).toHaveValue('2026-11-25')
+    expect(confirm).toBeDisabled()
+    expect(api.askStream).not.toHaveBeenCalled()
+    fireEvent.change(within(earlier).getByLabelText('Start date'), { target: { value: '2026-10-04' } })
+    fireEvent.change(within(earlier).getByLabelText('End date'), { target: { value: '2026-10-07' } })
+    expect(confirm).toBeEnabled()
+    expect(api.askStream).not.toHaveBeenCalled()
+    fireEvent.click(confirm)
+    await waitFor(() => expect(api.askStream).toHaveBeenCalledOnce())
+    expect(api.askStream).toHaveBeenCalledWith({
+      question, workspaceId: 'search-workspace', timeZone: expect.any(String),
+      comparisonRanges: {
+        previous: { startDate: '2026-10-04', endDate: '2026-10-07' },
+        current: { startDate: '2026-11-18', endDate: '2026-11-25' },
+      },
+    }, expect.any(Object))
+  })
+
   test('a task title and its evidence are separate and browser Back restores the original view', async () => {
     setup('/search?q=launch&f=action_items')
     const title = await screen.findByRole('link', { name: 'Send launch update' })

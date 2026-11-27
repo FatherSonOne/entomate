@@ -150,7 +150,7 @@ class AskService {
         'Return only JSON in this form: {"claims":[{"text":"A single plain-text claim.","evidence":[{"id":"p1","quote":"Verbatim text from that passage."}]}]}',
       ]),
       ...(monthlyRecapScope?.comparisonRanges
-        ? ['Identify custom periods by their dates or as the earlier and later periods.']
+        ? ['Use the confirmed dates in the comparison coverage as the scope, even if the question mentions different dates. Identify the periods by those dates or as earlier and later.']
         : []),
       'Give up to eight concise claims. Supply a short, exact quote for each supporting passage and pick enough words to identify it unambiguously. Copy capitalization and punctuation.',
       'Every claim must be directly supported by its quotes. Cite multiple passages when they are jointly needed. Omit unsupported claims, and return {"claims":[]} if the evidence is insufficient.',

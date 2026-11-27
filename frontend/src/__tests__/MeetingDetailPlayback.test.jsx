@@ -234,7 +234,11 @@ describe('a pressed timecode plays the recording', () => {
       comparing: true, coverageName: 'Month-over-month coverage' },
     { label: 'custom date comparison', question: 'What changed between these periods?',
       comparing: true, custom: true, coverageName: 'Date range coverage' },
-  ])('$label restores coverage and the exact Before and After links without a second Ask request', async ({ question, comparing, custom, coverageName }) => {
+    { label: 'typed ISO dates', question: 'Compare 2026-10-04 to 2026-10-07 with 2026-11-18 to 2026-11-25. What changed about launch?',
+      comparing: true, custom: true, typed: true, coverageName: 'Date range coverage' },
+    { label: 'typed written dates', question: 'What changed about launch between Oct 4–7, 2026 and Nov 18–26, 2026?',
+      comparing: true, custom: true, typed: true, corrected: true, coverageName: 'Date range coverage' },
+  ])('$label restores coverage and the exact Before and After links without a second Ask request', async ({ question, comparing, custom, typed, corrected, coverageName }) => {
     const beforeQuote = 'We agreed to launch on Monday.'
     const afterQuote = 'The launch is now scheduled for Friday.'
     const laterRevision = 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb'
@@ -284,7 +288,21 @@ describe('a pressed timecode plays the recording', () => {
     )
 
     const rangeInput = (period, field) => within(screen.getByRole('group', { name: period })).getByLabelText(field)
-    if (custom) {
+    if (typed) {
+      const questionField = screen.getByRole('textbox', { name: 'Question about your meetings' })
+      fireEvent.change(questionField, { target: { value: question } })
+      fireEvent.click(screen.getByRole('button', { name: 'Ask Entomate' }))
+      const confirmation = screen.getByRole('form', { name: 'Confirm date ranges' })
+      await waitFor(() => expect(within(confirmation).getByRole('heading')).toHaveFocus())
+      expect(confirmation).toHaveTextContent(Intl.DateTimeFormat().resolvedOptions().timeZone)
+      expect(rangeInput('Earlier period', 'Start date')).toHaveValue(ranges.previous.startDate)
+      expect(rangeInput('Earlier period', 'End date')).toHaveValue(ranges.previous.endDate)
+      expect(rangeInput('Later period', 'Start date')).toHaveValue(ranges.current.startDate)
+      expect(rangeInput('Later period', 'End date')).toHaveValue(corrected ? '2026-11-26' : ranges.current.endDate)
+      expect(search.askStream).not.toHaveBeenCalled()
+      if (corrected) fireEvent.change(rangeInput('Later period', 'End date'), { target: { value: ranges.current.endDate } })
+      fireEvent.click(within(confirmation).getByRole('button', { name: 'Compare periods' }))
+    } else if (custom) {
       fireEvent.click(screen.getByRole('button', { name: 'Compare date ranges' }))
       const submit = screen.getByRole('button', { name: 'Compare periods' })
       expect(submit).toBeDisabled()
@@ -334,6 +352,7 @@ describe('a pressed timecode plays the recording', () => {
         expect(rangeInput('Later period', 'Start date')).toHaveValue(ranges.current.startDate)
         expect(rangeInput('Later period', 'End date')).toHaveValue('2026-11-26')
       }
+      if (typed) expect(screen.getByRole('form', { name: 'Confirm date ranges' })).toHaveTextContent(question)
     }
     expect(player.cueAt).toHaveBeenCalledWith(22_000)
     expect(player.playFrom).not.toHaveBeenCalled()
@@ -346,6 +365,7 @@ describe('a pressed timecode plays the recording', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Compare periods' }))
       await waitFor(() => expect(search.askStream).toHaveBeenCalledTimes(2))
       expect(search.askStream).toHaveBeenLastCalledWith(expect.objectContaining({
+        question,
         comparisonRanges: { ...ranges, current: { ...ranges.current, endDate: '2026-11-26' } },
       }), expect.any(Object))
     }

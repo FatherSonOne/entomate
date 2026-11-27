@@ -19,13 +19,15 @@ import { useOrgSafe } from '../contexts/OrgContext'
 import { useNotes, useRecentSearches, useSearch } from '../hooks/useSearch'
 import type { UseNotesResult } from '../hooks/useSearch'
 import { searchApi } from '../services/api'
+import { EMPTY_RANGES, parseTypedComparison, rangeDates, readComparisonRanges, validComparisonRanges } from '../services/askDateRanges'
+import type { ComparisonRanges } from '../services/askDateRanges'
 import {
   GROUPS, groupCount, isFilter, matchCommands, metaLine, readUrlState, resultHref, resultMomentHref, searchEverything,
   shortDate, statusSignal, timecode, writeUrlState,
 } from '../services/searchEngine'
 import type { Filter, SearchMode, SearchResponse, SearchResult } from '../services/searchEngine'
 import { readSearchVisit, rememberSearchVisit } from '../services/searchReturn'
-import type { AskCitation, AskClaim, AskMeeting, ComparisonRanges, CompletedAnswer, MonthlyRecap, PeriodComparison } from '../services/searchReturn'
+import type { AskCitation, AskClaim, AskMeeting, ComparisonDraft, CompletedAnswer, MonthlyRecap, PeriodComparison } from '../services/searchReturn'
 import { meetingSourceHref } from '../services/meetingSourceLink'
 import {
   clipFromResult, clipKey, kindLabel, noteHref, notesToMarkdown, originLabel, sourceLine,
@@ -41,32 +43,10 @@ const MIN_QUERY = 2
 const MAX_QUESTION = 2000
 const MODES = [{ value: 'search', label: 'Search' }, { value: 'ask', label: 'Ask' }] as const
 const COMPARISON_QUESTION = 'What changed between these periods?'
-const EMPTY_RANGES: ComparisonRanges = {
-  previous: { startDate: '', endDate: '' },
-  current: { startDate: '', endDate: '' },
-}
 type SearchLinkState = { searchReturnKey: string }
 
 const resultLinkId = (r: SearchResult) => `search-result-${r.type}-${r.id}`
 const ordinaryClick = (e: React.MouseEvent) => e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey
-const rangeDates = ({ previous, current }: ComparisonRanges) => [previous.startDate, previous.endDate, current.startDate, current.endDate]
-
-function validRangeDates(dates: string[]): dates is [string, string, string, string] {
-  if (dates.length !== 4 || !dates.every((value) => {
-    if (!/^(?!0000)\d{4}-\d{2}-\d{2}$/.test(value)) return false
-    const date = new Date(value)
-    return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value
-  })) return false
-  const [earlierStart = '', earlierEnd = '', laterStart = '', laterEnd = ''] = dates
-  return earlierStart <= earlierEnd && earlierEnd < laterStart && laterStart <= laterEnd
-}
-
-function readComparisonRanges(value: string | null): ComparisonRanges | null {
-  const dates = value?.split(',')
-  if (!dates || !validRangeDates(dates)) return null
-  const [earlierStart, earlierEnd, laterStart, laterEnd] = dates
-  return { previous: { startDate: earlierStart, endDate: earlierEnd }, current: { startDate: laterStart, endDate: laterEnd } }
-}
 
 export default function Search(): React.ReactElement {
   const { user } = useAuth() as unknown as { user: { id: string } | null }
@@ -85,17 +65,24 @@ function SearchPage({ owner, workspace }: { owner: string | null; workspace?: { 
   const url = readUrlState(params)
   const comparisonParam = params.get('compare')
   const comparisonRanges = useMemo(() => readComparisonRanges(comparisonParam), [comparisonParam])
+  const proposedRanges = useMemo(() => url.ask && comparisonParam === null ? parseTypedComparison(url.q) : null,
+    [url.ask, url.q, comparisonParam])
+  const comparisonQuestion = url.q !== COMPARISON_QUESTION ? url.q || undefined : undefined
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
   const [restored, setRestored] = useState(() => {
     const visit = readSearchVisit(location.key, owner, location.search)
     const returnKey = location.state?.searchReturnKey
     return visit ?? (returnKey ? readSearchVisit(returnKey, owner, location.search) : null)
   })
-  const [draft, setDraft] = useState(restored?.draft ?? (comparisonParam === null ? url.q : ''))
-  const [rangeDraft, setRangeDraft] = useState(() => restored ? restored.rangeDraft
-    : comparisonParam === null ? null : comparisonRanges ?? EMPTY_RANGES)
+  const [draft, setDraft] = useState(restored?.draft ?? (comparisonParam === null ? url.q : comparisonQuestion ?? ''))
+  const [rangeDraft, setRangeDraft] = useState<ComparisonDraft | null>(() => {
+    if (restored) return restored.rangeDraft
+    if (comparisonParam === null) return null
+    return { ranges: comparisonRanges ?? EMPTY_RANGES, question: comparisonQuestion }
+  })
   const [recentKey, setRecentKey] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
+  const confirmationRef = useRef<HTMLHeadingElement>(null)
   const previousQuery = useRef(url.q)
 
   const setUrl = useCallback((next: Parameters<typeof writeUrlState>[1], compare?: string | null) => {
@@ -125,6 +112,11 @@ function SearchPage({ owner, workspace }: { owner: string | null; workspace?: { 
     previousQuery.current = url.q
     if (comparisonParam === null) setDraft(url.q)
   }, [url.q, comparisonParam])
+
+  // A palette shortcut can enter Ask with a query already in the URL.
+  useEffect(() => {
+    if (proposedRanges) setRangeDraft({ ranges: proposedRanges, question: url.q.trim() })
+  }, [proposedRanges, url.q])
 
   useEffect(() => {
     if (!restored) return
@@ -171,21 +163,26 @@ function SearchPage({ owner, workspace }: { owner: string | null; workspace?: { 
     if (t.length < MIN_QUERY) return
     if (!isAsk) { logQuery(t); return }
     if (t.length > MAX_QUESTION) return
+    const ranges = parseTypedComparison(t)
+    if (ranges) {
+      setRangeDraft({ ranges, question: t })
+      requestAnimationFrame(() => confirmationRef.current?.focus())
+      return
+    }
     if (url.ask && t === q && comparisonParam === null) return
     setRestored(null)
-    if (comparisonParam !== null) setRangeDraft(null)
+    if (comparisonParam !== null || rangeDraft?.question) setRangeDraft(null)
     setUrl({ q: t, mode: 'ask', ask: true, meaning: t === q && url.meaning }, null)
   }
 
   const onCompare = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!rangeDraft || !workspace) return
-    const dates = rangeDates(rangeDraft)
-    if (!validRangeDates(dates)) return
-    const compare = dates.join(',')
-    if (url.ask && q === COMPARISON_QUESTION && comparisonParam === compare) return
+    if (!rangeDraft || !workspace || !validComparisonRanges(rangeDraft.ranges)) return
+    const compare = rangeDates(rangeDraft.ranges).join(',')
+    const question = rangeDraft.question ?? COMPARISON_QUESTION
+    if (url.ask && q === question && comparisonParam === compare) return
     setRestored(null)
-    setUrl({ q: COMPARISON_QUESTION, mode: 'ask', ask: true, meaning: false }, compare)
+    setUrl({ q: question, mode: 'ask', ask: true, meaning: false }, compare)
   }
 
   const changeMode = (mode: SearchMode) => {
@@ -254,13 +251,17 @@ function SearchPage({ owner, workspace }: { owner: string | null; workspace?: { 
         {isAsk ? <Key type="submit" variant="primary" className="bs-srch-submit" disabled={draft.trim().length < MIN_QUERY || draft.trim().length > MAX_QUESTION}>Ask Entomate</Key>
           : <FilterSelect data={currentData} value={url.filter} onChange={(filter) => setUrl({ filter })} />}
       </form>
-      {isAsk && workspace && (
+      {isAsk && (workspace || rangeDraft) && (
         <div className="bs-srch-compare">
           <Key size="sm" aria-expanded={rangeDraft !== null} aria-controls={rangeDraft ? 'ask-date-ranges' : undefined}
-            onClick={() => setRangeDraft(rangeDraft ? null : comparisonRanges ?? EMPTY_RANGES)}>
+            onClick={() => setRangeDraft(rangeDraft ? null
+              : { ranges: comparisonRanges ?? proposedRanges ?? EMPTY_RANGES, question: comparisonRanges || proposedRanges ? comparisonQuestion : undefined })}>
             Compare date ranges
           </Key>
-          {rangeDraft && <ComparisonForm ranges={rangeDraft} timeZone={timeZone} onChange={setRangeDraft} onSubmit={onCompare} />}
+          {rangeDraft && <ComparisonForm ranges={rangeDraft.ranges} timeZone={timeZone} workspace={workspace}
+            confirmationRef={confirmationRef} typed={!!rangeDraft.question}
+            proposedQuestion={rangeDraft.question !== draft.trim() ? rangeDraft.question : undefined}
+            onChange={(ranges) => setRangeDraft({ ...rangeDraft, ranges })} onSubmit={onCompare} />}
         </div>
       )}
       {!isAsk && <div className="bs-srch-status">
@@ -274,9 +275,9 @@ function SearchPage({ owner, workspace }: { owner: string | null; workspace?: { 
       </div>}
 
       <div className="bs-srch-main">
-        {isAsk ? (url.ask && q.length >= MIN_QUERY && (comparisonParam === null || (comparisonRanges && workspace)) ? (
+        {isAsk ? (url.ask && !proposedRanges && q.length >= MIN_QUERY && (comparisonParam === null || (comparisonRanges && workspace)) ? (
           <AskAnswer key={JSON.stringify([q, comparisonParam])} question={q} workspaceId={workspace?.id} workspaceName={workspace?.name}
-            comparisonRanges={comparisonRanges} timeZone={timeZone} showQuestion={!comparisonRanges && draft.trim() !== q} initial={restoredAnswer} onClip={clip} clipped={notes.clipped}
+            comparisonRanges={comparisonRanges} timeZone={timeZone} showQuestion={q !== COMPARISON_QUESTION && draft.trim() !== q} initial={restoredAnswer} onClip={clip} clipped={notes.clipped}
             linkState={linkState} onLeave={saveReturn} />
         ) : <p className="bs-srch-empty">Ask about a decision, a commitment, or what changed across your meetings.</p>) : q.length >= MIN_QUERY ? (
           <>
@@ -461,17 +462,26 @@ function agentWord(field: string): string {
 
 // ── Ask Entomate ──
 
-function ComparisonForm({ ranges, timeZone, onChange, onSubmit }: {
+function ComparisonForm({ ranges, timeZone, workspace, confirmationRef, typed, proposedQuestion, onChange, onSubmit }: {
   ranges: ComparisonRanges
   timeZone: string
+  workspace?: { name?: string } | null
+  confirmationRef: React.Ref<HTMLHeadingElement>
+  typed: boolean
+  proposedQuestion?: string
   onChange: (ranges: ComparisonRanges) => void
   onSubmit: (e: React.FormEvent) => void
 }): React.ReactElement {
   const dates = rangeDates(ranges)
-  const valid = validRangeDates(dates)
+  const valid = validComparisonRanges(ranges)
+  const complete = dates.every(Boolean)
   return (
-    <form className="bs-srch-compare-form" id="ask-date-ranges" onSubmit={onSubmit}>
-      <p>Both start and end dates are included · {timeZone}</p>
+    <form className="bs-srch-compare-form" id="ask-date-ranges" onSubmit={onSubmit}
+      aria-labelledby={typed ? 'ask-confirm-date-ranges' : undefined}>
+      {typed && <h2 className="bs-lbl" id="ask-confirm-date-ranges" tabIndex={-1} ref={confirmationRef}>Confirm date ranges</h2>}
+      {proposedQuestion && <p>{proposedQuestion}</p>}
+      <p>Both start and end dates are included · {timeZone} · {workspace ? workspace.name || 'Current workspace' : 'Choose a workspace'}</p>
+      {typed && !complete && <p>Fill in the missing dates or correct them below. Include a year for each range when typing dates.</p>}
       <div className="bs-srch-compare-periods">
         {(['previous', 'current'] as const).map((period) => (
           <fieldset key={period}>
@@ -489,9 +499,9 @@ function ComparisonForm({ ranges, timeZone, onChange, onSubmit }: {
         ))}
       </div>
       <div className="bs-srch-compare-action">
-        <Key type="submit" size="sm" variant="primary" disabled={!valid}>Compare periods</Key>
+        <Key type="submit" size="sm" variant="primary" disabled={!valid || !workspace}>Compare periods</Key>
         <div aria-live="polite">
-          {dates.every(Boolean) && !valid && <p>Enter valid dates with each start on or before its end. The earlier period must end before the later period starts.</p>}
+          {complete && !valid && <p>Enter valid dates with each start on or before its end. The earlier period must end before the later period starts.</p>}
         </div>
       </div>
     </form>
