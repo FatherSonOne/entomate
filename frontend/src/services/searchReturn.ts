@@ -28,9 +28,16 @@ export interface MonthlyRecap {
   unsampledMeetings: number
 }
 
-export interface MonthComparison {
+export interface PeriodComparison {
   previous: MonthlyRecap
   current: MonthlyRecap
+}
+
+export interface DateRange { startDate: string; endDate: string }
+
+export interface ComparisonRanges {
+  previous: DateRange
+  current: DateRange
 }
 
 export interface CompletedAnswer {
@@ -39,13 +46,14 @@ export interface CompletedAnswer {
   meetings: AskMeeting[]
   claims?: AskClaim[]
   recap?: MonthlyRecap
-  comparison?: MonthComparison
+  comparison?: PeriodComparison
 }
 
 export interface SearchVisit {
   owner: string
   search: string
   draft: string
+  rangeDraft: ComparisonRanges | null
   results: SearchResponse | null
   meaning: boolean
   answer: CompletedAnswer | null

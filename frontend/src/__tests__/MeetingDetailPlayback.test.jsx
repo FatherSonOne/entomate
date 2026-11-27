@@ -232,7 +232,9 @@ describe('a pressed timecode plays the recording', () => {
     { label: 'monthly recap', question: 'What changed this month?', comparing: false, coverageName: 'Monthly recap scope' },
     { label: 'month-over-month comparison', question: 'Compare this month to date with all of last month',
       comparing: true, coverageName: 'Month-over-month coverage' },
-  ])('$label restores coverage and the exact Before and After links without a second Ask request', async ({ question, comparing, coverageName }) => {
+    { label: 'custom date comparison', question: 'What changed between these periods?',
+      comparing: true, custom: true, coverageName: 'Date range coverage' },
+  ])('$label restores coverage and the exact Before and After links without a second Ask request', async ({ question, comparing, custom, coverageName }) => {
     const beforeQuote = 'We agreed to launch on Monday.'
     const afterQuote = 'The launch is now scheduled for Friday.'
     const laterRevision = 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb'
@@ -257,9 +259,13 @@ describe('a pressed timecode plays the recording', () => {
         ],
       }
     })
-    const recap = { startDate: '2026-11-01', endDate: '2026-11-27', timeZone: 'America/New_York',
+    const ranges = {
+      previous: { startDate: '2026-10-04', endDate: '2026-10-07' },
+      current: { startDate: '2026-11-18', endDate: '2026-11-25' },
+    }
+    const recap = { ...(custom ? ranges.current : { startDate: '2026-11-01', endDate: '2026-11-27' }), timeZone: 'America/New_York',
       totalMeetings: 4, reviewedMeetings: 2, meetingsWithoutTranscripts: 1, unindexedMeetings: 1, unsampledMeetings: 0 }
-    const previous = { ...recap, startDate: '2026-10-01', endDate: '2026-10-31',
+    const previous = { ...recap, ...(custom ? ranges.previous : { startDate: '2026-10-01', endDate: '2026-10-31' }),
       totalMeetings: 5, reviewedMeetings: 3, unindexedMeetings: 0, unsampledMeetings: 1 }
     const answerScope = comparing ? { comparison: { previous, current: recap } } : { recap }
     const answer = 'Launch moved from Monday to Friday.'
@@ -267,7 +273,7 @@ describe('a pressed timecode plays the recording', () => {
       callbacks.onComplete({ answer, ...answerScope, claims: [{ topic: 'Launch', text: answer, citations: sources }] })
     })
     render(
-      <MemoryRouter initialEntries={[{ pathname: '/search', search: `?q=${encodeURIComponent(question)}&ask=1`, key: crypto.randomUUID() }]}>
+      <MemoryRouter initialEntries={[{ pathname: '/search', search: custom ? '?mode=ask' : `?q=${encodeURIComponent(question)}&ask=1`, key: crypto.randomUUID() }]}>
         <NavTrailRecorder />
         <BrowserBack />
         <Routes>
@@ -277,18 +283,34 @@ describe('a pressed timecode plays the recording', () => {
       </MemoryRouter>,
     )
 
+    const rangeInput = (period, field) => within(screen.getByRole('group', { name: period })).getByLabelText(field)
+    if (custom) {
+      fireEvent.click(screen.getByRole('button', { name: 'Compare date ranges' }))
+      const submit = screen.getByRole('button', { name: 'Compare periods' })
+      expect(submit).toBeDisabled()
+      fireEvent.change(rangeInput('Earlier period', 'Start date'), { target: { value: ranges.previous.startDate } })
+      fireEvent.change(rangeInput('Earlier period', 'End date'), { target: { value: ranges.current.startDate } })
+      fireEvent.change(rangeInput('Later period', 'Start date'), { target: { value: ranges.current.startDate } })
+      fireEvent.change(rangeInput('Later period', 'End date'), { target: { value: ranges.current.endDate } })
+      expect(submit).toBeDisabled()
+      expect(screen.getByText(/The earlier period must end before the later period starts/)).toBeVisible()
+      expect(search.askStream).not.toHaveBeenCalled()
+      fireEvent.change(rangeInput('Earlier period', 'End date'), { target: { value: ranges.previous.endDate } })
+      fireEvent.click(submit)
+    }
     const coverage = await screen.findByRole('region', { name: coverageName })
-    const current = comparing ? within(coverage).getByRole('region', { name: 'This month to date' }) : coverage
-    expect(current).toHaveTextContent(/Nov 1.\D*27, 2026/)
+    const current = comparing ? within(coverage).getByRole('region', { name: custom ? 'Later period' : 'This month to date' }) : coverage
+    expect(current).toHaveTextContent(custom ? /Nov 18\D+25, 2026/ : /Nov 1\D+27, 2026/)
     expect(coverage).toHaveTextContent('America/New_York')
     expect(current).toHaveTextContent('2 of 4 meetings reviewed · 1 without transcripts · 1 awaiting indexing')
     if (comparing) {
-      const lastMonth = within(coverage).getByRole('region', { name: 'Last month' })
-      expect(lastMonth).toHaveTextContent(/Oct 1.\D*31, 2026/)
+      const lastMonth = within(coverage).getByRole('region', { name: custom ? 'Earlier period' : 'Last month' })
+      expect(lastMonth).toHaveTextContent(custom ? /Oct 4\D+7, 2026/ : /Oct 1\D+31, 2026/)
       expect(lastMonth).toHaveTextContent('3 of 5 meetings reviewed · 1 without transcripts · 1 beyond the review limit')
     }
     expect(screen.getByRole('heading', { name: 'Launch', exact: true })).toBeInTheDocument()
     fireEvent.change(screen.getByRole('textbox', { name: 'Question about your meetings' }), { target: { value: 'Unsubmitted draft' } })
+    if (custom) fireEvent.change(rangeInput('Later period', 'End date'), { target: { value: '2026-11-26' } })
 
     for (const [index, source] of sources.entries()) {
       const linkName = new RegExp(`^${source.role} · ${source.title}`, 'i')
@@ -306,11 +328,27 @@ describe('a pressed timecode plays the recording', () => {
       expect(screen.getByText(answer)).toBeInTheDocument()
       expect(screen.getByRole('region', { name: coverageName }).textContent).toBe(coverage.textContent)
       expect(screen.getByRole('textbox', { name: 'Question about your meetings' })).toHaveValue('Unsubmitted draft')
+      if (custom) {
+        expect(rangeInput('Earlier period', 'Start date')).toHaveValue(ranges.previous.startDate)
+        expect(rangeInput('Earlier period', 'End date')).toHaveValue(ranges.previous.endDate)
+        expect(rangeInput('Later period', 'Start date')).toHaveValue(ranges.current.startDate)
+        expect(rangeInput('Later period', 'End date')).toHaveValue('2026-11-26')
+      }
     }
     expect(player.cueAt).toHaveBeenCalledWith(22_000)
     expect(player.playFrom).not.toHaveBeenCalled()
     expect(search.askStream).toHaveBeenCalledTimes(1)
-    expect(search.askStream).toHaveBeenCalledWith({ question, workspaceId: 'playback-org', timeZone: expect.any(String) }, expect.any(Object))
+    expect(search.askStream).toHaveBeenCalledWith({
+      question, workspaceId: 'playback-org', timeZone: expect.any(String),
+      ...(custom ? { comparisonRanges: ranges } : {}),
+    }, expect.any(Object))
+    if (custom) {
+      fireEvent.click(screen.getByRole('button', { name: 'Compare periods' }))
+      await waitFor(() => expect(search.askStream).toHaveBeenCalledTimes(2))
+      expect(search.askStream).toHaveBeenLastCalledWith(expect.objectContaining({
+        comparisonRanges: { ...ranges, current: { ...ranges.current, endDate: '2026-11-26' } },
+      }), expect.any(Object))
+    }
   })
 
   test('a Transcript & recording speaker button includes its line count and plays from the first line', async () => {

@@ -6,7 +6,7 @@
  *
  * Results use the full page. Private notes and clips live in the Notepad drawer.
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { ChevronDown, NotebookPen, Search as SearchIcon } from 'lucide-react'
 import {
@@ -25,7 +25,7 @@ import {
 } from '../services/searchEngine'
 import type { Filter, SearchMode, SearchResponse, SearchResult } from '../services/searchEngine'
 import { readSearchVisit, rememberSearchVisit } from '../services/searchReturn'
-import type { AskCitation, AskClaim, AskMeeting, CompletedAnswer, MonthComparison, MonthlyRecap } from '../services/searchReturn'
+import type { AskCitation, AskClaim, AskMeeting, ComparisonRanges, CompletedAnswer, MonthlyRecap, PeriodComparison } from '../services/searchReturn'
 import { meetingSourceHref } from '../services/meetingSourceLink'
 import {
   clipFromResult, clipKey, kindLabel, noteHref, notesToMarkdown, originLabel, sourceLine,
@@ -40,10 +40,33 @@ interface ToastApi {
 const MIN_QUERY = 2
 const MAX_QUESTION = 2000
 const MODES = [{ value: 'search', label: 'Search' }, { value: 'ask', label: 'Ask' }] as const
+const COMPARISON_QUESTION = 'What changed between these periods?'
+const EMPTY_RANGES: ComparisonRanges = {
+  previous: { startDate: '', endDate: '' },
+  current: { startDate: '', endDate: '' },
+}
 type SearchLinkState = { searchReturnKey: string }
 
 const resultLinkId = (r: SearchResult) => `search-result-${r.type}-${r.id}`
 const ordinaryClick = (e: React.MouseEvent) => e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey
+const rangeDates = ({ previous, current }: ComparisonRanges) => [previous.startDate, previous.endDate, current.startDate, current.endDate]
+
+function validRangeDates(dates: string[]): dates is [string, string, string, string] {
+  if (dates.length !== 4 || !dates.every((value) => {
+    if (!/^(?!0000)\d{4}-\d{2}-\d{2}$/.test(value)) return false
+    const date = new Date(value)
+    return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value
+  })) return false
+  const [earlierStart = '', earlierEnd = '', laterStart = '', laterEnd = ''] = dates
+  return earlierStart <= earlierEnd && earlierEnd < laterStart && laterStart <= laterEnd
+}
+
+function readComparisonRanges(value: string | null): ComparisonRanges | null {
+  const dates = value?.split(',')
+  if (!dates || !validRangeDates(dates)) return null
+  const [earlierStart, earlierEnd, laterStart, laterEnd] = dates
+  return { previous: { startDate: earlierStart, endDate: earlierEnd }, current: { startDate: laterStart, endDate: laterEnd } }
+}
 
 export default function Search(): React.ReactElement {
   const { user } = useAuth() as unknown as { user: { id: string } | null }
@@ -60,18 +83,28 @@ function SearchPage({ owner, workspace }: { owner: string | null; workspace?: { 
   const isPhone = useMediaQuery(PHONE_QUERY)
   const [params, setParams] = useSearchParams()
   const url = readUrlState(params)
+  const comparisonParam = params.get('compare')
+  const comparisonRanges = useMemo(() => readComparisonRanges(comparisonParam), [comparisonParam])
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
   const [restored, setRestored] = useState(() => {
     const visit = readSearchVisit(location.key, owner, location.search)
     const returnKey = location.state?.searchReturnKey
     return visit ?? (returnKey ? readSearchVisit(returnKey, owner, location.search) : null)
   })
-  const [draft, setDraft] = useState(restored?.draft ?? url.q)
+  const [draft, setDraft] = useState(restored?.draft ?? (comparisonParam === null ? url.q : ''))
+  const [rangeDraft, setRangeDraft] = useState(() => restored ? restored.rangeDraft
+    : comparisonParam === null ? null : comparisonRanges ?? EMPTY_RANGES)
   const [recentKey, setRecentKey] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
   const previousQuery = useRef(url.q)
 
-  const setUrl = useCallback((next: Parameters<typeof writeUrlState>[1]) => {
-    setParams((prev) => writeUrlState(prev, next), { replace: true })
+  const setUrl = useCallback((next: Parameters<typeof writeUrlState>[1], compare?: string | null) => {
+    setParams((prev) => {
+      const updated = writeUrlState(prev, next)
+      if (compare === null) updated.delete('compare')
+      else if (compare !== undefined) updated.set('compare', compare)
+      return updated
+    }, { replace: true })
   }, [setParams])
 
   const q = url.q.trim()
@@ -90,8 +123,8 @@ function SearchPage({ owner, workspace }: { owner: string | null; workspace?: { 
   useEffect(() => {
     if (previousQuery.current === url.q) return
     previousQuery.current = url.q
-    setDraft(url.q)
-  }, [url.q])
+    if (comparisonParam === null) setDraft(url.q)
+  }, [url.q, comparisonParam])
 
   useEffect(() => {
     if (!restored) return
@@ -138,15 +171,27 @@ function SearchPage({ owner, workspace }: { owner: string | null; workspace?: { 
     if (t.length < MIN_QUERY) return
     if (!isAsk) { logQuery(t); return }
     if (t.length > MAX_QUESTION) return
-    if (url.ask && t === q) return
+    if (url.ask && t === q && comparisonParam === null) return
     setRestored(null)
-    setUrl({ q: t, mode: 'ask', ask: true, meaning: t === q && url.meaning })
+    if (comparisonParam !== null) setRangeDraft(null)
+    setUrl({ q: t, mode: 'ask', ask: true, meaning: t === q && url.meaning }, null)
+  }
+
+  const onCompare = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!rangeDraft || !workspace) return
+    const dates = rangeDates(rangeDraft)
+    if (!validRangeDates(dates)) return
+    const compare = dates.join(',')
+    if (url.ask && q === COMPARISON_QUESTION && comparisonParam === compare) return
+    setRestored(null)
+    setUrl({ q: COMPARISON_QUESTION, mode: 'ask', ask: true, meaning: false }, compare)
   }
 
   const changeMode = (mode: SearchMode) => {
     if (mode === url.mode) return
     if (draft.trim() !== q) setRestored(null)
-    setUrl({ mode, q: draft, ask: false, meaning: draft.trim() === q && url.meaning })
+    setUrl({ mode, q: draft, ask: false, meaning: draft.trim() === q && url.meaning }, null)
   }
 
   const pickRecent = (text: string) => {
@@ -171,7 +216,7 @@ function SearchPage({ owner, workspace }: { owner: string | null; workspace?: { 
   const saveReturn = (linkId: string, answer: CompletedAnswer | null = null) => {
     if (!owner) return
     rememberSearchVisit(location.key, {
-      owner, search: location.search, draft, results: currentData, meaning: includeMeaning, answer, linkId, scrollY: window.scrollY,
+      owner, search: location.search, draft, rangeDraft, results: currentData, meaning: includeMeaning, answer, linkId, scrollY: window.scrollY,
     })
   }
 
@@ -209,6 +254,15 @@ function SearchPage({ owner, workspace }: { owner: string | null; workspace?: { 
         {isAsk ? <Key type="submit" variant="primary" className="bs-srch-submit" disabled={draft.trim().length < MIN_QUERY || draft.trim().length > MAX_QUESTION}>Ask Entomate</Key>
           : <FilterSelect data={currentData} value={url.filter} onChange={(filter) => setUrl({ filter })} />}
       </form>
+      {isAsk && workspace && (
+        <div className="bs-srch-compare">
+          <Key size="sm" aria-expanded={rangeDraft !== null} aria-controls={rangeDraft ? 'ask-date-ranges' : undefined}
+            onClick={() => setRangeDraft(rangeDraft ? null : comparisonRanges ?? EMPTY_RANGES)}>
+            Compare date ranges
+          </Key>
+          {rangeDraft && <ComparisonForm ranges={rangeDraft} timeZone={timeZone} onChange={setRangeDraft} onSubmit={onCompare} />}
+        </div>
+      )}
       {!isAsk && <div className="bs-srch-status">
         <EngineLine data={currentData} />
         {q.length >= MIN_QUERY && canIncludeMeaning && (
@@ -220,8 +274,9 @@ function SearchPage({ owner, workspace }: { owner: string | null; workspace?: { 
       </div>}
 
       <div className="bs-srch-main">
-        {isAsk ? (url.ask && q.length >= MIN_QUERY ? (
-          <AskAnswer key={q} question={q} workspaceId={workspace?.id} workspaceName={workspace?.name} showQuestion={draft.trim() !== q} initial={restoredAnswer} onClip={clip} clipped={notes.clipped}
+        {isAsk ? (url.ask && q.length >= MIN_QUERY && (comparisonParam === null || (comparisonRanges && workspace)) ? (
+          <AskAnswer key={JSON.stringify([q, comparisonParam])} question={q} workspaceId={workspace?.id} workspaceName={workspace?.name}
+            comparisonRanges={comparisonRanges} timeZone={timeZone} showQuestion={!comparisonRanges && draft.trim() !== q} initial={restoredAnswer} onClip={clip} clipped={notes.clipped}
             linkState={linkState} onLeave={saveReturn} />
         ) : <p className="bs-srch-empty">Ask about a decision, a commitment, or what changed across your meetings.</p>) : q.length >= MIN_QUERY ? (
           <>
@@ -406,10 +461,49 @@ function agentWord(field: string): string {
 
 // ── Ask Entomate ──
 
-function AskAnswer({ question, workspaceId, workspaceName, showQuestion, initial, onClip, clipped, linkState, onLeave }: {
+function ComparisonForm({ ranges, timeZone, onChange, onSubmit }: {
+  ranges: ComparisonRanges
+  timeZone: string
+  onChange: (ranges: ComparisonRanges) => void
+  onSubmit: (e: React.FormEvent) => void
+}): React.ReactElement {
+  const dates = rangeDates(ranges)
+  const valid = validRangeDates(dates)
+  return (
+    <form className="bs-srch-compare-form" id="ask-date-ranges" onSubmit={onSubmit}>
+      <p>Both start and end dates are included · {timeZone}</p>
+      <div className="bs-srch-compare-periods">
+        {(['previous', 'current'] as const).map((period) => (
+          <fieldset key={period}>
+            <legend>{period === 'previous' ? 'Earlier period' : 'Later period'}</legend>
+            <div className="bs-srch-compare-dates">
+              {(['startDate', 'endDate'] as const).map((field) => (
+                <label key={field}>
+                  {field === 'startDate' ? 'Start date' : 'End date'}
+                  <TextInput type="date" required value={ranges[period][field]}
+                    onChange={(e) => onChange({ ...ranges, [period]: { ...ranges[period], [field]: e.target.value } })} />
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        ))}
+      </div>
+      <div className="bs-srch-compare-action">
+        <Key type="submit" size="sm" variant="primary" disabled={!valid}>Compare periods</Key>
+        <div aria-live="polite">
+          {dates.every(Boolean) && !valid && <p>Enter valid dates with each start on or before its end. The earlier period must end before the later period starts.</p>}
+        </div>
+      </div>
+    </form>
+  )
+}
+
+function AskAnswer({ question, workspaceId, workspaceName, comparisonRanges, timeZone, showQuestion, initial, onClip, clipped, linkState, onLeave }: {
   question: string
   workspaceId?: string
   workspaceName?: string
+  comparisonRanges: ComparisonRanges | null
+  timeZone: string
   showQuestion: boolean
   initial?: CompletedAnswer | null
   onClip: (n: NewNote) => void
@@ -436,16 +530,15 @@ function AskAnswer({ question, workspaceId, workspaceName, showQuestion, initial
       setState('failed')
     }
     const askStream = (searchApi as unknown as {
-      askStream: (data: { question: string; workspaceId?: string; timeZone: string }, cb: {
+      askStream: (data: { question: string; workspaceId?: string; timeZone: string; comparisonRanges?: ComparisonRanges }, cb: {
         signal: AbortSignal
         onChunk: (c: string) => void
         onCitations: (c: AskMeeting[]) => void
-        onComplete: (r: { answer?: string; citations?: AskMeeting[]; claims?: AskClaim[]; recap?: MonthlyRecap; comparison?: MonthComparison }) => void
+        onComplete: (r: { answer?: string; citations?: AskMeeting[]; claims?: AskClaim[]; recap?: MonthlyRecap; comparison?: PeriodComparison }) => void
         onError: () => void
       }) => Promise<void>
     }).askStream
-    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-    askStream({ question, workspaceId, timeZone }, {
+    askStream({ question, workspaceId, timeZone, ...(comparisonRanges ? { comparisonRanges } : {}) }, {
       signal: controller.signal,
       onChunk: (c) => { if (!controller.signal.aborted && !finished) { streamed += c; setText(streamed) } },
       onCitations: (c) => { if (!controller.signal.aborted && !finished) setCitations(Array.isArray(c) ? c : []) },
@@ -462,7 +555,7 @@ function AskAnswer({ question, workspaceId, workspaceName, showQuestion, initial
       onError: fail,
     }).then(fail, fail)
     return () => controller.abort()
-  }, [initial, question, workspaceId, attempt])
+  }, [initial, question, workspaceId, timeZone, comparisonRanges, attempt])
 
   const meetings = claims ? [] : citations.filter((c) => c.type === 'meeting' && c.id)
   const meetingCount = new Set((claims ? claims.flatMap((claim) => claim.citations) : meetings).map((c) => c.id)).size
@@ -493,7 +586,7 @@ function AskAnswer({ question, workspaceId, workspaceName, showQuestion, initial
         )}
       </div>
       {showQuestion && <p className="bs-srch-answer-question">{question}</p>}
-      {state === 'done' && comparison && <ComparisonCoverage comparison={comparison} workspaceName={workspaceName} />}
+      {state === 'done' && comparison && <ComparisonCoverage comparison={comparison} workspaceName={workspaceName} custom={!!comparisonRanges} />}
       {state === 'done' && recap && <RecapCoverage recap={recap} workspaceName={workspaceName} />}
       {state === 'failed' ? (
         <div className="bs-srch-empty">
@@ -521,7 +614,7 @@ function AskAnswer({ question, workspaceId, workspaceName, showQuestion, initial
                       const id = `search-answer-claim-${claimIndex}-${sourceIndex}`
                       const time = timecode(source.atMs)
                       const moment = time ?? (source.passage.kind === 'segment' ? `Line ${source.passage.position}` : 'Transcript excerpt')
-                      const label = citationLead(source)
+                      const label = citationLead(source, !!comparisonRanges)
                       return (
                         <li key={id}>
                           <Link id={id} className="bs-srch-claim-source"
@@ -559,11 +652,11 @@ function AskAnswer({ question, workspaceId, workspaceName, showQuestion, initial
   )
 }
 
-function citationLead(source: AskCitation): string {
+function citationLead(source: AskCitation, custom: boolean): string {
   if (source.role === 'before') return 'Before'
   if (source.role === 'after') return 'After'
-  if (source.period === 'previous') return 'Last month'
-  if (source.period === 'current') return 'This month'
+  if (source.period === 'previous') return custom ? 'Earlier period' : 'Last month'
+  if (source.period === 'current') return custom ? 'Later period' : 'This month'
   return ''
 }
 
@@ -597,21 +690,26 @@ function RecapCoverage({ recap, workspaceName }: { recap: MonthlyRecap; workspac
   )
 }
 
-function ComparisonCoverage({ comparison, workspaceName }: { comparison: MonthComparison; workspaceName?: string }): React.ReactElement {
+function ComparisonCoverage({ comparison, workspaceName, custom }: { comparison: PeriodComparison; workspaceName?: string; custom: boolean }): React.ReactElement {
+  const earlier = custom ? 'Earlier period' : 'Last month'
+  const later = custom ? 'Later period' : 'This month to date'
+  const onePeriodHasEvidence = (comparison.previous.reviewedMeetings > 0) !== (comparison.current.reviewedMeetings > 0)
   return (
-    <section className="bs-srch-recap" aria-label="Month-over-month coverage">
-      <h2>Month-over-month comparison{workspaceName ? ` · ${workspaceName}` : ''}</h2>
+    <section className="bs-srch-recap" aria-label={custom ? 'Date range coverage' : 'Month-over-month coverage'}>
+      <h2>{custom ? 'Date range comparison' : 'Month-over-month comparison'}{workspaceName ? ` · ${workspaceName}` : ''}</h2>
       <p>{comparison.current.timeZone}</p>
       <div className="bs-srch-recap-periods">
-        <section aria-label="Last month">
-          <h3>Last month</h3>
+        <section aria-label={earlier}>
+          <h3>{earlier}</h3>
           <RecapPeriod recap={comparison.previous} />
         </section>
-        <section aria-label="This month to date">
-          <h3>This month to date</h3>
+        <section aria-label={later}>
+          <h3>{later}</h3>
           <RecapPeriod recap={comparison.current} />
         </section>
       </div>
+      {custom && onePeriodHasEvidence &&
+        <p>One period has no reviewed transcripts, so changes between the periods can’t be verified.</p>}
       {comparison.previous.reviewedMeetings + comparison.current.reviewedMeetings > 0 && <p>Based on selected transcript passages.</p>}
     </section>
   )

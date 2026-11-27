@@ -296,11 +296,23 @@ const monthComparison = {
 const october = { ...oldPlan, meeting_at: '2026-10-22T19:00:00Z' };
 const unchanged = { ...newPlan, source_line: 94, body: october.body };
 const octoberEarlier = { ...oldPlan, meeting_id: 'aaaa0000-aaaa-4aaa-aaaa-aaaaaaaaaaaa', meeting_at: '2026-10-01T19:00:00Z' };
+const comparisonRanges = {
+  previous: { startDate: '2026-10-01', endDate: '2026-10-24' },
+  current: { startDate: '2026-11-19', endDate: '2026-11-20' },
+};
+const dateComparison = {
+  previous: { ...monthComparison.previous, ...comparisonRanges.previous },
+  current: { ...monthComparison.current, ...comparisonRanges.current },
+};
 
-test('month-over-month Ask keeps coverage for both periods and validates each quote and period', async () => {
+test.each([
+  { label: 'Month-over-month Ask', custom: false },
+  { label: 'Custom date comparison', custom: true },
+])('$label keeps coverage for both periods and validates each quote and period', async ({ custom }) => {
+  const comparison = custom ? dateComparison : monthComparison;
   orgMemberships = [orgId, monthlyWorkspace];
   supabase.rpc.mockResolvedValue({ data: {
-    comparison: monthComparison,
+    comparison,
     previousPassages: [october, octoberEarlier],
     currentPassages: [newPlan, unchanged],
   } });
@@ -319,17 +331,22 @@ test('month-over-month Ask keeps coverage for both periods and validates each qu
     { topic: 'Launch', kind: 'comparison', text: 'Invented later phrasing.', evidence: [old, { ...revised, quote: 'Launch was cancelled.' }] },
   ]));
   const res = await request(app).post('/search/ask/stream').send({
-    question: 'Compare this month to date with all of last month.',
+    question: custom ? 'What changed between these periods?' : 'Compare this month to date with all of last month.',
     workspaceId: monthlyWorkspace, timeZone: 'America/New_York',
+    ...(custom ? { comparisonRanges } : {}),
   });
   expect(res.status).toBe(200);
   expect(meterAiForOrg).toHaveBeenCalledWith(monthlyWorkspace, expect.anything(), expect.any(Function));
   expect(supabase.rpc).toHaveBeenCalledTimes(1);
-  expect(supabase.rpc).toHaveBeenCalledWith('get_ask_monthly_comparison', {
+  expect(supabase.rpc).toHaveBeenCalledWith(custom ? 'get_ask_date_comparison' : 'get_ask_monthly_comparison', {
     p_org_id: monthlyWorkspace, p_time_zone: 'America/New_York', p_meeting_ids: null,
+    ...(custom ? {
+      p_previous_start: '2026-10-01', p_previous_end: '2026-10-24',
+      p_current_start: '2026-11-19', p_current_end: '2026-11-20',
+    } : {}),
   });
   const result = extractEvents(res).at(-1);
-  expect(result.comparison).toEqual(monthComparison);
+  expect(result.comparison).toEqual(comparison);
   expect(result.claims).toHaveLength(2);
   expect(result.claims[0].citations).toMatchObject([
     { role: 'before', period: 'previous', id: october.meeting_id, date: october.meeting_at, quote: october.body,
@@ -344,23 +361,54 @@ test('month-over-month Ask keeps coverage for both periods and validates each qu
     .toEqual(['previous', 'previous', 'current', 'current']);
 });
 
-test('month-over-month Ask displays an empty prior period and accepts only current recorded evidence', async () => {
+test.each([
+  { label: 'Month-over-month Ask', custom: false },
+  { label: 'Custom date comparison', custom: true },
+])('$label displays an empty prior period and accepts only later recorded evidence', async ({ custom }) => {
+  const scope = custom ? dateComparison : monthComparison;
+  const recorded = 'Friday was recorded in the later period.';
   const comparison = {
-    ...monthComparison,
-    previous: { ...monthComparison.previous, totalMeetings: 1, reviewedMeetings: 0, unindexedMeetings: 0 },
+    ...scope,
+    previous: { ...scope.previous, totalMeetings: 0, reviewedMeetings: 0, meetingsWithoutTranscripts: 0, unindexedMeetings: 0 },
   };
   supabase.rpc.mockResolvedValue({ data: { comparison, previousPassages: [], currentPassages: [newPlan, unchanged] } });
   ai.chat.mockResolvedValue(modelAnswer([
     { topic: 'Launch', kind: 'comparison', text: 'Current records guessed a change.', evidence: [
       ref('p1', newPlan, 'before'), ref('p2', unchanged, 'after'),
     ] },
-    { topic: 'Launch', kind: 'recorded', text: 'Friday was recorded this month.', evidence: [ref('p1', newPlan, 'source')] },
+    { topic: 'Launch', kind: 'recorded', text: recorded, evidence: [ref('p1', newPlan, 'source')] },
   ]));
-  const res = await request(app).post('/search/ask').send({ question: 'How does this month compare to last month?' });
+  const res = await request(app).post('/search/ask').send(custom
+    ? { question: 'What changed between these periods?', comparisonRanges }
+    : { question: 'How does this month compare to last month?' });
   expect(res.status).toBe(200);
-  expect(res.body).toMatchObject({ comparison, answer: 'Friday was recorded this month.' });
+  expect(res.body).toMatchObject({ comparison, answer: recorded });
   expect(res.body.citations).toHaveLength(1);
   expect(res.body.citations[0]).toMatchObject({ role: 'source', period: 'current', passage: { position: 93 } });
+});
+
+test.each([
+  ['missing date', { ...comparisonRanges, current: { startDate: '2026-11-19' } }],
+  ['nonexistent calendar day', { ...comparisonRanges, previous: { startDate: '2026-02-29', endDate: '2026-10-24' } }],
+  ['reversed range', { ...comparisonRanges, current: { startDate: '2026-11-20', endDate: '2026-11-19' } }],
+  ['overlap on an inclusive end date', { ...comparisonRanges, previous: { ...comparisonRanges.previous, endDate: '2026-11-19' } }],
+  ['reversed periods', { previous: comparisonRanges.current, current: comparisonRanges.previous }],
+  ['null range payload', null],
+])('custom date comparison rejects %s before metering or retrieval', async (_reason, ranges) => {
+  await request(app).post('/search/ask/stream').send({
+    question: 'What changed between these periods?', workspaceId: orgId, comparisonRanges: ranges,
+  }).expect(400);
+  expect(meterAiForOrg).not.toHaveBeenCalled();
+  expect(supabase.rpc).not.toHaveBeenCalled();
+  expect(ai.chat).not.toHaveBeenCalled();
+});
+
+test('custom date comparison rejects a workspace outside the caller memberships', async () => {
+  await request(app).post('/search/ask/stream').send({
+    question: 'What changed between these periods?', workspaceId: monthlyWorkspace, comparisonRanges,
+  }).expect(403);
+  expect(meterAiForOrg).not.toHaveBeenCalled();
+  expect(supabase.rpc).not.toHaveBeenCalled();
 });
 
 test.each([

@@ -49,17 +49,17 @@ function citationKey(citation) {
 function recapClaim(claim, text, citations, mode) {
   const topic = typeof claim.topic === 'string' ? claim.topic.trim() : '';
   if (!topic || topic.length > 80 || !citations.length) return [];
-  const comparingMonths = mode === 'comparison';
+  const comparingPeriods = mode === 'comparison';
   if (claim.kind === 'recorded' && citations.every((citation) => citation.role === 'source')) {
-    if (comparingMonths && citations.some((citation) => citation.period !== citations[0].period)) return [];
+    if (comparingPeriods && citations.some((citation) => citation.period !== citations[0].period)) return [];
     return [{ topic, text, citations }];
   }
-  if ((claim.kind !== 'comparison' && !(comparingMonths && claim.kind === 'conflict')) || citations.length !== 2) return [];
+  if ((claim.kind !== 'comparison' && !(comparingPeriods && claim.kind === 'conflict')) || citations.length !== 2) return [];
 
   const before = citations.find((citation) => citation.role === 'before');
   const after = citations.find((citation) => citation.role === 'after');
   if (!before || !after || before.id === after.id || !(Date.parse(before.date) < Date.parse(after.date))) return [];
-  if (comparingMonths) {
+  if (comparingPeriods) {
     if (before.period !== 'previous' || after.period !== 'current') return [];
     const normalized = (quote) => quote.toLowerCase().replace(/\s+/g, ' ');
     if (normalized(before.quote) === normalized(after.quote)) return [];
@@ -98,7 +98,7 @@ class AskService {
   async answerQuestion(question, options = {}) {
     const { meetingIds, userId, monthlyRecapScope } = options;
     const orgIds = requestOrgIds();
-    const recapMode = monthlyRecapMode(question);
+    const recapMode = monthlyRecapScope?.comparisonRanges ? 'comparison' : monthlyRecapMode(question);
     const conversationId = await this.ownedConversationId(options.conversationId, userId);
     const empty = {
       answer: NO_EVIDENCE, claims: [], citations: [], relevantExcerpts: [],
@@ -106,7 +106,7 @@ class AskService {
     };
     if (!orgIds.length) return empty;
     if (!supabase) throw new Error('Database is unavailable');
-    if (recapMode && !orgIds.includes(monthlyRecapScope?.orgId)) throw new Error('Workspace access required for monthly recap');
+    if (recapMode && !orgIds.includes(monthlyRecapScope?.orgId)) throw new Error('Workspace access required for date-scoped Ask');
 
     let history = [];
     if (conversationId && !recapMode) {
@@ -149,6 +149,9 @@ class AskService {
         'Use prior messages only to resolve references in the question, never as evidence.',
         'Return only JSON in this form: {"claims":[{"text":"A single plain-text claim.","evidence":[{"id":"p1","quote":"Verbatim text from that passage."}]}]}',
       ]),
+      ...(monthlyRecapScope?.comparisonRanges
+        ? ['Identify custom periods by their dates or as the earlier and later periods.']
+        : []),
       'Give up to eight concise claims. Supply a short, exact quote for each supporting passage and pick enough words to identify it unambiguously. Copy capitalization and punctuation.',
       'Every claim must be directly supported by its quotes. Cite multiple passages when they are jointly needed. Omit unsupported claims, and return {"claims":[]} if the evidence is insufficient.',
       JSON.stringify({

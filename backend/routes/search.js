@@ -8,7 +8,7 @@ const { supabase } = require('../config/supabase');
 const ai = require('../config/ai');
 const embeddingService = require('../services/embeddingService');
 const askService = require('../services/askService');
-const { monthlyRecapMode } = require('../services/askMonthlyRecap');
+const { monthlyRecapMode, validComparisonRanges } = require('../services/askMonthlyRecap');
 const { searchCache, suggestionCache, withCache } = require('../utils/cache');
 const { authenticate } = require('../middleware/auth');
 const log = require('../utils/log');
@@ -290,20 +290,23 @@ function validAskMeetingIds(ids) {
 }
 
 function meterAsk(req, res, next) {
-  if (!monthlyRecapMode(req.body?.question)) return meterAi(req, res, next);
-  const { workspaceId, timeZone = 'UTC' } = req.body;
+  const { question, workspaceId, timeZone = 'UTC', comparisonRanges } = req.body || {};
+  if (comparisonRanges === undefined && !monthlyRecapMode(question)) return meterAi(req, res, next);
+  if (comparisonRanges !== undefined && !validComparisonRanges(comparisonRanges)) {
+    return res.status(400).json({ error: 'Choose two valid, non-overlapping ranges with the earlier period first' });
+  }
   const orgIds = req.orgIds || [];
   const orgId = workspaceId ?? (orgIds.length === 1 ? orgIds[0] : null);
-  if (!orgId) return res.status(400).json({ error: 'Choose a workspace for the monthly recap' });
+  if (!orgId) return res.status(400).json({ error: 'Choose a workspace for this question' });
   if (!orgIds.includes(orgId)) return res.status(403).json({ error: 'Workspace access required' });
   try {
     if (typeof timeZone !== 'string' || !timeZone || timeZone.length > 80) throw new Error('Invalid time zone');
     // PostgreSQL and browsers accept IANA time zones. Reject raw offsets.
     if (!/^[a-z][a-z0-9_+\-/]*$/i.test(timeZone)) throw new Error('Invalid time zone');
     const canonicalTimeZone = new Intl.DateTimeFormat('en', { timeZone }).resolvedOptions().timeZone;
-    req.monthlyRecapScope = { orgId, timeZone: canonicalTimeZone };
+    req.monthlyRecapScope = { orgId, timeZone: canonicalTimeZone, comparisonRanges };
   } catch {
-    return res.status(400).json({ error: 'Choose a valid time zone for the monthly recap' });
+    return res.status(400).json({ error: 'Choose a valid time zone for this question' });
   }
   return meterAiForOrg(orgId, res, next);
 }

@@ -2211,6 +2211,15 @@ mark.bs-hit { background: color-mix(in srgb, var(--bs-brand) 16%, transparent); 
 .bs-srch-modes { margin-top: 16px; }
 .bs-srch-q { position: relative; padding-top: 10px; --bs-srch-filter-width: 8.5rem; }
 .bs-srch-q.bs-srch-q--ask { --bs-srch-filter-width: 8rem; }
+.bs-srch-compare { margin-top: 8px; }
+.bs-srch-compare-form { display: grid; justify-items: start; gap: 8px; margin-top: 8px; padding: 10px; border: 1px solid var(--bs-rule2); border-radius: 8px; }
+.bs-srch-compare-form p { margin: 0; color: var(--bs-ink2); font-size: 13px; }
+.bs-srch-compare-action { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.bs-srch-compare-periods { width: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr)); gap: 8px; }
+.bs-srch-compare-periods fieldset { min-width: 0; margin: 0; padding: 6px 8px 8px; border: 1px solid var(--bs-rule2); border-radius: 6px; color: var(--bs-ink); font-size: 13px; }
+.bs-srch-compare-dates { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 7.5rem), 1fr)); gap: 8px; }
+.bs-srch-compare-dates label { min-width: 0; }
+.bs-srch-compare-dates .bs-input { min-width: 0; margin-top: 4px; }
 .bs-srch-submit { position: absolute; right: 5px; bottom: 5px; height: 38px; }
 .bs-srch-q .bs-input { height: 48px; font-size: 17px; border-radius: 10px; }
 .bs-srch-q .bs-input-wrap .bs-input { padding-left: 40px; padding-right: calc(var(--bs-srch-filter-width) + 14px); }

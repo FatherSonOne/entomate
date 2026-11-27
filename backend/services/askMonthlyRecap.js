@@ -19,12 +19,32 @@ function monthlyRecapMode(question) {
   return MONTHLY_QUESTION.test(normalized) ? 'monthly' : null;
 }
 
-async function loadMonthlyRecap({ orgId, timeZone, meetingIds, mode }) {
+function validCalendarDate(value) {
+  if (typeof value !== 'string' || !/^(?!0000)\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+function validComparisonRanges(ranges) {
+  const previous = ranges?.previous;
+  const current = ranges?.current;
+  return [previous?.startDate, previous?.endDate, current?.startDate, current?.endDate].every(validCalendarDate)
+    && previous.startDate <= previous.endDate && previous.endDate < current.startDate && current.startDate <= current.endDate;
+}
+
+async function loadMonthlyRecap({ orgId, timeZone, meetingIds, mode, comparisonRanges }) {
   const comparing = mode === 'comparison';
-  const { data, error } = await supabase.rpc(comparing ? 'get_ask_monthly_comparison' : 'get_ask_monthly_recap', {
+  const rpc = comparisonRanges ? 'get_ask_date_comparison' : comparing ? 'get_ask_monthly_comparison' : 'get_ask_monthly_recap';
+  const { data, error } = await supabase.rpc(rpc, {
     p_org_id: orgId,
     p_time_zone: timeZone,
     p_meeting_ids: meetingIds?.length ? meetingIds : null,
+    ...(comparisonRanges ? {
+      p_previous_start: comparisonRanges.previous.startDate,
+      p_previous_end: comparisonRanges.previous.endDate,
+      p_current_start: comparisonRanges.current.startDate,
+      p_current_end: comparisonRanges.current.endDate,
+    } : {}),
   });
   if (!error && comparing && data?.comparison?.previous && data.comparison.current
     && Array.isArray(data.previousPassages) && Array.isArray(data.currentPassages)) {
@@ -39,7 +59,7 @@ async function loadMonthlyRecap({ orgId, timeZone, meetingIds, mode }) {
   if (!error && !comparing && data?.recap && Array.isArray(data.passages)) {
     return { coverage: { recap: data.recap }, passages: data.passages };
   }
-  throw new Error('Could not retrieve the monthly recap evidence', { cause: error });
+  throw new Error('Could not retrieve Ask evidence for the requested dates', { cause: error });
 }
 
 const CLAIM_FORMAT = 'Return JSON only in this form: {"claims":[{"topic":"Launch","text":"One plain-text claim.","kind":"comparison","evidence":[{"id":"p1","quote":"Verbatim excerpt.","role":"before"},{"id":"p2","quote":"Verbatim excerpt.","role":"after"}]}]}';
@@ -59,4 +79,4 @@ const COMPARISON_INSTRUCTIONS = [
   'For kind "recorded", use role "source" and explicitly name the period whose evidence supports the statement. If evidence exists on only one side, report what was recorded and do not infer a change or absence in the other period.',
 ];
 
-module.exports = { monthlyRecapMode, loadMonthlyRecap, MONTHLY_INSTRUCTIONS, COMPARISON_INSTRUCTIONS };
+module.exports = { monthlyRecapMode, validComparisonRanges, loadMonthlyRecap, MONTHLY_INSTRUCTIONS, COMPARISON_INSTRUCTIONS };
