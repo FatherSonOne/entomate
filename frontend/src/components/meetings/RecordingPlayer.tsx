@@ -20,6 +20,8 @@ export interface RecordingPlayerProps {
   audioUrl?: string
   durationMs?: number | null
   waveformPeaks?: ReadonlyArray<number> | null
+  /** Progress shown in place of the waveform while the transcript is rebuilt. */
+  waveformReplacement?: React.ReactNode
   transcriptSegments?: ReadonlyArray<TranscriptSegment> | null
   decisions?: ReadonlyArray<TapeMarker>
   actions?: ReadonlyArray<TapeMarker>
@@ -55,7 +57,7 @@ function rulerMarks(durationMs: number): number[] {
 }
 
 export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayerProps>(function RecordingPlayer(
-  { meetingId, audioUrl, durationMs, waveformPeaks, transcriptSegments, decisions = [], actions = [], onMoment, onStepMoment, onTime, onAudioRemoved },
+  { meetingId, audioUrl, durationMs, waveformPeaks, waveformReplacement, transcriptSegments, decisions = [], actions = [], onMoment, onStepMoment, onTime, onAudioRemoved },
   ref,
 ) {
   const [source, setSource] = useState<Source | null>(null)
@@ -309,7 +311,7 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
           onError={e => onError(e.currentTarget)}
         />
       )}
-      <Display className="bs-recording-display">
+      {waveformReplacement ?? <Display className="bs-recording-display">
         <div className="bs-recording-readout">
           <span className="bs-recording-state" data-playing={playing}>
             <span aria-hidden="true" />
@@ -405,7 +407,7 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
             </div>
           </div>
         )}
-      </Display>
+      </Display>}
 
       <div className="bs-recording-controls">
         <div className="bs-recording-transport">

@@ -155,6 +155,23 @@ describe('RecordingPlayer', () => {
     expect(waveform.querySelector('path')?.getAttribute('d')?.match(/M/g)).toHaveLength(2)
   })
 
+  test('can replace the waveform without resetting playback controls', () => {
+    const recording = { meetingId: MEETING, durationMs: 12_000, waveformPeaks: [0.2, 0.5, 0.3] }
+    const { rerender } = render(<RecordingPlayer {...recording} />)
+    const speed = screen.getByRole('combobox', { name: 'Playback speed' })
+    fireEvent.change(speed, { target: { value: '1.5' } })
+    expect(screen.getByTestId('recording-waveform')).toBeInTheDocument()
+
+    rerender(<RecordingPlayer {...recording} waveformReplacement={<p>Rebuilding transcript</p>} />)
+    expect(screen.getByText('Rebuilding transcript')).toBeInTheDocument()
+    expect(screen.queryByTestId('recording-waveform')).toBeNull()
+    expect(speed).toHaveValue('1.5')
+
+    rerender(<RecordingPlayer {...recording} />)
+    expect(screen.getByTestId('recording-waveform')).toBeInTheDocument()
+    expect(speed).toHaveValue('1.5')
+  })
+
   test('renders peaks saved during processing immediately and colors speech near the end', () => {
     const { container } = render(<RecordingPlayer meetingId={MEETING} durationMs={1_740_000}
       waveformPeaks={[0.2, 0.5, 0.3]} transcriptSegments={[

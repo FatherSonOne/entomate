@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { act, render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { vi, describe, test, expect, beforeEach } from 'vitest'
 
@@ -12,15 +12,14 @@ vi.mock('../components/vc/ToastProvider', () => ({ useToast: () => ({ success: v
 vi.mock('../components/intelligence/MeetingIntelligencePanel', () => ({ default: () => null }))
 vi.mock('../components/EcosystemSyncStatus', () => ({ default: () => null }))
 vi.mock('../components/meetings/MeetingNotesPanel', () => ({ default: () => null }))
-vi.mock('../components/meetings/RecordingStatus', () => ({ default: () => null }))
 vi.mock('../components/ChatChannelSelector', () => ({ default: () => null }))
 vi.mock('../components/meetings/RecordingPlayer', async () => {
   const { forwardRef, useImperativeHandle } = await import('react')
   return {
-    default: forwardRef(function Stub({ decisions, onMoment, audioUrl }, ref) {
+    default: forwardRef(function Stub({ decisions, onMoment, audioUrl, waveformReplacement }, ref) {
       useImperativeHandle(ref, () => ({ isReady: () => player.ready, playFrom: player.playFrom }))
       return <div data-testid="player-stub" data-audio-url={audioUrl}>
-        {decisions.map(({ atMs, label }) => (
+        {waveformReplacement ?? decisions.map(({ atMs, label }) => (
           <button key={label} type="button" onClick={() => onMoment(atMs)}>{label}</button>
         ))}
       </div>
@@ -87,6 +86,37 @@ describe('a pressed timecode plays the recording', () => {
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Rebuild transcript from audio' }))
     expect(recordings.rebuildTranscript).toHaveBeenCalledWith('m1')
     expect(screen.getByTestId('player-stub')).toBeInTheDocument()
+  })
+
+  test('swaps the waveform for rebuild progress and restores it when polling reports completion', async () => {
+    const canvas = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
+    const intervals = vi.spyOn(window, 'setInterval')
+    const job = { status: 'done', source: 'browser', audioKept: true, durationMs: 60_000 }
+    try {
+      renderPage(job)
+      expect(await screen.findByRole('button', { name: 'Decision: Ship on the fourteenth' })).toBeInTheDocument()
+
+      recordings.rebuildTranscript.mockResolvedValue({ success: true })
+      api.get.mockResolvedValue({
+        ...MEETING, recording_job: { ...job, transcriptRebuildAt: new Date().toISOString() },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Rebuild transcript from audio' }))
+      const progress = await screen.findByRole('progressbar', { name: 'Transcript rebuild progress' })
+      expect(screen.getByTestId('player-stub')).toContainElement(progress)
+      expect(screen.queryByRole('button', { name: 'Decision: Ship on the fourteenth' })).toBeNull()
+      expect(screen.queryByText('Action items', { selector: '.bs-dl-steps span' })).toBeNull()
+
+      api.get.mockResolvedValue({ ...MEETING, recording_job: job })
+      const poll = intervals.mock.calls.find(([, delay]) => delay === 5000)?.[0]
+      expect(poll).toBeTypeOf('function')
+      await act(async () => { await poll() })
+      expect(screen.queryByRole('progressbar', { name: 'Transcript rebuild progress' })).toBeNull()
+      expect(screen.getByRole('button', { name: 'Decision: Ship on the fourteenth' })).toBeInTheDocument()
+    } finally {
+      intervals.mockRestore()
+      canvas.mockRestore()
+    }
   })
 
   test('a Virtual room speaker button includes its line count and plays from the first line', async () => {

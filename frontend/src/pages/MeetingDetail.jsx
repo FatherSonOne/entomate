@@ -14,11 +14,13 @@ import TimecodeButton from '../components/meetings/TimecodeButton'
 import CarryForward from '../components/meetings/CarryForward'
 import RecordingStatus from '../components/meetings/RecordingStatus'
 import RecordingPlayer from '../components/meetings/RecordingPlayer'
+import { DebriefLoader } from '../components/bot/DebriefLoader'
 import { LiveMeetingInsights } from '../components/meetings/LiveMeetingInsights'
 import CrmSendDrawer from '../components/meetings/CrmSendDrawer'
 import { useFollowUp, FollowUpLetter, FollowUpContext, FollowUpSending, FollowUpOptions } from '../components/meetings/FollowUpPanel'
 import { sendBlocker, sendingView } from '../services/followUpView'
 import { canPlay, isRebuildingTranscript, rebuildRecordingTranscript, toRecordingJob, toWaveformPeaks } from '../services/meetingRecorderService'
+import { recordingRebuildSource } from '../services/recordingProgress'
 import cache from '../services/apiCache'
 import { clipToNotes } from '../services/searchNotesService'
 import { formatClock, speakersOf, toSegments, toSummaryMoments } from '../services/meetingTranscriptService'
@@ -78,6 +80,7 @@ export default function MeetingDetail() {
   const uploadedAudioUrl = keptRecording ? undefined : meeting?.audio_file_url || undefined
   const playable = keptRecording || Boolean(uploadedAudioUrl)
   const recordingJob = toRecordingJob(meeting?.recording_job)
+  const rebuildingTranscript = keptRecording && isRebuildingTranscript(recordingJob)
   const browserRecording = recordingJob && (recordingJob.source === 'browser'
     || (!recordingJob.source && !meeting?.recording_job?.botSessionId && recordingJob.mode))
   const canRebuildTranscript = keptRecording && browserRecording
@@ -560,7 +563,7 @@ export default function MeetingDetail() {
           { key: 'rename', label: 'Rename', onSelect: startEditTitle },
           ...(canRebuildTranscript ? [{
             key: 'rebuild-transcript', label: 'Rebuild transcript from audio',
-            disabled: requestingTranscriptRebuild || isRebuildingTranscript(recordingJob), onSelect: handleRebuildTranscript,
+            disabled: requestingTranscriptRebuild || rebuildingTranscript, onSelect: handleRebuildTranscript,
           }] : []),
           { key: 'cal', label: calendarSyncing ? 'Adding to calendar' : 'Add to calendar', disabled: calendarSyncing, onSelect: handleAddToCalendar },
           ...(meeting.transcript && templates.length > 0 ? [
@@ -714,6 +717,9 @@ export default function MeetingDetail() {
             audioUrl={uploadedAudioUrl}
             durationMs={meeting.recording_job?.durationMs || lengthMs}
             waveformPeaks={keptRecording ? toWaveformPeaks(meeting.recording_job?.waveformPeaks) : null}
+            waveformReplacement={rebuildingTranscript
+              ? <DebriefLoader source={recordingRebuildSource(recordingJob, meeting.title, meeting.attendees)} />
+              : undefined}
             transcriptSegments={transcriptSegments}
             onTime={setPlayingAtMs}
             decisions={decisionMarks}

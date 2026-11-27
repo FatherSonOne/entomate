@@ -52,3 +52,16 @@ export function recordingSource(job: RecordingJob, title: string | null | undefi
     stepStartedAt: job.stage ? job.stageAt : null,
   }
 }
+
+export function recordingRebuildSource(job: RecordingJob, title: string | null | undefined, attendees: unknown): DebriefSource {
+  const startedAt = job.transcriptRebuildAt ?? null
+  return {
+    ...recordingSource(job, title, attendees),
+    kind: 'transcript-rebuild',
+    endedAt: startedAt,
+    stepStartedAt: startedAt,
+    steps: recordingSteps('transcript').slice(0, 2),
+    headline: 'Rebuilding transcript',
+    sinceLabel: 'since rebuild started',
+  }
+}
