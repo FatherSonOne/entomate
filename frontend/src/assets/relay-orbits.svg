@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" role="img" aria-label="Relay Orbits">
+  <title>Relay Orbits</title>
+  <view id="relay-orbits-compact" viewBox="96 96 808 808"/>
+  <defs>
+    <linearGradient id="relay-orbits-hull" x1="0" y1="0" x2=".83" y2="1" gradientUnits="objectBoundingBox">
+      <stop stop-color="#ffb99c"/><stop offset=".24" stop-color="#f95b5f"/>
+      <stop offset=".48" stop-color="#a42540"/><stop offset=".7" stop-color="#64162d"/>
+      <stop offset="1" stop-color="#f05460"/>
+    </linearGradient>
+    <linearGradient id="relay-orbits-face" x1=".2" y1="0" x2=".87" y2=".94" gradientUnits="objectBoundingBox">
+      <stop stop-color="#fc735f"/><stop offset=".23" stop-color="#e34252"/>
+      <stop offset=".48" stop-color="#8e1935"/><stop offset=".75" stop-color="#b82e47"/>
+      <stop offset="1" stop-color="#ffad8d"/>
+    </linearGradient>
+    <linearGradient id="relay-orbits-lip" x1=".14" y1="0" x2=".65" y2="1" gradientUnits="objectBoundingBox">
+      <stop stop-color="#ffbd9f"/><stop offset=".16" stop-color="#fff0d8"/>
+      <stop offset=".44" stop-color="#df7474"/><stop offset=".68" stop-color="#8b2c48"/>
+      <stop offset=".89" stop-color="#ff9b81"/><stop offset="1" stop-color="#ffe0b8"/>
+    </linearGradient>
+    <linearGradient id="relay-orbits-etch" x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox">
+      <stop stop-color="#fff3dc" stop-opacity=".65"/><stop offset=".5" stop-color="#ff847f" stop-opacity=".15"/>
+      <stop offset="1" stop-color="#ff887e" stop-opacity=".67"/>
+    </linearGradient>
+    <radialGradient id="relay-orbits-chamber">
+      <stop stop-color="#1c3c3c"/><stop offset=".68" stop-color="#081e24"/><stop offset="1" stop-color="#0d1019"/>
+    </radialGradient>
+    <linearGradient id="relay-orbits-iris" x1="0" y1="0" x2="1" y2="1" gradientUnits="objectBoundingBox">
+      <stop stop-color="#187176"/><stop offset=".37" stop-color="#2a9d97"/><stop offset=".68" stop-color="#b8fff1"/>
+      <stop offset=".85" stop-color="#49e4ce"/><stop offset="1" stop-color="#216973"/>
+    </linearGradient>
+    <radialGradient id="relay-orbits-lens" cx=".37" cy=".3" r=".72">
+      <stop stop-color="#fff1ca"/><stop offset=".25" stop-color="#edaa82"/><stop offset=".59" stop-color="#d45158"/>
+      <stop offset=".88" stop-color="#5a1833"/><stop offset="1" stop-color="#251a2a"/>
+    </radialGradient>
+    <linearGradient id="relay-orbits-axis" gradientUnits="userSpaceOnUse" x1="119" y1="500" x2="881" y2="500">
+      <stop stop-color="#f96a77" stop-opacity=".28"/><stop offset=".43" stop-color="#ff7a73"/>
+      <stop offset=".64" stop-color="#fff1cd"/><stop offset="1" stop-color="#64ecd7" stop-opacity=".35"/>
+    </linearGradient>
+    <radialGradient id="relay-orbits-energy">
+      <stop stop-color="#ffefd4"/><stop offset=".28" stop-color="#ff9783" stop-opacity=".7"/>
+      <stop offset="1" stop-color="#f7445b" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="relay-orbits-radiance">
+      <stop stop-color="#b8fff0"/><stop offset=".25" stop-color="#70f2db" stop-opacity=".7"/>
+      <stop offset="1" stop-color="#42ccb9" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <g data-iris="" transform="translate(531 500) scale(1 1) translate(-531 -500)">
+    <ellipse cx="531" cy="500" rx="158" ry="194" fill="url(#relay-orbits-chamber)" stroke="#315958" stroke-width="5"/>
+    <ellipse cx="531" cy="500" rx="139" ry="174" fill="none" stroke="url(#relay-orbits-iris)" stroke-width="15"/>
+    <ellipse cx="531" cy="500" rx="119" ry="152" fill="none" stroke="#4bb2ad" stroke-opacity=".4" stroke-width="3"/>
+    <path d="M539 328C611 333 669 398 670 487M668 529C658 604 612 665 549 673" fill="none" stroke="#baffec" stroke-linecap="round" stroke-width="4" opacity=".84"/>
+    <path d="M624 371L613 385M657 415L641 424M669 567L651 560M643 624L628 612" fill="none" stroke="#74d1c5" stroke-width="3" opacity=".82"/>
+  </g>
+  <g>
+    <path data-hull="" d="M755 300C701 211 609 157 509 155C324 150 164 298 164 500C164 702 324 850 509 845C609 843 701 789 755 700C686 758 604 780 533 741C447 695 398 606 398 500C398 394 447 305 533 259C604 220 686 242 755 300Z" fill="url(#relay-orbits-hull)"/>
+    <path data-face="" d="M755 300C687 226 602 186 510 187C337 188 202 317 202 500C202 683 337 812 510 813C602 814 687 774 755 700C684 758 599 777 525 736C443 692 395 604 395 500C395 396 443 308 525 264C599 223 684 242 755 300Z" fill="url(#relay-orbits-face)"/>
+    <path data-lip="" d="M755 300C675 233 592 212 512 247C416 288 354 383 354 500C354 617 416 712 512 753C592 788 675 767 755 700C686 758 604 780 533 741C447 695 398 606 398 500C398 394 447 305 533 259C604 220 686 242 755 300Z" fill="url(#relay-orbits-lip)"/>
+    <path data-etch="" d="M725 270C650 211 560 183 480 192C322 209 209 339 209 500C209 661 322 791 480 808C560 817 650 789 725 730" fill="none" stroke="url(#relay-orbits-etch)" stroke-width="3"/>
+    <path data-seam="" d="M725 280C649 227 570 217 496 249C401 289 336 389 336 500C336 611 401 711 496 751C570 783 649 773 725 720" fill="none" stroke="#481428" stroke-opacity=".55" stroke-width="4"/>
+    <path data-charge="" opacity="0" pathLength="1" stroke-dasharray=".18 2" stroke-dashoffset=".18" d="M725 280C649 227 570 217 496 249C401 289 336 389 336 500C336 611 401 711 496 751C570 783 649 773 725 720" fill="none" stroke="#ffd3ab" stroke-linecap="round" stroke-width="10"/>
+  </g>
+  <g>
+    <path d="M119 500H881" fill="none" stroke="url(#relay-orbits-axis)" stroke-width="3.5"/>
+    <circle cx="119" cy="500" r="7" fill="#ff8c86"/>
+    <circle cx="881" cy="500" r="8" fill="#56b9b1"/>
+  </g>
+  <g data-core="" transform="translate(531 500) scale(1 1) translate(-531 -500)">
+    <circle cx="531" cy="500" r="72" fill="#291727" stroke="#ce6968" stroke-opacity=".55" stroke-width="4"/>
+    <circle cx="531" cy="500" r="57" fill="url(#relay-orbits-lens)" stroke="#fcad91" stroke-width="3"/>
+    <path d="M494 477C508 459 539 455 559 471" fill="none" stroke="#fff3d0" stroke-opacity=".68" stroke-linecap="round" stroke-width="5"/>
+    <path d="M488 518C508 535 546 540 568 518" fill="none" stroke="#f37f7c" stroke-opacity=".56" stroke-linecap="round" stroke-width="3"/>
+  </g>
+  <ellipse data-wave="" cx="531" cy="500" rx="67" ry="84" fill="none" stroke="#9dfce8" stroke-width="3" opacity="0"/>
+  <circle data-catch="" cx="531" cy="500" r="110" fill="url(#relay-orbits-energy)" opacity="0"/>
+  <g data-inbound="" transform="translate(119 500)" opacity="0">
+    <path d="M-112 0H0" stroke="#ff8c75" stroke-width="4" stroke-linecap="round"/>
+    <ellipse rx="53" ry="21" fill="url(#relay-orbits-energy)"/>
+    <circle r="5" fill="#fff0d1"/>
+  </g>
+  <g data-outbound="" transform="translate(531 500)" opacity="0">
+    <path d="M-115 0H0" stroke="#83ead7" stroke-width="4" stroke-linecap="round"/>
+    <ellipse rx="56" ry="26" fill="url(#relay-orbits-radiance)"/>
+    <circle r="5" fill="#d9fff2"/>
+  </g>
+</svg>

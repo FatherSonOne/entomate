@@ -1,0 +1,191 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 704 704" role="img" aria-labelledby="facet-hands-title">
+  <title id="facet-hands-title">Facet Hands</title>
+  <view id="facet-hands-compact" viewBox="21 48 662 616"/>
+  <defs>
+    <linearGradient id="facet-hands-face" x1=".1" y1="0" x2=".8" y2="1">
+      <stop stop-color="#ff5276"/>
+      <stop offset=".43" stop-color="#f63761"/>
+      <stop offset="1" stop-color="#ed2354"/>
+    </linearGradient>
+    <linearGradient id="facet-hands-edge" x1="0" y1="0" x2=".9" y2="1">
+      <stop stop-color="#e73158"/>
+      <stop offset="1" stop-color="#b1183f"/>
+    </linearGradient>
+    <linearGradient id="facet-hands-gold" x1="0" y1="0" x2=".75" y2="1">
+      <stop stop-color="#fff3b8"/>
+      <stop offset=".55" stop-color="#ffcc75"/>
+      <stop offset="1" stop-color="#ec9653"/>
+    </linearGradient>
+    <linearGradient id="facet-hands-bar" x2="0" y2="1">
+      <stop stop-color="#ff486c"/>
+      <stop offset="1" stop-color="#ee2454"/>
+    </linearGradient>
+    <radialGradient id="facet-hands-tip-halo">
+      <stop stop-color="#ffa14b" stop-opacity=".56"/>
+      <stop offset=".42" stop-color="#fb8b38" stop-opacity=".25"/>
+      <stop offset="1" stop-color="#fc8142" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="facet-hands-blur" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4"/>
+    </filter>
+
+    <g id="facet-hands-wrist" stroke-linejoin="round">
+      <path d="M178 462L241 446H275V568H148Z" fill="url(#facet-hands-face)"/>
+      <path d="M241 447L239 568H192Z" fill="url(#facet-hands-edge)"/>
+      <path d="M275 445V568H241Z" fill="#bb1e46"/>
+      <path d="M178 463L240 447L239 568M243 564L275 447" fill="none" stroke="#190d17" stroke-width="4.2"/>
+    </g>
+    <g id="facet-hands-finger-1" stroke-linejoin="round">
+      <path d="M130 148L145 153L152 187L149 240L164 286L149 295L118 279L114 243Z" fill="url(#facet-hands-face)"/>
+      <path d="M130 148L133 188L128 240L142 326L123 351L114 243Z" fill="url(#facet-hands-edge)"/>
+      <path d="M129 242L148 240L162 286" fill="none" stroke="#1a0c17" stroke-width="3.4"/>
+      <path d="M130 149L145 154L151 186L133 188Z" fill="url(#facet-hands-gold)" stroke="#ffd587" stroke-width="1.5"/>
+    </g>
+    <g id="facet-hands-finger-2" stroke-linejoin="round">
+      <path d="M186 129L202 136L203 172L187 238L197 296L166 287L167 238L156 237Z" fill="url(#facet-hands-face)"/>
+      <path d="M186 130V174L168 237L166 287L157 239Z" fill="url(#facet-hands-edge)"/>
+      <path d="M166 286L168 237H187L194 295" fill="none" stroke="#180d17" stroke-width="4"/>
+      <path d="M187 130L201 136L202 172L186 172Z" fill="url(#facet-hands-gold)" stroke="#ffd587" stroke-width="1.5"/>
+    </g>
+    <g id="facet-hands-finger-3" stroke-linejoin="round">
+      <path d="M232 161L244 169L241 202L221 256L226 308L198 299L202 253L192 251Z" fill="url(#facet-hands-face)"/>
+      <path d="M232 161L228 201L204 252L199 299L193 251Z" fill="url(#facet-hands-edge)"/>
+      <path d="M200 297L204 252L221 256L226 305" fill="none" stroke="#180d17" stroke-width="3.7"/>
+      <path d="M233 162L244 169L241 202L226 200Z" fill="url(#facet-hands-gold)" stroke="#ffd587" stroke-width="1.5"/>
+    </g>
+    <g id="facet-hands-finger-4" stroke-linejoin="round">
+      <path d="M264 211L272 218L268 242L250 278L246 316L225 308L229 270Z" fill="url(#facet-hands-face)"/>
+      <path d="M264 212L258 241L238 273L226 306L229 270Z" fill="url(#facet-hands-edge)"/>
+      <path d="M227 306L238 273L250 277" fill="none" stroke="#180d17" stroke-width="3.1"/>
+      <path d="M264 212L271 218L267 242L257 239Z" fill="url(#facet-hands-gold)" stroke="#ffd587" stroke-width="1.35"/>
+    </g>
+    <g id="facet-hands-palm" stroke-linejoin="round">
+      <path d="M115 242L149 240L163 285L245 310L260 358L275 400V447L238 450L177 464L114 406L94 375L123 349Z" fill="url(#facet-hands-face)"/>
+      <path d="M115 243L129 243L143 326L123 350Z" fill="url(#facet-hands-edge)"/>
+      <path d="M142 327L124 350L139 359L177 427L239 447L225 381Z" fill="#ff4269" opacity=".48"/>
+      <path d="M225 381L275 445L239 449Z" fill="url(#facet-hands-edge)"/>
+      <path d="M163 285L244 312M124 350L142 327L259 359M142 327L225 381L274 446M225 381L239 447" fill="none" stroke="#180c16" stroke-width="4.1"/>
+    </g>
+    <g id="facet-hands-thumb" stroke-linejoin="round">
+      <path d="M43 300L56 295L86 309L101 332L134 356L145 361L178 427L239 447L177 464L113 406L72 353Z" fill="url(#facet-hands-face)"/>
+      <path d="M71 332L84 321L112 351L176 425L239 447L176 462L112 405L72 352Z" fill="url(#facet-hands-edge)"/>
+      <path d="M114 407L178 427L239 447L177 464M137 359L225 381M145 361L177 426M84 344L101 332" fill="none" stroke="#180c16" stroke-width="4.1"/>
+      <path d="M44 300L56 296L72 328L64 335Z" fill="url(#facet-hands-gold)" stroke="#ffd587" stroke-width="1.4"/>
+    </g>
+
+    <rect id="facet-hands-top-bar" x="282" y="235" width="140" height="29" rx="2"/>
+    <rect id="facet-hands-mid-bar" x="282" y="318" width="126" height="29" rx="2"/>
+    <rect id="facet-hands-low-bar" x="282" y="401" width="140" height="29" rx="2"/>
+    <g id="facet-hands-bars">
+      <use href="#facet-hands-top-bar"/>
+      <use href="#facet-hands-mid-bar"/>
+      <use href="#facet-hands-low-bar"/>
+    </g>
+    <g id="facet-hands-halos" fill="url(#facet-hands-tip-halo)">
+      <ellipse cx="139" cy="167" rx="57" ry="58"/>
+      <ellipse cx="194" cy="148" rx="59" ry="65"/>
+      <ellipse cx="235" cy="181" rx="55" ry="59"/>
+      <ellipse cx="266" cy="223" rx="43" ry="50"/>
+      <ellipse cx="59" cy="310" rx="64" ry="54"/>
+    </g>
+    <filter id="facet-hands-mask-ink" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
+      <feColorMatrix type="matrix" values=".3 .6 .1 0 .18  .3 .6 .1 0 .18  .3 .6 .1 0 .18  0 0 0 1 0"/>
+    </filter>
+    <mask id="facet-hands-mask-left" maskUnits="userSpaceOnUse" x="-45" y="40" width="400" height="575">
+      <use href="#facet-hands-left-geometry" filter="url(#facet-hands-mask-ink)"/>
+    </mask>
+    <mask id="facet-hands-mask-right" maskUnits="userSpaceOnUse" x="-45" y="40" width="400" height="575">
+      <use href="#facet-hands-right-geometry" filter="url(#facet-hands-mask-ink)"/>
+    </mask>
+    <linearGradient id="facet-hands-sweep" x1="135" y1="39" x2="169" y2="152" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffc8a4" stop-opacity="0"/>
+      <stop offset=".25" stop-color="#ffeece" stop-opacity=".98"/>
+      <stop offset=".33" stop-color="#fff2d1" stop-opacity=".85"/>
+      <stop offset=".56" stop-color="#ff9e6d" stop-opacity=".46"/>
+      <stop offset=".84" stop-color="#f65677" stop-opacity=".14"/>
+      <stop offset="1" stop-color="#f65677" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="facet-hands-warm-air" x1="95" x2="230" y1="264" y2="73" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ff6380" stop-opacity="0"/>
+      <stop offset=".36" stop-color="#ff9d7f" stop-opacity=".66"/>
+      <stop offset=".63" stop-color="#ffc79f" stop-opacity=".91"/>
+      <stop offset="1" stop-color="#fff0be" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="facet-hands-bar-sweep" x1="164" x2="276" y1="306" y2="332" gradientUnits="userSpaceOnUse" data-facet-bar-sweep="">
+      <stop stop-color="#ffd9a5" stop-opacity="0"/>
+      <stop offset=".53" stop-color="#ffc191" stop-opacity=".85"/>
+      <stop offset=".64" stop-color="#fff0cb"/>
+      <stop offset="1" stop-color="#ff7191" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <g data-facet-hand="left" transform="rotate(0 214 550)">
+    <use href="#facet-hands-halos"/>
+    <g id="facet-hands-left-geometry">
+      <use href="#facet-hands-wrist"/>
+      <use data-facet-finger="" transform="rotate(0 140 248)" href="#facet-hands-finger-1"/>
+      <use data-facet-finger="" transform="rotate(0 176 247)" href="#facet-hands-finger-2"/>
+      <use data-facet-finger="" transform="rotate(0 210 264)" href="#facet-hands-finger-3"/>
+      <use data-facet-finger="" transform="rotate(0 239 282)" href="#facet-hands-finger-4"/>
+      <use href="#facet-hands-palm"/>
+      <use href="#facet-hands-thumb"/>
+    </g>
+    <g mask="url(#facet-hands-mask-left)">
+      <rect data-facet-caustic="" x="-35" y="-50" width="355" height="277" fill="url(#facet-hands-sweep)" transform="translate(0 475)" opacity="0" style="mix-blend-mode:screen"/>
+    </g>
+  </g>
+  <g transform="translate(704 0) scale(-1 1)">
+    <g data-facet-hand="right" transform="rotate(0 214 550)">
+      <use href="#facet-hands-halos"/>
+      <g id="facet-hands-right-geometry">
+        <use href="#facet-hands-wrist"/>
+        <use data-facet-finger="" transform="rotate(0 140 248)" href="#facet-hands-finger-1"/>
+        <use data-facet-finger="" transform="rotate(0 176 247)" href="#facet-hands-finger-2"/>
+        <use data-facet-finger="" transform="rotate(0 210 264)" href="#facet-hands-finger-3"/>
+        <use data-facet-finger="" transform="rotate(0 239 282)" href="#facet-hands-finger-4"/>
+        <use href="#facet-hands-palm"/>
+        <use href="#facet-hands-thumb"/>
+      </g>
+      <g mask="url(#facet-hands-mask-right)">
+        <rect data-facet-caustic="" x="-35" y="-50" width="355" height="277" fill="url(#facet-hands-sweep)" transform="translate(0 475)" opacity="0" style="mix-blend-mode:screen"/>
+      </g>
+    </g>
+  </g>
+  <use href="#facet-hands-bars" fill="#ff3964" opacity=".38" filter="url(#facet-hands-blur)"/>
+  <use href="#facet-hands-bars" fill="url(#facet-hands-bar)"/>
+  <g fill="url(#facet-hands-bar-sweep)">
+    <use data-facet-reflection="" href="#facet-hands-low-bar" opacity="0"/>
+    <use data-facet-reflection="" href="#facet-hands-mid-bar" opacity="0"/>
+    <use data-facet-reflection="" href="#facet-hands-top-bar" opacity="0"/>
+  </g>
+
+  <g data-facet-vapor="" fill="none" stroke="url(#facet-hands-warm-air)" stroke-linecap="round" opacity="0">
+    <path data-facet-vapor-path="" d="M84 306C37 279 65 234 83 205S114 159 167 135S219 120 243 94" stroke-width="19" filter="url(#facet-hands-blur)" opacity=".61"/>
+    <path data-facet-vapor-path="" d="M86 306C42 280 70 233 87 205S119 159 169 137S224 120 246 95" stroke-width="2.7" opacity=".72"/>
+    <path data-facet-vapor-path="" d="M87 301C49 279 71 243 88 218S123 176 169 151S219 128 250 109" stroke-width="1.5" opacity=".61"/>
+  </g>
+  <g transform="translate(704 0) scale(-1 1)">
+    <g data-facet-vapor="" fill="none" stroke="url(#facet-hands-warm-air)" stroke-linecap="round" opacity="0">
+      <path data-facet-vapor-path="" d="M84 306C37 279 65 234 83 205S114 159 167 135S219 120 243 94" stroke-width="19" filter="url(#facet-hands-blur)" opacity=".61"/>
+      <path data-facet-vapor-path="" d="M86 306C42 280 70 233 87 205S119 159 169 137S224 120 246 95" stroke-width="2.7" opacity=".72"/>
+      <path data-facet-vapor-path="" d="M87 301C49 279 71 243 88 218S123 176 169 151S219 128 250 109" stroke-width="1.5" opacity=".61"/>
+    </g>
+  </g>
+  <g data-facet-dust="" fill="#ffd9aa" aria-hidden="true">
+    <circle cx="105" cy="185" r="1.8" opacity="0"/>
+    <circle cx="137" cy="166" r="2.3" opacity="0"/>
+    <circle cx="168" cy="155" r="1.3" opacity="0"/>
+    <circle cx="192" cy="148" r="2" opacity="0"/>
+    <circle cx="217" cy="163" r="1.4" opacity="0"/>
+    <circle cx="236" cy="178" r="2.2" opacity="0"/>
+    <circle cx="251" cy="199" r="1.7" opacity="0"/>
+    <circle cx="283" cy="216" r="1.4" opacity="0"/>
+    <circle cx="596" cy="182" r="2.5" opacity="0"/>
+    <circle cx="568" cy="164" r="1.2" opacity="0"/>
+    <circle cx="532" cy="152" r="1.6" opacity="0"/>
+    <circle cx="519" cy="149" r="2.1" opacity="0"/>
+    <circle cx="486" cy="164" r="2" opacity="0"/>
+    <circle cx="470" cy="183" r="1.6" opacity="0"/>
+    <circle cx="447" cy="202" r="2.3" opacity="0"/>
+  </g>
+</svg>

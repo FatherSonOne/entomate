@@ -2,7 +2,7 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import LogoSystemPicker from '../components/settings/LogoSystemPicker'
-import { __resetLogoForTests, LOGO_KEY } from '../services/logoSystem'
+import { __resetLogoForTests, logoAsset, LOGO_KEY } from '../services/logoSystem'
 
 beforeEach(() => {
   window.localStorage.removeItem(LOGO_KEY)
@@ -39,6 +39,23 @@ describe('logo system picker', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Hide preview' }))
     fireEvent.click(card('Bloom'))
     expect(screen.getByRole('button', { name: 'Show preview' })).toBeTruthy()
+  })
+
+  it.each([
+    ['constellation', 'Constellation', 'Triangulation'],
+    ['trinity', 'Threshold', 'Gate ignition'],
+    ['slipstream', 'Slipstream', 'Current capture'],
+  ])('opens the %s full-screen preview with the chosen artwork', (id, name, motion) => {
+    render(<LogoSystemPicker />)
+    const choice = card(name)
+    fireEvent.click(choice)
+    expect(choice).toHaveAttribute('aria-checked', 'true')
+    expect(document.querySelector('.lp-bar img[data-brand-mark]')).toHaveAttribute('src', logoAsset(id, 'small'))
+    fireEvent.click(screen.getByRole('button', { name: 'Full-screen preview' }))
+    const preview = screen.getByRole('dialog', { name: new RegExp(name) })
+    expect(preview).toHaveTextContent(motion)
+    expect(preview.querySelector('[data-loading-logo] svg')).toHaveAttribute('aria-label', name)
+    expect(document.querySelector('.lp-panel [data-loading-logo]')).toBeNull()
   })
 
   it('nests no buttons inside the cards', () => {

@@ -15,7 +15,7 @@ const PANEL_EDGE = 400 + 18
 /** Air between the cards and the panel when it does cover them. */
 const PANEL_GAP = 20
 
-/** Whether the 17 cards are open, per browser. Closed by default: the bar says what's in use. */
+/** Whether the logo cards are open, per browser. */
 const GRID_KEY = 'entomate-logo-grid-open'
 function readGridOpen(): boolean {
   try { return localStorage.getItem(GRID_KEY) === '1' } catch { return false }
@@ -139,7 +139,7 @@ export default function LogoSystemPicker(): React.ReactElement {
                       className="lp-card" onClick={() => pick(logo.id)}>
                       <Display className="lp-card-disp">
                         {/* With the panel docked the motion plays there; otherwise the picked card plays it in place */}
-                        {on && !docked
+                        {on && !docked && !preview
                           ? <AnimatedLoadingLogo logoId={logo.id} size={512} controls={false} />
                           : <img src={logoAsset(logo.id, 256)} alt="" loading="lazy" width={128} height={128} />}
                       </Display>
@@ -166,7 +166,7 @@ export default function LogoSystemPicker(): React.ReactElement {
         footer={<Key variant="primary" onClick={() => setPreview(true)}>Full-screen preview</Key>}>
         <Display className="lp-panel-disp">
           <span className="bs-lbl lp-corner lp-corner--r">{inUse.motion}</span>
-          {panel && <AnimatedLoadingLogo logoId={inUse.id} size={512} controls={false} />}
+          {panel && !preview && <AnimatedLoadingLogo logoId={inUse.id} size={512} controls={false} />}
         </Display>
         <div className="lp-panel-meta">
           <Signal tone="brand">In use</Signal>

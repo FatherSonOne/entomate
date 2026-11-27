@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="29 24 931 944" role="img" aria-label="Aperture">
+  <defs>
+    <linearGradient id="brass" x1="0" y1="0" x2=".8" y2="1">
+      <stop stop-color="#fff0bc"/>
+      <stop offset=".26" stop-color="#f8b367"/>
+      <stop offset=".48" stop-color="#ffdc96"/>
+      <stop offset=".7" stop-color="#e58341"/>
+      <stop offset="1" stop-color="#ffd49a"/>
+    </linearGradient>
+    <linearGradient id="copper" x1=".1" y1="0" x2=".91" y2="1">
+      <stop stop-color="#f94d32"/>
+      <stop offset=".41" stop-color="#a83629"/>
+      <stop offset=".69" stop-color="#ef5e37"/>
+      <stop offset="1" stop-color="#c74229"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2=".8" y2="1">
+      <stop stop-color="#b5f5e4"/>
+      <stop offset=".38" stop-color="#58999a"/>
+      <stop offset=".69" stop-color="#66bdb8"/>
+      <stop offset="1" stop-color="#8de0d2"/>
+    </linearGradient>
+    <radialGradient id="lens">
+      <stop stop-color="#fff6cf"/>
+      <stop offset=".38" stop-color="#ffd795"/>
+      <stop offset=".66" stop-color="#f39342"/>
+      <stop offset="1" stop-color="#a64227"/>
+    </radialGradient>
+  </defs>
+  <circle cx="489" cy="500" r="445" fill="none" stroke="#93694a" stroke-width="10" opacity=".63"/>
+  <g fill="none" stroke-linecap="round">
+    <path d="M438 80A424 424 0 1 1 450 922" stroke="url(#glass)" stroke-width="20"/>
+    <path d="M430 121A382 382 0 1 1 451 881" stroke="url(#brass)" stroke-width="67"/>
+    <path d="M435 164A340 340 0 1 1 452 838" stroke="#ab3928" stroke-width="21"/>
+    <path d="M442 184A319 319 0 1 1 457 817" stroke="#9bdcd1" stroke-width="19"/>
+    <path d="M447 217A286 286 0 1 1 460 785" stroke="url(#copper)" stroke-width="29"/>
+    <path d="M219 365C199 420 249 452 293 480" stroke="#ed9851" stroke-width="14"/>
+  </g>
+  <circle cx="342" cy="497" r="115" fill="none" stroke="#b9865c" stroke-width="11"/>
+  <circle cx="342" cy="497" r="78" fill="#2b1718" stroke="#d3915e" stroke-width="13"/>
+  <circle cx="342" cy="497" r="50" fill="#542827" stroke="#f3ac66" stroke-width="16"/>
+  <circle cx="342" cy="497" r="30" fill="url(#lens)"/>
+</svg>

@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" role="img" aria-label="Slipstream">
+  <title>Slipstream</title>
+  <view id="slipstream-compact" viewBox="111 111 778 778"/>
+  <defs>
+    <linearGradient id="slipstream-metal" x1=".1" x2=".89" y1="0" y2=".94">
+      <stop stop-color="#fdc299"/><stop offset=".22" stop-color="#984359"/>
+      <stop offset=".48" stop-color="#52223a"/><stop offset=".77" stop-color="#f38872"/>
+      <stop offset="1" stop-color="#a04a66"/>
+    </linearGradient>
+    <linearGradient id="slipstream-red" x1=".15" x2=".82" y1="0" y2="1">
+      <stop stop-color="#ee8c75"/><stop offset=".22" stop-color="#ac3853"/>
+      <stop offset=".47" stop-color="#7a2a47"/><stop offset=".77" stop-color="#ef555f"/>
+      <stop offset="1" stop-color="#ffae87"/>
+    </linearGradient>
+    <linearGradient id="slipstream-trim" x1="0" x2="1" y1=".12" y2=".9">
+      <stop stop-color="#ffc8ac"/><stop offset=".27" stop-color="#934761"/>
+      <stop offset=".61" stop-color="#ffae8c"/><stop offset="1" stop-color="#ffe7b6"/>
+    </linearGradient>
+    <linearGradient id="slipstream-mint" gradientUnits="userSpaceOnUse" x1="464" y1="448" x2="529" y2="551">
+      <stop stop-color="#287a82" stop-opacity="0"/><stop offset=".43" stop-color="#3e8f8c" stop-opacity=".59"/>
+      <stop offset=".82" stop-color="#69c8b2"/><stop offset="1" stop-color="#bcffdf"/>
+    </linearGradient>
+    <radialGradient id="slipstream-center-glow">
+      <stop stop-color="#f6fff0"/><stop offset=".22" stop-color="#bcffe8" stop-opacity=".89"/>
+      <stop offset=".65" stop-color="#77eacf" stop-opacity=".42"/><stop offset="1" stop-color="#73ead2" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="slipstream-current-glow" x="-14%" y="-14%" width="128%" height="128%">
+      <feGaussianBlur stdDeviation="8" result="bloom"/>
+      <feMerge><feMergeNode in="bloom"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <clipPath id="slipstream-swirl-clip"><use href="#slipstream-body"/></clipPath>
+  </defs>
+
+  <path id="slipstream-body" data-ribbon-shell="" d="M430 149C364 170 305 207 259 255C213 303 180 362 165 424C151 487 154 552 174 611C193 670 229 723 275 764C321 804 377 832 435 845C494 858 554 857 609 843C664 828 715 800 754 763C793 726 821 680 834 631C848 582 846 531 832 485C818 439 791 399 758 369C724 340 683 320 642 312C601 304 560 306 524 318C487 330 456 350 433 377C410 403 397 435 394 466C391 498 398 528 414 552C429 576 452 593 476 601C500 609 526 608 548 598C574 588 587 558 577 532C567 506 537 493 511 503C514 500 515 500 516 498C516 497 516 496 516 493C516 491 516 488 518 483C520 478 523 472 530 466C538 460 548 453 563 450C577 447 594 447 611 451C629 456 646 465 659 478C673 492 684 509 689 528C695 547 695 568 688 590C682 612 669 634 649 653C629 672 602 688 570 696C539 705 503 706 468 699C433 691 400 675 372 652C344 628 323 598 311 564C298 530 295 493 303 455C311 418 329 380 358 348C387 317 427 290 472 274C507 263 525 225 514 191C502 156 465 137 430 149Z" fill="url(#slipstream-metal)" stroke="#f3ae91" stroke-opacity=".56" stroke-width="4"/>
+  <path data-ribbon-face="" d="M433 157C369 178 310 214 265 261C220 308 189 366 175 426C161 487 164 550 183 608C202 665 237 717 282 756C327 795 381 822 438 835C494 848 553 847 607 833C660 819 709 792 747 756C784 720 811 675 824 628C837 581 836 532 823 488C809 444 783 405 751 377C718 348 680 330 640 321C601 313 561 316 526 327C491 338 461 358 440 383C418 408 405 438 402 467C399 497 406 526 421 548C435 571 456 587 479 594C501 602 525 601 546 592C568 583 579 557 571 535C562 512 536 501 513 510C515 508 514 507 513 505C512 504 510 501 509 497C508 493 508 488 509 482C511 475 516 468 524 460C532 452 544 445 560 441C576 437 595 437 613 442C632 447 651 457 666 471C681 485 693 504 699 525C705 546 705 569 698 593C692 616 678 640 656 660C635 681 606 697 573 706C540 715 502 716 466 708C430 701 394 684 365 659C337 635 314 603 301 567C289 532 286 492 294 453C302 414 321 375 352 342C382 309 422 282 469 266C499 256 515 224 505 194C495 164 463 147 433 157Z" fill="url(#slipstream-red)"/>
+  <path data-ribbon-ridge="" d="M364 232C315 262 276 303 249 350C222 397 209 449 209 500C209 551 222 601 247 645C272 688 308 724 350 750C392 776 439 792 487 797C534 801 582 794 624 778C666 762 703 737 730 706C757 675 776 638 783 601C791 564 788 526 776 492C765 459 744 430 719 407C693 385 663 371 632 363C601 356 570 357 543 364C515 372 491 385 473 403C455 420 444 441 439 462C434 483 436 504 443 522C450 539 463 553 477 562C492 571 508 574 523 572" fill="none" stroke="url(#slipstream-trim)" stroke-width="8" stroke-linecap="round"/>
+  <path data-ribbon-seam="" d="M339 324C305 359 282 401 272 445C262 488 264 532 277 573C291 613 315 650 347 678C379 706 418 725 459 734C500 744 542 743 579 733C617 723 650 704 675 680C700 657 717 628 725 600C733 571 732 542 724 516C716 491 701 468 682 451C663 434 640 423 617 418C594 414 571 415 552 421C533 427 519 437 509 448C499 459 494 471 493 481C492 491 494 499 498 504C502 510 506 513 510 515" fill="none" stroke="#ffb48b" stroke-opacity=".59" stroke-width="3" stroke-linecap="round"/>
+  <path data-ribbon-tip="" d="M413 425C405 445 401 466 401 486C402 506 408 526 417 542C426 559 439 572 453 582C467 591 483 597 499 599C515 601 531 598 546 592C568 583 579 557 571 535C562 512 536 501 513 510C514 508 514 508 514 507C513 506 512 505 511 503C510 501 509 499 509 496C508 493 508 490 509 486C509 482 511 477 514 472C527 444 515 411 487 398C459 385 426 397 413 425Z" fill="url(#slipstream-mint)"/>
+  <path data-ribbon-grain="" d="M374 278C333 306 301 343 281 384C260 424 251 469 253 512C255 554 268 596 291 631C313 667 344 697 381 718C417 739 458 751 498 753C539 756 579 749 614 735C649 721 678 699 700 674C721 648 735 619 741 589C746 560 743 531 734 505C725 479 709 457 689 440C669 423 646 412 622 406C598 401 575 402 554 407C534 412 517 422 505 434C492 445 485 459 482 471C479 484 480 495 483 504C487 513 493 520 499 524C505 528 512 529 516 528" fill="none" stroke="#ffc5a7" stroke-width="4" stroke-linecap="round" pathLength="1" stroke-dasharray=".009 .083 .003 .057" stroke-dashoffset="0" opacity="0"/>
+  <path data-ribbon-flow="" d="M451 212C395 230 346 262 308 302C271 342 245 390 234 440C223 490 226 541 242 588C258 634 287 676 324 708C360 739 405 761 452 772C498 782 546 781 590 769C633 758 672 736 701 708C731 680 751 646 761 610C771 575 770 539 761 506C751 474 732 445 709 424C685 403 656 388 627 382C598 375 568 377 543 384C518 391 497 405 482 421C467 438 458 457 456 475C453 493 457 510 465 523C472 536 484 545 496 550C508 555 520 554 529 551" fill="none" stroke="#fff0c6" stroke-width="13" stroke-linecap="round" pathLength="1" stroke-dasharray=".15 2" stroke-dashoffset=".15" opacity="0" filter="url(#slipstream-current-glow)"/>
+  <g clip-path="url(#slipstream-swirl-clip)">
+    <circle data-center-flare="" cx="529" cy="551" r="53" fill="url(#slipstream-center-glow)" opacity="0"/>
+  </g>
+</svg>

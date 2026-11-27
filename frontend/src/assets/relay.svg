@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" role="img" aria-label="Relay">
+  <title>Relay</title>
+  <view id="relay-mark-compact" viewBox="54 54 892 892"/>
+  <defs>
+    <linearGradient id="relay-mark-copper" x1=".12" x2=".78" y1="0" y2="1">
+      <stop stop-color="#552536"/><stop offset=".25" stop-color="#ed7e69"/>
+      <stop offset=".48" stop-color="#9b3444"/><stop offset=".72" stop-color="#402537"/>
+      <stop offset="1" stop-color="#de6a55"/>
+    </linearGradient>
+    <linearGradient id="relay-mark-edge" x1=".18" x2=".81" y1="0" y2="1">
+      <stop stop-color="#b75859"/><stop offset=".24" stop-color="#ffc8a2"/>
+      <stop offset=".49" stop-color="#c35b56"/><stop offset=".7" stop-color="#593346"/>
+      <stop offset="1" stop-color="#faab8b"/>
+    </linearGradient>
+    <linearGradient id="relay-mark-glass" x1="0" x2=".85" y1="0" y2="1">
+      <stop stop-color="#8ef6d5"/><stop offset=".26" stop-color="#d6ffed"/>
+      <stop offset=".51" stop-color="#3abfa6"/><stop offset=".72" stop-color="#237379"/>
+      <stop offset="1" stop-color="#74e8c8"/>
+    </linearGradient>
+    <linearGradient id="relay-mark-sash" x1="0" x2="1" y1=".72" y2=".2">
+      <stop stop-color="#bc7770"/><stop offset=".27" stop-color="#fbd1ad"/>
+      <stop offset=".53" stop-color="#f7eed6"/><stop offset=".75" stop-color="#e29378"/>
+      <stop offset="1" stop-color="#a35959"/>
+    </linearGradient>
+    <linearGradient id="relay-mark-wire" gradientUnits="userSpaceOnUse" x1="120" x2="880" y1="500" y2="500">
+      <stop stop-color="#ca6e66"/><stop offset=".22" stop-color="#fcb498"/>
+      <stop offset=".78" stop-color="#fcb498"/><stop offset="1" stop-color="#ca6e66"/>
+    </linearGradient>
+    <radialGradient id="relay-mark-lens" cx=".35" cy=".32" r=".73">
+      <stop stop-color="#b8fbe4"/><stop offset=".22" stop-color="#71ceb7"/>
+      <stop offset=".57" stop-color="#285f62"/><stop offset="1" stop-color="#101928"/>
+    </radialGradient>
+    <radialGradient id="relay-mark-aperture" r=".5">
+      <stop offset=".48" stop-color="#1e514b" stop-opacity=".06"/>
+      <stop offset="1" stop-color="#35bb9e" stop-opacity=".22"/>
+    </radialGradient>
+    <radialGradient id="relay-mark-flare">
+      <stop stop-color="#f1ffdd"/><stop offset=".22" stop-color="#c7ffe4" stop-opacity=".8"/>
+      <stop offset="1" stop-color="#69e9b7" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="relay-mark-current-glow" x="-12%" y="-24%" width="124%" height="148%">
+      <feGaussianBlur stdDeviation="7" result="halo"/>
+      <feMerge><feMergeNode in="halo"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <path data-sash-back="" d="M180 662C132 625 232 494 403 390C577 285 755 226 820 273" fill="none" stroke="url(#relay-mark-sash)" stroke-width="8" stroke-linecap="round" opacity=".63"/>
+  <path data-guide="" transform="rotate(0 500 500)" d="M228 306C279 251 444 301 596 391C750 482 830 600 772 678C720 749 552 695 399 605C245 514 170 372 228 306Z" fill="none" stroke="#bd796c" stroke-opacity=".47" stroke-width="3.5"/>
+
+  <g fill="none" stroke-linecap="round">
+    <path data-wire-shadow="left" d="M128 500C168 500 199 500 232 500" stroke="#5e293c" stroke-width="22"/>
+    <path data-wire-shadow="right" d="M872 500C832 500 801 500 768 500" stroke="#5e293c" stroke-width="22"/>
+    <path data-wire="left" d="M128 500C168 500 199 500 232 500" stroke="url(#relay-mark-wire)" stroke-width="5"/>
+    <path data-wire="right" d="M872 500C832 500 801 500 768 500" stroke="url(#relay-mark-wire)" stroke-width="5"/>
+  </g>
+
+  <g data-housing="" transform="translate(500 500) scale(1 1) translate(-500 -500)">
+    <path d="M500 233C619 233 716 307 748 408C762 454 766 482 780 500C766 518 762 546 748 592C716 693 619 767 500 767C381 767 284 693 252 592C238 546 234 518 220 500C234 482 238 454 252 408C284 307 381 233 500 233Z M500 306A194 194 0 1 0 500 694A194 194 0 1 0 500 306Z" fill="url(#relay-mark-copper)" fill-rule="evenodd" stroke="url(#relay-mark-edge)" stroke-width="5"/>
+    <circle cx="500" cy="500" r="242" fill="none" stroke="#531f33" stroke-width="20"/>
+    <circle cx="500" cy="500" r="252" fill="none" stroke="url(#relay-mark-edge)" stroke-width="3"/>
+    <circle cx="500" cy="500" r="228" fill="none" stroke="#172a32" stroke-width="29"/>
+    <circle cx="500" cy="500" r="211" fill="none" stroke="url(#relay-mark-glass)" stroke-width="22"/>
+    <circle cx="500" cy="500" r="193" fill="url(#relay-mark-aperture)" stroke="#70dbc3" stroke-opacity=".72" stroke-width="3.5"/>
+    <path d="M341 361C381 315 437 289 499 289M633 666C598 693 550 712 507 712" fill="none" stroke="#e2ffe9" stroke-opacity=".88" stroke-width="4" stroke-linecap="round"/>
+    <path d="M230 500H257M743 500H770" fill="none" stroke="#fcc2a2" stroke-width="4" stroke-linecap="round"/>
+    <path d="M427 254L430 269M500 243V262M573 254L570 269M427 746L430 731M500 757V738M573 746L570 731" fill="none" stroke="#ef9f87" stroke-opacity=".8" stroke-width="3.5" stroke-linecap="round"/>
+    <path data-current="top" d="M289 500C289 383.5 383.5 289 500 289C616.5 289 711 383.5 711 500" pathLength="1" stroke-dasharray=".23 2" stroke-dashoffset=".23" opacity="0" fill="none" stroke="#ffdbab" stroke-width="16" stroke-linecap="round" filter="url(#relay-mark-current-glow)"/>
+    <path data-current="bottom" d="M711 500C711 616.5 616.5 711 500 711C383.5 711 289 616.5 289 500" pathLength="1" stroke-dasharray=".23 2" stroke-dashoffset=".23" opacity="0" fill="none" stroke="#effff5" stroke-width="16" stroke-linecap="round" filter="url(#relay-mark-current-glow)"/>
+  </g>
+
+  <path data-sash-front="" d="M820 273C885 320 787 440 618 547C450 655 234 710 180 662" fill="none" stroke="#552f40" stroke-opacity=".65" stroke-width="18" stroke-linecap="round"/>
+  <path data-sash-trim="" d="M820 273C885 320 787 440 618 547C450 655 234 710 180 662" fill="none" stroke="url(#relay-mark-sash)" stroke-width="9" stroke-linecap="round"/>
+
+  <g data-node="left" transform="translate(128 500) scale(1 1)">
+    <circle r="55" fill="#251c2a" stroke="url(#relay-mark-edge)" stroke-width="7"/>
+    <circle r="42" fill="url(#relay-mark-lens)" stroke="#68beac" stroke-width="3"/>
+    <path d="M-25 -16C-14 -30 5 -34 20 -26" fill="none" stroke="#d4f8e4" stroke-width="3" stroke-linecap="round"/>
+    <circle data-node-flare="" r="65" fill="url(#relay-mark-flare)" opacity="0"/>
+  </g>
+  <g data-node="right" transform="translate(872 500) scale(1 1)">
+    <circle r="55" fill="#251c2a" stroke="url(#relay-mark-edge)" stroke-width="7"/>
+    <circle r="42" fill="url(#relay-mark-lens)" stroke="#68beac" stroke-width="3"/>
+    <path d="M-25 -16C-14 -30 5 -34 20 -26" fill="none" stroke="#d4f8e4" stroke-width="3" stroke-linecap="round"/>
+    <circle data-node-flare="" r="65" fill="url(#relay-mark-flare)" opacity="0"/>
+  </g>
+  <g data-guide="" transform="rotate(0 500 500)">
+    <g transform="translate(228 306)">
+      <circle r="25" fill="#291f2e" stroke="#e6a68c" stroke-width="4"/>
+      <circle r="16" fill="url(#relay-mark-lens)"/>
+      <circle cx="-4" cy="-5" r="3.5" fill="#c5fbe0"/>
+    </g>
+    <g transform="translate(772 678)">
+      <circle r="25" fill="#291f2e" stroke="#e6a68c" stroke-width="4"/>
+      <circle r="16" fill="url(#relay-mark-lens)"/>
+      <circle cx="-4" cy="-5" r="3.5" fill="#c5fbe0"/>
+    </g>
+  </g>
+</svg>

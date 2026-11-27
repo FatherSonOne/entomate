@@ -1,4 +1,5 @@
 import React from 'react'
+import { SLIPSTREAM_ID, THRESHOLD_ID } from '../services/logoSystem'
 
 /**
  * First-load progress drawn into each logo's own geometry (2026-11-22).
@@ -16,11 +17,12 @@ const orbit = (r: number, startDeg = 270, cx = 500, cy = 500): Geometry => ({ ki
 /* Radii clear the art (measured from each mark's alpha); 180° starts on a horizontal axis's left end, 270° at the top, 90° at the root. */
 export const PROGRESS_GEOMETRY: Record<string, Geometry> = {
   'relay-orbits': orbit(418, 180),
-  relay: orbit(432, 180),
+  relay: orbit(469, 180),
   orbit: orbit(480),
   'orbital-network': orbit(432, 180),
   constellation: orbit(412),
-  trinity: orbit(432),
+  [THRESHOLD_ID]: orbit(403, 270),
+  [SLIPSTREAM_ID]: orbit(480, 180),
   'circuit-e': { kind: 'rule', x1: 175, x2: 825, y: 860 },
   'circuit-spire': { kind: 'rule', x1: 160, x2: 840, y: 880 },
   'catalyst-core': { kind: 'rule', x1: 160, x2: 840, y: 880 },
