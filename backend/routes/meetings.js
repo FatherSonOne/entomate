@@ -18,6 +18,7 @@ const meetingNotes = require('../services/meetingNotesService');
 const meetingEvents = require('../services/meetingEvents');
 const transcriptMoments = require('../services/transcriptMoments');
 const summaryTemplates = require('../services/summaryTemplates');
+const { loadProfile, profileGuidance } = require('../services/meetingIntelligenceProfile');
 const speakerNames = require('../services/speakerNames');
 const actionItemNudge = require('../services/actionItemNudge');
 const ownerPreferences = require('../services/ownerPreferences');
@@ -1020,19 +1021,20 @@ router.get('/:id/recap', authenticate, async (req, res) => {
  *
  * @param {string} transcript - The meeting transcript text
  * @param {string} title - Meeting title (used for embedding context and template choice)
- * @param {{ attendees?: unknown[], template?: string|null, extractActions?: boolean }} [opts]
+ * @param {{ attendees?: unknown[], template?: string|null, extractActions?: boolean, meetingId?: string }} [opts]
  * @returns {{ summaryData, actionItems, embedding }}
  */
 async function runAIPipeline(transcript, title, opts = {}) {
   // Summary template per meeting type: chosen on the meeting page, else guessed from title/attendees.
   const template = summaryTemplates.detectTemplate({ title, attendees: opts.attendees, chosen: opts.template });
-  const summaryData = await ai.generateSummary(transcript, { addon: summaryTemplates.promptAddon(template) });
+  const { actionAddon, summaryAddon, sections } = profileGuidance(await loadProfile(opts.meetingId), template);
+  const summaryData = await ai.generateSummary(transcript, { addon: summaryAddon });
   if (typeof summaryData?.summary !== 'string' || !summaryData.summary.trim()) {
     throw new Error('Meeting summary was empty');
   }
   summaryData.template = template;
-  summaryData.sections = summaryTemplates.normalizeSections(summaryData.sections, template);
-  const actionItems = opts.extractActions === false ? [] : await ai.extractActionItems(transcript);
+  summaryData.sections = summaryTemplates.normalizeSections(summaryData.sections, template, sections);
+  const actionItems = opts.extractActions === false ? [] : await ai.extractActionItems(transcript, { addon: actionAddon });
 
   let embedding = null;
   try {
@@ -1340,6 +1342,7 @@ router.post('/:id/reprocess', userOrServiceAuth, async (req, res) => {
     const { summaryData, actionItems: rawActionItems, embedding } = await runAIPipeline(transcript, meeting.title, {
       attendees: meeting.attendees, template: meeting.summary_template,
       extractActions: meeting.action_items_require_approval !== true,
+      meetingId: id,
     });
     const segments = Array.isArray(meeting.transcript_segments) ? meeting.transcript_segments : null;
     const actionItems = transcriptMoments.withActionItemMoments(segments, rawActionItems);

@@ -732,6 +732,9 @@ export const calendarApi = {
   updateAutoJoin: (body) => api.put('/calendar/auto-join', body),
   // Meetings › Upcoming: next days of events with the bot's plan for each
   getUpcomingMeetings: (days = 60) => api.get('/calendar/upcoming-meetings', { params: { days } }),
+  /** @returns {Promise<{profileId: string | null}>} */
+  getMeetingProfile: (workspaceId, eventKey) => api.get('/calendar/meeting-profile', { params: { workspaceId, eventKey }, _noCache: true }),
+  setMeetingProfile: (workspaceId, eventKey, profileId) => api.put('/calendar/meeting-profile', { workspaceId, eventKey, profileId }),
   // One meeting's bot choice: 'skip', 'join', or null to clear
   setAutoJoinOverride: (eventKey, decision) => api.put('/calendar/auto-join/override', { eventKey, decision }),
   // Check the calendar now (throttled on the server) and read missed meetings; never cached.

@@ -24,6 +24,7 @@
 const ai = require('../config/ai');
 const log = require('../utils/log');
 const summaryTemplates = require('./summaryTemplates');
+const { seedBotProfile } = require('./meetingIntelligenceProfile');
 const speakerNames = require('./speakerNames');
 const transcriptMoments = require('./transcriptMoments');
 
@@ -48,12 +49,13 @@ function buildTranscriptText(segments) {
  * @param {string} [opts.transcript]  flat text, when there are no timed lines
  * @param {string} opts.title
  * @param {Array} [opts.attendees]  people for the summary prompt and template guess
+ * @param {object} [opts.botSession]  resolved session for a bot transcript
  * @param {(stage: string) => Promise<void>} [opts.onStage]
  * @returns {Promise<{ segments: Array, transcript: string, summaryData: object, actionItems: Array,
  *   speakerSuggestions: Array, summaryError: string|null, fields: object }>}
  *   `fields` are the meetings columns the minutes fill.
  */
-async function writeMinutes({ meeting, segments, transcript, title, attendees, onStage = async () => {} }) {
+async function writeMinutes({ meeting, segments, transcript, title, attendees, botSession, onStage = async () => {} }) {
   let lines = Array.isArray(segments) ? segments : [];
   let text = lines.length ? buildTranscriptText(lines) : String(transcript || '').trim();
 
@@ -81,19 +83,21 @@ async function writeMinutes({ meeting, segments, transcript, title, attendees, o
   // Saved on the job so a missing summary can be diagnosed from the database.
   let summaryError = null;
   await onStage('summary');
-  if (!ai.isConfigured()) {
-    summaryError = 'AI provider not configured';
-  } else {
-    try {
+  try {
+    await seedBotProfile(meeting, botSession);
+    if (!ai.isConfigured()) {
+      summaryError = 'AI provider not configured';
+    } else {
       ({ summaryData, actionItems, embedding } = await pipeline().runAIPipeline(text, title, {
         attendees,
         template: meeting?.summary_template,
+        meetingId: meeting?.id,
       }));
-    } catch (err) {
-      // The transcript is the valuable part; the summary can be rebuilt with Reprocess.
-      summaryError = String(err?.message || err).slice(0, 500);
-      log.warn('Minutes: AI pipeline failed, saving transcript only', { meetingId: meeting?.id, error: err.message });
     }
+  } catch (err) {
+    // The transcript is the valuable part; the summary can be rebuilt with Reprocess.
+    summaryError = String(err?.message || err).slice(0, 500);
+    log.warn('Minutes: AI pipeline failed, saving transcript only', { meetingId: meeting?.id, error: err.message });
   }
 
   actionItems = transcriptMoments.withActionItemMoments(lines, actionItems);

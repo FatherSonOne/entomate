@@ -12,6 +12,7 @@ import { useOrgSafe } from '../../contexts/OrgContext'
 import { settingsApi, botsApi } from '../../services/api'
 import { Key, Switch, TextInput, TextArea } from '../bench'
 import { BOT_LAUNCHED_EVENT } from '../../services/botView'
+import MeetingProfileField from '../intelligence/MeetingProfileField'
 
 const ADMIN_ROLES = ['owner', 'admin']
 
@@ -60,6 +61,7 @@ const CONSENT = {
 function launchError(err) {
   const msg = String(err?.response?.data?.message || err?.message || '')
   if (err?.response?.data?.error === 'bot_hours_exhausted') return msg
+  if (err?.response?.data?.error === 'invalid_intelligence_profile') return 'That intelligence profile is unavailable. Choose another or use General.'
   if (/consent/i.test(msg)) return 'Tick the consent line first.'
   if (/403|forbidden|insufficient role/i.test(msg)) return 'Only owners and admins can send the bot.'
   if (/invalid.*url|meeting_url/i.test(msg)) return 'That meeting link did not work. Copy it again from the invite.'
@@ -79,6 +81,7 @@ export default function SendBotForm({ onLaunched, autoFocus = false }) {
   const [jurisdiction, setJurisdiction] = useState('permissive')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState(null)
+  const [profileId, setProfileId] = useState('')
 
   useEffect(() => {
     if (!org?.id || !canSend) return
@@ -119,10 +122,11 @@ export default function SendBotForm({ onLaunched, autoFocus = false }) {
         platform,
         consentAcknowledged: true,
         participantEmails: invitees,
+        ...(profileId ? { intelligenceProfileId: profileId } : {}),
       })
       window.dispatchEvent(new CustomEvent(BOT_LAUNCHED_EVENT))
       onLaunched?.({ sessionId: res?.sessionId, meetingId, attendees: res?.attendees || [] })
-      setUrl(''); setConsent(false); setEmails(''); setPlatformPicked(false)
+      setUrl(''); setConsent(false); setEmails(''); setPlatformPicked(false); setProfileId('')
     } catch (err) {
       setError(launchError(err))
     } finally {
@@ -155,6 +159,8 @@ export default function SendBotForm({ onLaunched, autoFocus = false }) {
           onChange={(v) => { setPlatform(v); setPlatformPicked(true) }}
         />
       </div>
+
+      <MeetingProfileField value={profileId} onChange={setProfileId} disabled={sending} />
 
       <details className="bs-bot-more">
         <summary>Invitees (optional){invitees.length > 0 && ` · ${invitees.length}`}</summary>

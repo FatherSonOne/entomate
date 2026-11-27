@@ -226,7 +226,7 @@ async function launchBotSession(p) {
   const {
     workspaceId, meetingId, meetingUrl, platform, botName,
     consentAcknowledgedBy, consentAcknowledgedByName, consentAcknowledgedByEmail,
-    participantEmails,
+    participantEmails, intelligenceProfileId,
     // Calendar auto-join (services/calendarAutoJoin.js): when the bot should
     // join, which calendar event it is for, and the event's title.
     joinAt, requireScheduled, calendarEventKey, title
@@ -266,6 +266,7 @@ async function launchBotSession(p) {
     insertRow.consent_acknowledged_by = consentAcknowledgedBy;
   }
   if (calendarEventKey) insertRow.calendar_event_key = calendarEventKey;
+  if (intelligenceProfileId) insertRow.intelligence_profile_id = intelligenceProfileId;
   if (title) insertRow.title = String(title).slice(0, 200);
   if (joinAt) insertRow.join_at = joinAt;
 

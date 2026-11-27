@@ -48,8 +48,11 @@ processing; per-meeting ask/recap/reprocess; publish-to-CRM. `botOrchestrator.js
 vs `agents/` typed agents + `agentOrchestrator` (guardrailed, idempotent). `routes/agents.js` imports all.
 **Intelligence / RAG** — *capable, split.* Briefings, meeting-prep, deal-risk, relationships, nudges;
 semantic + keyword + RAG search (SSE). **Two embedding stacks** (`embeddingService` for /search vs `vectorStore` for workflow RAG; 1536 vs 768 dim mismatch).
-**MIP (Meeting Intelligence Profiles)** — *Phases 1–3 built, Phase 4 open.* Profile tables, 7–8 built-in
-profiles, context assembler, suggestion engine, `MeetingIntelligencePanel`. Value-path enrichment on **outbound recaps not yet wired** (still generic `formatRecapFallback`).
+**MIP (Meeting Intelligence Profiles)** — Seven built-in profiles, with title and description matches in the meeting toolbar’s
+profile picker. Upcoming and Send the bot let owners and admins choose a profile before capture. Saved focus areas,
+meeting details and instructions guide recorded meeting summaries and initial action
+extraction. Profile sections appear in Minutes and document exports. Rewrite summary applies the profile to an existing
+transcript and keeps the action items.
 **Ecosystem** — *mid-migration.* Direct-HTTP bridge live (outbound events wired for Pulse + LV); inbound
 edge fn caches context for MIP. Legacy hub still dual-writing. Retry/backoff/DLQ present; **no inbound idempotency**.
 **Consent / GDPR** — *solid.* P1.7 slices 1–4 shipped (organizer consent gate, bot announcement, pre-meeting
@@ -136,8 +139,8 @@ Sequenced **foundation → surface**. Tier 0 is load-bearing for everything abov
   cutover, build `ecosystem_alerts` admin UI. *Conduct: `gateway`, `sentinel`, `weave`.*
 
 ### Tier 3 — Intelligence Completion
-- **S6 · MIP Value Path** — wire profile-enriched recaps on outbound (kill generic fallback), verify context
-  assembler post-pivot, build MIP Phase 4 (suggested→accepted→completed learning loop + custom-profile editor). *Conduct: `weave`, `radar`.*
+- **S6 · MIP Value Path** — profile-aware minutes, extraction and summary rewrite are wired. Ecosystem context
+  assembly, dedicated outbound profile sections, effectiveness feedback and a custom-profile editor remain open.
 - **S7 · RAG/Search Consolidation** — unify `embeddingService` + `vectorStore` onto one index + one dimension. *Conduct: `atlas`, `schema`.*
 - **S8 · Agent System Consolidation** — converge the 3 agent subsystems onto `agentOrchestrator` as canonical. *Conduct: `atlas`, `ripple`.*
 

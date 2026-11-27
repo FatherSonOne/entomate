@@ -336,7 +336,7 @@ async function ingestBotTranscript(sessionId, { transcriptUrl } = {}) {
   let saved;
   let savedActions;
   try {
-    minutes = await meetingFinish().writeMinutes({ meeting, segments, title, attendees, onStage: markStage });
+    minutes = await meetingFinish().writeMinutes({ meeting, segments, title, attendees, botSession: session, onStage: markStage });
     await markStage('saving');
     savedActions = await meetingFinish().saveMinutesActions(meeting, minutes);
 

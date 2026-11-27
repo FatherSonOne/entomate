@@ -140,7 +140,7 @@ Return JSON with this exact structure:
    * @param {string} transcript - Meeting transcript
    * @returns {Promise<Array>} Action items with owner, due date, priority
    */
-  async extractActionItems(transcript) {
+  async extractActionItems(transcript, options = {}) {
     if (!this.isConfigured()) {
       throw new Error('Gemini API not configured');
     }
@@ -183,7 +183,7 @@ Rules:
 - If no date mentioned, infer: "ASAP"=+2 days, "soon"=+7 days, "next week"=next Monday
 - Priority: "high" if deadline ≤3 days or marked urgent, "medium" if ≤7 days, "low" otherwise
 - Extract 3-10 action items maximum (focus on the important ones)
-- If no clear action items found, return empty array`
+- If no clear action items found, return empty array${options.addon || ''}`
           }]
         }]
       });

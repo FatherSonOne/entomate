@@ -14,6 +14,7 @@ const { authenticate } = require('../middleware/auth');
 const log = require('../utils/log');
 const { attachOrgIds } = require('../utils/orgContext');
 const summaryTemplates = require('../services/summaryTemplates');
+const { loadProfile, profileGuidance } = require('../services/meetingIntelligenceProfile');
 const transcriptMoments = require('../services/transcriptMoments');
 
 const router = express.Router();
@@ -73,9 +74,13 @@ router.post('/:id/regenerate', authenticate, async (req, res) => {
     });
 
     // Regenerate summary using AI
-    const summaryData = await ai.generateSummary(meeting.transcript, { addon: summaryTemplates.promptAddon(template) });
+    const { summaryAddon, sections } = profileGuidance(await loadProfile(id), template);
+    const summaryData = await ai.generateSummary(meeting.transcript, { addon: summaryAddon });
+    if (typeof summaryData?.summary !== 'string' || !summaryData.summary.trim()) {
+      throw new Error('Meeting summary was empty');
+    }
     summaryData.template = template;
-    summaryData.sections = summaryTemplates.normalizeSections(summaryData.sections, template);
+    summaryData.sections = summaryTemplates.normalizeSections(summaryData.sections, template, sections);
     const segments = Array.isArray(meeting.transcript_segments) ? meeting.transcript_segments : null;
 
     // Extract next steps from action items or generate them

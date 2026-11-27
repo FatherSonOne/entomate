@@ -79,6 +79,12 @@ describe('a pressed timecode plays the recording', () => {
     expect(player.playFrom).toHaveBeenCalledWith(22_000)
   })
 
+  test('opens the intelligence profile from the meeting toolbar', async () => {
+    renderPage({ status: 'done' })
+    fireEvent.click(await screen.findByRole('button', { name: 'Intelligence profile' }))
+    expect(await screen.findByRole('dialog', { name: 'Intelligence profile' })).toBeInTheDocument()
+  })
+
   test.each([false, true])('offers to rebuild a browser recording with kept audio (complete timing: %s)', async (hasEndTimes) => {
     recordings.rebuildTranscript.mockResolvedValue({ success: true })
     renderPage({ status: 'done', source: 'browser', audioKept: true, durationMs: 60_000 }, {

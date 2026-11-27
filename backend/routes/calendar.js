@@ -8,13 +8,14 @@ const router = express.Router();
 const { supabase } = require('../config/supabase');
 const calendarService = require('../services/calendarService');
 const log = require('../utils/log');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, authorizeOrgRole } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const schemas = require('../schemas/calendar');
 const { attachOrgIds } = require('../utils/orgContext');
 const autoJoin = require('../services/calendarAutoJoin');
 const { readCalendarSettings, updateCalendarSettings } = require('../services/calendarSettings');
 const { createState, verifyState } = require('../utils/oauthState');
+const { calendarEventId, getCalendarProfile, setCalendarProfile, validateProfileChoice } = require('../services/meetingIntelligenceProfile');
 router.use(attachOrgIds); // org-owned tables below are limited to req.orgIds (audit finding 3)
 
 // Initialize calendar service
@@ -735,6 +736,49 @@ router.get('/upcoming-meetings', authenticate, async (req, res) => {
   } catch (error) {
     log.error('Error getting upcoming meetings:', { error: error.message || error });
     res.status(500).json({ error: 'Failed to load upcoming meetings' });
+  }
+});
+
+const profileRoles = ['owner', 'admin'];
+
+router.get('/meeting-profile', authenticate, authorizeOrgRole(profileRoles, req => req.query.workspaceId), async (req, res) => {
+  const eventId = calendarEventId(req.query.eventKey);
+  if (!eventId) return res.status(400).json({ error: 'Choose an upcoming calendar meeting.' });
+  try {
+    res.set('Cache-Control', 'no-store');
+    res.json({ profileId: await getCalendarProfile(req.orgId, eventId) });
+  } catch (error) {
+    log.warn('Could not read calendar meeting profile', { error: error.message });
+    res.status(500).json({ error: 'Could not read this meeting’s profile.' });
+  }
+});
+
+router.put('/meeting-profile', authenticate, authorizeOrgRole(profileRoles, req => req.body?.workspaceId), async (req, res) => {
+  const { eventKey, profileId } = req.body || {};
+  const eventId = calendarEventId(eventKey);
+  if (!eventId || profileId === undefined) return res.status(400).json({ error: 'Choose a calendar meeting and profile.' });
+
+  try {
+    const tokens = (await readCalendarSettings(req.user.id))?.calendar_json?.tokens;
+    if (!tokens || !calendarService.isConfigured()) return res.status(409).json({ error: 'Connect Google Calendar to set a profile.' });
+    const event = await calendarService.getEvent({
+      ...tokens, _onRefresh: next => autoJoin.persistTokens(req.user.id, next, tokens),
+    }, eventId).catch(error => {
+      if ([404, 410].includes(Number(error.response?.status ?? error.code))) return null;
+      throw error;
+    });
+    const start = Date.parse(event?.start?.dateTime);
+    if (!(start > Date.now()) || event.status === 'cancelled' || autoJoin.eventKey(event) !== eventKey || !autoJoin.meetingLink(event)) {
+      return res.status(409).json({ error: 'This meeting changed or already started. Open Upcoming again.' });
+    }
+    if (profileId !== null && !await validateProfileChoice(profileId, req.user.id)) {
+      return res.status(400).json({ error: 'Choose an available intelligence profile.' });
+    }
+    await setCalendarProfile(req.orgId, eventId, profileId);
+    res.json({ profileId });
+  } catch (error) {
+    log.warn('Could not save calendar meeting profile', { error: error.message });
+    res.status(500).json({ error: 'Could not save this meeting’s profile. Try again.' });
   }
 });
 

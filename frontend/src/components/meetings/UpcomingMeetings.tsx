@@ -3,6 +3,7 @@ import { Link, useLocation, useOutletContext, useSearchParams } from 'react-rout
 import { Drawer, Key, Section, Select, Signal, Switch, TextInput, useMediaQuery, PHONE_QUERY, cx } from '../bench'
 import CarryForward, { type CarryForwardData } from './CarryForward'
 import BriefControls from './BriefControls'
+import MeetingProfileField from '../intelligence/MeetingProfileField'
 import { calendarApi, entoAiApi, meetingsApi } from '../../services/api'
 import { tokensMatch, type EntoProposal } from '../EntoAssistant/ProposalCard'
 import { requestMeetingBrief, requestThread } from '../EntoAssistant/threadSignal'
@@ -295,7 +296,63 @@ function BookingControls({ event, defaultLead, onBooked }: {
   )
 }
 
+function UpcomingProfile({ workspaceId, eventKey }: { workspaceId: string; eventKey: string }) {
+  const [saved, setSaved] = useState<string | null>(null)
+  const [profileId, setProfileId] = useState('')
+  const [attempt, setAttempt] = useState(0)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [updated, setUpdated] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    calendarApi.getMeetingProfile(workspaceId, eventKey).then(({ profileId: next }) => {
+      if (!active) return
+      setSaved(next || '')
+      setProfileId(next || '')
+    }).catch(() => {
+      if (active) setError('Could not load this meeting’s profile.')
+    })
+    return () => { active = false }
+  }, [workspaceId, eventKey, attempt])
+
+  const save = async () => {
+    if (busy || saved === profileId) return
+    setBusy(true)
+    setError('')
+    try {
+      await calendarApi.setMeetingProfile(workspaceId, eventKey, profileId || null)
+      setSaved(profileId)
+      setUpdated(true)
+    } catch (failure) {
+      const response = (failure as { response?: { data?: { error?: string } } }).response
+      setError(response?.data?.error || 'Could not save this meeting’s profile. Try again.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className="mip-upcoming-profile" aria-label="Meeting intelligence">
+      {saved === null ? (
+        error ? <Key size="sm" onClick={() => { setError(''); setAttempt(count => count + 1) }}>Retry profile setup</Key>
+          : <p className="mip-launch-help" role="status">Loading intelligence profile…</p>
+      ) : (
+        <>
+          <MeetingProfileField value={profileId} onChange={(next) => { setProfileId(next); setUpdated(false); setError('') }} disabled={busy} />
+          <Key size="sm" disabled={busy || saved === profileId} onClick={() => { void save() }}>
+            {busy ? 'Saving…' : 'Save for this meeting'}
+          </Key>
+          {updated && <p className="mip-launch-help" role="status">Profile saved for this meeting.</p>}
+        </>
+      )}
+      {error && <p className="bs-up-booking-note" role="alert">{error}</p>}
+    </section>
+  )
+}
+
 function Prep({ event, autoJoinOn, busy, onDecide, defaultLead, onBooked, openAssistant }: { event: UpcomingEvent; autoJoinOn: boolean; busy: boolean; onDecide: (e: UpcomingEvent, d: 'skip' | 'join' | null) => void; defaultLead: number; onBooked: () => void; openAssistant?: () => void }): React.ReactElement {
+  const workspace = useOrgSafe() as { org: { id: string } | null; myRole: string | null } | null
   const [carry, setCarry] = useState<CarryForwardData | null>(null)
   const plan = botPlan(event, autoJoinOn)
   const d = startDate(event)
@@ -329,6 +386,10 @@ function Prep({ event, autoJoinOn, busy, onDecide, defaultLead, onBooked, openAs
         </div>
         <BotKey event={event} autoJoinOn={autoJoinOn} busy={busy} onDecide={onDecide} />
       </div>
+      {workspace?.org?.id && ['owner', 'admin'].includes(workspace.myRole ?? '') && event.key && event.meetingLink && !event.allDay
+        && event.reason !== 'declined' && d.getTime() > Date.now() && (
+        <UpcomingProfile key={`${workspace.org.id}:${event.key}`} workspaceId={workspace.org.id} eventKey={event.key} />
+      )}
       <BookingControls key={event.key ?? event.id} event={event} defaultLead={defaultLead} onBooked={onBooked} />
       <CarryForward data={carry} title="Open from last time" limit={5} />
       {event.attendees.length > 0 && (

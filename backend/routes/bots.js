@@ -18,6 +18,7 @@ const { supabaseAdmin } = require('../config/supabase');
 const orchestrator = require('../services/botOrchestrator');
 const { buildBotView } = require('../services/botView');
 const captions = require('../services/botCaptions');
+const { validateProfileChoice } = require('../services/meetingIntelligenceProfile');
 const log = require('../utils/log');
 
 const router = express.Router();
@@ -223,13 +224,16 @@ router.post('/launch', authenticate, authorizeOrgRole(ADMIN_ROLES, orgFromBody),
   try {
     const {
       workspaceId, meetingId, meetingUrl, platform, botName,
-      consentAcknowledged, participantEmails
+      consentAcknowledged, participantEmails, intelligenceProfileId
     } = req.body || {};
     if (consentAcknowledged !== true) {
       return res.status(400).json({
         error: 'consent_required',
         message: 'consentAcknowledged: true is required. The organizer must affirm participant consent before bot launch. See https://entomate.onrender.com/privacy for the recording disclosure.'
       });
+    }
+    if (intelligenceProfileId != null && !await validateProfileChoice(intelligenceProfileId, req.user.id)) {
+      return res.status(400).json({ error: 'invalid_intelligence_profile', message: 'Choose an available intelligence profile.' });
     }
     const organizerName = req.user.firstName
       || (req.user.email ? req.user.email.split('@')[0] : null);
@@ -238,7 +242,8 @@ router.post('/launch', authenticate, authorizeOrgRole(ADMIN_ROLES, orgFromBody),
       consentAcknowledgedBy: req.user.id,
       consentAcknowledgedByName: organizerName,
       consentAcknowledgedByEmail: req.user.email || null,
-      participantEmails: Array.isArray(participantEmails) ? participantEmails : []
+      participantEmails: Array.isArray(participantEmails) ? participantEmails : [],
+      ...(intelligenceProfileId ? { intelligenceProfileId } : {})
     });
     res.status(201).json(result);
   } catch (err) {

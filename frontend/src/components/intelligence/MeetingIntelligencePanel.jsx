@@ -1,448 +1,290 @@
-/**
- * MeetingIntelligencePanel (Frontend JSX version)
- * Self-contained panel for the MeetingDetail page.
- * Queries intelligence_profiles and meeting_intelligence_config directly via Supabase.
- */
-
-import React, { useState, useEffect, useCallback } from 'react'
-import { Select } from '../bench'
-import { Brain, ChevronDown, ChevronUp, RefreshCw, X, Check, Sliders, Loader2 } from 'lucide-react'
+import React, { useEffect, useId, useRef, useState } from 'react'
+import {
+  ArrowLeft, Check, ChevronRight, ClipboardList, FileCheck2, Handshake, Landmark,
+  ListChecks, MessageCircle, Route, Target,
+} from 'lucide-react'
+import { Key, TextArea, TextInput } from '../bench'
 import { supabase } from '../../services/supabaseClient'
-import { authFetch } from '../../services/authFetch'
-import { ProfileIcon } from '../icons/AnimatedIcons'
+import './meetingIntelligence.css'
 
-// ==================== SUGGESTION ENGINE (inline) ====================
-
-function evaluateKeywordRule(matchWords, searchText) {
-  const matched = matchWords.filter(kw => searchText.includes(kw.toLowerCase()))
-  if (matched.length === 0) return null
-  const weight = matched.length / matchWords.length
-  return { confidence: weight, reason: `Title contains "${matched.join('", "')}"` }
+const presets = {
+  'board-meeting': [Landmark, 'Motions, votes and governance decisions'],
+  'client-check-in': [MessageCircle, 'Client feedback, open issues and renewal risks'],
+  'grant-specialist': [ClipboardList, 'Deliverables, budgets and reporting requirements'],
+  'internal-standup': [ListChecks, 'Progress, blockers and commitments'],
+  'sales-discovery': [Target, 'Buyer needs, objections and next steps'],
+  'strategic-planning': [Route, 'Priorities, trade-offs and milestones'],
+  'vendor-negotiation': [Handshake, 'Pricing, terms and concessions'],
 }
 
-function suggestProfilesForMeeting(profiles, meeting) {
-  const searchText = `${meeting.title || ''} ${meeting.description || ''}`.toLowerCase()
-  const suggestions = []
+function descriptionFor(profile) {
+  return presets[profile.slug]?.[1] || profile.description
+}
 
+function ProfileMark({ profile }) {
+  const Icon = presets[profile.slug]?.[0] || FileCheck2
+  return <span className="mip-mark"><Icon aria-hidden="true" size={19} strokeWidth={1.65} /></span>
+}
+
+function suggestProfile(profiles, title, description) {
+  const normalize = value => ` ${value.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()} `
+  const text = normalize(`${title || ''} ${description || ''}`)
+  let best
+  let score = 0
   for (const profile of profiles) {
-    const rules = Array.isArray(profile.suggest_when) ? profile.suggest_when : []
-    let bestConfidence = 0
-    let bestReason = ''
-
-    for (const rule of rules) {
-      const matchValues = Array.isArray(rule.match) ? rule.match : [rule.match]
-
-      if (rule.type === 'keyword') {
-        const result = evaluateKeywordRule(matchValues, searchText)
-        if (result && result.confidence * rule.confidence > bestConfidence) {
-          bestConfidence = result.confidence * rule.confidence
-          bestReason = result.reason
-        }
-      } else if (rule.type === 'recurring') {
-        const recurringKw = ['weekly', 'daily', 'biweekly', 'monthly', 'standup', 'sync', 'huddle']
-        if (recurringKw.some(kw => searchText.includes(kw))) {
-          if (rule.confidence > bestConfidence) {
-            bestConfidence = rule.confidence
-            bestReason = 'Recurring meeting pattern detected'
-          }
-        }
-      } else if (rule.type === 'org_type') {
-        const matched = matchValues.filter(t => searchText.includes(t.toLowerCase()))
-        if (matched.length > 0 && rule.confidence > bestConfidence) {
-          bestConfidence = rule.confidence
-          bestReason = `Organization type: ${matched.join(', ')}`
-        }
+    for (const rule of Array.isArray(profile.suggest_when) ? profile.suggest_when : []) {
+      const count = [rule.match].flat().filter(word => typeof word === 'string' && word.trim() && text.includes(normalize(word))).length
+      const nextScore = Number(rule.confidence) * count
+      if (nextScore > score) {
+        best = profile.id
+        score = nextScore
       }
     }
-
-    if (bestConfidence >= 0.3) {
-      suggestions.push({ profile, confidence: bestConfidence, reason: bestReason })
-    }
   }
-
-  return suggestions.sort((a, b) => b.confidence - a.confidence)
+  return best
 }
 
-// ==================== FIELD RENDERER ====================
-
-function FieldInput({ field, value, onChange }) {
-  const style = {
-    background: 'var(--bg-surface)',
-    borderColor: 'var(--border-subtle)',
-    color: 'var(--text-primary)',
-  }
-
-  if (field.type === 'textarea') {
-    return (
-      <textarea value={value || ''} onChange={e => onChange(e.target.value)}
-        placeholder={field.placeholder} rows={2}
-        className="w-full px-3 py-2 rounded-lg border text-sm resize-y focus:outline-none"
-        style={style} />
-    )
-  }
-
-  if (field.type === 'select') {
-    return (
-      <Select
-        label={field.label}
-        className="w-full"
-        value={value || ''}
-        onChange={onChange}
-        placeholder="Select…"
-        options={(field.options || []).map(opt => ({ value: String(opt.value), label: opt.label }))}
-      />
-    )
-  }
-
-  if (field.type === 'date') {
-    return (
-      <input type="date" value={value || ''} onChange={e => onChange(e.target.value)}
-        className="w-full px-3 py-2 rounded-lg border text-sm focus:outline-none" style={style} />
-    )
+function ProfileField({ field, value, onChange }) {
+  const id = useId()
+  const props = {
+    id, value: value ?? '', required: Boolean(field.required),
+    onChange: event => onChange(event.target.value),
   }
 
   return (
-    <input type="text" value={value || ''} onChange={e => onChange(e.target.value)}
-      placeholder={field.placeholder}
-      className="w-full px-3 py-2 rounded-lg border text-sm focus:outline-none" style={style} />
+    <div className="mip-field">
+      <label htmlFor={id}>{field.label}{field.required && <span> (required)</span>}</label>
+      {field.type === 'select' ? (
+        <select className="bs-input" {...props}>
+          <option value="">Choose an option</option>
+          {(field.options || []).map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+        </select>
+      ) : field.type === 'textarea' ? (
+        <TextArea rows={2} placeholder={field.placeholder} maxLength={2000} {...props} />
+      ) : (
+        <TextInput type={field.type === 'date' ? 'date' : 'text'} placeholder={field.placeholder} maxLength={500} {...props} />
+      )}
+    </div>
   )
 }
 
-// ==================== MAIN COMPONENT ====================
+export default function MeetingIntelligencePanel({ meetingId, meetingTitle, meetingDescription, canRewrite, onRewrite }) {
+  const [data, setData] = useState(null)
+  const [reload, setReload] = useState(0)
+  const [loadError, setLoadError] = useState(false)
+  const [draft, setDraft] = useState(null)
+  const [browsing, setBrowsing] = useState(false)
+  const [busy, setBusy] = useState('')
+  const [message, setMessage] = useState(null)
+  const heading = useRef(null)
+  const moveFocus = useRef(false)
+  const notesId = useId()
 
-export default function MeetingIntelligencePanel({
-  meetingId,
-  meetingTitle = '',
-  meetingDescription = '',
-  meetingTags = [],
-  meetingParticipants = [],
-}) {
-  const [state, setState] = useState('loading') // loading | suggestions | configuring | saving | ready | dismissed
-  const [expanded, setExpanded] = useState(true)
-  const [profiles, setProfiles] = useState([])
-  const [suggestions, setSuggestions] = useState([])
-  const [selectedProfile, setSelectedProfile] = useState(null)
-  const [fieldValues, setFieldValues] = useState({})
-  const [additionalInstructions, setAdditionalInstructions] = useState('')
-  const [existingConfig, setExistingConfig] = useState(null)
-
-  // Load data on mount
   useEffect(() => {
-    loadData()
-  }, [meetingId])
-
-  const loadData = async () => {
-    setState('loading')
-    try {
-      // Load profiles and existing config in parallel
-      const [profilesRes, configRes] = await Promise.all([
-        supabase.from('intelligence_profiles').select('*').eq('is_active', true).order('name'),
-        supabase.from('meeting_intelligence_config').select('*').eq('meeting_id', meetingId).single(),
-      ])
-
-      const allProfiles = profilesRes.data || []
-      setProfiles(allProfiles)
-
-      if (configRes.data && configRes.data.profile_id) {
-        setExistingConfig(configRes.data)
-        const profile = allProfiles.find(p => p.id === configRes.data.profile_id)
-        if (profile) {
-          setSelectedProfile(profile)
-          setFieldValues(configRes.data.custom_field_values || {})
-          setAdditionalInstructions(configRes.data.additional_instructions || '')
-        }
-        if (['context_ready', 'active', 'completed'].includes(configRes.data.status)) {
-          setState('ready')
-          return
-        }
-        if (configRes.data.profile_id) {
-          setState('configuring')
-          return
-        }
+    let current = true
+    const load = async () => {
+      try {
+        const [catalog, settings] = await Promise.all([
+          supabase.from('intelligence_profiles')
+            .select('id, name, slug, description, custom_fields, focus_areas, suggest_when, is_active')
+            .order('name'),
+          supabase.from('meeting_intelligence_config')
+            .select('profile_id, custom_field_values, additional_instructions')
+            .eq('meeting_id', meetingId).maybeSingle(),
+        ])
+        if (catalog.error || settings.error) throw catalog.error || settings.error
+        if (current) setData({ profiles: catalog.data || [], saved: settings.data })
+      } catch {
+        if (current) setLoadError(true)
       }
-
-      // Run suggestions
-      const results = suggestProfilesForMeeting(allProfiles, {
-        title: meetingTitle,
-        description: meetingDescription,
-      })
-      setSuggestions(results)
-      setState('suggestions')
-    } catch (err) {
-      console.error('[MeetingIntelligencePanel] Load failed:', err)
-      setState('suggestions')
     }
+    load()
+    return () => { current = false }
+  }, [meetingId, reload])
+
+  const savedProfile = data?.profiles.find(profile => profile.id === data.saved?.profile_id)
+  const view = draft ? 'setup' : data?.saved?.profile_id && !browsing ? 'saved' : 'catalog'
+  useEffect(() => {
+    if (moveFocus.current) {
+      heading.current?.focus()
+      moveFocus.current = false
+    }
+  }, [view])
+
+  function openProfile(profile) {
+    const settings = data.saved?.profile_id === profile.id ? data.saved : null
+    moveFocus.current = true
+    setMessage(null)
+    setDraft({ profile, values: settings?.custom_field_values || {}, notes: settings?.additional_instructions || '' })
   }
 
-  const selectProfile = useCallback((profile) => {
-    setSelectedProfile(profile)
-    setFieldValues({})
-    setState('configuring')
-  }, [])
-
-  const handleAccept = useCallback(() => {
-    if (suggestions.length > 0) selectProfile(suggestions[0].profile)
-  }, [suggestions, selectProfile])
-
-  const handleDismiss = useCallback(() => {
-    setState('dismissed')
-  }, [])
-
-  const handleSave = useCallback(async () => {
-    if (!selectedProfile) return
-    setState('saving')
-
+  async function saveProfile(event) {
+    event.preventDefault()
+    if (busy) return
+    const fields = draft.profile.custom_fields || []
+    if (fields.some(field => field.required && !String(draft.values[field.key] ?? '').trim())) {
+      setMessage({ error: true, text: 'Fill in the required profile fields.' })
+      return
+    }
+    setBusy('save')
+    setMessage(null)
     try {
-      await supabase.from('meeting_intelligence_config').upsert({
-        meeting_id: meetingId,
-        profile_id: selectedProfile.id,
-        custom_field_values: fieldValues,
-        additional_instructions: additionalInstructions || null,
-        status: 'pending',
+      const values = {
+        profile_id: draft.profile.id,
+        custom_field_values: draft.values,
+        additional_instructions: draft.notes.trim() || null,
+      }
+      const switching = data.saved?.profile_id !== draft.profile.id
+      const { error } = await supabase.from('meeting_intelligence_config').upsert({
+        meeting_id: meetingId, ...values,
+        ...(switching ? { status: 'pending', assembled_context: {}, context_assembled_at: null, composed_prompt: null } : {}),
       }, { onConflict: 'meeting_id' })
-
-      setExistingConfig({ profile_id: selectedProfile.id, status: 'pending' })
-      setState('ready')
-
-      // Broadcast a pre-meeting briefing to LV + Pulse so participants get
-      // context. Fire-and-forget — failures here must not block save UX.
-      const apiBase = import.meta.env.VITE_API_URL || ''
-      authFetch(`${apiBase}/api/intelligence/meeting-prep/${meetingId}/broadcast-briefing`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      }).catch(err => console.warn('[MeetingIntelligencePanel] briefing broadcast failed:', err?.message || err))
-    } catch (err) {
-      console.error('[MeetingIntelligencePanel] Save failed:', err)
-      setState('configuring')
+      if (error) throw error
+      moveFocus.current = true
+      setData({ ...data, saved: values })
+      setDraft(null)
+      setBrowsing(false)
+      setMessage({ text: 'Profile saved.' })
+    } catch {
+      setMessage({ error: true, text: 'The profile could not be saved. Your changes are still here. Try again.' })
+    } finally {
+      setBusy('')
     }
-  }, [selectedProfile, fieldValues, additionalInstructions, meetingId])
+  }
 
-  const handleClear = useCallback(async () => {
-    setSelectedProfile(null)
-    setFieldValues({})
-    setExistingConfig(null)
-
+  async function removeProfile() {
+    if (busy) return
+    setBusy('remove')
+    setMessage(null)
     try {
-      await supabase.from('meeting_intelligence_config').delete().eq('meeting_id', meetingId)
-    } catch { /* non-critical */ }
-
-    const results = suggestProfilesForMeeting(profiles, { title: meetingTitle, description: meetingDescription })
-    setSuggestions(results)
-    setState('suggestions')
-  }, [meetingId, profiles, meetingTitle, meetingDescription])
-
-  // ==================== RENDER ====================
-
-  if (state === 'loading') {
-    return (
-      <div className="vc p-4 flex items-center gap-2">
-        <Loader2 className="w-4 h-4 animate-spin" style={{ color: 'var(--text-tertiary)' }} />
-        <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Loading intelligence...</span>
-      </div>
-    )
+      const { data: removed, error } = await supabase.from('meeting_intelligence_config')
+        .delete().eq('meeting_id', meetingId).select('meeting_id').maybeSingle()
+      if (error || !removed) throw error || new Error('Profile settings were not removed')
+      moveFocus.current = true
+      setData({ ...data, saved: null })
+      setMessage({ text: 'Profile removed.' })
+    } catch {
+      setMessage({ error: true, text: 'The profile could not be removed. Try again.' })
+    } finally {
+      setBusy('')
+    }
   }
 
-  if (state === 'dismissed') {
-    return (
-      <button onClick={() => setState('suggestions')}
-        className="text-xs px-3 py-1.5 rounded-lg border transition-all hover:opacity-80"
-        style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-tertiary)' }}>
-        <Brain className="w-3 h-3 inline mr-1" /> Configure Intelligence Profile
-      </button>
-    )
+  async function rewrite() {
+    if (busy) return
+    setBusy('rewrite')
+    setMessage(null)
+    try {
+      await onRewrite()
+      setMessage({ text: 'Summary updated. Open the Minutes tab to read it.' })
+    } catch {
+      setMessage({ error: true, text: 'The summary could not be rewritten. Try again.' })
+    } finally {
+      setBusy('')
+    }
   }
+
+  const fields = draft?.profile.custom_fields || []
+  const activeProfiles = data?.profiles.filter(profile => profile.is_active) || []
+  const suggestedId = view === 'catalog' && suggestProfile(activeProfiles, meetingTitle, meetingDescription)
+  const focus = (draft?.profile || savedProfile)?.focus_areas
+  const focusLabels = Array.isArray(focus) ? focus.map(area => area?.label).filter(Boolean) : []
 
   return (
-    <div className="vc overflow-hidden">
-      {/* Header */}
-      <button onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between px-5 py-3">
-        <div className="flex items-center gap-2">
-          <Brain className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-          <span className="font-semibold text-sm" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}>
-            Meeting Intelligence
-          </span>
-          {selectedProfile && (
-            <span className="text-xs px-2 py-0.5 rounded-full inline-flex items-center gap-1"
-              style={{ background: 'var(--accent-primary-dim)', color: 'var(--accent-primary)' }}>
-              <ProfileIcon emoji={selectedProfile.icon} size={14} /> {selectedProfile.name}
-            </span>
-          )}
-          {state === 'ready' && (
-            <span className="text-xs px-2 py-0.5 rounded-full"
-              style={{ background: 'var(--accent-secondary-dim)', color: 'var(--accent-secondary)' }}>
-              Ready
-            </span>
-          )}
+    <div className="mip">
+      {loadError ? (
+        <div className="mip-notice">
+          <p role="alert">Intelligence profiles couldn’t be loaded.</p>
+          <Key onClick={() => { setLoadError(false); setReload(value => value + 1) }}>Try again</Key>
         </div>
-        {expanded ? <ChevronUp className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
-                   : <ChevronDown className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />}
-      </button>
-
-      {expanded && (
-        <div className="px-5 pb-5 space-y-4">
-
-          {/* Suggestion Banner */}
-          {state === 'suggestions' && suggestions.length > 0 && (
-            <div className="rounded-xl p-4 border" style={{
-              background: 'var(--bg-elevated)',
-              borderColor: suggestions[0].confidence >= 0.8 ? 'var(--accent-primary)' : 'var(--border-subtle)',
-              boxShadow: suggestions[0].confidence >= 0.8 ? '0 0 20px var(--accent-primary-glow)' : undefined,
-            }}>
-              <div className="flex items-start gap-3">
-                <ProfileIcon emoji={suggestions[0].profile.icon} size={28} />
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
-                      {suggestions[0].profile.name}
+      ) : !data ? (
+        <p className="mip-notice" role="status">Loading profiles…</p>
+      ) : view === 'catalog' ? (
+        <>
+          {browsing && (
+            <Key size="sm" icon={<ArrowLeft aria-hidden="true" />} onClick={() => { moveFocus.current = true; setBrowsing(false) }}>
+              Back to saved profile
+            </Key>
+          )}
+          <header className="mip-heading">
+            <h2 ref={heading} tabIndex={-1}>Choose a meeting profile</h2>
+            <p>Tell Entomate what to listen for when it writes the summary and finds action items.</p>
+          </header>
+          {activeProfiles.length ? (
+            <ul className="mip-list">
+              {activeProfiles.map(profile => (
+                <li key={profile.id}>
+                  <button type="button" className="mip-option" onClick={() => openProfile(profile)}>
+                    <ProfileMark profile={profile} />
+                    <span className="mip-option-text">
+                      <strong>{profile.name}</strong>
+                      <span>{descriptionFor(profile)}</span>
                     </span>
-                    <span className="font-mono text-xs px-2 py-0.5 rounded-full"
-                      style={{ background: 'var(--accent-tertiary-dim)', color: 'var(--accent-tertiary)' }}>
-                      {Math.round(suggestions[0].confidence * 100)}% match
-                    </span>
-                  </div>
-                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-                    {suggestions[0].reason}
-                  </p>
-                </div>
-              </div>
-              <div className="flex gap-2 mt-3">
-                <button onClick={handleAccept}
-                  className="px-4 py-1.5 rounded-lg text-sm font-medium text-white"
-                  style={{ background: 'var(--accent-primary)' }}>
-                  <Check className="w-3 h-3 inline mr-1" /> Accept
-                </button>
-                <button onClick={() => selectProfile(suggestions[0].profile)}
-                  className="px-4 py-1.5 rounded-lg text-sm border"
-                  style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}>
-                  <Sliders className="w-3 h-3 inline mr-1" /> Customize
-                </button>
-                <button onClick={handleDismiss}
-                  className="px-3 py-1.5 rounded-lg text-sm"
-                  style={{ color: 'var(--text-tertiary)' }}>
-                  Dismiss
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Profile Grid */}
-          {(state === 'suggestions' || state === 'configuring') && (
-            <div>
-              <p className="font-mono text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--text-tertiary)' }}>
-                {suggestions.length > 0 ? 'Or choose a profile' : 'Choose a profile'}
-              </p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-                {profiles.map(profile => {
-                  const isSelected = selectedProfile?.id === profile.id
-                  const suggestion = suggestions.find(s => s.profile.id === profile.id)
-                  return (
-                    <button key={profile.id} onClick={() => selectProfile(profile)}
-                      className="relative flex flex-col items-center gap-1.5 p-3 rounded-xl border text-center transition-all duration-200 hover:scale-[1.02]"
-                      style={{
-                        background: isSelected ? 'var(--accent-primary-dim)' : 'var(--bg-surface)',
-                        borderColor: isSelected ? 'var(--accent-primary)' : suggestion ? 'var(--accent-tertiary)' : 'var(--border-subtle)',
-                        boxShadow: isSelected ? '0 0 16px var(--accent-primary-glow)' : undefined,
-                      }}>
-                      {suggestion && (
-                        <span className="absolute -top-1 -right-1 font-mono text-[10px] px-1 py-0.5 rounded-full"
-                          style={{ background: 'var(--accent-tertiary)', color: '#000' }}>
-                          {Math.round(suggestion.confidence * 100)}%
-                        </span>
-                      )}
-                      <ProfileIcon emoji={profile.icon} size={22} />
-                      <span className="text-xs font-medium leading-tight" style={{ color: 'var(--text-primary)' }}>
-                        {profile.name}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Profile Description */}
-          {selectedProfile && state === 'configuring' && (
-            <p className="text-sm rounded-lg p-3" style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}>
-              {selectedProfile.description}
-            </p>
-          )}
-
-          {/* Custom Fields */}
-          {selectedProfile && state === 'configuring' && (selectedProfile.custom_fields || []).length > 0 && (
-            <div>
-              <p className="font-mono text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--text-tertiary)' }}>
-                Profile Configuration
-              </p>
-              <div className="space-y-3">
-                {(selectedProfile.custom_fields || []).map(field => (
-                  <div key={field.key}>
-                    <label className="flex items-center gap-1 mb-1">
-                      <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{field.label}</span>
-                      {field.required && <span style={{ color: 'var(--accent-primary)' }}>*</span>}
-                    </label>
-                    <FieldInput
-                      field={field}
-                      value={fieldValues[field.key]}
-                      onChange={val => setFieldValues(prev => ({ ...prev, [field.key]: val }))}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Ready state */}
-          {state === 'ready' && selectedProfile && (
-            <div className="rounded-lg p-3 flex items-center gap-2"
-              style={{ background: 'var(--accent-secondary-dim)' }}>
-              <Check className="w-4 h-4" style={{ color: 'var(--accent-secondary)' }} />
-              <span className="text-sm" style={{ color: 'var(--accent-secondary)' }}>
-                Intelligence profile configured. Gemini will use specialized analysis for this meeting.
-              </span>
-            </div>
-          )}
-
-          {/* Additional Instructions */}
-          {selectedProfile && (state === 'configuring' || state === 'ready') && (
-            <div>
-              <label className="font-mono text-xs uppercase tracking-wider" style={{ color: 'var(--text-tertiary)' }}>
-                Additional Instructions (optional)
-              </label>
-              <textarea value={additionalInstructions}
-                onChange={e => setAdditionalInstructions(e.target.value)}
-                placeholder="Any specific focus or instructions..."
-                rows={2} className="w-full mt-1 px-3 py-2 rounded-lg border text-sm resize-y focus:outline-none"
-                style={{ background: 'var(--bg-surface)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }} />
-            </div>
-          )}
-
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2">
-            {state === 'configuring' && selectedProfile && (
-              <button onClick={handleSave}
-                className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-all hover:opacity-90"
-                style={{ background: 'var(--accent-primary)' }}>
-                Save & Activate
-              </button>
-            )}
-            {state === 'saving' && (
-              <button disabled className="px-4 py-2 rounded-lg text-sm font-medium text-white opacity-50"
-                style={{ background: 'var(--accent-primary)' }}>
-                <Loader2 className="w-3 h-3 inline mr-1 animate-spin" /> Saving...
-              </button>
-            )}
-            {selectedProfile && (
-              <button onClick={handleClear}
-                className="px-3 py-2 rounded-lg text-sm border transition-all hover:opacity-80"
-                style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}>
-                Clear Profile
-              </button>
-            )}
+                    {profile.id === savedProfile?.id ? <span className="mip-label">Saved</span>
+                      : profile.id === suggestedId ? <span className="mip-label">Suggested</span> : null}
+                    <ChevronRight className="mip-chevron" size={16} aria-hidden="true" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="mip-notice">There are no active profiles available for this meeting.</p>}
+        </>
+      ) : view === 'setup' ? (
+        <form className="mip-form" onSubmit={saveProfile}>
+          <Key size="sm" disabled={Boolean(busy)} icon={<ArrowLeft aria-hidden="true" />}
+            onClick={() => { moveFocus.current = true; setDraft(null); setMessage(null) }}>
+            {browsing || !savedProfile ? 'Back to profiles' : 'Back to saved profile'}
+          </Key>
+          <div className="mip-profile">
+            <ProfileMark profile={draft.profile} />
+            <header className="mip-heading">
+              <h2 ref={heading} tabIndex={-1}>{draft.profile.name}</h2>
+              <p>{draft.profile.description || descriptionFor(draft.profile)}</p>
+            </header>
           </div>
-        </div>
+          {focusLabels.length > 0 && <p className="mip-focus"><strong>Analysis focus</strong>{focusLabels.join(' · ')}</p>}
+          <fieldset className="mip-fields" disabled={Boolean(busy)}>
+            {fields.map(field => (
+              <ProfileField key={field.key} field={field} value={draft.values[field.key]}
+                onChange={value => setDraft({ ...draft, values: { ...draft.values, [field.key]: value } })} />
+            ))}
+            <div className="mip-field">
+              <label htmlFor={notesId}>Additional instructions <span>(optional)</span></label>
+              <TextArea id={notesId} rows={3} maxLength={2000} value={draft.notes}
+                placeholder="What should the AI pay particular attention to?"
+                onChange={event => setDraft({ ...draft, notes: event.target.value })} />
+            </div>
+          </fieldset>
+          <p className="mip-help">People with access to this meeting can see these details.</p>
+          <div className="mip-actions">
+            <Key type="submit" variant="primary" disabled={Boolean(busy)}>{busy === 'save' ? 'Saving…' : 'Save profile'}</Key>
+          </div>
+        </form>
+      ) : (
+        <>
+          <div className="mip-profile">
+            {savedProfile && <ProfileMark profile={savedProfile} />}
+            <header className="mip-heading">
+              <h2 ref={heading} tabIndex={-1}>{savedProfile?.name || 'Saved profile unavailable'}</h2>
+              <p>{savedProfile?.is_active ? <><Check size={14} aria-hidden="true" /> Saved for this meeting</>
+                : 'Choose an active profile to guide the next summary.'}</p>
+            </header>
+          </div>
+          {focusLabels.length > 0 && <p className="mip-focus"><strong>Analysis focus</strong>{focusLabels.join(' · ')}</p>}
+          <p className="mip-help">{canRewrite && savedProfile?.is_active
+            ? 'Rewrite summary updates the summary, key points and decisions from the transcript. It keeps existing action items.'
+            : 'An active profile guides the next summary and initial action-item extraction.'}</p>
+          <div className="mip-actions">
+            {canRewrite && savedProfile?.is_active && (
+              <Key variant="primary" onClick={rewrite} disabled={Boolean(busy)}>{busy === 'rewrite' ? 'Rewriting…' : 'Rewrite summary'}</Key>
+            )}
+            {savedProfile?.is_active && <Key onClick={() => openProfile(savedProfile)} disabled={Boolean(busy)}>Edit details</Key>}
+            <Key onClick={() => { moveFocus.current = true; setBrowsing(true); setMessage(null) }} disabled={Boolean(busy)}>Change profile</Key>
+            <Key onClick={removeProfile} disabled={Boolean(busy)}>{busy === 'remove' ? 'Removing…' : 'Remove profile'}</Key>
+          </div>
+        </>
       )}
+      {message && <p className="mip-notice" role={message.error ? 'alert' : 'status'}>{message.text}</p>}
     </div>
   )
 }

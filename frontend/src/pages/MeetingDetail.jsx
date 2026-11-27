@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef, useSyncExternalStore } from 'react'
 import { useLocation, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
-import { Loader2, Plus, Send, X } from 'lucide-react'
+import { ListChecks, Loader2, Plus, Send, X } from 'lucide-react'
 import { meetingsApi, integrationsApi, calendarApi, reportsApi } from '../services/api'
 import ActionItemsList from '../components/ActionItemsList'
 import ChatChannelSelector from '../components/ChatChannelSelector'
@@ -592,6 +592,7 @@ export default function MeetingDetail() {
           { key: 'intel', label: 'Intelligence profile', onSelect: () => setShowIntel(true) },
         ]}
       />
+      <Key icon={<ListChecks aria-hidden="true" />} aria-haspopup="dialog" onClick={() => setShowIntel(true)}>Intelligence profile</Key>
       <Key onClick={handleSyncToCRM}>Send to CRM</Key>
       <Menu
         label="Export meeting"
@@ -804,7 +805,12 @@ export default function MeetingDetail() {
                 <Section
                   title="Summary"
                   level={3}
-                  aside={!editingSummary && !minutesPending && <Key size="sm" onClick={startEditSummary}>Edit</Key>}
+                  aside={!editingSummary && !minutesPending && (
+                    <div className="bs-title-keys">
+                      <Key size="sm" aria-label="Intelligence profile for this summary" aria-haspopup="dialog" onClick={() => setShowIntel(true)}>Intelligence profile</Key>
+                      <Key size="sm" onClick={startEditSummary}>Edit</Key>
+                    </div>
+                  )}
                 />
                 {editingSummary ? (
                   <div className="bs-mtg-edit">
@@ -984,17 +990,18 @@ export default function MeetingDetail() {
         onSent={refreshMeeting}
       />
 
-      {/* Intelligence profile: set-up for the agents, folded out of the old Context tab */}
       <Drawer open={showIntel} onClose={() => setShowIntel(false)} label="Intelligence profile" className="bs-drawer-wide">
-        <div className="bs-mtg-block bs-skin bs-mtg-intel">
-          <MeetingIntelligencePanel
-            meetingId={meeting.id}
-            meetingTitle={meeting.title}
-            meetingDescription={meeting.description}
-            meetingTags={meeting.tags}
-            meetingParticipants={meeting.attendees || meeting.participants}
-          />
-        </div>
+        <MeetingIntelligencePanel
+          key={meeting.id}
+          meetingId={meeting.id}
+          meetingTitle={meeting.title}
+          meetingDescription={meeting.description}
+          canRewrite={Boolean(meeting.transcript) && !minutesPending && !writingLiveMinutes}
+          onRewrite={async () => {
+            await meetingsApi.regenerateSummary(id)
+            await refreshMeeting()
+          }}
+        />
       </Drawer>
 
       {/* Share recap: a drawer on desktop, a sheet on phone */}

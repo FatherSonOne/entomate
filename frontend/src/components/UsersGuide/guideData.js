@@ -389,7 +389,7 @@ export const guideSections = [
         id: 'md-intelligence',
         title: 'Intelligence profile',
         steps: [
-          'Open More actions \u203a Intelligence profile to see or change how this meeting is analysed.',
+          'Select Intelligence profile in the meeting toolbar to see or change how this meeting is analysed.',
         ],
         note: 'See Meeting Intelligence Profiles for the built-in profiles.',
       },
@@ -760,10 +760,11 @@ export const guideSections = [
     title: 'Meeting Intelligence Profiles',
     summary: 'Profiles that shape how a meeting is analysed, summarised and followed up.',
     steps: [
-      'Open a meeting, then More actions \u203a Intelligence profile.',
-      'Entomate suggests a profile that fits, with how sure it is. Accept it or pick another.',
-      'Fill in any fields the profile asks for, such as a grant name or deal stage.',
-      'The profile shapes the summary, what the analysis focuses on and which action items are pulled out.',
+      'Before a bot meeting, select Intelligence profile in Upcoming or Send the bot to set the focus for the first summary.',
+      'Open a meeting and select Intelligence profile in the meeting toolbar.',
+      'Choose a profile to see what Entomate will look for in the transcript.',
+      'Fill in any profile details, such as a grant name or deal stage, then save.',
+      'To update existing minutes, select Rewrite summary. Existing action items are kept.',
     ],
     subsections: [
       {
@@ -783,8 +784,8 @@ export const guideSections = [
         id: 'mip-suggest',
         title: 'How suggestions work',
         steps: [
-          'Entomate looks at the title, the attendees and words in the meeting.',
-          'It matches them against each profile\u2019s rules and shows how sure it is.',
+          'Entomate checks the meeting title and description against the profiles’ matching rules.',
+          'The best match is marked Suggested when a rule matches.',
           'You can always choose a different profile.',
         ],
       },

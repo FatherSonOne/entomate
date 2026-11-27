@@ -3,25 +3,59 @@ const request = require('supertest');
 
 jest.mock('../middleware/auth', () => ({
   authenticate: (req, res, next) => { req.user = { id: 'entomate-user' }; next(); },
+  authorizeOrgRole: (_roles, resolve) => (req, _res, next) => { req.orgId = resolve(req); next(); },
 }));
 jest.mock('../utils/orgContext', () => ({ attachOrgIds: (_req, _res, next) => next() }));
 jest.mock('../config/supabase', () => ({ supabase: null }));
-jest.mock('../services/calendarSettings', () => ({ updateCalendarSettings: jest.fn() }));
-jest.mock('../services/calendarAutoJoin', () => ({ withdrawScheduled: jest.fn() }));
+jest.mock('../services/calendarSettings', () => ({ readCalendarSettings: jest.fn(), updateCalendarSettings: jest.fn() }));
+jest.mock('../services/calendarAutoJoin', () => ({
+  withdrawScheduled: jest.fn(),
+  eventKey: (event) => `${event.id}@${new Date(event.start.dateTime).toISOString()}`,
+  meetingLink: (event) => event.hangoutLink,
+}));
+jest.mock('../services/meetingIntelligenceProfile', () => ({
+  ...jest.requireActual('../services/meetingIntelligenceProfile'),
+  getCalendarProfile: jest.fn(),
+  setCalendarProfile: jest.fn(),
+  validateProfileChoice: jest.fn(),
+}));
 
 const calendar = require('../services/calendarService');
 const settings = require('../services/calendarSettings');
 const autoJoin = require('../services/calendarAutoJoin');
 const { createState, verifyState } = require('../utils/oauthState');
 const routes = require('../routes/calendar');
+const profiles = require('../services/meetingIntelligenceProfile');
 
-const app = express().use('/calendar', routes);
+const app = express().use(express.json()).use('/calendar', routes);
 const returnUrl = '/settings?s=connections&dr=calendar';
 const makeState = () => createState({ userId: 'entomate-user', returnUrl });
 const previous = {
   tokens: { access_token: 'personal', refresh_token: 'personal-refresh' },
   auto_join: { enabled: true, bookings: { old: { decision: 'schedule' } } },
 };
+
+test('saves a profile for a verified upcoming occurrence and rejects a stale selection', async () => {
+  jest.clearAllMocks();
+  const eventId = 'board_review';
+  const startsAt = new Date(Date.now() + 3_600_000).toISOString();
+  settings.readCalendarSettings.mockResolvedValue({ calendar_json: previous });
+  profiles.validateProfileChoice.mockResolvedValue(true);
+  profiles.setCalendarProfile.mockResolvedValue(undefined);
+  jest.spyOn(calendar, 'getEvent').mockResolvedValue({
+    id: eventId, start: { dateTime: startsAt }, hangoutLink: 'https://meet.google.com/abc-defg-hij',
+  });
+
+  await request(app).put('/calendar/meeting-profile').send({
+    workspaceId: 'workspace', eventKey: `${eventId}@${startsAt}`, profileId: 'board',
+  }).expect(200, { profileId: 'board' });
+  expect(profiles.setCalendarProfile).toHaveBeenCalledWith('workspace', eventId, 'board');
+
+  await request(app).put('/calendar/meeting-profile').send({
+    workspaceId: 'workspace', eventKey: `${eventId}@2026-12-03T10:00:00.000Z`, profileId: null,
+  }).expect(409);
+  expect(profiles.setCalendarProfile).toHaveBeenCalledTimes(1);
+});
 
 beforeEach(() => {
   jest.restoreAllMocks();

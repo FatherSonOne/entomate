@@ -87,8 +87,8 @@ class AIService {
    * @param {string} transcript - Meeting transcript
    * @returns {Promise<Array>} Action items with owner, due date, priority
    */
-  async extractActionItems(transcript) {
-    return this.provider.extractActionItems(transcript);
+  async extractActionItems(transcript, options) {
+    return this.provider.extractActionItems(transcript, options);
   }
 
   /**

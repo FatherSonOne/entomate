@@ -111,14 +111,23 @@ function detectTemplate({ title, attendees, chosen } = {}) {
  * Extra prompt text for a template, appended to the base summary prompt.
  * Empty for General, so the default prompt is unchanged.
  */
-function promptAddon(id) {
+function sectionTitles(tpl, extraSections) {
+  const sections = new Map(tpl.sections.map(title => [title.toLowerCase(), title]));
+  for (const title of extraSections) {
+    if (!sections.has(title.toLowerCase())) sections.set(title.toLowerCase(), title);
+  }
+  return [...sections.values()];
+}
+
+function promptAddon(id, extraSections = []) {
   const tpl = getTemplate(id);
-  if (!tpl.sections.length) return '';
-  const shape = tpl.sections.map((s) => `    { "title": ${JSON.stringify(s)}, "items": ["..."] }`).join(',\n');
+  const sections = sectionTitles(tpl, extraSections);
+  if (!sections.length) return '';
+  const meetingType = tpl.focus ? `MEETING TYPE: ${tpl.label}. ${tpl.focus}\n` : '';
+  const shape = sections.map((s) => `    { "title": ${JSON.stringify(s)}, "items": ["..."] }`).join(',\n');
   return `
 
-MEETING TYPE: ${tpl.label}. ${tpl.focus}
-Also include a "sections" array with exactly these titles, in this order. Each item is one short sentence taken from the transcript. Use an empty items array when the meeting did not cover a section; never invent content.
+${meetingType}Also include a "sections" array with exactly these titles, in this order. Each item is one short sentence taken from the transcript. Use an empty items array when the meeting did not cover a section; never invent content.
 "sections": [
 ${shape}
 ]`;
@@ -128,15 +137,15 @@ ${shape}
  * Keep only the template's sections, in its order, with tidy items.
  * @returns {{ title: string, items: string[] }[]}
  */
-function normalizeSections(raw, id) {
+function normalizeSections(raw, id, extraSections = []) {
   const tpl = getTemplate(id);
-  if (!tpl.sections.length) return [];
+  const sections = sectionTitles(tpl, extraSections);
   const given = new Map();
   for (const s of Array.isArray(raw) ? raw : []) {
     if (!s || typeof s.title !== 'string') continue;
     given.set(s.title.trim().toLowerCase(), s);
   }
-  return tpl.sections.map((title) => {
+  return sections.map((title) => {
     const s = given.get(title.toLowerCase());
     const items = (Array.isArray(s?.items) ? s.items : [])
       .filter((x) => typeof x === 'string' && x.trim())
