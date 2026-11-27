@@ -3,7 +3,7 @@
 
 .lp { display: flex; flex-direction: column; min-width: 0; }
 
-/* Head: the whole title is the disclosure for the 17 cards */
+/* The heading opens and closes the logo cards. */
 .lp-head .bs-sec-title { margin: 0; }
 .lp-disclose {
   display: inline-flex;

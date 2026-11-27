@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="37 38 916 922" role="img" aria-label="Ribbon Catalyst">
+  <defs>
+    <linearGradient id="silk" x1=".12" y1=".02" x2=".9" y2=".91">
+      <stop stop-color="#f0a898"/>
+      <stop offset=".24" stop-color="#8edfdf"/>
+      <stop offset=".49" stop-color="#3c989e"/>
+      <stop offset=".75" stop-color="#df9da8"/>
+      <stop offset="1" stop-color="#bbdfed"/>
+    </linearGradient>
+    <linearGradient id="edge" x1=".09" y1=".31" x2=".93" y2=".7">
+      <stop stop-color="#6bafb7"/>
+      <stop offset=".4" stop-color="#e0a195"/>
+      <stop offset=".7" stop-color="#ddab9a"/>
+      <stop offset="1" stop-color="#8be9dd"/>
+    </linearGradient>
+    <linearGradient id="hub" x1=".06" y1=".09" x2=".9" y2=".8">
+      <stop stop-color="#522f35"/>
+      <stop offset=".39" stop-color="#1c4851"/>
+      <stop offset=".73" stop-color="#42535c"/>
+      <stop offset="1" stop-color="#7a4b4d"/>
+    </linearGradient>
+  </defs>
+  <path d="M464 72C291 71 121 228 85 400C53 574 144 749 314 853C415 915 550 944 668 878"
+    fill="none" stroke="#47363e" stroke-width="31" stroke-linecap="round"/>
+  <path d="M465 71C325 73 189 168 125 299C104 353 94 435 149 460
+    C195 473 304 336 379 347C337 381 301 443 288 493C275 550 235 599 173 582
+    C203 689 327 791 439 822C492 835 572 857 666 864
+    C608 925 499 944 403 912C225 854 64 685 62 507C49 303 235 72 465 71Z"
+    fill="url(#silk)" fill-opacity=".88" stroke="url(#edge)" stroke-width="12" stroke-linejoin="round"/>
+  <path d="M90 486C161 512 235 445 319 391M176 668C278 772 408 803 489 876M225 207C291 151 378 123 450 109"
+    fill="none" stroke="#caf1e6" stroke-opacity=".75" stroke-width="14" stroke-linecap="round"/>
+  <path d="M375 195C476 116 626 123 769 209C915 298 969 439 913 566
+    C869 662 821 742 743 756C782 696 810 630 794 583C765 636 677 705 575 705
+    C437 705 334 609 334 476C334 365 389 280 473 242C425 233 398 226 375 195Z
+    M575 327C652 327 718 387 718 467C718 545 652 605 575 605C497 605 435 545 435 467
+    C435 387 497 327 575 327Z"
+    fill="url(#hub)" fill-rule="evenodd" stroke="url(#edge)" stroke-width="15" stroke-linejoin="round"/>
+  <path d="M401 413C432 309 546 262 643 292C744 326 799 435 765 532C737 625 625 667 541 650"
+    fill="none" stroke="url(#edge)" stroke-width="16" stroke-linecap="round"/>
+  <path d="M789 252C907 356 934 492 846 635M495 621C573 667 660 641 715 589"
+    fill="none" stroke="url(#silk)" stroke-width="32" stroke-linecap="round" opacity=".88"/>
+  <path d="M407 322L454 303M696 283L736 313M812 478H859M741 619L775 652"
+    fill="none" stroke="#f4bd9d" stroke-opacity=".81" stroke-width="9" stroke-linecap="round"/>
+</svg>

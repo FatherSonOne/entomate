@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" role="img" aria-label="Threshold">
+  <title>Threshold</title>
+  <view id="threshold-compact" viewBox="94 94 812 812"/>
+  <defs>
+    <linearGradient id="threshold-green" x1="0" x2=".92" y1=".15" y2=".96">
+      <stop stop-color="#8ee8d3"/><stop offset=".34" stop-color="#397e79"/>
+      <stop offset=".67" stop-color="#204248"/><stop offset="1" stop-color="#62b7a3"/>
+    </linearGradient>
+    <linearGradient id="threshold-brass" x1=".12" x2=".92" y1="0" y2=".92">
+      <stop stop-color="#fee0a0"/><stop offset=".24" stop-color="#a96653"/>
+      <stop offset=".59" stop-color="#e98d62"/><stop offset=".84" stop-color="#ffd59b"/>
+      <stop offset="1" stop-color="#96564e"/>
+    </linearGradient>
+    <linearGradient id="threshold-red" x1="0" x2=".95" y1=".5" y2=".25">
+      <stop stop-color="#ee4a62"/><stop offset=".22" stop-color="#8c2240"/>
+      <stop offset=".63" stop-color="#361a2a"/><stop offset="1" stop-color="#151c25"/>
+    </linearGradient>
+    <linearGradient id="threshold-field" x1="0" x2="1" y1=".5" y2=".5">
+      <stop stop-color="#fff0b8"/><stop offset=".20" stop-color="#ff9790"/>
+      <stop offset=".60" stop-color="#ff4462"/><stop offset="1" stop-color="#8a3150" stop-opacity=".48"/>
+    </linearGradient>
+    <radialGradient id="threshold-glow">
+      <stop stop-color="#fff2cb"/><stop offset=".29" stop-color="#ff8f80" stop-opacity=".76"/>
+      <stop offset="1" stop-color="#ff2d59" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="threshold-chamber">
+      <path d="M522 205C679 215 802 342 802 500C802 658 679 785 522 795Z"/>
+    </clipPath>
+  </defs>
+
+  <path d="M473 159C293 172 153 318 153 500C153 682 293 828 473 841V776C329 764 218 646 218 500C218 354 329 236 473 224Z" fill="url(#threshold-green)"/>
+  <path d="M473 171C300 183 165 325 165 500C165 675 300 817 473 829M473 212C322 224 205 347 205 500C205 653 322 776 473 788" fill="none" stroke="#d4f5ce" stroke-opacity=".56" stroke-width="4"/>
+  <path d="M248 363C285 291 356 247 440 233M244 624C288 710 360 750 440 762" fill="none" stroke="#75bfb2" stroke-opacity=".6" stroke-width="5" stroke-linecap="round"/>
+  <path d="M300 411L405 469M268 500H391M303 587L405 532" fill="none" stroke="#589e8f" stroke-opacity=".49" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="300" cy="411" r="7" fill="#bff4d4"/><circle cx="268" cy="500" r="8" fill="#bff4d4"/><circle cx="303" cy="587" r="7" fill="#bff4d4"/>
+  <g fill="none" stroke="#bcffed" stroke-width="6" stroke-linecap="round">
+    <path data-input="" d="M290 381C324 422 380 469 477 496" pathLength="1" stroke-dasharray=".17 2" stroke-dashoffset=".17" opacity="0"/>
+    <path data-input="" d="M230 500H480" pathLength="1" stroke-dasharray=".17 2" stroke-dashoffset=".17" opacity="0"/>
+    <path data-input="" d="M288 621C335 573 389 526 477 503" pathLength="1" stroke-dasharray=".17 2" stroke-dashoffset=".17" opacity="0"/>
+  </g>
+
+  <path d="M520 159C701 171 846 317 846 500C846 683 701 829 520 841V799C677 789 804 659 804 500C804 341 677 211 520 201Z" fill="url(#threshold-brass)"/>
+  <path d="M522 205C679 215 802 342 802 500C802 658 679 785 522 795Z" fill="url(#threshold-red)"/>
+  <path d="M540 228C681 247 775 361 775 500C775 639 681 753 540 772" fill="none" stroke="#fba883" stroke-opacity=".53" stroke-width="4"/>
+  <g clip-path="url(#threshold-chamber)">
+    <path data-field-veins="" d="M526 498C602 460 608 371 731 303M526 500C606 481 651 446 791 422M526 504C640 504 698 522 802 524M526 506C630 537 704 638 748 664M526 512C593 568 610 656 682 739" fill="none" stroke="url(#threshold-field)" stroke-opacity=".73" stroke-width="4.5" stroke-linecap="round"/>
+    <path d="M579 259V741M624 273V726M671 301V695M717 341V655M763 408V596" fill="none" stroke="#ffc08e" stroke-opacity=".16" stroke-width="2"/>
+    <path data-wave-halo="" transform="translate(0 0)" d="M532 244C578 344 496 411 532 500C572 595 490 657 532 761" fill="none" stroke="#ff4b65" stroke-width="31" opacity="0"/>
+    <path data-wave-edge="" transform="translate(0 0)" d="M532 244C578 344 496 411 532 500C572 595 490 657 532 761" fill="none" stroke="#ffd0a4" stroke-width="6" stroke-linecap="round" opacity="0"/>
+    <ellipse data-gate-flare="" cx="535" cy="501" rx="115" ry="67" fill="url(#threshold-glow)" opacity="0"/>
+  </g>
+
+  <path d="M478 154H512V394L523 422V580L512 608V847H478V613L466 583V418L478 390Z" fill="#28252b" stroke="url(#threshold-brass)" stroke-width="6"/>
+  <path d="M493 164V824" stroke="url(#threshold-brass)" stroke-width="9" stroke-linecap="round"/>
+  <path d="M467 310H481M466 405H481M465 595H481M469 692H481" fill="none" stroke="#b3f4d7" stroke-width="13" stroke-linecap="round"/>
+  <path d="M512 315H526M519 410H531M519 590H531M512 687H526" fill="none" stroke="#ffb591" stroke-width="10" stroke-linecap="round"/>
+  <path data-seam-flow="" d="M495 809V191" fill="none" stroke="#ffdabc" stroke-width="13" stroke-linecap="round" pathLength="1" stroke-dasharray=".21 2" stroke-dashoffset=".21" opacity="0"/>
+  <path d="M495 459L530 500 495 541 459 500Z" fill="#34272b" stroke="url(#threshold-brass)" stroke-width="6"/>
+  <path d="M495 480L512 500 495 520 478 500Z" fill="#ffcf9e"/>
+  <circle data-core-flare="" cx="495" cy="500" r="74" fill="url(#threshold-glow)" opacity="0"/>
+</svg>

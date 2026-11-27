@@ -15,8 +15,10 @@ export function EntomateMark({ size = 36, alt = 'Entomate', style = undefined, c
     return <img className={`en-brand-mark ${className}`} src={logoAsset(id, 'small')} width={size} height={size}
       alt={alt} aria-hidden={alt === '' ? true : undefined} decoding="async" style={style} data-brand-mark="" />
   }
-  return <img className={`en-brand-mark ${className}`} src={`/brand/${id}-128.webp`}
-    srcSet={`/brand/${id}-128.webp 128w, /brand/${id}-256.webp 256w, /brand/${id}-512.webp 512w`}
+  const src = logoAsset(id, 128)
+  const medium = logoAsset(id, 256)
+  return <img className={`en-brand-mark ${className}`} src={src}
+    srcSet={src === medium ? undefined : `${src} 128w, ${medium} 256w, ${logoAsset(id, 512)} 512w`}
     sizes={`${size}px`} width={size} height={size} alt={alt} aria-hidden={alt === '' ? true : undefined}
     decoding="async" style={style} />
 }

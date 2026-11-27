@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="15 15 970 970" role="img" aria-label="Orbital Network">
+  <defs>
+    <linearGradient id="steel" x1=".18" x2=".92" y2="1">
+      <stop stop-color="#bcd8d5"/><stop offset=".25" stop-color="#537782"/>
+      <stop offset=".48" stop-color="#243b4b"/><stop offset=".8" stop-color="#598692"/>
+      <stop offset="1" stop-color="#91bebd"/>
+    </linearGradient>
+    <linearGradient id="rose" x1=".18" x2=".8" y2="1">
+      <stop stop-color="#ffcdab"/><stop offset=".36" stop-color="#ed919d"/>
+      <stop offset=".6" stop-color="#b95f76"/><stop offset="1" stop-color="#ffaab0"/>
+    </linearGradient>
+    <g id="station">
+      <circle r="94" fill="#182a34" stroke="url(#steel)" stroke-width="17"/>
+      <circle r="74" fill="#101b25" stroke="url(#rose)" stroke-width="22"/>
+      <path d="M-73 0H-52M52 0H73M0-73V-53M0 53V73" fill="none" stroke="#f0a58d" stroke-width="6"/>
+      <circle r="15" fill="#ffc69b"/>
+    </g>
+  </defs>
+  <ellipse cx="504" cy="503" rx="304" ry="241" transform="rotate(-17 504 503)" fill="none" stroke="url(#steel)" stroke-width="24" opacity=".75"/>
+  <ellipse cx="506" cy="503" rx="372" ry="121" transform="rotate(-8 506 503)" fill="none" stroke="#50909a" stroke-width="13" opacity=".55"/>
+  <path d="M48 466H351L396 502H942M175 503H420M324 351L415 430M704 376L619 445M720 644L622 568" fill="none" stroke="#314b5a" stroke-linecap="round" stroke-width="35"/>
+  <path d="M48 466H351L396 502H942M175 503H420M324 351L415 430M704 376L619 445M720 644L622 568" fill="none" stroke="#6eacb5" stroke-linecap="round" stroke-width="9"/>
+  <use href="#station" transform="translate(173 510) scale(.89)"/>
+  <use href="#station" transform="translate(324 347) scale(.71)"/>
+  <use href="#station" transform="translate(718 382) scale(.76)"/>
+  <use href="#station" transform="translate(723 650) scale(.67)"/>
+  <circle cx="500" cy="500" r="164" fill="#142630" stroke="url(#steel)" stroke-width="24"/>
+  <circle cx="500" cy="500" r="136" fill="#16242f" stroke="url(#rose)" stroke-width="26"/>
+  <circle cx="500" cy="500" r="100" fill="#0b1820" stroke="#68a6af" stroke-width="13"/>
+  <path d="M338 500H662M500 386V614" fill="none" stroke="#385763" stroke-width="22"/>
+  <path d="M338 500H662M500 386V614" fill="none" stroke="#97bfc1" stroke-width="6"/>
+  <path d="M500 474L524 500 500 526 476 500Z" fill="#ffcca0"/>
+</svg>

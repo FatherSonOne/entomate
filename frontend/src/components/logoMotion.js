@@ -1,4 +1,4 @@
-// Loading motion for the 17 logo systems (v2, 2026-11-22).
+// SVG motion for the legacy logo systems (v2, 2026-11-22).
 //
 // Each mark moves its own parts: regions of the artwork are cut out of the
 // still image and turned, slid, extended or charged in place, with
@@ -9,12 +9,6 @@
 // Coordinates are in the artwork's 1000-unit box (the 1300px canvas).
 
 export const LOGO_MOTIONS = {
-  'relay-orbits': { name: 'Orbital handoff', note: 'The crescent winds back, spins a full turn and settles; then the signal axis fires and the core kicks.', type: 'nested' },
-  relay: { name: 'Signal relay', note: 'The two outer cores lunge in and hand the signal to the ring, while the small satellites orbit it.', type: 'relay' },
-  orbit: { name: 'Ribbon exchange', note: 'The ribbon mass rocks on its axis and throws off a wave of itself at each turn.', type: 'ribbons' },
-  'orbital-network': { name: 'Network convergence', note: 'Each satellite winds back and lunges in to dock in turn; the core kicks and charges as it arrives.', type: 'network' },
-  constellation: { name: 'Connected cores', note: 'The dial carries its three cores round in three clicks while the inner scope sweeps the other way.', type: 'constellation' },
-  trinity: { name: 'Three-part harmony', note: 'The two upper rings spin in turn and the lower orbit tilts, one after the other.', type: 'trinity' },
   'circuit-e': { name: 'Sequential execution', note: 'Each ring node fires, its stub and route draw, and its bar strikes on, top to bottom; then all of it retracts.', type: 'circuit' },
   'circuit-spire': { name: 'Crown handover', note: 'Wireframe hands rise and draw in edge by edge, the circuit crown routes up between the fingers, then the Circuit E builds below.', type: 'spire' },
   'catalyst-core': { name: 'Fingertip relay', note: 'The wire hands rise turned in and open out, the fingertip nodes glow in turn, and the three bars of the E strike on between them.', type: 'core' },
@@ -169,60 +163,7 @@ export function renderLogoMotion(id, href, duration = 6, title = id) {
   }
 
   let moving = ''
-  const AXIS_H = (y, h = 30) => rect(0, y - h / 2, 1000, h)
-  if (kind === 'nested') {
-    // Relay Orbits: the crescent winds back, spins a full turn, overshoots and settles; the axis fires and the core answers.
-    moving = part({ shape: ring(482, 488, 318, 142), cx: 482, cy: 488, trail: [0.16, 0.5],
-      rot: [[0, 0], [0.08, 0], [0.18, -14, 'io'], [0.48, 372, 'out'], [0.58, 360, 'io'], [1, 360]] })
-      + part({ shape: circle(527, 494, 100), cx: 527, cy: 494,
-        scale: [[0, 1], [0.42, 1], [0.47, 0.94, 'in'], [0.53, 1.07, 'out'], [0.66, 1, 'io'], [1, 1]],
-        hot: [[0, 0], [0.46, 0], [0.52, 0.85, 'out'], [0.8, 0, 'io'], [1, 0]] })
-      + charge(AXIS_H(494, 26), [[0, 0], [0.44, 0], [0.5, 0.95, 'out'], [0.72, 0, 'io'], [1, 0]])
-  } else if (kind === 'relay') {
-    // Relay: outer cores lunge in and hand off; small satellites orbit the ring.
-    const lunge = (dx) => [[0, '0 0'], [0.1, `${-dx * 0.15} 0`, 'io'], [0.22, `${dx} 0`, 'in'], [0.3, `${-dx * 0.12} 0`, 'out'], [0.38, '0 0', 'io'], [1, '0 0']]
-    moving = part({ shape: ring(500, 470, 178, 96), cx: 500, cy: 470, rot: [[0, 0], [1, 360, 'lin']] })
-      + part({ shape: circle(112, 470, 52), move: lunge(70), trail: [0.12, 0.32], smear: true })
-      + part({ shape: circle(862, 466, 52), move: lunge(-70), trail: [0.12, 0.32], smear: true, phase: -0.5 })
-      + part({ shape: circle(226, 318, 30), cx: 500, cy: 470, rot: [[0, 0], [1, 360, 'lin']] })
-      + part({ shape: circle(764, 614, 30), cx: 500, cy: 470, rot: [[0, 0], [1, 360, 'lin']] })
-      + charge(ring(500, 470, 178, 96), [[0, 0], [0.21, 0], [0.25, 0.9, 'out'], [0.45, 0, 'io'], [1, 0]])
-      + charge(ring(500, 470, 178, 96), [[0, 0], [0.21, 0], [0.25, 0.9, 'out'], [0.45, 0, 'io'], [1, 0]], -0.5)
-  } else if (kind === 'ribbons') {
-    // Orbit: the ribbon mass rocks with weight and throws off a wave at each turn.
-    moving = part({ shape: null, cx: 500, cy: 490,
-      rot: [[0, 0], [0.12, -2, 'io'], [0.42, 10, 'io'], [0.5, 9, 'io'], [0.62, 11, 'io'], [0.92, -1, 'io'], [1, 0, 'io']],
-      scale: [[0, 1], [0.42, 1.025, 'io'], [0.92, 0.995, 'io'], [1, 1, 'io']] })
-      + wave(null, 500, 490, 1.14, 0, 0.35, [0.38, 0.72])
-      + wave(null, 500, 490, 1.14, 0.5, 0.25, [0.38, 0.72])
-  } else if (kind === 'network') {
-    // Orbital Network: each satellite lunges in to dock in turn; the core kicks and charges as it arrives.
-    const sats = [[320, 322], [730, 340], [720, 650], [166, 510]]
-    const kicks = [0, 1, 2, 3].flatMap((i) => [[i / 4 + 0.12, 1], [i / 4 + 0.15, 1.07, 'out'], [i / 4 + 0.23, 1, 'io']])
-    moving = part({ shape: ring(500, 500, 150, 66), cx: 500, cy: 500, scale: [[0, 1], ...kicks, [1, 1]] })
-      + sats.map(([x, y], i) => {
-        const dx = (500 - x) * 0.24, dy = (500 - y) * 0.24
-        return part({ shape: circle(x, y, 62), cx: x, cy: y, phase: -i / 4, trail: [0.03, 0.2], smear: true,
-          move: [[0, '0 0'], [0.03, `${-dx * 0.14} ${-dy * 0.14}`, 'io'], [0.13, `${dx} ${dy}`, 'in'], [0.19, `${-dx * 0.1} ${-dy * 0.1}`, 'out'], [0.26, '0 0', 'io'], [1, '0 0']],
-          scale: [[0, 1], [0.03, 1.05, 'io'], [0.13, 0.9, 'in'], [0.2, 1.03, 'out'], [0.26, 1, 'io'], [1, 1]] })
-      }).join('')
-      + [0, 1, 2, 3].map((i) => charge(circle(500, 500, 150), [[0, 0], [0.12, 0], [0.14, 0.75, 'out'], [0.26, 0, 'io'], [1, 0]], -i / 4)).join('')
-  } else if (kind === 'constellation') {
-    // Constellation: the dial carries its cores round in three clicks; the scope sweeps against it.
-    const clicks = [0, 1, 2].flatMap((i) => [[i / 3 + 0.08, i * 120], [i / 3 + 0.12, i * 120 - 5, 'io'], [i / 3 + 0.24, i * 120 + 124, 'out'], [i / 3 + 0.3, i * 120 + 120, 'io']])
-    moving = part({ shape: ring(500, 500, 420, 182), cx: 500, cy: 500, rot: [[0, 0], ...clicks, [1, 360]], trail: [0.12, 0.24] })
-      + part({ shape: circle(500, 500, 182), cx: 500, cy: 500, rot: [[0, 0], [1, -360, 'lin']] })
-      + [0, 1, 2].map((i) => charge(circle(500, 500, 100), [[0, 0], [0.22, 0], [0.25, 0.7, 'out'], [0.33, 0, 'io'], [1, 0]], -i / 3)).join('')
-  } else if (kind === 'trinity') {
-    // Trinity: the upper rings spin in turn; the lower orbit tilts.
-    moving = part({ shape: circle(338, 345, 126), cx: 338, cy: 345, trail: [0.06, 0.3],
-      rot: [[0, 0], [0.05, 0], [0.09, -12, 'io'], [0.28, 372, 'out'], [0.34, 360, 'io'], [1, 360]] })
-      + part({ shape: circle(598, 340, 130), cx: 598, cy: 340, trail: [0.38, 0.62],
-        rot: [[0, 0], [0.37, 0], [0.41, 12, 'io'], [0.6, -372, 'out'], [0.66, -360, 'io'], [1, -360]] })
-      + part({ shape: ellipse(520, 652, 470, 150), cx: 520, cy: 640,
-        scale: [[0, 1], [0.66, 1], [0.72, '1 1.06', 'io'], [0.84, '1 .78', 'io'], [0.92, '1 1.03', 'out'], [1, 1, 'io']],
-        rot: [[0, 0], [0.66, 0], [0.84, -3, 'io'], [1, 0, 'io']] })
-  } else if (kind === 'circuit') {
+  if (kind === 'circuit') {
     // Circuit E: each node fires and its bar shoots out from the spine; then all retract.
     const bars = [[292, 112, 625, 148, 200, 182], [292, 402, 583, 148, 200, 600], [292, 742, 623, 156, 200, 820]]
     moving = bars.map(([x, y, w, h, nx, ny], i) => {
@@ -305,7 +246,6 @@ export function renderLogoMotion(id, href, duration = 6, title = id) {
 
   // Marks with a still middle: give it a living centre (cx, cy, r, turn direction)
   const CENTRES = {
-    'relay-orbits': [[527, 494, 96, -1]],
     'orbital-network': [[500, 500, 70, 1]],
     constellation: [[500, 500, 130, -1]],
     'catalyst-core': [[500, 500, 150, 1]],
@@ -315,7 +255,6 @@ export function renderLogoMotion(id, href, duration = 6, title = id) {
     'flow-field': [[362, 352, 70, 1], [632, 360, 70, -1], [650, 650, 70, 1], [362, 642, 70, -1]],
     'neural-core': [[482, 482, 175, 1]],
     'signal-cascade': [[500, 500, 125, -1]],
-    orbit: [[500, 500, 150, 1]],
   }
   moving += (CENTRES[id] || []).map(([x, y, r, d], i) => centre(x, y, r, d, i * 0.17)).join('')
 

@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-309 -309 618 618" role="img" aria-label="Signal Cascade">
+  <defs>
+    <linearGradient id="copper" x1=".08" y1=".02" x2=".94" y2=".88">
+      <stop stop-color="#f4a565"/>
+      <stop offset=".35" stop-color="#a8442c"/>
+      <stop offset=".65" stop-color="#f67243"/>
+      <stop offset="1" stop-color="#9d3927"/>
+    </linearGradient>
+    <linearGradient id="gold" x1=".14" y1=".05" x2=".87" y2=".96">
+      <stop stop-color="#ffb86f"/>
+      <stop offset=".37" stop-color="#fff4c7"/>
+      <stop offset=".69" stop-color="#ff9a58"/>
+      <stop offset="1" stop-color="#ffe8a5"/>
+    </linearGradient>
+    <radialGradient id="beacon">
+      <stop stop-color="#fff1c0"/>
+      <stop offset=".42" stop-color="#ffba66"/>
+      <stop offset=".78" stop-color="#d05a36"/>
+      <stop offset="1" stop-color="#5c2d2c"/>
+    </radialGradient>
+  </defs>
+  <g fill="none">
+    <circle r="247" stroke="#953e30" stroke-width="8" stroke-dasharray="5 14"/>
+    <circle r="238" stroke="url(#copper)" stroke-width="13"/>
+    <circle r="206" stroke="url(#copper)" stroke-width="25"/>
+    <circle r="169" stroke="#5a3030" stroke-width="29"/>
+    <circle r="144" stroke="#f27c4e" stroke-width="7" stroke-dasharray="3 10"/>
+    <circle r="121" stroke="url(#gold)" stroke-width="26"/>
+    <circle r="86" fill="#472423" stroke="#ba5535" stroke-width="11"/>
+    <circle r="55" fill="#15131a" stroke="#ffb878" stroke-width="10"/>
+    <path d="M-276 0H-181M181 0H276M0-276V-181M0 181V276"
+      stroke="#e5a16b" stroke-width="10" stroke-linecap="round"/>
+    <path d="M201 83A218 218 0 0 1 93 197" stroke="#ffe0a2" stroke-width="9" stroke-linecap="round"/>
+  </g>
+  <g fill="#ffe5a1">
+    <circle cx="158" cy="151" r="10"/><circle cx="113" cy="184" r="9"/>
+  </g>
+  <circle cx="178" cy="193" r="33" fill="#3e262b" stroke="#e39460" stroke-width="8"/>
+  <circle cx="178" cy="193" r="22" fill="url(#beacon)"/>
+</svg>

@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="82 93 834 795" role="img" aria-label="Neural Core">
+  <defs>
+    <linearGradient id="wire" x1=".13" y1=".9" x2=".83" y2=".16">
+      <stop stop-color="#2c758a"/>
+      <stop offset=".33" stop-color="#37c7cb"/>
+      <stop offset=".64" stop-color="#a4e8db"/>
+      <stop offset="1" stop-color="#649ab6"/>
+    </linearGradient>
+    <linearGradient id="fiber" x1="0" y1=".16" x2=".88" y2=".85">
+      <stop stop-color="#a13e62"/>
+      <stop offset=".36" stop-color="#f282a2"/>
+      <stop offset=".74" stop-color="#d44b73"/>
+      <stop offset="1" stop-color="#e29e97"/>
+    </linearGradient>
+    <linearGradient id="matrix" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#d58652"/>
+      <stop offset=".45" stop-color="#ffe8ab"/>
+      <stop offset="1" stop-color="#dc9462"/>
+    </linearGradient>
+    <path id="upper" d="M357 429C355 285 442 175 552 165C670 156 761 230 763 342C765 434 690 490 579 521"/>
+    <path id="east" d="M549 439C665 366 802 392 865 488C928 582 873 717 752 727C651 735 568 683 506 593"/>
+    <path id="lower" d="M598 535C670 641 619 783 518 815C409 852 299 788 288 684C278 583 322 512 398 461"/>
+    <path id="west" d="M489 515C376 599 235 575 153 499C67 415 128 324 255 315C351 307 452 344 533 425"/>
+  </defs>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <g stroke="#233745" stroke-width="55">
+      <use href="#upper"/><use href="#east"/><use href="#lower"/><use href="#west"/>
+    </g>
+    <g stroke="url(#wire)" stroke-width="32">
+      <use href="#upper"/><use href="#east"/><use href="#lower"/><use href="#west"/>
+    </g>
+    <g stroke="url(#fiber)" stroke-width="12">
+      <use href="#upper" transform="translate(9 13)"/><use href="#east" transform="translate(-13 8)"/>
+      <use href="#lower" transform="translate(-11 -8)"/><use href="#west" transform="translate(7 -12)"/>
+    </g>
+    <path d="M250 586C360 485 509 423 678 195M335 715C495 643 571 592 696 500"
+      stroke="#b07567" stroke-opacity=".69" stroke-width="10"/>
+  </g>
+  <path d="M391 382H584V596H391Z" fill="#11242d" fill-opacity=".85" stroke="#a97055" stroke-width="9" stroke-linejoin="round"/>
+  <g fill="none" stroke="url(#matrix)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M407 419H565M407 480H565M407 555H565M435 399V577M484 399V577M538 399V577M435 419L483 480L538 555M436 555L484 480L538 419"/>
+  </g>
+  <g fill="#ffe5a0">
+    <circle cx="435" cy="419" r="13"/><circle cx="484" cy="419" r="10"/><circle cx="538" cy="419" r="12"/>
+    <circle cx="435" cy="480" r="10"/><circle cx="484" cy="480" r="14"/><circle cx="538" cy="480" r="10"/>
+    <circle cx="435" cy="555" r="12"/><circle cx="484" cy="555" r="10"/><circle cx="538" cy="555" r="13"/>
+  </g>
+</svg>

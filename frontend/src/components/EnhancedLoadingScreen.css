@@ -17,6 +17,62 @@
 }
 .en-loader--preview { z-index: 10000; }
 
+.en-loader[data-logo="relay-orbits"] {
+  background:
+    radial-gradient(ellipse 46vmin 53vmin at 39% 50%, rgb(136 26 47 / 26%), transparent 78%),
+    radial-gradient(ellipse 40vmin 37vmin at 57% 50%, rgb(26 104 100 / 19%), transparent 77%),
+    #09070b;
+}
+
+.en-loader[data-logo="relay"] {
+  background:
+    radial-gradient(ellipse 41vmin 36vmin at 50% 50%, rgb(27 110 100 / 22%), transparent 85%),
+    radial-gradient(ellipse 58vmin 22vmin at 50% 50%, rgb(130 55 51 / 22%), transparent 83%),
+    #0a090e;
+}
+
+.en-loader[data-logo="orbit"] {
+  background:
+    radial-gradient(ellipse 42vmin 56vmin at 59% 57%, rgb(19 99 116 / 22%), transparent 83%),
+    radial-gradient(ellipse 42vmin 42vmin at 42% 43%, rgb(130 25 68 / 22%), transparent 85%),
+    #0b080f;
+}
+
+.en-loader[data-logo="orbital-network"] {
+  background:
+    radial-gradient(ellipse 49vmin 30vmin at 55% 55%, rgb(23 78 93 / 24%), transparent 83%),
+    radial-gradient(ellipse 34vmin 30vmin at 41% 43%, rgb(94 38 61 / 18%), transparent 89%),
+    #070a10;
+}
+
+.en-loader[data-logo="constellation"] {
+  background:
+    radial-gradient(ellipse 43vmin 46vmin at 54% 50%, rgb(28 90 73 / 22%), transparent 85%),
+    radial-gradient(ellipse 48vmin 34vmin at 48% 57%, rgb(126 70 31 / 15%), transparent 82%),
+    #090c0b;
+}
+
+.en-loader[data-logo="trinity"] {
+  background:
+    radial-gradient(ellipse 44% 69% at 50% 50%, #080d10 2%, rgb(8 13 16 / 86%) 43%, transparent 100%),
+    linear-gradient(180deg, rgb(7 11 13 / 87%), rgb(7 11 13 / 59%) 44%, rgb(7 11 13 / 94%)),
+    url('../assets/threshold-chamber.webp') center / cover no-repeat #080d10;
+}
+
+.en-loader[data-logo="slipstream"] {
+  background:
+    radial-gradient(ellipse 48% 65% at 50% 49%, #0a0d14 6%, rgb(10 13 20 / 88%) 43%, transparent 100%),
+    linear-gradient(180deg, rgb(8 12 17 / 87%), rgb(8 12 17 / 51%) 66%, rgb(8 12 17 / 82%)),
+    url('../assets/slipstream-chamber.webp') center 56% / cover no-repeat #0a0d14;
+}
+
+.en-loader[data-logo="flow-field"] {
+  background:
+    radial-gradient(ellipse 43vmin 44vmin at 39% 50%, rgb(43 112 112 / 20%), transparent 83%),
+    radial-gradient(ellipse 43vmin 40vmin at 61% 50%, rgb(129 67 62 / 23%), transparent 84%),
+    #090d11;
+}
+
 .en-loader-stage {
   position: absolute;
   inset: 0;
@@ -32,6 +88,12 @@
 .en-loader .en-app-loading-logo-art {
   width: min(94vmin, 100vw);
   height: min(94vmin, 100vw);
+}
+
+/* Give Orbit’s unfurled tips room inside the first-load progress ring. */
+.en-loader--boot[data-logo="orbit"] .en-app-loading-logo-art {
+  width: min(77vmin, 100vw);
+  height: min(77vmin, 100vw);
 }
 
 /* Corners: small, flush to the grid, never over the centre */

@@ -1,0 +1,168 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" role="img" aria-labelledby="node-hands-title">
+  <title id="node-hands-title">Node Hands</title>
+  <view id="node-hands-compact" viewBox="62 82 676 704"/>
+  <defs>
+    <linearGradient id="node-hands-wire" gradientUnits="userSpaceOnUse" x1="170" y1="117" x2="278" y2="697">
+      <stop stop-color="#ff6a7c"/>
+      <stop offset=".39" stop-color="#ff4267"/>
+      <stop offset="1" stop-color="#e72952"/>
+    </linearGradient>
+    <linearGradient id="node-hands-cuff" gradientUnits="userSpaceOnUse" x1="202" y1="622" x2="160" y2="767">
+      <stop stop-color="#be163b"/>
+      <stop offset=".66" stop-color="#f2365e"/>
+      <stop offset="1" stop-color="#f82c56"/>
+    </linearGradient>
+    <radialGradient id="node-hands-amber-halo">
+      <stop stop-color="#ffb85c" stop-opacity=".64"/>
+      <stop offset=".49" stop-color="#ff9239" stop-opacity=".2"/>
+      <stop offset="1" stop-color="#ff873b" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="node-hands-amber" cx=".36" cy=".29" r=".85">
+      <stop stop-color="#fff1bd"/>
+      <stop offset=".39" stop-color="#ffd482"/>
+      <stop offset="1" stop-color="#ef9249"/>
+    </radialGradient>
+    <linearGradient id="node-hands-bar-top" x2="0" y2="1">
+      <stop stop-color="#ff5172"/>
+      <stop offset="1" stop-color="#f42f57"/>
+    </linearGradient>
+    <linearGradient id="node-hands-bar-mid" x2="0" y2="1">
+      <stop stop-color="#f8395b"/>
+      <stop offset="1" stop-color="#e9224c"/>
+    </linearGradient>
+    <linearGradient id="node-hands-bar-low" x2="0" y2="1">
+      <stop stop-color="#da2c4f"/>
+      <stop offset="1" stop-color="#bb163b"/>
+    </linearGradient>
+    <filter id="node-hands-bloom" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="5.2"/>
+    </filter>
+    <g id="node-hands-node">
+      <circle r="54" fill="url(#node-hands-amber-halo)"/>
+      <circle r="16.5" fill="url(#node-hands-amber)" stroke="#ffd994" stroke-opacity=".65" stroke-width="1.7"/>
+    </g>
+    <path id="node-hands-outer-thread" pathLength="1" d="M122 163L135 125L215 119"/>
+    <path id="node-hands-upper-thread" pathLength="1" d="M215 119C219 138 221 159 222 177L297 184"/>
+    <path id="node-hands-inner-thread" pathLength="1" d="M297 184C280 209 258 236 244 258L318 300"/>
+    <g id="node-hands-palm">
+      <path d="M143 768L187 626L236 724Z" fill="url(#node-hands-cuff)" stroke="#f74062" stroke-opacity=".54" stroke-width="2" stroke-linejoin="round"/>
+      <g fill="none" stroke="#ee965c" stroke-width="1.85" stroke-linejoin="round">
+        <use href="#node-hands-outer-thread"/>
+        <path d="M122 163L215 119M122 163L278 222"/>
+        <use href="#node-hands-upper-thread"/>
+        <use href="#node-hands-inner-thread"/>
+      </g>
+      <use href="#node-hands-node" x="122" y="163"/>
+      <use href="#node-hands-node" x="215" y="119"/>
+      <use href="#node-hands-node" x="297" y="184"/>
+      <use href="#node-hands-node" x="318" y="300"/>
+      <g fill="none" stroke="url(#node-hands-wire)" stroke-width="5.3" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M187 626L204 579L105 414L98 279L119 163L143 200L144 257L153 336L204 403"/>
+        <path d="M144 257L211 118L224 157L183 272L159 216M183 272L177 353"/>
+        <path d="M194 246L293 184L279 223L181 297M215 271L191 319L177 353"/>
+        <path d="M188 347L233 294H314C301 309 287 317 266 319L248 324M257 294L271 317"/>
+        <path d="M199 462L209 320Q218 301 234 314L245 323L255 349V374L230 394L206 383"/>
+        <path d="M255 374L257 434L273 473M256 401L300 464L319 494L325 528L298 669L294 698"/>
+        <path d="M257 434L300 464L317 550L311 584L105 414M315 580L296 674L278 591L244 720"/>
+        <path d="M278 591L204 579M278 591L187 626M98 279L201 426L179 464"/>
+      </g>
+    </g>
+    <rect id="node-hands-bar-a" x="346" y="299" width="110" height="30" rx="1.8"/>
+    <rect id="node-hands-bar-b" x="346" y="368" width="110" height="30" rx="1.8"/>
+    <rect id="node-hands-bar-c" x="346" y="437" width="110" height="30" rx="1.8"/>
+    <g id="node-hands-bars">
+      <use href="#node-hands-bar-a"/><use href="#node-hands-bar-b"/><use href="#node-hands-bar-c"/>
+    </g>
+    <radialGradient id="node-hands-live-halo">
+      <stop stop-color="#fff0bf" stop-opacity=".9"/>
+      <stop offset=".32" stop-color="#ffbe71" stop-opacity=".55"/>
+      <stop offset="1" stop-color="#ff764e" stop-opacity="0"/>
+    </radialGradient>
+    <g id="node-hands-live">
+      <circle r="48" fill="url(#node-hands-live-halo)"/>
+      <circle r="12" fill="#fff0c4" opacity=".88"/>
+    </g>
+    <linearGradient id="node-hands-transfer-light" gradientUnits="userSpaceOnUse" x1="224" x2="371" y1="0" y2="0" data-node-transfer-light="">
+      <stop stop-color="#ff513c" stop-opacity="0"/>
+      <stop offset=".26" stop-color="#ff875a" stop-opacity=".25"/>
+      <stop offset=".54" stop-color="#ffe2af"/>
+      <stop offset=".66" stop-color="#fff2cf"/>
+      <stop offset=".85" stop-color="#ffb47e" stop-opacity=".52"/>
+      <stop offset="1" stop-color="#ff8b69" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="node-hands-bar-light" gradientUnits="userSpaceOnUse" x1="0" x2="12" y1="220" y2="325" data-node-bar-light="">
+      <stop stop-color="#ff6b57" stop-opacity="0"/>
+      <stop offset=".31" stop-color="#ffad80" stop-opacity=".34"/>
+      <stop offset=".55" stop-color="#ffe5b2"/>
+      <stop offset=".68" stop-color="#fff1c6" stop-opacity=".7"/>
+      <stop offset="1" stop-color="#ff704b" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="node-hands-vapor" gradientUnits="userSpaceOnUse" x1="387" x2="406" y1="246" y2="479">
+      <stop stop-color="#ffc3a2" stop-opacity="0"/>
+      <stop offset=".22" stop-color="#ffb985" stop-opacity=".74"/>
+      <stop offset=".54" stop-color="#ee5b71" stop-opacity=".44"/>
+      <stop offset="1" stop-color="#dd3060" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <g data-node-stage="">
+    <g data-node-hand="left" transform="rotate(0 242 700)">
+      <use href="#node-hands-palm"/>
+      <g fill="none" stroke="#ffe2aa" stroke-width="3.8" stroke-linecap="round" stroke-dasharray=".34 2">
+        <use data-node-feed="" href="#node-hands-outer-thread" stroke-dashoffset=".34" opacity="0"/>
+        <use data-node-feed="" href="#node-hands-upper-thread" stroke-dashoffset=".34" opacity="0"/>
+        <use data-node-feed="" href="#node-hands-inner-thread" stroke-dashoffset=".34" opacity="0"/>
+      </g>
+      <use href="#node-hands-live" data-node-tip="" x="122" y="163" opacity="0"/>
+      <use href="#node-hands-live" data-node-tip="" x="215" y="119" opacity="0"/>
+      <use href="#node-hands-live" data-node-tip="" x="297" y="184" opacity="0"/>
+      <use href="#node-hands-live" data-node-tip="" x="318" y="300" opacity="0"/>
+    </g>
+    <g transform="translate(800 0) scale(-1 1)">
+      <g data-node-hand="right" transform="rotate(0 242 700)">
+        <use href="#node-hands-palm"/>
+        <g fill="none" stroke="#ffe2aa" stroke-width="3.8" stroke-linecap="round" stroke-dasharray=".34 2">
+          <use data-node-feed="" href="#node-hands-outer-thread" stroke-dashoffset=".34" opacity="0"/>
+          <use data-node-feed="" href="#node-hands-upper-thread" stroke-dashoffset=".34" opacity="0"/>
+          <use data-node-feed="" href="#node-hands-inner-thread" stroke-dashoffset=".34" opacity="0"/>
+        </g>
+        <use href="#node-hands-live" data-node-tip="" x="122" y="163" opacity="0"/>
+        <use href="#node-hands-live" data-node-tip="" x="215" y="119" opacity="0"/>
+        <use href="#node-hands-live" data-node-tip="" x="297" y="184" opacity="0"/>
+        <use href="#node-hands-live" data-node-tip="" x="318" y="300" opacity="0"/>
+      </g>
+    </g>
+    <use href="#node-hands-bars" fill="#f42d55" opacity=".38" filter="url(#node-hands-bloom)"/>
+    <use href="#node-hands-bar-a" fill="url(#node-hands-bar-top)"/>
+    <use href="#node-hands-bar-b" fill="url(#node-hands-bar-mid)"/>
+    <use href="#node-hands-bar-c" fill="url(#node-hands-bar-low)"/>
+    <use href="#node-hands-bars" fill="url(#node-hands-bar-light)" data-node-reflection="" opacity="0"/>
+    <g data-node-vapors="" fill="none" stroke="url(#node-hands-vapor)" stroke-linecap="round" opacity="0">
+      <path data-node-vapor="" d="M365 295C356 271 388 259 399 277S387 339 405 364S441 395 417 473" stroke-width="17" filter="url(#node-hands-bloom)"/>
+      <path data-node-vapor="" d="M365 295C356 271 388 259 399 277S387 339 405 364S441 395 417 473" stroke-width="2.7"/>
+      <path data-node-vapor="" d="M444 295C445 272 408 267 401 288S431 332 414 354S372 399 383 468" stroke-width="2"/>
+    </g>
+    <g data-node-bridge="" fill="none" stroke-linecap="round" opacity="0">
+      <path data-node-filament="" d="M318 300C350 270 365 292 400 282S451 275 482 300" stroke="#f56f62" stroke-width="13" stroke-opacity=".46" filter="url(#node-hands-bloom)"/>
+      <path data-node-filament="" d="M318 300C350 270 365 292 400 282S451 275 482 300" stroke="#ef8f76" stroke-width="1.8" stroke-opacity=".59"/>
+      <path data-node-filament="" d="M318 300C350 270 365 292 400 282S451 275 482 300" stroke="url(#node-hands-transfer-light)" stroke-width="4"/>
+      <path data-node-echo="" d="M318 300C349 316 368 262 400 280S454 320 482 300" stroke="#ffac85" stroke-width="1.5" stroke-opacity=".54"/>
+    </g>
+    <g data-node-dust="" fill="#ffc48f" aria-hidden="true">
+      <circle cx="348" cy="294" r="2.1" opacity="0"/>
+      <circle cx="356" cy="292" r="1.3" opacity="0"/>
+      <circle cx="367" cy="298" r="2.8" opacity="0"/>
+      <circle cx="372" cy="284" r="1.8" opacity="0"/>
+      <circle cx="388" cy="293" r="1.4" opacity="0"/>
+      <circle cx="394" cy="286" r="2.2" opacity="0"/>
+      <circle cx="405" cy="280" r="1.2" opacity="0"/>
+      <circle cx="403" cy="295" r="2.5" opacity="0"/>
+      <circle cx="419" cy="293" r="1.5" opacity="0"/>
+      <circle cx="425" cy="280" r="2.5" opacity="0"/>
+      <circle cx="429" cy="301" r="1.2" opacity="0"/>
+      <circle cx="435" cy="296" r="2.7" opacity="0"/>
+      <circle cx="447" cy="290" r="1.7" opacity="0"/>
+      <circle cx="456" cy="299" r="2.1" opacity="0"/>
+    </g>
+  </g>
+</svg>

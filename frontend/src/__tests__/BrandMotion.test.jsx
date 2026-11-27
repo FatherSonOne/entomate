@@ -77,8 +77,7 @@ describe('Entomate brand motion', () => {
     expect(screen.getByText('63%')).toBeInTheDocument()
     expect(container.querySelector('.en-signal-loader-track span')).toHaveStyle({ width: '63%' })
     expect(container.querySelector('video')).not.toBeInTheDocument()
-    expect(container.querySelector('.en-app-loading-logo-art svg image').getAttribute('href'))
-      .toBe('/brand/relay-orbits-1024.webp')
+    expect(container.querySelector('.en-app-loading-logo-art svg [data-iris]')).toBeInTheDocument()
     expect(container.querySelector('.en-signal-loader-wordmark svg')).toHaveAttribute('aria-label', 'Entomate')
   })
 
