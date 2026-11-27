@@ -11,7 +11,7 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Check, ChevronDown, ChevronUp, Loader2, Pencil, Search, X } from 'lucide-react'
+import { AlertTriangle, Check, ChevronDown, ChevronUp, GitMerge, Loader2, Pencil, Play, Search, X } from 'lucide-react'
 import { smoothScrollBehavior } from '../bench/motion'
 import {
   formatClock,
@@ -43,6 +43,8 @@ export interface TranscriptPanelProps {
   playingAtMs?: number | null
   /** Given when there is audio to play: each line's time plays from that moment. */
   onPlayFrom?: (atMs: number) => void
+  onPreviewSpeaker?: (atMs: number, endMs: number) => void
+  speakerEditsDisabled?: boolean
   /** Given when lines can be clipped to Search notes: adds a Clip key to each line. */
   onClip?: (line: TranscriptSegment) => void
   onCreateTask?: (line: TranscriptSegment) => void
@@ -59,6 +61,7 @@ export function lineAt(lines: TranscriptSegment[], atMs: number): number {
 }
 
 const MAX_SPEAKER_NAME = 120
+const SPEAKER_PREVIEW_MS = 5000
 
 const INPUT =
   'w-full rounded-lg border border-line bg-surface-elevated px-3 py-1.5 text-sm text-content-primary ' +
@@ -66,6 +69,22 @@ const INPUT =
 const ICON_BUTTON =
   'inline-flex min-h-8 min-w-8 items-center justify-center rounded text-content-secondary hover:text-content-primary ' +
   'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary disabled:opacity-40'
+const SPEAKER_BUTTON =
+  'inline-flex min-h-8 items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-xs text-content-primary ' +
+  'hover:border-line-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary disabled:opacity-40'
+
+function speakerPreviews(lines: TranscriptSegment[]): Map<string, { atMs: number; endMs: number }> {
+  const previews = new Map<string, { atMs: number; endMs: number }>()
+  lines.forEach(({ speaker, atMs, endMs }, index) => {
+    const next = lines[index + 1]?.atMs
+    const end = Math.min(atMs + SPEAKER_PREVIEW_MS, endMs != null && endMs > atMs ? endMs : Infinity, next ?? Infinity)
+    const previous = previews.get(speaker)
+    if (end > atMs && (!previous || (previous.endMs - previous.atMs < 2500 && end - atMs > previous.endMs - previous.atMs))) {
+      previews.set(speaker, { atMs, endMs: end })
+    }
+  })
+  return previews
+}
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -90,12 +109,13 @@ function Highlighted({ text, query }: { text: string; query: string }): React.Re
   )
 }
 
-export function TranscriptPanel({ meetingId, segments, onRenamed, suggestions, focusAtMs, focusEventId, playingAtMs, onPlayFrom, onClip, onCreateTask }: TranscriptPanelProps): React.ReactElement {
+export function TranscriptPanel({ meetingId, segments, onRenamed, suggestions, focusAtMs, focusEventId, playingAtMs, onPlayFrom, onPreviewSpeaker, speakerEditsDisabled, onClip, onCreateTask }: TranscriptPanelProps): React.ReactElement {
   const [lines, setLines] = useState<TranscriptSegment[]>(segments)
   const [query, setQuery] = useState('')
   const [current, setCurrent] = useState(0)
   const [renaming, setRenaming] = useState<string | null>(null)
   const [newName, setNewName] = useState('')
+  const [merge, setMerge] = useState<{ from: string; to: string } | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [guesses, setGuesses] = useState<SpeakerSuggestion[]>(() => toSuggestions(suggestions, segments))
@@ -105,8 +125,12 @@ export function TranscriptPanel({ meetingId, segments, onRenamed, suggestions, f
   const listRef = useRef<HTMLOListElement | null>(null)
 
   useEffect(() => setLines(segments), [segments])
+  useEffect(() => setGuesses(toSuggestions(suggestions, segments)), [suggestions, segments])
 
   const speakers = useMemo(() => speakersOf(lines), [lines])
+  const previews = useMemo(() => speakerPreviews(lines), [lines])
+  const hasSpeaker = (name: string) => speakers.some(speaker => speaker.name === name)
+  const canMerge = merge && merge.from !== merge.to && hasSpeaker(merge.from) && hasSpeaker(merge.to)
   const unnamed = speakers.some((s) => isGenericSpeaker(s.name))
   const hits = useMemo(() => matchingLines(lines, query), [lines, query])
   const citedLine = focusEventId ? lines.findIndex(line => line.eventId === focusEventId) : -1
@@ -150,9 +174,26 @@ export function TranscriptPanel({ meetingId, segments, onRenamed, suggestions, f
   }
 
   const startRename = (name: string): void => {
+    setMerge(null)
     setRenaming(name)
     setNewName(name)
     setError(null)
+  }
+
+  const saveSpeaker = async (from: string, to: string, merging = false): Promise<boolean> => {
+    if (saving || speakerEditsDisabled) return false
+    setSaving(true)
+    setError(null)
+    const { result, error: reason } = await renameSpeaker(meetingId, from, to, merging)
+    setSaving(false)
+    if (!result) {
+      setError(reason)
+      return false
+    }
+    setLines(result.segments)
+    setGuesses(prev => prev.filter(x => x.speaker !== from && x.name !== to))
+    onRenamed?.(result)
+    return true
   }
 
   const submitRename = async (): Promise<void> => {
@@ -166,17 +207,7 @@ export function TranscriptPanel({ meetingId, segments, onRenamed, suggestions, f
       setError('A speaker name cannot contain a colon.')
       return
     }
-    setSaving(true)
-    setError(null)
-    const { result, error: reason } = await renameSpeaker(meetingId, renaming, to)
-    setSaving(false)
-    if (!result) {
-      setError(reason)
-      return
-    }
-    setLines(result.segments)
-    setRenaming(null)
-    onRenamed?.(result)
+    if (await saveSpeaker(renaming, to)) setRenaming(null)
   }
 
   const askForNames = async (): Promise<void> => {
@@ -186,20 +217,6 @@ export function TranscriptPanel({ meetingId, segments, onRenamed, suggestions, f
     setGuessing(false)
     setGuesses(found)
     setGuessNote(reason ?? (found.length ? null : 'No names could be worked out from what was said. Rename speakers by hand.'))
-  }
-
-  const acceptGuess = async (g: SpeakerSuggestion): Promise<void> => {
-    setSaving(true)
-    setError(null)
-    const { result, error: reason } = await renameSpeaker(meetingId, g.speaker, g.name)
-    setSaving(false)
-    if (!result) {
-      setError(reason)
-      return
-    }
-    setLines(result.segments)
-    setGuesses((prev) => prev.filter((x) => x.speaker !== g.speaker && x.name !== g.name))
-    onRenamed?.(result)
   }
 
   return (
@@ -241,53 +258,100 @@ export function TranscriptPanel({ meetingId, segments, onRenamed, suggestions, f
       </div>
 
       <div className="mb-3">
-        <h3 className="mb-1.5 text-xs font-medium text-content-secondary">Speakers</h3>
+        <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-xs font-medium text-content-secondary">Speakers</h3>
+          {speakers.length > 1 && (
+            <button type="button" className={SPEAKER_BUTTON} aria-expanded={merge !== null} disabled={saving || speakerEditsDisabled} onClick={() => {
+              setMerge(merge ? null : { from: '', to: '' })
+              setRenaming(null)
+              setError(null)
+            }}>
+              <GitMerge className="h-3.5 w-3.5" aria-hidden="true" /> Merge speakers
+            </button>
+          )}
+        </div>
+        {merge && (
+          <form className="mb-2 space-y-2 rounded-lg border border-line p-2" onSubmit={async (e) => {
+            e.preventDefault()
+            if (canMerge && await saveSpeaker(merge.from, merge.to, true)) setMerge(null)
+          }}>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <label className="space-y-1 text-xs text-content-secondary">
+                <span>Merge from</span>
+                <select className={INPUT} value={merge.from} disabled={saving || speakerEditsDisabled} onChange={(e) => setMerge({ from: e.target.value, to: merge.to === e.target.value ? '' : merge.to })}>
+                  <option value="">Choose a speaker</option>
+                  {speakers.map(({ name }) => <option key={name} value={name}>{name}</option>)}
+                </select>
+              </label>
+              <label className="space-y-1 text-xs text-content-secondary">
+                <span>Keep this speaker</span>
+                <select className={INPUT} value={merge.to} disabled={saving || speakerEditsDisabled} onChange={(e) => setMerge({ ...merge, to: e.target.value })}>
+                  <option value="">Choose a speaker</option>
+                  {speakers.filter(({ name }) => name !== merge.from).map(({ name }) => <option key={name} value={name}>{name}</option>)}
+                </select>
+              </label>
+            </div>
+            {canMerge && <p className="text-xs text-content-secondary">All lines from {merge.from} will be labeled {merge.to}.</p>}
+            <div className="flex flex-wrap gap-2">
+              <button type="submit" className={SPEAKER_BUTTON} disabled={!canMerge || saving || speakerEditsDisabled}>{saving ? 'Merging…' : 'Merge'}</button>
+              <button type="button" className={SPEAKER_BUTTON} disabled={saving} onClick={() => {
+                setMerge(null)
+                setError(null)
+              }}>Cancel</button>
+            </div>
+          </form>
+        )}
         <ul className="flex flex-wrap gap-1.5">
-          {speakers.map((s) => (
-            <li key={s.name} className="max-w-full">
-              {renaming === s.name ? (
-                <form
-                  className="flex items-center gap-1"
-                  onSubmit={(e) => {
-                    e.preventDefault()
-                    void submitRename()
-                  }}
-                >
-                  <label htmlFor="speaker-rename" className="sr-only">
-                    New name for {s.name}
-                  </label>
-                  <input
-                    id="speaker-rename"
-                    autoFocus
-                    maxLength={MAX_SPEAKER_NAME}
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Escape') setRenaming(null)
+          {speakers.map((s) => {
+            const preview = previews.get(s.name)
+            return (
+              <li key={s.name} className="max-w-full">
+                {renaming === s.name ? (
+                  <form
+                    className="flex items-center gap-1"
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      void submitRename()
                     }}
-                    className={`${INPUT} w-44 py-1`}
-                  />
-                  <button type="submit" aria-label="Save name" disabled={saving} className={ICON_BUTTON}>
-                    {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Check className="h-4 w-4" aria-hidden="true" />}
-                  </button>
-                  <button type="button" aria-label="Cancel rename" onClick={() => setRenaming(null)} className={ICON_BUTTON}>
-                    <X className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                </form>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => startRename(s.name)}
-                  aria-label={`Rename ${s.name}`}
-                  className="inline-flex min-h-8 max-w-full items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-left text-xs text-content-primary hover:border-line-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary"
-                >
-                  <span className="min-w-0 break-words">{s.name}</span>
-                  <span className="shrink-0 tabular-nums text-content-secondary">{s.lines}</span>
-                  <Pencil className="h-3 w-3 shrink-0 text-content-secondary" aria-hidden="true" />
-                </button>
-              )}
-            </li>
-          ))}
+                  >
+                    <label htmlFor="speaker-rename" className="sr-only">
+                      New name for {s.name}
+                    </label>
+                    <input
+                      id="speaker-rename"
+                      autoFocus
+                      maxLength={MAX_SPEAKER_NAME}
+                      value={newName}
+                      onChange={(e) => setNewName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') setRenaming(null)
+                      }}
+                      className={`${INPUT} w-44 py-1`}
+                    />
+                    <button type="submit" aria-label="Save name" disabled={saving || speakerEditsDisabled} className={ICON_BUTTON}>
+                      {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Check className="h-4 w-4" aria-hidden="true" />}
+                    </button>
+                    <button type="button" aria-label="Cancel rename" onClick={() => setRenaming(null)} className={ICON_BUTTON}>
+                      <X className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                  </form>
+                ) : (
+                  <div className="flex max-w-full items-center rounded-full border border-line">
+                    {onPreviewSpeaker && preview && (
+                      <button type="button" title={`Preview ${s.name}`} aria-label={`Preview ${s.name}`} className={`${ICON_BUTTON} rounded-full`} onClick={() => onPreviewSpeaker(preview.atMs, preview.endMs)}>
+                        <Play className="h-3 w-3" aria-hidden="true" />
+                      </button>
+                    )}
+                    <button type="button" onClick={() => startRename(s.name)} aria-label={`Rename ${s.name}`} disabled={saving || speakerEditsDisabled} className={`${SPEAKER_BUTTON} min-w-0 border-0 text-left`}>
+                      <span className="min-w-0 break-words">{s.name}</span>
+                      <span className="shrink-0 tabular-nums text-content-secondary">{s.lines}</span>
+                      <Pencil className="h-3 w-3 shrink-0 text-content-secondary" aria-hidden="true" />
+                    </button>
+                  </div>
+                )}
+              </li>
+            )
+          })}
         </ul>
         {(unnamed || guesses.length > 0) && (
           <div className="mt-2" data-testid="speaker-suggestions">
@@ -299,7 +363,7 @@ export function TranscriptPanel({ meetingId, segments, onRenamed, suggestions, f
                     <b className="text-content-primary">{g.name}</b>
                     <span className="tabular-nums text-content-secondary">{Math.round(g.confidence * 100)}%</span>
                     {g.evidence && <q className="min-w-0 max-w-full truncate text-content-secondary">{g.evidence}</q>}
-                    <button type="button" onClick={() => void acceptGuess(g)} disabled={saving} className="inline-flex min-h-8 items-center gap-1 rounded-full border border-line px-2.5 py-1 text-xs text-content-primary hover:border-line-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary disabled:opacity-40" aria-label={`Rename ${g.speaker} to ${g.name}`}>
+                    <button type="button" onClick={() => void saveSpeaker(g.speaker, g.name)} disabled={saving || speakerEditsDisabled} className={SPEAKER_BUTTON} aria-label={`Rename ${g.speaker} to ${g.name}`}>
                       <Check className="h-3 w-3" aria-hidden="true" /> Use name
                     </button>
                     <button type="button" onClick={() => setGuesses((prev) => prev.filter((x) => x.speaker !== g.speaker))} className={ICON_BUTTON} aria-label={`Dismiss ${g.name} for ${g.speaker}`}>
@@ -310,7 +374,7 @@ export function TranscriptPanel({ meetingId, segments, onRenamed, suggestions, f
               </ul>
             )}
             {unnamed && guesses.length === 0 && (
-              <button type="button" onClick={() => void askForNames()} disabled={guessing} className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-xs text-content-primary hover:border-line-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary disabled:opacity-40">
+              <button type="button" onClick={() => void askForNames()} disabled={guessing || speakerEditsDisabled} className={SPEAKER_BUTTON}>
                 {guessing && <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />}
                 {guessing ? 'Working out names' : 'Suggest names'}
               </button>

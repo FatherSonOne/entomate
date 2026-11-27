@@ -600,6 +600,22 @@ describe('meeting routes are org-scoped', () => {
     expect((await request(app).patch(url).set(as(MEMBER)).send({ from: 'Nobody', to: 'X' })).status).toBe(404);
     expect((await request(app).patch(url).set(as(OUTSIDER)).send({ from: 'Bo', to: 'X' })).status).toBe(404);
   });
+
+  test('merging requires an existing destination and preserves the lines and timing', async () => {
+    const meeting = mockDb.meetings.find(row => row.id === MEETING_A);
+    meeting.attendees = ['Speaker 1', 'Bo'];
+    meeting.recording_job = { status: 'done', speakers: 2 };
+    const url = `/api/meetings/${MEETING_A}/speakers`;
+    await request(app).patch(url).set(as(MEMBER)).send({ from: 'Speaker 1', to: 'Missing', merge: true }).expect(404);
+    await request(app).patch(url).set(as(MEMBER)).send({ from: 'Speaker 1', to: 'Bo', merge: true }).expect(200);
+    expect(meeting.transcript_segments).toEqual([
+      { atMs: 0, speaker: 'Bo', text: 'hi' },
+      { atMs: 5000, speaker: 'Bo', text: 'yo' },
+    ]);
+    expect(meeting.transcript).toBe('Bo: hi\nBo: yo');
+    expect(meeting.attendees).toEqual(['Bo']);
+    expect(meeting.recording_job.speakers).toBe(1);
+  });
 });
 
 describe('ingestBotTranscript: one finishing step with the browser recorder', () => {

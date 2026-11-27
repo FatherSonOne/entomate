@@ -124,6 +124,7 @@ async function transcribeRecording(buffer, mimeType, onProgress = async () => {}
     });
     const samples = new Map();
     let nextSpeaker = 1;
+    await onProgress({ processedMs: 0, totalMs: durationMs });
     if (!durationMs) {
       const lines = await requestClip({ files, model, clip: input, mimeType, samples, nextSpeaker });
       if (lines === null) throw new Error('Gemini returned an incomplete transcript');
@@ -155,6 +156,7 @@ async function transcribeRecording(buffer, mimeType, onProgress = async () => {}
         await playbackFile.extractTranscriptionClip(source, sample, atMs, sampleMs);
         samples.set(line.speaker, (await fs.readFile(sample)).toString('base64'));
       }
+      await onProgress({ processedMs: startMs + lengthMs, totalMs: durationMs });
     }
 
     for (let start = 0; start < durationMs; start += CLIP_MS) {

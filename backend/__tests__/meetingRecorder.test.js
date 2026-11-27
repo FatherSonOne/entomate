@@ -349,21 +349,41 @@ describe('recorder routes', () => {
     const previous = meeting(id);
     previous.summary = 'Edited summary';
     const beforeActions = JSON.stringify(mockDb.action_items);
-    geminiRecording.transcribeRecording.mockResolvedValueOnce([
-      { atMs: 1000, endMs: 3000, speaker: 'Speaker 1', text: 'Opening remarks.' },
-      { atMs: 54000, endMs: 59000, speaker: 'Speaker 2', text: 'Ship the launch on the fourteenth.' },
-    ]);
+    let announceProgress;
+    let resume;
+    const progressSaved = new Promise(resolve => { announceProgress = resolve; });
+    const resumeTranscription = new Promise(resolve => { resume = resolve; });
+    geminiRecording.transcribeRecording.mockImplementationOnce(async (_audio, _mime, report) => {
+      await report({ processedMs: 30_000, totalMs: 60_000 });
+      announceProgress();
+      await resumeTranscription;
+      return [
+        { atMs: 1000, endMs: 3000, speaker: 'Speaker 1', text: 'Opening remarks.' },
+        { atMs: 54000, endMs: 59000, speaker: 'Speaker 2', text: 'Ship the launch on the fourteenth.' },
+      ];
+    });
 
     const path = `/api/recordings/${id}/rebuild-transcript`;
     await request(server).post(path).set(as(OUTSIDER)).expect(404);
     await request(server).post(path).set(as(MEMBER)).expect(202);
+    await progressSaved;
+    try {
+      expect(meeting(id).recording_job.transcriptRebuildProgress).toEqual({
+        stage: 'transcribing', processedMs: 30_000, totalMs: 60_000,
+      });
+    } finally {
+      resume();
+    }
     await settle(id);
 
     const row = meeting(id);
     expect(row.transcript_segments.at(-1)).toMatchObject({ atMs: 54000, endMs: 59000, speaker: 'Speaker 2' });
     expect(row.summary).toBe('Edited summary');
     expect(row.summary_moments.decisions).toEqual([54000]);
-    expect(row.recording_job).toMatchObject({ status: 'done', transcriptRebuildAt: null, audioKept: true });
+    expect(row.recording_job).toMatchObject({
+      status: 'done', transcriptRebuildAt: null, transcriptRebuildProgress: null,
+      transcriptRebuiltAt: expect.any(String), audioKept: true,
+    });
     expect(JSON.stringify(mockDb.action_items)).toBe(beforeActions);
   });
 

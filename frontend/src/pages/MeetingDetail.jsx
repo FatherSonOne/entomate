@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef, useSyncExternalStore } from 'react'
 import { useLocation, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
-import { Loader2, Plus, Send } from 'lucide-react'
+import { Loader2, Plus, Send, X } from 'lucide-react'
 import { meetingsApi, integrationsApi, calendarApi, reportsApi } from '../services/api'
 import ActionItemsList from '../components/ActionItemsList'
 import ChatChannelSelector from '../components/ChatChannelSelector'
@@ -85,6 +85,19 @@ export default function MeetingDetail() {
     || (!recordingJob.source && !meeting?.recording_job?.botSessionId && recordingJob.mode))
   const canRebuildTranscript = keptRecording && browserRecording
   const [requestingTranscriptRebuild, setRequestingTranscriptRebuild] = useState(false)
+  const rebuiltAt = recordingJob?.transcriptRebuiltAt
+  const completionKey = `entomate:transcript-rebuilt:${id}`
+  const [dismissedRebuild, setDismissedRebuild] = useState(null)
+  const seenRebuild = useMemo(() => {
+    try { return sessionStorage.getItem(completionKey) } catch { return null }
+  }, [completionKey])
+  const completionRevision = `${completionKey}:${rebuiltAt}`
+  const showRebuildCompletion = Boolean(rebuiltAt && transcriptSegments?.length && !recordingJob?.transcriptRebuildAt
+    && !recordingJob?.transcriptRebuildError && !requestingTranscriptRebuild && completionRevision !== dismissedRebuild && rebuiltAt !== seenRebuild)
+  const dismissRebuildCompletion = () => {
+    setDismissedRebuild(completionRevision)
+    try { sessionStorage.setItem(completionKey, rebuiltAt) } catch { /* In-memory dismissal still applies. */ }
+  }
   // A browser recording whose minutes are still being written: empty sections say so instead of "none".
   const minutesPending = ['transcribing', 'backup'].includes(recordingJob?.status)
   const jumpToTranscript = useCallback((atMs, play = true, eventId = null) => {
@@ -291,13 +304,13 @@ export default function MeetingDetail() {
   }, [])
   useEffect(() => { setTemplatePick(meeting?.summary_template || '') }, [meeting?.summary_template])
   const handleRewriteSummary = async (template = templatePick) => {
-    if (!template) return
-    setTemplatePick(template)
+    if (rewriting || rebuildingTranscript || requestingTranscriptRebuild) return
+    if (template) setTemplatePick(template)
     setRewriting(true)
     try {
-      await meetingsApi.regenerateSummary(id, template)
-      cache.invalidate(`/meetings/${id}`)
-      setMeeting(await meetingsApi.get(id))
+      await meetingsApi.regenerateSummary(id, template || undefined)
+      if (showRebuildCompletion) dismissRebuildCompletion()
+      await refreshMeeting()
       toast.success('Rewritten', 'The summary was rewritten for this meeting type')
     } catch (err) {
       console.error('Failed to rewrite summary:', err)
@@ -562,7 +575,7 @@ export default function MeetingDetail() {
           { key: 'rename', label: 'Rename', onSelect: startEditTitle },
           ...(canRebuildTranscript ? [{
             key: 'rebuild-transcript', label: 'Rebuild transcript from audio',
-            disabled: requestingTranscriptRebuild || rebuildingTranscript, onSelect: handleRebuildTranscript,
+            disabled: requestingTranscriptRebuild || rebuildingTranscript || rewriting, onSelect: handleRebuildTranscript,
           }] : []),
           { key: 'cal', label: calendarSyncing ? 'Adding to calendar' : 'Add to calendar', disabled: calendarSyncing, onSelect: handleAddToCalendar },
           ...(meeting.transcript && templates.length > 0 ? [
@@ -571,7 +584,7 @@ export default function MeetingDetail() {
               key: `t-${t.id}`,
               label: t.label,
               hint: t.id === (meeting.summary_template || '') ? 'Current' : undefined,
-              disabled: rewriting,
+              disabled: rewriting || rebuildingTranscript || requestingTranscriptRebuild,
               onSelect: () => handleRewriteSummary(t.id),
             })),
           ] : []),
@@ -664,6 +677,8 @@ export default function MeetingDetail() {
               focusEventId={focusEventId}
               playingAtMs={playable ? playingAtMs : null}
               onPlayFrom={playable ? (atMs) => playerRef.current?.playFrom(atMs) : undefined}
+              onPreviewSpeaker={playable ? (atMs, endMs) => playerRef.current?.playFrom(atMs, endMs) : undefined}
+              speakerEditsDisabled={rebuildingTranscript || requestingTranscriptRebuild}
               onClip={(line) => clipToSearchNotes({ kind: 'transcript', body: line.speaker ? `${line.speaker}: ${line.text}` : line.text, atMs: line.atMs })}
               onCreateTask={openTask}
               suggestions={meeting.recording_job?.speakerSuggestions}
@@ -705,6 +720,18 @@ export default function MeetingDetail() {
       <div className="bs-mtg-status-row">
         {writingLiveMinutes ? <Signal tone="brand">Writing meeting minutes</Signal>
           : <RecordingStatus meetingId={meeting.id} recordingJob={meeting.recording_job} onRefresh={refreshMeeting} hasSummary={!!meeting.summary} hasTranscript={!!meeting.transcript} title={meeting.title} attendees={meeting.attendees} />}
+        {showRebuildCompletion && (
+          <div className="bs-recstat" data-tone="live">
+            <div role="status"><Signal tone="live">Transcript rebuilt · {transcriptSegments.length.toLocaleString()} {transcriptSegments.length === 1 ? 'line' : 'lines'}</Signal></div>
+            <p className="bs-recstat-text">Use the rebuilt transcript to refresh the summary, key points and decisions.</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <Key onClick={() => handleRewriteSummary()} disabled={rewriting}>
+                {rewriting ? 'Rewriting summary…' : 'Rewrite summary'}
+              </Key>
+              <Key iconOnly aria-label="Dismiss transcript rebuild notice" onClick={dismissRebuildCompletion}><X aria-hidden="true" /></Key>
+            </div>
+          </div>
+        )}
       </div>
 
       {playable && (

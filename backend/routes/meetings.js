@@ -808,7 +808,7 @@ ${meeting.transcript}
 
 /**
  * PATCH /api/meetings/:id/speakers
- * Rename a speaker everywhere in a meeting's transcript: { from, to }.
+ * Rename a speaker everywhere in a meeting's transcript. With merge: true, to must be an existing label.
  * Diarization and platform names are often "Speaker 2" or a dial-in number, so this is
  * how a teammate fixes the labels once. Any member of the meeting's org may do it, the
  * same people who can read the transcript. Both the timed lines and the flat text change,
@@ -819,10 +819,12 @@ router.patch('/:id/speakers', authenticate, async (req, res) => {
     const { id } = req.params;
     const from = typeof req.body?.from === 'string' ? req.body.from.trim() : '';
     const to = typeof req.body?.to === 'string' ? req.body.to.trim() : '';
+    const merge = req.body?.merge === true;
 
     if (!from || !to) {
       return res.status(400).json({ error: 'Both the current and the new speaker name are required' });
     }
+    if (merge && from === to) return res.status(400).json({ error: 'Choose two different speakers to merge' });
     if (to.length > MAX_SPEAKER_NAME) {
       return res.status(400).json({ error: `A speaker name can be at most ${MAX_SPEAKER_NAME} characters` });
     }
@@ -839,7 +841,7 @@ router.patch('/:id/speakers', authenticate, async (req, res) => {
 
     const { data: meeting, error } = await supabase
       .from('meetings')
-      .select('id, transcript, transcript_segments, attendees, recording_job')
+      .select('id, transcript, transcript_segments, attendees, recording_job, updated_at')
       .eq('id', id)
       .eq('org_id', orgId)
       .single();
@@ -851,26 +853,42 @@ router.patch('/:id/speakers', authenticate, async (req, res) => {
     if (!segments || !segments.some((s) => s?.speaker === from)) {
       return res.status(404).json({ error: 'That speaker is not in this transcript' });
     }
+    if (merge && !segments.some((s) => s?.speaker === to)) {
+      return res.status(404).json({ error: 'The speaker to keep is no longer in this transcript' });
+    }
+    const job = meeting.recording_job;
+    if (job?.transcriptRebuildAt && require('../services/meetingRecorder').isTranscriptRebuilding(job)) {
+      return res.status(409).json({ error: 'Wait for the transcript rebuild to finish before editing speakers' });
+    }
 
     const renamed = segments.map((s) => (s?.speaker === from ? { ...s, speaker: to } : s));
     const { buildTranscriptText } = require('../services/transcriptIngest');
-    const { data: updated, error: updateError } = await supabase
+    let write = supabase
       .from('meetings')
       .update({
         transcript_segments: renamed,
         transcript: buildTranscriptText(renamed),
         // The attendee list drives carry-forward matching, so it follows the rename.
         attendees: speakerNames.renameAttendees(meeting.attendees, { [from]: to }),
-        ...(Array.isArray(meeting.recording_job?.speakerSuggestions)
-          ? { recording_job: { ...meeting.recording_job, speakerSuggestions: meeting.recording_job.speakerSuggestions.filter((g) => g?.speaker !== from && g?.name !== to) } }
+        ...(job
+          ? { recording_job: {
+            ...job,
+            ...(Array.isArray(job.speakerSuggestions)
+              ? { speakerSuggestions: job.speakerSuggestions.filter((g) => g?.speaker !== from && g?.name !== to) }
+              : {}),
+            ...(merge ? { speakers: new Set(renamed.map(s => s?.speaker).filter(Boolean)).size } : {}),
+          } }
           : {}),
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
-      .eq('org_id', orgId)
+      .eq('org_id', orgId);
+    write = meeting.updated_at ? write.eq('updated_at', meeting.updated_at) : write.is('updated_at', null);
+    const { data: updated, error: updateError } = await write
       .select('id, transcript, transcript_segments, attendees, recording_job')
-      .single();
-    if (updateError || !updated) throw updateError || new Error('Speaker rename failed');
+      .maybeSingle();
+    if (updateError) throw updateError;
+    if (!updated) return res.status(409).json({ error: 'The meeting changed. Reload the meeting and try again.' });
 
     // Action items the summary gave to "Speaker 2" now belong to the real person.
     const { error: itemsError } = await supabase

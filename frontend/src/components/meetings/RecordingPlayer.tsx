@@ -10,8 +10,8 @@ import './RecordingPlayer.css'
 export interface RecordingPlayerHandle {
   /** The audio can seek immediately. */
   isReady: () => boolean
-  /** Play from this moment (ms from the start), loading the recording if needed. */
-  playFrom: (atMs: number) => void
+  /** Play from this moment, optionally stopping at the end of a preview. */
+  playFrom: (atMs: number, endMs?: number) => void
 }
 
 export interface RecordingPlayerProps {
@@ -39,6 +39,7 @@ interface Source extends RecordingAudio {
 interface SeekRequest {
   atMs: number
   play: boolean
+  endMs?: number
 }
 
 const SPEEDS = [0.75, 1, 1.25, 1.5, 2]
@@ -80,6 +81,7 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
   const audioRef = useRef<HTMLAudioElement>(null)
   const request = useRef<AbortController | null>(null)
   const pending = useRef<SeekRequest | null>(null)
+  const previewEnd = useRef<number | undefined>(undefined)
   const mediaReady = useRef(false)
   const measuring = useRef(false)
   const renewed = useRef(false)
@@ -157,6 +159,10 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
   const updatePosition = (audio: HTMLAudioElement): void => {
     if (!mediaReady.current || !Number.isFinite(audio.currentTime)) return
     const atMs = Math.round(audio.currentTime * 1000)
+    if (previewEnd.current !== undefined && atMs >= previewEnd.current) {
+      previewEnd.current = undefined
+      audio.pause()
+    }
     setPosition(atMs)
     const second = Math.floor(atMs / 1000)
     if (second !== lastSecond.current) {
@@ -175,20 +181,22 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
     })
   }
 
-  const performSeek = (audio: HTMLAudioElement, { atMs, play: resume }: SeekRequest): void => {
+  const performSeek = (audio: HTMLAudioElement, { atMs, play: resume, endMs }: SeekRequest): void => {
     const duration = finiteDuration(audio.duration) * 1000
     const clamped = Math.max(0, duration ? Math.min(atMs, duration) : atMs)
     if (Math.abs(audio.currentTime * 1000 - clamped) > 0.5) {
       audio.currentTime = clamped / 1000
       updatePosition(audio)
     }
+    previewEnd.current = endMs
     if (resume) play(audio)
   }
 
-  const seek = (atMs: number, resume = false): void => {
+  const seek = (atMs: number, resume = false, endMs?: number): void => {
     if (!Number.isFinite(atMs)) return
+    previewEnd.current = undefined
     const audio = audioRef.current
-    const requested = { atMs, play: resume || Boolean(pending.current?.play) }
+    const requested = { atMs, play: resume || Boolean(pending.current?.play), endMs }
     if (mediaReady.current && audio) {
       performSeek(audio, requested)
       return
@@ -200,7 +208,7 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
 
   useImperativeHandle(ref, () => ({
     isReady: () => mediaReady.current,
-    playFrom: (atMs) => seek(atMs, true),
+    playFrom: (atMs, endMs) => seek(atMs, true, endMs),
   }))
 
   const applyMetadata = (audio: HTMLAudioElement): void => {
@@ -241,7 +249,7 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
     setPlaying(false)
     if (source && !audioUrl && !source.blob && !renewed.current) {
       renewed.current = true
-      pending.current ??= { atMs: Math.round(audio.currentTime * 1000), play: playing }
+      pending.current ??= { atMs: Math.round(audio.currentTime * 1000), play: playing, endMs: previewEnd.current }
       void load(true)
       return
     }
@@ -251,6 +259,7 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
   }
 
   const togglePlay = (): void => {
+    previewEnd.current = undefined
     const audio = audioRef.current
     if (!mediaReady.current || !audio) {
       seek(position, true)
@@ -270,6 +279,7 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
       request.current?.abort()
       request.current = null
       pending.current = null
+      previewEnd.current = undefined
       mediaReady.current = false
       setAudioRemoved(true)
       setWaveStatus('idle')
@@ -307,7 +317,7 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
           onSeeked={e => updatePosition(e.currentTarget)}
           onPlaying={() => { renewed.current = false; setPlaying(true) }}
           onPause={() => setPlaying(false)}
-          onEnded={() => setPlaying(false)}
+          onEnded={() => { previewEnd.current = undefined; setPlaying(false) }}
           onError={e => onError(e.currentTarget)}
         />
       )}
