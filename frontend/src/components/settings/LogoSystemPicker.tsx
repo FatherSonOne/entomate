@@ -6,7 +6,7 @@ import EnhancedLoadingScreen from '../EnhancedLoadingScreen'
 import { Wordmark } from '../Logo'
 import LogoMotionGallery from './LogoMotionGallery'
 import {
-  LOGO_FAMILIES, LOGO_SYSTEMS, logoAsset, logosInFamily, setLogo, useLogoSystem,
+  LOGO_FAMILIES, LOGO_SYSTEMS, logoAsset, logosInFamily, retryLogoSync, setLogo, useLogoSyncStatus, useLogoSystem,
   type LogoSystem,
 } from '../../services/logoSystem'
 import '../../styles/logo-picker.css'
@@ -58,6 +58,7 @@ function SizeProof({ logo, compact = false }: { logo: LogoSystem; compact?: bool
  */
 export default function LogoSystemPicker(): React.ReactElement {
   const inUse = useLogoSystem()
+  const syncStatus = useLogoSyncStatus()
   const isPhone = useMediaQuery(PHONE_QUERY)
   const [preview, setPreview] = useState<boolean>(false)
   const [panel, setPanel] = useState<boolean>(false)
@@ -132,6 +133,18 @@ export default function LogoSystemPicker(): React.ReactElement {
           {panel ? 'Hide preview' : 'Show preview'}
         </Key>
       </div>
+
+      {syncStatus !== 'browser' && (
+        <div className="lp-sync">
+          <span role="status">
+            {syncStatus === 'saving' ? 'Saving logo to your account…'
+              : syncStatus === 'saved' ? 'Logo saved to your account'
+              : syncStatus === 'retry' ? 'Account logo sync unavailable'
+              : 'Logo choices sync across devices'}
+          </span>
+          {syncStatus === 'retry' && <Key size="sm" onClick={retryLogoSync}>Retry sync</Key>}
+        </div>
+      )}
 
       <div id="lp-gallery" hidden={!galleryOpen}>
         {galleryOpen && <LogoMotionGallery activeLogoId={inUse.id} onSelectLogo={setLogo} />}
