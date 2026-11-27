@@ -2278,6 +2278,10 @@ div.bs-srch-empty p { margin: 0; }
 .bs-srch-claim-source > span { color: var(--bs-ink); font-weight: 600; text-decoration: underline; }
 .bs-srch-claim-source q { color: var(--bs-ink2); }
 .bs-srch-claim-source:focus-visible { outline: 2px solid var(--bs-brand); outline-offset: 2px; }
+.bs-srch-recap { margin-top: 12px; padding-block: 10px; border-block: 1px solid var(--bs-rule2); }
+.bs-srch-recap h2, .bs-srch-recap-topic h3 { margin: 0; color: var(--bs-ink); font-size: 14px; }
+.bs-srch-recap p { margin: 4px 0 0; color: var(--bs-ink2); font-size: 13px; overflow-wrap: anywhere; }
+.bs-srch-recap-topic { margin-top: 14px; }
 
 .bs-srch-recent button { all: unset; box-sizing: border-box; cursor: pointer; width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--bs-rule2); font-size: 14px; color: var(--bs-ink); }
 .bs-srch-recent button > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

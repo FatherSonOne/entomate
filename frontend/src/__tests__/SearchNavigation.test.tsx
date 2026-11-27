@@ -88,7 +88,9 @@ describe('Search and Ask navigation', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Ask Entomate' }))
     expect(await screen.findByText('The vendor needed more time.')).toBeInTheDocument()
     expect(api.askStream).toHaveBeenCalledOnce()
-    expect(api.askStream).toHaveBeenCalledWith({ question: 'Why did launch move?' }, expect.any(Object))
+    expect(api.askStream).toHaveBeenCalledWith({
+      question: 'Why did launch move?', workspaceId: 'search-workspace', timeZone: expect.any(String),
+    }, expect.any(Object))
   })
 
   test('a timed result opens the source and Back to Search restores its filtered results and focus', async () => {

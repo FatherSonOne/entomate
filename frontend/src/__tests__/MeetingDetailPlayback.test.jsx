@@ -225,7 +225,77 @@ describe('a pressed timecode plays the recording', () => {
     await waitFor(() => expect(screen.getByRole('link', { name: /Planning · 00:22 · Pat/ })).toHaveFocus())
     expect(screen.getByText('Pat owns the launch plan update.')).toBeInTheDocument()
     expect(search.askStream).toHaveBeenCalledTimes(1)
-    expect(search.askStream).toHaveBeenCalledWith({ question }, expect.any(Object))
+    expect(search.askStream).toHaveBeenCalledWith({ question, workspaceId: 'playback-org', timeZone: expect.any(String) }, expect.any(Object))
+  })
+
+  test('monthly recap restores coverage and the exact Before and After links without a second Ask request', async () => {
+    const question = 'What changed this month?'
+    const beforeQuote = 'We agreed to launch on Monday.'
+    const afterQuote = 'The launch is now scheduled for Friday.'
+    const laterRevision = 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb'
+    const sources = [
+      { id: 'before-m1', title: 'Launch planning', date: '2026-11-06T18:00:00Z', speaker: 'Ana', quote: beforeQuote, role: 'before',
+        atMs: 22_000, passage: { revision: REVISION, kind: 'segment', position: 2 } },
+      { id: 'after-m2', title: 'Launch follow-up', date: '2026-11-20T18:00:00Z', speaker: 'Pat', quote: afterQuote, role: 'after',
+        atMs: 22_000, passage: { revision: laterRevision, kind: 'segment', position: 2 } },
+    ]
+    api.get.mockImplementation(async (id) => {
+      const source = sources.find((item) => item.id === id)
+      return {
+        ...MEETING, id, title: source.title,
+        recording_job: { status: 'done', audioKept: true, durationMs: 60_000 },
+        transcript_search_revision: source.passage.revision,
+        transcript_segments: [
+          { atMs: source.atMs, speaker: source.speaker, text: 'This is another line with the same timestamp.' },
+          { atMs: source.atMs, speaker: source.speaker, text: source.quote },
+          { atMs: source.atMs, speaker: source.speaker, text: 'The final line also shares that timestamp.' },
+        ],
+      }
+    })
+    const recap = { startDate: '2026-11-01', endDate: '2026-11-27', timeZone: 'America/New_York',
+      totalMeetings: 4, reviewedMeetings: 2, meetingsWithoutTranscripts: 1, unindexedMeetings: 1, unsampledMeetings: 0 }
+    const answer = 'Launch moved from Monday to Friday.'
+    search.askStream.mockImplementation(async (_data, callbacks) => {
+      callbacks.onComplete({ answer, recap, claims: [{ topic: 'Launch', text: answer, citations: sources }] })
+    })
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/search', search: `?q=${encodeURIComponent(question)}&ask=1`, key: crypto.randomUUID() }]}>
+        <NavTrailRecorder />
+        <BrowserBack />
+        <Routes>
+          <Route path="/search" element={<Search />} />
+          <Route path="/meetings/:id" element={<MeetingDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    const coverage = await screen.findByRole('region', { name: 'Monthly recap scope' })
+    expect(coverage).toHaveTextContent(/Nov 1.\D*27, 2026 · America\/New_York/)
+    expect(coverage).toHaveTextContent('2 of 4 meetings reviewed · 1 without transcripts · 1 awaiting indexing')
+    expect(screen.getByRole('heading', { name: 'Launch', exact: true })).toBeInTheDocument()
+    fireEvent.change(screen.getByRole('textbox', { name: 'Question about your meetings' }), { target: { value: 'Unsubmitted draft' } })
+
+    for (const [index, source] of sources.entries()) {
+      const linkName = new RegExp(`^${source.role} · ${source.title}`, 'i')
+      const link = screen.getByRole('link', { name: linkName })
+      expect(link).toHaveAttribute('href', `/meetings/${source.id}?tab=transcript&t=22000&rev=${source.passage.revision}&line=2`)
+      fireEvent.click(link)
+      const transcript = await screen.findByRole('list', { name: 'Transcript' })
+      const line = within(transcript).getByText(source.quote, { exact: false }).closest('li')
+      await waitFor(() => expect(line).toHaveFocus())
+      expect(line).toHaveAttribute('aria-current', 'true')
+      expect(api.get).toHaveBeenCalledWith(source.id, { _noCache: true })
+      if (index === 0) fireEvent.click(screen.getByRole('link', { name: 'Back to Search' }))
+      else fireEvent.click(screen.getByRole('button', { name: 'Browser back' }))
+      await waitFor(() => expect(screen.getByRole('link', { name: linkName })).toHaveFocus())
+      expect(screen.getByText(answer)).toBeInTheDocument()
+      expect(screen.getByRole('region', { name: 'Monthly recap scope' }).textContent).toBe(coverage.textContent)
+      expect(screen.getByRole('textbox', { name: 'Question about your meetings' })).toHaveValue('Unsubmitted draft')
+    }
+    expect(player.cueAt).toHaveBeenCalledWith(22_000)
+    expect(player.playFrom).not.toHaveBeenCalled()
+    expect(search.askStream).toHaveBeenCalledTimes(1)
+    expect(search.askStream).toHaveBeenCalledWith({ question, workspaceId: 'playback-org', timeZone: expect.any(String) }, expect.any(Object))
   })
 
   test('a Transcript & recording speaker button includes its line count and plays from the first line', async () => {

@@ -8,11 +8,12 @@ const { supabase } = require('../config/supabase');
 const ai = require('../config/ai');
 const embeddingService = require('../services/embeddingService');
 const askService = require('../services/askService');
+const { isMonthlyRecap } = require('../services/askMonthlyRecap');
 const { searchCache, suggestionCache, withCache } = require('../utils/cache');
 const { authenticate } = require('../middleware/auth');
 const log = require('../utils/log');
 const { attachOrgIds, getOrgIdForUser } = require('../utils/orgContext');
-const { meterAi } = require('../services/aiUsage');
+const { meterAi, meterAiForOrg } = require('../services/aiUsage');
 const searchEverything = require('../services/searchEverything');
 const searchNotes = require('../services/searchNotesService');
 
@@ -288,8 +289,27 @@ function validAskMeetingIds(ids) {
     ids.every((id) => typeof id === 'string' && /^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i.test(id)));
 }
 
+function meterAsk(req, res, next) {
+  if (!isMonthlyRecap(req.body?.question)) return meterAi(req, res, next);
+  const { workspaceId, timeZone = 'UTC' } = req.body;
+  const orgIds = req.orgIds || [];
+  const orgId = workspaceId ?? (orgIds.length === 1 ? orgIds[0] : null);
+  if (!orgId) return res.status(400).json({ error: 'Choose a workspace for the monthly recap' });
+  if (!orgIds.includes(orgId)) return res.status(403).json({ error: 'Workspace access required' });
+  try {
+    if (typeof timeZone !== 'string' || !timeZone || timeZone.length > 80) throw new Error('Invalid time zone');
+    // PostgreSQL and browsers accept IANA time zones. Reject raw offsets.
+    if (!/^[a-z][a-z0-9_+\-/]*$/i.test(timeZone)) throw new Error('Invalid time zone');
+    const canonicalTimeZone = new Intl.DateTimeFormat('en', { timeZone }).resolvedOptions().timeZone;
+    req.monthlyRecapScope = { orgId, timeZone: canonicalTimeZone };
+  } catch {
+    return res.status(400).json({ error: 'Choose a valid time zone for the monthly recap' });
+  }
+  return meterAiForOrg(orgId, res, next);
+}
+
 /** POST /api/search/ask */
-router.post('/ask', authenticate, meterAi, async (req, res) => {
+router.post('/ask', authenticate, meterAsk, async (req, res) => {
   try {
     const { question, conversationId, meetingIds } = req.body;
 
@@ -307,6 +327,7 @@ router.post('/ask', authenticate, meterAi, async (req, res) => {
     const answer = await askService.answerQuestion(question.trim(), {
       conversationId,
       meetingIds,
+      monthlyRecapScope: req.monthlyRecapScope,
       userId: req.user.id
     });
 
@@ -322,7 +343,7 @@ router.post('/ask', authenticate, meterAi, async (req, res) => {
  * POST /api/search/ask/stream
  * Ask AI a question with streaming response (SSE)
  */
-router.post('/ask/stream', authenticate, meterAi, async (req, res) => {
+router.post('/ask/stream', authenticate, meterAsk, async (req, res) => {
   try {
     const { question, conversationId, meetingIds } = req.body;
 
@@ -350,6 +371,7 @@ router.post('/ask/stream', authenticate, meterAi, async (req, res) => {
     await askService.answerQuestionStreaming(question.trim(), {
       conversationId,
       meetingIds,
+      monthlyRecapScope: req.monthlyRecapScope,
       userId: req.user.id,
       onChunk: (chunk) => {
         res.write(`data: ${JSON.stringify({ type: 'chunk', content: chunk })}\n\n`);
@@ -386,7 +408,7 @@ router.post('/ask/stream', authenticate, meterAi, async (req, res) => {
  * POST /api/search/ask/follow-up
  * Ask follow-up question in existing conversation
  */
-router.post('/ask/follow-up', authenticate, meterAi, async (req, res) => {
+router.post('/ask/follow-up', authenticate, meterAsk, async (req, res) => {
   try {
     const { question, conversationId } = req.body;
 
@@ -402,7 +424,9 @@ router.post('/ask/follow-up', authenticate, meterAi, async (req, res) => {
       return res.status(503).json({ error: 'AI service not configured' });
     }
 
-    const answer = await askService.answerQuestion(question.trim(), { conversationId, userId: req.user.id });
+    const answer = await askService.answerQuestion(question.trim(), {
+      conversationId, monthlyRecapScope: req.monthlyRecapScope, userId: req.user.id,
+    });
 
     res.json(answer);
 

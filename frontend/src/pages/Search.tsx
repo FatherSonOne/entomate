@@ -25,7 +25,7 @@ import {
 } from '../services/searchEngine'
 import type { Filter, SearchMode, SearchResponse, SearchResult } from '../services/searchEngine'
 import { readSearchVisit, rememberSearchVisit } from '../services/searchReturn'
-import type { AskClaim, AskMeeting, CompletedAnswer } from '../services/searchReturn'
+import type { AskClaim, AskMeeting, CompletedAnswer, MonthlyRecap } from '../services/searchReturn'
 import { meetingSourceHref } from '../services/meetingSourceLink'
 import {
   clipFromResult, clipKey, kindLabel, noteHref, notesToMarkdown, originLabel, sourceLine,
@@ -47,13 +47,13 @@ const ordinaryClick = (e: React.MouseEvent) => e.button === 0 && !e.metaKey && !
 
 export default function Search(): React.ReactElement {
   const { user } = useAuth() as unknown as { user: { id: string } | null }
-  const context = useOrgSafe() as { org: { id: string } | null } | null
+  const context = useOrgSafe() as { org: { id: string; name?: string } | null } | null
   const org = context?.org
   const owner = user?.id && org?.id ? `${user.id}:${org.id}` : null
-  return <SearchPage key={owner} owner={owner} />
+  return <SearchPage key={owner} owner={owner} workspace={org} />
 }
 
-function SearchPage({ owner }: { owner: string | null }): React.ReactElement {
+function SearchPage({ owner, workspace }: { owner: string | null; workspace?: { id: string; name?: string } | null }): React.ReactElement {
   const toast = useToast() as ToastApi
   const location = useLocation()
   const navigate = useNavigate()
@@ -221,7 +221,7 @@ function SearchPage({ owner }: { owner: string | null }): React.ReactElement {
 
       <div className="bs-srch-main">
         {isAsk ? (url.ask && q.length >= MIN_QUERY ? (
-          <AskAnswer key={q} question={q} showQuestion={draft.trim() !== q} initial={restoredAnswer} onClip={clip} clipped={notes.clipped}
+          <AskAnswer key={q} question={q} workspaceId={workspace?.id} workspaceName={workspace?.name} showQuestion={draft.trim() !== q} initial={restoredAnswer} onClip={clip} clipped={notes.clipped}
             linkState={linkState} onLeave={saveReturn} />
         ) : <p className="bs-srch-empty">Ask about a decision, a commitment, or what changed across your meetings.</p>) : q.length >= MIN_QUERY ? (
           <>
@@ -406,8 +406,10 @@ function agentWord(field: string): string {
 
 // ── Ask Entomate ──
 
-function AskAnswer({ question, showQuestion, initial, onClip, clipped, linkState, onLeave }: {
+function AskAnswer({ question, workspaceId, workspaceName, showQuestion, initial, onClip, clipped, linkState, onLeave }: {
   question: string
+  workspaceId?: string
+  workspaceName?: string
   showQuestion: boolean
   initial?: CompletedAnswer | null
   onClip: (n: NewNote) => void
@@ -418,6 +420,7 @@ function AskAnswer({ question, showQuestion, initial, onClip, clipped, linkState
   const [text, setText] = useState(initial?.text ?? '')
   const [citations, setCitations] = useState<AskMeeting[]>(initial?.meetings ?? [])
   const [claims, setClaims] = useState<AskClaim[] | undefined>(initial?.claims)
+  const [recap, setRecap] = useState(initial?.recap)
   const [state, setState] = useState<'asking' | 'done' | 'failed'>(initial ? 'done' : 'asking')
   const [attempt, setAttempt] = useState(0)
 
@@ -432,15 +435,16 @@ function AskAnswer({ question, showQuestion, initial, onClip, clipped, linkState
       setState('failed')
     }
     const askStream = (searchApi as unknown as {
-      askStream: (data: { question: string }, cb: {
+      askStream: (data: { question: string; workspaceId?: string; timeZone: string }, cb: {
         signal: AbortSignal
         onChunk: (c: string) => void
         onCitations: (c: AskMeeting[]) => void
-        onComplete: (r: { answer?: string; citations?: AskMeeting[]; claims?: AskClaim[] }) => void
+        onComplete: (r: { answer?: string; citations?: AskMeeting[]; claims?: AskClaim[]; recap?: MonthlyRecap }) => void
         onError: () => void
       }) => Promise<void>
     }).askStream
-    askStream({ question }, {
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+    askStream({ question, workspaceId, timeZone }, {
       signal: controller.signal,
       onChunk: (c) => { if (!controller.signal.aborted && !finished) { streamed += c; setText(streamed) } },
       onCitations: (c) => { if (!controller.signal.aborted && !finished) setCitations(Array.isArray(c) ? c : []) },
@@ -449,24 +453,32 @@ function AskAnswer({ question, showQuestion, initial, onClip, clipped, linkState
         if (r.answer) setText(r.answer)
         if (Array.isArray(r.citations)) setCitations(r.citations)
         if (Array.isArray(r.claims)) setClaims(r.claims)
+        setRecap(r.recap)
         finished = true
         setState('done')
       },
       onError: fail,
     }).then(fail, fail)
     return () => controller.abort()
-  }, [initial, question, attempt])
+  }, [initial, question, workspaceId, attempt])
 
   const meetings = claims ? [] : citations.filter((c) => c.type === 'meeting' && c.id)
   const meetingCount = new Set((claims ? claims.flatMap((claim) => claim.citations) : meetings).map((c) => c.id)).size
   const leave = (event: React.MouseEvent, id: string) => {
-    if (ordinaryClick(event)) onLeave(id, { question, text, meetings, claims })
+    if (ordinaryClick(event)) onLeave(id, { question, text, meetings, claims, recap })
   }
   const note: NewNote = {
     kind: 'answer', body: text.trim() || ' ', origin: 'ask', query: question,
     sourceLabel: meetingCount ? `${meetingCount} meeting${meetingCount === 1 ? '' : 's'}` : null,
   }
   const isClipped = clipped.has(clipKey(note))
+  const grouped = new Map<string, { topic?: string; items: { claim: AskClaim; index: number }[] }>()
+  claims?.forEach((claim, index) => {
+    const key = claim.topic?.toLocaleLowerCase() ?? ''
+    const group = grouped.get(key) ?? { topic: claim.topic, items: [] }
+    group.items.push({ claim, index })
+    grouped.set(key, group)
+  })
 
   return (
     <div className="bs-srch-answer" aria-live="polite">
@@ -479,6 +491,7 @@ function AskAnswer({ question, showQuestion, initial, onClip, clipped, linkState
         )}
       </div>
       {showQuestion && <p className="bs-srch-answer-question">{question}</p>}
+      {state === 'done' && recap && <RecapCoverage recap={recap} workspaceName={workspaceName} />}
       {state === 'failed' ? (
         <div className="bs-srch-empty">
           <p>Entomate couldn't answer right now.</p>
@@ -486,34 +499,41 @@ function AskAnswer({ question, showQuestion, initial, onClip, clipped, linkState
             setText('')
             setCitations([])
             setClaims(undefined)
+            setRecap(undefined)
             setState('asking')
             setAttempt((n) => n + 1)
           }}>Try again</Key>
         </div>
       ) : state === 'done' && !!claims?.length ? (
-        <ul className="bs-srch-claims">
-          {claims.map((claim, claimIndex) => (
-            <li key={claimIndex}>
-              <p className="bs-srch-answer-p">{claim.text}</p>
-              <ul className="bs-srch-claim-sources" aria-label="Transcript sources">
-                {claim.citations.map((source, sourceIndex) => {
-                  const id = `search-answer-claim-${claimIndex}-${sourceIndex}`
-                  const time = timecode(source.atMs)
-                  const moment = time ?? (source.passage.kind === 'segment' ? `Line ${source.passage.position}` : 'Transcript excerpt')
-                  return (
-                    <li key={id}>
-                      <Link id={id} className="bs-srch-claim-source"
-                        to={meetingSourceHref(source.id, source.atMs, source.passage)} state={linkState} onClick={(e) => leave(e, id)}>
-                        <span>{source.title} · {moment}{source.speaker ? ` · ${source.speaker}` : ''}{source.date ? ` · ${shortDate(source.date)}` : ''}</span>
-                        <q>{source.quote}</q>
-                      </Link>
-                    </li>
-                  )
-                })}
-              </ul>
-            </li>
-          ))}
-        </ul>
+        [...grouped].map(([key, group]) => (
+          <div key={key} className={group.topic ? 'bs-srch-recap-topic' : undefined}>
+            {group.topic && <h3>{group.topic}</h3>}
+            <ul className="bs-srch-claims">
+              {group.items.map(({ claim, index: claimIndex }) => (
+                <li key={claimIndex}>
+                  <p className="bs-srch-answer-p">{claim.text}</p>
+                  <ul className="bs-srch-claim-sources" aria-label="Transcript sources">
+                    {claim.citations.map((source, sourceIndex) => {
+                      const id = `search-answer-claim-${claimIndex}-${sourceIndex}`
+                      const time = timecode(source.atMs)
+                      const moment = time ?? (source.passage.kind === 'segment' ? `Line ${source.passage.position}` : 'Transcript excerpt')
+                      const label = source.role === 'before' ? 'Before · ' : source.role === 'after' ? 'After · ' : ''
+                      return (
+                        <li key={id}>
+                          <Link id={id} className="bs-srch-claim-source"
+                            to={meetingSourceHref(source.id, source.atMs, source.passage)} state={linkState} onClick={(e) => leave(e, id)}>
+                            <span>{label}{source.title} · {moment}{source.speaker ? ` · ${source.speaker}` : ''}{source.date ? ` · ${shortDate(source.date)}` : ''}</span>
+                            <q>{source.quote}</q>
+                          </Link>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))
       ) : (
         <p className="bs-srch-answer-p">{text || 'Reading your meetings…'}</p>
       )}
@@ -532,6 +552,28 @@ function AskAnswer({ question, showQuestion, initial, onClip, clipped, linkState
         </section>
       )}
     </div>
+  )
+}
+
+function RecapCoverage({ recap, workspaceName }: { recap: MonthlyRecap; workspaceName?: string }): React.ReactElement {
+  // These are calendar dates in the recap's time zone. Format them without shifting them.
+  const calendar = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+  const start = new Date(`${recap.startDate}T00:00:00Z`)
+  const end = new Date(`${recap.endDate}T00:00:00Z`)
+  const dateRange = calendar.formatRange(start, end)
+  const coverage = [
+    `${recap.reviewedMeetings} of ${recap.totalMeetings} meetings reviewed`,
+    recap.meetingsWithoutTranscripts ? `${recap.meetingsWithoutTranscripts} without transcripts` : '',
+    recap.unindexedMeetings ? `${recap.unindexedMeetings} awaiting indexing` : '',
+    recap.unsampledMeetings ? `${recap.unsampledMeetings} beyond the review limit` : '',
+  ].filter(Boolean).join(' · ')
+  return (
+    <section className="bs-srch-recap" aria-label="Monthly recap scope">
+      <h2>Monthly recap{workspaceName ? ` · ${workspaceName}` : ''}</h2>
+      <p>{dateRange} · {recap.timeZone}</p>
+      <p>{coverage}</p>
+      {recap.reviewedMeetings > 0 && <p>Based on selected transcript passages.</p>}
+    </section>
   )
 }
 

@@ -11,15 +11,28 @@ export interface AskCitation {
   quote: string
   atMs: number | null
   passage: PassageAnchor
+  role?: 'before' | 'after' | 'source'
 }
 
-export interface AskClaim { text: string; citations: AskCitation[] }
+export interface AskClaim { text: string; citations: AskCitation[]; topic?: string }
+
+export interface MonthlyRecap {
+  startDate: string
+  endDate: string
+  timeZone: string
+  totalMeetings: number
+  reviewedMeetings: number
+  meetingsWithoutTranscripts: number
+  unindexedMeetings: number
+  unsampledMeetings: number
+}
 
 export interface CompletedAnswer {
   question: string
   text: string
   meetings: AskMeeting[]
   claims?: AskClaim[]
+  recap?: MonthlyRecap
 }
 
 export interface SearchVisit {

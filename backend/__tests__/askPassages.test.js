@@ -10,13 +10,17 @@ jest.mock('../config/ai', () => ({
   generatePassageEmbeddings: jest.fn(),
 }));
 jest.mock('../utils/cache', () => ({}));
-jest.mock('../services/aiUsage', () => ({ meterAi: (req, res, next) => next() }));
+jest.mock('../services/aiUsage', () => ({
+  meterAi: (req, res, next) => next(),
+  meterAiForOrg: jest.fn((orgId, res, next) => next()),
+}));
 jest.mock('../middleware/auth', () => ({ authenticate: (req, res, next) => next() }));
 jest.mock('../services/embeddingService', () => ({}));
 
 const { supabase } = require('../config/supabase');
 const ai = require('../config/ai');
 const { backfillPassageEmbeddings } = require('../services/meetingPassageRetrieval');
+const { meterAiForOrg } = require('../services/aiUsage');
 const app = express();
 const orgId = 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
 const meetingId = 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb';
@@ -47,9 +51,11 @@ const indexed = evaluation.meetings.flatMap((meeting) => meeting.lines.map((line
 })));
 
 const coverageQuery = {};
+let orgMemberships;
 
 beforeEach(() => {
   jest.clearAllMocks();
+  orgMemberships = [orgId];
   ai.getPassageEmbeddingModel.mockReturnValue(null);
   for (const method of ['select', 'in', 'eq', 'not', 'limit']) coverageQuery[method] = jest.fn().mockReturnValue(coverageQuery);
   coverageQuery.abortSignal = jest.fn().mockResolvedValue({ data: [{ meeting_id: meetingId }] });
@@ -58,7 +64,7 @@ beforeEach(() => {
   writeMessages.mockResolvedValue({});
   supabase.from.mockImplementation((table) => {
     if (table === 'org_members') {
-      return { select: () => ({ eq: async () => ({ data: [{ org_id: orgId }] }) }) };
+      return { select: () => ({ eq: async () => ({ data: orgMemberships.map((org_id) => ({ org_id })) }) }) };
     }
     if (table === 'conversations') {
       return { insert: () => ({ select: () => ({ single: async () => ({ data: { id: conversationId } }) }) }) };
@@ -209,4 +215,76 @@ test('the worker embeds a batch of passages and submits each original revision f
     p_model: model, p_updates: [vendor, update].map(({ meeting_id, source_line, chunk_start }) =>
       ({ meeting_id, source_line, chunk_start, revision, embedding })),
   });
+});
+
+const monthlyWorkspace = '98765432-1234-4234-8234-123456789abc';
+const recap = {
+  startDate: '2026-11-01', endDate: '2026-11-27', timeZone: 'America/New_York',
+  totalMeetings: 4, reviewedMeetings: 2, meetingsWithoutTranscripts: 1,
+  unindexedMeetings: 1, unsampledMeetings: 0,
+};
+const oldPlan = { ...vendor, meeting_at: '2026-11-06T19:00:00Z', body: 'We agreed to launch on Monday.' };
+const newPlan = {
+  ...update, meeting_id: monthlyWorkspace, revision: '87654321-1234-4234-8234-123456789abc',
+  meeting_at: '2026-11-20T19:00:00Z', body: 'The launch is now scheduled for Friday.',
+};
+const ref = (id, row, role) => ({ id, quote: row.body, role });
+
+test('monthly Ask meters and reads only the selected workspace and verifies chronological quotes', async () => {
+  orgMemberships = [orgId, monthlyWorkspace];
+  supabase.rpc.mockResolvedValue({ data: { recap, passages: [oldPlan, newPlan] } });
+  const before = ref('p1', oldPlan, 'before');
+  const after = ref('p2', newPlan, 'after');
+  ai.chat.mockResolvedValue(modelAnswer([
+    { topic: 'Launch', kind: 'comparison', text: 'Launch moved from Monday to Friday.', evidence: [after, before] },
+    { topic: 'Launch', kind: 'comparison', text: 'Missing earlier evidence.', evidence: [after] },
+    { topic: 'Launch', kind: 'comparison', text: 'Reversed chronology.', evidence: [
+      { ...before, role: 'after' }, { ...after, role: 'before' },
+    ] },
+    { topic: 'Launch', kind: 'comparison', text: 'Same meeting.', evidence: [before, { ...before, role: 'after' }] },
+    { topic: 'Launch', kind: 'recorded', text: 'Friday was recorded as the launch date.', evidence: [{ ...after, role: 'source' }] },
+    { topic: 'Launch', kind: 'recorded', text: 'Invented quote.', evidence: [{ ...after, role: 'source', quote: 'We cancelled the launch.' }] },
+  ]));
+  const res = await request(app).post('/search/ask/stream').send({
+    question: 'What changed this month?', workspaceId: monthlyWorkspace, timeZone: 'America/New_York',
+  });
+  expect(res.status).toBe(200);
+  expect(meterAiForOrg).toHaveBeenCalledWith(monthlyWorkspace, expect.anything(), expect.any(Function));
+  expect(supabase.rpc).toHaveBeenCalledTimes(1);
+  expect(supabase.rpc).toHaveBeenCalledWith('get_ask_monthly_recap', {
+    p_org_id: monthlyWorkspace, p_time_zone: 'America/New_York', p_meeting_ids: null,
+  });
+  const result = extractEvents(res).at(-1);
+  expect(result.recap).toEqual(recap);
+  expect(result.claims).toHaveLength(2);
+  expect(result.claims[0]).toMatchObject({
+    topic: 'Launch', text: 'Launch moved from Monday to Friday.',
+    citations: [
+      { id: oldPlan.meeting_id, role: 'before', date: oldPlan.meeting_at, atMs: oldPlan.at_ms, quote: oldPlan.body,
+        passage: { kind: 'segment', revision: oldPlan.revision, position: 92 } },
+      { id: newPlan.meeting_id, role: 'after', date: newPlan.meeting_at, atMs: newPlan.at_ms, quote: newPlan.body,
+        passage: { kind: 'segment', revision: newPlan.revision, position: 93 } },
+    ],
+  });
+  expect(result.claims[1].citations[0]).toMatchObject({ role: 'source', quote: newPlan.body });
+});
+
+test('monthly Ask rejects a workspace outside the caller memberships and invalid time zones before reading evidence', async () => {
+  const question = 'What has changed so far this month?';
+  await request(app).post('/search/ask/stream').send({ question, workspaceId: monthlyWorkspace }).expect(403);
+  await request(app).post('/search/ask').send({ question, workspaceId: orgId, timeZone: '+05:00' }).expect(400);
+  orgMemberships = [orgId, monthlyWorkspace];
+  await request(app).post('/search/ask').send({ question }).expect(400);
+  expect(meterAiForOrg).not.toHaveBeenCalled();
+  expect(supabase.rpc).not.toHaveBeenCalled();
+  expect(ai.chat).not.toHaveBeenCalled();
+});
+
+test('monthly Ask returns coverage without generation when transcripts are unavailable', async () => {
+  const emptyRecap = { ...recap, totalMeetings: 1, reviewedMeetings: 0, unindexedMeetings: 0 };
+  supabase.rpc.mockResolvedValue({ data: { recap: emptyRecap, passages: [] } });
+  const res = await request(app).post('/search/ask').send({ question: 'What’s changed across meetings this month?' });
+  expect(res.status).toBe(200);
+  expect(res.body).toMatchObject({ recap: emptyRecap, claims: [], answer: expect.stringContaining("couldn't verify") });
+  expect(ai.chat).not.toHaveBeenCalled();
 });
