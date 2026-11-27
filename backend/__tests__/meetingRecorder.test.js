@@ -572,8 +572,8 @@ describe('recorder routes', () => {
     }).expect(201);
     const id = start.body.meetingId;
     const upload = (track, seq, durationMs = 30000, user = MEMBER) => request(server)
-      .put(`/api/recordings/${id}/pieces/${seq}`)
-      .query({ durationMs, ...(track === 'mix' ? {} : { track }) })
+      .put(`/api/recordings/${id}/pieces/${seq}${track === 'mix' ? '' : '/' + track}`)
+      .query({ durationMs })
       .set(as(user)).set('Content-Type', 'audio/webm').send(Buffer.from(`${track}-${seq}|`));
     await upload('mic', 0, 30000, OUTSIDER).expect(404);
     await upload('unknown', 0).expect(400);

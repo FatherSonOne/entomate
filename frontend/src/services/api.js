@@ -239,8 +239,8 @@ export const recordingsApi = {
   start: (data) => api.post('/recordings', data),
   // One piece of audio as the raw body; the server stores it by number, so a repeat is safe.
   uploadPiece: (meetingId, seq, durationMs, blob, contentType, track) =>
-    api.put(`/recordings/${meetingId}/pieces/${seq}`, blob, {
-      params: { durationMs, ...(track ? { track } : {}) },
+    api.put(`/recordings/${meetingId}/pieces/${seq}${track ? '/' + track : ''}`, blob, {
+      params: { durationMs },
       headers: { 'Content-Type': contentType },
       timeout: 60000,
     }),

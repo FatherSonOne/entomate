@@ -79,7 +79,7 @@ router.post('/', authenticate, async (req, res) => {
   }
 });
 
-router.put('/:id/pieces/:seq', authenticate, rawAudio, async (req, res) => {
+async function uploadRecordingPiece(req, res) {
   try {
     const orgId = await meetingNotes.assertMeetingAccess(req.user?.id, req.params.id);
     await recorder.savePiece({
@@ -87,14 +87,18 @@ router.put('/:id/pieces/:seq', authenticate, rawAudio, async (req, res) => {
       meetingId: req.params.id,
       seq: Number(req.params.seq),
       durationMs: Number(req.query.durationMs),
-      track: req.query.track,
+      track: req.params.track ?? req.query.track,
       buffer: Buffer.isBuffer(req.body) ? req.body : null,
     });
     res.status(204).end();
   } catch (err) {
     sendError(res, err, 'piece');
   }
-});
+}
+
+router.put('/:id/pieces/:seq', authenticate, rawAudio, uploadRecordingPiece);
+// A distinct URL makes older backends reject isolated chunks before they can reach the mix.
+router.put('/:id/pieces/:seq/:track', authenticate, rawAudio, uploadRecordingPiece);
 
 router.get('/:id/recovery', authenticate, async (req, res) => {
   try {
