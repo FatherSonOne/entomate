@@ -96,6 +96,22 @@ async function audioDuration(file) {
   return Math.round(seconds * 1000);
 }
 
+/** Render seekable mono Opus on the room recording clock. Inputs are local files. */
+async function renderAlignedAudio(clips, durationMs, output) {
+  const filters = clips.map(({ startMs, endMs }, i) => (
+    `[${i}:a:0]asetpts=PTS-STARTPTS,aresample=48000:async=1:first_pts=0,aformat=channel_layouts=mono,` +
+    `atrim=duration=${(endMs - startMs) / 1000},adelay=${startMs},` +
+    `apad,atrim=duration=${durationMs / 1000}[a${i}]`
+  ));
+  const mix = clips.map((_, i) => `[a${i}]`).join('');
+  filters.push(`${mix}amix=inputs=${clips.length}:normalize=0,alimiter=limit=0.95:latency=1[audio]`);
+  await run('ffmpeg', [
+    '-nostdin', '-hide_banner', '-loglevel', 'error', '-protocol_whitelist', 'file', '-y',
+    ...clips.flatMap(clip => ['-i', clip.file]), '-filter_complex', filters.join(';'), '-map', '[audio]',
+    '-c:a', 'libopus', '-b:a', '48k', ...MUXER_FLAGS.webm, output,
+  ], 5 * 60 * 1000);
+}
+
 /** Decode the joined MediaRecorder stream to indexed speech audio before seeking into it. */
 async function prepareTranscriptionAudio(input, output) {
   await run('ffmpeg', [
@@ -160,6 +176,6 @@ async function readWaveformPeaksFromAudio(audio) {
 }
 
 module.exports = {
-  makeSeekable, extractSpeechAudio, prepareTranscriptionAudio, extractTranscriptionClip,
+  makeSeekable, extractSpeechAudio, prepareTranscriptionAudio, extractTranscriptionClip, renderAlignedAudio, audioDuration,
   readWaveformPeaks, readWaveformPeaksFromAudio,
 };

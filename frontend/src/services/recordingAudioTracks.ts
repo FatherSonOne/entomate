@@ -1,13 +1,24 @@
 export const ISOLATED_AUDIO_TRACKS = ['mic', 'tab'] as const
 export type IsolatedAudioTrack = typeof ISOLATED_AUDIO_TRACKS[number]
 export const ROOM_PARTICIPANT_TRACKS = ['p1', 'p2', 'p3'] as const
-export type RoomParticipantTrack = typeof ROOM_PARTICIPANT_TRACKS[number]
+export type RoomParticipantTrack = `p${number}`
 export type PlaybackTrack = IsolatedAudioTrack | RoomParticipantTrack
 export type RecordingTrack = 'mix' | PlaybackTrack
 export const TRACK_LABELS = { mix: 'Combined', mic: 'Microphone', tab: 'Tab audio' }
 
-export interface TrackCoverage { pieces: number; durationMs: number; label?: string }
+export interface TrackCoverage {
+  pieces: number
+  durationMs: number
+  label?: string
+  status?: 'processing' | 'saved' | 'partial' | 'missing'
+}
 export type AudioTracks = Partial<Record<PlaybackTrack, TrackCoverage>>
+
+export function roomParticipantTracks(raw: unknown): RoomParticipantTrack[] {
+  return raw && typeof raw === 'object' ? Object.keys(raw)
+    .filter((key): key is RoomParticipantTrack => /^p[1-9]\d{0,2}$/.test(key))
+    .sort((a, b) => Number(a.slice(1)) - Number(b.slice(1))) : []
+}
 
 export interface AudioGapRange {
   startMs: number
@@ -20,7 +31,7 @@ export interface RecordingGaps {
 }
 
 export interface AudioGap extends AudioGapRange {
-  track: IsolatedAudioTrack
+  track: PlaybackTrack
 }
 
 export function audioGaps(timeline: RecordingGaps): AudioGap[] {
@@ -31,6 +42,10 @@ export function audioGaps(timeline: RecordingGaps): AudioGap[] {
 }
 
 export function readRecordingGaps(raw: Record<string, unknown>, durationMs: number): AudioGap[] {
+  if (raw.source === 'room') {
+    const tracks = raw.participantTracks as Record<string, { gaps?: unknown }>
+    return roomParticipantTracks(tracks).flatMap(track => readAudioGaps(tracks[track]?.gaps, durationMs).map(gap => ({ ...gap, track })))
+  }
   return audioGaps({ micAudioGaps: readAudioGaps(raw.micAudioGaps, durationMs), tabAudioGaps: readAudioGaps(raw.tabAudioGaps, durationMs) })
 }
 

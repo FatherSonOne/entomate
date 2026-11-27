@@ -16,6 +16,7 @@
     "build:docker": "docker build -t entomate-backend ."
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.948.0",
     "@google/generative-ai": "^0.21.0",
     "@sentry/node": "^8.0.0",
     "@supabase/supabase-js": "^2.47.0",

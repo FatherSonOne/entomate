@@ -3,7 +3,7 @@ import { ChevronDown, Loader2, Pause, Play, RotateCcw, RotateCw, SkipBack, SkipF
 import { Display, Key, Tape, Toggle, type TapeMarker } from '../bench'
 import { formatClock, type TranscriptSegment } from '../../services/meetingTranscriptService'
 import { loadRecordingAudio, loadRecordingWaveformPeaks, removeRecordingAudio, type AudioTracks, type RecordingAudio } from '../../services/meetingRecorderService'
-import { ISOLATED_AUDIO_TRACKS, ROOM_PARTICIPANT_TRACKS, TRACK_LABELS, type AudioGap, type IsolatedAudioTrack, type PlaybackTrack, type RecordingTrack } from '../../services/recordingAudioTracks'
+import { ISOLATED_AUDIO_TRACKS, roomParticipantTracks, TRACK_LABELS, type AudioGap, type IsolatedAudioTrack, type PlaybackTrack, type RecordingTrack } from '../../services/recordingAudioTracks'
 import { TrackSaveStatus, type TrackSaveStates } from './TrackSaveStatus'
 import { readRecordingWaveform, waveformFromPeaks } from '../../services/recordingWaveform'
 import { recordingSpeakers } from './recordingSpeakers'
@@ -113,10 +113,10 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
   const savedWaveform = useMemo(() => waveformPeaks?.length ? waveformFromPeaks(waveformPeaks) : null, [waveformPeaks])
   const trackKey = track ?? 'mix'
   const waveform = audioRemoved ? null : ((!track ? savedWaveform : null) ?? waveforms[trackKey] ?? null)
-  const participantTracks = ROOM_PARTICIPANT_TRACKS.filter(name => (audioTracks?.[name]?.durationMs ?? 0) > 0)
+  const participantTracks = roomParticipantTracks(audioTracks)
   const availableTracks: PlaybackTrack[] = [
     ...ISOLATED_AUDIO_TRACKS.filter(name => (audioTracks?.[name]?.durationMs ?? 0) > 0),
-    ...participantTracks,
+    ...participantTracks.filter(name => (audioTracks?.[name]?.durationMs ?? 0) > 0),
   ]
   const labelOf = (name: PlaybackTrack): string => {
     if (name === 'mic' || name === 'tab') return TRACK_LABELS[name]
@@ -211,6 +211,7 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
   }
 
   const gapPlaybackTrack = (gap: AudioGap): IsolatedAudioTrack | undefined => {
+    if (gap.track !== 'mic' && gap.track !== 'tab') return undefined
     const other = gap.track === 'mic' ? 'tab' : 'mic'
     const otherIsAvailable = (audioTracks?.[other]?.durationMs ?? 0) > gap.startMs
       && !gaps.some(point => point.track === other && point.startMs <= gap.startMs
@@ -401,6 +402,15 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
         </label>
       )}
       {!audioRemoved && audioTracks && !roomRecording && <TrackSaveStatus tracks={trackSaveStates} final />}
+      {!audioRemoved && participantTracks.length > 0 && (
+        <ul aria-label="Participant track status">
+          {participantTracks.map(track => {
+            const status = audioTracks?.[track]?.status
+            const label = status === 'partial' ? 'Partial' : status === 'missing' ? 'Unavailable' : 'Saved'
+            return <li key={track}>{labelOf(track)} · {label}</li>
+          })}
+        </ul>
+      )}
       {source && (
         <audio
           ref={audioRef}
@@ -493,18 +503,19 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
             ))}
           </div>
         )}
-        {!audioRemoved && timelineDuration > 0 && ISOLATED_AUDIO_TRACKS.map(name => {
+        {!audioRemoved && timelineDuration > 0 && (roomRecording ? participantTracks : ISOLATED_AUDIO_TRACKS).map(name => {
           const trackGaps = gaps.filter(gap => gap.track === name && gap.startMs < timelineDuration)
           if (!trackGaps.length) return null
+          const trackLabel = labelOf(name)
           return (
-            <div className="bs-recording-gaps" key={name} role="group" aria-label={`${TRACK_LABELS[name]} gaps`}>
-              <span>{TRACK_LABELS[name]} gaps</span>
+            <div className="bs-recording-gaps" key={name} role="group" aria-label={`${trackLabel} gaps`}>
+              <span>{trackLabel} gaps</span>
               <div className="bs-recording-gap-lane">
                 {trackGaps.map(gap => {
                   const left = gap.startMs / timelineDuration * 100
                   const end = Math.min(gap.endMs ?? timelineDuration, timelineDuration)
                   const until = gap.endMs === null ? 'the end' : formatClock(end)
-                  const label = `${TRACK_LABELS[name]} gap from ${formatClock(gap.startMs)} to ${until}. Play ${TRACK_LABELS[gapPlaybackTrack(gap) ?? 'mix']}.`
+                  const label = `${trackLabel} gap from ${formatClock(gap.startMs)} to ${until}. Play ${TRACK_LABELS[gapPlaybackTrack(gap) ?? 'mix']}.`
                   return (
                     <button type="button" key={gap.startMs} aria-label={label} title={label} onClick={() => playGap(gap)}
                       style={{ left: `min(${left}%, calc(100% - 24px))`, width: `${(end - gap.startMs) / timelineDuration * 100}%` }} />

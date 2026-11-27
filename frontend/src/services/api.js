@@ -439,6 +439,7 @@ export const liveRoomsApi = {
   join: (id, host, data) => api.post(`/live-meeting-rooms/${id}/${host ? 'host' : 'guest'}/join`, data, { skipRetry: true }),
   startAudio: (id, mimeType) => api.post(`/live-meeting-rooms/${id}/recording/start`, { mimeType }, { skipRetry: true }),
   finishAudio: (id, pieces, labels) => api.post(`/live-meeting-rooms/${id}/recording/finish`, { pieces, labels }, { timeout: 180_000, skipRetry: true }),
+  refreshAudio: (id) => api.post(`/live-meeting-rooms/${id}/recording/refresh`, {}, { skipRetry: true }),
   lines: (id, lines) => api.post(`/live-meeting-rooms/${id}/lines`, { lines }, { skipRetry: true }),
   insights: (id) => api.get(`/live-meeting-rooms/${id}/insights`, { _noCache: true, skipRetry: true }),
   refreshInsights: (id) => api.post(`/live-meeting-rooms/${id}/insights/refresh`, {}, { skipRetry: true }),

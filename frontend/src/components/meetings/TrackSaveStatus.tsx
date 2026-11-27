@@ -1,8 +1,8 @@
 import React from 'react'
 import { formatClock } from '../../services/meetingTranscriptService'
-import { ISOLATED_AUDIO_TRACKS, TRACK_LABELS, type RecordingTrack } from '../../services/recordingAudioTracks'
+import { ISOLATED_AUDIO_TRACKS, TRACK_LABELS, type IsolatedAudioTrack } from '../../services/recordingAudioTracks'
 
-export type TrackSaveStates = Partial<Record<RecordingTrack, {
+export type TrackSaveStates = Partial<Record<'mix' | IsolatedAudioTrack, {
   savedMs: number
   sentMs?: number
   recorded?: number
