@@ -165,8 +165,9 @@ describe('a pressed timecode plays the recording', () => {
     }
   })
 
-  test('Ask citations cue the exact line and both Back paths restore the completed answer without asking again', async () => {
+  test('a paraphrased Ask cites the exact line and both Back paths restore the completed answer without asking again', async () => {
     const time = 22_000
+    const question = 'What pushed the release date back?'
     api.get.mockResolvedValue({
       ...MEETING,
       recording_job: { status: 'done', audioKept: true, durationMs: 60_000 },
@@ -190,7 +191,7 @@ describe('a pressed timecode plays the recording', () => {
       callbacks.onComplete({ answer: claims.map((claim) => claim.text).join('\n\n'), claims })
     })
     render(
-      <MemoryRouter initialEntries={[{ pathname: '/search', search: '?q=Why+did+launch+move%3F&ask=1', key: crypto.randomUUID() }]}>
+      <MemoryRouter initialEntries={[{ pathname: '/search', search: `?q=${encodeURIComponent(question)}&ask=1`, key: crypto.randomUUID() }]}>
         <NavTrailRecorder />
         <BrowserBack />
         <Routes>
@@ -205,25 +206,26 @@ describe('a pressed timecode plays the recording', () => {
     expect(first).toHaveAttribute('href', `/meetings/m1?tab=transcript&t=22000&rev=${REVISION}&line=1`)
     expect(second).toHaveAttribute('href', `/meetings/m1?tab=transcript&t=22000&rev=${REVISION}&line=2`)
     fireEvent.change(screen.getByRole('textbox', { name: 'Question about your meetings' }), { target: { value: 'Unsubmitted draft' } })
-    fireEvent.click(second)
+    fireEvent.click(first)
     const transcript = await screen.findByRole('list', { name: 'Transcript' })
-    const line = within(transcript).getByText('I will update the launch plan.', { exact: false }).closest('li')
+    const line = within(transcript).getByText('The vendor needed another week.', { exact: false }).closest('li')
     await waitFor(() => expect(line).toHaveFocus())
     expect(line).toHaveAttribute('aria-current', 'true')
     expect(player.cueAt).toHaveBeenCalledWith(time)
     expect(player.playFrom).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('link', { name: 'Back to Search' }))
-    await waitFor(() => expect(screen.getByRole('link', { name: /Planning · 00:22 · Pat/ })).toHaveFocus())
-    expect(screen.getByText('Pat owns the launch plan update.')).toBeInTheDocument()
-    expect(screen.getByRole('textbox', { name: 'Question about your meetings' })).toHaveValue('Unsubmitted draft')
-
-    fireEvent.click(screen.getByRole('link', { name: /Planning · 00:22 · Ana/ }))
-    expect(await screen.findByRole('tab', { name: 'Transcript & recording', selected: true })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Browser back' }))
     await waitFor(() => expect(screen.getByRole('link', { name: /Planning · 00:22 · Ana/ })).toHaveFocus())
     expect(screen.getByText('The vendor needed more time.')).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Question about your meetings' })).toHaveValue('Unsubmitted draft')
+
+    fireEvent.click(screen.getByRole('link', { name: /Planning · 00:22 · Pat/ }))
+    expect(await screen.findByRole('tab', { name: 'Transcript & recording', selected: true })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Browser back' }))
+    await waitFor(() => expect(screen.getByRole('link', { name: /Planning · 00:22 · Pat/ })).toHaveFocus())
+    expect(screen.getByText('Pat owns the launch plan update.')).toBeInTheDocument()
     expect(search.askStream).toHaveBeenCalledTimes(1)
+    expect(search.askStream).toHaveBeenCalledWith({ question }, expect.any(Object))
   })
 
   test('a Transcript & recording speaker button includes its line count and plays from the first line', async () => {

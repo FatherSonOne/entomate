@@ -6,6 +6,7 @@ const express = require('express');
 const request = require('supertest');
 
 jest.mock('../services/retentionService', () => ({ runRetentionSweep: jest.fn(async () => ({ ok: true })) }));
+jest.mock('../services/meetingPassageRetrieval', () => ({ backfillPassageEmbeddings: jest.fn(async () => ({ indexed: 1 })) }));
 
 describe('POST /api/internal/jobs/:job (finding 11)', () => {
   const saved = process.env.INTERNAL_API_KEY;
@@ -23,6 +24,13 @@ describe('POST /api/internal/jobs/:job (finding 11)', () => {
     expect(res.status).toBe(202);
     await new Promise((r) => setImmediate(r));
     expect(require('../services/retentionService').runRetentionSweep).toHaveBeenCalled();
+  });
+
+  test('the passage embedding job is available to the authenticated worker', async () => {
+    await request(app()).post('/api/internal/jobs/passage-embeddings').expect(401);
+    await request(app()).post('/api/internal/jobs/passage-embeddings').set('X-API-Key', 'svc-key').expect(202);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(require('../services/meetingPassageRetrieval').backfillPassageEmbeddings).toHaveBeenCalledTimes(1);
   });
 
   test('unknown job is 404', async () => {

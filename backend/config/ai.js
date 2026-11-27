@@ -100,6 +100,14 @@ class AIService {
     return this.provider.generateEmbedding(text);
   }
 
+  getPassageEmbeddingModel() {
+    return this.isConfigured() ? this.provider.passageEmbeddingModel : null;
+  }
+
+  async generatePassageEmbeddings(texts, kind, signal) {
+    return this.provider.generatePassageEmbeddings(texts, kind, signal);
+  }
+
   /**
    * Answer questions about meeting context
    * @param {string} question - User question

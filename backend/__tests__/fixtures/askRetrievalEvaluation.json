@@ -1,0 +1,75 @@
+{
+  "vectors": {
+    "delay": [1, 0, 0, 0],
+    "delay-followup": [0.8, 0, 0.2, 0],
+    "pilot": [0, 1, 0, 0],
+    "owner": [0, 0, 1, 0],
+    "unrelated": [0, 0, 0, 1]
+  },
+  "meetings": [
+    {
+      "id": "11111111-1111-4111-8111-111111111111",
+      "workspace": "allowed",
+      "title": "Launch review",
+      "date": "2025-12-22T10:00:00Z",
+      "lines": [
+        { "atMs": 12500, "text": "The vendor needed another week.", "vector": "delay" },
+        { "atMs": 12500, "text": "The rollout remains limited to pilot customers.", "vector": "pilot" },
+        { "atMs": 16000, "text": "Priya will send the revised schedule.", "vector": "owner" }
+      ]
+    },
+    {
+      "id": "22222222-2222-4222-8222-222222222222",
+      "workspace": "allowed",
+      "title": "Launch follow-up",
+      "date": "2026-01-15T10:00:00Z",
+      "lines": [
+        { "atMs": 9000, "text": "The supplier delivered early, so we can start on Monday.", "vector": "delay-followup" },
+        { "atMs": 13000, "text": "We can invite one more customer to the trial.", "vector": "pilot" }
+      ]
+    },
+    {
+      "id": "33333333-3333-4333-8333-333333333333",
+      "workspace": "other",
+      "title": "Private launch review",
+      "date": "2026-01-16T10:00:00Z",
+      "lines": [
+        { "atMs": 8000, "text": "The manufactured delay is private.", "vector": "delay" }
+      ]
+    }
+  ],
+  "questions": [
+    {
+      "name": "exact wording",
+      "question": "What did the vendor need?",
+      "vector": "delay",
+      "expected": [{ "meeting": 0, "line": 1 }]
+    },
+    {
+      "name": "paraphrase with no shared content words on the answer line",
+      "question": "Why was the launch delayed?",
+      "vector": "delay",
+      "expected": [{ "meeting": 0, "line": 1 }],
+      "keywordMiss": true
+    },
+    {
+      "name": "cross-meeting change",
+      "question": "How did the shipping timeline change?",
+      "vector": "delay",
+      "expected": [{ "meeting": 0, "line": 1 }, { "meeting": 1, "line": 1 }]
+    },
+    {
+      "name": "meeting-scoped paraphrase",
+      "question": "When did the launch get moved up?",
+      "vector": "delay",
+      "meetingScope": [1],
+      "expected": [{ "meeting": 1, "line": 1 }]
+    },
+    {
+      "name": "no supporting evidence",
+      "question": "What was the approved catering budget?",
+      "vector": "unrelated",
+      "expected": []
+    }
+  ]
+}

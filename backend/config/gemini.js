@@ -250,6 +250,29 @@ Rules:
     }
   }
 
+  get passageEmbeddingModel() {
+    return `gemini:${EMBEDDING_MODEL}:${EMBEDDING_DIMENSIONS}:retrieval`;
+  }
+
+  async generatePassageEmbeddings(texts, kind, signal) {
+    const model = `models/${EMBEDDING_MODEL}`;
+    const requests = texts.map((text) => ({
+      model,
+      content: { parts: [{ text }] },
+      outputDimensionality: EMBEDDING_DIMENSIONS,
+      taskType: kind === 'query' ? 'RETRIEVAL_QUERY' : 'RETRIEVAL_DOCUMENT',
+    }));
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/${model}:batchEmbedContents`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': this.apiKey },
+      body: JSON.stringify({ requests }),
+      signal,
+    });
+    if (!response.ok) throw new Error(`Passage embeddings returned HTTP ${response.status}`);
+    const data = await response.json();
+    return data.embeddings?.map((item) => item.values);
+  }
+
   /**
    * Answer questions about meeting context
    * @param {string} question - User question

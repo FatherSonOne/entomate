@@ -19,6 +19,7 @@ router.use(internalJobAuth);
 const JOBS = {
   retention: () => require('../services/retentionService').runRetentionSweep(),
   embeddings: () => require('../services/embeddingService').backfillMissing(),
+  'passage-embeddings': () => require('../services/meetingPassageRetrieval').backfillPassageEmbeddings(),
   autojoin: () => require('../services/calendarAutoJoin').runAutoJoin(),
   digest: () => require('../services/overdueDigest').runOverdueDigest(),
   followups: () => require('../services/followUp').runFollowUps(),

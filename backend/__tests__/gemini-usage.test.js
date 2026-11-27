@@ -31,3 +31,26 @@ test('answerQuestion reports the response usageMetadata once', async () => {
   expect(result.answer).toBe('Two meetings.');
   expect(addUsage.mock.calls).toEqual([[META]]);
 });
+
+test.each([['query', 'RETRIEVAL_QUERY'], ['document', 'RETRIEVAL_DOCUMENT']])(
+  'passage embeddings request the %s task with the indexed model and dimensions',
+  async (kind, taskType) => {
+    const values = Array(768).fill(0.25);
+    const fetch = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true, json: async () => ({ embeddings: [{ values }, { values }] }),
+    });
+    try {
+      const { signal } = new AbortController();
+      const inputs = ['One passage.', 'Another passage.'];
+      expect(await gemini.generatePassageEmbeddings(inputs, kind, signal)).toEqual([values, values]);
+      const [url, init] = fetch.mock.calls[0];
+      expect(url).toContain('/models/gemini-embedding-001:batchEmbedContents');
+      expect(init.signal).toBe(signal);
+      expect(JSON.parse(init.body).requests).toEqual(inputs.map((text) => ({
+        model: 'models/gemini-embedding-001', content: { parts: [{ text }] }, outputDimensionality: 768, taskType,
+      })));
+    } finally {
+      fetch.mockRestore();
+    }
+  }
+);

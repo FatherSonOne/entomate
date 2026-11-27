@@ -1,5 +1,7 @@
 const OpenAI = require('openai');
 const log = require('../utils/log');
+const EMBEDDING_MODEL = 'text-embedding-3-small';
+const PASSAGE_EMBEDDING_DIMENSIONS = 768;
 
 class OpenAIService {
   constructor() {
@@ -217,7 +219,7 @@ Rules:
 
     try {
       const response = await this.client.embeddings.create({
-        model: 'text-embedding-3-small',
+        model: EMBEDDING_MODEL,
         input: text
       });
       return response.data[0].embedding;
@@ -225,6 +227,19 @@ Rules:
       log.error('Embedding error:', { error: error.message || error });
       throw new Error(`Embedding generation failed: ${error.message}`);
     }
+  }
+
+  get passageEmbeddingModel() {
+    return `openai:${EMBEDDING_MODEL}:${PASSAGE_EMBEDDING_DIMENSIONS}`;
+  }
+
+  async generatePassageEmbeddings(texts, _kind, signal) {
+    const response = await this.client.embeddings.create({
+      model: EMBEDDING_MODEL,
+      dimensions: PASSAGE_EMBEDDING_DIMENSIONS,
+      input: texts,
+    }, { signal, maxRetries: 0 });
+    return response.data.sort((a, b) => a.index - b.index).map((item) => item.embedding);
   }
 
   /**
