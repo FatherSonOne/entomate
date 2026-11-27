@@ -122,9 +122,8 @@ describe('RecordingPlayer', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('could not be played')
   })
 
-  test('renders waveform bars from decoded audio and leaves its silent half empty', async () => {
+  test('draws uploaded audio on open and leaves its silent half empty', async () => {
     const signedUrl = 'https://signed.test/seekable'
-    api.playback.mockResolvedValue({ url: signedUrl, durationMs: 12_000 })
     const decodeAudioData = vi.fn().mockResolvedValue({
       length: 4,
       numberOfChannels: 1,
@@ -133,11 +132,9 @@ describe('RecordingPlayer', () => {
     vi.stubGlobal('OfflineAudioContext', class {
       decodeAudioData = decodeAudioData
     })
-    render(<RecordingPlayer meetingId={MEETING} />)
-    expect(screen.queryByTestId('recording-waveform')).toBeNull()
-    expect(okFetch).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: 'Play the recording' }))
+    render(<RecordingPlayer meetingId={MEETING} audioUrl={signedUrl} durationMs={12_000} />)
     const waveform = await screen.findByTestId('recording-waveform')
+    expect(screen.queryByTestId('recording-player')).toBeNull()
     const path = waveform.querySelector('path')?.getAttribute('d') ?? ''
     expect(okFetch).toHaveBeenCalledWith(signedUrl, expect.objectContaining({ credentials: 'omit' }))
     expect(decodeAudioData).toHaveBeenCalledTimes(1)
@@ -150,13 +147,25 @@ describe('RecordingPlayer', () => {
     api.playback.mockResolvedValue({ url, durationMs: 3_215_044, serverWaveform: true })
     api.waveform.mockResolvedValue({ peaks: [0, 0.4, 0, 0.25] })
     render(<RecordingPlayer meetingId={MEETING} />)
-    expect(api.waveform).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: 'Play the recording' }))
     const waveform = await screen.findByTestId('recording-waveform')
-    expect(screen.getByTestId('recording-player')).toHaveAttribute('src', url)
+    expect(screen.queryByTestId('recording-player')).toBeNull()
+    expect(api.playback).not.toHaveBeenCalled()
     expect(api.waveform).toHaveBeenCalledWith(MEETING, expect.any(AbortSignal))
     expect(okFetch).not.toHaveBeenCalled()
     expect(waveform.querySelector('path')?.getAttribute('d')?.match(/M/g)).toHaveLength(2)
+  })
+
+  test('renders peaks saved during processing immediately and colors speech near the end', () => {
+    const { container } = render(<RecordingPlayer meetingId={MEETING} durationMs={1_740_000}
+      waveformPeaks={[0.2, 0.5, 0.3]} transcriptSegments={[
+        { speaker: 'Speaker 1', atMs: 0, endMs: 3_000, text: 'First' },
+        { speaker: 'Speaker 2', atMs: 1_705_000, endMs: 1_710_000, text: 'Near the end' },
+      ]} />)
+    expect(screen.getByTestId('recording-waveform')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('switch', { name: 'Speaker colors' }))
+    expect([...container.querySelectorAll('stop')].some(stop => Number(stop.getAttribute('offset')) > .97)).toBe(true)
+    expect(api.waveform).not.toHaveBeenCalled()
+    expect(api.playback).not.toHaveBeenCalled()
   })
 
   test('a recording moment passes the original transcript time to the jump handler', () => {

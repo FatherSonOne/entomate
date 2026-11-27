@@ -12,7 +12,8 @@
  *   3. finish    once every piece is there, the pieces are joined (they are one recorder's
  *                output, so joined in order they are one valid file), Gemini transcribes it
  *                with speaker turns and times, and the meeting gets the same summary,
- *                decisions, action items and timecodes as a bot meeting.
+ *                decisions, action items and timecodes as a bot meeting. Waveform peaks
+ *                are measured from the joined audio while the transcript is written.
  *   4. playback  the audio is kept so the meeting page can play it beside the transcript
  *                (signed URLs, `getPlayback`). After the transcript is written, ffmpeg also
  *                makes one seekable copy, {org}/{meeting}/playback.webm, which the browser
@@ -28,6 +29,7 @@
 const { supabase } = require('../config/supabase');
 const geminiRecording = require('../config/geminiRecording');
 const meetingFinish = require('./meetingFinish');
+const transcriptMoments = require('./transcriptMoments');
 const playbackFile = require('./playbackFile');
 const log = require('../utils/log');
 
@@ -79,52 +81,6 @@ function parsePieceName(name) {
   return m ? { seq: Number(m[1]), durationMs: Number(m[2]) } : null;
 }
 
-// ── Transcript parsing (port of LV `parseTimestampedTranscript`) ─────────────
-
-const STAMPED_LINE = /^\s*\**\s*\[\s*(?:(\d{1,2}):)?(\d{1,2}):(\d{2})\s*\]\s*\**\s*(.*)$/;
-const SPEAKER_PREFIX = /^\**(Speaker \d+|[A-Z][\w.'-]*(?: [A-Z][\w.'-]*){0,3})\**:\**\s+(.+)$/;
-
-/**
- * The timed lines of a transcript Gemini wrote as `[MM:SS] Speaker 1: words`. Gemini writes
- * the tag as `[00:12]`, `[ 00:12 ]` or `[1:02:03]`, sometimes bolds it, and leaves the
- * speaker out when it hears one voice. A line without a tag continues the line before it.
- * A line with no speaker keeps the previous speaker (or "Speaker 1" at the start).
- *
- * @returns {Array<{atMs: number, speaker: string, text: string}>} in time order.
- */
-function parseTimestampedTranscript(text) {
-  const out = [];
-  if (typeof text !== 'string') return out;
-  for (const raw of text.split(/\r?\n/)) {
-    const m = raw.match(STAMPED_LINE);
-    if (!m) {
-      const more = raw.trim();
-      if (more && out.length) out[out.length - 1].text += ` ${more}`;
-      continue;
-    }
-    const body = m[4].trim();
-    if (!body) continue;
-    const who = body.match(SPEAKER_PREFIX);
-    const speaker = who ? who[1] : out.length ? out[out.length - 1].speaker : 'Speaker 1';
-    const words = (who ? who[2] : body).trim();
-    if (!words) continue;
-    out.push({
-      atMs: ((Number(m[1] ?? 0) * 60 + Number(m[2])) * 60 + Number(m[3])) * 1000,
-      speaker,
-      text: words,
-    });
-  }
-  // Gemini's times are monotonic in practice; a stray earlier tag must not reorder speech.
-  for (let i = 1; i < out.length; i++) {
-    if (out[i].atMs < out[i - 1].atMs) out[i].atMs = out[i - 1].atMs;
-  }
-  return out;
-}
-
-function buildTranscriptText(segments) {
-  return segments.map((s) => `${s.speaker}: ${s.text}`).join('\n');
-}
-
 function cleanAttendees(input) {
   const list = Array.isArray(input)
     ? input
@@ -157,6 +113,21 @@ async function listPieces(orgId, meetingId) {
     if (parsed) pieces.push({ ...parsed, path: f.path, createdAt: f.createdAt });
   }
   return pieces.sort((a, b) => a.seq - b.seq);
+}
+
+async function* recordingPieceBytes(pieces) {
+  const bucket = supabase.storage.from(BUCKET);
+  for (const piece of pieces) {
+    const { data, error } = await bucket.download(piece.path);
+    if (error || !data) throw error || new Error(`Missing piece ${piece.seq}`);
+    yield Buffer.from(await data.arrayBuffer());
+  }
+}
+
+async function downloadRecordingPieces(pieces) {
+  const parts = [];
+  for await (const bytes of recordingPieceBytes(pieces)) parts.push(bytes);
+  return Buffer.concat(parts);
 }
 
 /** Deletes a meeting's saved audio: the pieces and the playback copy. Idempotent. */
@@ -196,7 +167,7 @@ async function savePlaybackFile(meeting, audio, mimeType) {
 async function loadMeeting(meetingId) {
   const { data, error } = await supabase
     .from('meetings')
-    .select('id, org_id, title, created_by, start_time, attendees, recording_job, summary_template')
+    .select('id, org_id, title, created_by, start_time, attendees, recording_job, summary_template, updated_at, key_points, decisions')
     .eq('id', meetingId)
     .maybeSingle();
   if (error) throw error;
@@ -494,6 +465,79 @@ async function retryTranscription({ meetingId }) {
   return { status: 'transcribing' };
 }
 
+/** Replace an old browser transcript from its retained audio without writing the minutes again. */
+async function rebuildTranscript({ meetingId, orgId }) {
+  const meeting = await loadPlaybackMeeting(orgId, meetingId);
+  const job = meeting.recording_job;
+  const browser = job.source === 'browser' || (!job.source && !job.botSessionId && MODES.includes(job.mode));
+  if (!browser || job.status !== 'done' || !job.audioKept) {
+    throw new RecorderError(409, 'The transcript can only be rebuilt from a saved browser recording.');
+  }
+  if (!geminiRecording.isConfigured()) throw new RecorderError(503, 'Transcription is unavailable.');
+  if (running.has(meetingId) || Date.now() - Date.parse(job.transcriptRebuildAt) < STALE_JOB_MS) {
+    throw new RecorderError(409, 'The transcript is already being rebuilt.');
+  }
+
+  const startedAt = new Date().toISOString();
+  let claim = supabase.from('meetings').update({
+    recording_job: { ...job, transcriptRebuildAt: startedAt, transcriptRebuildError: null },
+    updated_at: startedAt,
+  }).eq('id', meetingId).eq('org_id', orgId);
+  claim = meeting.updated_at ? claim.eq('updated_at', meeting.updated_at) : claim.is('updated_at', null);
+  const { data, error } = await claim.select('id').maybeSingle();
+  if (error) throw error;
+  if (!data) throw new RecorderError(409, 'The meeting changed. Try again.');
+  running.add(meetingId);
+  void runTranscriptRebuild(meeting, startedAt)
+    .catch(err => log.error('Recording transcript rebuild failed', { meetingId, error: err.message }))
+    .finally(() => running.delete(meetingId));
+  return { status: 'transcribing' };
+}
+
+async function runTranscriptRebuild(meeting, startedAt) {
+  const { id, org_id: orgId, recording_job: job } = meeting;
+  let segments;
+  let transcriptRebuildError = null;
+  try {
+    const pieces = (await listPieces(orgId, id)).filter(piece => piece.seq < (job.pieces || MAX_PIECES));
+    if (!pieces.length || pieces.some((piece, index) => piece.seq !== index) || (job.pieces && pieces.length !== job.pieces)) {
+      throw new Error('The saved recording is missing audio pieces');
+    }
+    segments = await geminiRecording.transcribeRecording(await downloadRecordingPieces(pieces), job.mimeType || 'audio/webm');
+    if (!segments.length) throw new Error('No speech found');
+  } catch (err) {
+    log.warn('Recording transcript could not be rebuilt', { meetingId: id, error: err.message });
+    transcriptRebuildError = 'The transcript could not be rebuilt. Try again.';
+  }
+
+  // Read again so chapter changes, speaker edits and audio removal can race the long transcription.
+  const latest = await loadMeeting(id);
+  const current = latest?.recording_job;
+  if (current?.transcriptRebuildAt !== startedAt || current.audioRemovedAt || current.retentionDeletedAt) return;
+  const updatedAt = new Date().toISOString();
+  const fields = transcriptRebuildError ? {} : {
+    transcript: meetingFinish.buildTranscriptText(segments),
+    transcript_segments: segments,
+    transcript_embedding: null,
+    summary_moments: transcriptMoments.summaryMoments(segments, latest.key_points || [], latest.decisions || []),
+  };
+  const { data, error } = await supabase.from('meetings').update({
+    ...fields,
+    recording_job: {
+      ...current,
+      ...(segments?.length ? { lines: segments.length, speakers: new Set(segments.map(line => line.speaker)).size, speakerSuggestions: [] } : {}),
+      transcriptRebuildAt: null, transcriptRebuildError, updatedAt,
+    },
+    updated_at: updatedAt,
+  }).eq('id', id).eq('org_id', orgId).eq('updated_at', latest.updated_at)
+    .eq('recording_job->>transcriptRebuildAt', startedAt)
+    .is('recording_job->>retentionDeletedAt', null).is('recording_job->>audioRemovedAt', null)
+    .select('transcript').maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error('Meeting changed while saving its rebuilt transcript');
+  if (!transcriptRebuildError) await require('./embeddingService').generateEmbeddingsForMeeting(id, { transcript: data.transcript });
+}
+
 /** Throw away a recording that never became a meeting: its audio and its row. */
 async function discardRecording({ orgId, meetingId }) {
   const meeting = await loadMeeting(meetingId);
@@ -534,25 +578,22 @@ async function transcribeMeeting(meetingId) {
     }
 
     const pieces = (await listPieces(meeting.org_id, meetingId)).filter((p) => p.seq < (job.pieces || MAX_PIECES));
-    const bucket = supabase.storage.from(BUCKET);
-    const parts = [];
-    for (const piece of pieces) {
-      const { data, error } = await bucket.download(piece.path);
-      if (error || !data) throw error || new Error(`Missing piece ${piece.seq}`);
-      parts.push(Buffer.from(await data.arrayBuffer()));
-    }
-    if (!parts.length) {
+    if (!pieces.length) {
       const err = new Error('No audio pieces found');
       err.userMessage = 'No audio was saved for this recording.';
       throw err;
     }
 
-    const audio = Buffer.concat(parts);
+    const audio = await downloadRecordingPieces(pieces);
     await markStage(meeting, 'transcript');
-    const text = await geminiRecording.transcribeRecording(audio, job.mimeType || 'audio/webm');
-    let segments = parseTimestampedTranscript(text);
-    const transcript = segments.length ? buildTranscriptText(segments) : String(text || '').trim();
-    if (!transcript) {
+    const waveform = playbackFile.readWaveformPeaksFromAudio(audio).catch((err) => {
+      log.warn('Recording: waveform could not be prepared', { meetingId, error: err.message });
+      return null;
+    });
+    let segments = await geminiRecording.transcribeRecording(audio, job.mimeType || 'audio/webm', async () => {
+      if (Date.now() - Date.parse(meeting.recording_job.updatedAt) >= 60_000) await setJob(meeting, {});
+    });
+    if (!segments.length) {
       const err = new Error('Empty transcript');
       err.userMessage = 'No speech was heard in this recording. Check that the right microphone or tab audio was shared.';
       throw err;
@@ -562,7 +603,6 @@ async function transcribeMeeting(meetingId) {
     const minutes = await meetingFinish.writeMinutes({
       meeting,
       segments,
-      transcript,
       title: meeting.title,
       attendees: meeting.attendees,
       onStage: (stage) => markStage(meeting, stage),
@@ -572,6 +612,7 @@ async function transcribeMeeting(meetingId) {
 
     await markStage(meeting, 'saving');
     const savedActions = await meetingFinish.saveMinutesActions(meeting, minutes);
+    const waveformPeaks = await waveform;
     const now = new Date().toISOString();
     const durationMs = job.durationMs || 0;
     const startMs = Date.parse(meeting.start_time || job.startedAt || now);
@@ -584,7 +625,7 @@ async function transcribeMeeting(meetingId) {
       recording_job: {
         ...meeting.recording_job, source: 'browser', status: 'done', stage: null, stageAt: null, error: null,
         summaryError: minutes.summaryError, speakerSuggestions: minutes.speakerSuggestions, audioKept: true,
-        playbackFile: playback, speakers: speakers.length, lines: segments.length, updatedAt: now,
+        playbackFile: playback, waveformPeaks, speakers: speakers.length, lines: segments.length, updatedAt: now,
       },
       updated_at: now,
     };
@@ -625,12 +666,18 @@ let activeWaveforms = 0;
  * (a later piece alone is not: only the first carries the header).
  * The caller has checked meeting access; `orgId` is the caller's org, which owns the folder.
  */
-async function getPlayback({ orgId, meetingId }) {
+async function loadPlaybackMeeting(orgId, meetingId) {
   const meeting = await loadMeeting(meetingId);
   const job = meeting?.recording_job;
   if (!job || meeting.org_id !== orgId || job.status === 'recording' || job.retentionDeletedAt || job.audioRemovedAt) {
     throw new RecorderError(404, 'There is no recording to play.');
   }
+  return meeting;
+}
+
+async function getPlayback({ orgId, meetingId }) {
+  const meeting = await loadPlaybackMeeting(orgId, meetingId);
+  const job = meeting.recording_job;
   if (typeof job.playbackFile === 'string' && job.playbackFile.startsWith(`${recordingFolder(orgId, meetingId)}/`)) {
     const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(job.playbackFile, PLAYBACK_FILE_TTL_S);
     if (!error && data?.signedUrl) {
@@ -661,12 +708,10 @@ async function getPlayback({ orgId, meetingId }) {
 
 /** Use the same authorized media source as playback. Coalesce simultaneous requests for it. */
 async function getRecordingWaveform({ orgId, meetingId }) {
-  const playback = await getPlayback({ orgId, meetingId });
-  if (!playback.url || playback.durationMs > 3 * 60 * 60 * 1000) {
-    throw new RecorderError(404, 'Waveform unavailable for this recording.');
-  }
-  // The file identity stays the same when a signed URL is renewed.
-  const key = `${orgId}/${meetingId}:${playback.url.split('?')[0]}`;
+  const meeting = await loadPlaybackMeeting(orgId, meetingId);
+  const job = meeting.recording_job;
+  if (Array.isArray(job.waveformPeaks) && job.waveformPeaks.length) return job.waveformPeaks;
+  const key = `${orgId}/${meetingId}:${job.playbackFile ?? job.finishedAt ?? job.botSessionId ?? ''}`;
   const cached = waveformCache.get(key);
   if (cached && cached.expiresAt > Date.now()) return cached.peaks;
   if (activeWaveforms >= 2) throw new RecorderError(429, 'Waveform processing is busy. Try again.');
@@ -678,7 +723,7 @@ async function getRecordingWaveform({ orgId, meetingId }) {
     if (completed) waveformCache.delete(completed[0]);
   }
 
-  const peaks = playbackFile.readWaveformPeaks(playback.url);
+  const peaks = measureSavedRecording(meeting);
   const entry = { peaks, expiresAt: Infinity };
   waveformCache.set(key, entry);
   activeWaveforms++;
@@ -694,6 +739,22 @@ async function getRecordingWaveform({ orgId, meetingId }) {
   }
 }
 
+async function measureSavedRecording(meeting) {
+  const { org_id: orgId, id: meetingId, recording_job: job } = meeting;
+  if (typeof job.playbackFile === 'string' && job.playbackFile.startsWith(`${recordingFolder(orgId, meetingId)}/`)) {
+    const { data, error } = await supabase.storage.from(BUCKET).download(job.playbackFile);
+    if (!error && data) return playbackFile.readWaveformPeaksFromAudio(Buffer.from(await data.arrayBuffer()));
+  }
+  if (job.source === 'bot' && job.botSessionId) {
+    const url = await require('./botRecording').freshRecordingLink(job.botSessionId);
+    if (!url) throw new Error('Bot recording unavailable');
+    return playbackFile.readWaveformPeaks(url);
+  }
+  const pieces = (await listPieces(orgId, meetingId)).filter((piece) => piece.seq < (job.pieces || MAX_PIECES));
+  if (!pieces.length || pieces[0].seq !== 0) throw new Error('Recording unavailable');
+  return playbackFile.readWaveformPeaksFromAudio(recordingPieceBytes(pieces));
+}
+
 /**
  * Remove a finished recording's audio now; the transcript, summary and notes stay.
  * The caller has checked meeting access. This cannot be undone.
@@ -705,7 +766,7 @@ async function removeAudio({ orgId, meetingId }) {
     throw new RecorderError(409, 'Only the audio of a finished recording can be removed.');
   }
   await purgeRecordingAudio(orgId, meetingId);
-  return setJob(meeting, { audioKept: false, audioRemovedAt: new Date().toISOString(), playbackFile: null });
+  return setJob(meeting, { audioKept: false, audioRemovedAt: new Date().toISOString(), playbackFile: null, waveformPeaks: null });
 }
 
 module.exports = {
@@ -719,12 +780,12 @@ module.exports = {
   savePiece,
   finishRecording,
   retryTranscription,
+  rebuildTranscript,
   discardRecording,
   purgeRecordingAudio,
   getPlayback,
   getRecordingWaveform,
   removeAudio,
   transcribeMeeting,
-  parseTimestampedTranscript,
   _internal: { botHandOff, baseMime, piecePath, parsePieceName, listPieces, isStale, cleanAttendees, running, STALE_JOB_MS },
 };

@@ -42,6 +42,8 @@ export interface RecordingJob {
   finishedAt: string | null
   /** Length of the recording, ms. */
   durationMs: number
+  transcriptRebuildAt?: string
+  transcriptRebuildError?: string
 }
 
 export type RecordingStage = 'transcript' | 'speakers' | 'summary' | 'saving'
@@ -67,6 +69,8 @@ export function toRecordingJob(raw: unknown): RecordingJob | null {
     stage: STAGES.find((x) => x === r.stage) ?? null,
     stageAt: typeof r.stageAt === 'string' ? r.stageAt : null,
     finishedAt: typeof r.finishedAt === 'string' ? r.finishedAt : null,
+    ...(typeof r.transcriptRebuildAt === 'string' ? { transcriptRebuildAt: r.transcriptRebuildAt } : {}),
+    ...(typeof r.transcriptRebuildError === 'string' ? { transcriptRebuildError: r.transcriptRebuildError } : {}),
     durationMs: typeof r.durationMs === 'number' && r.durationMs > 0 ? r.durationMs : 0,
   }
 }
@@ -75,7 +79,7 @@ export function toRecordingJob(raw: unknown): RecordingJob | null {
 export function canPlay(raw: unknown): boolean {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false
   const r = raw as Record<string, unknown>
-  return r.status === 'done' && r.audioKept === true && !r.retentionDeletedAt
+  return r.status === 'done' && r.audioKept === true && !r.retentionDeletedAt && !r.audioRemovedAt
 }
 
 interface PlaybackResponse {
@@ -141,10 +145,15 @@ export async function loadRecordingAudio(
 
 export async function loadRecordingWaveformPeaks(meetingId: string, signal: AbortSignal): Promise<number[]> {
   const result = (await recordingsApi.waveform(meetingId, signal)) as unknown as { peaks?: unknown }
-  const peaks = result?.peaks
+  const peaks = toWaveformPeaks(result?.peaks)
+  if (!peaks) throw new Error('Waveform unavailable')
+  return peaks
+}
+
+export function toWaveformPeaks(peaks: unknown): number[] | null {
   if (!Array.isArray(peaks) || !peaks.length || peaks.length > 160 ||
       !peaks.every(value => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1)) {
-    throw new Error('Waveform unavailable')
+    return null
   }
   return peaks
 }
@@ -160,6 +169,10 @@ export async function removeRecordingAudio(meetingId: string): Promise<void> {
 
 /** A job still transcribing after this long has died with the server and may be retried. */
 export const STALE_JOB_MS = 20 * 60 * 1000
+
+export function isRebuildingTranscript(job: RecordingJob | null): boolean {
+  return Date.now() - Date.parse(job?.transcriptRebuildAt ?? '') < STALE_JOB_MS
+}
 
 export function canRetry(job: RecordingJob | null, now = Date.now()): boolean {
   if (!job) return false
@@ -324,6 +337,14 @@ export async function retryRecording(meetingId: string): Promise<void> {
     cache.invalidate(`/meetings/${meetingId}`)
   } catch (err) {
     throw new Error(errorText(err, 'The transcript could not be restarted.'))
+  }
+}
+
+export async function rebuildRecordingTranscript(meetingId: string): Promise<void> {
+  try {
+    await recordingsApi.rebuildTranscript(meetingId)
+  } catch (err) {
+    throw new Error(errorText(err, 'The transcript could not be rebuilt.'))
   }
 }
 

@@ -29,6 +29,10 @@ function mockMakeQuery(table) {
   const filters = [];
   let mode = 'select';
   let payload = null;
+  const field = (row, column) => {
+    const [key, property] = column.split('->>');
+    return property ? row[key]?.[property] : row[key];
+  };
   const matches = (row) => filters.every((f) => f(row));
   const run = () => {
     const rows = mockDb[table] || (mockDb[table] = []);
@@ -58,9 +62,9 @@ function mockMakeQuery(table) {
     insert(p) { mode = 'insert'; payload = p; return q; },
     update(p) { mode = 'update'; payload = p; return q; },
     delete() { mode = 'delete'; return q; },
-    eq(col, val) { filters.push((r) => r[col] === val); return q; },
+    eq(col, val) { filters.push((r) => field(r, col) === val); return q; },
     in(col, vals) { filters.push((r) => vals.includes(r[col])); return q; },
-    is(col, val) { filters.push((r) => (r[col] ?? null) === val); return q; },
+    is(col, val) { filters.push((r) => (field(r, col) ?? null) === val); return q; },
     not(col, op, val) { filters.push((r) => (op === 'is' ? (r[col] ?? null) !== val : true)); return q; },
     lt(col, val) { filters.push((r) => r[col] < val); return q; },
     like(col, pattern) {
@@ -121,11 +125,14 @@ jest.mock('../utils/log', () => ({ info: jest.fn(), warn: jest.fn(), error: jest
 jest.mock('../services/playbackFile', () => ({
   makeSeekable: jest.fn(async (buf, ext) => Buffer.concat([Buffer.from(`seekable.${ext}:`), buf])),
   readWaveformPeaks: jest.fn(async () => [0, 0.6, 0.3]),
+  readWaveformPeaksFromAudio: jest.fn(async () => [0.1, 0.6, 0.3]),
 }));
 jest.mock('../services/botRecording', () => ({
   freshRecordingLink: jest.fn(async () => 'https://signed.test/recording.mp4?token=fresh'),
 }));
-jest.mock('../config/geminiRecording', () => ({ isConfigured: jest.fn(() => true), transcribeRecording: jest.fn() }));
+jest.mock('../config/geminiRecording', () => ({
+  ...jest.requireActual('../config/geminiRecording'), isConfigured: jest.fn(() => true), transcribeRecording: jest.fn(),
+}));
 jest.mock('../config/ai', () => ({
   isConfigured: jest.fn(() => true),
   generateSummary: jest.fn(async () => ({
@@ -195,7 +202,7 @@ beforeEach(() => {
   mockDb.meetings = [];
   mockDb.action_items = [];
   geminiRecording.transcribeRecording.mockReset();
-  geminiRecording.transcribeRecording.mockResolvedValue(GEMINI_TEXT);
+  geminiRecording.transcribeRecording.mockResolvedValue(geminiRecording.parseTimestampedTranscript(GEMINI_TEXT));
   geminiRecording.isConfigured.mockReturnValue(true);
 });
 
@@ -218,7 +225,7 @@ async function startAndUpload(server, pieces = 2) {
 }
 
 describe('parseTimestampedTranscript', () => {
-  const parse = recorder.parseTimestampedTranscript;
+  const parse = geminiRecording.parseTimestampedTranscript;
 
   test('reads tags, bold markup, continuations and hours', () => {
     const lines = parse(`${GEMINI_TEXT}\n[1:02:03] Speaker 3: Late arrival.`);
@@ -322,12 +329,42 @@ describe('recorder routes', () => {
 
     // The audio stays for playback (retention deletes it later), plus one seekable copy.
     expect(mockStorage.size).toBe(3);
-    expect(row.recording_job).toMatchObject({ audioKept: true, playbackFile: `${ORG_A}/${id}/playback.webm` });
+    expect(row.recording_job).toMatchObject({ audioKept: true, playbackFile: `${ORG_A}/${id}/playback.webm`, waveformPeaks: [0.1, 0.6, 0.3] });
     expect(mockStorage.get(`meeting-recordings/${ORG_A}/${id}/playback.webm`).toString()).toBe('seekable.webm:piece-0|piece-1|');
 
     // The meeting page sees it.
     const page = await request(server).get(`/api/meetings/${id}`).set(as(MEMBER));
     expect(page.status).toBe(200);
+    playbackFile.readWaveformPeaksFromAudio.mockClear();
+    const waveform = await request(server).get(`/api/recordings/${id}/waveform`).set(as(MEMBER)).expect(200);
+    expect(waveform.body.peaks).toEqual([0.1, 0.6, 0.3]);
+    expect(playbackFile.readWaveformPeaksFromAudio).not.toHaveBeenCalled();
+  });
+
+  test('an existing browser recording can rebuild the missing later transcript without republishing its recap', async () => {
+    const server = app();
+    const id = await startAndUpload(server);
+    await request(server).post(`/api/recordings/${id}/finish`).set(as(MEMBER)).send({ pieces: 2 }).expect(202);
+    await settle(id);
+    const previous = meeting(id);
+    previous.summary = 'Edited summary';
+    const beforeActions = JSON.stringify(mockDb.action_items);
+    geminiRecording.transcribeRecording.mockResolvedValueOnce([
+      { atMs: 1000, endMs: 3000, speaker: 'Speaker 1', text: 'Opening remarks.' },
+      { atMs: 54000, endMs: 59000, speaker: 'Speaker 2', text: 'Ship the launch on the fourteenth.' },
+    ]);
+
+    const path = `/api/recordings/${id}/rebuild-transcript`;
+    await request(server).post(path).set(as(OUTSIDER)).expect(404);
+    await request(server).post(path).set(as(MEMBER)).expect(202);
+    await settle(id);
+
+    const row = meeting(id);
+    expect(row.transcript_segments.at(-1)).toMatchObject({ atMs: 54000, endMs: 59000, speaker: 'Speaker 2' });
+    expect(row.summary).toBe('Edited summary');
+    expect(row.summary_moments.decisions).toEqual([54000]);
+    expect(row.recording_job).toMatchObject({ status: 'done', transcriptRebuildAt: null, audioKept: true });
+    expect(JSON.stringify(mockDb.action_items)).toBe(beforeActions);
   });
 
   test('a Gemini failure is recorded with a readable reason; retry recovers', async () => {
@@ -383,7 +420,7 @@ describe('recorder routes', () => {
   test('silence is a failure that says so', async () => {
     const server = app();
     const id = await startAndUpload(server, 1);
-    geminiRecording.transcribeRecording.mockResolvedValueOnce('   ');
+    geminiRecording.transcribeRecording.mockResolvedValueOnce([]);
     await request(server).post(`/api/recordings/${id}/finish`).set(as(MEMBER)).send({ pieces: 1 });
     await settle(id);
     expect(meeting(id).recording_job).toMatchObject({ status: 'failed' });
@@ -442,6 +479,17 @@ describe('recorder routes', () => {
     expect(res.body).toMatchObject({ mimeType: 'audio/webm', durationMs: 60000 });
     expect(res.body.pieces.map((p) => p.seq)).toEqual([0, 1]);
     expect(res.body.pieces[0].url).toBe(`https://signed.test/${ORG_A}/${id}/000000-30000.webm?ttl=600`);
+
+    // Older rows have no persisted peaks and can be measured from the complete stream.
+    delete meeting(id).recording_job.waveformPeaks;
+    playbackFile.readWaveformPeaksFromAudio.mockImplementationOnce(async (audio) => {
+      const pieces = [];
+      for await (const part of audio) pieces.push(part);
+      expect(Buffer.concat(pieces).toString()).toBe('piece-0|piece-1|');
+      return [0.2, 0.5];
+    });
+    const waveform = await request(server).get(`/api/recordings/${id}/waveform`).set(as(MEMBER)).expect(200);
+    expect(waveform.body.peaks).toEqual([0.2, 0.5]);
 
     const outsider = await request(server).get(`/api/recordings/${id}/playback`).set(as(OUTSIDER));
     expect(outsider.status).toBe(404);

@@ -19,6 +19,7 @@ export interface RecordingPlayerProps {
   /** Direct audio from a legacy meeting upload. Kept recordings use the playback service. */
   audioUrl?: string
   durationMs?: number | null
+  waveformPeaks?: ReadonlyArray<number> | null
   transcriptSegments?: ReadonlyArray<TranscriptSegment> | null
   decisions?: ReadonlyArray<TapeMarker>
   actions?: ReadonlyArray<TapeMarker>
@@ -54,7 +55,7 @@ function rulerMarks(durationMs: number): number[] {
 }
 
 export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayerProps>(function RecordingPlayer(
-  { meetingId, audioUrl, durationMs, transcriptSegments, decisions = [], actions = [], onMoment, onStepMoment, onTime, onAudioRemoved },
+  { meetingId, audioUrl, durationMs, waveformPeaks, transcriptSegments, decisions = [], actions = [], onMoment, onStepMoment, onTime, onAudioRemoved },
   ref,
 ) {
   const [source, setSource] = useState<Source | null>(null)
@@ -63,6 +64,7 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
   const [error, setError] = useState<string | null>(null)
   const [confirmRemove, setConfirmRemove] = useState(false)
   const [removing, setRemoving] = useState(false)
+  const [audioRemoved, setAudioRemoved] = useState(false)
   const [mediaDuration, setMediaDuration] = useState(0)
   const [position, setPosition] = useState(0)
   const [hoverPosition, setHoverPosition] = useState<number | null>(null)
@@ -71,7 +73,7 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
   const [muted, setMuted] = useState(false)
   const [volume, setVolume] = useState(1)
   const [showSpeakerColors, setShowSpeakerColors] = useState(false)
-  const [waveform, setWaveform] = useState<string | null>(null)
+  const [loadedWaveform, setLoadedWaveform] = useState<string | null>(null)
   const [waveStatus, setWaveStatus] = useState<'idle' | 'drawing' | 'unavailable'>('idle')
   const audioRef = useRef<HTMLAudioElement>(null)
   const request = useRef<AbortController | null>(null)
@@ -80,7 +82,6 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
   const measuring = useRef(false)
   const renewed = useRef(false)
   const lastSecond = useRef<number | null>(null)
-  const savedWaveform = useRef<string | null>(null)
   const clipId = useId()
   const speakerGradientId = `${clipId}-speakers`
   const effectiveDuration = mediaDuration || finiteDuration(source?.durationMs) || finiteDuration(durationMs)
@@ -92,6 +93,8 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
   const fraction = effectiveDuration ? Math.min(position / effectiveDuration, 1) : 0
   const elapsed = formatClock(position)
   const total = effectiveDuration ? formatClock(effectiveDuration) : '–:––'
+  const savedWaveform = useMemo(() => waveformPeaks?.length ? waveformFromPeaks(waveformPeaks) : null, [waveformPeaks])
+  const waveform = audioRemoved ? null : savedWaveform ?? loadedWaveform
 
   useEffect(() => () => request.current?.abort(), [])
   useEffect(() => {
@@ -100,24 +103,24 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
   }, [source])
 
   useEffect(() => {
-    if (!source || savedWaveform.current !== null) return
+    if (savedWaveform !== null || audioRemoved) return
     const controller = new AbortController()
+    setLoadedWaveform(null)
     setWaveStatus('drawing')
-    const readWaveform = source.serverWaveform
-      ? loadRecordingWaveformPeaks(meetingId, controller.signal).then(waveformFromPeaks)
-      : readRecordingWaveform(source.blob ?? source.url, source.durationMs || finiteDuration(durationMs), controller.signal)
+    const readWaveform = audioUrl
+      ? readRecordingWaveform(audioUrl, finiteDuration(durationMs), controller.signal)
+      : loadRecordingWaveformPeaks(meetingId, controller.signal).then(waveformFromPeaks)
     void readWaveform
       .then(path => {
         if (controller.signal.aborted) return
-        savedWaveform.current = path
-        setWaveform(path)
+        setLoadedWaveform(path)
         setWaveStatus('idle')
       })
       .catch(() => {
         if (!controller.signal.aborted) setWaveStatus('unavailable')
       })
     return () => controller.abort()
-  }, [source, durationMs, meetingId])
+  }, [audioRemoved, audioUrl, durationMs, meetingId, savedWaveform])
 
   const load = async (refresh = false): Promise<void> => {
     if (request.current || (source && !refresh)) return
@@ -266,8 +269,7 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
       request.current = null
       pending.current = null
       mediaReady.current = false
-      savedWaveform.current = null
-      setWaveform(null)
+      setAudioRemoved(true)
       setWaveStatus('idle')
       setPosition(0)
       setSource(null)
@@ -283,9 +285,9 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
 
   const playLabel = playing ? 'Pause' : loading ? 'Loading recording' : !source && error ? 'Try again' : source ? 'Play' : 'Play the recording'
   const status = loading ? (progress == null ? 'Loading audio' : `Loading audio · ${Math.round(progress * 100)}%`)
-    : waveStatus === 'drawing' ? 'Drawing waveform'
-      : waveStatus === 'unavailable' && source ? 'Waveform unavailable'
-        : playing ? 'Playing recording' : 'Audio recording'
+    : playing ? 'Playing recording'
+      : waveform === null && waveStatus === 'drawing' ? 'Drawing waveform'
+        : waveform === null && waveStatus === 'unavailable' ? 'Audio recording · Waveform unavailable' : 'Audio recording'
   const hasMoments = decisions.length > 0 || actions.length > 0
 
   return (

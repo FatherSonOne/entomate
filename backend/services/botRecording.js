@@ -108,7 +108,11 @@ async function copyBotRecording(sessionId) {
     const storagePath = `${meeting.org_id}/${meeting.id}/playback.webm`;
     const { error } = await db().storage.from(BUCKET).upload(storagePath, audio, { contentType: 'audio/webm', upsert: true });
     if (error) throw new Error(`upload failed: ${error.message}`);
-    await setJob(meeting.id, { ...base, playbackFile: storagePath, mimeType: 'audio/webm', durationMs, bytes: audio.length });
+    const waveformPeaks = await playbackFile.readWaveformPeaksFromAudio(audio).catch((err) => {
+      log.warn('Bot recording waveform could not be prepared', { sessionId, error: err.message });
+      return null;
+    });
+    await setJob(meeting.id, { ...base, playbackFile: storagePath, mimeType: 'audio/webm', durationMs, bytes: audio.length, waveformPeaks });
     log.info('Bot recording saved for playback', { sessionId, meetingId: meeting.id, bytes: audio.length, durationMs });
     return { status: 'saved' };
   } catch (err) {

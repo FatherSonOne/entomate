@@ -248,6 +248,7 @@ export const recordingsApi = {
   // The recording tab closed before Stop: transcribe the audio that reached the server.
   salvage: (meetingId) => api.post(`/recordings/${meetingId}/finish`, { salvage: true }),
   retry: (meetingId) => api.post(`/recordings/${meetingId}/retry`),
+  rebuildTranscript: (meetingId) => api.post(`/recordings/${meetingId}/rebuild-transcript`),
   // Remove a finished recording's audio; the transcript stays.
   removeAudio: (meetingId) => api.delete(`/recordings/${meetingId}/audio`),
   discard: (meetingId) => api.delete(`/recordings/${meetingId}`),

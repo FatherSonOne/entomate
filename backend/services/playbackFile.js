@@ -19,7 +19,7 @@ const path = require('path');
 const MUXER_FLAGS = { webm: ['-cues_to_front', '1'], m4a: ['-movflags', '+faststart'], ogg: [] };
 const TIMEOUT_MS = 2 * 60 * 1000;
 const WAVEFORM_BARS = 160;
-const WAVEFORM_LIMIT_SECONDS = 3 * 60 * 60;
+const WAVEFORM_LIMIT_SECONDS = 9 * 60 * 60;
 
 // Measure a peak every quarter second before combining measurements into the display's bars.
 const PEAK_FILTER = 'aresample=8000:async=1:first_pts=0,asetnsamples=n=2000:p=0,' +
@@ -86,32 +86,46 @@ async function extractSpeechAudio(inputPath, outputPath) {
     '-vn', '-ac', '1', '-c:a', 'libopus', '-b:a', '16k', '-application', 'voip',
     ...MUXER_FLAGS.webm, outputPath,
   ], 10 * 60 * 1000);
-  try {
-    const out = await run('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=nw=1:nk=1', outputPath]);
-    const seconds = parseFloat(String(out).trim());
-    return Number.isFinite(seconds) ? Math.round(seconds * 1000) : 0;
-  } catch {
-    return 0;
-  }
+  return audioDuration(outputPath).catch(() => 0);
 }
 
-/** Stream a signed recording through its audio track and return only numeric waveform data. */
-async function readWaveformPeaks(url) {
-  if (new URL(url).protocol !== 'https:') throw new Error('Expected a signed HTTPS recording URL');
+async function audioDuration(file) {
+  const out = await run('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=nw=1:nk=1', file]);
+  const seconds = Number(out.trim());
+  if (!Number.isFinite(seconds) || seconds <= 0) throw new Error('Recording duration is unavailable');
+  return Math.round(seconds * 1000);
+}
+
+/** Decode the joined MediaRecorder stream to indexed speech audio before seeking into it. */
+async function prepareTranscriptionAudio(input, output) {
+  await run('ffmpeg', [
+    '-nostdin', '-hide_banner', '-loglevel', 'error', '-protocol_whitelist', 'file', '-y', '-i', input,
+    '-map', '0:a:0', '-af', 'aresample=16000:async=1:first_pts=0', '-ac', '1', '-c:a', 'flac', output,
+  ], 10 * 60 * 1000);
+  return audioDuration(output);
+}
+
+async function extractTranscriptionClip(input, output, startMs, durationMs) {
+  await run('ffmpeg', [
+    '-nostdin', '-hide_banner', '-loglevel', 'error', '-y', '-ss', String(startMs / 1000), '-i', input,
+    '-t', String(durationMs / 1000), '-c:a', 'flac', output,
+  ]);
+}
+
+async function measureWaveform(inputArgs) {
   let output;
   try {
     output = await run('ffmpeg', [
       '-nostdin', '-hide_banner', '-loglevel', 'error',
-      '-protocol_whitelist', 'https,tls,tcp,crypto',
-      '-rw_timeout', '12000000', '-i', url,
+      ...inputArgs,
       '-map', '0:a:0', '-t', String(WAVEFORM_LIMIT_SECONDS + 1),
       '-af', PEAK_FILTER, '-f', 'null', '-',
-    ], 90_000, 5 * 1024 * 1024);
+    ], 90_000, 16 * 1024 * 1024);
   } catch {
     // ffmpeg's error may include the signed URL.
     throw new Error('The recording audio could not be measured');
   }
-  const levels = [...output.matchAll(/^lavfi\.astats\.Overall\.Peak_level=(-?inf|[-+]?\d+(?:\.\d+)?)$/gm)];
+  const levels = [...output.matchAll(/^lavfi\.astats\.Overall\.Peak_level=(-?inf|[-+]?\d+(?:\.\d+)?)\r?$/gm)];
   if (!levels.length || levels.length > WAVEFORM_LIMIT_SECONDS * 4) throw new Error('No supported waveform available');
   const count = Math.min(WAVEFORM_BARS, levels.length);
   return Array.from({ length: count }, (_, bar) => {
@@ -126,4 +140,26 @@ async function readWaveformPeaks(url) {
   });
 }
 
-module.exports = { makeSeekable, extractSpeechAudio, readWaveformPeaks };
+/** Stream a signed recording through its audio track and return only numeric waveform data. */
+async function readWaveformPeaks(url) {
+  if (new URL(url).protocol !== 'https:') throw new Error('Expected a signed HTTPS recording URL');
+  return measureWaveform(['-protocol_whitelist', 'https,tls,tcp,crypto', '-rw_timeout', '12000000', '-i', url]);
+}
+
+async function readWaveformPeaksFromAudio(audio) {
+  // Use a local file so MP4 inputs can find their index even when it is at the end.
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'entomate-waveform-'));
+  const input = path.join(dir, 'recording');
+  try {
+    await fs.writeFile(input, audio);
+    return await measureWaveform(['-protocol_whitelist', 'file', '-i', input]);
+  } finally {
+    await fs.unlink(input).catch(() => {});
+    await fs.rmdir(dir);
+  }
+}
+
+module.exports = {
+  makeSeekable, extractSpeechAudio, prepareTranscriptionAudio, extractTranscriptionClip,
+  readWaveformPeaks, readWaveformPeaksFromAudio,
+};
