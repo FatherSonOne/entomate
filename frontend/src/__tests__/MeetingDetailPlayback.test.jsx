@@ -79,9 +79,13 @@ describe('a pressed timecode plays the recording', () => {
     expect(player.playFrom).toHaveBeenCalledWith(22_000)
   })
 
-  test('offers to rebuild an older browser transcript from its kept audio', async () => {
+  test.each([false, true])('offers to rebuild a browser recording with kept audio (complete timing: %s)', async (hasEndTimes) => {
     recordings.rebuildTranscript.mockResolvedValue({ success: true })
-    renderPage({ status: 'done', source: 'browser', audioKept: true, durationMs: 60_000 })
+    renderPage({ status: 'done', source: 'browser', audioKept: true, durationMs: 60_000 }, {
+      transcript_segments: hasEndTimes
+        ? MEETING.transcript_segments.map(line => ({ ...line, endMs: line.atMs + 1000 }))
+        : MEETING.transcript_segments,
+    })
     fireEvent.click(await screen.findByRole('button', { name: 'More actions' }))
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Rebuild transcript from audio' }))
     expect(recordings.rebuildTranscript).toHaveBeenCalledWith('m1')

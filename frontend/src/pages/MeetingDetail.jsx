@@ -84,7 +84,6 @@ export default function MeetingDetail() {
   const browserRecording = recordingJob && (recordingJob.source === 'browser'
     || (!recordingJob.source && !meeting?.recording_job?.botSessionId && recordingJob.mode))
   const canRebuildTranscript = keptRecording && browserRecording
-    && (!transcriptSegments?.length || transcriptSegments.some(line => line.endMs == null))
   const [requestingTranscriptRebuild, setRequestingTranscriptRebuild] = useState(false)
   // A browser recording whose minutes are still being written: empty sections say so instead of "none".
   const minutesPending = ['transcribing', 'backup'].includes(recordingJob?.status)
