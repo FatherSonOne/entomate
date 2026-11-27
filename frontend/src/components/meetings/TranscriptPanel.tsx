@@ -236,7 +236,7 @@ export function TranscriptPanel({ meetingId, segments, onRenamed, suggestions, f
         <h3 className="mb-1.5 text-xs font-medium text-content-secondary">Speakers</h3>
         <ul className="flex flex-wrap gap-1.5">
           {speakers.map((s) => (
-            <li key={s.name}>
+            <li key={s.name} className="max-w-full">
               {renaming === s.name ? (
                 <form
                   className="flex items-center gap-1"
@@ -271,11 +271,11 @@ export function TranscriptPanel({ meetingId, segments, onRenamed, suggestions, f
                   type="button"
                   onClick={() => startRename(s.name)}
                   aria-label={`Rename ${s.name}`}
-                  className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-xs text-content-primary hover:border-line-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary"
+                  className="inline-flex min-h-8 max-w-full items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-left text-xs text-content-primary hover:border-line-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary"
                 >
-                  {s.name}
-                  <span className="tabular-nums text-content-secondary">{s.lines}</span>
-                  <Pencil className="h-3 w-3 text-content-secondary" aria-hidden="true" />
+                  <span className="min-w-0 break-words">{s.name}</span>
+                  <span className="shrink-0 tabular-nums text-content-secondary">{s.lines}</span>
+                  <Pencil className="h-3 w-3 shrink-0 text-content-secondary" aria-hidden="true" />
                 </button>
               )}
             </li>

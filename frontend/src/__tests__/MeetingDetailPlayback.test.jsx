@@ -79,6 +79,16 @@ describe('a pressed timecode plays the recording', () => {
     expect(player.playFrom).toHaveBeenCalledWith(22_000)
   })
 
+  test('a Virtual room speaker button includes its line count and plays from the first line', async () => {
+    renderPage({ status: 'done', audioKept: true, durationMs: 60_000 })
+    fireEvent.click(await screen.findByRole('tab', { name: 'Virtual room' }))
+    const speaker = screen.getByRole('button', { name: 'Speaker 2, 1 line' })
+    expect(speaker).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(speaker)
+    expect(speaker).toHaveAttribute('aria-pressed', 'true')
+    expect(player.playFrom).toHaveBeenCalledExactlyOnceWith(22_000)
+  })
+
   test('routes legacy uploaded audio through Slate even without a timed transcript', async () => {
     const audioUrl = 'https://signed.test/uploaded'
     renderPage(undefined, { audio_file_url: audioUrl, transcript_segments: null })
