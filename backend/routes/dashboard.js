@@ -118,9 +118,11 @@ router.patch('/action-items/:id', async (req, res) => {
     if (assigned_to_name !== undefined) updates.assigned_to_name = assigned_to_name;
     if (assigned_to_email !== undefined) updates.assigned_to_email = assigned_to_email;
 
-    // If completing, set completed_at
+    // Reopening must clear the timestamp used by follow-through reporting.
     if (status === 'done') {
-      updates.completed_at = new Date().toISOString();
+      updates.completed_at = updates.updated_at;
+    } else if (['open', 'in_progress', 'review', 'blocked'].includes(status)) {
+      updates.completed_at = null;
     }
 
     const { data, error } = await supabase

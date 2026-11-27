@@ -1926,6 +1926,18 @@ a.bs-today-call-what:hover, .bs-today-link:hover, .bs-today-dec-src:hover { text
 .bs-tasks-title { all: unset; cursor: pointer; display: block; font-weight: 600; line-height: 1.35; color: var(--bs-ink); overflow-wrap: anywhere; }
 .bs-tasks-title:focus-visible { outline: 2px solid var(--bs-brand); outline-offset: 2px; border-radius: 2px; }
 .bs-tasks-row.done .bs-tasks-title { text-decoration: line-through; color: var(--bs-muted); }
+.bs-tasks-row.is-completing {
+  animation: bs-task-complete 200ms ease-out;
+  background: color-mix(in srgb, var(--bs-mint) 9%, transparent);
+}
+@keyframes bs-task-complete {
+  from { background: color-mix(in srgb, var(--bs-mint) 22%, transparent); }
+  to { background: color-mix(in srgb, var(--bs-mint) 9%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bs-tasks-row.is-completing { animation: none; }
+}
+html[data-motion="reduce"] .bs-tasks-row.is-completing { animation: none; }
 .bs-tasks-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 5px; font-size: 12px; color: var(--bs-ink2); min-width: 0; }
 .bs-tasks-meta .bs-mono { font-size: 11.5px; color: var(--bs-muted); }
 .bs-tasks-src { display: inline-flex; align-items: center; gap: 6px; min-width: 0; color: var(--bs-ink2); text-decoration: none; }

@@ -5,6 +5,7 @@ import { dashboardApi, tasksApi } from '../services/api'
 import {
   Drawer, GroupHead, Key, PHONE_QUERY, Signal, Switch, Tabs, TextArea, TextInput, TitleRule, useMediaQuery,
 } from '../components/bench'
+import { prefersReducedMotion } from '../components/bench/motion'
 import { useConfirm } from '../components/vc/ConfirmDialog'
 import { useToast } from '../components/vc/ToastProvider'
 import ErrorState from '../components/vc/ErrorState'
@@ -24,12 +25,14 @@ import {
  */
 
 const LOAD_LIMIT = 200
+const COMPLETE_FEEDBACK_MS = 220
+const COMPLETE_UNDO_MS = 8000
 const WIDE_QUERY = '(min-width: 1200px)'
 
 const SHOW_OPTIONS = [
   { value: 'open', label: 'Open' },
   { value: 'meetings', label: <><span className="bs-dt">From meetings</span><span className="bs-tasks-ph">Meetings</span></> },
-  { value: 'done', label: 'Done' },
+  { value: 'done', label: 'Completed' },
   { value: 'all', label: 'All' },
 ]
 const SOURCE_OPTIONS = [{ value: 'all', label: 'All' }, { value: 'meetings', label: <><span className="bs-dt">From meetings</span><span className="bs-tasks-ph">Meetings</span></> }]
@@ -79,6 +82,9 @@ export default function Tasks() {
   const [creating, setCreating] = useState(false)
   const [editing, setEditing] = useState(null)
   const [dragKey, setDragKey] = useState(null)
+  const [pendingStatus, setPendingStatus] = useState({})
+  const [statusAnnouncement, setStatusAnnouncement] = useState('')
+  const statusWrites = useRef(new Map())
   const searchRef = useRef(null)
 
   // The command palette opens the same draft drawer as this page's New task key.
@@ -153,33 +159,91 @@ export default function Tasks() {
 
   const patchAction = (saved) => setActionRows((rows) => rows.map((r) => r.id === saved.id ? { ...r, ...saved } : r))
 
-  const setStatus = async (item, status) => {
-    if (item.status === status) return
-    patchLocal(item, status)
-    try {
-      if (item.kind === 'task') {
-        if (status === 'done') await tasksApi.complete(item.id)
-        else if (item.status === 'done' && status === 'open') await tasksApi.reopen(item.id)
-        else await tasksApi.update(item.id, { status })
-      } else {
+  const dismissCompletion = (key) => {
+    const entry = statusWrites.current.get(key)
+    if (entry?.toastId != null) {
+      toast.dismiss(entry.toastId)
+      statusWrites.current.delete(key)
+    }
+  }
+
+  const setStatus = async (item, status, { checkbox, undo = false } = {}) => {
+    if (item.status === status || statusWrites.current.get(item.key)?.pending) return
+    dismissCompletion(item.key)
+    const entry = { pending: true }
+    statusWrites.current.set(item.key, entry)
+    setPendingStatus((prev) => ({ ...prev, [item.key]: status }))
+
+    const save = async () => {
+      if (item.kind !== 'task') {
         const { actionItem } = await dashboardApi.updateActionItemStatus(item.id, status)
-        if (actionItem) patchAction(actionItem)
+        return actionItem
+      }
+      if (status === 'done') await tasksApi.complete(item.id)
+      else if (item.status === 'done' && status === 'open') await tasksApi.reopen(item.id)
+      else await tasksApi.update(item.id, { status })
+      return null
+    }
+
+    try {
+      const feedback = status === 'done' && !prefersReducedMotion()
+        ? new Promise((resolve) => setTimeout(resolve, COMPLETE_FEEDBACK_MS))
+        : undefined
+      const [actionItem] = await Promise.all([save(), feedback])
+
+      if (checkbox && checkbox === document.activeElement) {
+        const controls = Array.from(checkbox.closest('.bs-tasks-list')?.querySelectorAll('.bs-tasks-row > .bs-check') ?? [])
+        const index = controls.indexOf(checkbox)
+        const available = (control) => control.getAttribute('aria-disabled') !== 'true'
+        const next = controls.slice(index + 1).find(available) || controls.slice(0, index).reverse().find(available)
+        ;(next || searchRef.current)?.focus({ preventScroll: true })
+      }
+
+      if (actionItem) patchAction(actionItem)
+      else patchLocal(item, status)
+
+      if (status === 'done') {
+        setStatusAnnouncement(`${item.title} completed. Undo is available.`)
+        entry.toastId = toast.show({
+          title: 'Task completed',
+          message: item.title,
+          color: 'mint',
+          duration: COMPLETE_UNDO_MS,
+          action: {
+            label: 'Undo',
+            onClick: () => {
+              if (statusWrites.current.get(item.key) !== entry) return
+              statusWrites.current.delete(item.key)
+              void setStatus({ ...item, status: 'done' }, item.status, { undo: true })
+            },
+          },
+        })
+      } else if (undo || item.status === 'done') {
+        setStatusAnnouncement(`${item.title} reopened.`)
+        toast.success('Task reopened', item.title)
       }
     } catch (err) {
       console.error('[Tasks] status error:', err)
       toast.error('Error', `Couldn't mark it ${statusWord(status).toLowerCase()}`)
-      load()
+      setStatusAnnouncement(`Couldn't update ${item.title}. Try again.`)
+    } finally {
+      entry.pending = false
+      if (entry.toastId == null) statusWrites.current.delete(item.key)
+      setPendingStatus((prev) => {
+        const next = { ...prev }
+        delete next[item.key]
+        return next
+      })
     }
   }
-
-  const toggleDone = (item) => setStatus(item, item.status === 'done' ? 'open' : 'done')
 
   const handleDelete = async (item) => {
     if (item.kind !== 'task') return
     const ok = await confirm({ title: 'Delete task', message: `Delete "${item.title}"?`, confirmLabel: 'Delete', variant: 'danger' })
-    if (!ok) return
+    if (!ok || statusWrites.current.get(item.key)?.pending) return
     try {
       await tasksApi.delete(item.id)
+      dismissCompletion(item.key)
       setTaskRows((rows) => rows.filter((r) => r.id !== item.id))
       if (url.item === item.key) setUrl({ item: null })
       toast.success('Deleted', 'Task deleted')
@@ -202,7 +266,12 @@ export default function Tasks() {
     if (pickedItems.length === 0) return
     const ok = await confirm({ title: 'Bulk update', message: `Mark ${pickedItems.length} as "${statusWord(status)}"?`, confirmLabel: 'Update', variant: 'primary' })
     if (!ok) return
+    if (pickedItems.some((item) => statusWrites.current.get(item.key)?.pending)) {
+      toast.info('Task update in progress', 'Try the bulk update again when it finishes.')
+      return
+    }
     try {
+      pickedItems.forEach((item) => dismissCompletion(item.key))
       const taskIds = pickedItems.filter((i) => i.kind === 'task').map((i) => i.id)
       if (taskIds.length) await tasksApi.bulkUpdateStatus(taskIds, status)
       for (const i of pickedItems.filter((x) => x.kind === 'action')) await dashboardApi.updateActionItemStatus(i.id, status)
@@ -230,9 +299,17 @@ export default function Tasks() {
       variant: 'danger',
     })
     if (!ok) return
+    if (del.some((item) => statusWrites.current.get(item.key)?.pending)) {
+      toast.info('Task update in progress', 'Try deleting again when it finishes.')
+      return
+    }
     try {
       let deleted = 0
-      for (const i of del) { await tasksApi.delete(i.id); deleted++ }
+      for (const i of del) {
+        await tasksApi.delete(i.id)
+        dismissCompletion(i.key)
+        deleted++
+      }
       toast.success('Deleted', `${deleted} task(s) deleted`)
       stopPicking()
       load()
@@ -326,18 +403,25 @@ export default function Tasks() {
   const row = (item) => {
     const isSel = inlineInspector && inspected?.key === item.key && !picking
     const isPicked = picked.has(item.key)
+    const saving = pendingStatus[item.key] != null
+    const done = item.status === 'done' || pendingStatus[item.key] === 'done'
+    const displayStatus = saving ? 'Saving…' : statusWord(item.status)
     return (
       <li
         key={item.key}
-        className={`bs-tasks-row${isSel || isPicked ? ' sel' : ''}${item.status === 'done' ? ' done' : ''}`}
+        className={`bs-tasks-row${isSel || isPicked ? ' sel' : ''}${done ? ' done' : ''}${pendingStatus[item.key] === 'done' ? ' is-completing' : ''}`}
         onClick={() => openItem(item)}
       >
         <input
           type="checkbox"
           className={`bs-check${picking ? ' bs-tasks-pick' : ''}`}
-          checked={picking ? isPicked : item.status === 'done'}
-          onChange={() => (picking ? togglePick(item.key) : toggleDone(item))}
-          onClick={(e) => e.stopPropagation()}
+          checked={picking ? isPicked : done}
+          aria-disabled={!picking && saving ? true : undefined}
+          onChange={(e) => (picking ? togglePick(item.key) : setStatus(item, item.status === 'done' ? 'open' : 'done', { checkbox: e.currentTarget }))}
+          onClick={(e) => {
+            e.stopPropagation()
+            if (!picking && saving) e.preventDefault()
+          }}
           aria-label={picking ? `Select ${item.title}` : item.status === 'done' ? `Reopen ${item.title}` : `Complete ${item.title}`}
         />
         <div className="bs-tasks-main">
@@ -350,12 +434,12 @@ export default function Tasks() {
                 <span className="bs-led ai" aria-hidden="true" />{item.agent.confidence}%
               </span>
             )}
-            <span className="bs-tasks-ph"><Signal tone={statusTone(item.status)}>{statusWord(item.status)}</Signal></span>
+            <span className="bs-tasks-ph"><Signal tone={statusTone(item.status)}>{displayStatus}</Signal></span>
           </div>
         </div>
         <span className={`bs-tasks-due${isOverdue(item, now) ? ' late' : ''}`}>{dueLabel(item.due, now)}</span>
         <span className="bs-dt"><Priority p={item.priority} /></span>
-        <span className="bs-dt"><Signal tone={statusTone(item.status)}>{statusWord(item.status)}</Signal></span>
+        <span className="bs-dt"><Signal tone={statusTone(item.status)}>{displayStatus}</Signal></span>
       </li>
     )
   }
@@ -462,6 +546,7 @@ export default function Tasks() {
 
   return (
     <div className="bs-tasks">
+      <p className="bs-sr" role="status" aria-atomic="true">{statusAnnouncement}</p>
       <TitleRule title="Tasks" meta={meta} actions={actions} />
       {filterBar}
       {error ? <ErrorState message={error} onRetry={load} /> : layout === 'lanes' ? lanesView : (
@@ -474,6 +559,7 @@ export default function Tasks() {
                   key={inspected.key}
                   item={inspected}
                   now={now}
+                  statusSaving={pendingStatus[inspected.key] != null}
                   onStatus={setStatus}
                   onEdit={() => setEditing(taskRows.find((t) => t.id === inspected.id) ?? null)}
                   onActionSaved={patchAction}
@@ -495,6 +581,7 @@ export default function Tasks() {
             item={selected}
             now={now}
             inDrawer
+            statusSaving={pendingStatus[selected.key] != null}
             onStatus={setStatus}
             onEdit={() => setEditing(taskRows.find((t) => t.id === selected.id) ?? null)}
             onActionSaved={patchAction}

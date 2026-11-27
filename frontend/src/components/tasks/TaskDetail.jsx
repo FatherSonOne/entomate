@@ -24,7 +24,7 @@ export function Priority({ p }) {
 }
 
 /** The inspector: fields, the meeting it came from, the agent's call, subtasks. Column on wide screens, drawer below. */
-export default function TaskDetail({ item, now, inDrawer = false, onStatus, onEdit, onActionSaved, onDelete, onOpenMeeting }) {
+export default function TaskDetail({ item, now, inDrawer = false, onStatus, onEdit, onActionSaved, onDelete, onOpenMeeting, statusSaving = false }) {
   const toast = useToast()
   const [subtasks, setSubtasks] = useState([])
   const [subLoading, setSubLoading] = useState(false)
@@ -108,7 +108,7 @@ export default function TaskDetail({ item, now, inDrawer = false, onStatus, onEd
         {item.status !== 'done' && (
           <div className="bs-field">
             <dt className="bs-lbl">Status</dt>
-            <dd><Switch label="Status" className="bs-tasks-stsw" options={STATUS_EDIT} value={item.status} onChange={(v) => onStatus(item, v)} /></dd>
+            <dd><Switch label="Status" className="bs-tasks-stsw" options={STATUS_EDIT} value={item.status} disabled={statusSaving} onChange={(v) => onStatus(item, v)} /></dd>
           </div>
         )}
         <div className="bs-field"><dt className="bs-lbl">Owner</dt><dd>{item.owner || <span className="bs-mut">Nobody yet</span>}{item.agent?.kind === 'assignment' && <> <Signal tone="ai">Agent pick</Signal></>}</dd></div>
@@ -162,8 +162,8 @@ export default function TaskDetail({ item, now, inDrawer = false, onStatus, onEd
       )}
 
       <div className="bs-tasks-keys">
-        <Key variant={inDrawer ? 'primary' : 'plain'} onClick={() => onStatus(item, item.status === 'done' ? 'open' : 'done')}>
-          {item.status === 'done' ? 'Reopen' : 'Mark done'}
+        <Key variant={inDrawer ? 'primary' : 'plain'} disabled={statusSaving} onClick={() => onStatus(item, item.status === 'done' ? 'open' : 'done')}>
+          {statusSaving ? 'Saving…' : item.status === 'done' ? 'Reopen' : 'Mark done'}
         </Key>
         {isTask && <Key onClick={onEdit}>Edit</Key>}
         {!isTask && src && onActionSaved && <Key onClick={() => setEditingAction(true)}>Edit action item</Key>}
