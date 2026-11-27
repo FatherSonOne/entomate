@@ -324,6 +324,7 @@ Return ONLY valid JSON:
     }));
     const generationConfig = typeof options.temperature === 'number' ? { temperature: options.temperature } : undefined;
     const response = await this.model.generateContent({ contents, generationConfig });
+    await addUsage(response.response.usageMetadata);
     return response.response.text();
   }
 

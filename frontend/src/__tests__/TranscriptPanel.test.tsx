@@ -96,6 +96,20 @@ describe('TranscriptPanel', () => {
     expect(screen.getAllByTestId('transcript-line')[2]).toHaveAttribute('aria-current', 'true')
   })
 
+  test('a draft citation focuses the exact line even when transcript timestamps match', () => {
+    const segments = toSegments([
+      { ...SEGMENTS[0], eventId: 'first' },
+      { ...SEGMENTS[1], atMs: SEGMENTS[0]!.atMs, eventId: 'second' },
+    ])!
+    const { rerender } = render(<TranscriptPanel meetingId={MEETING} segments={segments} />)
+    fireEvent.change(screen.getByLabelText('Search transcript'), { target: { value: 'Hi there' } })
+    rerender(<TranscriptPanel meetingId={MEETING} segments={segments} focusAtMs={500} focusEventId="second" />)
+    const cited = screen.getAllByTestId('transcript-line')[1]
+    expect(cited).toHaveAttribute('id', 'transcript-line-second')
+    expect(cited).toHaveAttribute('aria-current', 'true')
+    expect(cited).toHaveFocus()
+  })
+
   test('a colon is refused before anything is sent', () => {
     render(<TranscriptPanel meetingId={MEETING} segments={SEGMENTS} />)
     fireEvent.click(screen.getByRole('button', { name: 'Rename Ann Lee' }))

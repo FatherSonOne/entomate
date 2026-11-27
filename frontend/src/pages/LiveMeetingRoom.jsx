@@ -1,8 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Link2, Mic, MicOff, MonitorUp, Video, VideoOff } from 'lucide-react'
 import { Display, Drawer, Key, Section, Signal, TextInput, TitleRule } from '../components/bench'
 import { MeetingNavigation, MeetingTrail, ROOM, START, WORKSPACE } from '../components/meetings/MeetingNavigation'
+import { LiveMeetingInsights } from '../components/meetings/LiveMeetingInsights'
 import { useAuth } from '../contexts/AuthContext'
 import { liveRoomsApi, meetingsApi } from '../services/api'
 
@@ -59,14 +60,14 @@ export default function LiveMeetingRoom({ guest = false }) {
   const [participants, setParticipants] = useState([])
   const [speaker, setSpeaker] = useState('')
   const [caption, setCaption] = useState(null)
+  const [transcriptRevision, setTranscriptRevision] = useState(0)
   const [transcribing, setTranscribing] = useState(false)
   const [notesError, setNotesError] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [copied, setCopied] = useState(false)
   const call = useRef(null)
-  const pending = useRef([])
-  const sending = useRef(null)
+  const checkpoint = useMemo(() => ({ pending: [], sending: null }), [id])
   const createId = useRef(null)
   const inAction = useRef(false)
   const mounted = useRef(false)
@@ -89,6 +90,7 @@ export default function LiveMeetingRoom({ guest = false }) {
     setLoading(true)
     setError('')
     setRoom(null)
+    setTranscriptRevision(0)
     if (!id) createId.current = null
     const request = !id ? liveRoomsApi.status() : guest ? liveRoomsApi.guest(id, inviteKey) : liveRoomsApi.host(id)
     request.then(data => {
@@ -127,18 +129,18 @@ export default function LiveMeetingRoom({ guest = false }) {
     }
   }, [camera, joined, audioMode, room?.available])
 
-  function flush() {
-    if (sending.current) return sending.current
-    if (!pending.current.length) return Promise.resolve()
-    sending.current = (async () => {
-      while (pending.current.length) {
-        const batch = pending.current.slice(0, 100)
+  const flush = useCallback(() => {
+    if (checkpoint.sending) return checkpoint.sending
+    if (!checkpoint.pending.length) return Promise.resolve()
+    checkpoint.sending = (async () => {
+      while (checkpoint.pending.length) {
+        const batch = checkpoint.pending.slice(0, 100)
         await liveRoomsApi.lines(id, batch)
-        pending.current.splice(0, batch.length)
+        checkpoint.pending.splice(0, batch.length)
       }
-    })().finally(() => { sending.current = null })
-    return sending.current
-  }
+    })().finally(() => { checkpoint.sending = null })
+    return checkpoint.sending
+  }, [id, checkpoint])
 
   useEffect(() => {
     if (!joined || guest || !room?.withNotes) return undefined
@@ -146,16 +148,14 @@ export default function LiveMeetingRoom({ guest = false }) {
       if (!endingCall.current) void flush().catch(() => setNotesError('Transcript sync paused. Entomate will retry.'))
     }
     const timer = window.setInterval(persist, 5000)
-    const warn = event => { if (pending.current.length) event.preventDefault() }
+    const warn = event => { if (checkpoint.pending.length) event.preventDefault() }
     window.addEventListener('beforeunload', warn)
     return () => {
       window.clearInterval(timer)
       window.removeEventListener('beforeunload', warn)
       if (!endingCall.current) void flush().catch(() => {})
     }
-    // Each joined call keeps one queue until it leaves.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [guest, id, joined, room?.withNotes])
+  }, [checkpoint, flush, guest, joined, room?.withNotes])
 
   async function create(event) {
     event.preventDefault()
@@ -198,7 +198,7 @@ export default function LiveMeetingRoom({ guest = false }) {
       }
       const updateSpeaker = event => setSpeaker(event.activeSpeaker.peerId)
       const onLine = event => {
-        if (event.rawResponse?.is_final === false || !event.text?.trim()) return
+        if (call.current !== connection || event.rawResponse?.is_final === false || !event.text?.trim()) return
         const who = Object.values(connection.participants()).find(person => person.session_id === event.participantId)
         const stamp = new Date(event.timestamp).getTime()
         const elapsed = (Number.isFinite(stamp) ? stamp : Date.now()) - Date.parse(access.openedAt)
@@ -207,7 +207,10 @@ export default function LiveMeetingRoom({ guest = false }) {
           atMs: Math.min(14_400_000, Math.max(0, Math.round(elapsed))),
         }
         setCaption(line)
-        if (access.host && access.withNotes) pending.current.push(line)
+        if (access.host && access.withNotes) {
+          checkpoint.pending.push(line)
+          setTranscriptRevision(previous => previous + 1)
+        }
       }
       connection.on('participant-joined', sync).on('participant-updated', sync).on('participant-left', sync)
         .on('track-started', sync).on('track-stopped', sync)
@@ -386,6 +389,8 @@ export default function LiveMeetingRoom({ guest = false }) {
         <div className="bs-meeting-tiles">{participants.map(p => <Participant key={p.session_id} participant={p} active={p.session_id === speaker} />)}</div>
         {caption && <p className="bs-meeting-caption"><b>{caption.speaker}</b> {caption.text}</p>}
       </section>}
+      {!guest && joined && room?.withNotes && <LiveMeetingInsights key={id} roomId={id} live
+        transcriptRevision={transcriptRevision} beforeRefresh={flush} disabled={busy} />}
       {notesError && <p role="status" className="bs-mut">{notesError}</p>}
       {!guest && <Drawer open={closing && !room?.finished} onClose={() => setClosing(false)} dismissible={!busy} label="End live room"
         footer={<>

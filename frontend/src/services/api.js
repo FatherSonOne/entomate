@@ -430,6 +430,15 @@ export const liveRoomsApi = {
   guest: (id, inviteKey) => api.post(`/live-meeting-rooms/${id}/guest`, { inviteKey }, { skipRetry: true }),
   join: (id, host, data) => api.post(`/live-meeting-rooms/${id}/${host ? 'host' : 'guest'}/join`, data, { skipRetry: true }),
   lines: (id, lines) => api.post(`/live-meeting-rooms/${id}/lines`, { lines }, { skipRetry: true }),
+  insights: (id) => api.get(`/live-meeting-rooms/${id}/insights`, { _noCache: true, skipRetry: true }),
+  refreshInsights: (id) => api.post(`/live-meeting-rooms/${id}/insights/refresh`, {}, { skipRetry: true }),
+  approveAction: async (id, draftId) => {
+    const result = await api.post(`/live-meeting-rooms/${id}/insights/actions/${draftId}/approve`, {}, { skipRetry: true })
+    cache.invalidate('/meetings')
+    cache.invalidate('/action-items')
+    cache.invalidate('/dashboard')
+    return result
+  },
   end: async (id) => {
     const result = await api.post(`/live-meeting-rooms/${id}/end`, {}, { skipRetry: true })
     cache.invalidate('/meetings')
