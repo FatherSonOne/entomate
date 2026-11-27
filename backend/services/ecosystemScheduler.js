@@ -5,7 +5,7 @@
  */
 
 const cron = require('node-cron');
-const { getEcosystemBridge } = require('./ecosystemBridge');
+const { getEcosystemBridge, ACTION_ITEM_STATUS_EVENT } = require('./ecosystemBridge');
 const { supabaseAdmin } = require('../config/supabase');
 const log = require('../utils/log');
 
@@ -15,6 +15,7 @@ class EcosystemScheduler {
   constructor() {
     this.job = null;
     this.retryJob = null;
+    this.taskStatusJob = null;
     this.initialized = false;
   }
 
@@ -24,6 +25,10 @@ class EcosystemScheduler {
    */
   initialize() {
     if (this.initialized) return;
+
+    if (supabaseAdmin && !this.taskStatusJob) {
+      this.taskStatusJob = cron.schedule('*/30 * * * * *', () => this.deliverTaskStatuses());
+    }
 
     if (process.env.ENABLE_ECOSYSTEM_AUTO_SYNC !== 'true') {
       log.info('[EcosystemScheduler] Auto-sync disabled (set ENABLE_ECOSYSTEM_AUTO_SYNC=true to enable)');
@@ -47,6 +52,32 @@ class EcosystemScheduler {
     log.info(`[EcosystemScheduler] Auto-sync scheduled: ${cronExpr}; retry tick: ${retryCron}`);
   }
 
+  async deliverTaskStatuses() {
+    if (!supabaseAdmin) return;
+    try {
+      const now = new Date();
+      const bridge = await getEcosystemBridge();
+      const destinations = ['pulse', 'logos_vision'].filter((app) => bridge.isConnected(app));
+      if (!destinations.length) return;
+      const { data: events, error } = await supabaseAdmin.from('ecosystem_events')
+        .select('id, event_id, target_app, entity_id, status, retry_count, payload')
+        .eq('direction', 'outbound')
+        .eq('event_type', ACTION_ITEM_STATUS_EVENT)
+        .in('target_app', destinations)
+        .in('status', ['pending', 'failed'])
+        .lte('next_retry_at', now.toISOString())
+        .order('next_retry_at')
+        .limit(12);
+      if (error) throw error;
+      const results = await Promise.allSettled(events.map((event) => bridge.deliverQueuedActionItemStatus(event, now)));
+      for (const result of results) {
+        if (result.status === 'rejected') log.error('[EcosystemScheduler] Task status delivery failed:', result.reason.message);
+      }
+    } catch (err) {
+      log.error('[EcosystemScheduler] Task status queue failed:', err.message);
+    }
+  }
+
   /**
    * Pending outbound rows older than the cutoff are presumed orphaned —
    * the bridge writes status='pending' *before* the HTTP call, so a backend
@@ -66,6 +97,7 @@ class EcosystemScheduler {
           next_retry_at: new Date(Date.now() + 60 * 1000).toISOString(),
         })
         .eq('direction', 'outbound')
+        .neq('event_type', ACTION_ITEM_STATUS_EVENT)
         .or('entity_type.is.null,entity_type.neq.project')
         .eq('status', 'pending')
         .lt('created_at', cutoff)
@@ -99,6 +131,7 @@ class EcosystemScheduler {
         .from('ecosystem_events')
         .select('id, retry_count, event_type, target_app')
         .eq('direction', 'outbound')
+        .neq('event_type', ACTION_ITEM_STATUS_EVENT)
         .or('entity_type.is.null,entity_type.neq.project')
         .eq('status', 'failed')
         .not('next_retry_at', 'is', null)
@@ -210,6 +243,10 @@ class EcosystemScheduler {
       this.retryJob.stop();
       this.retryJob = null;
     }
+    if (this.taskStatusJob) {
+      this.taskStatusJob.stop();
+      this.taskStatusJob = null;
+    }
     log.info('[EcosystemScheduler] Stopped');
   }
 
@@ -218,6 +255,7 @@ class EcosystemScheduler {
       initialized: this.initialized,
       running: !!this.job,
       retryRunning: !!this.retryJob,
+      taskStatusRunning: !!this.taskStatusJob,
       cron: process.env.ECOSYSTEM_SYNC_CRON || '0 */6 * * *',
       retryCron: process.env.ECOSYSTEM_RETRY_CRON || '*/5 * * * *',
     };

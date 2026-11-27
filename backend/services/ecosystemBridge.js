@@ -19,6 +19,8 @@ const { supabaseAdmin } = require('../config/supabase');
 const log = require('../utils/log');
 
 const SOURCE_APP = 'entomate';
+const ACTION_ITEM_STATUS_EVENT = 'action_item.status_changed';
+const STATUS_RETRY_MINUTES = [5, 15, 60, 240, 720];
 
 // Same scheme as supabase/functions/ecosystem-inbound/signature.ts (EAI-08):
 // v1=<hex HMAC-SHA256(secret, `${timestamp}.${eventId}.${rawBody}`)>.
@@ -136,7 +138,7 @@ class EcosystemBridge {
    * Send an event to a specific app via HTTP
    * @returns {Promise<{success: boolean, eventLogId?: string, error?: string}>}
    */
-  async sendEvent(targetApp, event, projectAttempt = null) {
+  async sendEvent(targetApp, event, projectAttempt = null, actionItemAttempt = null) {
     const cfg = this._config.get(targetApp);
     const destination = cfg?.features?.project_handoff;
     const destinationChanged = projectAttempt && (
@@ -166,8 +168,9 @@ class EcosystemBridge {
     };
 
     // Project handoffs claim their event before calling the bridge.
-    let eventLogId = projectAttempt?.id ?? null;
-    if (!projectAttempt) {
+    const attempt = projectAttempt ?? actionItemAttempt;
+    let eventLogId = attempt?.id ?? null;
+    if (!attempt) {
       try {
         const { data: logEntry } = await supabaseAdmin
           .from('ecosystem_events')
@@ -229,6 +232,9 @@ class EcosystemBridge {
       if (projectAttempt && (responseData?.received !== true || responseData.eventId !== eventId)) {
         throw new Error('Pulse did not confirm receipt of this handoff');
       }
+      if (actionItemAttempt && responseData?.actionItemStatusSynced !== true) {
+        throw new Error('Destination did not acknowledge the action item status');
+      }
 
       // Update event log to delivered
       if (eventLogId) {
@@ -238,7 +244,7 @@ class EcosystemBridge {
           error_message: null,
           next_retry_at: null,
           processing_time_ms: processingTime
-        }, projectAttempt);
+        }, attempt);
       }
 
       // Update heartbeat
@@ -260,8 +266,10 @@ class EcosystemBridge {
             status: 'failed',
             error_message: err.message,
             processing_time_ms: processingTime,
-            next_retry_at: projectAttempt ? null : new Date(Date.now() + 5 * 60 * 1000).toISOString()
-          }, projectAttempt);
+            next_retry_at: projectAttempt ? null : new Date(Date.now() + (
+              actionItemAttempt ? STATUS_RETRY_MINUTES[actionItemAttempt.retry_count - 1] : 5
+            ) * 60 * 1000).toISOString()
+          }, attempt);
         } catch {
           // Swallow — logging failure shouldn't mask the original error
         }
@@ -272,11 +280,40 @@ class EcosystemBridge {
     }
   }
 
-  async finishEvent(id, updates, projectAttempt) {
+  async finishEvent(id, updates, attempt) {
     const query = supabaseAdmin.from('ecosystem_events').update(updates).eq('id', id);
-    if (projectAttempt) query.eq('retry_count', projectAttempt.retry_count).eq('status', 'pending');
+    if (attempt) query.eq('retry_count', attempt.retry_count).eq('status', 'pending');
     const { error } = await query;
     if (error) log.warn('[EcosystemBridge] Failed to save delivery status:', error.message);
+  }
+
+  async deliverQueuedActionItemStatus(event, now = new Date()) {
+    if (!this.isConnected(event.target_app)) {
+      return { success: false, error: 'Destination is disconnected' };
+    }
+
+    const exhausted = event.retry_count >= STATUS_RETRY_MINUTES.length;
+    const { data: attempt, error } = await supabaseAdmin.from('ecosystem_events')
+      .update(exhausted
+        ? { status: 'exhausted', next_retry_at: null }
+        : { status: 'pending', retry_count: event.retry_count + 1, next_retry_at: new Date(now.getTime() + 60000).toISOString() })
+      .eq('id', event.id)
+      .eq('event_type', ACTION_ITEM_STATUS_EVENT)
+      .eq('direction', 'outbound')
+      .eq('retry_count', event.retry_count)
+      .eq('status', event.status)
+      .select('id, retry_count')
+      .maybeSingle();
+    if (error) throw error;
+    if (!attempt || exhausted) return { success: false, error: 'Delivery already claimed or exhausted' };
+
+    return this.sendEvent(event.target_app, {
+      id: event.event_id,
+      eventType: ACTION_ITEM_STATUS_EVENT,
+      entityType: 'action_item',
+      entityId: event.entity_id,
+      data: event.payload.data,
+    }, null, attempt);
   }
 
   /**
@@ -314,6 +351,9 @@ class EcosystemBridge {
 
     if (event.status !== 'failed') {
       return { success: false, error: `Event status is '${event.status}', not 'failed'` };
+    }
+    if (event.event_type === ACTION_ITEM_STATUS_EVENT) {
+      return this.deliverQueuedActionItemStatus(event);
     }
 
     // Increment retry count
@@ -571,4 +611,4 @@ async function getEcosystemBridge() {
   return bridge;
 }
 
-module.exports = { EcosystemBridge, getEcosystemBridge, ecosystemBridge: bridge, signBridgeRequest };
+module.exports = { EcosystemBridge, getEcosystemBridge, ecosystemBridge: bridge, signBridgeRequest, ACTION_ITEM_STATUS_EVENT };
