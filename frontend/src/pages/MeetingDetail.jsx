@@ -797,7 +797,7 @@ export default function MeetingDetail() {
             durationMs={meeting.recording_job?.durationMs || lengthMs}
             audioTracks={keptRecording && (browserRecording || roomRecording) ? recordingJob.audioTracks : undefined}
             roomRecording={roomRecording}
-            gaps={keptRecording && browserRecording ? recordingJob.audioGaps : undefined}
+            gaps={keptRecording && (browserRecording || roomRecording) ? recordingJob.audioGaps : undefined}
             waveformPeaks={keptRecording ? toWaveformPeaks(meeting.recording_job?.waveformPeaks) : null}
             waveformReplacement={rebuildingTranscript
               ? <DebriefLoader source={recordingRebuildSource(recordingJob, meeting.title, meeting.attendees)} />

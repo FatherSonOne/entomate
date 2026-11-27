@@ -8,7 +8,7 @@
  */
 
 import { meetingsApi, recordingsApi } from './api'
-import { ISOLATED_AUDIO_TRACKS, ROOM_PARTICIPANT_TRACKS, readRecordingGaps, type AudioGap, type AudioTracks, type IsolatedAudioTrack, type PlaybackTrack, type RecordingGaps, type RecordingTrack, type TrackCoverage } from './recordingAudioTracks'
+import { ISOLATED_AUDIO_TRACKS, readRecordingGaps, roomParticipantTracks, type AudioGap, type AudioTracks, type IsolatedAudioTrack, type PlaybackTrack, type RecordingGaps, type TrackCoverage } from './recordingAudioTracks'
 import { lockRecording, recordingJournal, type RecordingPiece } from './recordingJournal'
 import cache from './apiCache'
 
@@ -22,7 +22,7 @@ const AUDIO_BITS_PER_SECOND = 64_000
 const VIDEO_BITS_PER_SECOND = 1_500_000
 
 /** `backup`: recorded beside the bot, which writes the minutes; this audio waits in case it cannot. */
-export type RecordingStatus = 'recording' | 'transcribing' | 'backup' | 'done' | 'failed'
+export type RecordingStatus = 'recording' | 'transcribing' | 'processing' | 'backup' | 'done' | 'failed'
 /** Which engine is writing (or wrote) the minutes: the Recall bot, or this browser's recording. */
 export type RecordingSource = 'bot' | 'browser' | 'room'
 
@@ -54,18 +54,21 @@ export interface RecordingJob {
 }
 
 export type { AudioTracks } from './recordingAudioTracks'
-interface RecordingCoverage extends TrackCoverage { audioTracks?: AudioTracks }
-export type RecoveryProgress = Partial<Record<RecordingTrack, { savedMs: number; sentMs: number }>>
+interface RecordingCoverage extends Pick<TrackCoverage, 'pieces' | 'durationMs'> { audioTracks?: AudioTracks }
+export type RecoveryProgress = Partial<Record<'mix' | IsolatedAudioTrack, { savedMs: number; sentMs: number }>>
 
 function readAudioTracks(raw: unknown, keys: readonly PlaybackTrack[] = ISOLATED_AUDIO_TRACKS): AudioTracks {
   const tracks: AudioTracks = {}
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return tracks
   for (const track of keys) {
     const value = (raw as AudioTracks)[track]
-    if (value && Number.isSafeInteger(value.pieces) && value.pieces > 0 && Number.isSafeInteger(value.durationMs) && value.durationMs >= 0) {
-      tracks[track] = { pieces: value.pieces, durationMs: value.durationMs,
-        ...(typeof value.label === 'string' && value.label.trim() ? { label: value.label.trim() } : {}),
-      }
+    if (!value) continue
+    const label = typeof value.label === 'string' ? value.label.trim() : ''
+    const status = value.status === 'partial' || value.status === 'saved' || value.status === 'processing' || value.status === 'missing' ? value.status : undefined
+    const playable = Number.isSafeInteger(value.pieces) && value.pieces > 0 && Number.isSafeInteger(value.durationMs) && value.durationMs >= 0
+    if (!playable && status !== 'missing' && status !== 'processing') continue
+    tracks[track] = { pieces: playable ? value.pieces : 0, durationMs: playable ? value.durationMs : 0,
+      ...(label ? { label } : {}), ...(status ? { status } : {}),
     }
   }
   return tracks
@@ -80,7 +83,7 @@ export interface TranscriptRebuildProgress {
 export type RecordingStage = 'transcript' | 'speakers' | 'summary' | 'saving'
 const STAGES: RecordingStage[] = ['transcript', 'speakers', 'summary', 'saving']
 
-const STATUSES: RecordingStatus[] = ['recording', 'transcribing', 'backup', 'done', 'failed']
+const STATUSES: RecordingStatus[] = ['recording', 'transcribing', 'processing', 'backup', 'done', 'failed']
 const MODES: RecorderMode[] = ['mic', 'camera', 'tab']
 
 /** Reads `meetings.recording_job` defensively. Null for a meeting not recorded here. */
@@ -112,7 +115,7 @@ export function toRecordingJob(raw: unknown): RecordingJob | null {
     durationMs: typeof r.durationMs === 'number' && r.durationMs > 0 ? r.durationMs : 0,
     ...(r.audioTracks || r.splitAudio === true ? { audioTracks: readAudioTracks(r.audioTracks) } : {}),
     ...(r.source === 'room' ? {
-      audioTracks: readAudioTracks(r.participantTracks, ROOM_PARTICIPANT_TRACKS),
+      audioTracks: readAudioTracks(r.participantTracks, roomParticipantTracks(r.participantTracks)),
       roomOffsetMs: typeof r.roomOffsetMs === 'number' && r.roomOffsetMs >= 0 ? r.roomOffsetMs : 0,
     } : {}),
     ...(audioGaps.length ? { audioGaps } : {}),
@@ -383,7 +386,7 @@ export async function recoverRecording(
     const cloud = (await recordingsApi.recovery(id)) as unknown as RecordingCoverage & { status: RecordingStatus }
     let progress: RecoveryProgress = {}
     if (cloud.status === 'recording') {
-      const makePlan = (coverage: TrackCoverage, track?: IsolatedAudioTrack, maxPieces = Infinity) => {
+      const makePlan = (coverage: RecordingCoverage, track?: IsolatedAudioTrack, maxPieces = Infinity) => {
         const pending: RecordingPiece[] = []
         let next = coverage.pieces
         for (const piece of saved.pieces) {
@@ -392,7 +395,7 @@ export async function recoverRecording(
           pending.push(piece)
           next += 1
         }
-        const name: RecordingTrack = track ?? 'mix'
+        const name: 'mix' | IsolatedAudioTrack = track ?? 'mix'
         progress[name] = {
           savedMs: pending.reduce((total, piece) => total + piece.durationMs, coverage.durationMs),
           sentMs: coverage.durationMs,

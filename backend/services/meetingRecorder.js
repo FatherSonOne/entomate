@@ -383,6 +383,7 @@ async function savePiece({ orgId, meetingId, userId, seq, durationMs, buffer, tr
   const meeting = await loadMeeting(meetingId);
   const job = meeting?.recording_job;
   if (!job || meeting.org_id !== orgId || job.status !== 'recording') throw new RecorderError(409, 'This meeting is not recording.');
+  if (job.roomCapture === 'daily') throw new RecorderError(409, 'Daily is saving this room audio.');
   if (job.source === 'room' && job.startedBy !== userId) throw new RecorderError(404, 'Recording not found.');
   const tracks = job.source === 'room' ? ROOM_TRACKS : job.splitAudio ? ISOLATED_TRACKS : [];
   if (track !== 'mix' && !tracks.includes(track)) {
@@ -431,14 +432,35 @@ async function roomRecordingJob(room) {
     && meeting.recording_job?.source === 'room' ? meeting : null;
 }
 
-async function prepareRoomRecording(room) {
+async function prepareRoomRecording(room, cloud = false) {
   const { error } = await supabase.from('meetings').upsert({
     id: room.id, org_id: room.org_id, created_by: room.host_id, title: room.title,
     start_time: room.created_at, action_items_require_approval: true,
-    recording_job: { source: 'room', status: 'ready', startedBy: room.host_id },
+    recording_job: { source: 'room', status: 'ready', startedBy: room.host_id, ...(cloud ? { roomCapture: 'daily' } : {}) },
   }, { onConflict: 'id', ignoreDuplicates: true });
   if (error) throw error;
   if (!(await roomRecordingJob(room))) throw new RecorderError(409, 'This room could not be prepared for recording.');
+}
+
+async function patchRoomRecording(meeting, patch) {
+  const previous = meeting.recording_job;
+  const updatedAt = new Date().toISOString();
+  const job = { ...previous, ...patch, updatedAt };
+  let request = supabase.from('meetings').update({ recording_job: job, updated_at: updatedAt })
+    .eq('id', meeting.id).eq('org_id', meeting.org_id).eq('recording_job->>status', previous.status);
+  if (previous.updatedAt) request = request.eq('recording_job->>updatedAt', previous.updatedAt);
+  const { data, error } = await request.select('id').maybeSingle();
+  if (error) throw error;
+  if (!data) throw new RecorderError(409, 'Room audio changed. Refresh and try again.');
+  meeting.recording_job = job;
+  return job;
+}
+
+async function saveRoomPlayback(meeting, track, bytes) {
+  const file = playbackPath(meeting.org_id, meeting.id, 'audio/webm', track);
+  const { error } = await supabase.storage.from(BUCKET).upload(file, bytes, { contentType: 'audio/webm', upsert: true });
+  if (error) throw error;
+  return file;
 }
 
 async function startRoomRecording(room, mimeType) {
@@ -889,7 +911,7 @@ async function loadPlaybackMeeting(orgId, meetingId) {
 
 function playbackTrackCoverage(job, track) {
   if (track === 'mix') return null;
-  const coverage = job.source === 'room' && ROOM_TRACKS.includes(track) ? job.participantTracks?.[track]
+  const coverage = job.source === 'room' && typeof track === 'string' && /^p[1-9]\d{0,2}$/.test(track) ? job.participantTracks?.[track]
     : job.source === 'browser' && ISOLATED_TRACKS.includes(track) ? job.audioTracks?.[track] : undefined;
   if (!coverage?.pieces || !coverage.durationMs) {
     throw new RecorderError(404, 'This audio track is unavailable.');
@@ -1018,6 +1040,8 @@ module.exports = {
   startRecording,
   roomRecordingJob,
   prepareRoomRecording,
+  patchRoomRecording,
+  saveRoomPlayback,
   startRoomRecording,
   finishRoomRecording,
   botsInCall,

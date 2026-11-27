@@ -130,6 +130,40 @@ describe('RecordingPlayer', () => {
     }
   })
 
+  test('marks a partial participant track and jumps to the same time on Combined', async () => {
+    api.playback.mockImplementation((_id, track) => Promise.resolve({
+      url: `https://signed.test/${track ?? 'combined'}`, durationMs: 60_000,
+    }))
+    const pause = vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {})
+    const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined)
+    const job = toRecordingJob({
+      source: 'room', status: 'done', durationMs: 60_000, participantTracks: {
+        p1: { pieces: 1, durationMs: 60_000, label: 'Host', status: 'saved' },
+        p4: { pieces: 1, durationMs: 60_000, label: 'Guest', status: 'partial',
+          gaps: [{ startMs: 9000, endMs: 14000 }] },
+      },
+    })
+    try {
+      render(<RecordingPlayer meetingId={MEETING} durationMs={60_000} roomRecording audioTracks={job?.audioTracks} gaps={job?.audioGaps} />)
+      expect(screen.getByRole('list', { name: 'Participant track status' })).toHaveTextContent('Guest · Partial')
+      const selector = screen.getByRole('combobox', { name: 'Audio source' })
+      expect(selector).toHaveValue('')
+      fireEvent.change(selector, { target: { value: 'p4' } })
+      const guest = await screen.findByTestId('recording-player') as HTMLAudioElement
+      expect(guest.src).toBe('https://signed.test/p4')
+      fireEvent.click(screen.getByRole('button', { name: 'Guest gap from 0:09 to 0:14. Play Combined.' }))
+      const combined = await screen.findByTestId('recording-player') as HTMLAudioElement
+      expect(combined.src).toBe('https://signed.test/combined')
+      Object.defineProperty(combined, 'duration', { configurable: true, value: 60 })
+      fireEvent.loadedMetadata(combined)
+      expect(combined.currentTime).toBe(9)
+      expect(play).toHaveBeenCalledTimes(1)
+    } finally {
+      pause.mockRestore()
+      play.mockRestore()
+    }
+  })
+
   test('draws each track on the shared clock and plays the available source when a gap is clicked', async () => {
     api.playback.mockImplementation((_id, track) => Promise.resolve({
       url: `https://signed.test/${track ?? 'combined'}`,

@@ -22,6 +22,8 @@ import {
 import { DebriefLoader } from '../bot/DebriefLoader'
 import { recordingSource } from '../../services/recordingProgress'
 import { TrackSaveStatus } from './TrackSaveStatus'
+import { liveRoomsApi } from '../../services/api'
+import { roomParticipantTracks } from '../../services/recordingAudioTracks'
 
 export interface RecordingStatusProps {
   meetingId: string
@@ -50,13 +52,32 @@ export function RecordingStatus({ meetingId, recordingJob, recoveryUserId, onRef
   const retryable = canRetry(job)
   const writing = job?.status === 'transcribing' && !retryable
   const rebuilding = canPlay(recordingJob) && isRebuildingTranscript(job)
-  const waiting = writing || rebuilding || job?.status === 'backup'
+  const processing = job?.source === 'room' && job.status === 'processing'
+  const waiting = writing || rebuilding || processing || job?.status === 'backup'
 
   useEffect(() => {
     if (!waiting) return
-    const timer = window.setInterval(onRefresh, POLL_MS)
+    const refresh = () => {
+      if (processing) void liveRoomsApi.refreshAudio(meetingId).catch(() => {})
+      onRefresh()
+    }
+    if (processing) void liveRoomsApi.refreshAudio(meetingId).catch(() => {})
+    const timer = window.setInterval(refresh, POLL_MS)
     return () => window.clearInterval(timer)
-  }, [waiting, onRefresh])
+  }, [meetingId, processing, waiting, onRefresh])
+
+  if (processing) {
+    return (
+      <div role="status" className="bs-recstat">
+        <Signal tone="brand">Processing room audio</Signal>
+        <ul aria-label="Participant track status">
+          {roomParticipantTracks(job.audioTracks).map(track => (
+            <li key={track}>{job.audioTracks?.[track]?.label} · Processing</li>
+          ))}
+        </ul>
+      </div>
+    )
+  }
 
   if (job?.source === 'room' && job.status === 'recording') {
     return <Signal tone="live">Recording room audio</Signal>
