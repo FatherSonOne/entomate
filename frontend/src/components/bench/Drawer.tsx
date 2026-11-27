@@ -58,8 +58,7 @@ export function Drawer({ open, onClose, label, children, footer, hideEscHint = f
   const [dragging, setDragging] = useState<boolean>(false)
   const panelRef = useRef<HTMLDivElement | null>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
-  const dragStartRef = useRef<number | null>(null)
-  const dragStartTimeRef = useRef<number>(0)
+  const dragStartRef = useRef<{ x: number; y: number; time: number } | null>(null)
   const labelId = useId()
   const dismiss = useCallback(() => {
     if (dismissible) onClose()
@@ -145,23 +144,28 @@ export function Drawer({ open, onClose, label, children, footer, hideEscHint = f
   const onPointerDown = (e: React.PointerEvent<HTMLElement>): void => {
     if (!isPhone || !dismissible) return
     if ((e.target as HTMLElement).closest('button:not(.bs-drawer-grip)')) return
-    dragStartRef.current = e.clientY
-    dragStartTimeRef.current = performance.now()
+    dragStartRef.current = { x: e.clientX, y: e.clientY, time: performance.now() }
     setDragging(true)
     e.currentTarget.setPointerCapture(e.pointerId)
   }
   const onPointerMove = (e: React.PointerEvent<HTMLElement>): void => {
-    if (dragStartRef.current == null) return
-    const dy = e.clientY - dragStartRef.current
+    const start = dragStartRef.current
+    if (!start) return
+    const dy = e.clientY - start.y
+    if (Math.abs(e.clientX - start.x) > Math.abs(dy)) {
+      setDrag(0)
+      return
+    }
     setDrag(dy >= 0 ? dy : dy * OVERDRAG_DAMPING)
   }
   const onPointerUp = (e: React.PointerEvent<HTMLElement>): void => {
-    if (dragStartRef.current == null) return
-    const dy = e.clientY - dragStartRef.current
+    const start = dragStartRef.current
+    if (!start) return
+    const dy = e.clientY - start.y
     dragStartRef.current = null
     setDragging(false)
-    const velocity = dy / Math.max(1, performance.now() - dragStartTimeRef.current)
-    if (dy > DISMISS_PX || (dy > 8 && velocity > FLICK_VELOCITY)) dismiss()
+    const velocity = dy / Math.max(1, performance.now() - start.time)
+    if (dy > Math.abs(e.clientX - start.x) && (dy > DISMISS_PX || (dy > 8 && velocity > FLICK_VELOCITY))) dismiss()
     // Let the spring carry it home (or the snap carry it away).
     requestAnimationFrame(() => setDrag(0))
   }
