@@ -25,6 +25,7 @@ import {
 
 /** What the loader draws. Bot calls and browser recordings each build one. */
 export interface DebriefSource {
+  kind?: 'transcript-rebuild'
   /** Meeting name under the state line. */
   title: string
   /** When writing began (the bot left, or Stop was pressed), ISO. */
@@ -160,6 +161,7 @@ const EMPTY_SOURCE: DebriefSource = {
 
 export function DebriefLoader({ view, source, plain = false }: DebriefLoaderProps): React.ReactElement {
   const src = source ?? (view ? botSource(view) : EMPTY_SOURCE)
+  const rebuilding = src.kind === 'transcript-rebuild'
   const rootRef = useRef<HTMLDivElement>(null)
   const callSpeakers = useCallSpeakers(src.sessionId)
   const speakers = callSpeakers.length ? callSpeakers : (src.speakers || [])
@@ -328,7 +330,7 @@ export function DebriefLoader({ view, source, plain = false }: DebriefLoaderProp
   const sub = [src.title, dur ? `${loaderClock(dur)} ${src.sessionId ? 'call' : 'recorded'}` : ''].filter(Boolean).join(' · ')
   const Box = plain ? 'div' : Display
   return (
-    <Box className={`bs-dl${plain ? ' is-plain' : ''}`}>
+    <Box className={`bs-dl${plain ? ' is-plain' : ''}${rebuilding ? ' is-rebuilding' : ''}`}>
       <div ref={rootRef} className="bs-dl-in">
         <canvas className="bs-dl-life" aria-hidden="true" />
         <div className="bs-dl-head">
@@ -348,7 +350,7 @@ export function DebriefLoader({ view, source, plain = false }: DebriefLoaderProp
           <div className="bs-dl-lines" data-dl-lines />
           <div className="bs-dl-cursor-row"><span className="bs-dl-cursor" /></div>
         </div>
-        <div className="bs-dl-bar" role="progressbar" aria-label="Minutes progress" aria-valuemin={0} aria-valuemax={100} data-dl-bar>
+        <div className="bs-dl-bar" role="progressbar" aria-label={rebuilding ? 'Transcript rebuild progress' : 'Minutes progress'} aria-valuemin={0} aria-valuemax={100} data-dl-bar>
           <i data-dl-fill />
         </div>
         <div className="bs-dl-meta">
@@ -359,9 +361,9 @@ export function DebriefLoader({ view, source, plain = false }: DebriefLoaderProp
           {steps.map((s, i) => <li key={s.key} data-dl-step={i}><span>{s.label}</span><small /></li>)}
         </ol>
         <p className="bs-dl-foot">
-          {plain
-            ? 'The summary, decisions and action items fill in on this page as they land. Times here are estimates.'
-            : 'You can leave this page. It turns into the meeting on its own. Times here are estimates.'}
+          {rebuilding ? 'Progress is estimated. The waveform returns when the rebuild finishes.'
+            : plain ? 'The summary, decisions and action items fill in on this page as they land. Times here are estimates.'
+              : 'You can leave this page. It turns into the meeting on its own. Times here are estimates.'}
         </p>
         <p className="bs-sr" role="status" data-dl-status />
       </div>

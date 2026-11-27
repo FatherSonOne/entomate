@@ -54,7 +54,7 @@ export function RecordingStatus({ meetingId, recordingJob, onRefresh, hasSummary
     return () => window.clearInterval(timer)
   }, [waiting, onRefresh])
 
-  if (rebuilding) return <Signal tone="brand">Rebuilding transcript</Signal>
+  if (rebuilding) return null
   if (canPlay(recordingJob) && job?.transcriptRebuildError) {
     return <p role="alert" className="bs-recstat-err">{job.transcriptRebuildError}</p>
   }
