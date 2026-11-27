@@ -6,10 +6,8 @@
  * the hit ranges marked) and, for meetings and decisions, the moment in the
  * recording (atMs) so the UI can jump to it.
  *
- * Meetings are matched in JS over the org's recent meetings because the words
- * we care about live in jsonb (transcript_segments, decisions), which PostgREST
- * can't filter with ilike. Capped at MEETING_SCAN rows; move to a tsvector
- * column when an org outgrows that.
+ * Interactive Search reads ranked passages from PostgreSQL. The older query
+ * stays available to existing assistant callers and during schema rollout.
  *
  * The pure helpers (terms, snippet, findSegmentHit, matchMeeting) are exported
  * for tests.
@@ -243,11 +241,53 @@ function orFilter(columns, words) {
   return columns.flatMap((c) => safe.map((w) => `${c}.ilike.%${w}%`)).join(',');
 }
 
+async function searchMeetingHistory({ db, words, orgIds, limit, includePassages, wantMeetings }) {
+  if (includePassages && typeof db.rpc === 'function') {
+    const { data, error } = await db.rpc('search_meeting_history', {
+      p_org_ids: orgIds, p_terms: words, p_limit: limit * 3, p_find_passages: wantMeetings,
+    });
+    if (!error) return { records: data?.records || [], passages: data?.passages || [] };
+    if (!['PGRST202', '42883'].includes(error.code)) throw error;
+  }
+
+  const { data, error } = await db.from('meetings')
+    .select('id, title, summary, transcript, transcript_segments, decisions, summary_moments, created_at')
+    .in('org_id', orgIds)
+    .order('created_at', { ascending: false })
+    .limit(MEETING_SCAN);
+  if (error) throw error;
+  return { records: data || [], passages: [] };
+}
+
+function passageResult(passage, words, record) {
+  const title = passage.title || 'Untitled meeting';
+  const match = snippet(passage.body, words);
+  const atMs = passage.at_ms;
+  const position = passage.source_line || passage.chunk_start;
+  return {
+    type: 'meeting',
+    id: passage.meeting_id,
+    title,
+    titleHits: hitRanges(title, words),
+    snippet: match.text,
+    snippetHits: match.hits,
+    meta: {
+      ...record?.meta,
+      date: passage.created_at || null,
+      speaker: passage.speaker || null,
+      atMs: Number.isSafeInteger(atMs) && atMs >= 0 ? atMs : null,
+      passage: { revision: passage.revision, kind: passage.source_line ? 'segment' : 'text', position },
+      spellingMatch: false,
+    },
+    score: (record?.score || 0) + termHits(passage.body, words) * 2 + passage.rank,
+  };
+}
+
 /**
  * @param {{ query: string, types?: string[], limit?: number, orgIds: string[], userId: string, db?: object }} opts
  *   `db` defaults to the service client; Entomate AI passes the caller's user-JWT client (D2).
  */
-async function search({ query, types = TYPES, limit = 8, orgIds, userId, db = supabase }) {
+async function search({ query, types = TYPES, limit = 8, orgIds, userId, db = supabase, includePassages = false }) {
   const words = terms(query);
   const want = new Set(types.filter((t) => TYPES.includes(t)));
   const empty = { query, terms: words, groups: {}, total: 0 };
@@ -257,22 +297,20 @@ async function search({ query, types = TYPES, limit = 8, orgIds, userId, db = su
   const groups = {};
 
   if (want.has('meetings') || want.has('decisions')) {
-    jobs.push(db
-      .from('meetings')
-      .select('id, title, summary, transcript, transcript_segments, decisions, summary_moments, created_at')
-      .in('org_id', orgIds)
-      .order('created_at', { ascending: false })
-      .limit(MEETING_SCAN)
-      .then(({ data, error }) => {
-        if (error) throw error;
-        const meetings = [];
+    const wantMeetings = want.has('meetings');
+    jobs.push(searchMeetingHistory({ db, words, orgIds, limit, includePassages, wantMeetings })
+      .then(({ records, passages }) => {
+        const meetings = new Map();
         const decisions = [];
-        for (const m of data || []) {
+        for (const m of records) {
           const r = matchMeeting(m, words);
-          if (r.meeting) meetings.push(r.meeting);
+          if (r.meeting) meetings.set(m.id, r.meeting);
           decisions.push(...r.decisions);
         }
-        if (want.has('meetings')) groups.meetings = meetings.sort(byScoreThenDate);
+        if (wantMeetings) {
+          for (const p of passages) meetings.set(p.meeting_id, passageResult(p, words, meetings.get(p.meeting_id)));
+          groups.meetings = [...meetings.values()].sort(byScoreThenDate);
+        }
         if (want.has('decisions')) groups.decisions = decisions.sort(byScoreThenDate);
       }));
   }

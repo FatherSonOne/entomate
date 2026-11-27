@@ -14,6 +14,7 @@ export interface TranscriptSegment {
   /** Milliseconds from the start of the recording. */
   atMs: number
   eventId?: string
+  sourcePosition?: number
   endMs?: number
   speaker: string
   text: string
@@ -26,20 +27,22 @@ interface ApiEnvelope<T> {
 }
 
 /** Validates the column's shape; anything malformed is dropped rather than rendered. */
-export function toSegments(raw: unknown): TranscriptSegment[] | null {
+export function toSegments(raw: unknown, { requireTimestamp = false, includeSourcePosition = false } = {}): TranscriptSegment[] | null {
   if (!Array.isArray(raw) || raw.length === 0) return null
   const out: TranscriptSegment[] = []
-  for (const item of raw) {
+  for (const [index, item] of raw.entries()) {
     if (!item || typeof item !== 'object') continue
     const r = item as Record<string, unknown>
     if (typeof r.text !== 'string' || !r.text.trim()) continue
+    if (requireTimestamp && (typeof r.atMs !== 'number' || !Number.isFinite(r.atMs) || r.atMs < 0)) continue
     const atMs = typeof r.atMs === 'number' && Number.isFinite(r.atMs) ? Math.max(0, r.atMs) : 0
     const seg: TranscriptSegment = {
       atMs,
-      ...(typeof r.eventId === 'string' && r.eventId ? { eventId: r.eventId } : {}),
       speaker: typeof r.speaker === 'string' && r.speaker.trim() ? r.speaker : 'Speaker',
       text: r.text,
     }
+    if (typeof r.eventId === 'string' && r.eventId) seg.eventId = r.eventId
+    if (includeSourcePosition) seg.sourcePosition = index + 1
     if (typeof r.endMs === 'number' && Number.isFinite(r.endMs)) seg.endMs = r.endMs
     out.push(seg)
   }

@@ -19,6 +19,14 @@ export interface NavLocation {
   search: string
 }
 
+/** A Search return link identifies the in-memory view the user opened this detail from. */
+export function crumbLinkState(to: string, state: unknown): { crumb: true; searchReturnKey?: string } {
+  const key = (state as { searchReturnKey?: unknown } | null)?.searchReturnKey
+  return to.split('?')[0] === '/search' && typeof key === 'string'
+    ? { crumb: true, searchReturnKey: key }
+    : { crumb: true }
+}
+
 /** Pages a crumb can lead back to, by pathname. */
 export const SECTION_LABELS: Readonly<Record<string, string>> = {
   '/dashboard': 'Today',

@@ -22,6 +22,7 @@ import { sendBlocker, sendingView } from '../services/followUpView'
 import { canPlay, isRebuildingTranscript, rebuildRecordingTranscript, toRecordingJob, toWaveformPeaks } from '../services/meetingRecorderService'
 import { recordingRebuildSource } from '../services/recordingProgress'
 import cache from '../services/apiCache'
+import { plainTextPassage, readPassageAnchor } from '../services/meetingSourceLink'
 import { clipToNotes } from '../services/searchNotesService'
 import { formatClock, speakersOf, toSegments, toSummaryMoments } from '../services/meetingTranscriptService'
 import MeetingIntelligencePanel from '../components/intelligence/MeetingIntelligencePanel'
@@ -39,6 +40,13 @@ export default function MeetingDetail() {
   const { id } = useParams()
   const { liveRoomHostId } = useOutletContext() || {}
   const { pathname, state } = useLocation()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tabParam = searchParams.get('tab')
+  const time = searchParams.get('t')
+  const rawMs = time == null ? NaN : Number(time)
+  const startAtMs = Number.isSafeInteger(rawMs) && rawMs >= 0 ? rawMs : null
+  const sourceAtMs = tabParam === 'transcript' ? startAtMs : null
+  const sourceAnchor = useMemo(() => tabParam === 'transcript' ? readPassageAnchor(searchParams) : null, [searchParams, tabParam])
   useSyncExternalStore(subscribeTrail, trailVersion, trailVersion)
   const parent = trailFor(pathname).at(-1) || { to: WORKSPACE, label: 'Meeting workspace' }
   const back = { ...parent, label: parent.label === 'Meeting workspace' ? 'workspace' : parent.label }
@@ -68,7 +76,8 @@ export default function MeetingDetail() {
   }, [id, meeting?.title, toast])
 
   // Timed transcript lines; null for pasted or uploaded meetings, which keep the plain view.
-  const transcriptSegments = useMemo(() => toSegments(meeting?.transcript_segments), [meeting?.transcript_segments])
+  const transcriptSegments = useMemo(() => toSegments(meeting?.transcript_segments, { includeSourcePosition: true }), [meeting?.transcript_segments])
+  const timedSegments = useMemo(() => toSegments(meeting?.transcript_segments, { requireTimestamp: true }), [meeting?.transcript_segments])
   const summaryMoments = useMemo(() => toSummaryMoments(meeting?.summary_moments), [meeting?.summary_moments])
   // Timecodes next to decisions, key points and action items jump the transcript here.
   const [focusAtMs, setFocusAtMs] = useState(null)
@@ -112,7 +121,7 @@ export default function MeetingDetail() {
     if (playable && !playerRef.current?.isReady()) playerRef.current?.playFrom(atMs)
     jumpToTranscript(atMs)
   }, [playable, jumpToTranscript])
-  const [tab, setTab] = useState('minutes')
+  const [tab, setTab] = useState(tabParam === 'transcript' ? 'room' : 'minutes')
   const isPhone = useMediaQuery(PHONE_QUERY)
   const [showIntel, setShowIntel] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -135,10 +144,10 @@ export default function MeetingDetail() {
   const [editKeyPoints, setEditKeyPoints] = useState('')
   const [saving, setSaving] = useState(false)
 
-  const loadMeeting = useCallback(async () => {
+  const loadMeeting = useCallback(async (fresh = false) => {
     try {
       setLoading(true)
-      const data = await meetingsApi.get(id)
+      const data = fresh ? await meetingsApi.get(id, { _noCache: true }) : await meetingsApi.get(id)
       setMeeting(data)
     } catch (error) {
       console.error('Failed to load meeting:', error)
@@ -148,8 +157,8 @@ export default function MeetingDetail() {
   }, [id])
 
   useEffect(() => {
-    loadMeeting()
-  }, [loadMeeting])
+    loadMeeting(Boolean(sourceAnchor))
+  }, [loadMeeting, sourceAnchor])
 
   // "From last time": commitments from earlier meetings with the same people or series.
   // Re-read when the attendee list changes (speaker rename turns "Speaker 1" into a name).
@@ -164,19 +173,22 @@ export default function MeetingDetail() {
     return () => { cancelled = true }
   }, [id, attendeeKey, projectId])
 
-  // ?t=<ms> (from Today's decision timecodes) jumps the transcript once the meeting has loaded.
-  const [searchParams, setSearchParams] = useSearchParams()
-  const requestedTime = searchParams.get('t')
-  const startAtMs = requestedTime === null ? NaN : Number(requestedTime)
-  const jumpedRef = useRef(false)
+  const currentMeeting = meeting?.id === id
+  // A source citation cues the recording without autoplay.
   useEffect(() => {
-    if (jumpedRef.current || !transcriptSegments || !Number.isFinite(startAtMs) || startAtMs < 0) return
-    jumpedRef.current = true
-    requestAnimationFrame(() => jumpToTranscript(startAtMs))
-  }, [transcriptSegments, startAtMs, jumpToTranscript])
+    if (!currentMeeting || (sourceAtMs == null && !sourceAnchor)) return
+    setFocusAtMs(sourceAtMs)
+    setFocusEventId(null)
+    setPlayingAtMs(null)
+    if (playable && sourceAtMs != null) playerRef.current?.cueAt(sourceAtMs)
+  }, [currentMeeting, id, playable, sourceAnchor, sourceAtMs])
 
-  // ?tab=followup|notes opens that tab (links from Today and the Share recap drawer).
-  const tabParam = searchParams.get('tab')
+  useEffect(() => {
+    if (!currentMeeting || !timedSegments || startAtMs == null || sourceAtMs != null) return
+    const frame = requestAnimationFrame(() => jumpToTranscript(startAtMs))
+    return () => cancelAnimationFrame(frame)
+  }, [currentMeeting, id, jumpToTranscript, sourceAtMs, startAtMs, timedSegments])
+
   const meetingLoaded = Boolean(meeting)
   useEffect(() => {
     if (tabParam === 'notes' && meetingLoaded) {
@@ -188,10 +200,14 @@ export default function MeetingDetail() {
   const chooseTab = useCallback((value) => {
     setTab(value)
     const next = new URLSearchParams(searchParams)
-    if (value === 'followup' || value === 'room') next.set('tab', value)
+    if (value === 'room') next.set('tab', 'transcript')
+    else if (value === 'followup') next.set('tab', value)
     else next.delete('tab')
-    setSearchParams(next, { replace: true })
-  }, [searchParams, setSearchParams])
+    if (value !== 'room' && (sourceAnchor || sourceAtMs != null)) {
+      for (const param of ['t', 'rev', 'line', 'textAt', 'textLen']) next.delete(param)
+    }
+    setSearchParams(next, { replace: true, state })
+  }, [searchParams, setSearchParams, sourceAnchor, sourceAtMs, state])
 
   // Follow-up email (Slate C "Letter"): drafted once the minutes are here.
   const hasMinutes = Boolean(meeting && (meeting.summary || asList(meeting.decisions).length || asList(meeting.actionItems).length))
@@ -203,8 +219,8 @@ export default function MeetingDetail() {
     setShowShareModal(true)
     const next = new URLSearchParams(searchParams)
     next.delete('share')
-    setSearchParams(next, { replace: true })
-  }, [meeting, searchParams, setSearchParams])
+    setSearchParams(next, { replace: true, state })
+  }, [meeting, searchParams, setSearchParams, state])
 
   // Browser tab title: "02 Meetings · <title> · Entomate" while the page is open.
   useEffect(() => {
@@ -476,6 +492,24 @@ export default function MeetingDetail() {
   }
   const showTape = !playable && Boolean(transcriptSegments && lengthMs > 0)
 
+  const anchorMatches = currentMeeting && sourceAnchor?.revision === meeting?.transcript_search_revision
+  const sourcePosition = anchorMatches && sourceAnchor?.kind === 'segment'
+    && transcriptSegments?.some(line => line.sourcePosition === sourceAnchor.position) ? sourceAnchor.position : null
+  const activeSourcePosition = focusAtMs === sourceAtMs && !focusEventId ? sourcePosition : null
+  const displayedSegments = activeSourcePosition == null && sourceAtMs != null && timedSegments ? timedSegments : transcriptSegments
+  const transcriptFocus = sourceAtMs != null && !timedSegments ? null : focusAtMs
+  const plainPassage = useMemo(() => anchorMatches && sourceAnchor?.kind === 'text' && !transcriptSegments
+    ? plainTextPassage(transcriptText, sourceAnchor.position, sourceAnchor.length) : null, [anchorMatches, sourceAnchor, transcriptSegments, transcriptText])
+  const quoteRef = useRef(null)
+  useEffect(() => {
+    if (!plainPassage || tab !== 'room' || loading) return
+    const frame = requestAnimationFrame(() => {
+      quoteRef.current?.focus({ preventScroll: true })
+      quoteRef.current?.scrollIntoView?.({ block: 'nearest' })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [loading, plainPassage, tab])
+
   if (loading) {
     return (
       <div className="bs-mtg-empty" aria-busy="true">
@@ -539,7 +573,7 @@ export default function MeetingDetail() {
   // On phone the transcript column becomes its own tab.
   const tabs = [
     { value: 'minutes', label: 'Minutes' },
-    { value: 'room', label: 'Virtual room' },
+    { value: 'room', label: 'Transcript & recording' },
     {
       value: 'followup',
       label: (
@@ -673,9 +707,11 @@ export default function MeetingDetail() {
           <div className="bs-transcript">
             <TranscriptPanel
               meetingId={meeting.id}
-              segments={transcriptSegments}
-              focusAtMs={focusAtMs}
+              segments={displayedSegments}
+              focusAtMs={transcriptFocus}
               focusEventId={focusEventId}
+              focusSourcePosition={activeSourcePosition}
+              focusSource={sourceAtMs != null && sourceAtMs === transcriptFocus}
               playingAtMs={playable ? playingAtMs : null}
               onPlayFrom={playable ? (atMs) => playerRef.current?.playFrom(atMs) : undefined}
               onPreviewSpeaker={playable ? (atMs, endMs) => playerRef.current?.playFrom(atMs, endMs) : undefined}
@@ -693,7 +729,7 @@ export default function MeetingDetail() {
           </div>
         ) : (
           <div className="bs-transcript-plain">
-            <pre>{meeting.transcript || 'No transcript yet.'}</pre>
+            <pre>{plainPassage ? <>{plainPassage[0]}<mark ref={quoteRef} tabIndex={-1}>{plainPassage[1]}</mark>{plainPassage[2]}</> : transcriptText || 'No transcript yet.'}</pre>
           </div>
         )}
       </section>
@@ -706,7 +742,9 @@ export default function MeetingDetail() {
 
   const voices = transcriptSegments ? speakersOf(transcriptSegments) : []
   const at = playingAtMs ?? focusAtMs
-  const currentLine = at != null && transcriptSegments ? transcriptSegments[lineAt(transcriptSegments, at)] : null
+  const currentLine = playingAtMs == null && activeSourcePosition != null
+    ? displayedSegments?.find(line => line.sourcePosition === activeSourcePosition)
+    : at != null && displayedSegments ? displayedSegments[lineAt(displayedSegments, at)] : null
 
   return (
     <div className="bs-mtg bs-mtg-detail bs-meeting-workspace">
@@ -928,6 +966,13 @@ export default function MeetingDetail() {
 
           {activeTab === 'room' && (
             <TabPanel idBase={TABS_ID} value="room">
+              {(sourceAtMs != null || sourceAnchor) && <div className="bs-meeting-source-moment">
+                <Signal tone="brand">{sourceAtMs != null ? `Source moment · ${formatClock(sourceAtMs)}` : 'Source passage'}</Signal>
+                {playable && sourceAtMs != null && <Key size="sm" onClick={() => playMoment(sourceAtMs)}>Play source audio</Key>}
+                {sourceAnchor && sourcePosition == null && !plainPassage
+                  ? <span className="bs-mut">{sourceAtMs != null && (playable || timedSegments) ? 'The transcript changed or expired. Showing the saved time.' : 'This passage is no longer available in the transcript.'}</span>
+                  : sourceAtMs != null && !timedSegments && <span className="bs-mut">A timed transcript is unavailable.</span>}
+              </div>}
               <div className="bs-meeting-playback">
                 <section aria-label="Meeting speakers">
                   <Section title="Speakers" level={3} />

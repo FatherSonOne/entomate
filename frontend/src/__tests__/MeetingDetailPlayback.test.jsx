@@ -1,13 +1,16 @@
 import React from 'react'
-import { act, render, screen, fireEvent } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { vi, describe, test, expect, beforeEach } from 'vitest'
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom'
+import { vi, describe, test, expect, beforeEach, afterEach } from 'vitest'
 
 const api = vi.hoisted(() => ({ get: vi.fn(), regenerateSummary: vi.fn(async () => ({})), carryForward: vi.fn(() => Promise.resolve(null)) }))
-const player = vi.hoisted(() => ({ ready: false, playFrom: vi.fn() }))
+const search = vi.hoisted(() => ({ askStream: vi.fn(), getHistory: async () => ({ history: [] }) }))
+const player = vi.hoisted(() => ({ ready: false, playFrom: vi.fn(), cueAt: vi.fn() }))
 const reports = vi.hoisted(() => ({ downloadMeetingDocument: vi.fn(async () => {}) }))
 const recordings = vi.hoisted(() => ({ rebuildTranscript: vi.fn() }))
-vi.mock('../services/api', () => ({ default: {}, meetingsApi: api, recordingsApi: recordings, integrationsApi: {}, calendarApi: {}, reportsApi: reports, searchApi: {} }))
+vi.mock('../services/api', () => ({ default: { get: async () => ({ notes: [] }) }, meetingsApi: api, recordingsApi: recordings, integrationsApi: {}, calendarApi: {}, reportsApi: reports, searchApi: search }))
+vi.mock('../contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 'playback-user' } }) }))
+vi.mock('../contexts/OrgContext', () => ({ useOrgSafe: () => ({ org: { id: 'playback-org' } }) }))
 vi.mock('../components/vc/ToastProvider', () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn() }) }))
 vi.mock('../components/intelligence/MeetingIntelligencePanel', () => ({ default: () => null }))
 vi.mock('../components/EcosystemSyncStatus', () => ({ default: () => null }))
@@ -17,7 +20,7 @@ vi.mock('../components/meetings/RecordingPlayer', async () => {
   const { forwardRef, useImperativeHandle } = await import('react')
   return {
     default: forwardRef(function Stub({ decisions, onMoment, audioUrl, waveformReplacement }, ref) {
-      useImperativeHandle(ref, () => ({ isReady: () => player.ready, playFrom: player.playFrom }))
+      useImperativeHandle(ref, () => ({ isReady: () => player.ready, playFrom: player.playFrom, cueAt: player.cueAt }))
       return <div data-testid="player-stub" data-audio-url={audioUrl}>
         {waveformReplacement ?? decisions.map(({ atMs, label }) => (
           <button key={label} type="button" onClick={() => onMoment(atMs)}>{label}</button>
@@ -28,6 +31,15 @@ vi.mock('../components/meetings/RecordingPlayer', async () => {
 })
 
 import MeetingDetail from '../pages/MeetingDetail'
+import Search from '../pages/Search'
+import NavTrailRecorder from '../components/NavTrailRecorder'
+
+const REVISION = 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa'
+
+function BrowserBack() {
+  const navigate = useNavigate()
+  return <button onClick={() => navigate(-1)}>Browser back</button>
+}
 
 const MEETING = {
   id: 'm1',
@@ -57,7 +69,10 @@ describe('a pressed timecode plays the recording', () => {
     window.matchMedia = window.matchMedia || ((q) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {} }))
     player.ready = false
     Element.prototype.scrollIntoView = vi.fn()
+    vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
   })
+
+  afterEach(() => { vi.restoreAllMocks() })
 
   test('loads and plays from the moment when the audio is not loaded yet', async () => {
     renderPage({ status: 'done', audioKept: true, durationMs: 60_000 })
@@ -150,9 +165,70 @@ describe('a pressed timecode plays the recording', () => {
     }
   })
 
-  test('a Virtual room speaker button includes its line count and plays from the first line', async () => {
+  test('Ask citations cue the exact line and both Back paths restore the completed answer without asking again', async () => {
+    const time = 22_000
+    api.get.mockResolvedValue({
+      ...MEETING,
+      recording_job: { status: 'done', audioKept: true, durationMs: 60_000 },
+      transcript_search_revision: REVISION,
+      transcript_segments: [
+        { atMs: time, speaker: 'Ana', text: 'The vendor needed another week.' },
+        { atMs: time, speaker: 'Pat', text: 'I will update the launch plan.' },
+      ],
+    })
+    const claims = [
+      ['The vendor needed more time.', 'Ana', 'The vendor needed another week.'],
+      ['Pat owns the launch plan update.', 'Pat', 'I will update the launch plan.'],
+    ].map(([text, speaker, quote], index) => ({
+      text,
+      citations: [{
+        id: 'm1', title: 'Planning', speaker, quote, atMs: time,
+        passage: { revision: REVISION, kind: 'segment', position: index + 1 },
+      }],
+    }))
+    search.askStream.mockImplementation(async (_data, callbacks) => {
+      callbacks.onComplete({ answer: claims.map((claim) => claim.text).join('\n\n'), claims })
+    })
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/search', search: '?q=Why+did+launch+move%3F&ask=1', key: crypto.randomUUID() }]}>
+        <NavTrailRecorder />
+        <BrowserBack />
+        <Routes>
+          <Route path="/search" element={<Search />} />
+          <Route path="/meetings/:id" element={<MeetingDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    const first = await screen.findByRole('link', { name: /Planning · 00:22 · Ana/ })
+    const second = screen.getByRole('link', { name: /Planning · 00:22 · Pat/ })
+    expect(first).toHaveAttribute('href', `/meetings/m1?tab=transcript&t=22000&rev=${REVISION}&line=1`)
+    expect(second).toHaveAttribute('href', `/meetings/m1?tab=transcript&t=22000&rev=${REVISION}&line=2`)
+    fireEvent.change(screen.getByRole('textbox', { name: 'Question about your meetings' }), { target: { value: 'Unsubmitted draft' } })
+    fireEvent.click(second)
+    const transcript = await screen.findByRole('list', { name: 'Transcript' })
+    const line = within(transcript).getByText('I will update the launch plan.', { exact: false }).closest('li')
+    await waitFor(() => expect(line).toHaveFocus())
+    expect(line).toHaveAttribute('aria-current', 'true')
+    expect(player.cueAt).toHaveBeenCalledWith(time)
+    expect(player.playFrom).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('link', { name: 'Back to Search' }))
+    await waitFor(() => expect(screen.getByRole('link', { name: /Planning · 00:22 · Pat/ })).toHaveFocus())
+    expect(screen.getByText('Pat owns the launch plan update.')).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Question about your meetings' })).toHaveValue('Unsubmitted draft')
+
+    fireEvent.click(screen.getByRole('link', { name: /Planning · 00:22 · Ana/ }))
+    expect(await screen.findByRole('tab', { name: 'Transcript & recording', selected: true })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Browser back' }))
+    await waitFor(() => expect(screen.getByRole('link', { name: /Planning · 00:22 · Ana/ })).toHaveFocus())
+    expect(screen.getByText('The vendor needed more time.')).toBeInTheDocument()
+    expect(search.askStream).toHaveBeenCalledTimes(1)
+  })
+
+  test('a Transcript & recording speaker button includes its line count and plays from the first line', async () => {
     renderPage({ status: 'done', audioKept: true, durationMs: 60_000 })
-    fireEvent.click(await screen.findByRole('tab', { name: 'Virtual room' }))
+    fireEvent.click(await screen.findByRole('tab', { name: 'Transcript & recording' }))
     const speaker = screen.getByRole('button', { name: 'Speaker 2, 1 line' })
     expect(speaker).toHaveAttribute('aria-pressed', 'false')
     fireEvent.click(speaker)

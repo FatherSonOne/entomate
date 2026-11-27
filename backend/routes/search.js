@@ -279,23 +279,32 @@ router.post('/semantic', authenticate, async (req, res) => {
   }
 });
 
-/**
- * POST /api/search/ask
- * Ask AI a question about meetings
- */
+function validAskQuestion(question) {
+  return typeof question === 'string' && question.trim().length > 0 && question.length <= 2000;
+}
+
+function validAskMeetingIds(ids) {
+  return ids == null || (Array.isArray(ids) && ids.length <= 100 &&
+    ids.every((id) => typeof id === 'string' && /^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i.test(id)));
+}
+
+/** POST /api/search/ask */
 router.post('/ask', authenticate, meterAi, async (req, res) => {
   try {
     const { question, conversationId, meetingIds } = req.body;
 
-    if (!question) {
-      return res.status(400).json({ error: 'Question is required' });
+    if (!validAskQuestion(question)) {
+      return res.status(400).json({ error: 'Enter a question of up to 2,000 characters' });
+    }
+    if (!validAskMeetingIds(meetingIds)) {
+      return res.status(400).json({ error: 'Provide up to 100 valid meeting IDs' });
     }
 
     if (!askService.isReady()) {
       return res.status(503).json({ error: 'AI service not configured' });
     }
 
-    const answer = await askService.answerQuestion(question, {
+    const answer = await askService.answerQuestion(question.trim(), {
       conversationId,
       meetingIds,
       userId: req.user.id
@@ -317,8 +326,11 @@ router.post('/ask/stream', authenticate, meterAi, async (req, res) => {
   try {
     const { question, conversationId, meetingIds } = req.body;
 
-    if (!question) {
-      return res.status(400).json({ error: 'Question is required' });
+    if (!validAskQuestion(question)) {
+      return res.status(400).json({ error: 'Enter a question of up to 2,000 characters' });
+    }
+    if (!validAskMeetingIds(meetingIds)) {
+      return res.status(400).json({ error: 'Provide up to 100 valid meeting IDs' });
     }
 
     if (!askService.isReady()) {
@@ -327,7 +339,7 @@ router.post('/ask/stream', authenticate, meterAi, async (req, res) => {
 
     // Set up SSE headers
     res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
 
@@ -335,7 +347,7 @@ router.post('/ask/stream', authenticate, meterAi, async (req, res) => {
     res.write(`data: ${JSON.stringify({ type: 'start', timestamp: Date.now() })}\n\n`);
 
     // Stream the answer
-    await askService.answerQuestionStreaming(question, {
+    await askService.answerQuestionStreaming(question.trim(), {
       conversationId,
       meetingIds,
       userId: req.user.id,
@@ -353,7 +365,8 @@ router.post('/ask/stream', authenticate, meterAi, async (req, res) => {
         res.end();
       },
       onError: (error) => {
-        res.write(`data: ${JSON.stringify({ type: 'error', message: error.message })}\n\n`);
+        log.error('Error generating Ask answer:', { error: error.message });
+        res.write(`data: ${JSON.stringify({ type: 'error', message: 'Failed to answer question' })}\n\n`);
         res.end();
       }
     });
@@ -381,11 +394,15 @@ router.post('/ask/follow-up', authenticate, meterAi, async (req, res) => {
       return res.status(400).json({ error: 'Conversation ID required for follow-up' });
     }
 
-    if (!question) {
-      return res.status(400).json({ error: 'Question is required' });
+    if (!validAskQuestion(question)) {
+      return res.status(400).json({ error: 'Enter a question of up to 2,000 characters' });
     }
 
-    const answer = await askService.answerQuestion(question, { conversationId, userId: req.user.id });
+    if (!askService.isReady()) {
+      return res.status(503).json({ error: 'AI service not configured' });
+    }
+
+    const answer = await askService.answerQuestion(question.trim(), { conversationId, userId: req.user.id });
 
     res.json(answer);
 
@@ -464,7 +481,7 @@ router.post('/everything', authenticate, async (req, res) => {
     const limit = Math.min(Math.max(parseInt(req.body.limit, 10) || 8, 1), 25);
 
     const startTime = Date.now();
-    const result = await searchEverything.search({ query, types, limit, orgIds: req.orgIds, userId: req.user.id });
+    const result = await searchEverything.search({ query, types, limit, orgIds: req.orgIds, userId: req.user.id, includePassages: true });
     const engine = req.body.meaning === false ? 'words' : await addMeaningMatches(result, query, limit);
     const executionTime = Date.now() - startTime;
 

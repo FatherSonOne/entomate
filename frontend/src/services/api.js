@@ -292,7 +292,7 @@ export const meetingsApi = {
   list: (params = {}) => api.get('/meetings', { params }),
 
   // Get meeting by ID
-  get: (id) => api.get(`/meetings/${id}`),
+  get: (id, options) => api.get(`/meetings/${id}`, options),
 
   // Update meeting
   update: (id, data) => api.put(`/meetings/${id}`, data),
@@ -541,15 +541,16 @@ export const searchApi = {
       body: JSON.stringify(data),
       signal
     }).then(response => {
+      if (!response.ok || !response.body) throw new Error(`Ask request failed: ${response.status}`)
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
+      let pending = ''
 
       function read() {
         return reader.read().then(({ done, value }) => {
-          if (done) return
-
-          const text = decoder.decode(value, { stream: true })
-          const lines = text.split('\n')
+          pending += done ? decoder.decode() : decoder.decode(value, { stream: true })
+          const lines = pending.split('\n')
+          pending = done ? '' : lines.pop() ?? ''
 
           for (const line of lines) {
             if (line.startsWith('data: ')) {
@@ -574,12 +575,12 @@ export const searchApi = {
                     break
                 }
               } catch (e) {
-                // Ignore parse errors for incomplete chunks
+                // Ignore malformed events and continue reading the stream.
               }
             }
           }
 
-          return read()
+          if (!done) return read()
         })
       }
 

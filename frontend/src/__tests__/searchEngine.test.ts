@@ -2,8 +2,8 @@ import { describe, test, expect, vi } from 'vitest'
 
 vi.mock('../services/api', () => ({ default: { post: vi.fn(), get: vi.fn() }, searchApi: {} }))
 import {
-  flatten, highlightParts, isQuestion, matchCommands, metaLine, normalizeResponse, readUrlState, recentFromHistory,
-  resultHref, searchPagePath, statusSignal, timecode, writeUrlState,
+  flatten, highlightParts, matchCommands, metaLine, normalizeResponse, readUrlState, recentFromHistory,
+  resultHref, resultMomentHref, searchPagePath, statusSignal, timecode, writeUrlState,
 } from '../services/searchEngine'
 import type { SearchResult } from '../services/searchEngine'
 import { clipFromResult, clipKey, noteHref, notesToMarkdown, originLabel, sourceLine } from '../services/searchNotesService'
@@ -41,10 +41,18 @@ describe('searchEngine', () => {
   })
 
   test('resultHref jumps meetings and decisions to the moment', () => {
-    expect(resultHref(meeting)).toBe('/meetings/m1?t=895000')
-    expect(resultHref(decision)).toBe('/meetings/m1?t=895000')
+    expect(resultHref(meeting)).toBe('/meetings/m1?tab=transcript&t=895000')
+    expect(resultHref(decision)).toBe('/meetings/m1?tab=transcript&t=895000')
     expect(resultHref(item)).toBe('/tasks?item=action:a1')
     expect(resultHref({ ...meeting, meta: { atMs: null } })).toBe('/meetings/m1')
+  })
+
+  test('action results retain the task link and expose a separate source when timed', () => {
+    const timed = { ...item, meta: { ...item.meta, meetingId: 'm1', atMs: 0 } }
+    expect(resultHref(timed)).toBe('/tasks?item=action:a1')
+    expect(resultMomentHref(timed)).toBe('/meetings/m1?tab=transcript&t=0')
+    expect(resultMomentHref(item)).toBeNull()
+    expect(resultMomentHref({ ...meeting, meta: { atMs: Infinity } })).toBeNull()
   })
 
   test('statusSignal marks late items and done ones', () => {
@@ -62,13 +70,6 @@ describe('searchEngine', () => {
   test('an item due today is not late in any time zone', () => {
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
     expect(statusSignal({ ...item, meta: { ...item.meta, dueDate: today } }, now)?.word).toBe('Open')
-  })
-
-  test('isQuestion', () => {
-    expect(isQuestion('pricing?')).toBe(true)
-    expect(isQuestion('what did we decide about pricing')).toBe(true)
-    expect(isQuestion('pricing')).toBe(false)
-    expect(isQuestion('who')).toBe(false)
   })
 
   test('matchCommands matches labels and keywords', () => {
@@ -115,7 +116,9 @@ describe('searchEngine', () => {
   test('URL state round trip', () => {
     const p = writeUrlState(new URLSearchParams(), { q: ' pricing ', filter: 'decisions', ask: true })
     expect(p.toString()).toBe('q=pricing&f=decisions&ask=1')
-    expect(readUrlState(p)).toEqual({ q: 'pricing', filter: 'decisions', ask: true, notes: false })
+    expect(readUrlState(p)).toEqual({ q: 'pricing', filter: 'decisions', mode: 'ask', ask: true, meaning: false, notes: false })
+    const draft = writeUrlState(p, { mode: 'ask', ask: false, meaning: true })
+    expect(readUrlState(draft)).toMatchObject({ mode: 'ask', ask: false, meaning: true })
     expect(readUrlState(new URLSearchParams('f=bogus')).filter).toBe('all')
     expect(searchPagePath('pricing', true)).toBe('/search?q=pricing&ask=1')
     expect(searchPagePath(' ')).toBe('/search')

@@ -1,6 +1,7 @@
 import React from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
+import { crumbLinkState } from '../../services/navTrail'
 import './meetingWorkspace.css'
 
 export const START = '/meetings'
@@ -9,7 +10,7 @@ export const UPCOMING = '/meetings/upcoming'
 export const ROOM = '/meetings/room'
 
 export function MeetingNavigation({ back }) {
-  const { pathname } = useLocation()
+  const { pathname, state } = useLocation()
   const workspaceDetail = /^\/meetings\/(?!room(?:\/|$)|upcoming$|workspace$)[^/]+$/.test(pathname)
   return (
     <div className="bs-meeting-nav">
@@ -18,7 +19,7 @@ export function MeetingNavigation({ back }) {
         <NavLink to={WORKSPACE} data-parent={workspaceDetail || undefined} end>Meeting workspace</NavLink>
         <NavLink to={UPCOMING} end>Upcoming</NavLink>
       </nav>
-      {back && <Link className="bs-key sm" to={back.to} state={{ crumb: true }} title={`Back to ${back.label}`}>
+      {back && <Link className="bs-key sm" to={back.to} state={crumbLinkState(back.to, state)} title={`Back to ${back.label}`}>
         <ArrowLeft aria-hidden="true" /><span className="bs-meeting-back-label">Back to {back.label}</span>
       </Link>}
     </div>

@@ -13,6 +13,7 @@ export interface RecordingPlayerHandle {
   isReady: () => boolean
   /** Play from this moment, optionally stopping at the end of a preview. */
   playFrom: (atMs: number, endMs?: number) => void
+  cueAt: (atMs: number) => void
 }
 
 export interface RecordingPlayerProps {
@@ -238,6 +239,17 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
   useImperativeHandle(ref, () => ({
     isReady: () => mediaReady.current,
     playFrom: (atMs, endMs) => seek(atMs, true, endMs),
+    cueAt: (atMs) => {
+      const cue = { atMs, play: false }
+      const audio = audioRef.current
+      if (mediaReady.current && audio) {
+        if (!audio.paused) audio.pause()
+        performSeek(audio, cue)
+      } else {
+        pending.current = cue
+        setPosition(atMs)
+      }
+    },
   }))
 
   const applyMetadata = (audio: HTMLAudioElement): void => {

@@ -8,6 +8,8 @@
  */
 
 import api from './api'
+import { meetingSourceHref } from './meetingSourceLink'
+import type { PassageAnchor } from './meetingSourceLink'
 
 export type ResultType = 'meeting' | 'decision' | 'action_item' | 'task' | 'project' | 'note' | 'meeting_note'
 export type GroupKey = 'meetings' | 'decisions' | 'action_items' | 'tasks' | 'projects' | 'notes'
@@ -24,6 +26,7 @@ export interface ResultMeta {
   spellingMatch?: boolean
   date?: string | null
   atMs?: number | null
+  passage?: PassageAnchor | null
   speaker?: string | null
   context?: ContextLine[]
   decisions?: string[]
@@ -130,16 +133,24 @@ export function timecode(ms: number | null | undefined): string | null {
   return h ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`
 }
 
-/** Where a result opens. Meetings and decisions jump to the moment when known. */
+/** The evidence link is distinct from the record link on task and action results. */
+export function resultMomentHref(r: SearchResult): string | null {
+  const atMs = r.meta.atMs
+  if (!r.meta.passage && (typeof atMs !== 'number' || !Number.isFinite(atMs) || atMs < 0)) return null
+  const meetingId = r.type === 'meeting' ? r.id : r.meta.meetingId
+    || (r.meta.sourceType === 'meeting' ? r.meta.sourceId : null)
+  return meetingId ? meetingSourceHref(meetingId, atMs, r.meta.passage) : null
+}
+
+/** Where the result title opens. */
 export function resultHref(r: SearchResult): string {
-  const at = (ms: number | null | undefined) => (ms != null && ms >= 0 ? `?t=${Math.round(ms)}` : '')
   switch (r.type) {
-    case 'meeting': return `/meetings/${r.id}${at(r.meta.atMs)}`
-    case 'decision': return r.meta.meetingId ? `/meetings/${r.meta.meetingId}${at(r.meta.atMs)}` : '/meetings'
+    case 'meeting': return meetingSourceHref(r.id, r.meta.atMs, r.meta.passage)
+    case 'decision': return r.meta.meetingId ? meetingSourceHref(r.meta.meetingId, r.meta.atMs) : '/meetings'
     case 'action_item': return `/tasks?item=action:${r.id}`
     case 'task': return `/tasks?item=task:${r.id}`
     case 'project': return `/projects/${r.id}`
-    case 'meeting_note': return r.meta.meetingId ? `/meetings/${r.meta.meetingId}` : '/meetings'
+    case 'meeting_note': return r.meta.meetingId ? meetingSourceHref(r.meta.meetingId, r.meta.atMs) : '/meetings'
     case 'note': return `/search?note=${r.id}`
   }
 }
@@ -219,14 +230,6 @@ export function metaLine(r: SearchResult, now: Date = new Date()): string {
   }
   if (m.spellingMatch) parts.push('closest spelling')
   return parts.filter(Boolean).join(' · ')
-}
-
-/** A query that reads as a question goes to Ask Entomate as well. */
-export function isQuestion(q: string): boolean {
-  const t = q.trim().toLowerCase()
-  if (!t) return false
-  if (t.endsWith('?')) return true
-  return /^(what|who|when|where|why|how|did|does|do|is|are|was|were|which|can|should)\b/.test(t) && t.split(/\s+/).length >= 3
 }
 
 /** Results in display order, for keyboard navigation in the palette. */
@@ -335,14 +338,18 @@ export function recentFromHistory(history: unknown, limit = 6): RecentSearch[] {
 
 // ── URL state for the Search page ──
 
-export interface SearchUrlState { q: string; filter: Filter; ask: boolean; notes: boolean }
+export type SearchMode = 'search' | 'ask'
+export interface SearchUrlState { q: string; filter: Filter; mode: SearchMode; ask: boolean; meaning: boolean; notes: boolean }
 
 export function readUrlState(params: URLSearchParams): SearchUrlState {
   const f = params.get('f')
+  const ask = params.get('ask') === '1'
   return {
     q: params.get('q') || '',
     filter: isFilter(f) ? f : 'all',
-    ask: params.get('ask') === '1',
+    mode: ask || params.get('mode') === 'ask' ? 'ask' : 'search',
+    ask,
+    meaning: params.get('meaning') === '1',
     notes: params.get('notes') === '1',
   }
 }
@@ -353,6 +360,8 @@ export function writeUrlState(prev: URLSearchParams, next: Partial<SearchUrlStat
   if (next.q !== undefined) set('q', next.q.trim())
   if (next.filter !== undefined) set('f', next.filter === 'all' ? null : next.filter)
   if (next.ask !== undefined) set('ask', next.ask ? '1' : null)
+  if (next.mode !== undefined) set('mode', next.mode === 'ask' ? 'ask' : null)
+  if (next.meaning !== undefined) set('meaning', next.meaning ? '1' : null)
   if (next.notes !== undefined) set('notes', next.notes ? '1' : null)
   return p
 }

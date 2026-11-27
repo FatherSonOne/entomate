@@ -445,12 +445,16 @@ router.get('/:id', authenticate, async (req, res) => {
     const orgId = await meetingOrgOrRespond(req, res, id);
     if (!orgId) return;
 
-    const { data: meeting, error: meetingError } = await supabase
+    const readMeeting = (columns) => supabase
       .from('meetings')
-      .select('*')
+      .select(columns)
       .eq('id', id)
       .eq('org_id', orgId)
       .single();
+    let { data: meeting, error: meetingError } = await readMeeting('*, meeting_passage_index(revision)');
+    if (meetingError?.code === 'PGRST200') {
+      ({ data: meeting, error: meetingError } = await readMeeting('*'));
+    }
 
     if (meetingError) {
       return res.status(404).json({ error: 'Meeting not found' });
@@ -462,8 +466,10 @@ router.get('/:id', authenticate, async (req, res) => {
       .eq('meeting_id', id)
       .order('priority', { ascending: false });
 
+    const { meeting_passage_index: passageIndex, ...record } = meeting;
     res.json({
-      ...meeting,
+      ...record,
+      transcript_search_revision: passageIndex?.revision ?? null,
       actionItems: actionItems || []
     });
 

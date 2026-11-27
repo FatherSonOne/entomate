@@ -4,7 +4,7 @@ vi.mock('../services/supabaseClient', () => ({
   supabase: { auth: { getSession: async () => ({ data: { session: { access_token: 'tok' } } }) } },
 }))
 
-import { entoAiApi } from '../services/api'
+import { entoAiApi, searchApi } from '../services/api'
 
 function sseResponse(chunks: string[], status = 200) {
   const encoder = new TextEncoder()
@@ -20,6 +20,19 @@ function sseResponse(chunks: string[], status = 200) {
 const ev = (o: object) => `data: ${JSON.stringify(o)}\n\n`
 
 afterEach(() => vi.unstubAllGlobals())
+
+test('Search Ask receives split answer chunks and completion events', async () => {
+  const events = ev({ type: 'chunk', content: 'The launch moved.' })
+    + ev({ type: 'complete', answer: 'The launch moved.', citations: [{ type: 'meeting', id: 'm1' }] })
+  vi.stubGlobal('fetch', vi.fn(async () => sseResponse(events.match(/[\s\S]{1,7}/g)!)))
+  const onChunk = vi.fn()
+  const onComplete = vi.fn()
+  const onError = vi.fn()
+  await searchApi.askStream({ question: 'What changed?' }, { onChunk, onComplete, onError })
+  expect(onChunk).toHaveBeenCalledExactlyOnceWith('The launch moved.')
+  expect(onComplete).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ answer: 'The launch moved.', citations: [{ type: 'meeting', id: 'm1' }] }))
+  expect(onError).not.toHaveBeenCalled()
+})
 
 describe('entoAiApi.queryStream', () => {
   test('events split across reads still arrive whole and in order', async () => {

@@ -37,6 +37,7 @@ test('an explicit word search returns no matches without invoking semantic searc
   const res = await request(app).post('/search/everything').send({ query: 'financial planning', meaning: false });
   expect(res.status).toBe(200);
   expect(res.body).toMatchObject({ engine: 'words', total: 0, groups: { meetings: [] } });
+  expect(search).toHaveBeenCalledWith(expect.objectContaining({ orgIds: ['fixture-workspace'], includePassages: true }));
   expect(semanticSearch).not.toHaveBeenCalled();
 });
 

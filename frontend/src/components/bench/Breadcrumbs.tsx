@@ -1,6 +1,6 @@
 import React, { useEffect, useSyncExternalStore } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { rememberLabel, subscribeTrail, trailFor, trailVersion } from '../../services/navTrail'
+import { crumbLinkState, rememberLabel, subscribeTrail, trailFor, trailVersion } from '../../services/navTrail'
 
 export interface BreadcrumbsProps {
   /** The current page's name (meeting or project title). Not a link. */
@@ -14,7 +14,7 @@ export interface BreadcrumbsProps {
  * nearest link shows, as "← Projects".
  */
 export function Breadcrumbs({ current }: BreadcrumbsProps): React.ReactElement {
-  const { pathname } = useLocation()
+  const { pathname, state } = useLocation()
   // Re-render when the trail is written (the recorder runs after this page renders).
   useSyncExternalStore(subscribeTrail, trailVersion, trailVersion)
   const trail = trailFor(pathname)
@@ -29,7 +29,7 @@ export function Breadcrumbs({ current }: BreadcrumbsProps): React.ReactElement {
       <ol>
         {trail.map((c, i) => (
           <li key={c.to} className={i === trail.length - 1 ? 'bs-crumbs-up' : undefined}>
-            <Link to={c.to} state={{ crumb: true }} className="bs-crumbs-link">
+            <Link to={c.to} state={crumbLinkState(c.to, state)} className="bs-crumbs-link">
               <span className="bs-crumbs-back" aria-hidden="true">←</span>
               <span className="bs-crumbs-label">{c.label}</span>
             </Link>

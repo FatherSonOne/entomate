@@ -2,6 +2,36 @@ const { search, terms, hitRanges, snippet, findSegmentHit, matchMeeting, orFilte
 const { cleanInput, SearchNotesError } = require('../services/searchNotesService');
 
 describe('searchEverything helpers', () => {
+  test('interactive Search uses the archive RPC and returns a revision-scoped passage link', async () => {
+    const db = { from: jest.fn(), rpc: jest.fn().mockResolvedValue({ data: {
+      records: [{ id: 'old', title: 'Planning', decisions: ['Keep zircon funding'] }],
+      passages: [{ meeting_id: 'old', title: 'Planning', source_line: 73, chunk_start: 1,
+        at_ms: 3_000_000, speaker: 'Ana', body: 'We kept zircon funding through December', revision: 'rev-1', rank: 1.2 }],
+    } }) };
+    const response = await search({ query: 'zircon', types: ['meetings', 'decisions'], orgIds: ['org-a'], db, includePassages: true });
+    expect(db.from).not.toHaveBeenCalled();
+    expect(db.rpc).toHaveBeenCalledTimes(1);
+    expect(db.rpc).toHaveBeenCalledWith('search_meeting_history', {
+      p_org_ids: ['org-a'], p_terms: ['zircon'], p_limit: 24, p_find_passages: true,
+    });
+    expect(response.groups.meetings[0]).toMatchObject({ id: 'old', snippet: 'We kept zircon funding through December', meta: {
+      atMs: 3_000_000, speaker: 'Ana', passage: { revision: 'rev-1', kind: 'segment', position: 73 },
+    } });
+    expect(response.groups.decisions).toHaveLength(1);
+  });
+
+  test('untimed archive results carry their Unicode offset and empty results do not rescan transcripts', async () => {
+    const rpc = jest.fn().mockResolvedValueOnce({ data: { records: [], passages: [] } }).mockResolvedValueOnce({ data: {
+      records: [], passages: [{ meeting_id: 'upload', title: 'Imported notes', source_line: 0, chunk_start: 1001,
+        at_ms: null, body: 'Legacy transcript', revision: 'rev-2', rank: 1 }],
+    } });
+    const db = { rpc, from: jest.fn() };
+    const options = { query: 'legacy', types: ['meetings'], orgIds: ['org-a'], db, includePassages: true };
+    expect((await search(options)).groups.meetings).toEqual([]);
+    expect((await search(options)).groups.meetings[0].meta).toMatchObject({ atMs: null, passage: { kind: 'text', position: 1001 } });
+    expect(db.from).not.toHaveBeenCalled();
+  });
+
   test('meeting name typos preserve the actual title and rank below exact words', () => {
     const fuzzy = matchMeeting({ id: 'm1', title: 'Pricing pilot' }, ['pricnig']).meeting;
     expect(fuzzy.title).toBe('Pricing pilot');

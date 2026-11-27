@@ -1,0 +1,139 @@
+import React from 'react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import NavTrailRecorder from '../components/NavTrailRecorder'
+import { MeetingNavigation } from '../components/meetings/MeetingNavigation'
+import Search from '../pages/Search'
+import { subscribeTrail, trailFor, trailVersion } from '../services/navTrail'
+
+const api = vi.hoisted(() => ({ post: vi.fn(), get: vi.fn(), askStream: vi.fn() }))
+vi.mock('../services/api', () => ({
+  default: api,
+  searchApi: { askStream: api.askStream, getHistory: async () => ({ history: [] }) },
+}))
+vi.mock('../contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 'search-user' } }) }))
+vi.mock('../contexts/OrgContext', () => ({ useOrgSafe: () => ({ org: { id: 'search-workspace' } }) }))
+vi.mock('../components/vc/ToastProvider', () => ({ useToast: () => ({ error: vi.fn() }) }))
+
+function Where() {
+  const { pathname, search } = useLocation()
+  return <output aria-label="Current route">{pathname + search}</output>
+}
+
+function Meeting() {
+  const { pathname } = useLocation()
+  React.useSyncExternalStore(subscribeTrail, trailVersion, trailVersion)
+  return <MeetingNavigation back={trailFor(pathname).at(-1)} />
+}
+
+function Task() {
+  const navigate = useNavigate()
+  return <button onClick={() => navigate(-1)}>Browser back</button>
+}
+
+function setup(path = '/search') {
+  render(
+    <MemoryRouter initialEntries={[{ pathname: '/search', search: path.slice('/search'.length), key: crypto.randomUUID() }]}>
+      <NavTrailRecorder />
+      <Where />
+      <Routes>
+        <Route path="/search" element={<Search />} />
+        <Route path="/meetings/:id" element={<Meeting />} />
+        <Route path="/tasks" element={<Task />} />
+      </Routes>
+    </MemoryRouter>,
+  )
+}
+
+const revision = 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa'
+const meeting = { type: 'meeting', id: 'm1', title: 'Launch review', titleHits: [], snippet: 'Late launch decision', snippetHits: [],
+  meta: { atMs: 25_345, passage: { revision, kind: 'segment', position: 73 } } }
+const action = { type: 'action_item', id: 'a1', title: 'Send launch update', titleHits: [], snippet: '', snippetHits: [], meta: { meetingId: 'm1', atMs: 42_125 } }
+
+describe('Search and Ask navigation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    sessionStorage.clear()
+    api.get.mockResolvedValue({ notes: [] })
+    api.post.mockImplementation(async (_path, body) => ({
+      query: body.query, total: 2,
+      engine: body.meaning ? 'words+meaning' : 'words',
+      groups: { meetings: [meeting], action_items: [action] },
+    }))
+    api.askStream.mockImplementation(async (_body, callbacks) => {
+      callbacks.onChunk('The vendor ')
+      callbacks.onComplete({ answer: 'The vendor needed more time.', citations: [{ type: 'meeting', id: 'm1', title: 'Launch review' }] })
+    })
+    vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  test('an explicit question mark in Search stays a search and Ask requires submission', async () => {
+    setup()
+    const modes = screen.getByRole('group', { name: 'Discovery mode' })
+    const query = screen.getByRole('textbox', { name: 'Search meetings, decisions, tasks, and notes' })
+    fireEvent.change(query, { target: { value: 'Why did launch move?' } })
+    fireEvent.submit(screen.getByRole('search'))
+    expect(await screen.findByRole('link', { name: 'Launch review' })).toBeInTheDocument()
+    expect(api.askStream).not.toHaveBeenCalled()
+    fireEvent.click(within(modes).getByRole('button', { name: 'Ask' }))
+    const question = screen.getByRole('textbox', { name: 'Question about your meetings' })
+    expect(question).toHaveValue('Why did launch move?')
+    expect(api.askStream).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Ask Entomate' }))
+    expect(await screen.findByText('The vendor needed more time.')).toBeInTheDocument()
+    expect(api.askStream).toHaveBeenCalledOnce()
+    expect(api.askStream).toHaveBeenCalledWith({ question: 'Why did launch move?' }, expect.any(Object))
+  })
+
+  test('a timed result opens the source and Back to Search restores its filtered results and focus', async () => {
+    setup('/search?q=launch&f=meetings&meaning=1')
+    const sourceName = 'View source at 00:25 for Launch review'
+    const link = await screen.findByRole('link', { name: sourceName })
+    const source = `/meetings/m1?tab=transcript&t=25345&rev=${revision}&line=73`
+    expect(link).toHaveAttribute('href', source)
+    expect(screen.queryByRole('link', { name: 'Send launch update' })).not.toBeInTheDocument()
+    vi.stubGlobal('scrollY', 480)
+    fireEvent.click(link)
+    expect(screen.getByLabelText('Current route')).toHaveTextContent(source)
+    const searches = api.post.mock.calls.length
+    fireEvent.click(screen.getByRole('link', { name: 'Back to Search' }))
+    const restored = await screen.findByRole('link', { name: sourceName })
+    await waitFor(() => expect(restored).toHaveFocus())
+    expect(screen.getByRole('combobox', { name: 'Filter by result type' })).toHaveValue('meetings')
+    expect(screen.getByRole('button', { name: 'Include related meetings' })).toHaveAttribute('aria-pressed', 'true')
+    expect(window.scrollTo).toHaveBeenCalledWith(0, 480)
+    expect(api.post).toHaveBeenCalledTimes(searches)
+  })
+
+  test('a task title and its evidence are separate and browser Back restores the original view', async () => {
+    setup('/search?q=launch&f=action_items')
+    const title = await screen.findByRole('link', { name: 'Send launch update' })
+    expect(screen.getByRole('link', { name: 'View source at 00:42 for Send launch update' }))
+      .toHaveAttribute('href', '/meetings/m1?tab=transcript&t=42125')
+    fireEvent.click(title)
+    expect(screen.getByLabelText('Current route')).toHaveTextContent('/tasks?item=action:a1')
+    fireEvent.click(screen.getByRole('button', { name: 'Browser back' }))
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Send launch update' })).toHaveFocus())
+  })
+
+  test('Back from a related meeting restores a completed Ask answer and an unsubmitted draft', async () => {
+    setup('/search?q=Why+did+launch+move%3F&ask=1')
+    const related = await screen.findByRole('region', { name: 'Related meetings' })
+    const link = within(related).getByRole('link', { name: 'Launch review' })
+    expect(link).toHaveAttribute('href', '/meetings/m1')
+    fireEvent.change(screen.getByRole('textbox', { name: 'Question about your meetings' }), { target: { value: 'Who owns the update?' } })
+    fireEvent.click(link)
+    fireEvent.click(screen.getByRole('link', { name: 'Back to Search' }))
+    expect(screen.getByText('The vendor needed more time.')).toBeInTheDocument()
+    expect(screen.getByText('Why did launch move?')).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Question about your meetings' })).toHaveValue('Who owns the update?')
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Launch review' })).toHaveFocus())
+    expect(api.askStream).toHaveBeenCalledOnce()
+  })
+})

@@ -262,3 +262,5 @@ html:has(.bs-meeting-bulk-actions) body > .vc-toast-stack { bottom: var(--meetin
   .bs-meeting-tiles { grid-template-columns: repeat(auto-fit, minmax(min(100%, 155px), 1fr)); }
   #meeting-notes-heading, #meeting-actions { scroll-margin-top: 88px; }
 }
+
+.bs-meeting-source-moment { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-block: 12px; }
