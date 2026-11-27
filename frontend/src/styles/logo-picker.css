@@ -133,7 +133,7 @@
 
 /* Compare the still mark and live loading animation at the same scale. */
 .lp-gallery { padding-top: 24px; }
-.lp-gallery-head, .lp-gallery-caption {
+.lp-gallery-head, .lp-gallery-actions {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -149,11 +149,16 @@
   list-style: none;
 }
 .lp-gallery-card {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   padding: 12px;
   border: 1px solid var(--bs-rule2);
   border-radius: 12px;
 }
+.lp-gallery-actions { margin-top: auto; padding-top: 12px; }
+.lp-gallery-use[aria-disabled="true"] { cursor: default; }
+.lp-gallery-use[aria-disabled="true"]:active { transform: none; }
 .lp-gallery-views {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);

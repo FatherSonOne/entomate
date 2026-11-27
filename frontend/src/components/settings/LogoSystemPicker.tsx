@@ -134,7 +134,7 @@ export default function LogoSystemPicker(): React.ReactElement {
       </div>
 
       <div id="lp-gallery" hidden={!galleryOpen}>
-        {galleryOpen && <LogoMotionGallery />}
+        {galleryOpen && <LogoMotionGallery activeLogoId={inUse.id} onSelectLogo={setLogo} />}
       </div>
 
       <div id="lp-grid" className="lp-grid">
