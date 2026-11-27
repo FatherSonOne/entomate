@@ -20,7 +20,6 @@
 .lp-disclose:focus-visible { outline: 2px solid var(--bs-brand); outline-offset: 3px; border-radius: 4px; }
 .lp-chev { transition: transform 180ms cubic-bezier(0.2, 0.9, 0.3, 1.04); color: var(--bs-ink2); }
 .lp-disclose[aria-expanded="true"] .lp-chev { transform: rotate(90deg); }
-.lp-head .bs-sec-aside { cursor: default; }
 
 /* The cards snap open and shut under the bar */
 .lp-grid { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 220ms cubic-bezier(0.2, 0.9, 0.3, 1.04); }
@@ -131,6 +130,58 @@
   .lp-card .lp-lockup img { width: 18px; height: 18px; }
   .lp-card-meta { flex-wrap: wrap; }
 }
+
+/* Compare the still mark and live loading animation at the same scale. */
+.lp-gallery { padding-top: 24px; }
+.lp-gallery-head, .lp-gallery-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.lp-gallery h4, .lp-gallery h5, .lp-gallery h6 { margin: 0; }
+.lp-gallery-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+  gap: 12px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.lp-gallery-card {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--bs-rule2);
+  border-radius: 12px;
+}
+.lp-gallery-views {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.lp-gallery-views figure { margin: 0; min-width: 0; }
+.lp-gallery-views figcaption { margin-top: 6px; color: var(--bs-ink2); }
+.bs-disp.lp-gallery-stage {
+  display: grid;
+  place-items: center;
+  height: clamp(116px, 13vw, 184px);
+  padding: 0;
+  border-radius: 8px;
+}
+.lp-gallery-stage > img, .lp-gallery-stage > .en-app-loading-logo {
+  width: min(90%, 174px);
+  height: 94%;
+  margin: 0;
+  object-fit: contain;
+}
+.lp-gallery-stage .en-app-loading-logo-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.lp-gallery-stage .en-raster-motion-canvas { object-fit: contain; }
 
 /* Appearance rows (Settings, Bench Swiss) */
 .ap { min-width: 0; color: var(--bs-ink); font-family: var(--bs-sans); }

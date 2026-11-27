@@ -4,6 +4,7 @@ import { Display, Drawer, GroupHead, Key, PHONE_QUERY, Signal, useMediaQuery } f
 import AnimatedLoadingLogo from '../AnimatedLoadingLogo'
 import EnhancedLoadingScreen from '../EnhancedLoadingScreen'
 import { Wordmark } from '../Logo'
+import LogoMotionGallery from './LogoMotionGallery'
 import {
   LOGO_FAMILIES, LOGO_SYSTEMS, logoAsset, logosInFamily, setLogo, useLogoSystem,
   type LogoSystem,
@@ -61,8 +62,11 @@ export default function LogoSystemPicker(): React.ReactElement {
   const [preview, setPreview] = useState<boolean>(false)
   const [panel, setPanel] = useState<boolean>(false)
   const [gridOpen, setGridOpen] = useState<boolean>(readGridOpen)
+  const [galleryOpen, setGalleryOpen] = useState(false)
+  const chooserOpen = gridOpen && !galleryOpen
   const toggleGrid = (): void => {
-    const next = !gridOpen
+    const next = !chooserOpen
+    setGalleryOpen(false)
     setGridOpen(next)
     try { localStorage.setItem(GRID_KEY, next ? '1' : '0') } catch { /* storage blocked */ }
     if (!next) { closedByHand.current = false; setPanel(false) }
@@ -74,7 +78,7 @@ export default function LogoSystemPicker(): React.ReactElement {
     setLogo(id)
     if (!isPhone && !closedByHand.current) setPanel(true)
   }
-  const openPanel = (): void => { closedByHand.current = false; setPanel(true) }
+  const openPanel = (): void => { closedByHand.current = false; setGalleryOpen(false); setPanel(true) }
   const closePanel = useCallback((): void => {
     // Esc while the full-screen preview is up closes only the preview
     if (preview) return
@@ -100,15 +104,20 @@ export default function LogoSystemPicker(): React.ReactElement {
   }, [docked])
 
   return (
-    <div className="lp" data-panel={docked} data-open={gridOpen} ref={rootRef}>
+    <div className="lp" data-panel={docked} data-open={chooserOpen} ref={rootRef}>
       <div className="bs-sec lp-head">
         <h3 className="bs-sec-title bs-h3">
-          <button type="button" className="lp-disclose" aria-expanded={gridOpen} aria-controls="lp-grid" onClick={toggleGrid}>
+          <button type="button" className="lp-disclose" aria-expanded={chooserOpen} aria-controls="lp-grid" onClick={toggleGrid}>
             <svg className="lp-chev" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M4 2.5 7.5 6 4 9.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
             Logo and loading screen
           </button>
         </h3>
-        <span className="bs-sec-aside bs-lbl">{gridOpen ? `${LOGO_SYSTEMS.length} systems` : `Show all ${LOGO_SYSTEMS.length}`}</span>
+        <Key aria-expanded={galleryOpen} aria-controls="lp-gallery" onClick={() => {
+          setPanel(false)
+          setGalleryOpen(!galleryOpen)
+        }}>
+          {galleryOpen ? 'Close gallery' : `Preview all ${LOGO_SYSTEMS.length}`}
+        </Key>
       </div>
 
       {/* Sticky: the pick's icon and wordmark at real size, and the panel key */}
@@ -124,7 +133,12 @@ export default function LogoSystemPicker(): React.ReactElement {
         </Key>
       </div>
 
+      <div id="lp-gallery" hidden={!galleryOpen}>
+        {galleryOpen && <LogoMotionGallery />}
+      </div>
+
       <div id="lp-grid" className="lp-grid">
+      {!galleryOpen && (
       <div className="lp-grid-inner" role="radiogroup" aria-label="Logo system">
         {LOGO_FAMILIES.map((family) => {
           const logos = logosInFamily(family.id)
@@ -160,6 +174,7 @@ export default function LogoSystemPicker(): React.ReactElement {
           )
         })}
       </div>
+      )}
       </div>
 
       <Drawer open={panel} onClose={closePanel} label="Loading screen · live" modal={false} className="bs-tokens lp-panel"
