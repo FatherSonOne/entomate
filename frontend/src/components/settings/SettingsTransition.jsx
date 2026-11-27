@@ -5,6 +5,8 @@ import { MOTION, prefersReducedMotion } from '../bench/motion'
 
 const slide = { duration: MOTION.navrail, easing: MOTION.easeInOut, fill: 'both' }
 const move = (x) => ({ transform: `translateX(${x})` })
+const CLOSE_SWIPE_DISTANCE = 72
+const TOUCH_CONTROLS = 'input, textarea, select, [contenteditable], [role="slider"], [role="combobox"]'
 
 function canSlide() {
   return !prefersReducedMotion() && typeof Element.prototype.animate === 'function'
@@ -46,6 +48,47 @@ function showExitPreview(pane, exit, pageScroll) {
 function SettingsPane({ exitRef, onClose, children }) {
   const paneRef = useRef(null)
   const scrollRef = useRef(0)
+  const swipeRef = useRef(null)
+
+  const closeSettings = () => {
+    scrollRef.current = window.scrollY
+    onClose()
+  }
+
+  const startSwipe = (event) => {
+    swipeRef.current = null
+    if (event.defaultPrevented || event.touches.length !== 1) return
+    const target = event.target
+    if (!target.closest?.('.bs-settings-shell, .bs-set-section-sheet') || target.closest(TOUCH_CONTROLS)) return
+    const touch = event.touches[0]
+    const scroller = target.closest('.bs-drawer-body') ?? document.scrollingElement
+    swipeRef.current = { id: touch.identifier, x: touch.clientX, y: touch.clientY, scroller, scroll: scroller?.scrollTop ?? 0 }
+  }
+
+  const trackSwipe = (event) => {
+    const start = swipeRef.current
+    if (!start) return
+    const touch = event.touches[0]
+    if (event.touches.length !== 1 || touch.identifier !== start.id) {
+      swipeRef.current = null
+      return
+    }
+    const vertical = Math.abs(touch.clientY - start.y)
+    if (vertical > 16 && vertical > Math.abs(touch.clientX - start.x)) swipeRef.current = null
+  }
+
+  const finishSwipe = (event) => {
+    const start = swipeRef.current
+    swipeRef.current = null
+    const touch = event.changedTouches[0]
+    if (!start || event.defaultPrevented || event.touches.length || touch?.identifier !== start.id) return
+    const distance = touch.clientX - start.x
+    const vertical = Math.abs(touch.clientY - start.y)
+    const scroll = start.scroller?.scrollTop ?? 0
+    if (distance < CLOSE_SWIPE_DISTANCE || distance < vertical * 1.5 || Math.abs(scroll - start.scroll) > 4) return
+    if (event.cancelable) event.preventDefault()
+    closeSettings()
+  }
 
   useLayoutEffect(() => {
     const pane = paneRef.current
@@ -67,10 +110,11 @@ function SettingsPane({ exitRef, onClose, children }) {
   }, [exitRef])
 
   return (
-    <div className="bs-app bs-tokens bs-settings-shell" ref={paneRef}>
+    <div className="bs-app bs-tokens bs-settings-shell" ref={paneRef}
+      onTouchStart={startSwipe} onTouchMove={trackSwipe} onTouchEnd={finishSwipe}
+      onTouchCancel={() => { swipeRef.current = null }}>
       <header className="bs-settings-bar">
-        <Key autoFocus onClick={() => { scrollRef.current = window.scrollY; onClose() }}
-          icon={<X size={16} aria-hidden="true" />}>Close Settings</Key>
+        <Key autoFocus onClick={closeSettings} icon={<X size={16} aria-hidden="true" />}>Close Settings</Key>
       </header>
       <main className="bs-plate bs-settings-page">{children}</main>
     </div>
