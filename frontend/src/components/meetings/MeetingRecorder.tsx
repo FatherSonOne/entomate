@@ -20,6 +20,8 @@
 import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
+import { lockRecording, recordingJournal, type SavedRecording } from '../../services/recordingJournal'
+import type { IsolatedAudioTrack } from '../../services/recordingAudioTracks'
 import { AlertTriangle, Bot, Camera, Download, ExternalLink, Loader2, Mic, MonitorUp, Pause, Play, Square, Trash2 } from 'lucide-react'
 import { canPip, dressWindow } from '../bot/BotLive'
 import { protectRecordingFromReload } from '../../services/chunkReload'
@@ -28,6 +30,8 @@ import { SilenceWatch, levelOf, silenceMessage } from '../../services/silenceWat
 import LiveCaptions, { speechRecognitionCtor } from './LiveCaptions'
 import {
   BotInCallError,
+  EMPTY_UPLOAD,
+  recoverRecording,
   PIECE_MS,
   PieceUploader,
   baseMime,
@@ -51,6 +55,7 @@ export interface MeetingRecorderProps {
   onQuickRecordConsumed?: () => void
   /** A microphone chosen in Settings; the default one when empty. */
   audioInputDeviceId?: string
+  recoveryUserId?: string
   /** Called once the recording is handed to the server for its transcript. */
   onRecorded?: (meetingId: string) => void
   /** Reports whether capture or audio handoff is in progress. */
@@ -67,9 +72,27 @@ interface Capture {
   streams: MediaStream[]
   audioContext: AudioContext
   audioRecorder: MediaRecorder
+  sourceTracks: SourceTrackCapture[]
+  splitInputs: Partial<Record<IsolatedAudioTrack, SplitInput>>
+  mix: MediaStreamAudioDestinationNode
   videoRecorder: MediaRecorder | null
   videoChunks: Blob[]
   preview: MediaStream | null
+}
+
+interface SplitInput {
+  stream: MediaStream
+  track: MediaStreamTrack
+  node: MediaStreamAudioSourceNode
+}
+
+interface SourceTrackCapture {
+  track: IsolatedAudioTrack
+  destination: MediaStreamAudioDestinationNode
+  recorder: MediaRecorder
+  uploader: PieceUploader
+  pendingDurations: number[]
+  failed: boolean
 }
 
 const MODE_OPTIONS: Array<{ mode: RecorderMode; label: string; hint: string; Icon: typeof Mic }> = [
@@ -168,12 +191,21 @@ function Preview({ stream }: { stream: MediaStream }): React.ReactElement {
   return <video ref={ref} autoPlay muted playsInline aria-label="Recording preview" className="aspect-video w-full rounded-lg bg-black object-contain" />
 }
 
-export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChange, onOpenMeeting, onPopOut, onReset, quickRecordRequest, onQuickRecordConsumed }: MeetingRecorderProps): React.ReactElement {
+export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, onRecorded, onCaptureChange, onOpenMeeting, onPopOut, onReset, quickRecordRequest, onQuickRecordConsumed }: MeetingRecorderProps): React.ReactElement {
   const navigate = useNavigate()
   // Unique per recorder, so two on one page (or a test harness) never share a radio group.
   const uid = useId()
   const [mode, setMode] = useState<RecorderMode>('mic')
   const [withMic, setWithMic] = useState(true)
+  const [splitAudio, setSplitAudio] = useState(false)
+  const [audioInputs, setAudioInputs] = useState<MediaDeviceInfo[]>([])
+  const [changingInput, setChangingInput] = useState(false)
+  const pendingInput = useRef(false)
+  const [sourceTrackWarning, setSourceTrackWarning] = useState(false)
+  const [savedRecordings, setSavedRecordings] = useState<SavedRecording[]>([])
+  const [recovering, setRecovering] = useState(false)
+  const journal = useRef<{ id: string; release: () => void } | null>(null)
+  const mounted = useRef(false)
   const [title, setTitle] = useState('')
   const [attendees, setAttendees] = useState('')
   const [consent, setConsent] = useState(false)
@@ -182,7 +214,7 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChang
   const [phase, setPhase] = useState<Phase>('setup')
   const [error, setError] = useState<string | null>(null)
   const [elapsedMs, setElapsedMs] = useState(0)
-  const [upload, setUpload] = useState<UploaderState>({ recorded: 0, sent: 0, retrying: false, failed: null })
+  const [upload, setUpload] = useState<UploaderState>(EMPTY_UPLOAD)
   const [meetingId, setMeetingId] = useState<string | null>(null)
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
   const [, setTick] = useState(0)
@@ -255,7 +287,41 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChang
   }, [botCheck])
 
   // Leaving the page mid-recording: stop the devices; warn before losing unsent audio.
-  useEffect(() => () => releaseDevices(), [releaseDevices])
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      uploader.current?.cancel()
+      capture.current?.sourceTracks.forEach(source => source.uploader.cancel())
+      journal.current?.release()
+      journal.current = null
+      releaseDevices()
+    }
+  }, [releaseDevices])
+
+  useEffect(() => {
+    if (!userId || phase !== 'setup') return
+    let disposed = false
+    void recordingJournal.list(userId).then(rows => {
+      if (!disposed) setSavedRecordings(rows)
+    }).catch(() => {})
+    return () => { disposed = true }
+  }, [phase, userId])
+
+  const recover = async (id: string): Promise<void> => {
+    if (!userId || recovering) return
+    setRecovering(true)
+    setError(null)
+    try {
+      await recoverRecording(id, userId)
+      setSavedRecordings(rows => rows.filter(row => row.id !== id))
+      openMeeting(id)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'The saved recording could not be recovered.')
+    } finally {
+      setRecovering(false)
+    }
+  }
   useEffect(() => {
     if (phase !== 'recording' && phase !== 'finishing') return
     const warn = (e: BeforeUnloadEvent): void => {
@@ -321,8 +387,52 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChang
     return { streams, video: tab.getVideoTracks()[0] ?? null }
   }
 
+  const changeInput = async (kind: IsolatedAudioTrack, deviceId?: string): Promise<void> => {
+    const current = capture.current
+    const previous = current?.splitInputs[kind]
+    if (!current || !previous || pendingInput.current || stopping.current) return
+    pendingInput.current = true
+    setChangingInput(true)
+    setError(null)
+    let replacement: MediaStream | undefined
+    try {
+      const mediaDevices = navigator.mediaDevices
+      if (kind === 'mic') {
+        replacement = await mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, ...(deviceId && deviceId !== 'default' ? { deviceId: { exact: deviceId } } : {}) },
+        })
+      } else {
+        const options: DisplayMediaOptionsWithAudio = { video: true, audio: true, selfBrowserSurface: 'exclude', systemAudio: 'include' }
+        replacement = await mediaDevices.getDisplayMedia(options)
+      }
+      if (capture.current !== current || stopping.current) return
+      const track = replacement.getAudioTracks()[0]
+      if (!track || track.readyState !== 'live') {
+        throw new Error(kind === 'tab' ? 'Choose a browser tab and turn on “Also share tab audio”.' : 'The microphone did not provide audio.')
+      }
+      const node = current.audioContext.createMediaStreamSource(new MediaStream([track]))
+      node.connect(current.mix)
+      const source = current.sourceTracks.find(side => side.track === kind && !side.failed)
+      if (source) node.connect(source.destination)
+      previous.node.disconnect()
+      // The original tab may still be writing a local video preview. Replacing
+      // audio leaves its video track alone until the user stops that share.
+      previous.track.stop()
+      current.streams = current.streams.filter(stream => stream !== previous.stream || stream.getVideoTracks().length > 0)
+      current.streams.push(replacement)
+      current.splitInputs[kind] = { stream: replacement, track, node }
+      replacement = undefined
+    } catch (err) {
+      if (capture.current === current && !stopping.current) setError(captureErrorMessage(err, kind))
+    } finally {
+      replacement?.getTracks().forEach(track => track.stop())
+      pendingInput.current = false
+      if (mounted.current) setChangingInput(false)
+    }
+  }
+
   const start = async (quick = false): Promise<void> => {
-    if (phase !== 'setup' || (!consent && !quick)) return
+    if (phase !== 'setup' || recovering || (!consent && !quick)) return
     const captureMode = quick ? 'mic' : mode
     setError(null)
     if (typeof MediaRecorder === 'undefined') {
@@ -348,9 +458,15 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChang
     // Every source (tab sound, microphone) mixed into one track for the transcript.
     const audioContext = new AudioContext()
     const mix = audioContext.createMediaStreamDestination()
-    for (const s of opened.streams) {
-      for (const track of s.getAudioTracks()) audioContext.createMediaStreamSource(new MediaStream([track])).connect(mix)
-    }
+    const saveSourceTracks = captureMode === 'tab' && splitAudio && withMic && !(bot && sameAsBot)
+    const splitInputs: Capture['splitInputs'] = {}
+    opened.streams.forEach((stream, index) => {
+      for (const track of stream.getAudioTracks()) {
+        const node = audioContext.createMediaStreamSource(new MediaStream([track]))
+        node.connect(mix)
+        if (saveSourceTracks) splitInputs[index === 0 ? 'tab' : 'mic'] ??= { stream, track, node }
+      }
+    })
     void audioContext.resume()
 
     let id: string
@@ -359,7 +475,9 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChang
       // The server's clock is UTC: name an untitled recording by this device's date, or an
       // evening meeting gets tomorrow's. Beside a bot, an empty title keeps the bot's title.
       const named = title.trim() || (!quick && bot && sameAsBot ? '' : `Recording, ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`)
-      ;({ meetingId: id } = await startRecording({ title: named, attendees, mode: captureMode, mimeType: audioMime, ...beside }))
+      ;({ meetingId: id } = await startRecording({ title: named, attendees, mode: captureMode, mimeType: audioMime, ...beside,
+        ...(saveSourceTracks ? { splitAudio: true } : {}),
+      }))
     } catch (err) {
       opened.streams.forEach((s) => s.getTracks().forEach((t) => t.stop()))
       void audioContext.close()
@@ -374,15 +492,73 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChang
       setPhase('setup')
       return
     }
+    const mimeType = baseMime(audioMime)
+    if (mounted.current && userId && saveSourceTracks) {
+      let release: (() => void) | null = null
+      try {
+        release = await lockRecording(id)
+        if (release) {
+          await recordingJournal.create({ id, userId, title: title.trim() || 'Meeting recording', mimeType })
+          if (mounted.current) journal.current = { id, release }
+        }
+      } catch { /* A browser that denies local storage can still upload during capture. */ }
+      if (!journal.current) release?.()
+    }
+    if (!mounted.current) {
+      opened.streams.forEach(stream => stream.getTracks().forEach(track => track.stop()))
+      await audioContext.close().catch(() => {})
+      return
+    }
+    setSourceTrackWarning(false)
     setHandedToBot(!quick && Boolean(bot && sameAsBot))
 
-    const pieces = new PieceUploader(sendPieceTo(id, baseMime(audioMime)), setUpload)
+    const pieces = new PieceUploader(sendPieceTo(id, mimeType), setUpload, undefined, journal.current?.id)
     uploader.current = pieces
     const audioRecorder = new MediaRecorder(mix.stream, recorderOptions('audio', audioMime))
+    const sourceTracks: SourceTrackCapture[] = []
+    const failSourceTrack = (source: SourceTrackCapture): void => {
+      if (source.failed) return
+      source.failed = true
+      if (source.recorder.state !== 'inactive') source.recorder.stop()
+      if (mounted.current) setSourceTrackWarning(true)
+    }
+    for (const track of Object.keys(splitInputs) as IsolatedAudioTrack[]) {
+      const input = splitInputs[track]!
+      try {
+        const destination = audioContext.createMediaStreamDestination()
+        const recorder = new MediaRecorder(destination.stream, recorderOptions('audio', audioMime))
+        const uploader = new PieceUploader(sendPieceTo(id, mimeType, track), state => {
+          if (state.failed) failSourceTrack(source)
+          else if (state.localSaveFailed && mounted.current) setSourceTrackWarning(true)
+        }, undefined, journal.current?.id, track)
+        const source = { track, destination, recorder, uploader, pendingDurations: [] as number[], failed: false }
+        recorder.ondataavailable = ({ data }): void => {
+          const duration = source.pendingDurations.shift()
+          if (duration === undefined || source.failed) return
+          if (data.size) uploader.add(data, duration)
+          else failSourceTrack(source)
+        }
+        recorder.onerror = () => failSourceTrack(source)
+        input.node.connect(destination)
+        sourceTracks.push(source)
+      } catch {
+        setSourceTrackWarning(true)
+      }
+    }
     audioRecorder.ondataavailable = (e: BlobEvent): void => {
       if (!e.data.size) return
-      const ms = recordedMs()
-      pieces.add(e.data, ms - msAtLastPiece.current)
+      const ms = Math.round(recordedMs())
+      const duration = ms - msAtLastPiece.current
+      pieces.add(e.data, duration)
+      // Cut both source streams on the combined recording's chunk boundaries.
+      for (const source of sourceTracks) {
+        if (source.failed || source.recorder.state === 'inactive') continue
+        source.pendingDurations.push(duration)
+        try { source.recorder.requestData() } catch {
+          source.pendingDurations.pop()
+          failSourceTrack(source)
+        }
+      }
       msAtLastPiece.current = ms
     }
 
@@ -400,12 +576,21 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChang
       streams: opened.streams,
       audioContext,
       audioRecorder,
+      sourceTracks,
+      splitInputs,
+      mix,
       videoRecorder,
       videoChunks,
       preview: opened.video ? new MediaStream([opened.video]) : null,
     }
     // "Stop sharing" in the browser's own bar, or a camera unplugged, ends the recording.
-    opened.streams.forEach((s) => s.getTracks().forEach((t) => t.addEventListener('ended', () => void stop())))
+    if (saveSourceTracks) {
+      void navigator.mediaDevices.enumerateDevices?.().then(devices => {
+        if (mounted.current) setAudioInputs(devices.filter(device => device.kind === 'audioinput'))
+      }).catch(() => {})
+    } else {
+      opened.streams.forEach(stream => stream.getTracks().forEach(track => track.addEventListener('ended', () => void stop())))
+    }
 
     startedAt.current = Date.now()
     bankedMs.current = 0
@@ -414,6 +599,9 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChang
     setPaused(false)
     stopping.current = false
     audioRecorder.start(PIECE_MS)
+    for (const source of sourceTracks) {
+      try { source.recorder.start() } catch { failSourceTrack(source) }
+    }
     videoRecorder?.start(10_000)
     meetingRef.current = id
     setMeetingId(id)
@@ -447,18 +635,27 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChang
       recorder.stop()
     })
 
-  /** Pause or resume both recorders; paused time is not recorded and not counted. */
+  const stopAudio = async (current: Capture): Promise<void> => {
+    // The combined recorder's last event asks both source recorders for their final piece.
+    await stopRecorder(current.audioRecorder)
+    await Promise.all(current.sourceTracks.map(source => stopRecorder(source.recorder)))
+  }
+
+  /** Pause or resume the recorders; paused time is not recorded and not counted. */
   const togglePause = (): void => {
     const c = capture.current
     if (!c || phase !== 'recording') return
     const now = Date.now()
     if (paused) {
       c.audioRecorder.resume()
+      for (const source of c.sourceTracks) if (source.recorder.state === 'paused') source.recorder.resume()
       if (c.videoRecorder?.state === 'paused') c.videoRecorder.resume()
       activeSince.current = now
       setPaused(false)
     } else {
       c.audioRecorder.pause()
+      for (const source of c.sourceTracks) if (source.recorder.state === 'recording') source.recorder.pause()
+      if (journal.current) c.audioRecorder.requestData()
       if (c.videoRecorder?.state === 'recording') c.videoRecorder.pause()
       bankedMs.current = recordedMs(now)
       activeSince.current = null
@@ -500,7 +697,7 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChang
     if (!c || !pieces || !meetingRef.current || stopping.current) return
     stopping.current = true
     setPhase('finishing')
-    await Promise.all([stopRecorder(c.audioRecorder), stopRecorder(c.videoRecorder)])
+    await Promise.all([stopAudio(c), stopRecorder(c.videoRecorder)])
     releaseDevices()
     if (c.videoRecorder && c.videoChunks.length) {
       setVideoUrl(URL.createObjectURL(new Blob(c.videoChunks, { type: c.videoRecorder.mimeType || 'video/webm' })))
@@ -517,8 +714,16 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChang
     setPhase('finishing')
     try {
       await pieces.drain()
+      await Promise.all((capture.current?.sourceTracks ?? []).map(source => source.uploader.drain().catch(() => {
+        if (mounted.current) setSourceTrackWarning(true)
+      })))
       if (pieces.state.recorded === 0) throw new Error('Nothing was recorded. Check the microphone and try again.')
       await finishRecording(id, pieces.state.recorded)
+      if (journal.current) {
+        await recordingJournal.remove(id).catch(() => {})
+        journal.current.release()
+        journal.current = null
+      }
       setPhase('done')
       onRecorded?.(id)
     } catch (err) {
@@ -531,8 +736,14 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChang
     const id = meetingRef.current
     if (!id) return
     uploader.current?.cancel()
+    capture.current?.sourceTracks.forEach(source => source.uploader.cancel())
     try {
       await discardRecording(id)
+      if (journal.current) {
+        await recordingJournal.remove(id).catch(() => {})
+        journal.current.release()
+        journal.current = null
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'The recording could not be discarded.')
       return
@@ -549,7 +760,8 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChang
     setVideoUrl(null)
     meetingRef.current = null
     setMeetingId(null)
-    setUpload({ recorded: 0, sent: 0, retrying: false, failed: null })
+    setUpload(EMPTY_UPLOAD)
+    setSourceTrackWarning(false)
     setElapsedMs(0)
     setError(null)
     setHandedToBot(false)
@@ -561,6 +773,25 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChang
   const waiting = upload.recorded - upload.sent
   const locked = phase !== 'setup'
   const showSetup = phase === 'setup' || phase === 'starting'
+  const inputControls = capture.current?.splitInputs.tab && phase === 'recording' && (
+    <div className="flex flex-wrap items-center gap-2">
+      {audioInputs.length > 0 && (
+        <label className="flex items-center gap-2 text-sm">
+          Microphone
+          <select className={INPUT} aria-label="Recording microphone" disabled={changingInput}
+            value={capture.current.splitInputs.mic?.track.getSettings?.().deviceId ?? 'default'}
+            onChange={event => void changeInput('mic', event.currentTarget.value)}>
+            <option value="default">System default</option>
+            {audioInputs.filter(device => device.deviceId && device.deviceId !== 'default').map((device, index) => (
+              <option key={device.deviceId} value={device.deviceId}>{device.label || 'Microphone ' + (index + 1)}</option>
+            ))}
+          </select>
+        </label>
+      )}
+      <button type="button" className={SECONDARY} disabled={changingInput}
+        onClick={() => void changeInput('tab')}>Re-share tab audio</button>
+    </div>
+  )
   const status = phase === 'finishing' ? (error ? 'Audio needs attention' : 'Sending the last of the audio') : paused ? 'Paused' : 'Recording'
 
   return (
@@ -577,6 +808,7 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChang
 
       {phase === 'done' && meetingId ? (
         <div className="space-y-3" aria-live="polite">
+          {sourceTrackWarning && <p className="text-xs text-content-secondary">Some separate audio may be unavailable in the recap.</p>}
           <p ref={savedStatus} tabIndex={-1} className="text-sm text-content-primary">
             {handedToBot
               ? 'Recording saved with the bot’s meeting. The bot writes the minutes; your recording is kept as a backup and is written up on its own if the bot cannot finish.'
@@ -599,6 +831,15 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChang
         </div>
       ) : showSetup ? (
         <>
+          {savedRecordings.length > 0 && (
+            <section aria-label="Recover separate audio" className="space-y-2">
+              {savedRecordings.map(saved => (
+                <button type="button" className={SECONDARY} key={saved.id} disabled={recovering} onClick={() => void recover(saved.id)}>
+                  Recover recording · {saved.title}
+                </button>
+              ))}
+            </section>
+          )}
           {bot && (
             <fieldset data-testid="recorder-bot" className="space-y-2 rounded-lg border border-line p-3" disabled={locked}>
               <legend className="flex items-center gap-2 px-1 text-sm font-medium text-content-primary">
@@ -649,6 +890,12 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChang
                 Also record my microphone
               </label>
             )}
+            {mode === 'tab' && withMic && !(bot && sameAsBot) && (
+              <label className="flex items-start gap-2 text-sm text-content-primary">
+                <input type="checkbox" checked={splitAudio} onChange={event => setSplitAudio(event.target.checked)} className="mt-0.5 h-4 w-4 accent-accent-primary" />
+                <span>Save separate mic and tab tracks <span className="block text-xs text-content-secondary">Listen to either source in the recap. Uses extra storage.</span></span>
+              </label>
+            )}
             {mode === 'tab' && (
               <p className="text-xs text-content-secondary">
                 Choose the tab with the call and turn on &quot;Also share tab audio&quot;. Chrome and Edge share tab sound; other browsers may share video only.
@@ -695,7 +942,7 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChang
             <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} disabled={locked} className="mt-0.5 h-4 w-4 accent-accent-primary" />
             Everyone in this meeting knows it is being recorded and has agreed.
           </label>
-          <button type="button" className={`${PRIMARY} w-full`} onClick={() => void start()} disabled={!consent || phase === 'starting'}>
+          <button type="button" className={`${PRIMARY} w-full`} onClick={() => void start()} disabled={!consent || recovering || phase === 'starting'}>
             {phase === 'starting' ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Mic className="h-4 w-4" aria-hidden="true" />}
             {phase === 'starting' ? 'Starting' : 'Start recording'}
           </button>
@@ -704,6 +951,7 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChang
         <div className="m-enter space-y-3">
           {c?.preview && phase === 'recording' && <Preview stream={c.preview} />}
           <div className="flex items-center justify-between gap-3">
+            {inputControls}
             <span ref={liveStatus} tabIndex={-1} role="status" className="flex items-center gap-2 text-sm font-medium text-content-primary">
               {phase === 'recording' && !paused && <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-accent-primary" aria-hidden="true" />}
               {status}
@@ -772,7 +1020,7 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChang
                       const c2 = capture.current
                       if (c2) {
                         stopping.current = true
-                        await Promise.all([stopRecorder(c2.audioRecorder), stopRecorder(c2.videoRecorder)])
+                        await Promise.all([stopAudio(c2), stopRecorder(c2.videoRecorder)])
                         releaseDevices()
                       }
                       await discard()
@@ -800,6 +1048,8 @@ export function MeetingRecorder({ audioInputDeviceId, onRecorded, onCaptureChang
             {c?.preview && phase === 'recording' && <Preview stream={c.preview} />}
             {c && phase === 'recording' && !paused && <LevelMeter context={c.audioContext} stream={c.audioRecorder.stream} />}
             {c && phase === 'recording' && !paused && <SilenceAlert context={c.audioContext} stream={c.audioRecorder.stream} mode={mode} />}
+            {inputControls}
+            {sourceTrackWarning && <p role="status" className="text-xs text-content-secondary">Some separate audio may be unavailable in the recap.</p>}
             {phase === 'finishing' && error ? <p role="alert" className="text-sm text-semantic-error">{error}</p> : (
               <p className="text-xs text-content-secondary" aria-live="polite">
                 {upload.failed ?? (paused ? 'Nothing is recorded until you resume.'

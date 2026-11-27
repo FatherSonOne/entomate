@@ -565,6 +565,50 @@ describe('recorder routes', () => {
     expect((await request(server).get(`/api/recordings/${id}/playback`).set(as(MEMBER))).status).toBe(404);
   });
 
+  test('separate browser tracks recover and play their aligned prefixes without entering transcription', async () => {
+    const server = app();
+    const start = await request(server).post('/api/recordings').set(as(MEMBER)).send({
+      title: 'Track test', mode: 'tab', mimeType: 'audio/webm', consentAcknowledged: true, splitAudio: true,
+    }).expect(201);
+    const id = start.body.meetingId;
+    const upload = (track, seq, durationMs = 30000, user = MEMBER) => request(server)
+      .put(`/api/recordings/${id}/pieces/${seq}`)
+      .query({ durationMs, ...(track === 'mix' ? {} : { track }) })
+      .set(as(user)).set('Content-Type', 'audio/webm').send(Buffer.from(`${track}-${seq}|`));
+    await upload('mic', 0, 30000, OUTSIDER).expect(404);
+    await upload('unknown', 0).expect(400);
+    for (const track of ['mix', 'mic', 'tab']) await upload(track, 0).expect(204);
+    await upload('mix', 1).expect(204);
+    await upload('mic', 1).expect(204);
+    await upload('tab', 1, 29500).expect(204);
+    const recovery = await request(server).get(`/api/recordings/${id}/recovery`).set(as(MEMBER)).expect(200);
+    expect(recovery.body).toMatchObject({ pieces: 2, durationMs: 60000, audioTracks: {
+      mic: { pieces: 2, durationMs: 60000 }, tab: { pieces: 2, durationMs: 59500 },
+    } });
+    await request(server).post(`/api/recordings/${id}/finish`).set(as(MEMBER)).send({ pieces: 2 }).expect(202);
+    await settle(id);
+    expect(geminiRecording.transcribeRecording.mock.calls[0][0].toString()).toBe('mix-0|mix-1|');
+    expect(meeting(id).recording_job.audioTracks).toEqual({
+      mic: { pieces: 2, durationMs: 60000, playbackFile: `${ORG_A}/${id}/mic-playback.webm` },
+      tab: { pieces: 1, durationMs: 30000, playbackFile: `${ORG_A}/${id}/tab-playback.webm` },
+    });
+    const path = `/api/recordings/${id}/playback`;
+    const combined = await request(server).get(path).set(as(MEMBER)).expect(200);
+    expect(combined.body.url).toContain('/playback.webm');
+    const mic = await request(server).get(path).query({ track: 'mic' }).set(as(MEMBER)).expect(200);
+    expect(mic.body).toMatchObject({ durationMs: 60000, url: expect.stringContaining('/mic-playback.webm') });
+    expect(mockStorage.get(`meeting-recordings/${ORG_A}/${id}/mic-playback.webm`).toString()).toBe('seekable.webm:mic-0|mic-1|');
+    const indexedTab = await request(server).get(path).query({ track: 'tab' }).set(as(MEMBER)).expect(200);
+    expect(indexedTab.body).toMatchObject({ durationMs: 30000, url: expect.stringContaining('/tab-playback.webm') });
+    meeting(id).recording_job.audioTracks.tab.playbackFile = null;
+    const tab = await request(server).get(path).query({ track: 'tab' }).set(as(MEMBER)).expect(200);
+    expect(tab.body.pieces).toEqual([{ seq: 0, durationMs: 30000, url: expect.stringContaining('/tab-000000-30000.webm') }]);
+    await request(server).get(path).query({ track: 'mic' }).set(as(OUTSIDER)).expect(404);
+    await request(server).delete(`/api/recordings/${id}/audio`).set(as(MEMBER)).expect(200);
+    expect(mockStorage.size).toBe(0);
+    await request(server).get(path).query({ track: 'tab' }).set(as(MEMBER)).expect(404);
+  });
+
   test('deleting a meeting also deletes leftover recording audio', async () => {
     const server = app();
     const id = await startAndUpload(server, 1);

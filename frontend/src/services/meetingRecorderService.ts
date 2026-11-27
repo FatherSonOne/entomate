@@ -8,6 +8,8 @@
  */
 
 import { meetingsApi, recordingsApi } from './api'
+import { ISOLATED_AUDIO_TRACKS, type IsolatedAudioTrack } from './recordingAudioTracks'
+import { lockRecording, recordingJournal, type RecordingPiece } from './recordingJournal'
 import cache from './apiCache'
 
 export type RecorderMode = 'mic' | 'camera' | 'tab'
@@ -42,10 +44,26 @@ export interface RecordingJob {
   finishedAt: string | null
   /** Length of the recording, ms. */
   durationMs: number
+  audioTracks?: AudioTracks
   transcriptRebuildAt?: string
   transcriptRebuildError?: string
   transcriptRebuiltAt?: string
   transcriptRebuildProgress?: TranscriptRebuildProgress
+}
+
+interface TrackCoverage { pieces: number; durationMs: number }
+export type AudioTracks = Partial<Record<IsolatedAudioTrack, TrackCoverage>>
+
+function readAudioTracks(raw: unknown): AudioTracks {
+  const tracks: AudioTracks = {}
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return tracks
+  for (const track of ISOLATED_AUDIO_TRACKS) {
+    const value = (raw as AudioTracks)[track]
+    if (value && Number.isSafeInteger(value.pieces) && value.pieces > 0 && Number.isSafeInteger(value.durationMs) && value.durationMs >= 0) {
+      tracks[track] = { pieces: value.pieces, durationMs: value.durationMs }
+    }
+  }
+  return tracks
 }
 
 export interface TranscriptRebuildProgress {
@@ -86,6 +104,7 @@ export function toRecordingJob(raw: unknown): RecordingJob | null {
     ...(typeof r.transcriptRebuiltAt === 'string' ? { transcriptRebuiltAt: r.transcriptRebuiltAt } : {}),
     ...(validProgress ? { transcriptRebuildProgress: progress as TranscriptRebuildProgress } : {}),
     durationMs: typeof r.durationMs === 'number' && r.durationMs > 0 ? r.durationMs : 0,
+    ...(r.audioTracks ? { audioTracks: readAudioTracks(r.audioTracks) } : {}),
   }
 }
 
@@ -125,11 +144,12 @@ export async function loadRecordingAudio(
   fetcher: typeof fetch = fetch,
   onProgress?: (fraction: number) => void,
   signal?: AbortSignal,
+  track?: IsolatedAudioTrack,
 ): Promise<RecordingAudio> {
   let res: PlaybackResponse
   try {
     cache.invalidate(`/recordings/${meetingId}/playback`)
-    res = (await recordingsApi.playback(meetingId)) as unknown as PlaybackResponse
+    res = (await (track ? recordingsApi.playback(meetingId, track) : recordingsApi.playback(meetingId))) as unknown as PlaybackResponse
   } catch (err) {
     throw new Error(errorText(err, 'The recording could not be loaded.'))
   }
@@ -258,6 +278,7 @@ export interface StartInput {
   botSessionId?: string
   /** The person says this is a different meeting from the bot's. */
   separate?: boolean
+  splitAudio?: boolean
 }
 
 /** A bot of the person's in a call now, or about to join one. */
@@ -328,6 +349,51 @@ export async function finishRecording(meetingId: string, pieces: number): Promis
   }
 }
 
+export async function recoverRecording(id: string, userId: string): Promise<void> {
+  const release = await lockRecording(id)
+  if (!release) throw new Error('This recording is open in another tab. Finish it there or close that tab.')
+  try {
+    const saved = await recordingJournal.read(id)
+    if (!saved || saved.recording.userId !== userId) throw new Error('This recording is no longer available on this device.')
+    const cloud = (await recordingsApi.recovery(id)) as unknown as {
+      status: RecordingStatus; pieces: number; durationMs: number; audioTracks?: AudioTracks
+    }
+    if (cloud.status === 'recording') {
+      const uploadMissing = async (coverage: TrackCoverage, track?: IsolatedAudioTrack, maxPieces = Infinity): Promise<number> => {
+        const send = sendPieceTo(id, saved.recording.mimeType, track)
+        let count = coverage.pieces
+        let durationMs = coverage.durationMs
+        for (const piece of saved.pieces) {
+          if (piece.track !== track || piece.seq < count) continue
+          if (piece.seq !== count || count >= maxPieces) break
+          try { await send(piece.seq, piece.durationMs, piece.blob) } catch (err) {
+            if (track && isPermanent(err)) break
+            throw err
+          }
+          count += 1
+          durationMs += piece.durationMs
+          const acknowledged = track ? recordingJournal.acknowledge(id, piece.seq, durationMs, track)
+            : recordingJournal.acknowledge(id, piece.seq, durationMs)
+          await acknowledged.catch(() => {})
+        }
+        return count
+      }
+      const count = await uploadMissing(cloud)
+      if (!count) throw new Error('No continuous audio could be recovered.')
+      if (cloud.audioTracks) {
+        const tracks = readAudioTracks(cloud.audioTracks)
+        await Promise.all(ISOLATED_AUDIO_TRACKS.map(track => uploadMissing(tracks[track] ?? { pieces: 0, durationMs: 0 }, track, count)))
+      }
+      await finishRecording(id, count)
+    }
+    await recordingJournal.remove(id).catch(() => {})
+  } catch (err) {
+    throw new Error(errorText(err, 'The saved recording could not be recovered.'))
+  } finally {
+    release()
+  }
+}
+
 export async function salvageRecording(meetingId: string): Promise<void> {
   try {
     await recordingsApi.salvage(meetingId)
@@ -380,10 +446,17 @@ export interface UploaderState {
   recorded: number
   /** Pieces the server has. */
   sent: number
+  sentMs: number
+  savedMs: number
+  localSaveFailed: boolean
   /** The last send failed and is being retried. */
   retrying: boolean
   /** The server refused a piece for good (e.g. the recording was closed); sending stopped. */
   failed: string | null
+}
+
+export const EMPTY_UPLOAD: UploaderState = {
+  recorded: 0, sent: 0, sentMs: 0, savedMs: 0, localSaveFailed: false, retrying: false, failed: null,
 }
 
 /** A 4xx other than timeout or rate limit will not succeed on a retry. */
@@ -393,13 +466,17 @@ function isPermanent(err: unknown): boolean {
 }
 
 /**
- * Sends pieces in order, one at a time, retrying each until it lands. A piece stays in
- * memory until the server has it, so a dropped connection only delays the upload.
+ * Sends pieces in order, retrying each until it lands. Store a recoverable copy before
+ * upload when the recorder has an open journal.
  */
 export class PieceUploader {
-  private queue: Array<{ seq: number; durationMs: number; blob: Blob }> = []
+  private queue: Array<RecordingPiece & { saved: Promise<void> }> = []
   private recorded = 0
+  private recordedMs = 0
   private sent = 0
+  private sentMs = 0
+  private savedMs = 0
+  private localSaveFailed = false
   private retrying = false
   private failed: string | null = null
   private pumping: Promise<void> | null = null
@@ -409,15 +486,32 @@ export class PieceUploader {
     private readonly send: SendPiece,
     private readonly onChange: (state: UploaderState) => void = () => {},
     private readonly retryDelayMs: (attempt: number) => number = (n) => Math.min(30_000, 1000 * 2 ** n),
+    private readonly journalId?: string,
+    private readonly track?: IsolatedAudioTrack,
   ) {}
 
   get state(): UploaderState {
-    return { recorded: this.recorded, sent: this.sent, retrying: this.retrying, failed: this.failed }
+    return {
+      recorded: this.recorded, sent: this.sent, sentMs: this.sentMs, savedMs: this.savedMs,
+      localSaveFailed: this.localSaveFailed, retrying: this.retrying, failed: this.failed,
+    }
   }
 
   add(blob: Blob, durationMs: number): void {
-    if (blob.size === 0) return
-    this.queue.push({ seq: this.recorded++, durationMs: Math.max(0, Math.min(120_000, Math.round(durationMs))), blob })
+    if (blob.size === 0 || this.stopped) return
+    const piece = { seq: this.recorded++, durationMs: Math.max(0, Math.min(120_000, Math.round(durationMs))), blob,
+      ...(this.track ? { track: this.track } : {}) }
+    this.recordedMs += piece.durationMs
+    const saved = this.journalId
+      ? recordingJournal.append(this.journalId, piece, this.recordedMs).then(ms => {
+        this.savedMs = Math.max(this.savedMs, ms)
+        if (!this.stopped) this.onChange(this.state)
+      }, () => {
+        this.localSaveFailed = true
+        if (!this.stopped) this.onChange(this.state)
+      })
+      : Promise.resolve()
+    this.queue.push({ ...piece, saved })
     this.onChange(this.state)
     void this.pump()
   }
@@ -448,9 +542,18 @@ export class PieceUploader {
     while (this.queue.length && !this.stopped && !this.failed) {
       const next = this.queue[0]!
       try {
+        await next.saved
+        if (this.stopped) return
         await this.send(next.seq, next.durationMs, next.blob)
+        if (this.stopped) return
         this.queue.shift()
         this.sent += 1
+        this.sentMs += next.durationMs
+        if (this.journalId) {
+          const acknowledged = this.track ? recordingJournal.acknowledge(this.journalId, next.seq, this.sentMs, this.track)
+            : recordingJournal.acknowledge(this.journalId, next.seq, this.sentMs)
+          await acknowledged.catch(() => {})
+        }
         attempt = 0
         this.retrying = false
       } catch (err) {
@@ -470,8 +573,9 @@ export class PieceUploader {
   }
 }
 
-export function sendPieceTo(meetingId: string, contentType: string): SendPiece {
+export function sendPieceTo(meetingId: string, contentType: string, track?: IsolatedAudioTrack): SendPiece {
   return async (seq, durationMs, blob) => {
-    await recordingsApi.uploadPiece(meetingId, seq, durationMs, blob, contentType)
+    if (track) await recordingsApi.uploadPiece(meetingId, seq, durationMs, blob, contentType, track)
+    else await recordingsApi.uploadPiece(meetingId, seq, durationMs, blob, contentType)
   }
 }

@@ -238,13 +238,17 @@ export const recordingsApi = {
   },
   start: (data) => api.post('/recordings', data),
   // One piece of audio as the raw body; the server stores it by number, so a repeat is safe.
-  uploadPiece: (meetingId, seq, durationMs, blob, contentType) =>
+  uploadPiece: (meetingId, seq, durationMs, blob, contentType, track) =>
     api.put(`/recordings/${meetingId}/pieces/${seq}`, blob, {
-      params: { durationMs },
+      params: { durationMs, ...(track ? { track } : {}) },
       headers: { 'Content-Type': contentType },
       timeout: 60000,
     }),
   finish: (meetingId, pieces) => api.post(`/recordings/${meetingId}/finish`, { pieces }),
+  recovery: (meetingId) => {
+    cache.invalidate(`/recordings/${meetingId}/recovery`)
+    return api.get(`/recordings/${meetingId}/recovery`, { _noCache: true })
+  },
   // The recording tab closed before Stop: transcribe the audio that reached the server.
   salvage: (meetingId) => api.post(`/recordings/${meetingId}/finish`, { salvage: true }),
   retry: (meetingId) => api.post(`/recordings/${meetingId}/retry`),
@@ -253,7 +257,7 @@ export const recordingsApi = {
   removeAudio: (meetingId) => api.delete(`/recordings/${meetingId}/audio`),
   discard: (meetingId) => api.delete(`/recordings/${meetingId}`),
   // Signed links to the saved audio, in order; they expire, so never read this from the cache.
-  playback: (meetingId) => api.get(`/recordings/${meetingId}/playback`),
+  playback: (meetingId, track) => api.get(`/recordings/${meetingId}/playback`, track ? { params: { track }, _noCache: true } : undefined),
   waveform: (meetingId, signal) => api.get(`/recordings/${meetingId}/waveform`, { signal, _noCache: true }),
 }
 

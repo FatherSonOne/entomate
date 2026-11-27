@@ -61,7 +61,7 @@ router.get('/bot-check', authenticate, async (req, res) => {
 router.post('/', authenticate, async (req, res) => {
   try {
     if (!supabase) return res.status(503).json({ error: 'Database not configured' });
-    const { title, attendees, mode, mimeType, consentAcknowledged, botSessionId, separate } = req.body || {};
+    const { title, attendees, mode, mimeType, consentAcknowledged, botSessionId, separate, splitAudio } = req.body || {};
     if (consentAcknowledged !== true) {
       return res.status(400).json({ error: 'Confirm that everyone in the meeting knows it is being recorded.' });
     }
@@ -71,6 +71,7 @@ router.post('/', authenticate, async (req, res) => {
       userId: req.user.id, orgId, title, attendees, mode, mimeType,
       botSessionId: typeof botSessionId === 'string' && botSessionId ? botSessionId : null,
       separate: separate === true,
+      splitAudio: splitAudio === true,
     });
     res.status(201).json({ success: true, ...result });
   } catch (err) {
@@ -86,11 +87,22 @@ router.put('/:id/pieces/:seq', authenticate, rawAudio, async (req, res) => {
       meetingId: req.params.id,
       seq: Number(req.params.seq),
       durationMs: Number(req.query.durationMs),
+      track: req.query.track,
       buffer: Buffer.isBuffer(req.body) ? req.body : null,
     });
     res.status(204).end();
   } catch (err) {
     sendError(res, err, 'piece');
+  }
+});
+
+router.get('/:id/recovery', authenticate, async (req, res) => {
+  try {
+    await meetingNotes.assertMeetingAccess(req.user?.id, req.params.id);
+    res.set('Cache-Control', 'no-store');
+    res.json(await recorder.recordingRecovery(req.params.id));
+  } catch (err) {
+    sendError(res, err, 'recovery');
   }
 });
 
@@ -133,7 +145,7 @@ router.get('/:id/playback', authenticate, async (req, res) => {
     const orgId = await meetingNotes.assertMeetingAccess(req.user?.id, req.params.id);
     // Signed links expire; a cached copy would hand out dead ones.
     res.set('Cache-Control', 'no-store');
-    res.json({ success: true, ...(await recorder.getPlayback({ orgId, meetingId: req.params.id })) });
+    res.json({ success: true, ...(await recorder.getPlayback({ orgId, meetingId: req.params.id, track: req.query.track })) });
   } catch (err) {
     sendError(res, err, 'playback');
   }

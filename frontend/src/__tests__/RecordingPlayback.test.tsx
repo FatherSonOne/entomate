@@ -70,6 +70,35 @@ describe('playback service', () => {
 })
 
 describe('RecordingPlayer', () => {
+  test('defaults to combined, switches to either source at the same playhead, and can switch back', async () => {
+    api.playback.mockImplementation((_id, track) => Promise.resolve({
+      url: `https://signed.test/${track ?? 'combined'}`, durationMs: track === 'tab' ? 30_000 : 60_000,
+    }))
+    const pause = vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {})
+    try {
+      render(<RecordingPlayer meetingId={MEETING} durationMs={60_000} audioTracks={{
+        mic: { pieces: 2, durationMs: 60_000 }, tab: { pieces: 1, durationMs: 30_000 },
+      }} />)
+      const selector = screen.getByRole('combobox', { name: 'Audio source' })
+      expect(selector).toHaveValue('')
+      expect(api.playback).not.toHaveBeenCalled()
+      fireEvent.change(screen.getByRole('slider', { name: 'Playback position' }), { target: { value: '12.25' } })
+      for (const [index, track] of ['', 'mic', 'tab', ''].entries()) {
+        if (index > 0) fireEvent.change(selector, { target: { value: track } })
+        const audio = await screen.findByTestId('recording-player') as HTMLAudioElement
+        expect(audio.getAttribute('src')).toBe(`https://signed.test/${track || 'combined'}`)
+        Object.defineProperty(audio, 'duration', { configurable: true, value: track === 'tab' ? 30 : 60 })
+        fireEvent.loadedMetadata(audio)
+        expect(audio.currentTime).toBe(12.25)
+      }
+      expect(api.playback.mock.calls).toEqual([[MEETING], [MEETING, 'mic'], [MEETING, 'tab'], [MEETING]])
+      expect(screen.getByRole('option', { name: 'Tab audio · through 0:30' })).toBeInTheDocument()
+    } finally {
+      pause.mockRestore()
+    }
+  })
+
+
   test('downloads nothing until asked, then seeks with the Slate slider without starting playback', async () => {
     const onTime = vi.fn()
     render(<RecordingPlayer meetingId={MEETING} durationMs={754_000} onTime={onTime} />)

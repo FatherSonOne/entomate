@@ -743,6 +743,7 @@ export default function MeetingDetail() {
             meetingId={meeting.id}
             audioUrl={uploadedAudioUrl}
             durationMs={meeting.recording_job?.durationMs || lengthMs}
+            audioTracks={keptRecording && browserRecording ? recordingJob.audioTracks : undefined}
             waveformPeaks={keptRecording ? toWaveformPeaks(meeting.recording_job?.waveformPeaks) : null}
             waveformReplacement={rebuildingTranscript
               ? <DebriefLoader source={recordingRebuildSource(recordingJob, meeting.title, meeting.attendees)} />

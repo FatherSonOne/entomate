@@ -350,7 +350,7 @@ export default function Layout() {
         label="New meeting" className="bs-tokens bs-drawer-wide meeting-recorder-drawer" layer="top">
         <div className="bs-skin meeting-recorder-body">
           <Suspense fallback={<p role="status"><Signal tone="off">Loading recorder</Signal></p>}>
-            <MeetingRecorder audioInputDeviceId={audioInputDeviceId} onRecorded={recorderRecorded}
+            <MeetingRecorder audioInputDeviceId={audioInputDeviceId} recoveryUserId={user?.id} onRecorded={recorderRecorded}
               onCaptureChange={setRecorderLocked} onOpenMeeting={closeRecorder} onPopOut={backgroundRecorder}
               onReset={() => setRecorderBackgrounded(false)}
               quickRecordRequest={quickRecordRequest} onQuickRecordConsumed={() => setQuickRecordRequest(0)} />

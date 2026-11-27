@@ -35,6 +35,7 @@ const log = require('../utils/log');
 
 const BUCKET = 'meeting-recordings';
 const MODES = ['mic', 'camera', 'tab'];
+const ISOLATED_TRACKS = ['mic', 'tab'];
 const PIECE_MAX_BYTES = 10 * 1024 * 1024;
 /** 1,000 pieces of 30 s is 8 h 20 min. */
 const MAX_PIECES = 1000;
@@ -64,14 +65,16 @@ function recordingFolder(orgId, meetingId) {
 }
 
 /** `{org}/{meeting}/{seq:06}-{durationMs}.{ext}`: sorts by name, and carries its own length. */
-function piecePath(orgId, meetingId, { seq, durationMs, mimeType }) {
+function piecePath(orgId, meetingId, { seq, durationMs, mimeType, track = 'mix' }) {
   const ext = EXT[baseMime(mimeType)] || 'webm';
-  return `${recordingFolder(orgId, meetingId)}/${String(seq).padStart(6, '0')}-${Math.max(0, Math.round(durationMs))}.${ext}`;
+  const prefix = track === 'mix' ? '' : `${track}-`;
+  return `${recordingFolder(orgId, meetingId)}/${prefix}${String(seq).padStart(6, '0')}-${Math.max(0, Math.round(durationMs))}.${ext}`;
 }
 
 /** The seekable copy made for playback; `listPieces` skips it (its name has no number). */
-function playbackPath(orgId, meetingId, mimeType) {
-  return `${recordingFolder(orgId, meetingId)}/playback.${EXT[baseMime(mimeType)] || 'webm'}`;
+function playbackPath(orgId, meetingId, mimeType, track = 'mix') {
+  const prefix = track === 'mix' ? '' : `${track}-`;
+  return `${recordingFolder(orgId, meetingId)}/${prefix}playback.${EXT[baseMime(mimeType)] || 'webm'}`;
 }
 
 const PIECE_NAME = /^(\d{6})-(\d+)\.[a-z0-9]+$/;
@@ -106,13 +109,18 @@ async function listFolder(orgId, meetingId) {
   return files;
 }
 
-async function listPieces(orgId, meetingId) {
+function piecesForTrack(files, track = 'mix') {
   const pieces = [];
-  for (const f of await listFolder(orgId, meetingId)) {
-    const parsed = parsePieceName(f.name);
+  for (const f of files) {
+    const name = track === 'mix' ? f.name : f.name.startsWith(`${track}-`) ? f.name.slice(track.length + 1) : '';
+    const parsed = parsePieceName(name);
     if (parsed) pieces.push({ ...parsed, path: f.path, createdAt: f.createdAt });
   }
   return pieces.sort((a, b) => a.seq - b.seq);
+}
+
+async function listPieces(orgId, meetingId) {
+  return piecesForTrack(await listFolder(orgId, meetingId));
 }
 
 async function* recordingPieceBytes(pieces) {
@@ -147,8 +155,8 @@ async function purgeRecordingAudio(orgId, meetingId) {
  * Save the seekable copy for playback. Returns its path, or null when it could not be made
  * (no ffmpeg, a damaged file); playback then joins the pieces, so this never fails the job.
  */
-async function savePlaybackFile(meeting, audio, mimeType) {
-  const path = playbackPath(meeting.org_id, meeting.id, mimeType);
+async function savePlaybackFile(meeting, audio, mimeType, track = 'mix') {
+  const path = playbackPath(meeting.org_id, meeting.id, mimeType, track);
   try {
     const file = await playbackFile.makeSeekable(audio, EXT[baseMime(mimeType)] || 'webm');
     const { error } = await supabase.storage
@@ -157,7 +165,7 @@ async function savePlaybackFile(meeting, audio, mimeType) {
     if (error) throw error;
     return path;
   } catch (err) {
-    log.warn('Recording: no seekable playback copy, the pieces will be joined instead', { meetingId: meeting.id, error: err.message });
+    log.warn('Recording: no seekable playback copy, the pieces will be joined instead', { meetingId: meeting.id, track, error: err.message });
     return null;
   }
 }
@@ -320,7 +328,7 @@ async function botCouldNotDeliver({ sessionId, meetingId = null }) {
  * Make the meeting a recording will fill.
  * @returns {Promise<{meetingId: string, recordingJob: object}>}
  */
-async function startRecording({ userId, orgId, title, attendees, mode, mimeType, botSessionId = null, separate = false, now = Date.now() }) {
+async function startRecording({ userId, orgId, title, attendees, mode, mimeType, botSessionId = null, separate = false, splitAudio = false, now = Date.now() }) {
   if (!MODES.includes(mode)) throw new RecorderError(400, 'Choose microphone, camera or browser tab.');
   const mime = baseMime(mimeType);
   if (!mime) throw new RecorderError(400, 'This browser records in a format Entomate cannot transcribe.');
@@ -343,6 +351,7 @@ async function startRecording({ userId, orgId, title, attendees, mode, mimeType,
   const name = String(title || '').trim().slice(0, MAX_TITLE) || (bot?.title ? String(bot.title).slice(0, MAX_TITLE) : '');
   const recordingJob = { status: 'recording', mode, mimeType: mime, startedAt: at, startedBy: userId, updatedAt: at };
   if (bot) recordingJob.botSessionId = bot.sessionId;
+  if (splitAudio && mode === 'tab' && !bot) recordingJob.splitAudio = true;
   const { data, error } = await supabase
     .from('meetings')
     .insert({
@@ -364,7 +373,7 @@ async function startRecording({ userId, orgId, title, attendees, mode, mimeType,
 }
 
 /** Save one piece. A piece already saved (a retry after a lost response) is success. */
-async function savePiece({ orgId, meetingId, seq, durationMs, buffer }) {
+async function savePiece({ orgId, meetingId, seq, durationMs, buffer, track = 'mix' }) {
   if (!Number.isInteger(seq) || seq < 0 || seq >= MAX_PIECES) throw new RecorderError(400, 'Invalid piece number.');
   if (!Number.isInteger(durationMs) || durationMs < 0 || durationMs > MAX_PIECE_MS) throw new RecorderError(400, 'Invalid piece length.');
   if (!Buffer.isBuffer(buffer) || buffer.length === 0) throw new RecorderError(400, 'The piece is empty.');
@@ -372,11 +381,14 @@ async function savePiece({ orgId, meetingId, seq, durationMs, buffer }) {
 
   const meeting = await loadMeeting(meetingId);
   const job = meeting?.recording_job;
-  if (!job || job.status !== 'recording') throw new RecorderError(409, 'This meeting is not recording.');
+  if (!job || meeting.org_id !== orgId || job.status !== 'recording') throw new RecorderError(409, 'This meeting is not recording.');
+  if (track !== 'mix' && (!job.splitAudio || !ISOLATED_TRACKS.includes(track))) {
+    throw new RecorderError(400, 'This recording does not have that audio track.');
+  }
 
   const { error } = await supabase.storage
     .from(BUCKET)
-    .upload(piecePath(orgId, meetingId, { seq, durationMs, mimeType: job.mimeType }), buffer, {
+    .upload(piecePath(orgId, meetingId, { seq, durationMs, mimeType: job.mimeType, track }), buffer, {
       contentType: job.mimeType,
       upsert: false,
     });
@@ -393,6 +405,39 @@ function contiguousCount(saved) {
   return n;
 }
 
+function trackCoverage(files, mixed) {
+  const tracks = {};
+  const durations = mixed && new Map(mixed.map(piece => [piece.seq, piece.durationMs]));
+  for (const track of ISOLATED_TRACKS) {
+    let pieces = 0;
+    let durationMs = 0;
+    for (const piece of piecesForTrack(files, track)) {
+      if (piece.seq < pieces) continue;
+      if (piece.seq !== pieces || (durations && durations.get(piece.seq) !== piece.durationMs)) break;
+      pieces += 1;
+      durationMs += piece.durationMs;
+    }
+    if (pieces > 0) tracks[track] = { pieces, durationMs };
+  }
+  return tracks;
+}
+
+async function recordingRecovery(meetingId) {
+  const meeting = await loadMeeting(meetingId);
+  const job = meeting?.recording_job;
+  if (!job) throw new RecorderError(409, 'This meeting was not recorded here.');
+  if (job.status !== 'recording') return { status: job.status };
+  const files = await listFolder(meeting.org_id, meetingId);
+  const saved = piecesForTrack(files);
+  const pieces = contiguousCount(saved);
+  return {
+    status: job.status,
+    pieces,
+    durationMs: saved.filter(piece => piece.seq < pieces).reduce((total, piece) => total + piece.durationMs, 0),
+    ...(job.splitAudio ? { audioTracks: trackCoverage(files) } : {}),
+  };
+}
+
 /**
  * Close the recording and start transcribing it in the background.
  * @param {{ pieces?: number, salvage?: boolean }} opts  `pieces`: how many the browser
@@ -405,7 +450,8 @@ async function finishRecording({ meetingId, pieces, salvage = false, now = Date.
   if (!job) throw new RecorderError(409, 'This meeting was not recorded here.');
   if (job.status !== 'recording') return { status: job.status };
 
-  const saved = await listPieces(meeting.org_id, meetingId);
+  const files = await listFolder(meeting.org_id, meetingId);
+  const saved = piecesForTrack(files);
   if (salvage) {
     const newest = Math.max(0, ...saved.map((p) => Date.parse(p.createdAt || '') || 0));
     if (newest && now - newest < SALVAGE_QUIET_MS) {
@@ -421,7 +467,8 @@ async function finishRecording({ meetingId, pieces, salvage = false, now = Date.
     throw new RecorderError(409, 'Some of the recording is still uploading.', { missing: missing.slice(0, 50) });
   }
 
-  const durationMs = saved.filter((p) => p.seq < pieces).reduce((sum, p) => sum + p.durationMs, 0);
+  const mixed = saved.filter(piece => piece.seq < pieces);
+  const durationMs = mixed.reduce((sum, piece) => sum + piece.durationMs, 0);
   const finishedAt = new Date(now).toISOString();
   // Recorded beside the bot: the bot writes the minutes, and this audio waits as a
   // backup, transcribed only if the bot cannot deliver (botCouldNotDeliver).
@@ -432,7 +479,10 @@ async function finishRecording({ meetingId, pieces, salvage = false, now = Date.
       return { status: handOff };
     }
   }
-  await setJob(meeting, { status: 'transcribing', source: 'browser', pieces, durationMs, finishedAt, error: null, stage: null, stageAt: null });
+  await setJob(meeting, {
+    status: 'transcribing', source: 'browser', pieces, durationMs, finishedAt, error: null, stage: null, stageAt: null,
+    ...(job.splitAudio ? { audioTracks: trackCoverage(files, mixed) } : {}),
+  });
   runInBackground(meetingId);
   return { status: 'transcribing' };
 }
@@ -615,7 +665,8 @@ async function transcribeMeeting(meetingId) {
       throw err;
     }
 
-    const pieces = (await listPieces(meeting.org_id, meetingId)).filter((p) => p.seq < (job.pieces || MAX_PIECES));
+    const files = await listFolder(meeting.org_id, meetingId);
+    const pieces = piecesForTrack(files).filter(piece => piece.seq < (job.pieces || MAX_PIECES));
     if (!pieces.length) {
       const err = new Error('No audio pieces found');
       err.userMessage = 'No audio was saved for this recording.';
@@ -651,6 +702,19 @@ async function transcribeMeeting(meetingId) {
     await markStage(meeting, 'saving');
     const savedActions = await meetingFinish.saveMinutesActions(meeting, minutes);
     const waveformPeaks = await waveform;
+    const audioTracks = { ...job.audioTracks };
+    for (const track of ISOLATED_TRACKS) {
+      const coverage = audioTracks[track];
+      if (!coverage?.durationMs) continue;
+      const sourcePieces = piecesForTrack(files, track).filter(piece => piece.seq < coverage.pieces);
+      if (sourcePieces.length !== coverage.pieces || sourcePieces.some((piece, index) => piece.seq !== index)) continue;
+      try {
+        const file = await savePlaybackFile(meeting, await downloadRecordingPieces(sourcePieces), job.mimeType, track);
+        if (file) audioTracks[track] = { ...coverage, playbackFile: file };
+      } catch (err) {
+        log.warn('Recording: separate audio could not be indexed', { meetingId, track, error: err.message });
+      }
+    }
     const now = new Date().toISOString();
     const durationMs = job.durationMs || 0;
     const startMs = Date.parse(meeting.start_time || job.startedAt || now);
@@ -664,6 +728,7 @@ async function transcribeMeeting(meetingId) {
         ...meeting.recording_job, source: 'browser', status: 'done', stage: null, stageAt: null, error: null,
         summaryError: minutes.summaryError, speakerSuggestions: minutes.speakerSuggestions, audioKept: true,
         playbackFile: playback, waveformPeaks, speakers: speakers.length, lines: segments.length, updatedAt: now,
+        ...(job.audioTracks ? { audioTracks } : {}),
       },
       updated_at: now,
     };
@@ -713,15 +778,24 @@ async function loadPlaybackMeeting(orgId, meetingId) {
   return meeting;
 }
 
-async function getPlayback({ orgId, meetingId }) {
+async function getPlayback({ orgId, meetingId, track = 'mix' }) {
   const meeting = await loadPlaybackMeeting(orgId, meetingId);
   const job = meeting.recording_job;
-  if (typeof job.playbackFile === 'string' && job.playbackFile.startsWith(`${recordingFolder(orgId, meetingId)}/`)) {
-    const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(job.playbackFile, PLAYBACK_FILE_TTL_S);
+  const coverage = track === 'mix' ? null : ISOLATED_TRACKS.includes(track) && job.audioTracks?.[track];
+  if (track !== 'mix' && (job.source !== 'browser' || !coverage?.pieces || !coverage.durationMs)) {
+    throw new RecorderError(404, 'This audio track is unavailable.');
+  }
+  const file = coverage ? coverage.playbackFile : job.playbackFile;
+  if (typeof file === 'string' && file.startsWith(`${recordingFolder(orgId, meetingId)}/`)) {
+    const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(file, PLAYBACK_FILE_TTL_S);
     if (!error && data?.signedUrl) {
-      return { mimeType: job.mimeType || 'audio/webm', durationMs: job.durationMs || 0, url: data.signedUrl };
+      return { mimeType: job.mimeType || 'audio/webm', durationMs: coverage?.durationMs ?? (job.durationMs || 0), url: data.signedUrl };
     }
     log.warn('Recording: playback copy could not be signed, using the pieces', { meetingId, error: error?.message });
+  }
+  if (coverage) {
+    const pieces = piecesForTrack(await listFolder(orgId, meetingId), track).filter(piece => piece.seq < coverage.pieces);
+    return signedPieces(pieces, job.mimeType, coverage.pieces);
   }
   // A bot meeting without a saved copy plays from Recall's own (fresh) link.
   if (job.source === 'bot' && job.botSessionId) {
@@ -730,7 +804,14 @@ async function getPlayback({ orgId, meetingId }) {
     throw new RecorderError(404, 'The bot recording is no longer available.');
   }
   const pieces = (await listPieces(orgId, meetingId)).filter((p) => p.seq < (job.pieces || MAX_PIECES));
+  return signedPieces(pieces, job.mimeType);
+}
+
+async function signedPieces(pieces, mimeType, expectedCount) {
   if (!pieces.length || pieces[0].seq !== 0) throw new RecorderError(404, 'There is no recording to play.');
+  if (expectedCount && (pieces.length !== expectedCount || pieces.some((piece, index) => piece.seq !== index))) {
+    throw new RecorderError(404, 'This audio track is incomplete.');
+  }
   const { data, error } = await supabase.storage
     .from(BUCKET)
     .createSignedUrls(pieces.map((p) => p.path), PLAYBACK_URL_TTL_S);
@@ -738,7 +819,7 @@ async function getPlayback({ orgId, meetingId }) {
   const urls = new Map((data || []).map((d) => [d.path, d.signedUrl]));
   if (pieces.some((p) => !urls.get(p.path))) throw new Error('A playback link could not be signed');
   return {
-    mimeType: job.mimeType || 'audio/webm',
+    mimeType: mimeType || 'audio/webm',
     durationMs: pieces.reduce((sum, p) => sum + p.durationMs, 0),
     pieces: pieces.map((p) => ({ seq: p.seq, durationMs: p.durationMs, url: urls.get(p.path) })),
   };
@@ -816,6 +897,7 @@ module.exports = {
   botsInCall,
   botCouldNotDeliver,
   savePiece,
+  recordingRecovery,
   finishRecording,
   retryTranscription,
   rebuildTranscript,

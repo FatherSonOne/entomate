@@ -2,7 +2,8 @@ import React, { forwardRef, useEffect, useId, useImperativeHandle, useMemo, useR
 import { ChevronDown, Loader2, Pause, Play, RotateCcw, RotateCw, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
 import { Display, Key, Tape, Toggle, type TapeMarker } from '../bench'
 import { formatClock, type TranscriptSegment } from '../../services/meetingTranscriptService'
-import { loadRecordingAudio, loadRecordingWaveformPeaks, removeRecordingAudio, type RecordingAudio } from '../../services/meetingRecorderService'
+import { loadRecordingAudio, loadRecordingWaveformPeaks, removeRecordingAudio, type AudioTracks, type RecordingAudio } from '../../services/meetingRecorderService'
+import { ISOLATED_AUDIO_TRACKS, type IsolatedAudioTrack } from '../../services/recordingAudioTracks'
 import { readRecordingWaveform, waveformFromPeaks } from '../../services/recordingWaveform'
 import { recordingSpeakers } from './recordingSpeakers'
 import './RecordingPlayer.css'
@@ -18,6 +19,7 @@ export interface RecordingPlayerProps {
   meetingId: string
   /** Direct audio from a legacy meeting upload. Kept recordings use the playback service. */
   audioUrl?: string
+  audioTracks?: AudioTracks
   durationMs?: number | null
   waveformPeaks?: ReadonlyArray<number> | null
   /** Progress shown in place of the waveform while the transcript is rebuilt. */
@@ -57,11 +59,14 @@ function rulerMarks(durationMs: number): number[] {
   return [...marks, durationMs]
 }
 
+const TRACK_LABELS = { mic: 'Microphone', tab: 'Tab audio' }
+
 export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayerProps>(function RecordingPlayer(
-  { meetingId, audioUrl, durationMs, waveformPeaks, waveformReplacement, transcriptSegments, decisions = [], actions = [], onMoment, onStepMoment, onTime, onAudioRemoved },
+  { meetingId, audioUrl, audioTracks, durationMs, waveformPeaks, waveformReplacement, transcriptSegments, decisions = [], actions = [], onMoment, onStepMoment, onTime, onAudioRemoved },
   ref,
 ) {
   const [source, setSource] = useState<Source | null>(null)
+  const [track, setTrack] = useState<IsolatedAudioTrack | undefined>()
   const [loading, setLoading] = useState(false)
   const [progress, setProgress] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -88,7 +93,8 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
   const lastSecond = useRef<number | null>(null)
   const clipId = useId()
   const speakerGradientId = `${clipId}-speakers`
-  const effectiveDuration = mediaDuration || finiteDuration(source?.durationMs) || finiteDuration(durationMs)
+  const trackDuration = track ? audioTracks?.[track]?.durationMs : durationMs
+  const effectiveDuration = mediaDuration || finiteDuration(source?.durationMs) || finiteDuration(trackDuration)
   const speakers = useMemo(() => recordingSpeakers(transcriptSegments ?? [], effectiveDuration), [transcriptSegments, effectiveDuration])
   const speakerColorsVisible = showSpeakerColors && speakers.turns.length > 0
   const currentSpeaker = speakerColorsVisible
@@ -98,7 +104,8 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
   const elapsed = formatClock(position)
   const total = effectiveDuration ? formatClock(effectiveDuration) : '–:––'
   const savedWaveform = useMemo(() => waveformPeaks?.length ? waveformFromPeaks(waveformPeaks) : null, [waveformPeaks])
-  const waveform = audioRemoved ? null : savedWaveform ?? loadedWaveform
+  const waveform = audioRemoved || track ? null : savedWaveform ?? loadedWaveform
+  const availableTracks = ISOLATED_AUDIO_TRACKS.filter(name => (audioTracks?.[name]?.durationMs ?? 0) > 0)
 
   useEffect(() => () => request.current?.abort(), [])
   useEffect(() => {
@@ -107,6 +114,7 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
   }, [source])
 
   useEffect(() => {
+    if (track) { setWaveStatus('idle'); return }
     if (savedWaveform !== null || audioRemoved) return
     const controller = new AbortController()
     setLoadedWaveform(null)
@@ -124,10 +132,10 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
         if (!controller.signal.aborted) setWaveStatus('unavailable')
       })
     return () => controller.abort()
-  }, [audioRemoved, audioUrl, durationMs, meetingId, savedWaveform])
+  }, [audioRemoved, audioUrl, durationMs, meetingId, savedWaveform, track])
 
-  const load = async (refresh = false): Promise<void> => {
-    if (request.current || (source && !refresh)) return
+  const load = async (playbackTrack: IsolatedAudioTrack | undefined, refresh = false): Promise<void> => {
+    if (request.current || (source && playbackTrack === track && !refresh)) return
     const controller = new AbortController()
     request.current = controller
     setLoading(true)
@@ -138,7 +146,7 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
         ? { url: audioUrl, durationMs: finiteDuration(durationMs), blob: undefined }
         : await loadRecordingAudio(meetingId, fetch, fraction => {
           if (!controller.signal.aborted) setProgress(fraction)
-        }, controller.signal)
+        }, controller.signal, playbackTrack)
       if (controller.signal.aborted) return
       const url = recording.url ?? URL.createObjectURL(recording.blob!)
       setSource({ ...recording, url })
@@ -154,6 +162,27 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
         setLoading(false)
       }
     }
+  }
+
+  const selectTrack = (nextTrack: IsolatedAudioTrack | undefined): void => {
+    if (nextTrack === track) return
+    const audio = audioRef.current
+    const shouldPlay = audio ? !audio.paused : Boolean(pending.current?.play)
+    const atMs = audio && mediaReady.current ? Math.round(audio.currentTime * 1000) : position
+    const endMs = nextTrack ? audioTracks?.[nextTrack]?.durationMs : durationMs
+    pending.current = { atMs: Math.min(atMs, endMs || Infinity), play: shouldPlay, endMs: pending.current?.endMs ?? previewEnd.current }
+    audio?.pause()
+    request.current?.abort()
+    request.current = null
+    mediaReady.current = false
+    measuring.current = false
+    renewed.current = false
+    setPlaying(false)
+    setMediaDuration(0)
+    setPosition(pending.current.atMs)
+    setSource(null)
+    setTrack(nextTrack)
+    void load(nextTrack, true)
   }
 
   const updatePosition = (audio: HTMLAudioElement): void => {
@@ -203,7 +232,7 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
     }
     pending.current = requested
     setPosition(atMs)
-    void load()
+    void load(track)
   }
 
   useImperativeHandle(ref, () => ({
@@ -250,7 +279,7 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
     if (source && !audioUrl && !source.blob && !renewed.current) {
       renewed.current = true
       pending.current ??= { atMs: Math.round(audio.currentTime * 1000), play: playing, endMs: previewEnd.current }
-      void load(true)
+      void load(track, true)
       return
     }
     renewed.current = false
@@ -304,6 +333,23 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
 
   return (
     <section className="bs-recording bs-tokens" aria-label="Meeting recording">
+      {!audioRemoved && availableTracks.length > 0 && (
+        <label className="flex flex-wrap items-center gap-2 text-sm">
+          Audio source
+          <select className="bs-key" value={track ?? ''} onChange={event => {
+            const value = ISOLATED_AUDIO_TRACKS.find(name => name === event.currentTarget.value)
+            selectTrack(value)
+          }}>
+            <option value="">Combined</option>
+            {availableTracks.map(name => {
+              const coverage = audioTracks?.[name]?.durationMs ?? 0
+              return <option key={name} value={name}>{TRACK_LABELS[name]}
+                {coverage < finiteDuration(durationMs) ? ` · through ${formatClock(coverage)}` : ''}
+              </option>
+            })}
+          </select>
+        </label>
+      )}
       {source && (
         <audio
           ref={audioRef}
