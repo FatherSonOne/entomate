@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import ErrorBoundary from './components/ErrorBoundary'
+import AccountLogoSync from './components/AccountLogoSync'
 import { AuthProvider } from './contexts/AuthContext'
 import { OrgProvider } from './contexts/OrgContext'
 import { LoadingProvider } from './contexts/LoadingContext'
@@ -55,6 +56,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <ErrorBoundary scope="app">
     <LoadingProvider>
     <AuthProvider>
+      <AccountLogoSync />
       <OrgProvider>
       <ThemeProvider>
         <ToastProvider>

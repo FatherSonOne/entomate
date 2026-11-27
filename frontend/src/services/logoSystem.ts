@@ -1,7 +1,6 @@
 /**
  * Logo systems, each paired with the shared vector wordmark and its own
- * loading motion. The pick is per browser, like the
- * theme and palette, and is read by the shell, Logo.jsx and the loading screen.
+ * loading motion. The shell, Logo.jsx and the loading screen share one choice.
  *
  * The raster marks live in public/brand/:
  *   <id>-128|256|512|1024.webp  full symbol on a square canvas (the motion's viewBox)
@@ -125,19 +124,134 @@ export function logoAsset(id: string, size: LogoAssetSize): string {
   return `/brand/${logoId}-${size}.webp`
 }
 
-/* ── Store: one value per browser, shared by every reader ── */
-const listeners = new Set<() => void>()
+type SyncStatus = 'browser' | 'ready' | 'saving' | 'saved' | 'retry'
+type CachedChoice = { id: string; source: 'legacy' | 'pending' | 'account' }
+type AccountSync = { select: (id: string) => void; refresh: () => Promise<void> }
 
-function read(): string {
+const listeners = new Set<() => void>()
+let account: AccountSync | undefined
+let status: SyncStatus = 'browser'
+
+function readBrowserChoice(): string | undefined {
   try {
-    const saved = typeof localStorage === 'undefined' ? null : localStorage.getItem(LOGO_KEY)
-    return isLogoId(saved) ? saved : DEFAULT_LOGO
+    const saved = localStorage.getItem(LOGO_KEY)
+    return isLogoId(saved) ? saved : undefined
   } catch {
-    return DEFAULT_LOGO
+    return undefined
   }
 }
 
-let current = read()
+function readAccountChoice(key: string): CachedChoice | undefined {
+  try {
+    const saved = JSON.parse(localStorage.getItem(key) ?? 'null')
+    if (isLogoId(saved?.id) && ['legacy', 'pending', 'account'].includes(saved.source)) return saved
+  } catch { /* cache unavailable */ }
+  return undefined
+}
+
+let current = readBrowserChoice() ?? DEFAULT_LOGO
+
+function publish(id: string, nextStatus: SyncStatus): void {
+  if (current === id && status === nextStatus) return
+  current = id
+  status = nextStatus
+  listeners.forEach((fn) => fn())
+}
+
+/** Connect one authenticated account and keep writes bound to its session. */
+export function connectLogoAccount(
+  userId: string,
+  sessionLogo: unknown,
+  request: (logoId?: string) => Promise<unknown>,
+): () => void {
+  const key = `${LOGO_KEY}:${userId}`
+  let legacy = readBrowserChoice()
+  let choice: CachedChoice | undefined = readAccountChoice(key)
+    ?? (isLogoId(sessionLogo) ? { id: sessionLogo, source: 'account' } : undefined)
+    ?? (legacy ? { id: legacy, source: 'legacy' } : undefined)
+  let reading = false
+  let writing = false
+  const active = (): boolean => account === connection
+
+  const apply = (next: CachedChoice | undefined, nextStatus: SyncStatus): void => {
+    choice = next
+    try {
+      if (next) localStorage.setItem(key, JSON.stringify(next))
+      else localStorage.removeItem(key)
+      if (legacy) {
+        localStorage.removeItem(LOGO_KEY)
+        legacy = undefined
+      }
+    } catch { /* the active session can still use the choice */ }
+    publish(next?.id ?? DEFAULT_LOGO, nextStatus)
+  }
+
+  async function save(): Promise<void> {
+    if (!active() || writing) return
+    writing = true
+    try {
+      while (active() && choice?.source === 'pending') {
+        const pending = choice
+        publish(pending.id, 'saving')
+        try {
+          const saved = await request(pending.id)
+          if (saved !== pending.id) throw new Error('Account did not confirm the logo choice')
+          if (active() && choice === pending) apply({ id: pending.id, source: 'account' }, 'saved')
+        } catch {
+          if (active() && choice === pending) {
+            publish(pending.id, 'retry')
+            return
+          }
+        }
+      }
+    } finally {
+      writing = false
+    }
+  }
+
+  async function refresh(): Promise<void> {
+    if (!active() || writing) return
+    if (choice?.source === 'pending') return save()
+    if (reading) return
+
+    const before = choice
+    reading = true
+    try {
+      const saved = await request()
+      if (!active() || choice !== before) return
+      if (isLogoId(saved)) apply({ id: saved, source: 'account' }, 'saved')
+      else if (saved == null && before?.source === 'legacy') connection.select(before.id)
+      else apply(undefined, 'ready')
+    } catch {
+      if (active() && choice === before) publish(current, 'retry')
+    } finally {
+      reading = false
+    }
+  }
+
+  const connection: AccountSync = {
+    select(id) {
+      apply({ id, source: 'pending' }, 'saving')
+      void save()
+    },
+    refresh,
+  }
+  account = connection
+  apply(choice, choice?.source === 'pending' ? 'saving' : 'ready')
+  const onVisible = (): void => { if (!document.hidden) void refresh() }
+  const onOnline = (): void => { void refresh() }
+  document.addEventListener('visibilitychange', onVisible)
+  window.addEventListener('online', onOnline)
+  void refresh()
+
+  return () => {
+    document.removeEventListener('visibilitychange', onVisible)
+    window.removeEventListener('online', onOnline)
+    if (!active()) return
+    account = undefined
+    publish(readBrowserChoice() ?? DEFAULT_LOGO, 'browser')
+  }
+}
 
 export function getLogo(): string {
   return current
@@ -145,17 +259,15 @@ export function getLogo(): string {
 
 export function setLogo(id: string): void {
   if (!isLogoId(id) || id === current) return
-  current = id
+  if (account) return account.select(id)
   try { localStorage.setItem(LOGO_KEY, id) } catch { /* storage blocked: keep it for this session */ }
-  listeners.forEach((fn) => fn())
+  publish(id, 'browser')
 }
 
 function subscribe(fn: () => void): () => void {
   listeners.add(fn)
   const onStorage = (e: StorageEvent): void => {
-    if (e.key !== LOGO_KEY) return
-    current = read()
-    fn()
+    if (e.key === LOGO_KEY && !account) publish(readBrowserChoice() ?? DEFAULT_LOGO, 'browser')
   }
   if (typeof window !== 'undefined') window.addEventListener('storage', onStorage)
   return () => {
@@ -164,13 +276,23 @@ function subscribe(fn: () => void): () => void {
   }
 }
 
-/** The logo system in use in this browser; re-renders when it changes (also across tabs). */
+/** The active mark and loading animation. */
 export function useLogoSystem(): LogoSystem {
   const id = useSyncExternalStore(subscribe, getLogo, () => DEFAULT_LOGO)
   return logoById(id)
 }
 
+export function useLogoSyncStatus(): SyncStatus {
+  return useSyncExternalStore(subscribe, () => status, () => 'browser' as SyncStatus)
+}
+
+export function retryLogoSync(): void {
+  void account?.refresh()
+}
+
 /** Test hook: re-read storage. */
 export function __resetLogoForTests(): void {
-  current = read()
+  account = undefined
+  status = 'browser'
+  current = readBrowserChoice() ?? DEFAULT_LOGO
 }

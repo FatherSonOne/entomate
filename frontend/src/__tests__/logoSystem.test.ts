@@ -1,13 +1,88 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   DEFAULT_LOGO, LOGO_FAMILIES, LOGO_KEY, LOGO_SYSTEMS, __resetLogoForTests, getLogo, isLogoId,
-  logoAsset, logoById, logosInFamily, setLogo,
+  connectLogoAccount, logoAsset, logoById, logosInFamily, retryLogoSync, setLogo,
 } from '../services/logoSystem'
 import { LOGO_MOTIONS } from '../components/logoMotion'
 
 afterEach(() => {
   localStorage.removeItem(LOGO_KEY)
   __resetLogoForTests()
+})
+
+describe('account logo sync', () => {
+  let disconnect: (() => void) | undefined
+
+  afterEach(() => {
+    disconnect?.()
+    localStorage.removeItem(`${LOGO_KEY}:account-a`)
+    localStorage.removeItem(`${LOGO_KEY}:account-b`)
+  })
+
+  it('uses the account choice over a legacy browser choice', async () => {
+    localStorage.setItem(LOGO_KEY, 'aperture')
+    const request = vi.fn(async () => 'signal-cascade')
+    disconnect = connectLogoAccount('account-a', undefined, request)
+    expect(getLogo()).toBe('aperture')
+    await vi.waitFor(() => expect(getLogo()).toBe('signal-cascade'))
+    expect(request.mock.calls).toEqual([[]])
+    expect(localStorage.getItem(LOGO_KEY)).toBeNull()
+    disconnect()
+    expect(getLogo()).toBe(DEFAULT_LOGO)
+    disconnect = connectLogoAccount('account-b', undefined, async () => undefined)
+    expect(getLogo()).toBe(DEFAULT_LOGO)
+  })
+
+  it('moves a legacy choice to the account once it confirms there is no preference', async () => {
+    localStorage.setItem(LOGO_KEY, 'flow-field')
+    const request = vi.fn(async (id?: string) => id)
+    disconnect = connectLogoAccount('account-a', undefined, request)
+    await vi.waitFor(() => expect(request.mock.calls).toEqual([[], ['flow-field']]))
+    expect(logoById(getLogo()).name).toBe('Rift')
+  })
+
+  it('keeps the latest pick when an older read or save finishes late', async () => {
+    let finishRead!: (id: string) => void
+    let finishFirstWrite!: (id: string) => void
+    const request = vi.fn((id?: string) => {
+      if (id === undefined) return new Promise<string>((resolve) => { finishRead = resolve })
+      if (id === 'aperture') return new Promise<string>((resolve) => { finishFirstWrite = resolve })
+      return Promise.resolve(id)
+    })
+    disconnect = connectLogoAccount('account-a', 'relay', request)
+    expect(getLogo()).toBe('relay')
+    setLogo('aperture')
+    setLogo('bloom')
+    expect(getLogo()).toBe('bloom')
+    expect(request.mock.calls).toEqual([[], ['aperture']])
+    finishRead('orbit')
+    finishFirstWrite('aperture')
+    await vi.waitFor(() => expect(request.mock.calls).toEqual([[], ['aperture'], ['bloom']]))
+    expect(getLogo()).toBe('bloom')
+  })
+
+  it('keeps a failed save scoped to its account and retries the same choice', async () => {
+    const offline = vi.fn(async (id?: string) => {
+      if (id) throw new Error('Offline')
+      return 'relay'
+    })
+    disconnect = connectLogoAccount('account-a', 'relay', offline)
+    setLogo('aperture')
+    await vi.waitFor(() => expect(offline).toHaveBeenCalledWith('aperture'))
+    disconnect()
+    disconnect = connectLogoAccount('account-b', 'bloom', async () => 'bloom')
+    expect(getLogo()).toBe('bloom')
+    disconnect()
+
+    const request = vi.fn<(id?: string) => Promise<unknown>>()
+      .mockRejectedValueOnce(new Error('Offline'))
+      .mockResolvedValue('aperture')
+    disconnect = connectLogoAccount('account-a', 'relay', request)
+    expect(getLogo()).toBe('aperture')
+    await vi.waitFor(() => expect(request).toHaveBeenCalledTimes(1))
+    retryLogoSync()
+    await vi.waitFor(() => expect(request.mock.calls).toEqual([['aperture'], ['aperture']]))
+  })
 })
 
 describe('logo systems', () => {
