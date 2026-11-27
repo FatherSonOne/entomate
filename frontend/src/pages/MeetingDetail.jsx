@@ -859,12 +859,25 @@ export default function MeetingDetail() {
               <div className="bs-meeting-playback">
                 <section aria-label="Meeting speakers">
                   <Section title="Speakers" level={3} />
-                  <div className="bs-meeting-voices">{voices.map(voice => (
-                    <Key key={voice.name} aria-pressed={currentLine?.speaker === voice.name} onClick={() => {
-                      const first = transcriptSegments.find(line => line.speaker === voice.name)
-                      if (first) playMoment(first.atMs)
-                    }}><span>{voice.name}</span><span className="bs-lbl">{voice.lines} {voice.lines === 1 ? 'line' : 'lines'}</span></Key>
-                  ))}</div>
+                  <div className="bs-meeting-voices">
+                    {voices.map(voice => {
+                      const lineCount = `${voice.lines} ${voice.lines === 1 ? 'line' : 'lines'}`
+                      return (
+                        <Key
+                          key={voice.name}
+                          aria-label={`${voice.name}, ${lineCount}`}
+                          aria-pressed={currentLine?.speaker === voice.name}
+                          onClick={() => {
+                            const first = transcriptSegments.find(line => line.speaker === voice.name)
+                            if (first) playMoment(first.atMs)
+                          }}
+                        >
+                          <span>{voice.name}</span>
+                          <span className="bs-lbl">{lineCount}</span>
+                        </Key>
+                      )
+                    })}
+                  </div>
                   {!voices.length && <p className="bs-mut">Speaker timestamps are unavailable for this meeting.</p>}
                   {currentLine && <p className="bs-meeting-caption"><b>{currentLine.speaker}</b> {currentLine.text}</p>}
                 </section>
