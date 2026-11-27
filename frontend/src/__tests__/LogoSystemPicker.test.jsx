@@ -1,8 +1,8 @@
 import React from 'react'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import LogoSystemPicker from '../components/settings/LogoSystemPicker'
-import { __resetLogoForTests, logoAsset, LOGO_KEY } from '../services/logoSystem'
+import { __resetLogoForTests, logoAsset, LOGO_KEY, LOGO_SYSTEMS } from '../services/logoSystem'
 
 beforeEach(() => {
   window.localStorage.removeItem(LOGO_KEY)
@@ -12,6 +12,7 @@ beforeEach(() => {
 })
 afterEach(() => {
   cleanup()
+  delete document.documentElement.dataset.motion
   window.localStorage.removeItem(LOGO_KEY)
   vi.unstubAllGlobals()
 })
@@ -61,5 +62,40 @@ describe('logo system picker', () => {
   it('nests no buttons inside the cards', () => {
     const { container } = render(<LogoSystemPicker />)
     expect(container.querySelector('.lp-card button')).toBeNull()
+  })
+
+  it('compares every still mark and live animation without changing the active logo', () => {
+    render(<LogoSystemPicker />)
+    fireEvent.click(screen.getByRole('button', { name: 'Preview all 18' }))
+    const gallery = screen.getByRole('region', { name: 'Logo and animation gallery' })
+    for (const logo of LOGO_SYSTEMS) {
+      const card = within(gallery).getByRole('heading', { name: logo.name }).closest('li')
+      expect(card.querySelector('img')).toHaveAttribute('src', logoAsset(logo.id, 256))
+      expect(card.querySelector('[data-loading-logo]')).toHaveAttribute('data-loading-logo', logo.id)
+    }
+
+    fireEvent.click(within(gallery).getByRole('button', { name: 'Pause Aperture loading animation' }))
+    expect(within(gallery).getByRole('button', { name: 'Play Aperture loading animation' })).toBeInTheDocument()
+    expect(within(gallery).getByRole('button', { name: 'Pause Bloom loading animation' })).toBeInTheDocument()
+    fireEvent.click(within(gallery).getByRole('button', { name: 'Pause all' }))
+    expect(within(gallery).getAllByRole('button', { name: /Play .* loading animation/ })).toHaveLength(18)
+    fireEvent.click(within(gallery).getByRole('button', { name: 'Play all' }))
+    expect(within(gallery).getAllByRole('button', { name: /Pause .* loading animation/ })).toHaveLength(18)
+    expect(window.localStorage.getItem(LOGO_KEY)).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close gallery' }))
+    expect(gallery).not.toBeInTheDocument()
+  })
+
+  it('starts still with reduced motion and plays a loop only after opt-in', () => {
+    document.documentElement.dataset.motion = 'reduce'
+    render(<LogoSystemPicker />)
+    fireEvent.click(screen.getByRole('button', { name: 'Preview all 18' }))
+    const gallery = screen.getByRole('region', { name: 'Logo and animation gallery' })
+    expect(within(gallery).getByRole('button', { name: 'Play all' })).toBeInTheDocument()
+    expect(within(gallery).getAllByRole('button', { name: /Play .* loading animation/ })).toHaveLength(18)
+    fireEvent.click(within(gallery).getByRole('button', { name: 'Play Relay loading animation' }))
+    expect(gallery.querySelector('[data-loading-logo="relay"] svg')).toHaveClass('motion-opt-in')
+    expect(within(gallery).getByRole('button', { name: 'Play Relay Orbits loading animation' })).toBeInTheDocument()
   })
 })

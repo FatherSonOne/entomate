@@ -71,8 +71,11 @@ const CIRCUIT_TIMELINES = {
  * Settings > Appearance unless `logoId` is given (the picker's previews).
  * `size` picks the artwork resolution: 512 for small stages, 1024 full screen.
  * `controls={false}` drops the Pause key (previews inside another control).
+ * `playing` lets a comparison gallery control playback across multiple previews.
+ *
+ * @param {{ logoId?: string, size?: number, controls?: boolean, playing?: boolean }} props
  */
-export default function AnimatedLoadingLogo({ logoId, size = 512, controls = true }) {
+export default function AnimatedLoadingLogo({ logoId, size = 512, controls = true, playing: controlledPlaying }) {
   const picked = useLogoSystem().id
   const id = isLogoId(logoId) ? logoId : picked
   const vector = VECTOR_LOADING[id]
@@ -81,7 +84,8 @@ export default function AnimatedLoadingLogo({ logoId, size = 512, controls = tru
   const hasTimeline = Boolean(createRasterTimeline || createSvgTimeline)
   const svgId = useId().replaceAll(':', '-')
   const artRef = useRef(null)
-  const [playing, setPlaying, reduced] = useMotionPlayback()
+  const [ownPlaying, setPlaying, reduced] = useMotionPlayback()
+  const playing = controlledPlaying ?? ownPlaying
   const [supportsSmil, setSupportsSmil] = useState(true)
   const [unavailableId, setUnavailableId] = useState(null)
   const rasterUnavailable = id === unavailableId
@@ -153,7 +157,7 @@ export default function AnimatedLoadingLogo({ logoId, size = 512, controls = tru
         <div className={`en-app-loading-logo-art${createRasterTimeline ? ' en-raster-motion-art' : ''}`} ref={artRef} aria-hidden="true"
           dangerouslySetInnerHTML={{ __html: markup }} />
       )}
-      {controls && supported && !failed && (
+      {controls && controlledPlaying === undefined && supported && !failed && (
         <button className="en-app-loading-motion-control" type="button"
           onClick={() => setPlaying(!playing)}>
           {playing ? 'Pause loading animation' : 'Play loading animation'}
