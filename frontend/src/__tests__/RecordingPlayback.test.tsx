@@ -122,6 +122,31 @@ describe('RecordingPlayer', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('could not be played')
   })
 
+  test('a speaker preview waits for audio and pauses at its end', async () => {
+    const ref = React.createRef<RecordingPlayerHandle>()
+    render(<RecordingPlayer ref={ref} meetingId={MEETING} />)
+    act(() => ref.current!.playFrom(10_000, 13_000))
+    const audio = (await screen.findByTestId('recording-player')) as HTMLAudioElement
+    const play = vi.spyOn(audio, 'play').mockResolvedValue(undefined)
+    const pause = vi.spyOn(audio, 'pause').mockImplementation(() => {})
+    Object.defineProperty(audio, 'duration', { configurable: true, value: 60 })
+    fireEvent.loadedMetadata(audio)
+    expect(audio.currentTime).toBe(10)
+    expect(play).toHaveBeenCalledTimes(1)
+    audio.currentTime = 12.9
+    fireEvent.timeUpdate(audio)
+    expect(pause).not.toHaveBeenCalled()
+    audio.currentTime = 13
+    fireEvent.timeUpdate(audio)
+    expect(pause).toHaveBeenCalledTimes(1)
+
+    act(() => ref.current!.playFrom(10_000, 13_000))
+    act(() => ref.current!.playFrom(11_000))
+    audio.currentTime = 14
+    fireEvent.timeUpdate(audio)
+    expect(pause).toHaveBeenCalledTimes(1)
+  })
+
   test('draws uploaded audio on open and leaves its silent half empty', async () => {
     const signedUrl = 'https://signed.test/seekable'
     const decodeAudioData = vi.fn().mockResolvedValue({

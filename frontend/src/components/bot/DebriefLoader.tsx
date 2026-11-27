@@ -22,10 +22,12 @@ import {
   estimate, glide, initials, loaderClock, minutesLeft, stepWhere,
   type DebriefInfo, type StepKey,
 } from '../../services/debriefProgress'
+import type { TranscriptRebuildProgress } from '../../services/meetingRecorderService'
 
 /** What the loader draws. Bot calls and browser recordings each build one. */
 export interface DebriefSource {
   kind?: 'transcript-rebuild'
+  rebuildProgress?: TranscriptRebuildProgress
   /** Meeting name under the state line. */
   title: string
   /** When writing began (the bot left, or Stop was pressed), ISO. */
@@ -223,6 +225,13 @@ export function DebriefLoader({ view, source, plain = false }: DebriefLoaderProp
 
     function render(now: number) {
       const v = srcRef.current
+      if (v.kind === 'transcript-rebuild') {
+        const start = v.endedAt ? Date.parse(v.endedAt) : now
+        const watch = q('[data-dl-watch]')
+        if (watch) watch.textContent = loaderClock(Math.max(0, now - start))
+        if (!reduced && now - typedAt > 900) { typedAt = now; typeLine() }
+        return
+      }
       const steps = v.steps
       const started = v.stepStartedAt ? Date.parse(v.stepStartedAt) : NaN
       const info: DebriefInfo = {
@@ -326,6 +335,11 @@ export function DebriefLoader({ view, source, plain = false }: DebriefLoaderProp
   }, [])
 
   const steps = src.steps
+  const progress = src.rebuildProgress
+  const percent = progress?.totalMs ? Math.floor(100 * progress.processedMs / progress.totalMs) : undefined
+  const processedLabel = progress?.totalMs ? `${loaderClock(progress.processedMs)} of ${loaderClock(progress.totalMs)} processed` : ''
+  const rebuildStatus = progress?.stage === 'saving' ? 'Saving transcript'
+    : processedLabel || (progress ? 'Transcribing audio' : 'Preparing audio')
   const dur = src.durationMs || 0
   const sub = [src.title, dur ? `${loaderClock(dur)} ${src.sessionId ? 'call' : 'recorded'}` : ''].filter(Boolean).join(' · ')
   const Box = plain ? 'div' : Display
@@ -350,22 +364,42 @@ export function DebriefLoader({ view, source, plain = false }: DebriefLoaderProp
           <div className="bs-dl-lines" data-dl-lines />
           <div className="bs-dl-cursor-row"><span className="bs-dl-cursor" /></div>
         </div>
-        <div className="bs-dl-bar" role="progressbar" aria-label={rebuilding ? 'Transcript rebuild progress' : 'Minutes progress'} aria-valuemin={0} aria-valuemax={100} data-dl-bar>
-          <i data-dl-fill />
-        </div>
-        <div className="bs-dl-meta">
-          <span><strong data-dl-pct>0%</strong> · <span data-dl-where /></span>
-          <span><span data-dl-left /> <i data-dl-est>(estimate)</i></span>
-        </div>
+        {rebuilding ? (
+          <>
+            <div className="bs-dl-bar" role="progressbar" aria-label="Transcript rebuild progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} aria-valuetext={rebuildStatus}>
+              <i style={{ '--p': `${percent ?? 0}%` } as React.CSSProperties} />
+            </div>
+            <p className="bs-dl-meta" role="status">
+              <strong>{rebuildStatus}</strong>
+              {progress?.stage === 'saving' && processedLabel && <span>{processedLabel}</span>}
+            </p>
+          </>
+        ) : (
+          <>
+            <div className="bs-dl-bar" role="progressbar" aria-label="Minutes progress" aria-valuemin={0} aria-valuemax={100} data-dl-bar>
+              <i data-dl-fill />
+            </div>
+            <div className="bs-dl-meta">
+              <span><strong data-dl-pct>0%</strong> · <span data-dl-where /></span>
+              <span><span data-dl-left /> <i data-dl-est>(estimate)</i></span>
+            </div>
+          </>
+        )}
         <ol className="bs-dl-steps">
-          {steps.map((s, i) => <li key={s.key} data-dl-step={i}><span>{s.label}</span><small /></li>)}
+          {steps.map((s, i) => (
+            <li key={s.key} data-dl-step={rebuilding ? undefined : i}
+              className={rebuilding ? (s.state === 'done' ? 'is-done' : s.state === 'working' ? 'is-now' : undefined) : undefined}
+              aria-current={rebuilding && s.state === 'working' ? 'step' : undefined}>
+              <span>{s.label}</span><small />
+            </li>
+          ))}
         </ol>
         <p className="bs-dl-foot">
-          {rebuilding ? 'Progress is estimated. The waveform returns when the rebuild finishes.'
+          {rebuilding ? 'The waveform returns when the transcript is saved.'
             : plain ? 'The summary, decisions and action items fill in on this page as they land. Times here are estimates.'
               : 'You can leave this page. It turns into the meeting on its own. Times here are estimates.'}
         </p>
-        <p className="bs-sr" role="status" data-dl-status />
+        {!rebuilding && <p className="bs-sr" role="status" data-dl-status />}
       </div>
     </Box>
   )

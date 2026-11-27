@@ -102,9 +102,11 @@ export async function renameSpeaker(
   meetingId: string,
   from: string,
   to: string,
+  merge = false,
 ): Promise<{ result: RenameResult | null; error: string | null }> {
   try {
-    const res = (await meetingsApi.renameSpeaker(meetingId, from, to)) as ApiEnvelope<{
+    const save = merge ? meetingsApi.mergeSpeakers : meetingsApi.renameSpeaker
+    const res = (await save(meetingId, from, to)) as ApiEnvelope<{
       transcript?: unknown
       transcript_segments?: unknown
     }>
@@ -114,10 +116,10 @@ export async function renameSpeaker(
     if (!segments) return { result: null, error: 'The transcript could not be updated.' }
     return { result: { segments, transcript: String(res?.data?.transcript ?? '') }, error: null }
   } catch (err) {
-    // api.js rejects with an Error whose message is the server's reason for a 400.
     const e = err as { status?: number; message?: unknown }
-    const reason = e?.status === 400 && typeof e.message === 'string' ? e.message : null
-    return { result: null, error: reason ?? 'The speaker could not be renamed.' }
+    const showReason = e?.status === 400 || e?.status === 409 || (merge && e?.status === 404)
+    const reason = showReason && typeof e.message === 'string' ? e.message : null
+    return { result: null, error: reason ?? (merge ? 'The speakers could not be merged.' : 'The speaker could not be renamed.') }
   }
 }
 

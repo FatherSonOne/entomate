@@ -325,6 +325,7 @@ export const meetingsApi = {
 
   // Rename a speaker across the transcript. Typed wrapper: services/meetingTranscriptService.ts
   renameSpeaker: (meetingId, from, to) => api.patch(`/meetings/${meetingId}/speakers`, { from, to }),
+  mergeSpeakers: (meetingId, from, to) => api.patch(`/meetings/${meetingId}/speakers`, { from, to, merge: true }),
   // Guess real names for "Speaker N" labels (renames nothing)
   suggestSpeakers: (meetingId) => api.post(`/meetings/${meetingId}/speakers/suggest`),
 

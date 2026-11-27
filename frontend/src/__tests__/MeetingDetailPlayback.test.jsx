@@ -3,7 +3,7 @@ import { act, render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { vi, describe, test, expect, beforeEach } from 'vitest'
 
-const api = vi.hoisted(() => ({ get: vi.fn(), carryForward: vi.fn(() => Promise.resolve(null)) }))
+const api = vi.hoisted(() => ({ get: vi.fn(), regenerateSummary: vi.fn(async () => ({})), carryForward: vi.fn(() => Promise.resolve(null)) }))
 const player = vi.hoisted(() => ({ ready: false, playFrom: vi.fn() }))
 const reports = vi.hoisted(() => ({ downloadMeetingDocument: vi.fn(async () => {}) }))
 const recordings = vi.hoisted(() => ({ rebuildTranscript: vi.fn() }))
@@ -108,15 +108,36 @@ describe('a pressed timecode plays the recording', () => {
       fireEvent.click(screen.getByRole('menuitem', { name: 'Rebuild transcript from audio' }))
       const progress = await screen.findByRole('progressbar', { name: 'Transcript rebuild progress' })
       expect(screen.getByTestId('player-stub')).toContainElement(progress)
+      expect(screen.getByText('Preparing audio')).toBeInTheDocument()
+      expect(progress).not.toHaveAttribute('aria-valuenow')
       expect(screen.queryByRole('button', { name: 'Decision: Ship on the fourteenth' })).toBeNull()
       expect(screen.queryByText('Action items', { selector: '.bs-dl-steps span' })).toBeNull()
 
-      api.get.mockResolvedValue({ ...MEETING, recording_job: job })
       const poll = intervals.mock.calls.find(([, delay]) => delay === 5000)?.[0]
       expect(poll).toBeTypeOf('function')
+      const rebuildingJob = { ...job, transcriptRebuildAt: new Date().toISOString() }
+      api.get.mockResolvedValue({ ...MEETING, recording_job: {
+        ...rebuildingJob, transcriptRebuildProgress: { stage: 'transcribing', processedMs: 30_000, totalMs: 60_000 },
+      } })
+      await act(async () => { await poll() })
+      expect(progress).toHaveAttribute('aria-valuenow', '50')
+      expect(screen.getByText('0:30 of 1:00 processed')).toBeInTheDocument()
+
+      api.get.mockResolvedValue({ ...MEETING, recording_job: {
+        ...rebuildingJob, transcriptRebuildProgress: { stage: 'saving', processedMs: 60_000, totalMs: 60_000 },
+      } })
+      await act(async () => { await poll() })
+      expect(screen.getByText('Saving transcript')).toBeInTheDocument()
+
+      api.get.mockResolvedValue({ ...MEETING, summary_template: 'planning', recording_job: { ...job, transcriptRebuiltAt: new Date().toISOString() } })
       await act(async () => { await poll() })
       expect(screen.queryByRole('progressbar', { name: 'Transcript rebuild progress' })).toBeNull()
       expect(screen.getByRole('button', { name: 'Decision: Ship on the fourteenth' })).toBeInTheDocument()
+      expect(screen.getByText('Transcript rebuilt · 2 lines')).toBeInTheDocument()
+      expect(api.regenerateSummary).not.toHaveBeenCalled()
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Rewrite summary' })) })
+      expect(api.regenerateSummary).toHaveBeenCalledWith('m1', 'planning')
+      expect(screen.queryByRole('button', { name: 'Rewrite summary' })).toBeNull()
     } finally {
       intervals.mockRestore()
       canvas.mockRestore()

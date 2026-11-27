@@ -2,7 +2,7 @@ import React from 'react'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { vi, describe, test, expect, beforeEach } from 'vitest'
 
-const api = vi.hoisted(() => ({ renameSpeaker: vi.fn(), suggestSpeakers: vi.fn() }))
+const api = vi.hoisted(() => ({ renameSpeaker: vi.fn(), mergeSpeakers: vi.fn(), suggestSpeakers: vi.fn() }))
 const cacheMock = vi.hoisted(() => ({ invalidate: vi.fn() }))
 vi.mock('../services/api', () => ({ meetingsApi: api }))
 vi.mock('../services/apiCache', () => ({ default: cacheMock }))
@@ -64,6 +64,23 @@ describe('TranscriptPanel', () => {
 
     fireEvent.change(screen.getByLabelText('Search transcript'), { target: { value: 'zebra' } })
     expect(screen.getByText('No matches')).toBeInTheDocument()
+  })
+
+  test('previews a speaker turn and merges two labels while keeping the selected name', async () => {
+    const onPreviewSpeaker = vi.fn()
+    const merged = SEGMENTS.map(line => ({ ...line, speaker: 'Ann Lee' }))
+    api.mergeSpeakers.mockResolvedValue({ data: { transcript_segments: merged, transcript: 'Merged' } })
+    render(<TranscriptPanel meetingId={MEETING} segments={SEGMENTS} onPreviewSpeaker={onPreviewSpeaker} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Preview Speaker 200' }))
+    expect(onPreviewSpeaker).toHaveBeenCalledWith(500, 5500)
+    fireEvent.click(screen.getByRole('button', { name: 'Merge speakers' }))
+    expect(screen.getByRole('button', { name: /^Merge$/ })).toBeDisabled()
+    fireEvent.change(screen.getByLabelText('Merge from'), { target: { value: 'Speaker 200' } })
+    fireEvent.change(screen.getByLabelText('Keep this speaker'), { target: { value: 'Ann Lee' } })
+    fireEvent.click(screen.getByRole('button', { name: /^Merge$/ }))
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Rename Speaker 200' })).toBeNull())
+    expect(api.mergeSpeakers).toHaveBeenCalledWith(MEETING, 'Speaker 200', 'Ann Lee')
+    expect(screen.getByRole('button', { name: 'Rename Ann Lee' })).toHaveTextContent('3')
   })
 
   test('renaming a speaker updates every line and tells the page', async () => {

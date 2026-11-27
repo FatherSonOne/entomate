@@ -465,6 +465,12 @@ async function retryTranscription({ meetingId }) {
   return { status: 'transcribing' };
 }
 
+function isTranscriptRebuilding(job) {
+  const started = Date.parse(job?.transcriptRebuildAt);
+  const lastProgress = Date.parse(job?.updatedAt) || 0;
+  return Number.isFinite(started) && Date.now() - Math.max(started, lastProgress) < STALE_JOB_MS;
+}
+
 /** Replace an old browser transcript from its retained audio without writing the minutes again. */
 async function rebuildTranscript({ meetingId, orgId }) {
   const meeting = await loadPlaybackMeeting(orgId, meetingId);
@@ -474,13 +480,13 @@ async function rebuildTranscript({ meetingId, orgId }) {
     throw new RecorderError(409, 'The transcript can only be rebuilt from a saved browser recording.');
   }
   if (!geminiRecording.isConfigured()) throw new RecorderError(503, 'Transcription is unavailable.');
-  if (running.has(meetingId) || Date.now() - Date.parse(job.transcriptRebuildAt) < STALE_JOB_MS) {
+  if (running.has(meetingId) || isTranscriptRebuilding(job)) {
     throw new RecorderError(409, 'The transcript is already being rebuilt.');
   }
 
   const startedAt = new Date().toISOString();
   let claim = supabase.from('meetings').update({
-    recording_job: { ...job, transcriptRebuildAt: startedAt, transcriptRebuildError: null },
+    recording_job: { ...job, transcriptRebuildAt: startedAt, transcriptRebuildError: null, transcriptRebuildProgress: null, updatedAt: startedAt },
     updated_at: startedAt,
   }).eq('id', meetingId).eq('org_id', orgId);
   claim = meeting.updated_at ? claim.eq('updated_at', meeting.updated_at) : claim.is('updated_at', null);
@@ -494,48 +500,80 @@ async function rebuildTranscript({ meetingId, orgId }) {
   return { status: 'transcribing' };
 }
 
+async function writeTranscriptRebuild({ id, org_id: orgId }, startedAt, changes) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const latest = await loadMeeting(id);
+    const current = latest?.recording_job;
+    if (current?.transcriptRebuildAt !== startedAt || current.audioRemovedAt || current.retentionDeletedAt) return null;
+    const updatedAt = new Date().toISOString();
+    const { job, ...fields } = changes(latest, updatedAt);
+    const { data, error } = await supabase.from('meetings').update({
+      ...fields,
+      recording_job: { ...current, ...job, updatedAt },
+      updated_at: updatedAt,
+    }).eq('id', id).eq('org_id', orgId).eq('updated_at', latest.updated_at)
+      .eq('recording_job->>transcriptRebuildAt', startedAt)
+      .is('recording_job->>retentionDeletedAt', null).is('recording_job->>audioRemovedAt', null)
+      .select('id').maybeSingle();
+    if (error) throw error;
+    if (data) return data;
+  }
+  throw new Error('The meeting changed while updating the transcript rebuild');
+}
+
 async function runTranscriptRebuild(meeting, startedAt) {
   const { id, org_id: orgId, recording_job: job } = meeting;
   let segments;
   let transcriptRebuildError = null;
+  let progress = { processedMs: 0, totalMs: 0 };
+  const report = async (stage) => {
+    try {
+      await writeTranscriptRebuild(meeting, startedAt, () => ({
+        job: { transcriptRebuildProgress: { ...progress, stage } },
+      }));
+    } catch (err) {
+      log.warn('Recording transcript rebuild progress could not be saved', { meetingId: id, error: err.message });
+    }
+  };
   try {
     const pieces = (await listPieces(orgId, id)).filter(piece => piece.seq < (job.pieces || MAX_PIECES));
     if (!pieces.length || pieces.some((piece, index) => piece.seq !== index) || (job.pieces && pieces.length !== job.pieces)) {
       throw new Error('The saved recording is missing audio pieces');
     }
-    segments = await geminiRecording.transcribeRecording(await downloadRecordingPieces(pieces), job.mimeType || 'audio/webm');
+    const audio = await downloadRecordingPieces(pieces);
+    segments = await geminiRecording.transcribeRecording(audio, job.mimeType || 'audio/webm', async (clipProgress) => {
+      if (!clipProgress) return;
+      progress = clipProgress;
+      await report('transcribing');
+    });
     if (!segments.length) throw new Error('No speech found');
+    await report('saving');
   } catch (err) {
     log.warn('Recording transcript could not be rebuilt', { meetingId: id, error: err.message });
     transcriptRebuildError = 'The transcript could not be rebuilt. Try again.';
   }
 
-  // Read again so chapter changes, speaker edits and audio removal can race the long transcription.
-  const latest = await loadMeeting(id);
-  const current = latest?.recording_job;
-  if (current?.transcriptRebuildAt !== startedAt || current.audioRemovedAt || current.retentionDeletedAt) return;
-  const updatedAt = new Date().toISOString();
-  const fields = transcriptRebuildError ? {} : {
-    transcript: meetingFinish.buildTranscriptText(segments),
-    transcript_segments: segments,
-    transcript_embedding: null,
-    summary_moments: transcriptMoments.summaryMoments(segments, latest.key_points || [], latest.decisions || []),
-  };
-  const { data, error } = await supabase.from('meetings').update({
-    ...fields,
-    recording_job: {
-      ...current,
-      ...(segments?.length ? { lines: segments.length, speakers: new Set(segments.map(line => line.speaker)).size, speakerSuggestions: [] } : {}),
-      transcriptRebuildAt: null, transcriptRebuildError, updatedAt,
+  const transcript = transcriptRebuildError ? null : meetingFinish.buildTranscriptText(segments);
+  const saved = await writeTranscriptRebuild(meeting, startedAt, (latest, updatedAt) => ({
+    ...(transcript === null ? {} : {
+      transcript,
+      transcript_segments: segments,
+      transcript_embedding: null,
+      summary_moments: transcriptMoments.summaryMoments(segments, latest.key_points || [], latest.decisions || []),
+    }),
+    job: {
+      ...(transcript === null ? {} : {
+        lines: segments.length,
+        speakers: new Set(segments.map(line => line.speaker)).size,
+        speakerSuggestions: [],
+        transcriptRebuiltAt: updatedAt,
+      }),
+      transcriptRebuildAt: null,
+      transcriptRebuildProgress: null,
+      transcriptRebuildError,
     },
-    updated_at: updatedAt,
-  }).eq('id', id).eq('org_id', orgId).eq('updated_at', latest.updated_at)
-    .eq('recording_job->>transcriptRebuildAt', startedAt)
-    .is('recording_job->>retentionDeletedAt', null).is('recording_job->>audioRemovedAt', null)
-    .select('transcript').maybeSingle();
-  if (error) throw error;
-  if (!data) throw new Error('Meeting changed while saving its rebuilt transcript');
-  if (!transcriptRebuildError) await require('./embeddingService').generateEmbeddingsForMeeting(id, { transcript: data.transcript });
+  }));
+  if (saved && transcript !== null) await require('./embeddingService').generateEmbeddingsForMeeting(id, { transcript });
 }
 
 /** Throw away a recording that never became a meeting: its audio and its row. */
@@ -781,6 +819,7 @@ module.exports = {
   finishRecording,
   retryTranscription,
   rebuildTranscript,
+  isTranscriptRebuilding,
   discardRecording,
   purgeRecordingAudio,
   getPlayback,

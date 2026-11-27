@@ -55,12 +55,17 @@ export function recordingSource(job: RecordingJob, title: string | null | undefi
 
 export function recordingRebuildSource(job: RecordingJob, title: string | null | undefined, attendees: unknown): DebriefSource {
   const startedAt = job.transcriptRebuildAt ?? null
+  const saving = job.transcriptRebuildProgress?.stage === 'saving'
   return {
     ...recordingSource(job, title, attendees),
     kind: 'transcript-rebuild',
     endedAt: startedAt,
     stepStartedAt: startedAt,
-    steps: recordingSteps('transcript').slice(0, 2),
+    rebuildProgress: job.transcriptRebuildProgress,
+    steps: [
+      { key: 'transcript', label: 'Transcribe audio', state: saving ? 'done' : 'working', value: '' },
+      { key: 'actions', label: 'Save transcript', state: saving ? 'working' : 'waiting', value: '' },
+    ],
     headline: 'Rebuilding transcript',
     sinceLabel: 'since rebuild started',
   }

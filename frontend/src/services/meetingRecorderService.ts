@@ -44,6 +44,14 @@ export interface RecordingJob {
   durationMs: number
   transcriptRebuildAt?: string
   transcriptRebuildError?: string
+  transcriptRebuiltAt?: string
+  transcriptRebuildProgress?: TranscriptRebuildProgress
+}
+
+export interface TranscriptRebuildProgress {
+  stage: 'transcribing' | 'saving'
+  processedMs: number
+  totalMs: number
 }
 
 export type RecordingStage = 'transcript' | 'speakers' | 'summary' | 'saving'
@@ -58,6 +66,10 @@ export function toRecordingJob(raw: unknown): RecordingJob | null {
   const r = raw as Record<string, unknown>
   const status = STATUSES.find((s) => s === r.status)
   if (!status) return null
+  const progress = r.transcriptRebuildProgress as Partial<TranscriptRebuildProgress> | null | undefined
+  const validProgress = progress && (progress.stage === 'transcribing' || progress.stage === 'saving')
+    && typeof progress.totalMs === 'number' && Number.isFinite(progress.totalMs) && progress.totalMs >= 0
+    && typeof progress.processedMs === 'number' && Number.isFinite(progress.processedMs) && progress.processedMs >= 0 && progress.processedMs <= progress.totalMs
   return {
     status,
     source: r.source === 'bot' || r.source === 'browser' ? r.source : null,
@@ -71,6 +83,8 @@ export function toRecordingJob(raw: unknown): RecordingJob | null {
     finishedAt: typeof r.finishedAt === 'string' ? r.finishedAt : null,
     ...(typeof r.transcriptRebuildAt === 'string' ? { transcriptRebuildAt: r.transcriptRebuildAt } : {}),
     ...(typeof r.transcriptRebuildError === 'string' ? { transcriptRebuildError: r.transcriptRebuildError } : {}),
+    ...(typeof r.transcriptRebuiltAt === 'string' ? { transcriptRebuiltAt: r.transcriptRebuiltAt } : {}),
+    ...(validProgress ? { transcriptRebuildProgress: progress as TranscriptRebuildProgress } : {}),
     durationMs: typeof r.durationMs === 'number' && r.durationMs > 0 ? r.durationMs : 0,
   }
 }
@@ -171,7 +185,9 @@ export async function removeRecordingAudio(meetingId: string): Promise<void> {
 export const STALE_JOB_MS = 20 * 60 * 1000
 
 export function isRebuildingTranscript(job: RecordingJob | null): boolean {
-  return Date.now() - Date.parse(job?.transcriptRebuildAt ?? '') < STALE_JOB_MS
+  const started = Date.parse(job?.transcriptRebuildAt ?? '')
+  const lastProgress = Date.parse(job?.updatedAt ?? '') || 0
+  return Number.isFinite(started) && Date.now() - Math.max(started, lastProgress) < STALE_JOB_MS
 }
 
 export function canRetry(job: RecordingJob | null, now = Date.now()): boolean {

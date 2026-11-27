@@ -45,7 +45,8 @@ test('retries a looping first clip in smaller parts and keeps recording times an
     .mockResolvedValueOnce(response('[00:20 - 00:30] Speaker 2: Second speaker.'))
     .mockResolvedValueOnce(response('[00:02 - 00:05] Speaker 1: Final remarks.'));
 
-  const turns = await transcribeRecording(Buffer.from('recording'), 'audio/webm');
+  const progress = jest.fn();
+  const turns = await transcribeRecording(Buffer.from('recording'), 'audio/webm', progress);
   expect(turns).toEqual([
     { atMs: 10_500, endMs: 16_500, speaker: 'Speaker 1', text: 'Opening remarks.' },
     { atMs: 320_000, endMs: 330_000, speaker: 'Speaker 2', text: 'Second speaker.' },
@@ -54,6 +55,9 @@ test('retries a looping first clip in smaller parts and keeps recording times an
   const windows = mockExtract.mock.calls.filter(([, file]) => file.endsWith('clip.flac'));
   expect(windows.map(args => args.slice(2))).toEqual([
     [0, 300_000], [0, 150_000], [150_000, 150_000], [300_000, 300_000], [600_000, 20_000],
+  ]);
+  expect(progress.mock.calls.flat().map(({ processedMs, totalMs }) => [processedMs, totalMs])).toEqual([
+    [0, 620_000], [150_000, 620_000], [300_000, 620_000], [600_000, 620_000], [620_000, 620_000],
   ]);
   expect(mockGenerate.mock.calls.at(-1)[0]).toEqual(expect.arrayContaining([
     { text: 'Reference voice for Speaker 1.' }, { text: 'Reference voice for Speaker 2.' },
