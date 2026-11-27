@@ -1,10 +1,13 @@
 export const ISOLATED_AUDIO_TRACKS = ['mic', 'tab'] as const
 export type IsolatedAudioTrack = typeof ISOLATED_AUDIO_TRACKS[number]
-export type RecordingTrack = 'mix' | IsolatedAudioTrack
+export const ROOM_PARTICIPANT_TRACKS = ['p1', 'p2', 'p3'] as const
+export type RoomParticipantTrack = typeof ROOM_PARTICIPANT_TRACKS[number]
+export type PlaybackTrack = IsolatedAudioTrack | RoomParticipantTrack
+export type RecordingTrack = 'mix' | PlaybackTrack
 export const TRACK_LABELS = { mix: 'Combined', mic: 'Microphone', tab: 'Tab audio' }
 
-export interface TrackCoverage { pieces: number; durationMs: number }
-export type AudioTracks = Partial<Record<IsolatedAudioTrack, TrackCoverage>>
+export interface TrackCoverage { pieces: number; durationMs: number; label?: string }
+export type AudioTracks = Partial<Record<PlaybackTrack, TrackCoverage>>
 
 export interface AudioGapRange {
   startMs: number

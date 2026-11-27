@@ -8,7 +8,7 @@
  */
 
 import { meetingsApi, recordingsApi } from './api'
-import { ISOLATED_AUDIO_TRACKS, readRecordingGaps, type AudioGap, type AudioTracks, type IsolatedAudioTrack, type RecordingGaps, type RecordingTrack, type TrackCoverage } from './recordingAudioTracks'
+import { ISOLATED_AUDIO_TRACKS, ROOM_PARTICIPANT_TRACKS, readRecordingGaps, type AudioGap, type AudioTracks, type IsolatedAudioTrack, type PlaybackTrack, type RecordingGaps, type RecordingTrack, type TrackCoverage } from './recordingAudioTracks'
 import { lockRecording, recordingJournal, type RecordingPiece } from './recordingJournal'
 import cache from './apiCache'
 
@@ -24,7 +24,7 @@ const VIDEO_BITS_PER_SECOND = 1_500_000
 /** `backup`: recorded beside the bot, which writes the minutes; this audio waits in case it cannot. */
 export type RecordingStatus = 'recording' | 'transcribing' | 'backup' | 'done' | 'failed'
 /** Which engine is writing (or wrote) the minutes: the Recall bot, or this browser's recording. */
-export type RecordingSource = 'bot' | 'browser'
+export type RecordingSource = 'bot' | 'browser' | 'room'
 
 export interface RecordingJob {
   status: RecordingStatus
@@ -46,6 +46,7 @@ export interface RecordingJob {
   durationMs: number
   audioTracks?: AudioTracks
   audioGaps?: AudioGap[]
+  roomOffsetMs?: number
   transcriptRebuildAt?: string
   transcriptRebuildError?: string
   transcriptRebuiltAt?: string
@@ -56,13 +57,15 @@ export type { AudioTracks } from './recordingAudioTracks'
 interface RecordingCoverage extends TrackCoverage { audioTracks?: AudioTracks }
 export type RecoveryProgress = Partial<Record<RecordingTrack, { savedMs: number; sentMs: number }>>
 
-function readAudioTracks(raw: unknown): AudioTracks {
+function readAudioTracks(raw: unknown, keys: readonly PlaybackTrack[] = ISOLATED_AUDIO_TRACKS): AudioTracks {
   const tracks: AudioTracks = {}
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return tracks
-  for (const track of ISOLATED_AUDIO_TRACKS) {
+  for (const track of keys) {
     const value = (raw as AudioTracks)[track]
     if (value && Number.isSafeInteger(value.pieces) && value.pieces > 0 && Number.isSafeInteger(value.durationMs) && value.durationMs >= 0) {
-      tracks[track] = { pieces: value.pieces, durationMs: value.durationMs }
+      tracks[track] = { pieces: value.pieces, durationMs: value.durationMs,
+        ...(typeof value.label === 'string' && value.label.trim() ? { label: value.label.trim() } : {}),
+      }
     }
   }
   return tracks
@@ -93,7 +96,7 @@ export function toRecordingJob(raw: unknown): RecordingJob | null {
     && typeof progress.processedMs === 'number' && Number.isFinite(progress.processedMs) && progress.processedMs >= 0 && progress.processedMs <= progress.totalMs
   return {
     status,
-    source: r.source === 'bot' || r.source === 'browser' ? r.source : null,
+    source: r.source === 'bot' || r.source === 'browser' || r.source === 'room' ? r.source : null,
     mode: MODES.find((m) => m === r.mode) ?? null,
     error: typeof r.error === 'string' && r.error ? r.error : null,
     updatedAt: typeof r.updatedAt === 'string' ? r.updatedAt : null,
@@ -108,6 +111,10 @@ export function toRecordingJob(raw: unknown): RecordingJob | null {
     ...(validProgress ? { transcriptRebuildProgress: progress as TranscriptRebuildProgress } : {}),
     durationMs: typeof r.durationMs === 'number' && r.durationMs > 0 ? r.durationMs : 0,
     ...(r.audioTracks || r.splitAudio === true ? { audioTracks: readAudioTracks(r.audioTracks) } : {}),
+    ...(r.source === 'room' ? {
+      audioTracks: readAudioTracks(r.participantTracks, ROOM_PARTICIPANT_TRACKS),
+      roomOffsetMs: typeof r.roomOffsetMs === 'number' && r.roomOffsetMs >= 0 ? r.roomOffsetMs : 0,
+    } : {}),
     ...(audioGaps.length ? { audioGaps } : {}),
   }
 }
@@ -148,7 +155,7 @@ export async function loadRecordingAudio(
   fetcher: typeof fetch = fetch,
   onProgress?: (fraction: number) => void,
   signal?: AbortSignal,
-  track?: IsolatedAudioTrack,
+  track?: PlaybackTrack,
 ): Promise<RecordingAudio> {
   let res: PlaybackResponse
   try {
@@ -181,7 +188,7 @@ export async function loadRecordingAudio(
   return { blob: new Blob(parts, { type }), durationMs }
 }
 
-export async function loadRecordingWaveformPeaks(meetingId: string, signal: AbortSignal, track?: IsolatedAudioTrack): Promise<number[]> {
+export async function loadRecordingWaveformPeaks(meetingId: string, signal: AbortSignal, track?: PlaybackTrack): Promise<number[]> {
   const result = (await (track ? recordingsApi.waveform(meetingId, signal, track) : recordingsApi.waveform(meetingId, signal))) as unknown as { peaks?: unknown }
   const peaks = toWaveformPeaks(result?.peaks)
   if (!peaks) throw new Error('Waveform unavailable')
@@ -617,7 +624,7 @@ export class PieceUploader {
   }
 }
 
-export function sendPieceTo(meetingId: string, contentType: string, track?: IsolatedAudioTrack): SendPiece {
+export function sendPieceTo(meetingId: string, contentType: string, track?: PlaybackTrack): SendPiece {
   return async (seq, durationMs, blob) => {
     if (track) await recordingsApi.uploadPiece(meetingId, seq, durationMs, blob, contentType, track)
     else await recordingsApi.uploadPiece(meetingId, seq, durationMs, blob, contentType)

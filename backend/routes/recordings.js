@@ -83,7 +83,7 @@ async function uploadRecordingPiece(req, res) {
   try {
     const orgId = await meetingNotes.assertMeetingAccess(req.user?.id, req.params.id);
     await recorder.savePiece({
-      orgId,
+      orgId, userId: req.user.id,
       meetingId: req.params.id,
       seq: Number(req.params.seq),
       durationMs: Number(req.query.durationMs),

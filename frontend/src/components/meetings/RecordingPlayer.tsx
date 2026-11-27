@@ -3,7 +3,7 @@ import { ChevronDown, Loader2, Pause, Play, RotateCcw, RotateCw, SkipBack, SkipF
 import { Display, Key, Tape, Toggle, type TapeMarker } from '../bench'
 import { formatClock, type TranscriptSegment } from '../../services/meetingTranscriptService'
 import { loadRecordingAudio, loadRecordingWaveformPeaks, removeRecordingAudio, type AudioTracks, type RecordingAudio } from '../../services/meetingRecorderService'
-import { ISOLATED_AUDIO_TRACKS, TRACK_LABELS, type AudioGap, type IsolatedAudioTrack, type RecordingTrack } from '../../services/recordingAudioTracks'
+import { ISOLATED_AUDIO_TRACKS, ROOM_PARTICIPANT_TRACKS, TRACK_LABELS, type AudioGap, type IsolatedAudioTrack, type PlaybackTrack, type RecordingTrack } from '../../services/recordingAudioTracks'
 import { TrackSaveStatus, type TrackSaveStates } from './TrackSaveStatus'
 import { readRecordingWaveform, waveformFromPeaks } from '../../services/recordingWaveform'
 import { recordingSpeakers } from './recordingSpeakers'
@@ -22,6 +22,7 @@ export interface RecordingPlayerProps {
   /** Direct audio from a legacy meeting upload. Kept recordings use the playback service. */
   audioUrl?: string
   audioTracks?: AudioTracks
+  roomRecording?: boolean
   gaps?: ReadonlyArray<AudioGap>
   durationMs?: number | null
   waveformPeaks?: ReadonlyArray<number> | null
@@ -63,11 +64,11 @@ function rulerMarks(durationMs: number): number[] {
 }
 
 export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayerProps>(function RecordingPlayer(
-  { meetingId, audioUrl, audioTracks, gaps = [], durationMs, waveformPeaks, waveformReplacement, transcriptSegments, decisions = [], actions = [], onMoment, onStepMoment, onTime, onAudioRemoved },
+  { meetingId, audioUrl, audioTracks, roomRecording, gaps = [], durationMs, waveformPeaks, waveformReplacement, transcriptSegments, decisions = [], actions = [], onMoment, onStepMoment, onTime, onAudioRemoved },
   ref,
 ) {
   const [source, setSource] = useState<Source | null>(null)
-  const [track, setTrack] = useState<IsolatedAudioTrack | undefined>()
+  const [track, setTrack] = useState<PlaybackTrack | undefined>()
   const [loading, setLoading] = useState(false)
   const [progress, setProgress] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -112,7 +113,17 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
   const savedWaveform = useMemo(() => waveformPeaks?.length ? waveformFromPeaks(waveformPeaks) : null, [waveformPeaks])
   const trackKey = track ?? 'mix'
   const waveform = audioRemoved ? null : ((!track ? savedWaveform : null) ?? waveforms[trackKey] ?? null)
-  const availableTracks = ISOLATED_AUDIO_TRACKS.filter(name => (audioTracks?.[name]?.durationMs ?? 0) > 0)
+  const participantTracks = ROOM_PARTICIPANT_TRACKS.filter(name => (audioTracks?.[name]?.durationMs ?? 0) > 0)
+  const availableTracks: PlaybackTrack[] = [
+    ...ISOLATED_AUDIO_TRACKS.filter(name => (audioTracks?.[name]?.durationMs ?? 0) > 0),
+    ...participantTracks,
+  ]
+  const labelOf = (name: PlaybackTrack): string => {
+    if (name === 'mic' || name === 'tab') return TRACK_LABELS[name]
+    const label = audioTracks?.[name]?.label || 'Participant'
+    const duplicates = participantTracks.filter(key => (audioTracks?.[key]?.label || 'Participant') === label)
+    return duplicates.length > 1 ? label + ' (' + (duplicates.indexOf(name) + 1) + ')' : label
+  }
   const trackSaveStates: TrackSaveStates = { mix: { savedMs: 0, sentMs: finiteDuration(durationMs) } }
   for (const name of ISOLATED_AUDIO_TRACKS) {
     trackSaveStates[name] = { savedMs: 0, sentMs: audioTracks?.[name]?.durationMs ?? 0 }
@@ -143,7 +154,7 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
     return () => controller.abort()
   }, [audioRemoved, audioUrl, durationMs, meetingId, track, trackKey, waveform])
 
-  const load = async (playbackTrack: IsolatedAudioTrack | undefined, refresh = false): Promise<void> => {
+  const load = async (playbackTrack: PlaybackTrack | undefined, refresh = false): Promise<void> => {
     if (request.current || (source && playbackTrack === track && !refresh)) return
     const controller = new AbortController()
     request.current = controller
@@ -173,7 +184,7 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
     }
   }
 
-  const switchTrack = (nextTrack: IsolatedAudioTrack | undefined, atMs: number, shouldPlay: boolean, endAtMs?: number): void => {
+  const switchTrack = (nextTrack: PlaybackTrack | undefined, atMs: number, shouldPlay: boolean, endAtMs?: number): void => {
     const audio = audioRef.current
     const endMs = nextTrack ? audioTracks?.[nextTrack]?.durationMs : durationMs
     pending.current = { atMs: Math.min(atMs, endMs || Infinity), play: shouldPlay, endMs: endAtMs }
@@ -191,7 +202,7 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
     void load(nextTrack, true)
   }
 
-  const selectTrack = (nextTrack: IsolatedAudioTrack | undefined): void => {
+  const selectTrack = (nextTrack: PlaybackTrack | undefined): void => {
     if (nextTrack === track) return
     const audio = audioRef.current
     const ready = audio && mediaReady.current
@@ -376,20 +387,20 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
         <label className="flex flex-wrap items-center gap-2 text-sm">
           Audio source
           <select className="bs-key" value={track ?? ''} onChange={event => {
-            const value = ISOLATED_AUDIO_TRACKS.find(name => name === event.currentTarget.value)
+            const value = availableTracks.find(name => name === event.currentTarget.value)
             selectTrack(value)
           }}>
             <option value="">Combined</option>
             {availableTracks.map(name => {
               const coverage = audioTracks?.[name]?.durationMs ?? 0
-              return <option key={name} value={name}>{TRACK_LABELS[name]}
+              return <option key={name} value={name}>{labelOf(name)}
                 {coverage < finiteDuration(durationMs) ? ` · through ${formatClock(coverage)}` : ''}
               </option>
             })}
           </select>
         </label>
       )}
-      {!audioRemoved && audioTracks && <TrackSaveStatus tracks={trackSaveStates} final />}
+      {!audioRemoved && audioTracks && !roomRecording && <TrackSaveStatus tracks={trackSaveStates} final />}
       {source && (
         <audio
           ref={audioRef}

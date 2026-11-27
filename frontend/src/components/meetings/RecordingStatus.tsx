@@ -58,6 +58,13 @@ export function RecordingStatus({ meetingId, recordingJob, recoveryUserId, onRef
     return () => window.clearInterval(timer)
   }, [waiting, onRefresh])
 
+  if (job?.source === 'room' && job.status === 'recording') {
+    return <Signal tone="live">Recording room audio</Signal>
+  }
+  if (job?.source === 'room' && job.status === 'failed') {
+    return <p role="alert" className="bs-recstat-err">{job.error || 'No room audio was saved.'}</p>
+  }
+
   if (rebuilding) return null
   if (canPlay(recordingJob) && job?.transcriptRebuildError) {
     return <p role="alert" className="bs-recstat-err">{job.transcriptRebuildError}</p>

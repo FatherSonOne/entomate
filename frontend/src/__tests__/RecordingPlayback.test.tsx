@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { render, screen, fireEvent, act, within } from '@testing-library/react'
 import { vi, describe, test, expect, beforeEach, afterEach } from 'vitest'
 
 const api = vi.hoisted(() => ({ playback: vi.fn(), waveform: vi.fn(), removeAudio: vi.fn() }))
@@ -10,7 +10,7 @@ vi.mock('../services/apiCache', () => ({ default: cacheMock }))
 import RecordingPlayer, { type RecordingPlayerHandle } from '../components/meetings/RecordingPlayer'
 import TranscriptPanel from '../components/meetings/TranscriptPanel'
 import LiveCaptions, { captionErrorMessage, speechRecognitionCtor } from '../components/meetings/LiveCaptions'
-import { canPlay, loadRecordingAudio } from '../services/meetingRecorderService'
+import { canPlay, loadRecordingAudio, toRecordingJob } from '../services/meetingRecorderService'
 import type { TranscriptSegment } from '../services/meetingTranscriptService'
 
 const MEETING = 'meeting-1'
@@ -98,6 +98,37 @@ describe('RecordingPlayer', () => {
     }
   })
 
+  test('keeps the playhead across Combined and three named room tracks', async () => {
+    api.playback.mockImplementation((_id, track) => Promise.resolve({
+      url: `https://signed.test/${track ?? 'combined'}`, durationMs: 60_000,
+    }))
+    const pause = vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {})
+    const coverage = { pieces: 2, durationMs: 60_000 }
+    const job = toRecordingJob({
+      source: 'room', status: 'done', durationMs: 60_000, participantTracks: {
+        p1: { ...coverage, label: 'Host' },
+        p2: { ...coverage, label: 'Alex' },
+        p3: { ...coverage, label: 'Alex' },
+      },
+    })
+    try {
+      render(<RecordingPlayer meetingId={MEETING} durationMs={60_000} roomRecording audioTracks={job?.audioTracks} />)
+      const selector = screen.getByRole('combobox', { name: 'Audio source' })
+      expect(selector).toHaveValue('')
+      expect(within(selector).getAllByRole('option').map(option => option.textContent)).toEqual(['Combined', 'Host', 'Alex (1)', 'Alex (2)'])
+      fireEvent.change(screen.getByRole('slider', { name: 'Playback position' }), { target: { value: '12.25' } })
+      for (const [index, track] of ['', 'p1', 'p2', 'p3', ''].entries()) {
+        if (index > 0) fireEvent.change(selector, { target: { value: track } })
+        const audio = await screen.findByTestId('recording-player') as HTMLAudioElement
+        expect(audio.src).toBe(`https://signed.test/${track || 'combined'}`)
+        Object.defineProperty(audio, 'duration', { configurable: true, value: 60 })
+        fireEvent.loadedMetadata(audio)
+        expect(audio.currentTime).toBe(12.25)
+      }
+    } finally {
+      pause.mockRestore()
+    }
+  })
 
   test('draws each track on the shared clock and plays the available source when a gap is clicked', async () => {
     api.playback.mockImplementation((_id, track) => Promise.resolve({

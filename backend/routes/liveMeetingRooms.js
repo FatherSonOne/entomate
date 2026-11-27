@@ -1,6 +1,6 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
-const { randomUUID } = require('node:crypto');
+const { createHash, randomUUID } = require('node:crypto');
 const { URL } = require('node:url');
 const { z } = require('zod');
 const { supabaseAdmin } = require('../config/supabase');
@@ -9,6 +9,7 @@ const { getOrgIdForUser, getOrgIdsForUser } = require('../utils/orgContext');
 const ai = require('../config/ai');
 const { meterAiForOrg } = require('../services/aiUsage');
 const { generateInsights, transcriptKey, viewInsights } = require('../services/liveMeetingInsights');
+const recorder = require('../services/meetingRecorder');
 const log = require('../utils/log');
 
 const router = express.Router();
@@ -17,9 +18,16 @@ const configured = () => Boolean(supabaseAdmin && process.env.DAILY_API_KEY?.tri
 const roomColumns = 'id, host_id, org_id, invite_key, provider_name, url, title, with_notes, audio_only, created_at, expires_at, ending_at, ended_at, meeting_id';
 const name = z.string().trim().min(1).max(120);
 const createSchema = z.object({
-  id: z.uuid(), title: z.string().trim().min(1).max(160), withNotes: z.boolean(), audioOnly: z.boolean(),
+  id: z.uuid(), title: z.string().trim().min(1).max(160), withNotes: z.boolean(), audioOnly: z.boolean(), recordAudio: z.boolean().optional(),
 });
-const joinSchema = z.object({ name, acceptNotes: z.boolean().optional() });
+const joinSchema = z.object({
+  name, acceptNotes: z.boolean().optional(), acceptRecording: z.boolean().optional(), guestId: z.uuid().optional(),
+});
+const recordingStart = z.object({ mimeType: z.string().max(120) });
+const recordingFinish = z.object({
+  pieces: z.number().int().min(1).max(1000),
+  labels: z.object({ p1: name.optional(), p2: name.optional(), p3: name.optional() }),
+});
 const linesSchema = z.object({ lines: z.array(z.object({
   id: z.uuid(), atMs: z.number().int().min(0).max(14_400_000), speaker: name, text: z.string().trim().min(1).max(3000),
 })).max(100) });
@@ -87,15 +95,31 @@ function view(room) {
   };
 }
 
-async function tokenFor(room, userName, hostId) {
+async function roomView(room) {
+  const audio = room.meeting_id && (await recorder.roomRecordingJob(room))?.recording_job;
+  return { ...view(room), ...(audio ? { roomAudio: audio.status } : {}) };
+}
+
+function roomGuestId(roomId, nonce) {
+  if (!nonce) return randomUUID();
+  const digest = createHash('sha256').update(roomId + ':' + nonce).digest('hex');
+  return digest.slice(0, 8) + '-' + digest.slice(8, 12) + '-4' + digest.slice(13, 16)
+    + '-8' + digest.slice(17, 20) + '-' + digest.slice(20, 32);
+}
+
+async function tokenFor(room, userName, hostId, guestId, acceptRecording) {
+  const current = await roomView(room);
+  if (!hostId && current.roomAudio && !acceptRecording) {
+    throw fail(400, 'Acknowledge room audio recording before joining.');
+  }
   if (!available(room) || !room.url) throw fail(410, 'This live room has ended or is unavailable.');
   const result = await daily('/meeting-tokens', 'POST', { properties: {
     room_name: room.provider_name, exp: Math.floor(Date.parse(room.expires_at) / 1000),
-    user_id: hostId || randomUUID(), user_name: userName, is_owner: Boolean(hostId),
+    user_id: hostId || roomGuestId(room.id, guestId), user_name: userName, is_owner: Boolean(hostId),
   } });
   if (typeof result.token !== 'string' || !result.token) throw fail(502, 'The video service did not return access to this room.');
   if (!available(await getRoom(room.id, hostId))) throw fail(410, 'This live room has ended.');
-  return { ...view(room), url: room.url, token: result.token, host: Boolean(hostId) };
+  return { ...current, url: room.url, token: result.token, host: Boolean(hostId) };
 }
 
 router.get('/status', authenticate, async (req, res) => {
@@ -125,13 +149,15 @@ router.post('/', authenticate, rateLimit({
   if (error) throw error;
   const room = await getRoom(body.id, req.user.id);
   if (!available(room)) throw fail(410, 'This live room has ended.');
+  const enableAudio = body.recordAudio && !room.meeting_id;
+  if (enableAudio && room.url) throw fail(409, 'Enable participant audio recording when you create a new room.');
   if (!room.url) {
     const providerPath = `/rooms/${room.provider_name}`;
     const provider = await daily(providerPath, 'GET', undefined, [404]) || await daily('/rooms', 'POST', {
       name: room.provider_name, privacy: 'private',
       properties: {
         enable_knocking: false, enable_screenshare: true, enforce_unique_user_ids: true,
-        enable_transcription_storage: false, eject_at_room_exp: true, max_participants: 25,
+        enable_transcription_storage: false, eject_at_room_exp: true, max_participants: body.recordAudio ? 3 : 25,
         exp: Math.floor(Date.parse(room.expires_at) / 1000),
       },
     });
@@ -139,15 +165,18 @@ router.post('/', authenticate, rateLimit({
     if (url.protocol !== 'https:' || !url.hostname.endsWith('.daily.co') || url.pathname !== `/${room.provider_name}`) {
       throw fail(502, 'The video service returned an invalid room.');
     }
-    const { error: updateError } = await table().update({ url: url.href }).eq('id', room.id).eq('host_id', req.user.id);
+    if (enableAudio) await recorder.prepareRoomRecording(room);
+    const savedRoom = { url: url.href, ...(enableAudio ? { meeting_id: room.id } : {}) };
+    const { error: updateError } = await table().update(savedRoom).eq('id', room.id).eq('host_id', req.user.id);
     if (updateError) throw updateError;
+    Object.assign(room, savedRoom);
   }
-  res.status(201).json(view(room));
+  res.status(201).json(await roomView(room));
 }));
 
 router.get('/:id/host', authenticate, route(async (req, res) => {
   const room = await getRoom(req.params.id, req.user.id);
-  res.json({ ...view(room), meetingId: room.meeting_id, inviteKey: room.invite_key });
+  res.json({ ...(await roomView(room)), meetingId: room.meeting_id, inviteKey: room.invite_key });
 }));
 
 router.post('/:id/host/join', authenticate, route(async (req, res) => {
@@ -171,15 +200,30 @@ function requireInvite(req, res, next) {
 router.post('/:id/guest', guestLimit, requireInvite, route(async (req, res) => {
   const room = await getRoom(req.params.id, null, req.inviteKey);
   if (!available(room) || !room.url) throw fail(410, 'This live room has ended or is unavailable.');
-  res.json(view(room));
+  res.json(await roomView(room));
 }));
 
 router.post('/:id/guest/join', guestLimit, requireInvite, route(async (req, res) => {
   const body = parse(joinSchema, req.body);
   const room = await getRoom(req.params.id, null, req.inviteKey);
   if (room.with_notes && !body.acceptNotes) throw fail(400, 'Acknowledge live transcription before joining.');
-  res.json(await tokenFor(room, body.name));
+  res.json(await tokenFor(room, body.name, null, body.guestId, body.acceptRecording));
 }));
+
+router.post('/:id/recording/start', authenticate, route(async (req, res) => {
+  const room = await getRoom(req.params.id, req.user.id);
+  if (!available(room) || room.meeting_id !== room.id) throw fail(409, 'Room recording is unavailable.');
+  const { mimeType } = parse(recordingStart, req.body);
+  const job = await recorder.startRoomRecording(room, mimeType);
+  res.status(201).json({ status: job.status });
+}, { needsDaily: false }));
+
+router.post('/:id/recording/finish', authenticate, route(async (req, res) => {
+  const room = await getRoom(req.params.id, req.user.id);
+  const { pieces, labels } = parse(recordingFinish, req.body);
+  const job = await recorder.finishRoomRecording(room, pieces, labels);
+  res.json({ status: job.status, meetingId: room.id });
+}, { needsDaily: false }));
 
 router.post('/:id/lines', authenticate, route(async (req, res) => {
   const room = await getRoom(req.params.id, req.user.id);
@@ -272,6 +316,16 @@ router.post('/:id/insights/actions/:draftId/approve', authenticate, insightsRout
 router.post('/:id/end', authenticate, route(async (req, res) => {
   const room = await getRoom(req.params.id, req.user.id);
   if (room.ended_at) return res.json({ meetingId: room.meeting_id });
+  if (room.meeting_id && (await recorder.roomRecordingJob(room))?.recording_job.status === 'recording') {
+    // Persist a recoverable Combined prefix if the host ended after losing capture.
+    try { await recorder.finishRoomRecording(room, null, {}); } catch (error) {
+      if (error.status !== 400) throw error;
+      const { error: updateError } = await supabaseAdmin.from('meetings')
+        .update({ recording_job: { source: 'room', status: 'failed', error: 'No room audio was saved.' } })
+        .eq('id', room.id).eq('org_id', room.org_id).eq('recording_job->>status', 'recording');
+      if (updateError) throw updateError;
+    }
+  }
   if (!room.ending_at) {
     const { error } = await table().update({ ending_at: new Date().toISOString() })
       .eq('id', room.id).eq('host_id', req.user.id).is('ending_at', null);

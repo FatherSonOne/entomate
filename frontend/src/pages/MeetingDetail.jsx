@@ -92,6 +92,14 @@ export default function MeetingDetail() {
   const rebuildingTranscript = keptRecording && isRebuildingTranscript(recordingJob)
   const browserRecording = recordingJob && (recordingJob.source === 'browser'
     || (!recordingJob.source && !meeting?.recording_job?.botSessionId && recordingJob.mode))
+  const roomRecording = recordingJob?.source === 'room'
+  const roomOffsetMs = roomRecording ? recordingJob.roomOffsetMs ?? 0 : 0
+  const roomRecordingDuration = roomRecording ? recordingJob.durationMs : null
+  const audioTime = useCallback(atMs => {
+    if (atMs == null) return null
+    const relative = atMs - roomOffsetMs
+    return relative >= 0 && (roomRecordingDuration === null || relative <= roomRecordingDuration) ? relative : null
+  }, [roomOffsetMs, roomRecordingDuration])
   const canRebuildTranscript = keptRecording && browserRecording
   const [requestingTranscriptRebuild, setRequestingTranscriptRebuild] = useState(false)
   const rebuiltAt = recordingJob?.transcriptRebuiltAt
@@ -112,15 +120,17 @@ export default function MeetingDetail() {
   const jumpToTranscript = useCallback((atMs, play = true, eventId = null) => {
     setFocusAtMs(atMs)
     setFocusEventId(eventId)
-    if (play && playerRef.current?.isReady()) playerRef.current.playFrom(atMs)
+    const cue = audioTime(atMs)
+    if (play && cue != null && playerRef.current?.isReady()) playerRef.current.playFrom(cue)
     // The transcript sits beside the content on desktop; on phone it is its own tab.
     if (window.matchMedia(PHONE_QUERY).matches) setTab('room')
-  }, [])
+  }, [audioTime])
   // A ▶ timecode or tape mark the user pressed: also loads the recording if needed, then plays from there.
   const playMoment = useCallback((atMs) => {
-    if (playable && !playerRef.current?.isReady()) playerRef.current?.playFrom(atMs)
+    const cue = audioTime(atMs)
+    if (playable && cue != null && !playerRef.current?.isReady()) playerRef.current?.playFrom(cue)
     jumpToTranscript(atMs)
-  }, [playable, jumpToTranscript])
+  }, [audioTime, playable, jumpToTranscript])
   const [tab, setTab] = useState(tabParam === 'transcript' ? 'room' : 'minutes')
   const isPhone = useMediaQuery(PHONE_QUERY)
   const [showIntel, setShowIntel] = useState(false)
@@ -180,8 +190,9 @@ export default function MeetingDetail() {
     setFocusAtMs(sourceAtMs)
     setFocusEventId(null)
     setPlayingAtMs(null)
-    if (playable && sourceAtMs != null) playerRef.current?.cueAt(sourceAtMs)
-  }, [currentMeeting, id, playable, sourceAnchor, sourceAtMs])
+    const cue = audioTime(sourceAtMs)
+    if (playable && cue != null) playerRef.current?.cueAt(cue)
+  }, [audioTime, currentMeeting, id, playable, sourceAnchor, sourceAtMs])
 
   useEffect(() => {
     if (!currentMeeting || !timedSegments || startAtMs == null || sourceAtMs != null) return
@@ -714,7 +725,10 @@ export default function MeetingDetail() {
               focusSource={sourceAtMs != null && sourceAtMs === transcriptFocus}
               playingAtMs={playable ? playingAtMs : null}
               onPlayFrom={playable ? (atMs) => playerRef.current?.playFrom(atMs) : undefined}
-              onPreviewSpeaker={playable ? (atMs, endMs) => playerRef.current?.playFrom(atMs, endMs) : undefined}
+              onPreviewSpeaker={playable ? (atMs, endMs) => {
+                const cue = audioTime(atMs)
+                if (cue != null) playerRef.current?.playFrom(cue, audioTime(endMs) ?? roomRecordingDuration ?? undefined)
+              } : undefined}
               speakerEditsDisabled={rebuildingTranscript || requestingTranscriptRebuild}
               onClip={(line) => clipToSearchNotes({ kind: 'transcript', body: line.speaker ? `${line.speaker}: ${line.text}` : line.text, atMs: line.atMs })}
               onCreateTask={openTask}
@@ -781,17 +795,27 @@ export default function MeetingDetail() {
             meetingId={meeting.id}
             audioUrl={uploadedAudioUrl}
             durationMs={meeting.recording_job?.durationMs || lengthMs}
-            audioTracks={keptRecording && browserRecording ? recordingJob.audioTracks : undefined}
+            audioTracks={keptRecording && (browserRecording || roomRecording) ? recordingJob.audioTracks : undefined}
+            roomRecording={roomRecording}
             gaps={keptRecording && browserRecording ? recordingJob.audioGaps : undefined}
             waveformPeaks={keptRecording ? toWaveformPeaks(meeting.recording_job?.waveformPeaks) : null}
             waveformReplacement={rebuildingTranscript
               ? <DebriefLoader source={recordingRebuildSource(recordingJob, meeting.title, meeting.attendees)} />
               : undefined}
-            transcriptSegments={transcriptSegments}
-            onTime={setPlayingAtMs}
-            decisions={decisionMarks}
-            actions={actionMarks}
-            onMoment={playMoment}
+            transcriptSegments={roomRecording ? transcriptSegments?.flatMap(line => {
+              const atMs = audioTime(line.atMs)
+              return atMs == null ? [] : [{ ...line, atMs, endMs: line.endMs == null ? undefined : Math.min(roomRecordingDuration, line.endMs - roomOffsetMs) }]
+            }) : transcriptSegments}
+            onTime={atMs => setPlayingAtMs(atMs == null ? null : atMs + roomOffsetMs)}
+            decisions={roomRecording ? decisionMarks.flatMap(mark => {
+              const atMs = audioTime(mark.atMs)
+              return atMs == null ? [] : [{ ...mark, atMs }]
+            }) : decisionMarks}
+            actions={roomRecording ? actionMarks.flatMap(mark => {
+              const atMs = audioTime(mark.atMs)
+              return atMs == null ? [] : [{ ...mark, atMs }]
+            }) : actionMarks}
+            onMoment={atMs => playMoment(atMs + roomOffsetMs)}
             onStepMoment={moments.length ? stepMoment : undefined}
             onAudioRemoved={keptRecording ? refreshMeeting : undefined}
           />

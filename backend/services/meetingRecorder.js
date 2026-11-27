@@ -36,6 +36,7 @@ const log = require('../utils/log');
 const BUCKET = 'meeting-recordings';
 const MODES = ['mic', 'camera', 'tab'];
 const ISOLATED_TRACKS = ['mic', 'tab'];
+const ROOM_TRACKS = ['p1', 'p2', 'p3'];
 const PIECE_MAX_BYTES = 10 * 1024 * 1024;
 /** 1,000 pieces of 30 s is 8 h 20 min. */
 const MAX_PIECES = 1000;
@@ -373,7 +374,7 @@ async function startRecording({ userId, orgId, title, attendees, mode, mimeType,
 }
 
 /** Save one piece. A piece already saved (a retry after a lost response) is success. */
-async function savePiece({ orgId, meetingId, seq, durationMs, buffer, track = 'mix' }) {
+async function savePiece({ orgId, meetingId, userId, seq, durationMs, buffer, track = 'mix' }) {
   if (!Number.isInteger(seq) || seq < 0 || seq >= MAX_PIECES) throw new RecorderError(400, 'Invalid piece number.');
   if (!Number.isInteger(durationMs) || durationMs < 0 || durationMs > MAX_PIECE_MS) throw new RecorderError(400, 'Invalid piece length.');
   if (!Buffer.isBuffer(buffer) || buffer.length === 0) throw new RecorderError(400, 'The piece is empty.');
@@ -382,7 +383,9 @@ async function savePiece({ orgId, meetingId, seq, durationMs, buffer, track = 'm
   const meeting = await loadMeeting(meetingId);
   const job = meeting?.recording_job;
   if (!job || meeting.org_id !== orgId || job.status !== 'recording') throw new RecorderError(409, 'This meeting is not recording.');
-  if (track !== 'mix' && (!job.splitAudio || !ISOLATED_TRACKS.includes(track))) {
+  if (job.source === 'room' && job.startedBy !== userId) throw new RecorderError(404, 'Recording not found.');
+  const tracks = job.source === 'room' ? ROOM_TRACKS : job.splitAudio ? ISOLATED_TRACKS : [];
+  if (track !== 'mix' && !tracks.includes(track)) {
     throw new RecorderError(400, 'This recording does not have that audio track.');
   }
 
@@ -405,10 +408,10 @@ function contiguousCount(saved) {
   return n;
 }
 
-function trackCoverage(files, mixed) {
+function trackCoverage(files, mixed, trackNames = ISOLATED_TRACKS) {
   const tracks = {};
   const durations = mixed && new Map(mixed.map(piece => [piece.seq, piece.durationMs]));
-  for (const track of ISOLATED_TRACKS) {
+  for (const track of trackNames) {
     let pieces = 0;
     let durationMs = 0;
     for (const piece of piecesForTrack(files, track)) {
@@ -422,10 +425,87 @@ function trackCoverage(files, mixed) {
   return tracks;
 }
 
+async function roomRecordingJob(room) {
+  const meeting = await loadMeeting(room.id);
+  return meeting?.org_id === room.org_id && meeting.created_by === room.host_id
+    && meeting.recording_job?.source === 'room' ? meeting : null;
+}
+
+async function prepareRoomRecording(room) {
+  const { error } = await supabase.from('meetings').upsert({
+    id: room.id, org_id: room.org_id, created_by: room.host_id, title: room.title,
+    start_time: room.created_at, action_items_require_approval: true,
+    recording_job: { source: 'room', status: 'ready', startedBy: room.host_id },
+  }, { onConflict: 'id', ignoreDuplicates: true });
+  if (error) throw error;
+  if (!(await roomRecordingJob(room))) throw new RecorderError(409, 'This room could not be prepared for recording.');
+}
+
+async function startRoomRecording(room, mimeType) {
+  const meeting = await roomRecordingJob(room);
+  const mime = baseMime(mimeType);
+  if (!meeting || !mime || room.ending_at || room.ended_at) throw new RecorderError(409, 'This room cannot start a recording.');
+  const now = new Date().toISOString();
+  const job = { ...meeting.recording_job, status: 'recording', mimeType: mime, startedAt: now, updatedAt: now,
+    roomOffsetMs: Math.max(0, Date.parse(now) - Date.parse(room.created_at)) };
+  const { data, error } = await supabase.from('meetings').update({ recording_job: job, updated_at: now })
+    .eq('id', room.id).eq('org_id', room.org_id).eq('recording_job->>status', 'ready').select('id').maybeSingle();
+  if (error) throw error;
+  if (!data) throw new RecorderError(409, 'This room already has a recording.');
+  return job;
+}
+
+const roomFinalizing = new Map();
+async function finishRoomRecording(room, pieces, labels) {
+  const active = roomFinalizing.get(room.id);
+  if (active) return active;
+  const finish = finalizeRoomAudio(room, pieces, labels).finally(() => roomFinalizing.delete(room.id));
+  roomFinalizing.set(room.id, finish);
+  return finish;
+}
+
+async function finalizeRoomAudio(room, pieces, labels) {
+  const meeting = await roomRecordingJob(room);
+  const job = meeting?.recording_job;
+  if (job?.status === 'done') return job;
+  if (job?.status !== 'recording') throw new RecorderError(409, 'This room has no recording to save.');
+  const files = await listFolder(meeting.org_id, meeting.id);
+  const combined = piecesForTrack(files);
+  if (pieces === null) pieces = contiguousCount(combined);
+  if (!Number.isInteger(pieces) || pieces < 1 || pieces > MAX_PIECES) {
+    throw new RecorderError(400, 'There is no room audio to save.');
+  }
+  const mixed = combined.filter(piece => piece.seq < pieces);
+  if (mixed.length !== pieces || mixed.some((piece, i) => piece.seq !== i)) {
+    throw new RecorderError(409, 'Some room audio is still uploading.');
+  }
+  const durationMs = mixed.reduce((total, piece) => total + piece.durationMs, 0);
+  const coverage = trackCoverage(files, mixed, ROOM_TRACKS);
+  const participantTracks = {};
+  const makeCopy = async (track, parts) => savePlaybackFile(meeting, await downloadRecordingPieces(parts), job.mimeType, track);
+  const playbackFile = await makeCopy('mix', mixed);
+  if (!playbackFile) throw new RecorderError(503, 'The room audio could not be prepared. Try saving again.');
+  for (const track of ROOM_TRACKS) {
+    if (!labels[track] || !coverage[track]?.durationMs) continue;
+    try {
+      const parts = piecesForTrack(files, track).filter(piece => piece.seq < coverage[track].pieces);
+      const file = await makeCopy(track, parts);
+      if (file) participantTracks[track] = { ...coverage[track], label: labels[track], playbackFile: file };
+    } catch (error) {
+      log.warn('Room participant audio could not be prepared', { meetingId: room.id, track, error: error.message });
+    }
+  }
+  return setJob(meeting, {
+    status: 'done', audioKept: true, pieces, durationMs, playbackFile, participantTracks,
+    finishedAt: new Date().toISOString(), error: null,
+  });
+}
+
 async function recordingRecovery(meetingId) {
   const meeting = await loadMeeting(meetingId);
   const job = meeting?.recording_job;
   if (!job) throw new RecorderError(409, 'This meeting was not recorded here.');
+  if (job.source === 'room') throw new RecorderError(409, 'Room audio is managed in the live room.');
   if (job.status !== 'recording') {
     return {
       status: job.status,
@@ -469,6 +549,7 @@ async function finishRecording({ meetingId, pieces, salvage = false, micAudioGap
   const meeting = await loadMeeting(meetingId);
   const job = meeting?.recording_job;
   if (!job) throw new RecorderError(409, 'This meeting was not recorded here.');
+  if (job.source === 'room') throw new RecorderError(409, 'Save this recording from its live room.');
   if (job.status !== 'recording') return { status: job.status };
 
   const files = await listFolder(meeting.org_id, meetingId);
@@ -522,6 +603,7 @@ async function retryTranscription({ meetingId }) {
   const meeting = await loadMeeting(meetingId);
   const job = meeting?.recording_job;
   if (!job) throw new RecorderError(409, 'This meeting was not recorded here.');
+  if (job.source === 'room') throw new RecorderError(409, 'Room audio is managed in the live room.');
   const stuck = job.status === 'transcribing' && !running.has(meetingId) && isStale(job);
   const retryable = job.status === 'failed' || job.status === 'backup' || stuck;
   if (!retryable) throw new RecorderError(409, job.status === 'transcribing' ? 'The transcript is still being written.' : 'There is nothing to retry.');
@@ -655,6 +737,7 @@ async function runTranscriptRebuild(meeting, startedAt) {
 /** Throw away a recording that never became a meeting: its audio and its row. */
 async function discardRecording({ orgId, meetingId }) {
   const meeting = await loadMeeting(meetingId);
+  if (meeting?.recording_job?.source === 'room') throw new RecorderError(409, 'Room audio is managed in the live room.');
   const status = meeting?.recording_job?.status;
   if (status !== 'recording' && status !== 'failed') throw new RecorderError(409, 'Only an unfinished recording can be discarded.');
   await purgeRecordingAudio(orgId, meetingId);
@@ -806,8 +889,9 @@ async function loadPlaybackMeeting(orgId, meetingId) {
 
 function playbackTrackCoverage(job, track) {
   if (track === 'mix') return null;
-  const coverage = ISOLATED_TRACKS.includes(track) && job.audioTracks?.[track];
-  if (job.source !== 'browser' || !coverage?.pieces || !coverage.durationMs) {
+  const coverage = job.source === 'room' && ROOM_TRACKS.includes(track) ? job.participantTracks?.[track]
+    : job.source === 'browser' && ISOLATED_TRACKS.includes(track) ? job.audioTracks?.[track] : undefined;
+  if (!coverage?.pieces || !coverage.durationMs) {
     throw new RecorderError(404, 'This audio track is unavailable.');
   }
   return coverage;
@@ -932,6 +1016,10 @@ module.exports = {
   PIECE_MAX_BYTES,
   RecorderError,
   startRecording,
+  roomRecordingJob,
+  prepareRoomRecording,
+  startRoomRecording,
+  finishRoomRecording,
   botsInCall,
   botCouldNotDeliver,
   savePiece,

@@ -6,6 +6,29 @@ import { MeetingNavigation, MeetingTrail, ROOM, START, WORKSPACE } from '../comp
 import { LiveMeetingInsights } from '../components/meetings/LiveMeetingInsights'
 import { useAuth } from '../contexts/AuthContext'
 import { liveRoomsApi, meetingsApi } from '../services/api'
+import { RoomAudioRecorder } from '../services/roomAudioRecorder'
+import { protectRecordingFromReload } from '../services/chunkReload'
+
+function guestIdentity(roomId) {
+  const key = 'entomate:room-guest:' + roomId
+  try {
+    const previous = sessionStorage.getItem(key)
+    if (previous) return previous
+    const id = crypto.randomUUID()
+    sessionStorage.setItem(key, id)
+    return id
+  } catch {
+    return crypto.randomUUID()
+  }
+}
+
+function recordingInputs(participants) {
+  return participants.map(person => ({
+    id: person.user_id || person.session_id,
+    name: (person.user_name || (person.local ? 'Host' : 'Guest')).slice(0, 120),
+    audio: liveTrack(person, 'audio'),
+  }))
+}
 
 function Track({ track, video, muted, className }) {
   const element = useRef(null)
@@ -49,6 +72,11 @@ export default function LiveMeetingRoom({ guest = false }) {
   const [name, setName] = useState('')
   const [withNotes, setWithNotes] = useState(false)
   const [acceptNotes, setAcceptNotes] = useState(false)
+  const [recordAudio, setRecordAudio] = useState(false)
+  const [acceptRecording, setAcceptRecording] = useState(false)
+  const [recordingBusy, setRecordingBusy] = useState(false)
+  const capture = useRef(null)
+  const guestId = useMemo(() => guest && id ? guestIdentity(id) : undefined, [guest, id])
   const [audioOnly, setAudioOnly] = useState(false)
   const [mic, setMic] = useState(true)
   const [camera, setCamera] = useState(false)
@@ -79,6 +107,8 @@ export default function LiveMeetingRoom({ guest = false }) {
     mounted.current = true
     return () => {
       mounted.current = false
+      capture.current?.cancel()
+      capture.current = null
       const previous = call.current
       call.current = null
       if (previous) void previous.destroy().catch(() => {})
@@ -91,6 +121,7 @@ export default function LiveMeetingRoom({ guest = false }) {
     setError('')
     setRoom(null)
     setTranscriptRevision(0)
+    setAcceptRecording(false)
     if (!id) createId.current = null
     const request = !id ? liveRoomsApi.status() : guest ? liveRoomsApi.guest(id, inviteKey) : liveRoomsApi.host(id)
     request.then(data => {
@@ -157,6 +188,67 @@ export default function LiveMeetingRoom({ guest = false }) {
     }
   }, [checkpoint, flush, guest, joined, room?.withNotes])
 
+  useEffect(() => {
+    if (!guest || !joined || !room?.roomAudio) return undefined
+    let active = true
+    const poll = () => void liveRoomsApi.guest(id, inviteKey).then(next => {
+      if (active) setRoom(current => ({ ...current, roomAudio: next.roomAudio }))
+    }).catch(() => {})
+    const timer = window.setInterval(poll, 5000)
+    return () => { active = false; window.clearInterval(timer) }
+  }, [guest, id, inviteKey, joined, Boolean(room?.roomAudio)])
+
+  useEffect(() => {
+    if (guest || room?.roomAudio !== 'recording' || !capture.current) return undefined
+    const unprotect = protectRecordingFromReload()
+    const warn = event => event.preventDefault()
+    window.addEventListener('beforeunload', warn)
+    return () => { window.removeEventListener('beforeunload', warn); unprotect() }
+  }, [guest, room?.roomAudio])
+
+  async function startAudio() {
+    if (!id || guest || !call.current || recordingBusy || inAction.current) return
+    inAction.current = true
+    setRecordingBusy(true)
+    setError('')
+    const connection = call.current
+    try {
+      const recorder = await RoomAudioRecorder.start(id, recordingInputs(Object.values(connection.participants())))
+      if (!mounted.current || call.current !== connection) { recorder.cancel(); return }
+      capture.current = recorder
+      recorder.update(recordingInputs(Object.values(connection.participants())))
+      setRoom(current => ({ ...current, roomAudio: 'recording' }))
+    } catch (err) {
+      setError(err.message || 'The room recording could not start.')
+    } finally {
+      inAction.current = false
+      if (mounted.current) setRecordingBusy(false)
+    }
+  }
+
+  async function saveAudio() {
+    const recorder = capture.current
+    if (!recorder) return
+    await recorder.finish()
+    capture.current = null
+    setRoom(current => ({ ...current, roomAudio: 'done' }))
+  }
+
+  async function stopAudio() {
+    if (!capture.current || inAction.current) return
+    inAction.current = true
+    setRecordingBusy(true)
+    setError('')
+    try {
+      await saveAudio()
+    } catch (err) {
+      setError(err.message || 'The room recording could not be saved.')
+    } finally {
+      inAction.current = false
+      if (mounted.current) setRecordingBusy(false)
+    }
+  }
+
   async function create(event) {
     event.preventDefault()
     if (inAction.current) return
@@ -165,7 +257,7 @@ export default function LiveMeetingRoom({ guest = false }) {
     setBusy(true)
     createId.current ||= crypto.randomUUID()
     try {
-      const result = await liveRoomsApi.create({ id: createId.current, title, withNotes, audioOnly })
+      const result = await liveRoomsApi.create({ id: createId.current, title, withNotes, audioOnly, ...(recordAudio ? { recordAudio } : {}) })
       navigate(`${ROOM}/${result.id}`, { replace: true })
     } catch (err) {
       setError(err.status === 502 ? 'The video service could not create this room. Try again.' : err.message)
@@ -188,13 +280,16 @@ export default function LiveMeetingRoom({ guest = false }) {
     try {
       const [{ default: Daily }, access] = await Promise.all([
         import('@daily-co/daily-js'),
-        liveRoomsApi.join(id, !guest, { name: name.trim() || user?.name || 'Host', ...(guest ? { inviteKey, acceptNotes } : {}) }),
+        liveRoomsApi.join(id, !guest, { name: name.trim() || user?.name || 'Host', ...(guest ? { inviteKey, acceptNotes, acceptRecording, guestId } : {}) }),
       ])
       if (!mounted.current) return
       const connection = Daily.createCallObject()
       call.current = connection
       const sync = () => {
-        if (call.current === connection) setParticipants(Object.values(connection.participants()))
+        if (call.current !== connection) return
+        const people = Object.values(connection.participants())
+        setParticipants(people)
+        capture.current?.update(recordingInputs(people))
       }
       const updateSpeaker = event => setSpeaker(event.activeSpeaker.peerId)
       const onLine = event => {
@@ -273,7 +368,10 @@ export default function LiveMeetingRoom({ guest = false }) {
   async function leave() {
     intentionalLeave.current = true
     try {
-      if (!guest) await flush()
+      if (!guest) {
+        await saveAudio()
+        await flush()
+      }
       if (call.current) await call.current.leave()
       setNotice('You left the call.')
     } catch {
@@ -292,6 +390,7 @@ export default function LiveMeetingRoom({ guest = false }) {
       if (transcribing) {
         try { call.current?.stopTranscription() } catch { /* Closing the room also stops transcription. */ }
       }
+      await saveAudio()
       await flush()
       const { meetingId } = await liveRoomsApi.end(id)
       setError('')
@@ -299,7 +398,7 @@ export default function LiveMeetingRoom({ guest = false }) {
       call.current = null
       if (connection) void connection.destroy().catch(() => {})
       if (meetingId) {
-        navigate(`/meetings/${meetingId}`, { replace: true, state: { writeMinutes: true } })
+        navigate(`/meetings/${meetingId}`, { replace: true, state: { writeMinutes: room.withNotes } })
       } else {
         setJoined(false)
         setRoom(previous => ({ ...previous, available: false, finished: true }))
@@ -337,7 +436,7 @@ export default function LiveMeetingRoom({ guest = false }) {
       {notice && <p role="status">{notice}</p>}
       {!guest && id && room && !room.finished && <div className="bs-meeting-room-actions">
         {room.available && <Key onClick={copyInvite} icon={<Link2 aria-hidden="true" />}>{copied ? 'Link copied' : 'Copy guest link'}</Key>}
-        <Key variant="danger" disabled={busy} onClick={() => setClosing(true)}>End room</Key>
+        <Key variant="danger" disabled={busy || recordingBusy} onClick={() => setClosing(true)}>End room</Key>
         {error?.includes('Clipboard') && <TextInput aria-label="Guest link" value={guestUrl} readOnly onFocus={event => event.target.select()} />}
       </div>}
       {!loading && !id && room?.configured && <form className="bs-meeting-lobby" onSubmit={create}>
@@ -346,6 +445,8 @@ export default function LiveMeetingRoom({ guest = false }) {
         <label className="bs-meeting-check"><input type="checkbox" checked={audioOnly} onChange={event => setAudioOnly(event.target.checked)} />Start in audio-only mode</label>
         <label className="bs-meeting-check"><input type="checkbox" checked={withNotes} onChange={event => setWithNotes(event.target.checked)} />Transcribe the call and save minutes</label>
         {withNotes && <p className="bs-mut">Guests acknowledge transcription before joining. Entomate saves the transcript and minutes in your workspace.</p>}
+        <label className="bs-meeting-check"><input type="checkbox" checked={recordAudio} onChange={event => setRecordAudio(event.target.checked)} />Enable participant audio recording</label>
+        {recordAudio && <p className="bs-mut">Up to three people. The host records microphones and keeps this room open until the audio saves.</p>}
         <Key variant="primary" type="submit" disabled={busy || !title.trim()}>{busy ? 'Creating room…' : 'Create room'}</Key>
       </form>}
       {showLobby && <form className="bs-meeting-lobby" onSubmit={join}>
@@ -362,13 +463,19 @@ export default function LiveMeetingRoom({ guest = false }) {
           <input type="checkbox" checked={acceptNotes} onChange={event => setAcceptNotes(event.target.checked)} required />
           I agree to have this call transcribed and saved in the host’s workspace.
         </label>}
-        <Key variant="primary" type="submit" disabled={busy || (guest && (!name.trim() || (room.withNotes && !acceptNotes)))}>
+        {guest && room.roomAudio && <label className="bs-meeting-check">
+          <input type="checkbox" checked={acceptRecording} onChange={event => setAcceptRecording(event.target.checked)} required />
+          I agree to have my microphone recorded and saved in the host’s workspace.
+        </label>}
+        <Key variant="primary" type="submit" disabled={busy || (guest && (!name.trim()
+          || (room.withNotes && !acceptNotes) || (room.roomAudio && !acceptRecording)))}>
           {busy ? 'Joining…' : guest ? 'Join room' : 'Enter room'}
         </Key>
       </form>}
       {joined && <section aria-label="Live call" className="bs-meeting-call">
         <div className="bs-meeting-call-status">
           <Signal tone="live">Live · {participants.length} {participants.length === 1 ? 'person' : 'people'}</Signal>
+          {room.roomAudio === 'recording' && <Signal tone="live">Recording room audio</Signal>}
           {room.withNotes && <Signal tone={transcribing ? 'brand' : 'off'}>{transcribing ? 'Transcribing' : 'Live transcription enabled'}</Signal>}
         </div>
         <div className="bs-meeting-controls">
@@ -380,7 +487,14 @@ export default function LiveMeetingRoom({ guest = false }) {
               else call.current?.startScreenShare()
             } catch { setError('Screen sharing could not start in this browser.') }
           }} icon={<MonitorUp aria-hidden="true" />}>{local?.screen ? 'Stop sharing' : 'Share screen'}</Key>
-          <Key onClick={leave} disabled={busy}>Leave room</Key>
+          {!guest && room.roomAudio === 'ready' && <Key onClick={startAudio} disabled={recordingBusy || busy}>
+            {recordingBusy ? 'Starting audio recording…' : 'Start audio recording'}
+          </Key>}
+          {!guest && room.roomAudio === 'recording' && capture.current && <Key onClick={stopAudio} disabled={recordingBusy || busy}>
+            {recordingBusy ? 'Saving room audio…' : 'Stop audio recording'}
+          </Key>}
+          {!guest && room.roomAudio === 'recording' && !capture.current && <span>Capture was interrupted. End the room to save any uploaded audio.</span>}
+          <Key onClick={leave} disabled={busy || recordingBusy}>Leave room</Key>
         </div>
         {shared && <div className="bs-meeting-share"><Track video muted track={liveTrack(shared, 'screenVideo')} />
           {!shared.local && liveTrack(shared, 'screenAudio') && <Track track={liveTrack(shared, 'screenAudio')} />}
