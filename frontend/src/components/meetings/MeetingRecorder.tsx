@@ -361,6 +361,33 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
     }
   }
 
+  useEffect(() => {
+    if (phase !== 'recording' && phase !== 'finishing') return
+    const warn = (e: BeforeUnloadEvent): void => {
+      e.preventDefault()
+    }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [phase])
+  useEffect(() => () => {
+    if (videoUrl) URL.revokeObjectURL(videoUrl)
+  }, [videoUrl])
+
+  useEffect(() => {
+    if (phase !== 'recording') return
+    const timer = window.setInterval(() => setElapsedMs(recordedMs()), 500)
+    return () => window.clearInterval(timer)
+  }, [phase])
+
+  // The pop-out closes once the recording is handed over, or when this recorder goes away.
+  useEffect(() => {
+    if (pop && phase !== 'recording' && phase !== 'finishing') {
+      pop.win.close()
+      setPop(null)
+    }
+  }, [phase, pop])
+  useEffect(() => () => pop?.win.close(), [pop])
+
   /** Ask the browser for the devices the chosen mode needs. */
   const openStreams = async (captureMode: RecorderMode): Promise<{ streams: MediaStream[]; video: MediaStreamTrack | null }> => {
     const md = navigator.mediaDevices
