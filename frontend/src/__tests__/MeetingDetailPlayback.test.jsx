@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom'
 import { vi, describe, test, expect, beforeEach, afterEach } from 'vitest'
 
 const api = vi.hoisted(() => ({ get: vi.fn(), regenerateSummary: vi.fn(async () => ({})), carryForward: vi.fn(() => Promise.resolve(null)) }))
-const search = vi.hoisted(() => ({ askStream: vi.fn(), getHistory: async () => ({ history: [] }) }))
+const search = vi.hoisted(() => ({ ask: vi.fn(), askStream: vi.fn(), getHistory: async () => ({ history: [] }) }))
 const listLaunchMilestones = vi.hoisted(() => vi.fn())
 const player = vi.hoisted(() => ({ ready: false, playFrom: vi.fn(), cueAt: vi.fn() }))
 const reports = vi.hoisted(() => ({ downloadMeetingDocument: vi.fn(async () => {}) }))
@@ -250,7 +250,9 @@ describe('a pressed timecode plays the recording', () => {
       comparing: true, custom: true, typed: true, relative: 'months', coverageName: 'Date range coverage' },
     { label: 'launch milestone comparison', question: 'The two weeks before launch vs. the two weeks after. What changed?',
       comparing: true, custom: true, typed: true, relative: 'launch', coverageName: 'Date range coverage' },
-  ])('$label restores coverage and the exact Before and After links without a second Ask request', async ({ question, comparing, custom, typed, corrected, relative, coverageName }) => {
+    { label: 'manual launch comparison', question: 'The two weeks before launch vs. the two weeks after. What changed?',
+      comparing: true, custom: true, typed: true, relative: 'launch', manual: true, coverageName: 'Date range coverage' },
+  ])('$label restores coverage and the exact Before and After links without a second Ask request', async ({ question, comparing, custom, typed, corrected, relative, manual, coverageName }) => {
     const relativeCase = {
       days: {
         beforeMidnight: [10, 28], afterMidnight: [10, 29],
@@ -298,6 +300,7 @@ describe('a pressed timecode plays the recording', () => {
         completedAt: new Date(2026, 10, 12, 12).toISOString() },
     ] })
     const chosenLaunch = 'p-beta:m-beta:completed|2026-11-12'
+    const launchName = manual ? 'Website launch' : 'Beta · Launch'
     const beforeQuote = 'We agreed to launch on Monday.'
     const afterQuote = 'The launch is now scheduled for Friday.'
     const laterRevision = 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb'
@@ -336,9 +339,10 @@ describe('a pressed timecode plays the recording', () => {
       totalMeetings: 5, reviewedMeetings: 3, unindexedMeetings: 0, unsampledMeetings: 1 }
     const answerScope = comparing ? { comparison: { previous, current: recap } } : { recap }
     const answer = 'Launch moved from Monday to Friday.'
-    search.askStream.mockImplementation(async (_data, callbacks) => {
-      callbacks.onComplete({ answer, ...answerScope, claims: [{ topic: 'Launch', text: answer, citations: sources }] })
-    })
+    const reply = { answer, ...answerScope, claims: [{ topic: 'Launch', text: answer, citations: sources }] }
+    const request = launch ? search.ask : search.askStream
+    if (launch) search.ask.mockResolvedValue(reply)
+    else search.askStream.mockImplementation(async (_data, callbacks) => callbacks.onComplete(reply))
     render(
       <MemoryRouter initialEntries={[{ pathname: '/search', search: custom ? '?mode=ask' : `?q=${encodeURIComponent(question)}&ask=1`, key: crypto.randomUUID() }]}>
         <NavTrailRecorder />
@@ -364,8 +368,13 @@ describe('a pressed timecode plays the recording', () => {
         expect(screen.getByRole('option', { name: /Beta · Launch · Scheduled date · 2026-11-11/ })).toBeVisible()
         expect(screen.getByRole('option', { name: /Beta · Launch · Marked complete · 2026-11-12/ })).toBeVisible()
         expect(search.askStream).not.toHaveBeenCalled()
+        expect(search.ask).not.toHaveBeenCalled()
         expect(listLaunchMilestones).toHaveBeenCalledWith('playback-org', expect.any(AbortSignal))
-        fireEvent.change(screen.getByLabelText('Launch milestone and date'), { target: { value: chosenLaunch } })
+        if (manual) {
+          fireEvent.change(screen.getByLabelText('Launch source'), { target: { value: 'manual' } })
+          fireEvent.change(screen.getByLabelText('Launch name (optional)'), { target: { value: launchName } })
+          fireEvent.change(screen.getByLabelText('Launch date'), { target: { value: '2026-11-12' } })
+        } else fireEvent.change(screen.getByLabelText('Launch milestone and date'), { target: { value: chosenLaunch } })
       }
       expect(confirmation).toHaveTextContent(Intl.DateTimeFormat().resolvedOptions().timeZone)
       expect(rangeInput('Earlier period', 'Start date')).toHaveValue(ranges.previous.startDate)
@@ -383,6 +392,7 @@ describe('a pressed timecode plays the recording', () => {
       }
       if (corrected || relativeCase) fireEvent.change(rangeInput('Later period', 'End date'), { target: { value: ranges.current.endDate } })
       expect(search.askStream).not.toHaveBeenCalled()
+      expect(search.ask).not.toHaveBeenCalled()
       fireEvent.click(within(confirmation).getByRole('button', { name: 'Compare periods' }))
     } else if (custom) {
       fireEvent.click(screen.getByRole('button', { name: 'Compare date ranges' }))
@@ -404,7 +414,7 @@ describe('a pressed timecode plays the recording', () => {
     expect(coverage).toHaveTextContent('America/New_York')
     expect(current).toHaveTextContent('2 of 4 meetings reviewed · 1 without transcripts · 1 awaiting indexing')
     if (launch) {
-      expect(coverage).toHaveTextContent('Beta · Launch · 2026-11-12 · Marked complete')
+      expect(coverage).toHaveTextContent(launchName + ' · 2026-11-12' + (manual ? '' : ' · Marked complete'))
       expect(current).toHaveTextContent('This period is incomplete')
     }
     if (comparing) {
@@ -439,20 +449,24 @@ describe('a pressed timecode plays the recording', () => {
         expect(rangeInput('Later period', 'End date')).toHaveValue(draftEnd)
       }
       if (typed) expect(screen.getByRole('form', { name: 'Confirm date ranges' })).toHaveTextContent(question)
-      if (launch) expect(screen.getByLabelText('Launch milestone and date')).toHaveValue(chosenLaunch)
+      if (manual) {
+        expect(screen.getByLabelText('Launch name (optional)')).toHaveValue(launchName)
+        expect(screen.getByLabelText('Launch date')).toHaveValue('2026-11-12')
+      } else if (launch) expect(screen.getByLabelText('Launch milestone and date')).toHaveValue(chosenLaunch)
     }
     expect(player.cueAt).toHaveBeenCalledWith(22_000)
     expect(player.playFrom).not.toHaveBeenCalled()
-    expect(search.askStream).toHaveBeenCalledTimes(1)
-    expect(search.askStream).toHaveBeenCalledWith({
+    expect(request).toHaveBeenCalledTimes(1)
+    if (launch) expect(search.askStream).not.toHaveBeenCalled()
+    expect(request).toHaveBeenCalledWith({
       question, workspaceId: 'playback-org', timeZone: expect.any(String),
       ...(custom ? { comparisonRanges: ranges } : {}),
-      ...(launch ? { comparisonEvent: { name: 'Beta · Launch', date: '2026-11-12' } } : {}),
-    }, expect.any(Object))
+      ...(launch ? { comparisonEvent: { name: launchName, date: '2026-11-12' } } : {}),
+    }, launch ? { signal: expect.any(AbortSignal), skipRetry: true } : expect.any(Object))
     if (custom) {
       fireEvent.click(screen.getByRole('button', { name: 'Compare periods' }))
-      await waitFor(() => expect(search.askStream).toHaveBeenCalledTimes(2))
-      expect(search.askStream).toHaveBeenLastCalledWith(expect.objectContaining({
+      await waitFor(() => expect(request).toHaveBeenCalledTimes(2))
+      expect(request).toHaveBeenLastCalledWith(expect.objectContaining({
         question,
         comparisonRanges: { ...ranges, current: { ...ranges.current, endDate: draftEnd } },
       }), expect.any(Object))

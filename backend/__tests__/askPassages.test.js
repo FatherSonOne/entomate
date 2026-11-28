@@ -334,7 +334,7 @@ test.each([
     ] },
     { topic: 'Launch', kind: 'comparison', text: 'Invented later phrasing.', evidence: [old, { ...revised, quote: 'Launch was cancelled.' }] },
   ]));
-  const res = await request(app).post('/search/ask/stream').send({
+  const res = await request(app).post(comparisonEvent ? '/search/ask' : '/search/ask/stream').send({
     question,
     workspaceId: monthlyWorkspace, timeZone: 'America/New_York',
     ...(custom ? { comparisonRanges } : {}),
@@ -350,7 +350,7 @@ test.each([
       p_current_start: '2026-11-19', p_current_end: '2026-11-20',
     } : {}),
   });
-  const result = extractEvents(res).at(-1);
+  const result = comparisonEvent ? res.body : extractEvents(res).at(-1);
   expect(result.comparison).toEqual(comparison);
   expect(result.claims).toHaveLength(2);
   expect(result.claims[0].citations).toMatchObject([

@@ -521,7 +521,7 @@ export const searchApi = {
   semantic: (data) => api.post('/search/semantic', data),
 
   // Ask question across meetings
-  ask: (data) => api.post('/search/ask', data),
+  ask: (data, config = {}) => api.post('/search/ask', data, config),
 
   // Ask question with streaming response (SSE)
   askStream: async (data, callbacks = {}) => {

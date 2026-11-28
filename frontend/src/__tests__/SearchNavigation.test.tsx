@@ -7,10 +7,10 @@ import { MeetingNavigation } from '../components/meetings/MeetingNavigation'
 import Search from '../pages/Search'
 import { subscribeTrail, trailFor, trailVersion } from '../services/navTrail'
 
-const api = vi.hoisted(() => ({ post: vi.fn(), get: vi.fn(), askStream: vi.fn(), listLaunchMilestones: vi.fn() }))
+const api = vi.hoisted(() => ({ post: vi.fn(), get: vi.fn(), ask: vi.fn(), askStream: vi.fn(), listLaunchMilestones: vi.fn() }))
 vi.mock('../services/api', () => ({
   default: api,
-  searchApi: { askStream: api.askStream, getHistory: async () => ({ history: [] }) },
+  searchApi: { ask: api.ask, askStream: api.askStream, getHistory: async () => ({ history: [] }) },
   projectsApi: { listLaunchMilestones: api.listLaunchMilestones },
 }))
 vi.mock('../contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 'search-user' } }) }))
@@ -149,28 +149,45 @@ describe('Search and Ask navigation', () => {
     expect(api.askStream).not.toHaveBeenCalled()
   })
 
-  test('a manual launch date calculates the ranges and requires confirmation from an Ask route', async () => {
+  test('a manual launch delivers the complete comparison in one request after confirmation', async () => {
     const question = 'The two weeks before launch vs. the two weeks after'
+    const ranges = {
+      previous: { startDate: '2026-10-29', endDate: '2026-11-11' },
+      current: { startDate: '2026-11-13', endDate: '2026-11-26' },
+    }
+    const counts = { totalMeetings: 1, reviewedMeetings: 1, meetingsWithoutTranscripts: 0, unindexedMeetings: 0, unsampledMeetings: 0 }
+    api.ask.mockResolvedValueOnce({
+      answer: 'The launch date is grounded in these two meetings.',
+      comparison: {
+        previous: { ...ranges.previous, ...counts, timeZone: 'America/New_York' },
+        current: { ...ranges.current, ...counts, timeZone: 'America/New_York' },
+      },
+    })
+    api.askStream.mockImplementation(async (_body, callbacks) => {
+      callbacks.onChunk('The launch date is grounded in these two meetings.')
+      // The connection closes after generation, before the final comparison event.
+    })
     setup('/search?q=' + encodeURIComponent(question) + '&ask=1&compare=2026-10-29,2026-11-11,2026-11-13,2026-11-26')
     const form = await screen.findByRole('form', { name: 'Confirm date ranges' })
     const confirm = within(form).getByRole('button', { name: 'Compare periods' })
     expect(confirm).toBeDisabled()
-    expect(api.askStream).not.toHaveBeenCalled()
+    expect(api.ask).not.toHaveBeenCalled()
     fireEvent.change(within(form).getByLabelText('Launch source'), { target: { value: 'manual' } })
     fireEvent.change(within(form).getByLabelText('Launch name (optional)'), { target: { value: 'Website launch' } })
     fireEvent.change(within(form).getByLabelText('Launch date'), { target: { value: '2026-11-12' } })
     expect(within(within(form).getByRole('group', { name: 'Earlier period' })).getByLabelText('End date')).toHaveValue('2026-11-11')
     expect(within(within(form).getByRole('group', { name: 'Later period' })).getByLabelText('Start date')).toHaveValue('2026-11-13')
     expect(api.askStream).not.toHaveBeenCalled()
+    expect(api.ask).not.toHaveBeenCalled()
     fireEvent.click(confirm)
-    await waitFor(() => expect(api.askStream).toHaveBeenCalledOnce())
-    expect(api.askStream).toHaveBeenCalledWith(expect.objectContaining({
+    expect(await screen.findByRole('region', { name: 'Date range coverage' })).toHaveTextContent('Website launch')
+    expect(screen.getByText('The launch date is grounded in these two meetings.')).toBeInTheDocument()
+    expect(api.askStream).not.toHaveBeenCalled()
+    expect(api.ask).toHaveBeenCalledOnce()
+    expect(api.ask).toHaveBeenCalledWith(expect.objectContaining({
       question, comparisonEvent: { name: 'Website launch', date: '2026-11-12' },
-      comparisonRanges: {
-        previous: { startDate: '2026-10-29', endDate: '2026-11-11' },
-        current: { startDate: '2026-11-13', endDate: '2026-11-26' },
-      },
-    }), expect.any(Object))
+      comparisonRanges: ranges,
+    }), { signal: expect.any(AbortSignal), skipRetry: true })
   })
 
   test('a task title and its evidence are separate and browser Back restores the original view', async () => {

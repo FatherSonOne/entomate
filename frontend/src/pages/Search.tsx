@@ -552,6 +552,14 @@ function ComparisonForm({ draft, timeZone, workspace, confirmationRef, proposedQ
   )
 }
 
+interface AskReply {
+  answer?: string
+  citations?: AskMeeting[]
+  claims?: AskClaim[]
+  recap?: MonthlyRecap
+  comparison?: PeriodComparison
+}
+
 function AskAnswer({ question, workspaceId, workspaceName, comparisonRanges, event, timeZone, showQuestion, initial, onClip, clipped, linkState, onLeave }: {
   question: string
   workspaceId?: string
@@ -585,34 +593,44 @@ function AskAnswer({ question, workspaceId, workspaceName, comparisonRanges, eve
       finished = true
       setState('failed')
     }
+    const complete = (reply: AskReply) => {
+      if (controller.signal.aborted || finished) return
+      if (reply.answer) setText(reply.answer)
+      if (Array.isArray(reply.citations)) setCitations(reply.citations)
+      if (Array.isArray(reply.claims)) setClaims(reply.claims)
+      setRecap(reply.recap)
+      setComparison(reply.comparison)
+      finished = true
+      setState('done')
+    }
+    const data = { question, workspaceId, timeZone, ...(comparisonRanges ? { comparisonRanges } : {}) }
+    if (event) {
+      // Launch comparisons are validated in full on the server before any answer is sent.
+      checkedAt.current = new Date().toISOString()
+      searchApi.ask({
+        ...data, comparisonEvent: { name: event.name.slice(0, 360), date: event.date },
+      }, { signal: controller.signal, skipRetry: true }).then((value) => {
+        const reply = value as unknown as AskReply
+        if (typeof reply?.answer !== 'string' || !reply.comparison) return fail()
+        complete(reply)
+      }, fail)
+      return () => controller.abort()
+    }
+
     const askStream = (searchApi as unknown as {
-      askStream: (data: { question: string; workspaceId?: string; timeZone: string; comparisonRanges?: ComparisonRanges;
-        comparisonEvent?: Pick<ComparisonEvent, 'name' | 'date'> }, cb: {
+      askStream: (input: typeof data, cb: {
         signal: AbortSignal
         onChunk: (c: string) => void
         onCitations: (c: AskMeeting[]) => void
-        onComplete: (r: { answer?: string; citations?: AskMeeting[]; claims?: AskClaim[]; recap?: MonthlyRecap; comparison?: PeriodComparison }) => void
+        onComplete: (r: AskReply) => void
         onError: () => void
       }) => Promise<void>
     }).askStream
-    if (event) checkedAt.current = new Date().toISOString()
-    askStream({
-      question, workspaceId, timeZone, ...(comparisonRanges ? { comparisonRanges } : {}),
-      ...(event ? { comparisonEvent: { name: event.name.slice(0, 360), date: event.date } } : {}),
-    }, {
+    askStream(data, {
       signal: controller.signal,
       onChunk: (c) => { if (!controller.signal.aborted && !finished) { streamed += c; setText(streamed) } },
       onCitations: (c) => { if (!controller.signal.aborted && !finished) setCitations(Array.isArray(c) ? c : []) },
-      onComplete: (r) => {
-        if (controller.signal.aborted || finished) return
-        if (r.answer) setText(r.answer)
-        if (Array.isArray(r.citations)) setCitations(r.citations)
-        if (Array.isArray(r.claims)) setClaims(r.claims)
-        setRecap(r.recap)
-        setComparison(r.comparison)
-        finished = true
-        setState('done')
-      },
+      onComplete: complete,
       onError: fail,
     }).then(fail, fail)
     return () => controller.abort()
