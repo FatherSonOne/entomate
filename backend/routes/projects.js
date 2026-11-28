@@ -181,24 +181,34 @@ router.get('/', validate(schemas.list), async (req, res) => {
   }
 });
 
-router.get('/launch-milestones', async (req, res) => {
-  const { workspaceId } = req.query;
+const normalizeMilestoneTitle = (title) => title.normalize('NFKC').trim().toLowerCase().replace(/\s+/g, ' ');
+
+router.get(['/launch-milestones', '/milestones'], async (req, res) => {
+  const { workspaceId, name } = req.query;
   if (typeof workspaceId !== 'string' || !req.orgIds.includes(workspaceId)) {
     return res.status(403).json({ error: 'Workspace access required' });
   }
+  const named = /^\/milestones\/?$/i.test(req.path);
+  if (named && (typeof name !== 'string' || !name.trim() || name.length > 160)) {
+    return res.status(400).json({ error: 'Enter a milestone name of up to 160 characters' });
+  }
+  const term = named ? normalizeMilestoneTitle(name) : null;
+  const exactMatch = (title) => term !== null && normalizeMilestoneTitle(title) === term;
   try {
     const projects = await readAllRows(() => supabase.from('projects').select('id,name,settings')
       .eq('org_id', workspaceId));
     const milestones = projects.flatMap((project) => readProgress(project).milestones
-      .filter((item) => /\b(?:launch|release|go[\s-]+live)\b/i.test(project.name + ' ' + item.title))
+      .filter((item) => term !== null ? normalizeMilestoneTitle(item.title).includes(term)
+        : /\b(?:launch|release|go[\s-]+live)\b/i.test(project.name + ' ' + item.title))
       .map(({ id, title, dueDate, completedAt }) => ({
         id, title, dueDate, completedAt, projectId: project.id, projectName: project.name,
       })))
-      .sort((a, b) => a.projectName.localeCompare(b.projectName) || a.title.localeCompare(b.title) || a.dueDate.localeCompare(b.dueDate));
+      .sort((a, b) => Number(exactMatch(b.title)) - Number(exactMatch(a.title))
+        || a.projectName.localeCompare(b.projectName) || a.title.localeCompare(b.title) || a.dueDate.localeCompare(b.dueDate));
     return res.json({ milestones });
   } catch (error) {
-    log.error('Error listing launch milestones:', error.message);
-    return res.status(500).json({ error: 'Could not load launch milestones' });
+    log.error('Error listing comparison milestones:', error.message);
+    return res.status(500).json({ error: 'Could not load milestones' });
   }
 });
 

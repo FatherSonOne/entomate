@@ -1,6 +1,14 @@
 import { describe, expect, test } from 'vitest'
 import { EMPTY_RANGES, eventComparisonRanges, parseTypedComparison, proposeComparison, rangeDates, readComparisonRanges, validComparisonRanges } from '../services/askDateRanges'
 
+test.each([
+  ['Compare the two weeks before and after Security Review. What changed?', 'Security Review'],
+  ['The 2 weeks before Security Review vs. the 2 weeks after', 'Security Review'],
+  ['Compare the two weeks before and after “Security Review v2.1”.', 'Security Review v2.1'],
+])('opens confirmation for a named milestone in %s', (question, milestoneName) => {
+  expect(proposeComparison(question, 'America/New_York')).toEqual({ ranges: EMPTY_RANGES, eventBased: true, milestoneName })
+})
+
 const octoberNovember = {
   previous: { startDate: '2026-10-28', endDate: '2026-10-31' },
   current: { startDate: '2026-11-12', endDate: '2026-11-27' },

@@ -11,6 +11,7 @@ export interface ComparisonProposal {
   ranges: ComparisonRanges
   relative?: `completed-${RelativeUnit}s` | `invalid-${RelativeUnit}-count`
   eventBased?: true
+  milestoneName?: string
 }
 
 export interface ComparisonEvent {
@@ -120,7 +121,22 @@ const LAUNCH_COMPARISON = new RegExp(
   String.raw`\b(?:two|2)\s+weeks\s+before\s+(?:the\s+)?launch${COMPARE}(?:two|2)\s+weeks\s+after\b`, 'i',
 )
 
-export const isEventComparison = (question: string) => LAUNCH_COMPARISON.test(question)
+const MILESTONE_TITLE = String.raw`(?:"([^"\r\n]+)"|“([^”\r\n]+)”|([^.!?;\r\n]+?))`
+const MILESTONE_END = String.raw`(?=\s*(?:[.!?;\r\n]|$))`
+const SURROUND_MILESTONE = new RegExp(
+  String.raw`\b(?:two|2)\s+weeks\s+before\s+and\s+after\s+${MILESTONE_TITLE}${MILESTONE_END}`, 'i',
+)
+const COMPARE_AROUND_MILESTONE = new RegExp(
+  String.raw`\b(?:two|2)\s+weeks\s+before\s+${MILESTONE_TITLE}${COMPARE}(?:two|2)\s+weeks\s+after\b${MILESTONE_END}`, 'i',
+)
+
+export function namedMilestone(question: string): string | undefined {
+  if (LAUNCH_COMPARISON.test(question)) return undefined
+  const match = SURROUND_MILESTONE.exec(question) ?? COMPARE_AROUND_MILESTONE.exec(question)
+  return (match?.[1] ?? match?.[2] ?? match?.[3])?.trim().slice(0, 160) || undefined
+}
+
+export const isEventComparison = (question: string) => LAUNCH_COMPARISON.test(question) || !!namedMilestone(question)
 const ELIDED_UNIT = String.raw`(?=\s*(?:[.,:;!?]|$)|\s+(?:for|on|about|in)\b)`
 const LAST_WEEK = String.raw`\blast\s+(?:completed\s+)?week\b`
 const PREVIOUS_WEEK = String.raw`\bprevious\s+(?:completed\s+)?week\b`
@@ -205,7 +221,10 @@ function relativeComparison(question: string, timeZone: string, asOf: Date): Com
 }
 
 export function proposeComparison(question: string, timeZone: string, asOf = new Date()): ComparisonProposal | null {
-  if (isEventComparison(question)) return { ranges: EMPTY_RANGES, eventBased: true }
+  const milestoneName = namedMilestone(question)
+  if (milestoneName || LAUNCH_COMPARISON.test(question)) {
+    return { ranges: EMPTY_RANGES, eventBased: true, ...(milestoneName ? { milestoneName } : {}) }
+  }
   const relative = relativeComparison(question, timeZone, asOf)
   if (relative) return relative
   const ranges = parseTypedComparison(question)

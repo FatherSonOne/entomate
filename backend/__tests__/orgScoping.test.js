@@ -208,6 +208,25 @@ test('launch milestone discovery only returns dated matches from the requested w
   }]);
 });
 
+test('named milestones prioritize exact titles and only return projects in the requested workspace', async () => {
+  const exact = { id: TASK_A, title: 'Security Review', dueDate: '2026-11-18', ownerId: null, completedAt: null };
+  const partial = { ...exact, id: TASK_B, title: 'Annual Security Review' };
+  mockDb.projects[0].settings = { progress: { milestones: [partial, exact] } };
+  mockDb.projects[1].settings = { progress: { milestones: [exact] } };
+  const route = request(app('../routes/projects', '/api/projects'));
+  const path = '/api/projects/milestones';
+  const name = '  security   review  ';
+  await route.get(path).query({ workspaceId: ORG_B, name }).expect(403);
+  mockDb.org_members.push({ user_id: USER_A, org_id: ORG_B });
+  await route.get(path).query({ workspaceId: ORG_A }).expect(400);
+  const res = await route.get(path).query({ workspaceId: ORG_A, name }).expect(200);
+  expect(res.body.milestones).toEqual([exact, partial].map(({ ownerId, ...milestone }) => ({
+    ...milestone, projectId: PROJ_A, projectName: 'mine',
+  })));
+  const empty = await route.get(path).query({ workspaceId: ORG_A, name: 'Missing milestone' }).expect(200);
+  expect(empty.body.milestones).toEqual([]);
+});
+
 describe('project handoff to Pulse', () => {
   const root = '/api/projects/' + PROJ_A + '/handoff';
   const workspaceId = '0ca42b5b-1c03-4270-9d88-14cc4158b72d';

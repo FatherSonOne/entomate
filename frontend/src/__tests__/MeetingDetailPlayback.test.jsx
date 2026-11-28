@@ -6,10 +6,11 @@ import { vi, describe, test, expect, beforeEach, afterEach } from 'vitest'
 const api = vi.hoisted(() => ({ get: vi.fn(), regenerateSummary: vi.fn(async () => ({})), carryForward: vi.fn(() => Promise.resolve(null)) }))
 const search = vi.hoisted(() => ({ ask: vi.fn(), askStream: vi.fn(), getHistory: async () => ({ history: [] }) }))
 const listLaunchMilestones = vi.hoisted(() => vi.fn())
+const findMilestones = vi.hoisted(() => vi.fn())
 const player = vi.hoisted(() => ({ ready: false, playFrom: vi.fn(), cueAt: vi.fn() }))
 const reports = vi.hoisted(() => ({ downloadMeetingDocument: vi.fn(async () => {}) }))
 const recordings = vi.hoisted(() => ({ rebuildTranscript: vi.fn() }))
-vi.mock('../services/api', () => ({ default: { get: async () => ({ notes: [] }) }, meetingsApi: api, recordingsApi: recordings, integrationsApi: {}, calendarApi: {}, reportsApi: reports, searchApi: search, projectsApi: { listLaunchMilestones } }))
+vi.mock('../services/api', () => ({ default: { get: async () => ({ notes: [] }) }, meetingsApi: api, recordingsApi: recordings, integrationsApi: {}, calendarApi: {}, reportsApi: reports, searchApi: search, projectsApi: { listLaunchMilestones, findMilestones } }))
 vi.mock('../contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 'playback-user' } }) }))
 vi.mock('../contexts/OrgContext', () => ({ useOrgSafe: () => ({ org: { id: 'playback-org' } }) }))
 vi.mock('../components/vc/ToastProvider', () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn() }) }))
@@ -252,7 +253,11 @@ describe('a pressed timecode plays the recording', () => {
       comparing: true, custom: true, typed: true, relative: 'launch', coverageName: 'Date range coverage' },
     { label: 'manual launch comparison', question: 'The two weeks before launch vs. the two weeks after. What changed?',
       comparing: true, custom: true, typed: true, relative: 'launch', manual: true, coverageName: 'Date range coverage' },
-  ])('$label restores coverage and the exact Before and After links without a second Ask request', async ({ question, comparing, custom, typed, corrected, relative, manual, coverageName }) => {
+    { label: 'named milestone comparison', question: 'Compare the two weeks before and after Security Review. What changed?',
+      comparing: true, custom: true, typed: true, relative: 'launch', named: true, coverageName: 'Date range coverage' },
+    { label: 'manual named milestone comparison', question: 'Compare the two weeks before and after Security Review. What changed?',
+      comparing: true, custom: true, typed: true, relative: 'launch', named: true, manual: true, coverageName: 'Date range coverage' },
+  ])('$label restores coverage and the exact Before and After links without a second Ask request', async ({ question, comparing, custom, typed, corrected, relative, manual, named, coverageName }) => {
     const relativeCase = {
       days: {
         beforeMidnight: [10, 28], afterMidnight: [10, 29],
@@ -286,21 +291,24 @@ describe('a pressed timecode plays the recording', () => {
         current: { startDate: '2026-11-13', endDate: '2026-11-25' },
         previewEnd: '2026-11-26', draftEnd: '2026-11-24',
         previousLabel: /Oct 29\D+Nov 11, 2026/, currentLabel: /Nov 13\D+25, 2026/,
-        message: '14 calendar days on each side and exclude launch day',
+        message: '14 calendar days on each side and exclude ' + (named ? 'the milestone date' : 'launch day'),
       },
     }[relative]
     const launch = relative === 'launch'
+    const milestoneTitle = named ? 'Security Review' : 'Launch'
+    const milestoneField = named ? 'Milestone and date' : 'Launch milestone and date'
+    const eventFieldPrefix = named ? 'Milestone' : 'Launch'
     if (relativeCase) {
       vi.useFakeTimers({ toFake: ['Date'] })
       vi.setSystemTime(new Date(2026, ...relativeCase.beforeMidnight, 23, 59))
     }
-    if (launch) listLaunchMilestones.mockResolvedValue({ milestones: [
-      { id: 'm-alpha', projectId: 'p-alpha', projectName: 'Alpha', title: 'Launch', dueDate: '2026-11-06', completedAt: null },
-      { id: 'm-beta', projectId: 'p-beta', projectName: 'Beta', title: 'Launch', dueDate: '2026-11-11',
+    if (launch) (named ? findMilestones : listLaunchMilestones).mockResolvedValue({ milestones: [
+      { id: 'm-alpha', projectId: 'p-alpha', projectName: 'Alpha', title: milestoneTitle, dueDate: '2026-11-06', completedAt: null },
+      { id: 'm-beta', projectId: 'p-beta', projectName: 'Beta', title: milestoneTitle, dueDate: '2026-11-11',
         completedAt: new Date(2026, 10, 12, 12).toISOString() },
     ] })
     const chosenLaunch = 'p-beta:m-beta:completed|2026-11-12'
-    const launchName = manual ? 'Website launch' : 'Beta · Launch'
+    const eventName = manual ? (named ? milestoneTitle : 'Website launch') : 'Beta · ' + milestoneTitle
     const beforeQuote = 'We agreed to launch on Monday.'
     const afterQuote = 'The launch is now scheduled for Friday.'
     const laterRevision = 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb'
@@ -364,17 +372,20 @@ describe('a pressed timecode plays the recording', () => {
       if (launch) {
         expect(within(confirmation).getByRole('button', { name: 'Compare periods' })).toBeDisabled()
         expect(screen.queryByRole('group', { name: 'Earlier period' })).not.toBeInTheDocument()
-        expect(await screen.findByRole('option', { name: /Alpha · Launch · Scheduled date · 2026-11-06/ })).toBeVisible()
-        expect(screen.getByRole('option', { name: /Beta · Launch · Scheduled date · 2026-11-11/ })).toBeVisible()
-        expect(screen.getByRole('option', { name: /Beta · Launch · Marked complete · 2026-11-12/ })).toBeVisible()
+        expect(await screen.findByRole('option', { name: `Alpha · ${milestoneTitle} · Scheduled date · 2026-11-06` })).toBeVisible()
+        expect(screen.getByRole('option', { name: `Beta · ${milestoneTitle} · Scheduled date · 2026-11-11` })).toBeVisible()
+        expect(screen.getByRole('option', { name: `Beta · ${milestoneTitle} · Marked complete · 2026-11-12` })).toBeVisible()
         expect(search.askStream).not.toHaveBeenCalled()
         expect(search.ask).not.toHaveBeenCalled()
-        expect(listLaunchMilestones).toHaveBeenCalledWith('playback-org', expect.any(AbortSignal))
+        if (named) expect(findMilestones).toHaveBeenCalledWith('playback-org', milestoneTitle, expect.any(AbortSignal))
+        else expect(listLaunchMilestones).toHaveBeenCalledWith('playback-org', expect.any(AbortSignal))
         if (manual) {
-          fireEvent.change(screen.getByLabelText('Launch source'), { target: { value: 'manual' } })
-          fireEvent.change(screen.getByLabelText('Launch name (optional)'), { target: { value: launchName } })
-          fireEvent.change(screen.getByLabelText('Launch date'), { target: { value: '2026-11-12' } })
-        } else fireEvent.change(screen.getByLabelText('Launch milestone and date'), { target: { value: chosenLaunch } })
+          fireEvent.change(screen.getByLabelText(eventFieldPrefix + ' source'), { target: { value: 'manual' } })
+          const nameInput = screen.getByLabelText(eventFieldPrefix + ' name (optional)')
+          if (named) expect(nameInput).toHaveValue(milestoneTitle)
+          else fireEvent.change(nameInput, { target: { value: eventName } })
+          fireEvent.change(screen.getByLabelText(eventFieldPrefix + ' date'), { target: { value: '2026-11-12' } })
+        } else fireEvent.change(screen.getByLabelText(milestoneField), { target: { value: chosenLaunch } })
       }
       expect(confirmation).toHaveTextContent(Intl.DateTimeFormat().resolvedOptions().timeZone)
       expect(rangeInput('Earlier period', 'Start date')).toHaveValue(ranges.previous.startDate)
@@ -414,7 +425,7 @@ describe('a pressed timecode plays the recording', () => {
     expect(coverage).toHaveTextContent('America/New_York')
     expect(current).toHaveTextContent('2 of 4 meetings reviewed · 1 without transcripts · 1 awaiting indexing')
     if (launch) {
-      expect(coverage).toHaveTextContent(launchName + ' · 2026-11-12' + (manual ? '' : ' · Marked complete'))
+      expect(coverage).toHaveTextContent(eventName + ' · 2026-11-12' + (manual ? '' : ' · Marked complete'))
       expect(current).toHaveTextContent('This period is incomplete')
     }
     if (comparing) {
@@ -450,9 +461,9 @@ describe('a pressed timecode plays the recording', () => {
       }
       if (typed) expect(screen.getByRole('form', { name: 'Confirm date ranges' })).toHaveTextContent(question)
       if (manual) {
-        expect(screen.getByLabelText('Launch name (optional)')).toHaveValue(launchName)
-        expect(screen.getByLabelText('Launch date')).toHaveValue('2026-11-12')
-      } else if (launch) expect(screen.getByLabelText('Launch milestone and date')).toHaveValue(chosenLaunch)
+        expect(screen.getByLabelText(eventFieldPrefix + ' name (optional)')).toHaveValue(eventName)
+        expect(screen.getByLabelText(eventFieldPrefix + ' date')).toHaveValue('2026-11-12')
+      } else if (launch) expect(screen.getByLabelText(milestoneField)).toHaveValue(chosenLaunch)
     }
     expect(player.cueAt).toHaveBeenCalledWith(22_000)
     expect(player.playFrom).not.toHaveBeenCalled()
@@ -461,7 +472,7 @@ describe('a pressed timecode plays the recording', () => {
     expect(request).toHaveBeenCalledWith({
       question, workspaceId: 'playback-org', timeZone: expect.any(String),
       ...(custom ? { comparisonRanges: ranges } : {}),
-      ...(launch ? { comparisonEvent: { name: launchName, date: '2026-11-12' } } : {}),
+      ...(launch ? { comparisonEvent: { name: eventName, date: '2026-11-12' } } : {}),
     }, launch ? { signal: expect.any(AbortSignal), skipRetry: true } : expect.any(Object))
     if (custom) {
       fireEvent.click(screen.getByRole('button', { name: 'Compare periods' }))

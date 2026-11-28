@@ -381,6 +381,9 @@ export const projectsApi = {
   listLaunchMilestones: (workspaceId, signal) => api.get('/projects/launch-milestones', {
     params: { workspaceId }, signal, _noCache: true,
   }),
+  findMilestones: (workspaceId, name, signal) => api.get('/projects/milestones', {
+    params: { workspaceId, name }, signal, _noCache: true,
+  }),
 
   // Get project by ID
   get: (id) => api.get(`/projects/${id}`),

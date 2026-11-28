@@ -13,7 +13,7 @@ import {
   Drawer, GroupHead, Key, Section, Signal, Switch, Tag, TextArea, TextInput, TitleRule, useMediaQuery, PHONE_QUERY,
 } from '../components/bench'
 import { Highlight } from '../components/search/Highlight'
-import { LaunchPicker } from '../components/search/LaunchPicker'
+import { MilestonePicker } from '../components/search/MilestonePicker'
 import { useToast } from '../components/vc/ToastProvider'
 import { useAuth } from '../contexts/AuthContext'
 import { useOrgSafe } from '../contexts/OrgContext'
@@ -21,7 +21,7 @@ import { useNotes, useRecentSearches, useSearch } from '../hooks/useSearch'
 import type { UseNotesResult } from '../hooks/useSearch'
 import { searchApi } from '../services/api'
 import {
-  EMPTY_RANGES, calendarDateInZone, eventComparisonRanges, isEventComparison, proposeComparison,
+  EMPTY_RANGES, calendarDateInZone, eventComparisonRanges, isEventComparison, namedMilestone, proposeComparison,
   rangeDates, readComparisonRanges, validComparisonRanges,
 } from '../services/askDateRanges'
 import type { ComparisonEvent, ComparisonRanges } from '../services/askDateRanges'
@@ -80,6 +80,7 @@ function SearchPage({ owner, workspace }: { owner: string | null; workspace?: { 
   const confirmedEvent = comparisonRanges && isEventComparison(url.q)
     ? (historyEvent?.workspaceId === workspace?.id ? historyEvent?.event : undefined) ?? restored?.answer?.event
     : undefined
+  const confirmedMilestoneName = confirmedEvent ? namedMilestone(url.q) : undefined
   const proposedComparison = useMemo(() => url.ask &&
     (comparisonParam === null || (!confirmedEvent && isEventComparison(url.q))) ? proposeComparison(url.q, timeZone) : null,
     [url.ask, url.q, comparisonParam, timeZone, confirmedEvent])
@@ -89,7 +90,7 @@ function SearchPage({ owner, workspace }: { owner: string | null; workspace?: { 
     if (proposedComparison) return { ...proposedComparison, question: comparisonQuestion }
     if (comparisonParam === null) return null
     return { ranges: comparisonRanges ?? EMPTY_RANGES, question: comparisonQuestion,
-      ...(confirmedEvent ? { eventBased: true, event: confirmedEvent } : {}) }
+      ...(confirmedEvent ? { eventBased: true, event: confirmedEvent, milestoneName: confirmedMilestoneName } : {}) }
   })
   const [recentKey, setRecentKey] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -196,7 +197,7 @@ function SearchPage({ owner, workspace }: { owner: string | null; workspace?: { 
     if (!rangeDraft || !workspace || !validComparisonRanges(rangeDraft.ranges)) return
     if (rangeDraft.eventBased && !rangeDraft.event?.date) return
     const event = rangeDraft.eventBased && rangeDraft.event
-      ? { ...rangeDraft.event, name: rangeDraft.event.name.trim() || 'Launch' }
+      ? { ...rangeDraft.event, name: rangeDraft.event.name.trim() || rangeDraft.milestoneName || 'Launch' }
       : undefined
     const compare = rangeDates(rangeDraft.ranges).join(',')
     const question = rangeDraft.question ?? COMPARISON_QUESTION
@@ -283,7 +284,8 @@ function SearchPage({ owner, workspace }: { owner: string | null; workspace?: { 
         <div className="bs-srch-compare">
           <Key size="sm" aria-expanded={rangeDraft !== null} aria-controls={rangeDraft ? 'ask-date-ranges' : undefined}
             onClick={() => setRangeDraft(rangeDraft ? null
-              : { ...(proposedComparison ?? { ranges: comparisonRanges ?? EMPTY_RANGES, ...(confirmedEvent ? { eventBased: true, event: confirmedEvent } : {}) }),
+              : { ...(proposedComparison ?? { ranges: comparisonRanges ?? EMPTY_RANGES,
+                ...(confirmedEvent ? { eventBased: true, event: confirmedEvent, milestoneName: confirmedMilestoneName } : {}) }),
                 question: comparisonRanges || proposedComparison ? comparisonQuestion : undefined })}>
             Compare date ranges
           </Key>
@@ -503,7 +505,7 @@ function ComparisonForm({ draft, timeZone, workspace, confirmationRef, proposedQ
   onEventChange: (event?: ComparisonEvent) => void
   onSubmit: (e: React.FormEvent) => void
 }): React.ReactElement {
-  const { ranges, relative, question, eventBased, event } = draft
+  const { ranges, relative, question, eventBased, event, milestoneName } = draft
   const dates = rangeDates(ranges)
   const valid = validComparisonRanges(ranges)
   const complete = dates.every(Boolean)
@@ -522,10 +524,11 @@ function ComparisonForm({ draft, timeZone, workspace, confirmationRef, proposedQ
       {question && !relative && !eventBased && !complete && <p>Fill in the missing dates or correct them below. Include a year for each range when typing dates.</p>}
       {eventBased && (
         <div className="bs-srch-compare-periods">
-          <LaunchPicker workspaceId={workspace?.id} timeZone={timeZone} event={event} onChange={onEventChange} />
+          <MilestonePicker key={milestoneName ?? ''} workspaceId={workspace?.id} timeZone={timeZone}
+            milestoneName={milestoneName} event={event} onChange={onEventChange} />
         </div>
       )}
-      {eventBased && event?.date && <p>The suggested ranges cover 14 calendar days on each side and exclude launch day.</p>}
+      {eventBased && event?.date && <p>The suggested ranges cover 14 calendar days on each side and exclude {milestoneName ? 'the milestone date' : 'launch day'}.</p>}
       {(!eventBased || event?.date) && <div className="bs-srch-compare-periods">
         {(['previous', 'current'] as const).map((period) => (
           <fieldset key={period}>
