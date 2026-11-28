@@ -25,9 +25,10 @@
  *                                 take 5-15s before firePostProcessing fires,
  *                                 so the default is wider than the agent smoke.
  *
- * NOTE: Each run leaves a test meeting row in Entomate's `meetings` table
- * (titled `[smoke] action-items <iso-date>`). The smoke script does not
- * clean up — delete the row manually if it bothers you.
+ * Cleanup: the test meeting (titled `[smoke] action-items <iso-date>`) is
+ * deleted through DELETE /api/meetings/:id before the script exits, pass or
+ * fail, so its action items never reach real reminders. If the delete fails
+ * the script says so; delete that meeting by hand.
  */
 
 /* eslint-disable no-console */
@@ -83,6 +84,24 @@ async function postEntomateTranscript(title) {
   const elapsedMs = Date.now() - start;
   const body = await resp.json().catch(() => ({}));
   return { status: resp.status, ok: resp.ok, body, elapsedMs };
+}
+
+/** Remove the test meeting (and its action items) so it can't reach real reminders. */
+async function deleteEntomateMeeting(id) {
+  if (!id) {
+    console.error('[verify-action-items-pulse-emit] WARN — no meeting id in the POST response, so the [smoke] meeting was not deleted. Delete it by hand.');
+    return;
+  }
+  try {
+    const resp = await fetch(`${ENTOMATE_API_URL}/api/meetings/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${ENTOMATE_TEST_JWT}` },
+    });
+    if (resp.ok) console.log(`[verify-action-items-pulse-emit] Cleaned up test meeting ${id}`);
+    else console.error(`[verify-action-items-pulse-emit] WARN — could not delete test meeting ${id} (HTTP ${resp.status}). Delete it by hand.`);
+  } catch (err) {
+    console.error(`[verify-action-items-pulse-emit] WARN — could not delete test meeting ${id}: ${err.message}. Delete it by hand.`);
+  }
 }
 
 async function pollPulseForEvent(sinceIso) {
@@ -153,6 +172,8 @@ async function main() {
   console.log(`[verify-action-items-pulse-emit] POST OK in ${postResult.elapsedMs}ms — meeting=${meeting?.id || '?'} actionItems=${actionItems.length}`);
 
   if (actionItems.length === 0) {
+    // Kept on purpose so the AI output can be inspected; with no items it can't
+    // reach any reminder. Delete it once you've looked.
     console.error(
       `[verify-action-items-pulse-emit] FAIL — AI extracted 0 action items.\n`
       + `  The emit hook only fires when there's at least one item, so no Pulse\n`
@@ -166,6 +187,9 @@ async function main() {
   const pollStart = Date.now();
   const pollResult = await pollPulseForEvent(sinceIso);
   const pollElapsed = Date.now() - pollStart;
+
+  // Polling is done, so post-processing has had its window; remove the test data.
+  await deleteEntomateMeeting(meeting?.id);
 
   if (pollResult.found) {
     console.log(`[verify-action-items-pulse-emit] PASS — event arrived in Pulse in ${pollElapsed}ms`);

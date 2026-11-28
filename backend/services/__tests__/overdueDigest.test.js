@@ -23,6 +23,15 @@ describe('overdue digest', () => {
     expect(isOverdue(item({ id: 'e', due_date: today }), today)).toBe(false);
   });
 
+  test('items from [smoke] test meetings never reach a digest', () => {
+    const withSmoke = new Map([...meetings, ['s1', { id: 's1', title: '[smoke] action-items 2026-05-04T23:54:29.284Z', created_by: 'u1' }]]);
+    const items = [
+      item({ id: 'smoke-waiting', meeting_id: 's1', assigned_to_name: 'Alice' }),
+      item({ id: 'smoke-owed', meeting_id: 's1', assigned_to_name: 'Dana Ray' }),
+    ];
+    expect(buildDigests({ members, items, meetings: withSmoke, today })).toEqual([]);
+  });
+
   test('daysOverdue counts whole days', () => {
     expect(daysOverdue('2026-11-20', today)).toBe(2);
   });

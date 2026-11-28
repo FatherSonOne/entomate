@@ -44,6 +44,9 @@ function daysOverdue(dueDate, today) {
   return Math.max(0, Math.round((now - due) / 86400000));
 }
 
+/** Meetings the smoke scripts create (backend/scripts/verify-*.js) are test data. */
+const isSmokeMeeting = (m) => Boolean(m && /^\[smoke\]/i.test(String(m.title || '').trim()));
+
 function isOverdue(item, today) {
   if (!item || !item.due_date) return false;
   if (DONE.has(norm(item.status))) return false;
@@ -67,7 +70,7 @@ function ownedBy(item, member) {
  * @returns {Array<{ member: object, owed: object[], waiting: object[] }>}
  */
 function buildDigests({ members, items, meetings, optedOut = new Set(), sentToday = new Set(), today }) {
-  const overdue = items.filter((i) => isOverdue(i, today));
+  const overdue = items.filter((i) => isOverdue(i, today) && !isSmokeMeeting(meetings.get(i.meeting_id)));
   const row = (i) => {
     const m = meetings.get(i.meeting_id) || null;
     return {
@@ -218,4 +221,4 @@ async function runOverdueDigest({ now = new Date(), dryRun = false } = {}) {
   return { overdue: items.length, recipients: perUser.size, sent, failed, dryRun };
 }
 
-module.exports = { runOverdueDigest, buildDigests, renderDigest, isOverdue, ownedBy, daysOverdue, isoDay };
+module.exports = { runOverdueDigest, buildDigests, renderDigest, isOverdue, isSmokeMeeting, ownedBy, daysOverdue, isoDay };
