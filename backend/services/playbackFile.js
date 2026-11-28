@@ -128,6 +128,14 @@ async function extractTranscriptionClip(input, output, startMs, durationMs) {
   ]);
 }
 
+async function exportAudioRange(input, output, startMs, endMs) {
+  await run('ffmpeg', [
+    '-nostdin', '-hide_banner', '-loglevel', 'error', '-protocol_whitelist', 'file',
+    '-ss', String(startMs / 1000), '-i', input, '-t', String((endMs - startMs) / 1000),
+    '-map', '0:a:0', '-c:a', 'libopus', '-b:a', '96k', ...MUXER_FLAGS.webm, output,
+  ]);
+}
+
 async function measureWaveform(inputArgs) {
   let output;
   try {
@@ -177,5 +185,6 @@ async function readWaveformPeaksFromAudio(audio) {
 
 module.exports = {
   makeSeekable, extractSpeechAudio, prepareTranscriptionAudio, extractTranscriptionClip, renderAlignedAudio, audioDuration,
+  exportAudioRange,
   readWaveformPeaks, readWaveformPeaksFromAudio,
 };

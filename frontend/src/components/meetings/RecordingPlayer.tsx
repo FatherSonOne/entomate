@@ -8,6 +8,7 @@ import { TrackSaveStatus, type TrackSaveStates } from './TrackSaveStatus'
 import { readRecordingWaveform, waveformFromPeaks } from '../../services/recordingWaveform'
 import { recordingSpeakers } from './recordingSpeakers'
 import { RoomAudioStem } from './RoomAudioStem'
+import { RecordingClips, validClipRange, type ClipRange } from './RecordingClips'
 import { RoomTrackTimeline } from './RoomTrackTimeline'
 import { recordingsApi } from '../../services/api'
 import './RecordingPlayer.css'
@@ -27,6 +28,7 @@ export interface RecordingPlayerProps {
   audioTracks?: AudioTracks
   roomRecording?: boolean
   cloudRoom?: boolean
+  sharedClipId?: string | null
   gaps?: ReadonlyArray<AudioGap>
   durationMs?: number | null
   waveformPeaks?: ReadonlyArray<number> | null
@@ -68,9 +70,15 @@ function rulerMarks(durationMs: number): number[] {
 }
 
 export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayerProps>(function RecordingPlayer(
-  { meetingId, audioUrl, audioTracks, roomRecording, cloudRoom, gaps = [], durationMs, waveformPeaks, waveformReplacement, transcriptSegments, decisions = [], actions = [], onMoment, onStepMoment, onTime, onAudioRemoved },
+  { meetingId, audioUrl, audioTracks, roomRecording, cloudRoom, sharedClipId, gaps = [], durationMs, waveformPeaks, waveformReplacement, transcriptSegments, decisions = [], actions = [], onMoment, onStepMoment, onTime, onAudioRemoved },
   ref,
 ) {
+  const [clipsOpen, setClipsOpen] = useState(Boolean(sharedClipId))
+  const [drawingClip, setDrawingClip] = useState(false)
+  const [clipRange, setClipRange] = useState<ClipRange>({ startMs: NaN, endMs: NaN })
+  const clipDrag = useRef<number | null>(null)
+  const mainWaveform = useRef<HTMLDivElement>(null)
+  const previewFrame = useRef<number | undefined>(undefined)
   const [source, setSource] = useState<Source | null>(null)
   const [track, setTrack] = useState<PlaybackTrack | undefined>()
   const [loading, setLoading] = useState(false)
@@ -100,6 +108,11 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
   const measuring = useRef(false)
   const renewed = useRef(false)
   const lastSecond = useRef<number | null>(null)
+  useEffect(() => { if (sharedClipId) setClipsOpen(true) }, [sharedClipId])
+  useEffect(() => () => {
+    if (previewFrame.current !== undefined) cancelAnimationFrame(previewFrame.current)
+  }, [])
+
   const clipId = useId()
   const speakerGradientId = `${clipId}-speakers`
   const trackDuration = track ? audioTracks?.[track]?.durationMs : durationMs
@@ -120,6 +133,10 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
   const savedWaveform = useMemo(() => waveformPeaks?.length ? waveformFromPeaks(waveformPeaks) : null, [waveformPeaks])
   const participantTracks = roomParticipantTracks(audioTracks)
   const roomTimeline = !audioRemoved && cloudRoom && participantTracks.length > 0
+  const clipDuration = finiteDuration(durationMs)
+  const canClip = !audioRemoved && cloudRoom && clipDuration > 0 && !waveformReplacement
+  const clipShown = canClip && clipsOpen
+  const highlightClip = clipShown && validClipRange(clipRange, clipDuration)
   const filteredMix = roomTimeline && !track && participantTracks.some(name => mutedParticipants.has(name))
   const audibleParticipants = filteredMix
     ? participantTracks.filter(name => (audioTracks?.[name]?.durationMs ?? 0) > 0 && !mutedParticipants.has(name))
@@ -249,10 +266,12 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
 
   const updatePosition = (audio: HTMLAudioElement): void => {
     if (!mediaReady.current || !Number.isFinite(audio.currentTime)) return
-    const atMs = Math.round(audio.currentTime * 1000)
+    let atMs = Math.round(audio.currentTime * 1000)
     if (previewEnd.current !== undefined && atMs >= previewEnd.current) {
+      atMs = previewEnd.current
       previewEnd.current = undefined
       audio.pause()
+      if (audio.currentTime !== atMs / 1000) audio.currentTime = atMs / 1000
     }
     setPosition(atMs)
     const second = Math.floor(atMs / 1000)
@@ -260,6 +279,16 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
       lastSecond.current = second
       onTime?.(second * 1000)
     }
+  }
+
+  const followPreview = (audio: HTMLAudioElement): void => {
+    if (previewFrame.current !== undefined) cancelAnimationFrame(previewFrame.current)
+    const check = () => {
+      if (audio !== audioRef.current || audio.paused || previewEnd.current === undefined) return
+      if (!audio.seeking && audio.currentTime * 1000 >= previewEnd.current) updatePosition(audio)
+      else previewFrame.current = requestAnimationFrame(check)
+    }
+    if (previewEnd.current !== undefined) previewFrame.current = requestAnimationFrame(check)
   }
 
   const play = (audio: HTMLAudioElement): void => {
@@ -280,7 +309,10 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
       updatePosition(audio)
     }
     previewEnd.current = endMs
-    if (resume) play(audio)
+    if (resume) {
+      if (!audio.paused) followPreview(audio)
+      play(audio)
+    }
   }
 
   const seek = (atMs: number, resume = false, endMs?: number): void => {
@@ -297,20 +329,23 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
     void load(track)
   }
 
+  const cueAt = (atMs: number) => {
+    const cue = { atMs, play: false }
+    const audio = audioRef.current
+    previewEnd.current = undefined
+    if (mediaReady.current && audio) {
+      if (!audio.paused) audio.pause()
+      performSeek(audio, cue)
+    } else {
+      pending.current = cue
+      setPosition(atMs)
+    }
+  }
+
   useImperativeHandle(ref, () => ({
     isReady: () => mediaReady.current,
     playFrom: (atMs, endMs) => seek(atMs, true, endMs),
-    cueAt: (atMs) => {
-      const cue = { atMs, play: false }
-      const audio = audioRef.current
-      if (mediaReady.current && audio) {
-        if (!audio.paused) audio.pause()
-        performSeek(audio, cue)
-      } else {
-        pending.current = cue
-        setPosition(atMs)
-      }
-    },
+    cueAt,
   }))
 
   const applyMetadata = (audio: HTMLAudioElement): void => {
@@ -362,13 +397,25 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
   const togglePlay = (): void => {
     previewEnd.current = undefined
     const audio = audioRef.current
-    if (!mediaReady.current || !audio) {
-      seek(position, true)
-    } else if (!audio.paused) {
+    if (mediaReady.current && audio && !audio.paused) {
       audio.pause()
+    } else if (highlightClip) {
+      const at = audio && mediaReady.current ? Math.round(audio.currentTime * 1000) : position
+      seek(at >= clipRange.startMs && at < clipRange.endMs ? at : clipRange.startMs, true, clipRange.endMs)
+    } else if (!mediaReady.current || !audio) {
+      seek(position, true)
     } else {
       play(audio)
     }
+  }
+
+  const rangePoint = (event: React.PointerEvent<HTMLDivElement>): number => {
+    const bounds = event.currentTarget.getBoundingClientRect()
+    return Math.round(Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width)) * clipDuration)
+  }
+
+  const drawRange = (anchor: number, atMs: number): void => {
+    setClipRange({ startMs: Math.min(anchor, atMs), endMs: Math.max(anchor, atMs) })
   }
 
   const remove = async (): Promise<void> => {
@@ -423,7 +470,11 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
   }
 
   return (
-    <section className="bs-recording bs-tokens" aria-label="Meeting recording">
+    <section className="bs-recording bs-tokens" aria-label="Meeting recording" data-clip-range={highlightClip}
+      style={highlightClip ? {
+        '--clip-start': (clipRange.startMs / clipDuration * 100) + '%',
+        '--clip-end': (clipRange.endMs / clipDuration * 100) + '%',
+      } as React.CSSProperties : undefined}>
       {!audioRemoved && availableTracks.length > 0 && (
         <label className="flex flex-wrap items-center gap-2 text-sm">
           Audio source
@@ -456,8 +507,24 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
         {availableTracks.length > 0 && <Key size="sm" disabled={downloading} onClick={() => void download(true)}>
           {downloading ? 'Preparing download…' : 'Download all tracks (ZIP)'}
         </Key>}
+        {canClip && <Key size="sm" aria-expanded={clipsOpen} onClick={() => {
+          setClipsOpen(!clipsOpen)
+          setDrawingClip(false)
+          clipDrag.current = null
+        }}>Recap clips</Key>}
         {downloadError && <p className="bs-recording-error" role="alert">{downloadError}</p>}
       </div>}
+      {clipShown && <RecordingClips meetingId={meetingId} sharedClipId={sharedClipId} range={clipRange}
+        durationMs={clipDuration} position={position} drawing={drawingClip} transcript={transcriptSegments}
+        tracks={[{ id: 'mix', label: 'Combined' }, ...participantTracks.filter(name => availableTracks.includes(name))
+          .map(name => ({ id: name, label: labelOf(name) }))]}
+        onRange={setClipRange}
+        onCue={cueAt}
+        onPreview={range => seek(range.startMs, true, range.endMs)}
+        onDraw={() => {
+          setDrawingClip(!drawingClip)
+          if (!drawingClip) mainWaveform.current?.scrollIntoView({ block: 'nearest' })
+        }} />}
       {source && (
         <audio
           ref={audioRef}
@@ -470,7 +537,11 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
           onDurationChange={e => onDuration(e.currentTarget)}
           onTimeUpdate={e => updatePosition(e.currentTarget)}
           onSeeked={e => updatePosition(e.currentTarget)}
-          onPlaying={() => { renewed.current = false; setPlaying(true) }}
+          onPlaying={event => {
+            renewed.current = false
+            setPlaying(true)
+            followPreview(event.currentTarget)
+          }}
           onPause={() => setPlaying(false)}
           onEnded={() => { previewEnd.current = undefined; setPlaying(false) }}
           onError={e => onError(e.currentTarget)}
@@ -494,7 +565,7 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
             {filteredMix && <span>{audibleParticipants.length ? 'Mutes applied' : 'All tracks muted'}</span>}
           </div>}
           <div className="bs-recording-master-lane">
-            <div className="bs-recording-scrub" style={{ '--position': `${fraction * 100}%` } as React.CSSProperties}>
+            <div ref={mainWaveform} className="bs-recording-scrub" style={{ '--position': `${fraction * 100}%` } as React.CSSProperties}>
               {isPartial && <span className="bs-recording-unavailable" style={{ left: `${coverageFraction * 100}%` }} aria-hidden="true" />}
               {(waveform !== null || speakerColorsVisible) && (
                 <svg data-testid={waveform !== null ? 'recording-waveform' : undefined} viewBox="0 0 1000 80" preserveAspectRatio="none" aria-hidden="true">
@@ -553,6 +624,23 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
                   seek(Math.min(effectiveDuration, Math.max(0, position + step)))
                 }}
               />
+              {clipShown && drawingClip && <div aria-hidden="true" className="bs-recording-clip-drag" data-testid="clip-range-drag"
+                onPointerDown={event => {
+                  if (!event.isPrimary || event.button !== 0) return
+                  event.currentTarget.setPointerCapture(event.pointerId)
+                  clipDrag.current = rangePoint(event)
+                }}
+                onPointerMove={event => {
+                  if (event.isPrimary && clipDrag.current !== null) drawRange(clipDrag.current, rangePoint(event))
+                }}
+                onPointerUp={event => {
+                  if (!event.isPrimary || clipDrag.current === null) return
+                  const at = rangePoint(event)
+                  if (at !== clipDrag.current) drawRange(clipDrag.current, at)
+                  clipDrag.current = null
+                  setDrawingClip(false)
+                }}
+                onPointerCancel={() => { clipDrag.current = null; setDrawingClip(false) }} />}
             </div>
             {timelineDuration > 0 && (
               <div className="bs-recording-ruler" aria-hidden="true">

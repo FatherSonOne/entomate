@@ -22,6 +22,7 @@
 'use strict';
 
 const express = require('express');
+const { createReadStream } = require('node:fs');
 const { Readable } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
 const { ZipFile } = require('yazl');
@@ -30,6 +31,7 @@ const { authenticate } = require('../middleware/auth');
 const { getOrgIdForUser } = require('../utils/orgContext');
 const meetingNotes = require('../services/meetingNotesService');
 const recorder = require('../services/meetingRecorder');
+const clips = require('../services/recordingClips');
 const log = require('../utils/log');
 
 const router = express.Router();
@@ -201,6 +203,54 @@ router.get('/:id/track-downloads/:track', authenticate, async (req, res) => {
   } catch (err) {
     if (res.headersSent || res.destroyed) return res.destroy();
     sendError(res, err, 'track download');
+  }
+});
+
+router.get('/:id/clips', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const orgId = await meetingNotes.assertMeetingAccess(req.user?.id, id);
+    const items = await clips.listClips(orgId, id);
+    res.set('Cache-Control', 'no-store').json({ clips: items });
+  } catch (err) {
+    sendError(res, err, 'list clips');
+  }
+});
+
+router.post('/:id/clips', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const orgId = await meetingNotes.assertMeetingAccess(req.user?.id, id);
+    const clip = await clips.saveClip(orgId, id, req.body || {});
+    res.status(201).json({ clip });
+  } catch (err) {
+    sendError(res, err, 'save clip');
+  }
+});
+
+router.get('/:id/clips/:clipId', authenticate, async (req, res) => {
+  try {
+    const { id, clipId } = req.params;
+    const orgId = await meetingNotes.assertMeetingAccess(req.user?.id, id);
+    const clip = await clips.getClip(orgId, id, clipId);
+    res.set('Cache-Control', 'no-store').json({ clip });
+  } catch (err) {
+    sendError(res, err, 'read clip');
+  }
+});
+
+router.get('/:id/clips/:clipId/download/:track', authenticate, async (req, res) => {
+  try {
+    const { id, clipId, track } = req.params;
+    const orgId = await meetingNotes.assertMeetingAccess(req.user?.id, id);
+    await clips.downloadClip(orgId, id, clipId, track, async file => {
+      res.set('Cache-Control', 'no-store');
+      res.attachment('Entomate-clip.webm').type('audio/webm');
+      await pipeline(createReadStream(file), res);
+    });
+  } catch (err) {
+    if (res.headersSent || res.destroyed) return res.destroy();
+    sendError(res, err, 'clip download');
   }
 });
 
