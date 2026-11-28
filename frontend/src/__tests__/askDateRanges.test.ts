@@ -50,6 +50,30 @@ test('parses hyphenated and space-separated counts before applying the unit', ()
   expect(proposal?.eventWindow).toEqual({ before: { count: 21, unit: 'day' }, after: { count: 99, unit: 'day' } })
 })
 
+test.each([
+  'a week before Security Review vs. a month after',
+  'A WEEK before Security Review vs. 1 month after',
+  'one week before Security Review vs. a month after',
+])('resolves single-unit windows in %s', (question) => {
+  const proposal = proposeComparison(question, 'America/New_York')
+  expect(proposal).toEqual({
+    ranges: EMPTY_RANGES, eventBased: true, milestoneName: 'Security Review',
+    eventWindow: { before: { count: 1, unit: 'week' }, after: { count: 1, unit: 'month' } },
+  })
+  expect(eventComparisonRanges('2026-07-15', proposal?.eventWindow)).toEqual({
+    previous: { startDate: '2026-07-08', endDate: '2026-07-14' },
+    current: { startDate: '2026-07-16', endDate: '2026-08-15' },
+  })
+})
+
+test('supports a single day and clamps an implied month to the last day of the target month', () => {
+  const proposal = proposeComparison('a day before Security Review vs. a month after', 'America/New_York')
+  expect(eventComparisonRanges('2026-01-31', proposal?.eventWindow)).toEqual({
+    previous: { startDate: '2026-01-30', endDate: '2026-01-30' },
+    current: { startDate: '2026-02-01', endDate: '2026-02-28' },
+  })
+})
+
 test('uses the entire spelled-out count when it ends in a legacy two-week window', () => {
   const proposal = proposeComparison('twenty two weeks before Security Review vs. two weeks after', 'America/New_York')
   expect(proposal?.eventWindow).toEqual({ before: { count: 22, unit: 'week' }, after: { count: 2, unit: 'week' } })
@@ -83,6 +107,8 @@ test.each(['0 days before Security Review vs. 7 days after',
   'two weeks before Security Review vs. one hundred months after',
   'two weeks before Security Review vs. half a month after',
   'two weeks before Security Review vs. zero months after',
+  'a weeks before Security Review vs. a month after',
+  'a week before Security Review vs. a months after',
 ])('requires a correction for %s', (question) => {
   const proposal = proposeComparison(question, 'America/New_York')
   expect(proposal?.eventWindow).toBe('invalid')

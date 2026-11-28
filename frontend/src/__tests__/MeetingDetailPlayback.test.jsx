@@ -269,6 +269,10 @@ describe('a pressed timecode plays the recording', () => {
       comparing: true, custom: true, typed: true, relative: 'mixed-milestone-window', named: true, coverageName: 'Date range coverage' },
     { label: 'manual milestone with spelled-out counts', question: 'two weeks before Security Review vs. one month after',
       comparing: true, custom: true, typed: true, relative: 'mixed-milestone-window', named: true, manual: true, coverageName: 'Date range coverage' },
+    { label: 'selected milestone with implied counts', question: 'a week before Security Review vs. a month after',
+      comparing: true, custom: true, typed: true, relative: 'implied-milestone-window', named: true, coverageName: 'Date range coverage' },
+    { label: 'manual milestone with implied counts', question: 'a week before Security Review vs. a month after',
+      comparing: true, custom: true, typed: true, relative: 'implied-milestone-window', named: true, manual: true, coverageName: 'Date range coverage' },
   ])('$label restores coverage and the exact Before and After links without a second Ask request', async ({ question, comparing, custom, typed, corrected, relative, manual, named, coverageName }) => {
     const relativeCase = {
       days: {
@@ -324,6 +328,16 @@ describe('a pressed timecode plays the recording', () => {
         previewEnd: '2026-08-15', draftEnd: '2026-08-14',
         previousLabel: /Jul 1\D+14, 2026/, currentLabel: /Jul 16\D+Aug 15, 2026/,
         message: '2 weeks before and 1 calendar month after. Both exclude the milestone date.',
+      },
+      'implied-milestone-window': {
+        beforeMidnight: [10, 24], afterMidnight: [10, 25],
+        scheduledPreview: { earlierStart: '2026-07-07', laterEnd: '2026-08-14' },
+        beforeMeeting: '2026-07-10T18:00:00Z', afterMeeting: '2026-08-10T18:00:00Z',
+        previous: { startDate: '2026-07-08', endDate: '2026-07-14' },
+        current: { startDate: '2026-07-16', endDate: '2026-08-15' },
+        previewEnd: '2026-08-15', draftEnd: '2026-08-14',
+        previousLabel: /Jul 8\D+14, 2026/, currentLabel: /Jul 16\D+Aug 15, 2026/,
+        message: '1 week before and 1 calendar month after. Both exclude the milestone date.',
       },
     }[relative]
     const scheduledPreview = relativeCase?.scheduledPreview

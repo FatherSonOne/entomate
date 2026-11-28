@@ -142,7 +142,7 @@ const TENS = ['twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty'
 // Capture longer number phrases in full so "one hundred twenty" cannot become "twenty".
 const COUNT_WORD = `(?:${[...SMALL_COUNTS, ...TENS].join('|')}|hundred|thousand|million|billion|trillion|minus|negative|point|half|quarter|a)`
 const WORD_COUNT = String.raw`${COUNT_WORD}(?:[\s-]+(?:${COUNT_WORD}|and))*`
-const WINDOW_LENGTH = String.raw`(${NUMERIC_COUNT}|${WORD_COUNT})\s+(day|week|month)s?`
+const WINDOW_LENGTH = String.raw`(${NUMERIC_COUNT}|${WORD_COUNT})\s+(days?|weeks?|months?)`
 const CUSTOM_MILESTONE_WINDOW = new RegExp(
   String.raw`${WINDOW_START}${WINDOW_LENGTH}\s+before\s+${MILESTONE_TITLE}${COMPARE}${WINDOW_LENGTH}\s+after\b${MILESTONE_END}`, 'i',
 )
@@ -167,6 +167,12 @@ function parseWindowCount(value: string): number {
   return words.length === 2 && ones > 0 && ones < 10 ? base + ones : NaN
 }
 
+function parseWindowLength(value: string, unit: string): EventWindowLength {
+  const writtenUnit = unit.toLowerCase()
+  const count = value.toLowerCase() === 'a' && !writtenUnit.endsWith('s') ? 1 : parseWindowCount(value)
+  return { count, unit: writtenUnit.replace(/s$/, '') as CalendarUnit }
+}
+
 export function eventComparisonProposal(question: string): ComparisonProposal | null {
   const custom = CUSTOM_MILESTONE_WINDOW.exec(question)
   const launch = LAUNCH_COMPARISON.exec(question)
@@ -179,8 +185,8 @@ export function eventComparisonProposal(question: string): ComparisonProposal | 
   const [, beforeCount, beforeUnit, quoted, curved, plain, afterCount, afterUnit] = custom
   const milestoneName = cleanMilestoneTitle(quoted ?? curved ?? plain)
   if (!milestoneName || !beforeCount || !beforeUnit || !afterCount || !afterUnit) return null
-  const before = { count: parseWindowCount(beforeCount), unit: beforeUnit.toLowerCase() as CalendarUnit }
-  const after = { count: parseWindowCount(afterCount), unit: afterUnit.toLowerCase() as CalendarUnit }
+  const before = parseWindowLength(beforeCount, beforeUnit)
+  const after = parseWindowLength(afterCount, afterUnit)
   return { ranges: EMPTY_RANGES, eventBased: true, milestoneName,
     eventWindow: validWindowCount(before.count) && validWindowCount(after.count) ? { before, after } : 'invalid' }
 }
