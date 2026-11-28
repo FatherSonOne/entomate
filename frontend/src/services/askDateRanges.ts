@@ -145,7 +145,7 @@ const SMALL_COUNTS = [
 ]
 const TENS = ['twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety']
 // Capture longer number phrases in full so "one hundred twenty" cannot become "twenty".
-const COUNT_WORD = `(?:${[...SMALL_COUNTS, ...TENS].join('|')}|hundred|thousand|million|billion|trillion|minus|negative|point|half|quarter|few|a)`
+const COUNT_WORD = `(?:${[...SMALL_COUNTS, ...TENS].join('|')}|hundred|thousand|million|billion|trillion|minus|negative|point|half|quarter|few|several|a)`
 const WORD_COUNT = String.raw`${COUNT_WORD}(?:[\s-]+(?:${COUNT_WORD}|and))*`
 const WINDOW_LENGTH = String.raw`(${NUMERIC_COUNT}|${WORD_COUNT})\s+(days?|weeks?|months?)`
 const CUSTOM_MILESTONE_WINDOW = new RegExp(
@@ -177,7 +177,7 @@ function parseWindowLength(value: string, unit: string): ProposedWindowLength {
   const writtenUnit = unit.toLowerCase()
   const plural = writtenUnit.endsWith('s')
   const calendarUnit = writtenUnit.replace(/s$/, '') as CalendarUnit
-  if (plural && /^a\s+few$/i.test(value)) return { count: null, unit: calendarUnit }
+  if (plural && /^(?:a\s+few|several)$/i.test(value)) return { count: null, unit: calendarUnit }
   const count = value.toLowerCase() === 'a' && !plural ? 1 : parseWindowCount(value)
   return { count, unit: calendarUnit }
 }

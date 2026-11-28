@@ -97,6 +97,20 @@ test('keeps a known earlier count when the later count needs clarification', () 
   })
 })
 
+test('requires both counts for a few weeks before and several days after', () => {
+  const proposal = proposeComparison('a few weeks before Security Review vs. several days after', 'America/New_York')
+  expect(proposal).toEqual({
+    ranges: EMPTY_RANGES, eventBased: true, milestoneName: 'Security Review',
+    eventWindow: { before: { count: null, unit: 'week' }, after: { count: null, unit: 'day' } },
+  })
+  expect(eventComparisonRanges('2026-07-15', proposal?.eventWindow, { before: 3 })).toEqual(EMPTY_RANGES)
+  expect(eventComparisonRanges('2026-07-15', proposal?.eventWindow, { after: 5 })).toEqual(EMPTY_RANGES)
+  expect(eventComparisonRanges('2026-07-15', proposal?.eventWindow, { before: 3, after: 5 })).toEqual({
+    previous: { startDate: '2026-06-24', endDate: '2026-07-14' },
+    current: { startDate: '2026-07-16', endDate: '2026-07-20' },
+  })
+})
+
 test('uses the entire spelled-out count when it ends in a legacy two-week window', () => {
   const proposal = proposeComparison('twenty two weeks before Security Review vs. two weeks after', 'America/New_York')
   expect(proposal?.eventWindow).toEqual({ before: { count: 22, unit: 'week' }, after: { count: 2, unit: 'week' } })
