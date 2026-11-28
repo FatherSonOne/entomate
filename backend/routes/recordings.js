@@ -32,6 +32,7 @@ const { getOrgIdForUser } = require('../utils/orgContext');
 const meetingNotes = require('../services/meetingNotesService');
 const recorder = require('../services/meetingRecorder');
 const clips = require('../services/recordingClips');
+const mixes = require('../services/recordingMixes');
 const log = require('../utils/log');
 
 const router = express.Router();
@@ -243,16 +244,51 @@ router.get('/:id/clips/:clipId/download/:track', authenticate, async (req, res) 
   try {
     const { id, clipId, track } = req.params;
     const orgId = await meetingNotes.assertMeetingAccess(req.user?.id, id);
-    await clips.downloadClip(orgId, id, clipId, track, async file => {
-      res.set('Cache-Control', 'no-store');
-      res.attachment('Entomate-clip.webm').type('audio/webm');
-      await pipeline(createReadStream(file), res);
-    });
+    const send = file => sendWebm(res, file, 'Entomate-clip.webm');
+    if (track === 'adjusted') await mixes.downloadMix(orgId, id, send, await clips.getClip(orgId, id, clipId));
+    else await clips.downloadClip(orgId, id, clipId, track, send);
   } catch (err) {
     if (res.headersSent || res.destroyed) return res.destroy();
     sendError(res, err, 'clip download');
   }
 });
+
+function sendWebm(res, file, name) {
+  res.set('Cache-Control', 'no-store');
+  if (name) res.attachment(name);
+  res.type('audio/webm');
+  return pipeline(createReadStream(file), res);
+}
+
+function mixRoute(action) {
+  return async (req, res) => {
+    try {
+      const { id } = req.params;
+      const orgId = await meetingNotes.assertMeetingAccess(req.user?.id, id);
+      res.set('Cache-Control', 'no-store');
+      await action(req, res, orgId, id);
+    } catch (err) {
+      if (res.headersSent || res.destroyed) return res.destroy();
+      sendError(res, err, 'recording mix');
+    }
+  };
+}
+
+router.get('/:id/mix', authenticate, mixRoute(async (req, res, orgId, id) => {
+  res.json({ mix: await mixes.getMix(orgId, id) });
+}));
+router.put('/:id/mix', authenticate, mixRoute(async (req, res, orgId, id) => {
+  res.json({ mix: await mixes.saveMix(orgId, id, req.body?.gains) });
+}));
+router.post('/:id/mix/balance', authenticate, mixRoute(async (req, res, orgId, id) => {
+  res.json({ gains: await mixes.balanceVoices(orgId, id) });
+}));
+router.post('/:id/mix/preview', authenticate, mixRoute(async (req, res, orgId, id) => {
+  await mixes.renderMix(orgId, id, req.body?.gains, file => sendWebm(res, file));
+}));
+router.get('/:id/mix/download', authenticate, mixRoute(async (req, res, orgId, id) => {
+  await mixes.downloadMix(orgId, id, file => sendWebm(res, file, 'Entomate-adjusted-mix.webm'));
+}));
 
 router.delete('/:id/audio', authenticate, async (req, res) => {
   try {
