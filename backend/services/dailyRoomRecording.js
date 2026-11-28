@@ -12,6 +12,8 @@ const playback = require('./playbackFile');
 const { readManifest, coverageGaps } = require('./roomRecordingManifest');
 const log = require('../utils/log');
 
+const recordingType = 'raw-tracks';
+
 function bucket() {
   const bucket_name = process.env.DAILY_ROOM_RECORDING_BUCKET?.trim();
   const bucket_region = process.env.DAILY_ROOM_RECORDING_REGION?.trim();
@@ -51,7 +53,7 @@ function start(room, daily) {
     let confirmed = current.status === 'starting' ? relevant(await list(room, daily)) : null;
     if (!confirmed) {
       await daily(recordingPath(room) + '/start', 'POST', {
-        type: 'raw-tracks', instanceId: room.id, dataOutputs: ['event-json'], maxDuration: 7200,
+        type: recordingType, instanceId: room.id, dataOutputs: ['event-json'], maxDuration: 7200,
       });
       for (const wait of [0, 500, 1000, 2000]) {
         if (wait) await delay(wait);
@@ -78,7 +80,7 @@ function stop(room, daily) {
     if (job.status !== 'stopping') {
       await recorder.patchRoomRecording(meeting, { status: 'stopping', stopRequestedAt: new Date().toISOString() });
     }
-    const response = await daily(recordingPath(room) + '/stop', 'POST', { instanceId: room.id }, [400, 404]);
+    const response = await daily(recordingPath(room) + '/stop', 'POST', { type: recordingType, instanceId: room.id }, [400, 404]);
     if (!response && (await list(room, daily)).some(recording => recording.status === 'in-progress')) {
       throw new recorder.RecorderError(502, 'Daily is still recording. Try stopping the audio again.');
     }
