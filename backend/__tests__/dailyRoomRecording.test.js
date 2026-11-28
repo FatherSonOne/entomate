@@ -74,7 +74,12 @@ test('imports the raw manifest and track directly from the matching S3 recording
       log.warn.mockImplementation(message => reject(new Error(message)));
       refresh(room, daily);
     });
-    expect(saved).toMatchObject({ playbackFile: 'mix.webm', durationMs: 3000, participantTracks: { p1: { label: 'Guest', playbackFile: 'p1.webm' } } });
+    expect(saved).toMatchObject({
+      playbackFile: 'mix.webm', durationMs: 3000,
+      participantTracks: { p1: { label: 'Guest', playbackFile: 'p1.webm',
+        attendance: [{ kind: 'join', atMs: 0 }, { kind: 'leave', atMs: 3000 }],
+      } },
+    });
     expect(mockSend.mock.calls.map(([command]) => command.input)).toEqual([
       { Bucket: bucket, Key: `${prefix}.event.json` }, { Bucket: bucket, Key: track },
     ]);

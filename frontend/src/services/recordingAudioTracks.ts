@@ -6,10 +6,16 @@ export type PlaybackTrack = IsolatedAudioTrack | RoomParticipantTrack
 export type RecordingTrack = 'mix' | PlaybackTrack
 export const TRACK_LABELS = { mix: 'Combined', mic: 'Microphone', tab: 'Tab audio' }
 
+export interface AttendanceMarker {
+  kind: 'join' | 'leave'
+  atMs: number
+}
+
 export interface TrackCoverage {
   pieces: number
   durationMs: number
   label?: string
+  attendance?: AttendanceMarker[]
   status?: 'processing' | 'saved' | 'partial' | 'missing'
 }
 export type AudioTracks = Partial<Record<PlaybackTrack, TrackCoverage>>

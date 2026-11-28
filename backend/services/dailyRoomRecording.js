@@ -160,7 +160,7 @@ async function renderRecording(meeting, manifest, get, lease) {
       }
       const gaps = coverageGaps(clips, durationMs, person.witnessedAt);
       if (!clips.length) {
-        participantTracks[track] = { label: person.label, status: 'missing', gaps };
+        participantTracks[track] = { label: person.label, status: 'missing', gaps, attendance: person.attendance };
         await recorder.patchRoomRecording(meeting, { participantTracks: { ...participantTracks } }, lease);
         continue;
       }
@@ -168,7 +168,7 @@ async function renderRecording(meeting, manifest, get, lease) {
       await playback.renderAlignedAudio(clips, durationMs, output);
       const playbackFile = await recorder.saveRoomPlayback(meeting, track, await fs.readFile(output));
       participantTracks[track] = { label: person.label, status: gaps.length ? 'partial' : 'saved',
-        pieces: 1, durationMs, playbackFile, gaps };
+        pieces: 1, durationMs, playbackFile, gaps, attendance: person.attendance };
       await recorder.patchRoomRecording(meeting, { participantTracks: { ...participantTracks } }, lease);
       mixed.push({ file: output, startMs: 0, endMs: durationMs });
     }
