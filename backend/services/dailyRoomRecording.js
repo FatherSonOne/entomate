@@ -16,7 +16,9 @@ function bucket() {
   const bucket_name = process.env.DAILY_ROOM_RECORDING_BUCKET?.trim();
   const bucket_region = process.env.DAILY_ROOM_RECORDING_REGION?.trim();
   const assume_role_arn = process.env.DAILY_ROOM_RECORDING_ROLE_ARN?.trim();
-  return bucket_name && bucket_region && assume_role_arn ? { bucket_name, bucket_region, assume_role_arn } : null;
+  return bucket_name && bucket_region && assume_role_arn
+    ? { bucket_name, bucket_region, assume_role_arn, allow_api_access: true }
+    : null;
 }
 
 const operations = new Map();
