@@ -24,6 +24,7 @@ const JOBS = {
   digest: () => require('../services/overdueDigest').runOverdueDigest(),
   followups: () => require('../services/followUp').runFollowUps(),
   'meeting-briefs': () => require('../services/entoAi/scheduledBriefs').runScheduledBriefs(),
+  'cloud-recording': () => require('../services/dailyRoomRecording').recover(),
 };
 
 const running = new Set();

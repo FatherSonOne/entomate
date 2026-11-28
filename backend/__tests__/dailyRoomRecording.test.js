@@ -2,6 +2,7 @@ const { Readable } = require('node:stream');
 const { writeFile } = require('node:fs/promises');
 
 const mockSend = jest.fn();
+const mockClaim = jest.fn();
 jest.mock('@aws-sdk/client-s3', () => ({
   S3Client: jest.fn(() => ({ send: mockSend, destroy: jest.fn() })),
   GetObjectCommand: jest.fn(input => ({ input })),
@@ -11,6 +12,10 @@ jest.mock('../services/meetingRecorder', () => ({
 }));
 jest.mock('../services/playbackFile', () => ({ audioDuration: jest.fn(), renderAlignedAudio: jest.fn() }));
 jest.mock('../utils/log', () => ({ warn: jest.fn() }));
+jest.mock('../config/supabase', () => {
+  const update = { eq: () => update, then: resolve => resolve({ error: null }) };
+  return { supabaseAdmin: { rpc: (...args) => mockClaim(...args), from: () => ({ update: () => update }) } };
+});
 
 const recorder = require('../services/meetingRecorder');
 const playback = require('../services/playbackFile');
@@ -24,6 +29,7 @@ test('imports the raw manifest and track directly from the matching S3 recording
   const track = `${prefix}-participant-cam-audio-1795847368663`;
   const start = 1795847368.663;
   const room = { id: 'room-id', provider_name: 'pilot', created_at: new Date(start * 1000).toISOString() };
+  mockClaim.mockResolvedValue({ data: [room] });
   const recording = { id: 'daily-recording', mtgSessionId: 'session', s3key: prefix, duration: 3, status: 'finished' };
   const manifest = {
     recording: { id: recording.id, instance_id: room.id },

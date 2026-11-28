@@ -22,6 +22,9 @@
 'use strict';
 
 const express = require('express');
+const { Readable } = require('node:stream');
+const { pipeline } = require('node:stream/promises');
+const { ZipFile } = require('yazl');
 const { supabase } = require('../config/supabase');
 const { authenticate } = require('../middleware/auth');
 const { getOrgIdForUser } = require('../utils/orgContext');
@@ -165,6 +168,39 @@ router.get('/:id/waveform', authenticate, async (req, res) => {
     res.json({ success: true, peaks });
   } catch (err) {
     sendError(res, err, 'waveform');
+  }
+});
+
+router.get('/:id/track-downloads/:track', authenticate, async (req, res) => {
+  try {
+    const { id, track } = req.params;
+    const orgId = await meetingNotes.assertMeetingAccess(req.user?.id, id);
+    const files = await recorder.alignedDownloads(orgId, id, track);
+    res.set('Cache-Control', 'no-store');
+    if (track !== 'all') return res.json(files[0]);
+
+    const archive = new ZipFile();
+    const abort = new AbortController();
+    const timeout = setTimeout(() => abort.abort(), 120_000);
+    res.once('close', () => {
+      clearTimeout(timeout);
+      abort.abort();
+    });
+    for (const file of files) {
+      archive.addReadStreamLazy(file.name, { compress: false }, callback => {
+        const unavailable = () => callback(new Error('A saved track could not be downloaded.'));
+        fetch(file.url, { signal: abort.signal }).then(response => {
+          if (!response.ok || !response.body) return unavailable();
+          callback(null, Readable.fromWeb(response.body));
+        }, unavailable);
+      });
+    }
+    res.attachment('Entomate-aligned-tracks.zip');
+    archive.end();
+    await pipeline(archive.outputStream, res);
+  } catch (err) {
+    if (res.headersSent || res.destroyed) return res.destroy();
+    sendError(res, err, 'track download');
   }
 });
 

@@ -7,6 +7,7 @@ import { ISOLATED_AUDIO_TRACKS, roomParticipantTracks, TRACK_LABELS, type AudioG
 import { TrackSaveStatus, type TrackSaveStates } from './TrackSaveStatus'
 import { readRecordingWaveform, waveformFromPeaks } from '../../services/recordingWaveform'
 import { recordingSpeakers } from './recordingSpeakers'
+import { recordingsApi } from '../../services/api'
 import './RecordingPlayer.css'
 
 export interface RecordingPlayerHandle {
@@ -23,6 +24,7 @@ export interface RecordingPlayerProps {
   audioUrl?: string
   audioTracks?: AudioTracks
   roomRecording?: boolean
+  alignedDownloads?: boolean
   gaps?: ReadonlyArray<AudioGap>
   durationMs?: number | null
   waveformPeaks?: ReadonlyArray<number> | null
@@ -64,7 +66,7 @@ function rulerMarks(durationMs: number): number[] {
 }
 
 export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayerProps>(function RecordingPlayer(
-  { meetingId, audioUrl, audioTracks, roomRecording, gaps = [], durationMs, waveformPeaks, waveformReplacement, transcriptSegments, decisions = [], actions = [], onMoment, onStepMoment, onTime, onAudioRemoved },
+  { meetingId, audioUrl, audioTracks, roomRecording, alignedDownloads, gaps = [], durationMs, waveformPeaks, waveformReplacement, transcriptSegments, decisions = [], actions = [], onMoment, onStepMoment, onTime, onAudioRemoved },
   ref,
 ) {
   const [source, setSource] = useState<Source | null>(null)
@@ -75,6 +77,8 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
   const [confirmRemove, setConfirmRemove] = useState(false)
   const [removing, setRemoving] = useState(false)
   const [audioRemoved, setAudioRemoved] = useState(false)
+  const [downloading, setDownloading] = useState(false)
+  const [downloadError, setDownloadError] = useState<string | null>(null)
   const [mediaDuration, setMediaDuration] = useState(0)
   const [position, setPosition] = useState(0)
   const [hoverPosition, setHoverPosition] = useState<number | null>(null)
@@ -382,6 +386,25 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
         : waveform === null && waveStatus === 'unavailable' ? 'Audio recording · Waveform unavailable' : 'Audio recording'
   const hasMoments = decisions.length > 0 || actions.length > 0
 
+  const download = async (all: boolean) => {
+    setDownloading(true)
+    setDownloadError(null)
+    try {
+      if (all) await recordingsApi.downloadTracks(meetingId)
+      else {
+        const { name, url } = await recordingsApi.trackDownload(meetingId, track || 'mix')
+        const link = document.createElement('a')
+        link.href = url
+        link.download = name
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+      }
+    } catch {
+      setDownloadError('Could not download the audio. Try again.')
+    } finally { setDownloading(false) }
+  }
+
   return (
     <section className="bs-recording bs-tokens" aria-label="Meeting recording">
       {!audioRemoved && availableTracks.length > 0 && (
@@ -411,6 +434,13 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
           })}
         </ul>
       )}
+      {!audioRemoved && alignedDownloads && <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Aligned track downloads">
+        <Key size="sm" disabled={downloading} onClick={() => void download(false)}>Download {track ? labelOf(track) : 'Combined'}</Key>
+        {availableTracks.length > 0 && <Key size="sm" disabled={downloading} onClick={() => void download(true)}>
+          {downloading ? 'Preparing download…' : 'Download all tracks (ZIP)'}
+        </Key>}
+        {downloadError && <p className="bs-recording-error" role="alert">{downloadError}</p>}
+      </div>}
       {source && (
         <audio
           ref={audioRef}

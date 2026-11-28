@@ -1,6 +1,6 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
-const { createHash, randomUUID } = require('node:crypto');
+const { createHash, createHmac, randomUUID, timingSafeEqual } = require('node:crypto');
 const { URL } = require('node:url');
 const { z } = require('zod');
 const { supabaseAdmin } = require('../config/supabase');
@@ -11,6 +11,7 @@ const { meterAiForOrg } = require('../services/aiUsage');
 const { generateInsights, transcriptKey, viewInsights } = require('../services/liveMeetingInsights');
 const recorder = require('../services/meetingRecorder');
 const cloudAudio = require('../services/dailyRoomRecording');
+const { daily } = cloudAudio;
 const log = require('../utils/log');
 
 const router = express.Router();
@@ -57,23 +58,6 @@ function route(handler, { needsDaily = true } = {}) {
   };
 }
 
-async function daily(path, method = 'GET', payload, allowed = []) {
-  let response;
-  try {
-    response = await globalThis.fetch(`https://api.daily.co/v1${path}`, {
-      method, signal: globalThis.AbortSignal.timeout(10_000),
-      headers: { Authorization: `Bearer ${process.env.DAILY_API_KEY.trim()}`, 'Content-Type': 'application/json' },
-      body: payload && JSON.stringify(payload),
-    });
-  } catch {
-    throw fail(502, 'The video service did not respond. Try again.');
-  }
-  if (allowed.includes(response.status)) return null;
-  if (!response.ok) throw fail(502, 'The video service could not complete this request. Try again.');
-  if (response.status === 204) return {};
-  return response.json();
-}
-
 async function getRoom(id, userId, inviteKey) {
   let query = table().select(roomColumns).eq('id', id);
   if (userId) query = query.eq('host_id', userId);
@@ -98,7 +82,15 @@ function view(room) {
 
 async function roomView(room) {
   const audio = room.meeting_id && (await recorder.roomRecordingJob(room))?.recording_job;
-  return { ...view(room), ...(audio ? { roomAudio: audio.status, roomCapture: audio.roomCapture ?? 'browser' } : {}) };
+  return {
+    ...view(room),
+    ...(audio ? { roomAudio: audio.status, roomCapture: audio.roomCapture ?? 'browser' } : {}),
+    ...(audio?.roomCapture === 'daily' ? {
+      cloudStage: audio.cloudStage,
+      cloudCanRetry: audio.status === 'failed' && Boolean(audio.cloudResumeStatus),
+      roomTrackProgress: Object.values(audio.participantTracks || {}).map(({ label, status }) => ({ label, status })),
+    } : {}),
+  };
 }
 
 function roomGuestId(roomId, nonce) {
@@ -126,6 +118,29 @@ async function tokenFor(room, userName, hostId, guestId, acceptRecording) {
 router.get('/status', authenticate, async (req, res) => {
   res.set('Cache-Control', 'no-store');
   res.json({ configured: configured(), ...(cloudAudio.bucket() ? { cloudAudio: true } : {}) });
+});
+
+router.post('/daily-recording-webhook', (req, res) => {
+  const secret = process.env.DAILY_RECORDING_WEBHOOK_SECRET?.trim();
+  if (!secret || !supabaseAdmin) return res.sendStatus(503);
+  const timestamp = req.get('X-Webhook-Timestamp') || '';
+  const time = Number(timestamp);
+  const age = Math.abs(Date.now() - (time < 1e12 ? time * 1000 : time));
+  const signature = Buffer.from(req.get('X-Webhook-Signature') || '', 'base64');
+  const key = Buffer.from(secret, 'base64');
+  if (!Buffer.isBuffer(req.rawBody) || !Number.isFinite(age) || age > 15 * 60 * 1000 || key.length < 32 || signature.length !== 32) {
+    return res.sendStatus(401);
+  }
+  const expected = createHmac('sha256', key).update(timestamp + '.').update(req.rawBody).digest();
+  if (!timingSafeEqual(signature, expected)) return res.sendStatus(401);
+  res.sendStatus(200);
+  const provider = req.body?.payload?.room_name;
+  if (req.body?.type !== 'recording.ready-to-download' || typeof provider !== 'string' || !/^entomate-[a-f0-9]{32}$/.test(provider)) return;
+  void (async () => {
+    const { data: room, error } = await table().select(roomColumns).eq('provider_name', provider).maybeSingle();
+    if (error) throw error;
+    if (room) await cloudAudio.recordingReady(room);
+  })().catch(error => log.warn('Daily recording webhook could not schedule import', { code: error.code }));
 });
 
 router.get('/host', authenticate, route(async (req, res) => {
@@ -221,7 +236,7 @@ router.post('/:id/recording/start', authenticate, route(async (req, res) => {
   if (!available(room) || room.meeting_id !== room.id) throw fail(409, 'Room recording is unavailable.');
   if ((await recorder.roomRecordingJob(room))?.recording_job.roomCapture === 'daily') {
     const job = await cloudAudio.start(room, daily);
-    return res.status(201).json({ status: job.status });
+    return res.status(201).json({ status: job.status, cloudStage: job.cloudStage });
   }
   const { mimeType } = parse(recordingStart, req.body);
   const job = await recorder.startRoomRecording(room, mimeType);
@@ -232,7 +247,7 @@ router.post('/:id/recording/finish', authenticate, route(async (req, res) => {
   const room = await getRoom(req.params.id, req.user.id);
   if ((await recorder.roomRecordingJob(room))?.recording_job.roomCapture === 'daily') {
     const job = await cloudAudio.stop(room, daily);
-    return res.json({ status: job.status, meetingId: room.id });
+    return res.json({ status: job.status, cloudStage: job.cloudStage, meetingId: room.id });
   }
   const { pieces, labels } = parse(recordingFinish, req.body);
   const job = await recorder.finishRoomRecording(room, pieces, labels);
@@ -242,8 +257,14 @@ router.post('/:id/recording/finish', authenticate, route(async (req, res) => {
 router.post('/:id/recording/refresh', authenticate, route(async (req, res) => {
   const room = await getRoom(req.params.id, req.user.id);
   const job = (await recorder.roomRecordingJob(room))?.recording_job;
-  if (job?.roomCapture === 'daily' && job.status === 'processing') cloudAudio.refresh(room, daily);
+  if (job?.roomCapture === 'daily' && ['stopping', 'processing'].includes(job.status)) cloudAudio.refresh(room, daily);
   res.sendStatus(204);
+}));
+
+router.post('/:id/recording/retry', authenticate, route(async (req, res) => {
+  const room = await getRoom(req.params.id, req.user.id);
+  const job = await cloudAudio.retry(room);
+  res.status(202).json({ status: job.status, cloudStage: job.cloudStage });
 }));
 
 router.post('/:id/lines', authenticate, route(async (req, res) => {
