@@ -946,12 +946,17 @@ async function getPlayback({ orgId, meetingId, track = 'mix' }) {
   return signedPieces(pieces, job.mimeType);
 }
 
-async function alignedDownloads(orgId, meetingId, requestedTrack) {
+async function loadAlignedRecording(orgId, meetingId) {
   const meeting = await loadPlaybackMeeting(orgId, meetingId);
   const job = meeting.recording_job;
   if (job.roomCapture !== 'daily' || job.status !== 'done') {
     throw new RecorderError(404, 'Aligned downloads are unavailable for this recording.');
   }
+  return meeting;
+}
+
+async function alignedDownloads(orgId, meetingId, requestedTrack) {
+  const { recording_job: job } = await loadAlignedRecording(orgId, meetingId);
   const tracks = [['mix', { label: 'Combined', playbackFile: job.playbackFile }],
     ...Object.entries(job.participantTracks || {}).filter(([key, track]) => /^p[1-9]\d{0,2}$/.test(key) && track?.pieces)];
   const folder = recordingFolder(orgId, meetingId) + '/';
@@ -1069,6 +1074,7 @@ module.exports = {
   patchRoomRecording,
   saveRoomPlayback,
   alignedDownloads,
+  loadAlignedRecording,
   startRoomRecording,
   finishRoomRecording,
   botsInCall,

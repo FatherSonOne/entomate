@@ -425,3 +425,67 @@
   margin-block: 5px;
   font-size: 12px;
 }
+
+.bs-recording-clips {
+  display: grid;
+  gap: 8px;
+  margin-block: 10px;
+  padding: 10px;
+  border: 1px solid var(--bs-rule);
+  border-radius: 5px;
+  color: var(--bs-ink);
+  font-size: 13px;
+}
+.bs-recording-clip-actions, .bs-recording-clip-times, .bs-recording-clip-times > div {
+  display: flex;
+  align-items: end;
+  gap: 6px 10px;
+  flex-wrap: wrap;
+}
+.bs-recording-clip-actions label, .bs-recording-clip-times label {
+  display: grid;
+  gap: 3px;
+}
+.bs-recording-clip-times input { width: 7em; }
+.bs-recording-clips input, .bs-recording-clips select { max-width: 100%; }
+.bs-recording-clip-help {
+  margin: 0;
+  color: var(--bs-ink);
+}
+.bs-recording-clip-transcript, .bs-recording-clip-list {
+  margin-block: 4px;
+  padding-inline-start: 0;
+  list-style: none;
+}
+.bs-recording-clip-list { display: grid; gap: 5px; max-height: 12em; overflow-y: auto; }
+.bs-recording-clip-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.bs-recording-clip-list li span {
+  font-family: var(--bs-mono);
+  white-space: nowrap;
+}
+.bs-recording-clip-transcript {
+  display: grid;
+  gap: 5px;
+  max-height: 9em;
+  overflow-y: auto;
+}
+.bs-recording[data-clip-range="true"] .bs-recording-scrub::after {
+  content: "";
+  position: absolute;
+  inset: 0 calc(100% - var(--clip-end)) 0 var(--clip-start);
+  z-index: 1;
+  background: color-mix(in srgb, var(--bs-d-brand) 22%, transparent);
+  border-inline: 1px solid var(--bs-d-brand);
+  pointer-events: none;
+}
+.bs-recording-clip-drag {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  cursor: crosshair;
+  touch-action: none;
+}

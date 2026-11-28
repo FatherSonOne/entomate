@@ -7,7 +7,10 @@
 'use strict';
 
 const { spawnSync } = require('child_process');
-const { makeSeekable } = require('../services/playbackFile');
+const { mkdtemp, rm } = require('node:fs/promises');
+const { tmpdir } = require('node:os');
+const path = require('node:path');
+const { makeSeekable, exportAudioRange } = require('../services/playbackFile');
 
 const hasFfmpeg = spawnSync('ffmpeg', ['-version'], { windowsHide: true }).status === 0;
 const maybe = hasFfmpeg ? test : test.skip;
@@ -49,3 +52,36 @@ describe('makeSeekable', () => {
     await expect(makeSeekable(Buffer.from('x'), 'mp3')).rejects.toThrow(/No playback format/);
   });
 });
+
+
+maybe('exports only the selected part of the recording clock', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'entomate-audio-range-test-'));
+  try {
+    const input = path.join(dir, 'source.webm');
+    const output = path.join(dir, 'clip.webm');
+    const source = spawnSync('ffmpeg', [
+      '-loglevel', 'error', '-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=mono:d=2',
+      '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000:duration=1',
+      '-filter_complex', '[0:a][1:a]concat=n=2:v=0:a=1[a]', '-map', '[a]', '-c:a', 'libopus', input,
+    ], { windowsHide: true });
+    expect(source.stderr.toString()).toBe('');
+    expect(source.status).toBe(0);
+
+    await exportAudioRange(input, output, 1250, 2750);
+    const decoded = spawnSync('ffmpeg', [
+      '-loglevel', 'error', '-i', output, '-ar', '8000', '-ac', '1', '-f', 's16le', '-',
+    ], { windowsHide: true });
+    expect(decoded.status).toBe(0);
+    const samples = decoded.stdout;
+    expect(Math.abs(samples.length / 2 / 8000 - 1.5)).toBeLessThan(0.02);
+    const peak = (from, to) => {
+      let value = 0;
+      for (let i = from * 8000; i < to * 8000; i++) value = Math.max(value, Math.abs(samples.readInt16LE(i * 2)));
+      return value;
+    };
+    expect(peak(0.1, 0.6)).toBeLessThan(25);
+    expect(peak(0.9, 1.4)).toBeGreaterThan(1000);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}, 30000);

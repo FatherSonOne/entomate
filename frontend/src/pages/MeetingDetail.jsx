@@ -42,6 +42,7 @@ export default function MeetingDetail() {
   const { pathname, state } = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
   const tabParam = searchParams.get('tab')
+  const sharedClipId = searchParams.get('clip')
   const time = searchParams.get('t')
   const rawMs = time == null ? NaN : Number(time)
   const startAtMs = Number.isSafeInteger(rawMs) && rawMs >= 0 ? rawMs : null
@@ -787,6 +788,9 @@ export default function MeetingDetail() {
         )}
       </div>
 
+      {sharedClipId && (!keptRecording || recordingJob?.roomCapture !== 'daily') && (
+        <p className="bs-mut" role="status">This clip is unavailable.</p>
+      )}
       {playable && (
         <div className="bs-cell">
           <RecordingPlayer
@@ -798,6 +802,7 @@ export default function MeetingDetail() {
             audioTracks={keptRecording && (browserRecording || roomRecording) ? recordingJob.audioTracks : undefined}
             roomRecording={roomRecording}
             cloudRoom={recordingJob?.roomCapture === 'daily'}
+            sharedClipId={sharedClipId}
             gaps={keptRecording && (browserRecording || roomRecording) ? recordingJob.audioGaps : undefined}
             waveformPeaks={keptRecording ? toWaveformPeaks(meeting.recording_job?.waveformPeaks) : null}
             waveformReplacement={rebuildingTranscript

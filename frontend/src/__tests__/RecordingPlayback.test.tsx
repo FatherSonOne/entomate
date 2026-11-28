@@ -2,7 +2,10 @@ import React from 'react'
 import { render, screen, fireEvent, act, within, waitFor } from '@testing-library/react'
 import { vi, describe, test, expect, beforeEach, afterEach } from 'vitest'
 
-const api = vi.hoisted(() => ({ playback: vi.fn(), waveform: vi.fn(), removeAudio: vi.fn() }))
+const api = vi.hoisted(() => ({
+  playback: vi.fn(), waveform: vi.fn(), removeAudio: vi.fn(),
+  listClips: vi.fn(), clip: vi.fn(), saveClip: vi.fn(), downloadClip: vi.fn(),
+}))
 const cacheMock = vi.hoisted(() => ({ invalidate: vi.fn() }))
 vi.mock('../services/api', () => ({ recordingsApi: api, meetingsApi: { renameSpeaker: vi.fn() } }))
 vi.mock('../services/apiCache', () => ({ default: cacheMock }))
@@ -202,6 +205,43 @@ describe('RecordingPlayer', () => {
     } finally {
       pause.mockRestore()
       load.mockRestore()
+    }
+  })
+
+  test('opens a shared recap clip, bounds preview, and exports the explicitly selected source', async () => {
+    const clip = { id: 'clip-1', title: 'Guest reconnect', startMs: 9250, endMs: 15250 }
+    api.listClips.mockResolvedValue({ clips: [clip] })
+    api.clip.mockResolvedValue({ clip })
+    api.waveform.mockResolvedValue({ peaks: [0.2, 0.4, 0.1] })
+    api.downloadClip.mockResolvedValue(undefined)
+    api.playback.mockResolvedValue({ url: 'https://signed.test/combined', durationMs: 60_000 })
+    const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined)
+    const pause = vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {})
+    try {
+      render(<RecordingPlayer meetingId={MEETING} durationMs={60_000} roomRecording cloudRoom sharedClipId={clip.id}
+        audioTracks={{ p1: { pieces: 1, durationMs: 60_000, label: 'Guest' } }} />)
+      const panel = screen.getByRole('region', { name: 'Recap clips' })
+      await waitFor(() => expect(within(panel).getByRole('spinbutton', { name: 'Start (seconds)' })).toHaveValue(9.25))
+      expect(screen.getByRole('slider', { name: 'Playback position' })).toHaveValue('9.25')
+      expect(api.playback).not.toHaveBeenCalled()
+      fireEvent.click(within(panel).getByRole('button', { name: 'Preview clip' }))
+      const audio = await screen.findByTestId('recording-player') as HTMLAudioElement
+      Object.defineProperty(audio, 'duration', { configurable: true, value: 60 })
+      fireEvent.loadedMetadata(audio)
+      expect(audio.currentTime).toBe(9.25)
+      audio.currentTime = 15.4
+      fireEvent.timeUpdate(audio)
+      expect(pause).toHaveBeenCalledTimes(1)
+      expect(audio.currentTime).toBe(15.25)
+      const source = within(panel).getByRole('combobox', { name: 'Download source' })
+      expect(source).toHaveValue('mix')
+      fireEvent.change(source, { target: { value: 'p1' } })
+      fireEvent.click(within(panel).getByRole('button', { name: 'Download clip' }))
+      await waitFor(() => expect(api.downloadClip).toHaveBeenCalledWith(MEETING, clip.id, 'p1', 'Guest reconnect - Guest.webm'))
+      expect(screen.getByRole('combobox', { name: 'Audio source' })).toHaveValue('')
+    } finally {
+      pause.mockRestore()
+      play.mockRestore()
     }
   })
 

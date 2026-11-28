@@ -260,6 +260,11 @@ export const recordingsApi = {
   playback: (meetingId, track) => api.get(`/recordings/${meetingId}/playback`, track ? { params: { track }, _noCache: true } : undefined),
   trackDownload: (id, track) => api.get(`/recordings/${id}/track-downloads/${track}`, { _noCache: true, skipRetry: true }),
   downloadTracks: (id) => downloadFile(`/recordings/${id}/track-downloads/all`, 'Entomate-aligned-tracks.zip'),
+  listClips: (id, signal) => api.get('/recordings/' + id + '/clips', { signal, _noCache: true }),
+  clip: (id, clipId, signal) => api.get('/recordings/' + id + '/clips/' + encodeURIComponent(clipId), { signal, _noCache: true }),
+  saveClip: (id, clip) => api.post('/recordings/' + id + '/clips', clip, { skipRetry: true }),
+  downloadClip: (id, clipId, track, filename) =>
+    downloadFile('/recordings/' + id + '/clips/' + encodeURIComponent(clipId) + '/download/' + track, filename),
   waveform: (meetingId, signal, track) => api.get(`/recordings/${meetingId}/waveform`, {
     signal, _noCache: true, ...(track ? { params: { track } } : {}),
   }),
