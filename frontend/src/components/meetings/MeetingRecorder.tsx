@@ -22,6 +22,8 @@ import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { lockRecording, recordingJournal, savedTrackCoverage, type SavedRecording } from '../../services/recordingJournal'
 import { ISOLATED_AUDIO_TRACKS, type IsolatedAudioTrack, type RecordingGaps } from '../../services/recordingAudioTracks'
+import { applyMicMode, MIC_MODES, microphoneConstraints, reportedMicMode, type MicMode } from '../../services/recordingMicrophone'
+import { useMicCheck } from './useMicCheck'
 import { TrackSaveStatus, type TrackSaveStates } from './TrackSaveStatus'
 import { AlertTriangle, Bot, Camera, Download, ExternalLink, Loader2, Mic, MonitorUp, Pause, Play, Square, Trash2 } from 'lucide-react'
 import { canPip, dressWindow } from '../bot/BotLive'
@@ -113,6 +115,26 @@ const INPUT =
 const BUTTON = 'vbtn min-h-10 justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary disabled:opacity-50'
 const PRIMARY = `${BUTTON} vbtn-primary`
 const SECONDARY = `${BUTTON} vbtn-ghost`
+
+function MicModeSelect({ value, disabled, onChange }: {
+  value: MicMode | null
+  disabled?: boolean
+  onChange: (mode: MicMode) => void
+}) {
+  return (
+    <label className="flex min-w-0 flex-wrap items-center gap-2 text-sm text-content-primary">
+      Microphone mode
+      <select className={INPUT} value={value ?? ''} disabled={disabled} onChange={event => {
+        const choice = event.currentTarget.value
+        if (choice === 'noise-reduction' || choice === 'original') onChange(choice)
+      }}>
+        <option value="" disabled>Mode not reported</option>
+        <option value="noise-reduction">{MIC_MODES['noise-reduction']}</option>
+        <option value="original">{MIC_MODES.original}</option>
+      </select>
+    </label>
+  )
+}
 
 interface DisplayMediaOptionsWithAudio extends DisplayMediaStreamOptions {
   selfBrowserSurface?: 'include' | 'exclude'
@@ -225,6 +247,8 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
   const uid = useId()
   const [mode, setMode] = useState<RecorderMode>('mic')
   const [withMic, setWithMic] = useState(true)
+  const [micMode, setMicMode] = useState<MicMode>('noise-reduction')
+  const [micModeNotice, setMicModeNotice] = useState('')
   const [splitAudio, setSplitAudio] = useState(false)
   const [audioInputs, setAudioInputs] = useState<MediaDeviceInfo[]>([])
   const [changingInput, setChangingInput] = useState(false)
@@ -244,6 +268,12 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
   // Live captions are opt-in: the browser's speech service (Google, in Chrome) hears the audio.
   const [captions, setCaptions] = useState(false)
   const [phase, setPhase] = useState<Phase>('setup')
+  const micCheck = useMicCheck(micMode, audioInputDeviceId, phase === 'setup' && !recovering && (mode !== 'tab' || withMic))
+  const micCheckAudio = useRef<HTMLAudioElement>(null)
+  useEffect(() => {
+    const audio = micCheckAudio.current
+    return () => { if (audio && !audio.paused) audio.pause() }
+  }, [micCheck.playback])
   const [error, setError] = useState<string | null>(null)
   const [elapsedMs, setElapsedMs] = useState(0)
   const [upload, setUpload] = useState<UploaderState>(EMPTY_UPLOAD)
@@ -392,11 +422,7 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
   const openStreams = async (captureMode: RecorderMode): Promise<{ streams: MediaStream[]; video: MediaStreamTrack | null }> => {
     const md = navigator.mediaDevices
     if (!md?.getUserMedia) throw new Error('This browser cannot record. Try a current Chrome, Edge, Firefox or Safari.')
-    const micConstraints: MediaTrackConstraints = {
-      echoCancellation: true,
-      noiseSuppression: true,
-      ...(audioInputDeviceId ? { deviceId: { exact: audioInputDeviceId } } : {}),
-    }
+    const micConstraints = microphoneConstraints(micMode, audioInputDeviceId)
     if (captureMode === 'mic') return { streams: [await md.getUserMedia({ audio: micConstraints })], video: null }
     if (captureMode === 'camera') {
       const s = await md.getUserMedia({ audio: micConstraints, video: { width: { ideal: 1280 }, height: { ideal: 720 } } })
@@ -479,26 +505,66 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
     syncGap(current, 'mic')
   }
 
-  const changeInput = async (kind: IsolatedAudioTrack, deviceId?: string, view?: Window | null): Promise<void> => {
+  const changeInput = async (kind: IsolatedAudioTrack, options: {
+    deviceId?: string
+    view?: Window | null
+    micMode?: MicMode
+  } = {}): Promise<void> => {
     const current = capture.current
     const previous = current?.inputs[kind]
     if (!current || !previous || pendingInput.current || stopping.current) return
+    const nextMode = options.micMode
+    const currentCapture = () => capture.current === current && !stopping.current
     pendingInput.current = true
     setChangingInput(true)
     setError(null)
+    if (kind === 'mic') setMicModeNotice('')
     let replacement: MediaStream | undefined
+    let reopeningMic = false
+    let restoredMode = false
     try {
       const mediaDevices = navigator.mediaDevices
-      if (kind === 'mic') {
-        replacement = await mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true, ...(deviceId && deviceId !== 'default' ? { deviceId: { exact: deviceId } } : {}) },
-        })
+      if (kind === 'mic' && nextMode) {
+        const active = await applyMicMode(previous.track, nextMode).catch(() => null)
+        if (!currentCapture() || previous.track.readyState !== 'live') return
+        if (active === nextMode) {
+          setMicMode(nextMode)
+          return
+        }
+
+        // Some browsers fix processing when opening a device and reuse it
+        // while any track from that input is live.
+        const previousMode = reportedMicMode(previous.track)
+        const deviceId = previous.track.getSettings?.().deviceId
+        const choices = previous.track.getCapabilities?.().noiseSuppression
+        if (!previousMode || !deviceId || !choices?.includes(nextMode === 'noise-reduction')) {
+          throw new Error('Microphone mode unavailable')
+        }
+        reopeningMic = true
+        previous.track.stop()
+        syncGap(current, 'mic')
+        try {
+          replacement = await mediaDevices.getUserMedia({ audio: microphoneConstraints(nextMode, deviceId) })
+          if (!currentCapture()) return
+          const track = replacement.getAudioTracks()[0]
+          if (!track || track.readyState !== 'live' || reportedMicMode(track) !== nextMode) {
+            throw new Error('Microphone mode unconfirmed')
+          }
+        } catch {
+          replacement?.getTracks().forEach(track => track.stop())
+          replacement = undefined
+          if (!currentCapture()) return
+          replacement = await mediaDevices.getUserMedia({ audio: microphoneConstraints(previousMode, deviceId) })
+          restoredMode = true
+        }
+      } else if (kind === 'mic') {
+        replacement = await mediaDevices.getUserMedia({ audio: microphoneConstraints(micMode, options.deviceId) })
       } else {
-        const options: DisplayMediaOptionsWithAudio = { video: true, audio: true, selfBrowserSurface: 'exclude', systemAudio: 'include' }
-        const popup = navigator.userActivation?.isActive === false && view !== window ? view?.navigator.mediaDevices : undefined
-        replacement = await (popup?.getDisplayMedia ? popup : mediaDevices).getDisplayMedia(options)
+        const display: DisplayMediaOptionsWithAudio = { video: true, audio: true, selfBrowserSurface: 'exclude', systemAudio: 'include' }
+        const popup = navigator.userActivation?.isActive === false && options.view !== window ? options.view?.navigator.mediaDevices : undefined
+        replacement = await (popup?.getDisplayMedia ? popup : mediaDevices).getDisplayMedia(display)
       }
-      if (capture.current !== current || stopping.current) return
+      if (!currentCapture()) return
       const track = replacement.getAudioTracks()[0]
       if (!track || track.readyState !== 'live') {
         throw new Error(kind === 'tab' ? 'Choose a browser tab and turn on “Also share tab audio”.' : 'The microphone did not provide audio.')
@@ -519,9 +585,16 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
       current.streams.push(replacement)
       current.inputs[kind] = { stream: replacement, track, node }
       replacement = undefined
+      if (nextMode && !restoredMode) setMicMode(nextMode)
+      if (restoredMode) setMicModeNotice('This microphone could not switch modes. Recording continues.')
       watchInput(current, kind)
     } catch (err) {
-      if (capture.current === current && !stopping.current) setError(captureErrorMessage(err, kind))
+      if (currentCapture()) {
+        if (nextMode) {
+          setMicModeNotice(reopeningMic ? 'The microphone could not restart. Choose a microphone to reconnect.'
+            : 'This microphone could not switch modes. Recording continues.')
+        } else setError(captureErrorMessage(err, kind))
+      }
     } finally {
       replacement?.getTracks().forEach(track => track.stop())
       pendingInput.current = false
@@ -530,7 +603,11 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
   }
 
   const start = async (quick = false): Promise<void> => {
-    if (phase !== 'setup' || recovering || (!consent && !quick)) return
+    if (phase !== 'setup' || recovering || (!quick && (!consent || micCheck.pending()))) return
+    const sample = micCheckAudio.current
+    if (sample && !sample.paused) sample.pause()
+    micCheck.clear()
+    setMicModeNotice('')
     const captureMode = quick ? 'mic' : mode
     setError(null)
     if (typeof MediaRecorder === 'undefined') {
@@ -905,12 +982,15 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
         Microphone interrupted at {formatClock(micGap.startMs)}. {paused ? 'Recording is paused.'
           : tabAvailable ? 'Tab audio is still recording.' : 'Choose an available microphone.'}
       </p>}
+      {mic && <MicModeSelect value={mic.track.readyState === 'live' ? reportedMicMode(mic.track) : null}
+        disabled={changingInput || mic.track.readyState !== 'live'} onChange={next => void changeInput('mic', { micMode: next })} />}
+      {micModeNotice && <p role="status" className="text-xs text-content-secondary">{micModeNotice}</p>}
       <div className="flex flex-wrap items-center gap-2">
         {mic && (
           <label className="flex items-center gap-2 text-sm">
             Microphone
             <select className={INPUT} aria-label="Recording microphone" disabled={changingInput} value={selectedMic}
-              onChange={event => void changeInput('mic', event.currentTarget.value)}>
+              onChange={event => void changeInput('mic', { deviceId: event.currentTarget.value })}>
               <option value="" disabled>Choose a microphone</option>
               <option value="default">System default</option>
               {audioInputs.filter(device => device.deviceId && device.deviceId !== 'default').map((device, index) => (
@@ -920,7 +1000,7 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
           </label>
         )}
         {tab && <button type="button" className={SECONDARY} disabled={changingInput}
-          onClick={event => void changeInput('tab', undefined, event.currentTarget.ownerDocument.defaultView)}>Re-share tab audio</button>}
+          onClick={event => void changeInput('tab', { view: event.currentTarget.ownerDocument.defaultView })}>Re-share tab audio</button>}
         {tab && mic && <button type="button" className={SECONDARY} disabled={mic.track.readyState === 'ended'} onClick={toggleMic}>
           {mic.track.enabled ? 'Mute mic' : 'Unmute mic'}
         </button>}
@@ -1082,6 +1162,26 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
             )}
           </fieldset>
 
+          {(mode !== 'tab' || withMic) && <fieldset disabled={locked} className="space-y-2 rounded-lg border border-line px-3 py-2">
+            <legend className="px-1 text-xs font-medium text-content-secondary">Microphone setup</legend>
+            <MicModeSelect value={micMode} onChange={setMicMode} />
+            <p className="text-xs text-content-secondary">Original mic turns off noise reduction and keeps the recorder’s echo cancellation setting.</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" className={SECONDARY} disabled={micCheck.running} onClick={() => void micCheck.start()}>
+                {micCheck.playback ? 'Repeat mic check' : 'Run five-second mic check'}
+              </button>
+              {micCheck.running && <button type="button" className={SECONDARY} onClick={micCheck.clear}>Cancel mic check</button>}
+            </div>
+            {micCheck.running && <p role="status" className="text-xs text-content-secondary">Recording a five-second mic sample…</p>}
+            {micCheck.error && <p role="alert" className="text-xs text-semantic-error">{micCheck.error}</p>}
+            {micCheck.playback && <div className="space-y-1">
+              <p role="status" className="text-xs text-content-secondary">
+                Mic check ready{micCheck.playback.label ? ' · ' + micCheck.playback.label : ''} · {micCheck.playback.mode ? MIC_MODES[micCheck.playback.mode] : 'Mode not reported'}
+              </p>
+              <audio ref={micCheckAudio} className="w-full" src={micCheck.playback.url} controls aria-label="Mic check playback" />
+            </div>}
+          </fieldset>}
+
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label htmlFor={`${uid}-title`} className="mb-1 block text-xs font-medium text-content-secondary">
@@ -1109,7 +1209,7 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
             <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} disabled={locked} className="mt-0.5 h-4 w-4 accent-accent-primary" />
             Everyone in this meeting knows it is being recorded and has agreed.
           </label>
-          <button type="button" className={`${PRIMARY} w-full`} onClick={() => void start()} disabled={!consent || Boolean(recovering) || phase === 'starting'}>
+          <button type="button" className={`${PRIMARY} w-full`} onClick={() => void start()} disabled={!consent || Boolean(recovering) || phase === 'starting' || micCheck.running}>
             {phase === 'starting' ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Mic className="h-4 w-4" aria-hidden="true" />}
             {phase === 'starting' ? 'Starting' : 'Start recording'}
           </button>

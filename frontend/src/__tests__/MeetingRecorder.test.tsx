@@ -121,11 +121,20 @@ describe('meetingRecorderService', () => {
 class FakeTrack {
   kind: string
   listeners: Record<string, Array<() => void>> = {}
+  settings: MediaTrackSettings = {}
+  constraints: MediaTrackConstraints = {}
   stopped = false
   enabled = true
   muted = false
   get readyState() { return this.stopped ? 'ended' : 'live' }
   constructor(kind: string) { this.kind = kind }
+  getSettings(): MediaTrackSettings { return this.settings }
+  getConstraints(): MediaTrackConstraints { return this.constraints }
+  async applyConstraints(constraints: MediaTrackConstraints): Promise<void> {
+    this.constraints = constraints
+    const setting = constraints.noiseSuppression
+    this.settings.noiseSuppression = typeof setting === 'boolean' ? setting : setting?.exact
+  }
   stop(): void { this.stopped = true }
   addEventListener(type: string, fn: () => void): void { (this.listeners[type] ||= []).push(fn) }
   removeEventListener(type: string, fn: () => void): void { this.listeners[type] = (this.listeners[type] ?? []).filter(handler => handler !== fn) }
@@ -155,6 +164,9 @@ class FakeRecorder {
   resume(): void { this.state = 'recording' }
   emit(text: string): void { this.ondataavailable?.({ data: new Blob([text], { type: this.mimeType }) }) }
   addEventListener(type: string, fn: () => void): void { if (type === 'stop') this.stopFns.push(fn) }
+  removeEventListener(type: string, fn: () => void): void {
+    if (type === 'stop') this.stopFns = this.stopFns.filter(listener => listener !== fn)
+  }
   stop(): void {
     this.emit('last')
     this.state = 'inactive'
@@ -424,6 +436,133 @@ describe('MeetingRecorder', () => {
     expect(popDoc.querySelector('meter[aria-label="Microphone level"]')).not.toBeNull()
     expect(popDoc.querySelector('meter[aria-label="Tab audio level"]')).not.toBeNull()
     open.mockRestore()
+  })
+
+  test('the five-second mic check uses the selected mode and releases a local sample before recording', async () => {
+    const mic = new FakeTrack('audio')
+    mic.settings.noiseSuppression = false
+    getUserMedia.mockResolvedValueOnce(new FakeStream([mic]))
+    const createUrl = vi.fn(() => 'blob:mic-check')
+    const revokeUrl = vi.fn()
+    const priorCreate = URL.createObjectURL
+    const priorRevoke = URL.revokeObjectURL
+    URL.createObjectURL = createUrl
+    URL.revokeObjectURL = revokeUrl
+    vi.useFakeTimers()
+    try {
+      renderRecorder()
+      fireEvent.change(screen.getByRole('combobox', { name: 'Microphone mode' }), { target: { value: 'original' } })
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: /run five-second mic check/i })) })
+      expect(getUserMedia).toHaveBeenCalledWith({ audio: { echoCancellation: true, noiseSuppression: false } })
+      expect(api.start).not.toHaveBeenCalled()
+      await act(async () => { await vi.advanceTimersByTimeAsync(4999) })
+      expect(mic.stopped).toBe(false)
+      await act(async () => { await vi.advanceTimersByTimeAsync(1) })
+      expect(mic.stopped).toBe(true)
+      expect(screen.getByLabelText('Mic check playback')).toHaveAttribute('src', 'blob:mic-check')
+      expect(screen.getByText(/Mic check ready.*Original mic/)).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('checkbox', { name: /knows it is being recorded/i }))
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Start recording' })) })
+      expect(revokeUrl).toHaveBeenCalledWith('blob:mic-check')
+      expect(screen.queryByLabelText('Mic check playback')).not.toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+      URL.createObjectURL = priorCreate
+      URL.revokeObjectURL = priorRevoke
+    }
+  })
+
+  test('live mode changes from the pop-out stay on the mic and carry through to a replacement device', async () => {
+    const first = new FakeTrack('audio')
+    first.settings = { deviceId: 'mic-a', noiseSuppression: true }
+    first.constraints = { echoCancellation: true, deviceId: { exact: 'mic-a' } }
+    const second = new FakeTrack('audio')
+    second.settings = { deviceId: 'mic-b', noiseSuppression: false }
+    const tab = new FakeTrack('audio')
+    const changeMode = vi.spyOn(first, 'applyConstraints')
+    const changeTab = vi.spyOn(tab, 'applyConstraints')
+    getUserMedia.mockResolvedValueOnce(new FakeStream([first])).mockResolvedValueOnce(new FakeStream([second]))
+    getDisplayMedia.mockResolvedValueOnce(new FakeStream([new FakeTrack('video'), tab]))
+    Object.assign(navigator.mediaDevices, { enumerateDevices: async () => [
+      { kind: 'audioinput', label: 'Mic A', deviceId: 'mic-a' },
+      { kind: 'audioinput', label: 'Mic B', deviceId: 'mic-b' },
+    ] })
+    const frame = document.createElement('iframe')
+    document.body.append(frame)
+    const popDoc = frame.contentDocument!
+    const popup = { document: popDoc, addEventListener: vi.fn(), close: vi.fn(), focus: vi.fn() }
+    const open = vi.spyOn(window, 'open').mockReturnValue(popup as unknown as Window)
+    try {
+      renderRecorder()
+      fireEvent.click(screen.getByRole('radio', { name: /browser tab/i }))
+      fireEvent.click(screen.getByRole('checkbox', { name: /knows it is being recorded/i }))
+      fireEvent.click(screen.getByRole('button', { name: 'Start recording' }))
+      await screen.findByRole('button', { name: 'Stop recording' })
+      fireEvent.click(screen.getByRole('button', { name: /pop out/i }))
+      await waitFor(() => expect(popDoc.querySelector('[data-testid="recorder-pop"]')).not.toBeNull())
+      const popView = within(popDoc.body)
+      const mode = popView.getByRole('combobox', { name: 'Microphone mode' })
+      expect(mode).toHaveValue('noise-reduction')
+      fireEvent.change(mode, { target: { value: 'original' } })
+      await waitFor(() => expect(mode).toHaveValue('original'))
+      expect(changeMode).toHaveBeenCalledWith({
+        echoCancellation: true, deviceId: { exact: 'mic-a' }, noiseSuppression: { exact: false },
+      })
+      expect(screen.getByRole('combobox', { name: 'Microphone mode' })).toHaveValue('original')
+      changeMode.mockRejectedValueOnce(new DOMException('Unsupported', 'OverconstrainedError'))
+      fireEvent.change(mode, { target: { value: 'noise-reduction' } })
+      await popView.findByText('This microphone could not switch modes. Recording continues.')
+      expect(mode).toHaveValue('original')
+      expect(first.stopped).toBe(false)
+      fireEvent.change(popView.getByRole('combobox', { name: 'Recording microphone' }), { target: { value: 'mic-b' } })
+      await waitFor(() => expect(first.stopped).toBe(true))
+      expect(getUserMedia).toHaveBeenLastCalledWith({
+        audio: { echoCancellation: true, noiseSuppression: false, deviceId: { exact: 'mic-b' } },
+      })
+      expect(mode).toHaveValue('original')
+      expect(changeTab).not.toHaveBeenCalled()
+      expect(tab.stopped).toBe(false)
+      expect(getDisplayMedia).toHaveBeenCalledTimes(1)
+      expect(recorders[0]?.state).toBe('recording')
+    } finally {
+      open.mockRestore()
+      frame.remove()
+    }
+  })
+
+  test('restores the previous mic mode after a failed reopen while the tab keeps recording', async () => {
+    const original = new FakeTrack('audio')
+    original.settings = { deviceId: 'mic-a', noiseSuppression: true }
+    Object.assign(original, { getCapabilities: () => ({ noiseSuppression: [true, false] }) })
+    vi.spyOn(original, 'applyConstraints').mockRejectedValueOnce(new DOMException('Unavailable', 'OverconstrainedError'))
+    const restored = new FakeTrack('audio')
+    restored.settings = { deviceId: 'mic-a', noiseSuppression: true }
+    const tab = new FakeTrack('audio')
+    getDisplayMedia.mockResolvedValueOnce(new FakeStream([new FakeTrack('video'), tab]))
+    getUserMedia
+      .mockResolvedValueOnce(new FakeStream([original]))
+      .mockRejectedValueOnce(new DOMException('Unavailable', 'NotReadableError'))
+      .mockResolvedValueOnce(new FakeStream([restored]))
+    renderRecorder()
+    fireEvent.click(screen.getByRole('radio', { name: /browser tab/i }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /knows it is being recorded/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Start recording' }))
+    await screen.findByRole('button', { name: 'Stop recording' })
+    const mode = screen.getByRole('combobox', { name: 'Microphone mode' })
+    fireEvent.change(mode, { target: { value: 'original' } })
+    expect(await screen.findByText('This microphone could not switch modes. Recording continues.')).toBeInTheDocument()
+    expect(getUserMedia).toHaveBeenNthCalledWith(2, {
+      audio: { noiseSuppression: false, echoCancellation: true, deviceId: { exact: 'mic-a' } },
+    })
+    expect(getUserMedia).toHaveBeenNthCalledWith(3, {
+      audio: { noiseSuppression: true, echoCancellation: true, deviceId: { exact: 'mic-a' } },
+    })
+    expect(mode).toHaveValue('noise-reduction')
+    expect(original.stopped).toBe(true)
+    expect(restored.stopped).toBe(false)
+    expect(tab.stopped).toBe(false)
+    expect(getDisplayMedia).toHaveBeenCalledTimes(1)
+    expect(recorders[0]?.state).toBe('recording')
   })
 
   test('a blocked share explains itself and makes no meeting', async () => {
