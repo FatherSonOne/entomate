@@ -139,6 +139,27 @@ test('the host ends the provider session and then finalizes the saved meeting', 
   expect(mockFinish).toHaveBeenCalledWith('finish_live_meeting', { p_room: roomId, p_host: host });
 });
 
+test('stopping a cloud recording uses the raw-tracks type and the original instance ID', async () => {
+  const recorder = require('../services/meetingRecorder');
+  const job = { roomCapture: 'daily', status: 'recording' };
+  mockRoom.meeting_id = roomId;
+  const readJob = jest.spyOn(recorder, 'roomRecordingJob').mockResolvedValue({ id: roomId, recording_job: job });
+  const patchJob = jest.spyOn(recorder, 'patchRoomRecording').mockImplementation(async (_meeting, patch) => ({ ...job, ...patch }));
+  try {
+    global.fetch.mockResolvedValue({ ok: true, json: async () => ({}) });
+    await request(app).post(`/${roomId}/recording/finish`).set('X-Test-User', host)
+      .expect(200, { status: 'processing', meetingId: roomId });
+
+    const [url, options] = global.fetch.mock.calls[0];
+    expect(new URL(url).pathname).toBe('/v1/rooms/pilot/recordings/stop');
+    expect(options.method).toBe('POST');
+    expect(JSON.parse(options.body)).toEqual({ type: 'raw-tracks', instanceId: roomId });
+  } finally {
+    patchJob.mockRestore();
+    readJob.mockRestore();
+  }
+});
+
 test('live drafts cite saved transcript lines and refreshing them never creates tasks', async () => {
   const cue = { event_id: visitor, at_ms: 14000, speaker: 'Priya', text: 'We decided to launch Friday. I will send the checklist.' };
   mockLines = [cue];
