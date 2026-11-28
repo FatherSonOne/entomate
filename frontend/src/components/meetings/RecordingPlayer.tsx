@@ -3,10 +3,12 @@ import { ChevronDown, Loader2, Pause, Play, RotateCcw, RotateCw, SkipBack, SkipF
 import { Display, Key, Tape, Toggle, type TapeMarker } from '../bench'
 import { formatClock, type TranscriptSegment } from '../../services/meetingTranscriptService'
 import { loadRecordingAudio, loadRecordingWaveformPeaks, removeRecordingAudio, type AudioTracks, type RecordingAudio } from '../../services/meetingRecorderService'
-import { ISOLATED_AUDIO_TRACKS, roomParticipantTracks, TRACK_LABELS, type AudioGap, type IsolatedAudioTrack, type PlaybackTrack, type RecordingTrack } from '../../services/recordingAudioTracks'
+import { ISOLATED_AUDIO_TRACKS, roomParticipantTracks, TRACK_LABELS, type AudioGap, type IsolatedAudioTrack, type PlaybackTrack, type RecordingTrack, type RoomParticipantTrack } from '../../services/recordingAudioTracks'
 import { TrackSaveStatus, type TrackSaveStates } from './TrackSaveStatus'
 import { readRecordingWaveform, waveformFromPeaks } from '../../services/recordingWaveform'
 import { recordingSpeakers } from './recordingSpeakers'
+import { RoomAudioStem } from './RoomAudioStem'
+import { RoomTrackTimeline } from './RoomTrackTimeline'
 import { recordingsApi } from '../../services/api'
 import './RecordingPlayer.css'
 
@@ -24,7 +26,7 @@ export interface RecordingPlayerProps {
   audioUrl?: string
   audioTracks?: AudioTracks
   roomRecording?: boolean
-  alignedDownloads?: boolean
+  cloudRoom?: boolean
   gaps?: ReadonlyArray<AudioGap>
   durationMs?: number | null
   waveformPeaks?: ReadonlyArray<number> | null
@@ -66,7 +68,7 @@ function rulerMarks(durationMs: number): number[] {
 }
 
 export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayerProps>(function RecordingPlayer(
-  { meetingId, audioUrl, audioTracks, roomRecording, alignedDownloads, gaps = [], durationMs, waveformPeaks, waveformReplacement, transcriptSegments, decisions = [], actions = [], onMoment, onStepMoment, onTime, onAudioRemoved },
+  { meetingId, audioUrl, audioTracks, roomRecording, cloudRoom, gaps = [], durationMs, waveformPeaks, waveformReplacement, transcriptSegments, decisions = [], actions = [], onMoment, onStepMoment, onTime, onAudioRemoved },
   ref,
 ) {
   const [source, setSource] = useState<Source | null>(null)
@@ -85,6 +87,7 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed] = useState(1)
   const [muted, setMuted] = useState(false)
+  const [mutedParticipants, setMutedParticipants] = useState<Set<RoomParticipantTrack>>(() => new Set())
   const [volume, setVolume] = useState(1)
   const [showSpeakerColors, setShowSpeakerColors] = useState(false)
   const [waveforms, setWaveforms] = useState<Partial<Record<RecordingTrack, string>>>({})
@@ -115,9 +118,15 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
   const elapsed = formatClock(position)
   const total = timelineDuration ? formatClock(timelineDuration) : '–:––'
   const savedWaveform = useMemo(() => waveformPeaks?.length ? waveformFromPeaks(waveformPeaks) : null, [waveformPeaks])
-  const trackKey = track ?? 'mix'
-  const waveform = audioRemoved ? null : ((!track ? savedWaveform : null) ?? waveforms[trackKey] ?? null)
   const participantTracks = roomParticipantTracks(audioTracks)
+  const roomTimeline = !audioRemoved && cloudRoom && participantTracks.length > 0
+  const filteredMix = roomTimeline && !track && participantTracks.some(name => mutedParticipants.has(name))
+  const audibleParticipants = filteredMix
+    ? participantTracks.filter(name => (audioTracks?.[name]?.durationMs ?? 0) > 0 && !mutedParticipants.has(name))
+    : []
+  const waveformTrack = roomTimeline ? undefined : track
+  const trackKey = waveformTrack ?? 'mix'
+  const waveform = audioRemoved ? null : ((!waveformTrack ? savedWaveform : null) ?? waveforms[trackKey] ?? null)
   const availableTracks: PlaybackTrack[] = [
     ...ISOLATED_AUDIO_TRACKS.filter(name => (audioTracks?.[name]?.durationMs ?? 0) > 0),
     ...participantTracks.filter(name => (audioTracks?.[name]?.durationMs ?? 0) > 0),
@@ -145,7 +154,7 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
     setWaveStatus('drawing')
     const readWaveform = audioUrl
       ? readRecordingWaveform(audioUrl, finiteDuration(durationMs), controller.signal)
-      : loadRecordingWaveformPeaks(meetingId, controller.signal, track).then(waveformFromPeaks)
+      : loadRecordingWaveformPeaks(meetingId, controller.signal, waveformTrack).then(waveformFromPeaks)
     void readWaveform
       .then(path => {
         if (controller.signal.aborted) return
@@ -156,7 +165,7 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
         if (!controller.signal.aborted) setWaveStatus('unavailable')
       })
     return () => controller.abort()
-  }, [audioRemoved, audioUrl, durationMs, meetingId, track, trackKey, waveform])
+  }, [audioRemoved, audioUrl, durationMs, meetingId, waveformTrack, trackKey, waveform])
 
   const load = async (playbackTrack: PlaybackTrack | undefined, refresh = false): Promise<void> => {
     if (request.current || (source && playbackTrack === track && !refresh)) return
@@ -212,6 +221,15 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
     const ready = audio && mediaReady.current
     switchTrack(nextTrack, ready ? Math.round(audio.currentTime * 1000) : position,
       ready ? !audio.paused : Boolean(pending.current?.play), pending.current?.endMs ?? previewEnd.current)
+  }
+
+  const toggleParticipantMute = (name: RoomParticipantTrack): void => {
+    setMutedParticipants(previous => {
+      const next = new Set(previous)
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
+      return next
+    })
   }
 
   const gapPlaybackTrack = (gap: AudioGap): IsolatedAudioTrack | undefined => {
@@ -301,7 +319,6 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
     setMediaDuration(finiteDuration(audio.duration) * 1000)
     audio.playbackRate = speed
     audio.volume = volume
-    audio.muted = muted
     const next = pending.current
     pending.current = null
     if (next) performSeek(audio, next)
@@ -434,7 +451,7 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
           })}
         </ul>
       )}
-      {!audioRemoved && alignedDownloads && <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Aligned track downloads">
+      {!audioRemoved && cloudRoom && <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Aligned track downloads">
         <Key size="sm" disabled={downloading} onClick={() => void download(false)}>Download {track ? labelOf(track) : 'Combined'}</Key>
         {availableTracks.length > 0 && <Key size="sm" disabled={downloading} onClick={() => void download(true)}>
           {downloading ? 'Preparing download…' : 'Download all tracks (ZIP)'}
@@ -446,6 +463,7 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
           ref={audioRef}
           src={source.url}
           preload="auto"
+          muted={muted || filteredMix}
           hidden
           data-testid="recording-player"
           onLoadedMetadata={e => onMetadata(e.currentTarget)}
@@ -458,6 +476,10 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
           onError={e => onError(e.currentTarget)}
         />
       )}
+      {source && audibleParticipants.map(name => (
+        <RoomAudioStem key={name} meetingId={meetingId} track={name} label={labelOf(name)}
+          masterRef={audioRef} muted={muted} volume={volume} />
+      ))}
       {waveformReplacement ?? <Display className="bs-recording-display">
         <div className="bs-recording-readout">
           <span className="bs-recording-state" data-playing={playing}>
@@ -466,72 +488,86 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
           </span>
           <span className="bs-recording-clock"><b>{elapsed}</b> <span aria-hidden="true">/</span> {total}</span>
         </div>
-        <div className="bs-recording-scrub" style={{ '--position': `${fraction * 100}%` } as React.CSSProperties}>
-          {isPartial && <span className="bs-recording-unavailable" style={{ left: `${coverageFraction * 100}%` }} aria-hidden="true" />}
-          {(waveform !== null || speakerColorsVisible) && (
-            <svg data-testid={waveform !== null ? 'recording-waveform' : undefined} viewBox="0 0 1000 80" preserveAspectRatio="none" aria-hidden="true">
-              <defs>
-                <clipPath id={clipId}><rect width={fraction * 1000} height="80" /></clipPath>
-                {speakerColorsVisible && (
-                  <linearGradient id={speakerGradientId} gradientUnits="userSpaceOnUse" x1="0" x2="1000" y1="0" y2="0">
-                    {speakers.stops.map(({ offset, color }, index) => <stop key={index} offset={offset} stopColor={color} />)}
-                  </linearGradient>
-                )}
-              </defs>
-              {waveform !== null && (
-                <>
-                  <path d={waveform} transform={waveformScale} className="bs-recording-unplayed" />
-                  <g clipPath={`url(#${clipId})`}>
-                    <path d={waveform} transform={waveformScale} className={speakerColorsVisible && !track ? 'bs-recording-played-neutral' : 'bs-recording-played'} />
-                  </g>
-                  {speakerColorsVisible && !track && (
+        <div className={roomTimeline ? 'bs-recording-room-row' : undefined}>
+          {roomTimeline && <div className="bs-recording-room-label">
+            <strong>Combined</strong>
+            {filteredMix && <span>{audibleParticipants.length ? 'Mutes applied' : 'All tracks muted'}</span>}
+          </div>}
+          <div className="bs-recording-master-lane">
+            <div className="bs-recording-scrub" style={{ '--position': `${fraction * 100}%` } as React.CSSProperties}>
+              {isPartial && <span className="bs-recording-unavailable" style={{ left: `${coverageFraction * 100}%` }} aria-hidden="true" />}
+              {(waveform !== null || speakerColorsVisible) && (
+                <svg data-testid={waveform !== null ? 'recording-waveform' : undefined} viewBox="0 0 1000 80" preserveAspectRatio="none" aria-hidden="true">
+                  <defs>
+                    <clipPath id={clipId}><rect width={fraction * 1000} height="80" /></clipPath>
+                    {speakerColorsVisible && (
+                      <linearGradient id={speakerGradientId} gradientUnits="userSpaceOnUse" x1="0" x2="1000" y1="0" y2="0">
+                        {speakers.stops.map(({ offset, color }, index) => <stop key={index} offset={offset} stopColor={color} />)}
+                      </linearGradient>
+                    )}
+                  </defs>
+                  {waveform !== null && (
                     <>
-                      <path d={waveform} fill={`url(#${speakerGradientId})`} opacity="0.7" />
-                      <path d={waveform} fill={`url(#${speakerGradientId})`} clipPath={`url(#${clipId})`} />
+                      <path d={waveform} transform={waveformScale} className="bs-recording-unplayed" />
+                      <g clipPath={`url(#${clipId})`}>
+                        <path d={waveform} transform={waveformScale} className={speakerColorsVisible && !waveformTrack ? 'bs-recording-played-neutral' : 'bs-recording-played'} />
+                      </g>
+                      {speakerColorsVisible && !waveformTrack && (
+                        <>
+                          <path d={waveform} fill={`url(#${speakerGradientId})`} opacity="0.7" />
+                          <path d={waveform} fill={`url(#${speakerGradientId})`} clipPath={`url(#${clipId})`} />
+                        </>
+                      )}
                     </>
                   )}
-                </>
+                  {speakerColorsVisible && <rect y="76" width="1000" height="4" fill={`url(#${speakerGradientId})`} />}
+                </svg>
               )}
-              {speakerColorsVisible && <rect y="76" width="1000" height="4" fill={`url(#${speakerGradientId})`} />}
-            </svg>
-          )}
-          {effectiveDuration > 0 && <span className="bs-recording-head" aria-hidden="true" />}
-          {hoverPosition !== null && (
-            <span className="bs-recording-hover" aria-hidden="true" style={{ left: `clamp(24px, ${hoverPosition * 100}%, calc(100% - 24px))` }}>
-              {formatClock(hoverPosition * effectiveDuration)}
-            </span>
-          )}
-          <input
-            type="range"
-            style={coverageFraction < 1 ? { width: `${coverageFraction * 100}%` } : undefined}
-            aria-label="Playback position"
-            aria-valuetext={`${elapsed} of ${total}${currentSpeaker ? `, ${currentSpeaker}` : ''}`}
-            min={0}
-            max={effectiveDuration / 1000 || 1}
-            step="any"
-            value={effectiveDuration ? Math.min(position, effectiveDuration) / 1000 : 0}
-            disabled={!effectiveDuration || removing}
-            onChange={e => seek(e.currentTarget.valueAsNumber * 1000)}
-            onPointerMove={e => {
-              if (e.pointerType === 'touch') return
-              const bounds = e.currentTarget.getBoundingClientRect()
-              if (bounds.width) setHoverPosition(Math.max(0, Math.min(1, (e.clientX - bounds.left) / bounds.width)))
-            }}
-            onPointerLeave={() => setHoverPosition(null)}
-            onKeyDown={e => {
-              if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return
-              e.preventDefault()
-              const step = e.key === 'ArrowLeft' || e.key === 'ArrowDown' ? -1000 : 1000
-              seek(Math.min(effectiveDuration, Math.max(0, position + step)))
-            }}
-          />
-        </div>
-        {timelineDuration > 0 && (
-          <div className="bs-recording-ruler" aria-hidden="true">
-            {rulerMarks(timelineDuration).map(at => (
-              <span key={at} style={{ left: `${at / timelineDuration * 100}%` }}>{formatClock(at)}</span>
-            ))}
+              {effectiveDuration > 0 && <span className="bs-recording-head" aria-hidden="true" />}
+              {hoverPosition !== null && (
+                <span className="bs-recording-hover" aria-hidden="true" style={{ left: `clamp(24px, ${hoverPosition * 100}%, calc(100% - 24px))` }}>
+                  {formatClock(hoverPosition * effectiveDuration)}
+                </span>
+              )}
+              <input
+                type="range"
+                style={coverageFraction < 1 ? { width: `${coverageFraction * 100}%` } : undefined}
+                aria-label="Playback position"
+                aria-valuetext={`${elapsed} of ${total}${currentSpeaker ? `, ${currentSpeaker}` : ''}`}
+                min={0}
+                max={effectiveDuration / 1000 || 1}
+                step="any"
+                value={effectiveDuration ? Math.min(position, effectiveDuration) / 1000 : 0}
+                disabled={!effectiveDuration || removing}
+                onChange={e => seek(e.currentTarget.valueAsNumber * 1000)}
+                onPointerMove={e => {
+                  if (e.pointerType === 'touch') return
+                  const bounds = e.currentTarget.getBoundingClientRect()
+                  if (bounds.width) setHoverPosition(Math.max(0, Math.min(1, (e.clientX - bounds.left) / bounds.width)))
+                }}
+                onPointerLeave={() => setHoverPosition(null)}
+                onKeyDown={e => {
+                  if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return
+                  e.preventDefault()
+                  const step = e.key === 'ArrowLeft' || e.key === 'ArrowDown' ? -1000 : 1000
+                  seek(Math.min(effectiveDuration, Math.max(0, position + step)))
+                }}
+              />
+            </div>
+            {timelineDuration > 0 && (
+              <div className="bs-recording-ruler" aria-hidden="true">
+                {rulerMarks(timelineDuration).map(at => (
+                  <span key={at} style={{ left: `${at / timelineDuration * 100}%` }}>{formatClock(at)}</span>
+                ))}
+              </div>
+            )}
           </div>
+        </div>
+        {roomTimeline && (
+          <RoomTrackTimeline meetingId={meetingId} tracks={participantTracks} audioTracks={audioTracks} labelOf={labelOf}
+            durationMs={timelineDuration} position={position} soloed={track}
+            muted={mutedParticipants} disabled={removing} onSeek={seek}
+            onSolo={name => selectTrack(track === name ? undefined : name)} onMute={toggleParticipantMute} />
         )}
         {!audioRemoved && timelineDuration > 0 && (roomRecording ? participantTracks : ISOLATED_AUDIO_TRACKS).map(name => {
           const trackGaps = gaps.filter(gap => gap.track === name && gap.startMs < timelineDuration)
@@ -613,18 +649,12 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
             </div>
           )}
           <div className="bs-recording-volume">
-            <button type="button" aria-label={muted ? 'Unmute' : 'Mute'} title={muted ? 'Unmute' : 'Mute'} onClick={() => {
-              if (audioRef.current) audioRef.current.muted = !muted
-              setMuted(!muted)
-            }}>{muted || !volume ? <VolumeX aria-hidden="true" /> : <Volume2 aria-hidden="true" />}</button>
+            <button type="button" aria-label={muted ? 'Unmute' : 'Mute'} title={muted ? 'Unmute' : 'Mute'} onClick={() => setMuted(!muted)}>{muted || !volume ? <VolumeX aria-hidden="true" /> : <Volume2 aria-hidden="true" />}</button>
             <input type="range" min={0} max={1} step={0.05} value={muted ? 0 : volume} aria-label="Volume"
               aria-valuetext={`${Math.round((muted ? 0 : volume) * 100)}%`}
               onChange={e => {
                 const value = e.currentTarget.valueAsNumber
-                if (audioRef.current) {
-                  audioRef.current.volume = value
-                  audioRef.current.muted = false
-                }
+                if (audioRef.current) audioRef.current.volume = value
                 setVolume(value)
                 setMuted(false)
               }} />

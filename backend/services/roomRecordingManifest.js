@@ -55,11 +55,11 @@ function readManifest({ events }, recording, participants, keys) {
 
   const people = new Map();
   const addPerson = (person, fallbackName) => {
-    const witnessedAt = timestamp(person.join_time);
+    const witnessedAt = Number.isFinite(person.join_time) ? timestamp(person.join_time) : NaN;
     let track = people.get(person.user_id);
     if (!track) {
       const label = String(person.user_name || fallbackName || 'Participant').trim().slice(0, 120);
-      track = { label: label || 'Participant', segments: [], witnessedAt };
+      track = { label: label || 'Participant', segments: [], attendance: [], witnessedAt };
       people.set(person.user_id, track);
     } else if (Number.isFinite(witnessedAt)) {
       track.witnessedAt = Number.isFinite(track.witnessedAt) ? Math.min(witnessedAt, track.witnessedAt) : witnessedAt;
@@ -67,9 +67,15 @@ function readManifest({ events }, recording, participants, keys) {
     return track;
   };
   for (const person of participants) {
+    if (!person.user_id || !Number.isFinite(person.join_time)) continue;
     const joined = timestamp(person.join_time);
-    const left = joined + (person.duration ?? 0) * 1000;
-    if (person.user_id && joined < durationMs && left > 0) addPerson(person);
+    const left = Number.isFinite(person.duration) && person.duration > 0
+      ? timestamp(person.join_time + person.duration)
+      : null;
+    if (joined >= durationMs || (joined < 0 && (left === null || left <= 0))) continue;
+    const { attendance } = addPerson(person);
+    if (joined >= 0) attendance.push({ kind: 'join', atMs: joined });
+    if (left !== null && left > 0 && left <= durationMs) attendance.push({ kind: 'leave', atMs: left });
   }
   for (const segment of sessions.values()) {
     const person = roster.get(segment.sessionId);
@@ -82,6 +88,10 @@ function readManifest({ events }, recording, participants, keys) {
     track.segments.push(segment);
   }
 
+  for (const person of people.values()) {
+    person.attendance = [...new Map(person.attendance.map(marker => [marker.kind + marker.atMs, marker])).values()]
+      .sort((a, b) => a.atMs - b.atMs);
+  }
   return { origin, durationMs, people: [...people.values()] };
 }
 

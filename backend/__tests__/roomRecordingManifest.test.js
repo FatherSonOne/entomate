@@ -41,6 +41,23 @@ test('uses Daily user identity across reconnects, even when participants share a
   ]);
 });
 
+test('keeps attendance on the same track across reconnects and omits events outside the recording', () => {
+  const roster = [
+    { ...participants[0], join_time: time(-2000), duration: 10 },
+    { ...participants[1], join_time: time(1900), duration: null },
+    participants[2], participants[3], participants[3],
+    { participant_id: 'late', user_id: 'late', join_time: time(29000), duration: 14 },
+  ];
+  const manifest = readManifest({ events }, recordings, roster, keys);
+  expect(manifest.people.map(person => person.attendance)).toEqual([
+    [{ kind: 'leave', atMs: 8000 }],
+    [{ kind: 'join', atMs: 1900 }],
+    [{ kind: 'join', atMs: 0 }, { kind: 'leave', atMs: 9000 },
+      { kind: 'join', atMs: 14000 }, { kind: 'leave', atMs: 30000 }],
+    [{ kind: 'join', atMs: 29000 }],
+  ]);
+});
+
 test('waits for the identity mapping and the recording objects before assigning tracks', () => {
   expect(readManifest({ events }, recordings, participants.slice(0, 3), keys)).toBeNull();
   expect(readManifest({ events }, recordings, participants, keys.slice(0, 3))).toBeNull();

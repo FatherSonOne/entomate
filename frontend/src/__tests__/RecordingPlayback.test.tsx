@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, screen, fireEvent, act, within } from '@testing-library/react'
+import { render, screen, fireEvent, act, within, waitFor } from '@testing-library/react'
 import { vi, describe, test, expect, beforeEach, afterEach } from 'vitest'
 
 const api = vi.hoisted(() => ({ playback: vi.fn(), waveform: vi.fn(), removeAudio: vi.fn() }))
@@ -127,6 +127,81 @@ describe('RecordingPlayer', () => {
       }
     } finally {
       pause.mockRestore()
+    }
+  })
+
+  test('stacks cloud waveforms and shares one playhead across attendance markers, solo, and mutes', async () => {
+    api.playback.mockImplementation((_id, track) => Promise.resolve({
+      url: 'https://signed.test/' + (track || 'combined'), durationMs: 60_000,
+    }))
+    api.waveform.mockResolvedValue({ peaks: [0.2, 0.4, 0.1] })
+    const pause = vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {})
+    const load = vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {})
+    const coverage = { pieces: 1, durationMs: 60_000 }
+    const job = toRecordingJob({
+      source: 'room', roomCapture: 'daily', status: 'done', durationMs: 60_000,
+      participantTracks: {
+        p1: { ...coverage, label: 'Host' },
+        p2: { ...coverage, label: 'Guest', attendance: [
+          { kind: 'leave', atMs: 9000 }, { kind: 'join', atMs: 14250 }, { kind: 'join', atMs: -1 }, null,
+        ] },
+        p3: { label: 'Quiet guest', status: 'missing' },
+      },
+    })
+    try {
+      const { container } = render(<RecordingPlayer meetingId={MEETING} durationMs={60_000}
+        roomRecording cloudRoom audioTracks={job?.audioTracks} waveformPeaks={[0.2, 0.4, 0.1]} />)
+      const selector = screen.getByRole('combobox', { name: 'Audio source' })
+      const timeline = screen.getByRole('group', { name: 'Participant timeline' })
+      expect(selector).toHaveValue('')
+      await waitFor(() => expect(within(timeline).getAllByTestId('participant-waveform')).toHaveLength(2))
+      expect(within(timeline).queryByRole('button', { name: 'Solo Quiet guest' })).not.toBeInTheDocument()
+      expect(within(timeline).getAllByRole('button', { name: /Guest (joined|left)/ })).toHaveLength(2)
+
+      const readPlayer = async () => {
+        const audio = await screen.findByTestId('recording-player') as HTMLAudioElement
+        Object.defineProperty(audio, 'duration', { configurable: true, value: 60 })
+        fireEvent.loadedMetadata(audio)
+        return audio
+      }
+      fireEvent.click(screen.getByRole('button', { name: 'Guest left at 0:09' }))
+      const combined = await readPlayer()
+      expect(combined.currentTime).toBe(9)
+      fireEvent.click(screen.getByRole('button', { name: 'Guest joined at 0:14' }))
+      expect(combined.currentTime).toBe(14.25)
+      const muteGuest = screen.getByRole('button', { name: 'Mute Guest in Combined' })
+      fireEvent.click(muteGuest)
+      expect(muteGuest).toHaveAttribute('aria-pressed', 'true')
+      expect(combined.muted).toBe(true)
+      expect(combined.currentTime).toBe(14.25)
+      expect(container.querySelector('[data-participant-audio="p1"]')).toBeInTheDocument()
+      expect(container.querySelector('[data-participant-audio="p2"]')).not.toBeInTheDocument()
+
+      const muteHost = screen.getByRole('button', { name: 'Mute Host in Combined' })
+      fireEvent.click(muteHost)
+      expect(combined.muted).toBe(true)
+      expect(container.querySelector('[data-participant-audio]')).not.toBeInTheDocument()
+      expect(screen.getByText('All tracks muted')).toBeInTheDocument()
+
+      const soloGuest = screen.getByRole('button', { name: 'Solo Guest' })
+      fireEvent.click(soloGuest)
+      const guest = await readPlayer()
+      expect(guest.src).toBe('https://signed.test/p2')
+      expect(guest.muted).toBe(false)
+      expect(guest.currentTime).toBe(14.25)
+      expect(soloGuest).toHaveAttribute('aria-pressed', 'true')
+      fireEvent.click(soloGuest)
+      const filtered = await readPlayer()
+      expect(selector).toHaveValue('')
+      expect(filtered.muted).toBe(true)
+      expect(filtered.currentTime).toBe(14.25)
+      fireEvent.click(muteHost)
+      fireEvent.click(muteGuest)
+      expect(filtered.muted).toBe(false)
+      expect(filtered.currentTime).toBe(14.25)
+    } finally {
+      pause.mockRestore()
+      load.mockRestore()
     }
   })
 

@@ -337,3 +337,91 @@
   .bs-recording-unplayed, .bs-recording-played, .bs-recording-played-neutral { fill: CanvasText; }
   .bs-recording-head { background: Highlight; forced-color-adjust: none; }
 }
+
+.bs-recording-room-row {
+  display: grid;
+  grid-template-columns: clamp(94px, 24%, 154px) minmax(0, 1fr);
+  column-gap: 10px;
+  align-items: start;
+}
+.bs-recording-master-lane { min-width: 0; }
+.bs-recording-room-tracks { display: grid; gap: 6px; }
+.bs-recording-room-label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding-block: 4px;
+  color: var(--bs-d-ink);
+  font: 500 12px/1.25 var(--bs-sans);
+}
+.bs-recording-room-label strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bs-recording-room-label > span {
+  color: var(--bs-d-mut);
+  font-size: 11px;
+}
+.bs-recording-room-controls { display: flex; gap: 4px; }
+.bs-recording-room-controls button {
+  min-height: 26px;
+  padding: 2px 5px;
+  border: 1px solid var(--recording-rule);
+  border-radius: 4px;
+  color: var(--bs-d-ink);
+  font: 500 11px/1 var(--bs-sans);
+}
+.bs-recording-room-controls button[aria-pressed="true"] {
+  border-color: var(--bs-d-brand);
+  background: color-mix(in srgb, var(--bs-d-brand) 22%, transparent);
+}
+.bs-recording-room-lane { height: 54px; }
+.bs-recording-room-lane[data-dimmed="true"] svg { opacity: .45; }
+.bs-recording-room-wave-status {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 2px 5px;
+  background: var(--bs-display);
+  color: var(--bs-d-mut);
+  font: 500 10px/1.2 var(--bs-mono);
+  text-align: center;
+  pointer-events: none;
+}
+.bs-recording .bs-recording-room-attendance {
+  position: absolute;
+  z-index: 3;
+  left: clamp(12px, var(--marker), calc(100% - 12px));
+  top: 0;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  transform: translateX(-50%);
+  border: 1px solid var(--recording-rule);
+  border-radius: 4px;
+  color: var(--bs-d-brand);
+  background: var(--bs-display);
+}
+.bs-recording .bs-recording-room-attendance[data-kind="leave"] {
+  top: auto;
+  bottom: 0;
+  color: var(--bs-d-ink);
+}
+.bs-recording-room-lane .bs-recording-room-attendance svg {
+  position: static;
+  width: 14px;
+  height: 14px;
+}
+.bs-recording-room-attendance:focus-visible,
+.bs-recording-room-controls button:focus-visible {
+  outline: 2px solid var(--bs-d-brand);
+  outline-offset: 1px;
+}
+.bs-recording-stem-status {
+  display: block;
+  margin-block: 5px;
+  font-size: 12px;
+}

@@ -71,8 +71,11 @@ function readAudioTracks(raw: unknown, keys: readonly PlaybackTrack[] = ISOLATED
     const status = value.status === 'partial' || value.status === 'saved' || value.status === 'processing' || value.status === 'missing' ? value.status : undefined
     const playable = Number.isSafeInteger(value.pieces) && value.pieces > 0 && Number.isSafeInteger(value.durationMs) && value.durationMs >= 0
     if (!playable && status !== 'missing' && status !== 'processing') continue
+    const attendance = Array.isArray(value.attendance) ? value.attendance.filter(marker =>
+      (marker?.kind === 'join' || marker?.kind === 'leave') && Number.isSafeInteger(marker.atMs) && marker.atMs >= 0,
+    ) : []
     tracks[track] = { pieces: playable ? value.pieces : 0, durationMs: playable ? value.durationMs : 0,
-      ...(label ? { label } : {}), ...(status ? { status } : {}),
+      ...(label ? { label } : {}), ...(status ? { status } : {}), ...(attendance.length ? { attendance } : {}),
     }
   }
   return tracks
