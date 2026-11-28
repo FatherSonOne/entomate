@@ -169,6 +169,36 @@ test.each(['two or three', '2 or 3', 'a few'])('asks for a count for about %s we
   expect(eventComparisonRanges('2026-07-15', proposal?.eventWindow)).toEqual(EMPTY_RANGES)
 })
 
+test.each(['two to three', '2 to 3'])('requires an explicit count within %s weeks', (words) => {
+  const proposal = proposeComparison(words + ' weeks before Security Review vs. roughly a month after', 'America/New_York')
+  expect(proposal).toEqual({
+    ranges: EMPTY_RANGES, eventBased: true, milestoneName: 'Security Review',
+    eventWindow: {
+      before: { count: null, unit: 'week', countRange: { min: 2, max: 3 } },
+      after: { count: 1, unit: 'month', editable: true },
+    },
+  })
+  for (const count of [null, 1, 2.5, 4]) {
+    expect(eventComparisonRanges('2026-07-15', proposal?.eventWindow, { before: count })).toEqual(EMPTY_RANGES)
+  }
+  expect(eventComparisonRanges('2026-07-15', proposal?.eventWindow, { before: 2 })).toEqual({
+    previous: { startDate: '2026-07-01', endDate: '2026-07-14' },
+    current: { startDate: '2026-07-16', endDate: '2026-08-15' },
+  })
+  expect(eventComparisonRanges('2026-07-15', proposal?.eventWindow, { before: 3 })).toEqual({
+    previous: { startDate: '2026-06-24', endDate: '2026-07-14' },
+    current: { startDate: '2026-07-16', endDate: '2026-08-15' },
+  })
+})
+
+test('accepts a whole number between the endpoints of a wider count range', () => {
+  const proposal = proposeComparison('two to five days before Security Review vs. a week after', 'America/New_York')
+  expect(eventComparisonRanges('2026-07-15', proposal?.eventWindow, { before: 4 })).toEqual({
+    previous: { startDate: '2026-07-11', endDate: '2026-07-14' },
+    current: { startDate: '2026-07-16', endDate: '2026-07-22' },
+  })
+})
+
 test('uses the entire spelled-out count when it ends in a legacy two-week window', () => {
   const proposal = proposeComparison('twenty two weeks before Security Review vs. two weeks after', 'America/New_York')
   expect(proposal?.eventWindow).toEqual({ before: { count: 22, unit: 'week' }, after: { count: 2, unit: 'week' } })
@@ -202,6 +232,9 @@ test.each(['0 days before Security Review vs. 7 days after',
   'two weeks before Security Review vs. one hundred months after',
   'two weeks before Security Review vs. half a month after',
   'two weeks before Security Review vs. zero months after',
+  'three to two weeks before Security Review vs. a month after',
+  '0 to 3 weeks before Security Review vs. a month after',
+  '2.5 to 3 weeks before Security Review vs. a month after',
   'a weeks before Security Review vs. a month after',
   'a week before Security Review vs. a months after',
 ])('requires a correction for %s', (question) => {

@@ -561,19 +561,33 @@ function ComparisonForm({ draft, timeZone, workspace, confirmationRef, proposedQ
           {sides.map((side) => {
             const length = eventWindow[side]
             const units = length.unit + 's'
+            const range = length.countRange
+            const options = range && range.max - range.min <= 1
+              ? Array.from({ length: range.max - range.min + 1 }, (_, index) => range.min + index)
+              : undefined
+            const value = eventWindowCount(length, clarifiedCounts?.[side]) ?? ''
             return (
               <label key={side}>
                 {length.editable
                   ? `${units.charAt(0).toUpperCase() + units.slice(1)} ${side} ${milestoneName}`
                   : `How many ${units} ${side} ${milestoneName} should I include?`}
-                <TextInput type="number" required min={1} step={1} value={eventWindowCount(length, clarifiedCounts?.[side]) ?? ''}
-                  aria-describedby="ask-event-count-hint"
-                  onChange={(e) => onEventCountChange(side, e.target.value ? e.target.valueAsNumber : null)} />
+                {options
+                  ? <select className="bs-input" required value={value} aria-describedby="ask-event-count-hint"
+                      onChange={(e) => onEventCountChange(side, e.target.value ? Number(e.target.value) : null)}>
+                      <option value="">Choose a count</option>
+                      {options.map((count) => <option key={count} value={count}>{count} {count === 1 ? length.unit : units}</option>)}
+                    </select>
+                  : <TextInput type="number" required min={range?.min ?? 1} max={range?.max} step={1} value={value}
+                      placeholder={range ? `${range.min} to ${range.max}` : undefined}
+                      aria-describedby="ask-event-count-hint"
+                      onChange={(e) => onEventCountChange(side, e.target.value ? e.target.valueAsNumber : null)} />}
               </label>
             )
           })}
           <p id="ask-event-count-hint">
-            Enter a positive whole number.
+            {sides.some((side) => eventWindow[side].countRange)
+              ? 'Choose a count or enter a positive whole number.'
+              : 'Enter a positive whole number.'}
             {sides.some((side) => eventWindow[side].editable && clarifiedCounts?.[side] === undefined)
               && ' You can edit the suggested counts.'}
           </p>

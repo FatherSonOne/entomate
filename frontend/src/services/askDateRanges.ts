@@ -10,7 +10,12 @@ export interface EventWindowLength { count: number; unit: CalendarUnit }
 export type EventWindowSide = 'before' | 'after'
 export type EventWindowCounts = Partial<Record<EventWindowSide, number | null>>
 type EventWindow = Record<EventWindowSide, EventWindowLength>
-type ProposedWindowLength = { count: number | null; unit: CalendarUnit; editable?: true }
+type ProposedWindowLength = {
+  count: number | null
+  unit: CalendarUnit
+  editable?: true
+  countRange?: { min: number; max: number }
+}
 type EventWindowProposal = Record<EventWindowSide, ProposedWindowLength>
 
 export interface ComparisonProposal {
@@ -150,7 +155,7 @@ const WORD_COUNT = String.raw`${COUNT_WORD}(?:[\s-]+(?:${COUNT_WORD}|and|of))*`
 const WINDOW_COUNT = `(?:${NUMERIC_COUNT}|${WORD_COUNT})`
 const APPROXIMATE_PREFIX = String.raw`(?:about|roughly)\s+`
 const APPROXIMATE_START = new RegExp('^' + APPROXIMATE_PREFIX, 'i')
-const WINDOW_LENGTH = String.raw`((?:${APPROXIMATE_PREFIX})?${WINDOW_COUNT}(?:\s+or\s+${WINDOW_COUNT})*)\s+(days?|weeks?|months?)`
+const WINDOW_LENGTH = String.raw`((?:${APPROXIMATE_PREFIX})?${WINDOW_COUNT}(?:\s+(?:or|to)\s+${WINDOW_COUNT})*)\s+(days?|weeks?|months?)`
 const CUSTOM_MILESTONE_WINDOW = new RegExp(
   String.raw`${WINDOW_START}${WINDOW_LENGTH}\s+before\s+${MILESTONE_TITLE}${COMPARE}${WINDOW_LENGTH}\s+after\b${MILESTONE_END}`, 'i',
 )
@@ -181,6 +186,13 @@ function parseWindowLength(value: string, unit: string): ProposedWindowLength {
   const plural = writtenUnit.endsWith('s')
   const calendarUnit = writtenUnit.replace(/s$/, '') as CalendarUnit
   const countText = value.replace(APPROXIMATE_START, '')
+  const bounds = countText.split(/\s+to\s+/i)
+  if (bounds.length > 1) {
+    const [min = NaN, max = NaN] = bounds.map(parseWindowCount)
+    return bounds.length === 2 && validWindowCount(min) && validWindowCount(max) && min <= max
+      ? { count: null, unit: calendarUnit, countRange: { min, max } }
+      : { count: NaN, unit: calendarUnit }
+  }
   if (plural && /^a\s+couple\s+of$/i.test(countText)) return { count: 2, unit: calendarUnit, editable: true }
   if ((plural && /^(?:a\s+few|several)$/i.test(countText)) || /\s+or\s+/i.test(countText)) return { count: null, unit: calendarUnit }
   const count = countText.toLowerCase() === 'a' && !plural ? 1 : parseWindowCount(countText)
@@ -257,11 +269,16 @@ export function eventWindowCount(length: ProposedWindowLength, override?: number
   return override !== undefined && (length.editable || length.count === null) ? override : length.count
 }
 
+function validWindowSelection(length: ProposedWindowLength, count: number | null): count is number {
+  const range = length.countRange
+  return validWindowCount(count) && (!range || (count >= range.min && count <= range.max))
+}
+
 export function resolveEventWindow(proposal: ComparisonProposal['eventWindow'], counts?: EventWindowCounts): EventWindow | 'invalid' | undefined {
   if (!proposal || proposal === 'invalid') return proposal
   const before = eventWindowCount(proposal.before, counts?.before)
   const after = eventWindowCount(proposal.after, counts?.after)
-  if (!validWindowCount(before) || !validWindowCount(after)) return 'invalid'
+  if (!validWindowSelection(proposal.before, before) || !validWindowSelection(proposal.after, after)) return 'invalid'
   return { before: { count: before, unit: proposal.before.unit }, after: { count: after, unit: proposal.after.unit } }
 }
 
