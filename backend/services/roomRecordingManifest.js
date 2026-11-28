@@ -53,6 +53,15 @@ function readManifest({ events }, recording, participants, keys) {
     }
   }
 
+  // The meeting roster can report a departure before the recorder stopped
+  // receiving that session's audio. Use the latest recorded track removal as
+  // a lower bound, while keeping later departures for people who went silent.
+  const lastRemovalBySession = new Map();
+  for (const { sessionId, hasMedia, endMs } of sessions.values()) {
+    if (!hasMedia || !Number.isFinite(endMs)) continue;
+    lastRemovalBySession.set(sessionId, Math.max(lastRemovalBySession.get(sessionId) ?? -Infinity, endMs));
+  }
+
   const people = new Map();
   const addPerson = (person, fallbackName) => {
     const witnessedAt = Number.isFinite(person.join_time) ? timestamp(person.join_time) : NaN;
@@ -70,7 +79,7 @@ function readManifest({ events }, recording, participants, keys) {
     if (!person.user_id || !Number.isFinite(person.join_time)) continue;
     const joined = timestamp(person.join_time);
     const left = Number.isFinite(person.duration) && person.duration > 0
-      ? timestamp(person.join_time + person.duration)
+      ? Math.max(timestamp(person.join_time + person.duration), lastRemovalBySession.get(person.participant_id) ?? -Infinity)
       : null;
     if (joined >= durationMs || (joined < 0 && (left === null || left <= 0))) continue;
     const { attendance } = addPerson(person);

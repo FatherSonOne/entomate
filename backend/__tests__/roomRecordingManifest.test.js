@@ -58,6 +58,20 @@ test('keeps attendance on the same track across reconnects and omits events outs
   ]);
 });
 
+test('bounds an early roster departure by the recorded session before a reconnect', () => {
+  const roster = [
+    { ...participants[0], duration: 10 },
+    participants[1],
+    { ...participants[2], join_time: time(-1800), duration: 3.7 },
+    participants[3],
+  ];
+  const manifest = readManifest({ events }, recordings, roster, keys);
+  expect(manifest.people[2].attendance).toEqual([
+    { kind: 'leave', atMs: 9000 }, { kind: 'join', atMs: 14000 }, { kind: 'leave', atMs: 30000 },
+  ]);
+  expect(manifest.people[0].attendance).toContainEqual({ kind: 'leave', atMs: 10000 });
+});
+
 test('waits for the identity mapping and the recording objects before assigning tracks', () => {
   expect(readManifest({ events }, recordings, participants.slice(0, 3), keys)).toBeNull();
   expect(readManifest({ events }, recordings, participants, keys.slice(0, 3))).toBeNull();
