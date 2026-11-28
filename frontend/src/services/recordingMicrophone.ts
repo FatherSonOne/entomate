@@ -8,6 +8,43 @@ export const MIC_MODES = {
 export type MicMode = keyof typeof MIC_MODES
 export const MIC_CHECK_MS = 5000
 
+export const MIC_CHECK_LEVELS = {
+  good: ['Good level', 'Keep speaking at this distance.'],
+  quiet: ['Too quiet', 'Move closer to the microphone or raise its input level.'],
+  clipping: ['Near clipping', 'Move farther from the microphone or lower its input level.'],
+  silent: ['No signal', 'Check the microphone’s mute switch or pick another input.'],
+} as const
+
+export type MicCheckLevel = keyof typeof MIC_CHECK_LEVELS
+
+export async function measureMicCheck(sample: Blob): Promise<MicCheckLevel | null> {
+  try {
+    const decoder = new OfflineAudioContext(1, 1, 48_000)
+    const audio = await decoder.decodeAudioData(await sample.arrayBuffer())
+    const windowSamples = Math.round(audio.sampleRate / 10)
+    let loudest = 0
+    // Use 100 ms windows so pauses between words don't make speech look quiet.
+    for (let channel = 0; channel < audio.numberOfChannels; channel++) {
+      const data = audio.getChannelData(channel)
+      for (let start = 0; start < data.length; start += windowSamples) {
+        const end = Math.min(start + windowSamples, data.length)
+        let squares = 0
+        for (let i = start; i < end; i++) {
+          const value = data[i] ?? 0
+          if (Math.abs(value) >= 0.97) return 'clipping'
+          squares += value * value
+        }
+        loudest = Math.max(loudest, Math.sqrt(squares / (end - start)))
+      }
+    }
+    if (loudest < 0.003) return 'silent'
+    return loudest < 0.02 ? 'quiet' : 'good'
+  } catch {
+    // Some browsers can play their recording format but can't decode it through Web Audio.
+    return null
+  }
+}
+
 export function microphoneConstraints(mode: MicMode, deviceId?: string): MediaTrackConstraints {
   return {
     echoCancellation: true,

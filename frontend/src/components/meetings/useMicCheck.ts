@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { captureErrorMessage } from '../../services/meetingRecorderService'
-import { captureMicCheck, type MicMode } from '../../services/recordingMicrophone'
+import { captureMicCheck, measureMicCheck, type MicCheckLevel, type MicMode } from '../../services/recordingMicrophone'
 
 interface MicCheckPlayback {
   url: string
   label: string
   mode: MicMode | null
+  level: MicCheckLevel | null
 }
 
 export function useMicCheck(mode: MicMode, deviceId: string | undefined, enabled: boolean) {
@@ -36,7 +37,9 @@ export function useMicCheck(mode: MicMode, deviceId: string | undefined, enabled
     setError('')
     try {
       const { sample, label, mode: active } = await captureMicCheck(mode, deviceId, controller.signal)
-      if (!controller.signal.aborted) setPlayback({ url: URL.createObjectURL(sample), label, mode: active })
+      if (controller.signal.aborted) return
+      const level = await measureMicCheck(sample)
+      if (!controller.signal.aborted) setPlayback({ url: URL.createObjectURL(sample), label, mode: active, level })
     } catch (err) {
       if (!controller.signal.aborted) setError(captureErrorMessage(err, 'mic'))
     } finally {

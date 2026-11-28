@@ -29,6 +29,7 @@ import RecordingStatus from '../components/meetings/RecordingStatus'
 import Layout from '../components/Layout'
 import ErrorBoundary from '../components/ErrorBoundary'
 import { installChunkReload } from '../services/chunkReload'
+import { measureMicCheck } from '../services/recordingMicrophone'
 import {
   PieceUploader,
   canRetry,
@@ -113,6 +114,25 @@ describe('meetingRecorderService', () => {
     up.add(new Blob(['a']), 1000)
     await expect(up.drain()).rejects.toThrow('This meeting is not recording.')
     expect(send).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('mic check level', () => {
+  test.each([
+    [0, 'silent'],
+    [0.01, 'quiet'],
+    [0.12, 'good'],
+    [0.99, 'clipping'],
+  ])('measures a recorded signal with peak %s as %s', async (peak, verdict) => {
+    const sampleRate = 48_000
+    const samples = new Float32Array(sampleRate * 5)
+    // A short burst surrounded by silence represents speaking briefly in the check.
+    for (let i = sampleRate; i < samples.length / 2; i++) samples[i] = peak * Math.sin(2 * Math.PI * 440 * i / sampleRate)
+    const decodeAudioData = vi.fn().mockResolvedValue({ sampleRate, numberOfChannels: 1, getChannelData: () => samples })
+    vi.stubGlobal('OfflineAudioContext', class { decodeAudioData = decodeAudioData })
+    const sample = new Blob(['recorded sample'])
+    await expect(measureMicCheck(sample)).resolves.toBe(verdict)
+    expect(decodeAudioData).toHaveBeenCalledOnce()
   })
 })
 
@@ -442,6 +462,11 @@ describe('MeetingRecorder', () => {
     const mic = new FakeTrack('audio')
     mic.settings.noiseSuppression = false
     getUserMedia.mockResolvedValueOnce(new FakeStream([mic]))
+    vi.stubGlobal('OfflineAudioContext', class {
+      async decodeAudioData() {
+        return { sampleRate: 48_000, numberOfChannels: 1, getChannelData: () => new Float32Array(4800).fill(0.01) }
+      }
+    })
     const createUrl = vi.fn(() => 'blob:mic-check')
     const revokeUrl = vi.fn()
     const priorCreate = URL.createObjectURL
@@ -461,6 +486,8 @@ describe('MeetingRecorder', () => {
       expect(mic.stopped).toBe(true)
       expect(screen.getByLabelText('Mic check playback')).toHaveAttribute('src', 'blob:mic-check')
       expect(screen.getByText(/Mic check ready.*Original mic/)).toBeInTheDocument()
+      expect(screen.getByText('Too quiet')).toBeInTheDocument()
+      expect(screen.getByText(/move closer to the microphone/i)).toBeInTheDocument()
       fireEvent.click(screen.getByRole('checkbox', { name: /knows it is being recorded/i }))
       await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Start recording' })) })
       expect(revokeUrl).toHaveBeenCalledWith('blob:mic-check')
@@ -525,6 +552,81 @@ describe('MeetingRecorder', () => {
       expect(getDisplayMedia).toHaveBeenCalledTimes(1)
       expect(recorders[0]?.state).toBe('recording')
     } finally {
+      open.mockRestore()
+      frame.remove()
+    }
+  })
+
+  test('retries the disconnected mic from the pop-out and saves only the mic gap', async () => {
+    const headset = new FakeTrack('audio')
+    headset.settings = { deviceId: 'usb-headset', noiseSuppression: true }
+    const reconnected = new FakeTrack('audio')
+    reconnected.settings = { ...headset.settings }
+    Object.assign(reconnected, { label: 'USB Headset' })
+    const tab = new FakeTrack('audio')
+    getDisplayMedia.mockResolvedValueOnce(new FakeStream([new FakeTrack('video'), tab]))
+    getUserMedia.mockResolvedValueOnce(new FakeStream([headset]))
+      .mockRejectedValueOnce(new DOMException('Disconnected', 'NotFoundError'))
+      .mockResolvedValueOnce(new FakeStream([reconnected]))
+    const devices = new EventTarget()
+    const usb = { kind: 'audioinput', deviceId: 'usb-headset', label: 'USB Headset' }
+    const enumerateDevices = vi.fn().mockResolvedValue([usb])
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true, value: Object.assign(devices, { getUserMedia, getDisplayMedia, enumerateDevices }),
+    })
+    const frame = document.createElement('iframe')
+    document.body.append(frame)
+    const popDoc = frame.contentDocument!
+    const popup = { document: popDoc, addEventListener: vi.fn(), close: vi.fn(), focus: vi.fn() }
+    const open = vi.spyOn(window, 'open').mockReturnValue(popup as unknown as Window)
+    const clock = vi.spyOn(Date, 'now')
+    try {
+      renderRecorder()
+      fireEvent.click(screen.getByRole('radio', { name: /browser tab/i }))
+      fireEvent.click(screen.getByRole('checkbox', { name: /save separate mic and tab tracks/i }))
+      fireEvent.click(screen.getByRole('checkbox', { name: /knows it is being recorded/i }))
+      clock.mockReturnValue(100_000)
+      fireEvent.click(screen.getByRole('button', { name: 'Start recording' }))
+      await screen.findByRole('button', { name: 'Stop recording' })
+      fireEvent.click(screen.getByRole('button', { name: /pop out/i }))
+      const pop = within(popDoc.body)
+      await pop.findByRole('option', { name: 'USB Headset' })
+
+      clock.mockReturnValue(104_000)
+      enumerateDevices.mockResolvedValue([])
+      await act(async () => {
+        headset.stop()
+        headset.settings = {}
+        headset.listeners.ended?.forEach(handler => handler())
+        devices.dispatchEvent(new Event('devicechange'))
+      })
+      expect(pop.getByText(/microphone disconnected at 0:04.*tab audio is still recording/i)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Reconnect mic' })).toBeInTheDocument()
+      expect(pop.queryByRole('option', { name: 'USB Headset' })).toBeNull()
+      fireEvent.click(pop.getByRole('button', { name: 'Reconnect mic' }))
+      expect(await pop.findByText(/no microphone was found.*choose another/i)).toBeInTheDocument()
+
+      enumerateDevices.mockResolvedValue([usb])
+      await act(async () => { devices.dispatchEvent(new Event('devicechange')) })
+      expect(pop.getByRole('option', { name: 'USB Headset' })).toBeInTheDocument()
+      clock.mockReturnValue(107_000)
+      fireEvent.click(pop.getByRole('button', { name: 'Reconnect mic' }))
+      expect(await pop.findByText('Microphone reconnected · USB Headset')).toBeInTheDocument()
+      expect(getUserMedia).toHaveBeenLastCalledWith({
+        audio: { noiseSuppression: true, echoCancellation: true, deviceId: { exact: 'usb-headset' } },
+      })
+      expect(pop.queryByRole('button', { name: 'Reconnect mic' })).toBeNull()
+      expect(getDisplayMedia).toHaveBeenCalledOnce()
+      expect(tab.stopped).toBe(false)
+      expect(recorders.slice(0, 3).map(recorder => recorder.state)).toEqual(['recording', 'recording', 'recording'])
+
+      clock.mockReturnValue(110_000)
+      fireEvent.click(pop.getByRole('button', { name: 'Stop recording' }))
+      await waitFor(() => expect(api.finish).toHaveBeenCalledWith('m-1', 1, {
+        micAudioGaps: [{ startMs: 4000, endMs: 7000 }],
+      }))
+    } finally {
+      clock.mockRestore()
       open.mockRestore()
       frame.remove()
     }
