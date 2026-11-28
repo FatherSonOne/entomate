@@ -6,12 +6,14 @@ export interface ComparisonRanges {
 }
 
 type RelativeUnit = 'day' | 'week' | 'month'
+interface EventWindow { beforeDays: number; afterDays: number }
 
 export interface ComparisonProposal {
   ranges: ComparisonRanges
   relative?: `completed-${RelativeUnit}s` | `invalid-${RelativeUnit}-count`
   eventBased?: true
   milestoneName?: string
+  eventWindow?: EventWindow | 'invalid'
 }
 
 export interface ComparisonEvent {
@@ -129,14 +131,30 @@ const SURROUND_MILESTONE = new RegExp(
 const COMPARE_AROUND_MILESTONE = new RegExp(
   String.raw`\b(?:two|2)\s+weeks\s+before\s+${MILESTONE_TITLE}${COMPARE}(?:two|2)\s+weeks\s+after\b${MILESTONE_END}`, 'i',
 )
+const CUSTOM_MILESTONE_WINDOW = new RegExp(
+  String.raw`(?<![\w./+-])${COUNT}\s+days?\s+before\s+${MILESTONE_TITLE}${COMPARE}${COUNT}\s+days?\s+after\b${MILESTONE_END}`, 'i',
+)
 
-export function namedMilestone(question: string): string | undefined {
-  if (LAUNCH_COMPARISON.test(question)) return undefined
+const validDayCount = (value: number) => Number.isSafeInteger(value) && value > 0
+const cleanMilestoneTitle = (title?: string) => title?.trim().slice(0, 160) || undefined
+
+export function eventComparisonProposal(question: string): ComparisonProposal | null {
+  const custom = CUSTOM_MILESTONE_WINDOW.exec(question)
+  if (custom) {
+    const [, before, quoted, curved, plain, after] = custom
+    const milestoneName = cleanMilestoneTitle(quoted ?? curved ?? plain)
+    if (!milestoneName) return null
+    const beforeDays = Number(before)
+    const afterDays = Number(after)
+    return { ranges: EMPTY_RANGES, eventBased: true, milestoneName,
+      eventWindow: validDayCount(beforeDays) && validDayCount(afterDays) ? { beforeDays, afterDays } : 'invalid' }
+  }
+  if (LAUNCH_COMPARISON.test(question)) return { ranges: EMPTY_RANGES, eventBased: true }
   const match = SURROUND_MILESTONE.exec(question) ?? COMPARE_AROUND_MILESTONE.exec(question)
-  return (match?.[1] ?? match?.[2] ?? match?.[3])?.trim().slice(0, 160) || undefined
+  const milestoneName = cleanMilestoneTitle(match?.[1] ?? match?.[2] ?? match?.[3])
+  return milestoneName ? { ranges: EMPTY_RANGES, eventBased: true, milestoneName } : null
 }
 
-export const isEventComparison = (question: string) => LAUNCH_COMPARISON.test(question) || !!namedMilestone(question)
 const ELIDED_UNIT = String.raw`(?=\s*(?:[.,:;!?]|$)|\s+(?:for|on|about|in)\b)`
 const LAST_WEEK = String.raw`\blast\s+(?:completed\s+)?week\b`
 const PREVIOUS_WEEK = String.raw`\bprevious\s+(?:completed\s+)?week\b`
@@ -172,12 +190,12 @@ function calendarDayBefore(today: Date, days = 0): string {
   return Number.isFinite(date.getTime()) ? date.toISOString().slice(0, 10) : ''
 }
 
-export function eventComparisonRanges(day: string): ComparisonRanges {
-  if (!isCalendarDate(day)) return EMPTY_RANGES
+export function eventComparisonRanges(day: string, window: ComparisonProposal['eventWindow'] = { beforeDays: 14, afterDays: 14 }): ComparisonRanges {
+  if (!isCalendarDate(day) || window === 'invalid') return EMPTY_RANGES
   const anchor = new Date(day + 'T00:00:00Z')
   const ranges = {
-    previous: { startDate: calendarDayBefore(anchor, 14), endDate: calendarDayBefore(anchor, 1) },
-    current: { startDate: calendarDayBefore(anchor, -1), endDate: calendarDayBefore(anchor, -14) },
+    previous: { startDate: calendarDayBefore(anchor, window.beforeDays), endDate: calendarDayBefore(anchor, 1) },
+    current: { startDate: calendarDayBefore(anchor, -1), endDate: calendarDayBefore(anchor, -window.afterDays) },
   }
   return validComparisonRanges(ranges) ? ranges : EMPTY_RANGES
 }
@@ -221,10 +239,8 @@ function relativeComparison(question: string, timeZone: string, asOf: Date): Com
 }
 
 export function proposeComparison(question: string, timeZone: string, asOf = new Date()): ComparisonProposal | null {
-  const milestoneName = namedMilestone(question)
-  if (milestoneName || LAUNCH_COMPARISON.test(question)) {
-    return { ranges: EMPTY_RANGES, eventBased: true, ...(milestoneName ? { milestoneName } : {}) }
-  }
+  const event = eventComparisonProposal(question)
+  if (event) return event
   const relative = relativeComparison(question, timeZone, asOf)
   if (relative) return relative
   const ranges = parseTypedComparison(question)

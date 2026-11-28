@@ -14,6 +14,38 @@ const octoberNovember = {
   current: { startDate: '2026-11-12', endDate: '2026-11-27' },
 }
 
+test.each([
+  ['30 days before Security Review vs. 7 days after', 'Security Review'],
+  ['30 days before “Security Review v2.1” versus 7 days after. What changed?', 'Security Review v2.1'],
+])('previews unequal day windows for %s', (question, milestoneName) => {
+  const proposal = proposeComparison(question, 'America/New_York')
+  expect(proposal).toEqual({
+    ranges: EMPTY_RANGES, eventBased: true, milestoneName, eventWindow: { beforeDays: 30, afterDays: 7 },
+  })
+  expect(eventComparisonRanges('2026-07-15', proposal?.eventWindow)).toEqual({
+    previous: { startDate: '2026-06-15', endDate: '2026-07-14' },
+    current: { startDate: '2026-07-16', endDate: '2026-07-22' },
+  })
+})
+
+test.each(['0 days before Security Review vs. 7 days after',
+  '-30 days before Security Review vs. 7 days after',
+  '30 days before Security Review vs. 1.5 days after',
+])('requires a correction for %s', (question) => {
+  const proposal = proposeComparison(question, 'America/New_York')
+  expect(proposal?.eventWindow).toBe('invalid')
+  expect(eventComparisonRanges('2026-07-15', proposal?.eventWindow)).toEqual(EMPTY_RANGES)
+})
+
+test('resolves single-day windows at a year boundary and rejects dates beyond the supported calendar', () => {
+  const proposal = proposeComparison('1 day before Security Review vs. 1 day after', 'America/New_York')
+  expect(eventComparisonRanges('2027-01-01', proposal?.eventWindow)).toEqual({
+    previous: { startDate: '2026-12-31', endDate: '2026-12-31' },
+    current: { startDate: '2027-01-02', endDate: '2027-01-02' },
+  })
+  expect(eventComparisonRanges('0001-01-01', proposal?.eventWindow)).toEqual(EMPTY_RANGES)
+})
+
 test('opens launch confirmation and resolves 14 calendar days on each side of the selected date', () => {
   expect(proposeComparison('The two weeks before launch vs. the two weeks after', 'America/New_York'))
     .toEqual({ ranges: EMPTY_RANGES, eventBased: true })

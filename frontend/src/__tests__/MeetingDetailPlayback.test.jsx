@@ -257,6 +257,10 @@ describe('a pressed timecode plays the recording', () => {
       comparing: true, custom: true, typed: true, relative: 'launch', named: true, coverageName: 'Date range coverage' },
     { label: 'manual named milestone comparison', question: 'Compare the two weeks before and after Security Review. What changed?',
       comparing: true, custom: true, typed: true, relative: 'launch', named: true, manual: true, coverageName: 'Date range coverage' },
+    { label: 'selected milestone with unequal windows', question: '30 days before Security Review vs. 7 days after',
+      comparing: true, custom: true, typed: true, relative: 'milestone-window', named: true, coverageName: 'Date range coverage' },
+    { label: 'manual milestone with unequal windows', question: '30 days before Security Review vs. 7 days after',
+      comparing: true, custom: true, typed: true, relative: 'milestone-window', named: true, manual: true, coverageName: 'Date range coverage' },
   ])('$label restores coverage and the exact Before and After links without a second Ask request', async ({ question, comparing, custom, typed, corrected, relative, manual, named, coverageName }) => {
     const relativeCase = {
       days: {
@@ -293,8 +297,20 @@ describe('a pressed timecode plays the recording', () => {
         previousLabel: /Oct 29\D+Nov 11, 2026/, currentLabel: /Nov 13\D+25, 2026/,
         message: '14 calendar days on each side and exclude ' + (named ? 'the milestone date' : 'launch day'),
       },
+      'milestone-window': {
+        beforeMidnight: [10, 24], afterMidnight: [10, 25],
+        beforeMeeting: '2026-07-10T18:00:00Z', afterMeeting: '2026-07-20T18:00:00Z',
+        previous: { startDate: '2026-06-15', endDate: '2026-07-14' },
+        current: { startDate: '2026-07-16', endDate: '2026-07-22' },
+        previewEnd: '2026-07-22', draftEnd: '2026-07-21',
+        previousLabel: /Jun 15\D+Jul 14, 2026/, currentLabel: /Jul 16\D+22, 2026/,
+        message: '30 days before and 7 days after. Both exclude the milestone date.',
+      },
     }[relative]
-    const launch = relative === 'launch'
+    const unequalWindows = relative === 'milestone-window'
+    const eventComparison = relative === 'launch' || unequalWindows
+    const eventDate = unequalWindows ? '2026-07-15' : '2026-11-12'
+    const scheduledDate = unequalWindows ? '2026-07-14' : '2026-11-11'
     const milestoneTitle = named ? 'Security Review' : 'Launch'
     const milestoneField = named ? 'Milestone and date' : 'Launch milestone and date'
     const eventFieldPrefix = named ? 'Milestone' : 'Launch'
@@ -302,12 +318,12 @@ describe('a pressed timecode plays the recording', () => {
       vi.useFakeTimers({ toFake: ['Date'] })
       vi.setSystemTime(new Date(2026, ...relativeCase.beforeMidnight, 23, 59))
     }
-    if (launch) (named ? findMilestones : listLaunchMilestones).mockResolvedValue({ milestones: [
-      { id: 'm-alpha', projectId: 'p-alpha', projectName: 'Alpha', title: milestoneTitle, dueDate: '2026-11-06', completedAt: null },
-      { id: 'm-beta', projectId: 'p-beta', projectName: 'Beta', title: milestoneTitle, dueDate: '2026-11-11',
-        completedAt: new Date(2026, 10, 12, 12).toISOString() },
+    if (eventComparison) (named ? findMilestones : listLaunchMilestones).mockResolvedValue({ milestones: [
+      { id: 'm-alpha', projectId: 'p-alpha', projectName: 'Alpha', title: milestoneTitle, dueDate: scheduledDate, completedAt: null },
+      { id: 'm-beta', projectId: 'p-beta', projectName: 'Beta', title: milestoneTitle, dueDate: scheduledDate,
+        completedAt: new Date(eventDate + 'T12:00:00').toISOString() },
     ] })
-    const chosenLaunch = 'p-beta:m-beta:completed|2026-11-12'
+    const selectedMilestone = 'p-beta:m-beta:completed|' + eventDate
     const eventName = manual ? (named ? milestoneTitle : 'Website launch') : 'Beta · ' + milestoneTitle
     const beforeQuote = 'We agreed to launch on Monday.'
     const afterQuote = 'The launch is now scheduled for Friday.'
@@ -348,8 +364,8 @@ describe('a pressed timecode plays the recording', () => {
     const answerScope = comparing ? { comparison: { previous, current: recap } } : { recap }
     const answer = 'Launch moved from Monday to Friday.'
     const reply = { answer, ...answerScope, claims: [{ topic: 'Launch', text: answer, citations: sources }] }
-    const request = launch ? search.ask : search.askStream
-    if (launch) search.ask.mockResolvedValue(reply)
+    const request = eventComparison ? search.ask : search.askStream
+    if (eventComparison) search.ask.mockResolvedValue(reply)
     else search.askStream.mockImplementation(async (_data, callbacks) => callbacks.onComplete(reply))
     render(
       <MemoryRouter initialEntries={[{ pathname: '/search', search: custom ? '?mode=ask' : `?q=${encodeURIComponent(question)}&ask=1`, key: crypto.randomUUID() }]}>
@@ -369,12 +385,12 @@ describe('a pressed timecode plays the recording', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Ask Entomate' }))
       const confirmation = screen.getByRole('form', { name: 'Confirm date ranges' })
       await waitFor(() => expect(within(confirmation).getByRole('heading')).toHaveFocus())
-      if (launch) {
+      if (eventComparison) {
         expect(within(confirmation).getByRole('button', { name: 'Compare periods' })).toBeDisabled()
         expect(screen.queryByRole('group', { name: 'Earlier period' })).not.toBeInTheDocument()
-        expect(await screen.findByRole('option', { name: `Alpha · ${milestoneTitle} · Scheduled date · 2026-11-06` })).toBeVisible()
-        expect(screen.getByRole('option', { name: `Beta · ${milestoneTitle} · Scheduled date · 2026-11-11` })).toBeVisible()
-        expect(screen.getByRole('option', { name: `Beta · ${milestoneTitle} · Marked complete · 2026-11-12` })).toBeVisible()
+        expect(await screen.findByRole('option', { name: `Alpha · ${milestoneTitle} · Scheduled date · ${scheduledDate}` })).toBeVisible()
+        expect(screen.getByRole('option', { name: `Beta · ${milestoneTitle} · Scheduled date · ${scheduledDate}` })).toBeVisible()
+        expect(screen.getByRole('option', { name: `Beta · ${milestoneTitle} · Marked complete · ${eventDate}` })).toBeVisible()
         expect(search.askStream).not.toHaveBeenCalled()
         expect(search.ask).not.toHaveBeenCalled()
         if (named) expect(findMilestones).toHaveBeenCalledWith('playback-org', milestoneTitle, expect.any(AbortSignal))
@@ -384,8 +400,14 @@ describe('a pressed timecode plays the recording', () => {
           const nameInput = screen.getByLabelText(eventFieldPrefix + ' name (optional)')
           if (named) expect(nameInput).toHaveValue(milestoneTitle)
           else fireEvent.change(nameInput, { target: { value: eventName } })
-          fireEvent.change(screen.getByLabelText(eventFieldPrefix + ' date'), { target: { value: '2026-11-12' } })
-        } else fireEvent.change(screen.getByLabelText(milestoneField), { target: { value: chosenLaunch } })
+        }
+        const dateField = screen.getByLabelText(manual ? eventFieldPrefix + ' date' : milestoneField)
+        if (unequalWindows) {
+          fireEvent.change(dateField, { target: { value: manual ? scheduledDate : 'p-beta:m-beta:scheduled|' + scheduledDate } })
+          expect(rangeInput('Earlier period', 'Start date')).toHaveValue('2026-06-14')
+          expect(rangeInput('Later period', 'End date')).toHaveValue('2026-07-21')
+        }
+        fireEvent.change(dateField, { target: { value: manual ? eventDate : selectedMilestone } })
       }
       expect(confirmation).toHaveTextContent(Intl.DateTimeFormat().resolvedOptions().timeZone)
       expect(rangeInput('Earlier period', 'Start date')).toHaveValue(ranges.previous.startDate)
@@ -402,6 +424,12 @@ describe('a pressed timecode plays the recording', () => {
         expect(rangeInput('Later period', 'End date')).toHaveValue(previewEnd)
       }
       if (corrected || relativeCase) fireEvent.change(rangeInput('Later period', 'End date'), { target: { value: ranges.current.endDate } })
+      if (unequalWindows) {
+        fireEvent.change(rangeInput('Earlier period', 'End date'), { target: { value: eventDate } })
+        expect(within(confirmation).getByRole('button', { name: 'Compare periods' })).toBeDisabled()
+        expect(confirmation).toHaveTextContent('Keep the earlier period before the milestone date')
+        fireEvent.change(rangeInput('Earlier period', 'End date'), { target: { value: ranges.previous.endDate } })
+      }
       expect(search.askStream).not.toHaveBeenCalled()
       expect(search.ask).not.toHaveBeenCalled()
       fireEvent.click(within(confirmation).getByRole('button', { name: 'Compare periods' }))
@@ -424,9 +452,10 @@ describe('a pressed timecode plays the recording', () => {
     expect(current).toHaveTextContent(relativeCase?.currentLabel ?? (custom ? /Nov 18\D+25, 2026/ : /Nov 1\D+27, 2026/))
     expect(coverage).toHaveTextContent('America/New_York')
     expect(current).toHaveTextContent('2 of 4 meetings reviewed · 1 without transcripts · 1 awaiting indexing')
-    if (launch) {
-      expect(coverage).toHaveTextContent(eventName + ' · 2026-11-12' + (manual ? '' : ' · Marked complete'))
-      expect(current).toHaveTextContent('This period is incomplete')
+    if (eventComparison) {
+      expect(coverage).toHaveTextContent(eventName + ' · ' + eventDate + (manual ? '' : ' · Marked complete'))
+      if (unequalWindows) expect(current).not.toHaveTextContent('This period is incomplete')
+      else expect(current).toHaveTextContent('This period is incomplete')
     }
     if (comparing) {
       const lastMonth = within(coverage).getByRole('region', { name: custom ? 'Earlier period' : 'Last month' })
@@ -462,18 +491,18 @@ describe('a pressed timecode plays the recording', () => {
       if (typed) expect(screen.getByRole('form', { name: 'Confirm date ranges' })).toHaveTextContent(question)
       if (manual) {
         expect(screen.getByLabelText(eventFieldPrefix + ' name (optional)')).toHaveValue(eventName)
-        expect(screen.getByLabelText(eventFieldPrefix + ' date')).toHaveValue('2026-11-12')
-      } else if (launch) expect(screen.getByLabelText(milestoneField)).toHaveValue(chosenLaunch)
+        expect(screen.getByLabelText(eventFieldPrefix + ' date')).toHaveValue(eventDate)
+      } else if (eventComparison) expect(screen.getByLabelText(milestoneField)).toHaveValue(selectedMilestone)
     }
     expect(player.cueAt).toHaveBeenCalledWith(22_000)
     expect(player.playFrom).not.toHaveBeenCalled()
     expect(request).toHaveBeenCalledTimes(1)
-    if (launch) expect(search.askStream).not.toHaveBeenCalled()
+    if (eventComparison) expect(search.askStream).not.toHaveBeenCalled()
     expect(request).toHaveBeenCalledWith({
       question, workspaceId: 'playback-org', timeZone: expect.any(String),
       ...(custom ? { comparisonRanges: ranges } : {}),
-      ...(launch ? { comparisonEvent: { name: eventName, date: '2026-11-12' } } : {}),
-    }, launch ? { signal: expect.any(AbortSignal), skipRetry: true } : expect.any(Object))
+      ...(eventComparison ? { comparisonEvent: { name: eventName, date: eventDate } } : {}),
+    }, eventComparison ? { signal: expect.any(AbortSignal), skipRetry: true } : expect.any(Object))
     if (custom) {
       fireEvent.click(screen.getByRole('button', { name: 'Compare periods' }))
       await waitFor(() => expect(request).toHaveBeenCalledTimes(2))
