@@ -22,7 +22,7 @@ import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { lockRecording, recordingJournal, savedTrackCoverage, type SavedRecording } from '../../services/recordingJournal'
 import { ISOLATED_AUDIO_TRACKS, type IsolatedAudioTrack, type RecordingGaps } from '../../services/recordingAudioTracks'
-import { applyMicMode, MIC_MODES, microphoneConstraints, reportedMicMode, type MicMode } from '../../services/recordingMicrophone'
+import { applyMicMode, MIC_CHECK_LEVELS, MIC_MODES, microphoneConstraints, reportedMicMode, type MicMode } from '../../services/recordingMicrophone'
 import { useMicCheck } from './useMicCheck'
 import { TrackSaveStatus, type TrackSaveStates } from './TrackSaveStatus'
 import { AlertTriangle, Bot, Camera, Download, ExternalLink, Loader2, Mic, MonitorUp, Pause, Play, Square, Trash2 } from 'lucide-react'
@@ -1177,6 +1177,10 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
             {micCheck.playback && <div className="space-y-1">
               <p role="status" className="text-xs text-content-secondary">
                 Mic check ready{micCheck.playback.label ? ' · ' + micCheck.playback.label : ''} · {micCheck.playback.mode ? MIC_MODES[micCheck.playback.mode] : 'Mode not reported'}
+                {micCheck.playback.level ? <>
+                  <strong className="mt-1 block text-content-primary">{MIC_CHECK_LEVELS[micCheck.playback.level][0]}</strong>
+                  {MIC_CHECK_LEVELS[micCheck.playback.level][1]}
+                </> : <span className="mt-1 block">Level unavailable. Play the sample to hear your microphone.</span>}
               </p>
               <audio ref={micCheckAudio} className="w-full" src={micCheck.playback.url} controls aria-label="Mic check playback" />
             </div>}

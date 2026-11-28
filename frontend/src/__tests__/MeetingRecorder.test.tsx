@@ -29,6 +29,7 @@ import RecordingStatus from '../components/meetings/RecordingStatus'
 import Layout from '../components/Layout'
 import ErrorBoundary from '../components/ErrorBoundary'
 import { installChunkReload } from '../services/chunkReload'
+import { measureMicCheck } from '../services/recordingMicrophone'
 import {
   PieceUploader,
   canRetry,
@@ -113,6 +114,25 @@ describe('meetingRecorderService', () => {
     up.add(new Blob(['a']), 1000)
     await expect(up.drain()).rejects.toThrow('This meeting is not recording.')
     expect(send).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('mic check level', () => {
+  test.each([
+    [0, 'silent'],
+    [0.01, 'quiet'],
+    [0.12, 'good'],
+    [0.99, 'clipping'],
+  ])('measures a recorded signal with peak %s as %s', async (peak, verdict) => {
+    const sampleRate = 48_000
+    const samples = new Float32Array(sampleRate * 5)
+    // A short burst surrounded by silence represents speaking briefly in the check.
+    for (let i = sampleRate; i < samples.length / 2; i++) samples[i] = peak * Math.sin(2 * Math.PI * 440 * i / sampleRate)
+    const decodeAudioData = vi.fn().mockResolvedValue({ sampleRate, numberOfChannels: 1, getChannelData: () => samples })
+    vi.stubGlobal('OfflineAudioContext', class { decodeAudioData = decodeAudioData })
+    const sample = new Blob(['recorded sample'])
+    await expect(measureMicCheck(sample)).resolves.toBe(verdict)
+    expect(decodeAudioData).toHaveBeenCalledOnce()
   })
 })
 
@@ -442,6 +462,11 @@ describe('MeetingRecorder', () => {
     const mic = new FakeTrack('audio')
     mic.settings.noiseSuppression = false
     getUserMedia.mockResolvedValueOnce(new FakeStream([mic]))
+    vi.stubGlobal('OfflineAudioContext', class {
+      async decodeAudioData() {
+        return { sampleRate: 48_000, numberOfChannels: 1, getChannelData: () => new Float32Array(4800).fill(0.01) }
+      }
+    })
     const createUrl = vi.fn(() => 'blob:mic-check')
     const revokeUrl = vi.fn()
     const priorCreate = URL.createObjectURL
@@ -461,6 +486,8 @@ describe('MeetingRecorder', () => {
       expect(mic.stopped).toBe(true)
       expect(screen.getByLabelText('Mic check playback')).toHaveAttribute('src', 'blob:mic-check')
       expect(screen.getByText(/Mic check ready.*Original mic/)).toBeInTheDocument()
+      expect(screen.getByText('Too quiet')).toBeInTheDocument()
+      expect(screen.getByText(/move closer to the microphone/i)).toBeInTheDocument()
       fireEvent.click(screen.getByRole('checkbox', { name: /knows it is being recorded/i }))
       await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Start recording' })) })
       expect(revokeUrl).toHaveBeenCalledWith('blob:mic-check')
