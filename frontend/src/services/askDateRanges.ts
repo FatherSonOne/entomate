@@ -147,7 +147,10 @@ const TENS = ['twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty'
 // Capture longer number phrases in full so "one hundred twenty" cannot become "twenty".
 const COUNT_WORD = `(?:${[...SMALL_COUNTS, ...TENS].join('|')}|hundred|thousand|million|billion|trillion|minus|negative|point|half|quarter|few|several|couple|a)`
 const WORD_COUNT = String.raw`${COUNT_WORD}(?:[\s-]+(?:${COUNT_WORD}|and|of))*`
-const WINDOW_LENGTH = String.raw`(${NUMERIC_COUNT}|${WORD_COUNT})\s+(days?|weeks?|months?)`
+const WINDOW_COUNT = `(?:${NUMERIC_COUNT}|${WORD_COUNT})`
+const APPROXIMATE_PREFIX = String.raw`(?:about|roughly)\s+`
+const APPROXIMATE_START = new RegExp('^' + APPROXIMATE_PREFIX, 'i')
+const WINDOW_LENGTH = String.raw`((?:${APPROXIMATE_PREFIX})?${WINDOW_COUNT}(?:\s+or\s+${WINDOW_COUNT})*)\s+(days?|weeks?|months?)`
 const CUSTOM_MILESTONE_WINDOW = new RegExp(
   String.raw`${WINDOW_START}${WINDOW_LENGTH}\s+before\s+${MILESTONE_TITLE}${COMPARE}${WINDOW_LENGTH}\s+after\b${MILESTONE_END}`, 'i',
 )
@@ -177,10 +180,11 @@ function parseWindowLength(value: string, unit: string): ProposedWindowLength {
   const writtenUnit = unit.toLowerCase()
   const plural = writtenUnit.endsWith('s')
   const calendarUnit = writtenUnit.replace(/s$/, '') as CalendarUnit
-  if (plural && /^a\s+couple\s+of$/i.test(value)) return { count: 2, unit: calendarUnit, editable: true }
-  if (plural && /^(?:a\s+few|several)$/i.test(value)) return { count: null, unit: calendarUnit }
-  const count = value.toLowerCase() === 'a' && !plural ? 1 : parseWindowCount(value)
-  return { count, unit: calendarUnit }
+  const countText = value.replace(APPROXIMATE_START, '')
+  if (plural && /^a\s+couple\s+of$/i.test(countText)) return { count: 2, unit: calendarUnit, editable: true }
+  if ((plural && /^(?:a\s+few|several)$/i.test(countText)) || /\s+or\s+/i.test(countText)) return { count: null, unit: calendarUnit }
+  const count = countText.toLowerCase() === 'a' && !plural ? 1 : parseWindowCount(countText)
+  return { count, unit: calendarUnit, ...(countText !== value && validWindowCount(count) ? { editable: true } : {}) }
 }
 
 export function eventComparisonProposal(question: string): ComparisonProposal | null {

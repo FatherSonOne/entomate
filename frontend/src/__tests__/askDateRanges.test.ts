@@ -138,6 +138,37 @@ test('can suggest an editable later count and use calendar months for the window
   })
 })
 
+test.each([
+  'about two weeks before Security Review vs. roughly a month after',
+  'roughly 2 weeks before Security Review versus about 1 month after',
+])('suggests editable counts for %s', (question) => {
+  const proposal = proposeComparison(question, 'America/New_York')
+  expect(proposal).toEqual({
+    ranges: EMPTY_RANGES, eventBased: true, milestoneName: 'Security Review',
+    eventWindow: {
+      before: { count: 2, unit: 'week', editable: true },
+      after: { count: 1, unit: 'month', editable: true },
+    },
+  })
+  expect(eventComparisonRanges('2026-07-15', proposal?.eventWindow)).toEqual({
+    previous: { startDate: '2026-07-01', endDate: '2026-07-14' },
+    current: { startDate: '2026-07-16', endDate: '2026-08-15' },
+  })
+  expect(eventComparisonRanges('2026-07-15', proposal?.eventWindow, { after: null })).toEqual(EMPTY_RANGES)
+  expect(eventComparisonRanges('2026-07-15', proposal?.eventWindow, { before: 3, after: 2 })).toEqual({
+    previous: { startDate: '2026-06-24', endDate: '2026-07-14' },
+    current: { startDate: '2026-07-16', endDate: '2026-09-15' },
+  })
+})
+
+test.each(['two or three', '2 or 3', 'a few'])('asks for a count for about %s weeks and keeps the later suggestion', (words) => {
+  const proposal = proposeComparison('about ' + words + ' weeks before Security Review vs. roughly a month after', 'America/New_York')
+  expect(proposal?.eventWindow).toEqual({
+    before: { count: null, unit: 'week' }, after: { count: 1, unit: 'month', editable: true },
+  })
+  expect(eventComparisonRanges('2026-07-15', proposal?.eventWindow)).toEqual(EMPTY_RANGES)
+})
+
 test('uses the entire spelled-out count when it ends in a legacy two-week window', () => {
   const proposal = proposeComparison('twenty two weeks before Security Review vs. two weeks after', 'America/New_York')
   expect(proposal?.eventWindow).toEqual({ before: { count: 22, unit: 'week' }, after: { count: 2, unit: 'week' } })

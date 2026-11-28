@@ -572,7 +572,11 @@ function ComparisonForm({ draft, timeZone, workspace, confirmationRef, proposedQ
               </label>
             )
           })}
-          <p id="ask-event-count-hint">Enter a positive whole number.</p>
+          <p id="ask-event-count-hint">
+            Enter a positive whole number.
+            {sides.some((side) => eventWindow[side].editable && clarifiedCounts?.[side] === undefined)
+              && ' You can edit the suggested counts.'}
+          </p>
         </div>
       )}
       {eventBased && eventWindow !== 'invalid' && (
