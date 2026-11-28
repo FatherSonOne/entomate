@@ -1,5 +1,6 @@
 const express = require('express');
 const request = require('supertest');
+const { createHmac } = require('node:crypto');
 
 const host = '11111111-1111-4111-8111-111111111111';
 const roomId = '22222222-2222-4222-8222-222222222222';
@@ -57,7 +58,8 @@ jest.mock('../utils/orgContext', () => ({
   getOrgIdsForUser: async () => [org],
 }));
 
-const app = express().use(express.json()).use(require('../routes/liveMeetingRooms'));
+const app = express().use(express.json({ verify: (req, _res, body) => { req.rawBody = body; } }))
+  .use(require('../routes/liveMeetingRooms'));
 const priorKey = process.env.DAILY_API_KEY;
 const priorFetch = global.fetch;
 
@@ -98,6 +100,26 @@ test('Daily room recording storage sets the required API access flag', () => {
       assume_role_arn: 'arn:aws:iam::111122223333:role/DailyRecording',
       allow_api_access: true,
     });
+  } finally {
+    originalEnv.restore();
+  }
+});
+
+test('the Daily recording webhook requires a signature over the timestamp and raw request', async () => {
+  const key = Buffer.alloc(32, 'a');
+  const originalEnv = jest.replaceProperty(process, 'env', {
+    ...process.env, DAILY_RECORDING_WEBHOOK_SECRET: key.toString('base64'),
+  });
+  const endpoint = '/daily-recording-webhook';
+  const body = '{ "test": "test" }';
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const signature = createHmac('sha256', key).update(timestamp + '.' + body).digest('base64');
+  try {
+    await request(app).post(endpoint).type('json').send(body).expect(401);
+    await request(app).post(endpoint).type('json').set('X-Webhook-Timestamp', timestamp)
+      .set('X-Webhook-Signature', signature).send('{"test":"altered"}').expect(401);
+    await request(app).post(endpoint).type('json').set('X-Webhook-Timestamp', timestamp)
+      .set('X-Webhook-Signature', signature).send(body).expect(200);
   } finally {
     originalEnv.restore();
   }
@@ -148,7 +170,7 @@ test('stopping a cloud recording uses the raw-tracks type and the original insta
   try {
     global.fetch.mockResolvedValue({ ok: true, json: async () => ({}) });
     await request(app).post(`/${roomId}/recording/finish`).set('X-Test-User', host)
-      .expect(200, { status: 'processing', meetingId: roomId });
+      .expect(200, { status: 'processing', cloudStage: 'storage', meetingId: roomId });
 
     const [url, options] = global.fetch.mock.calls[0];
     expect(new URL(url).pathname).toBe('/v1/rooms/pilot/recordings/stop');

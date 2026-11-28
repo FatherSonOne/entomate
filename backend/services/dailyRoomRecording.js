@@ -6,13 +6,34 @@ const { pipeline } = require('node:stream/promises');
 const { tmpdir } = require('node:os');
 const { setTimeout: delay } = require('node:timers/promises');
 const path = require('node:path');
+const { randomUUID } = require('node:crypto');
 const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { supabaseAdmin } = require('../config/supabase');
 const recorder = require('./meetingRecorder');
 const playback = require('./playbackFile');
 const { readManifest, coverageGaps } = require('./roomRecordingManifest');
 const log = require('../utils/log');
 
 const recordingType = 'raw-tracks';
+const leaseMs = 75_000;
+const maxAttempts = 8;
+
+async function daily(path, method = 'GET', payload, allowed = []) {
+  let response;
+  try {
+    response = await fetch(`https://api.daily.co/v1${path}`, {
+      method, signal: AbortSignal.timeout(10_000),
+      headers: { Authorization: `Bearer ${process.env.DAILY_API_KEY.trim()}`, 'Content-Type': 'application/json' },
+      body: payload && JSON.stringify(payload),
+    });
+  } catch {
+    throw new recorder.RecorderError(502, 'The video service did not respond. Try again.');
+  }
+  if (allowed.includes(response.status)) return null;
+  if (!response.ok) throw new recorder.RecorderError(502, 'The video service could not complete this request. Try again.');
+  if (response.status === 204) return {};
+  return response.json();
+}
 
 function bucket() {
   const bucket_name = process.env.DAILY_ROOM_RECORDING_BUCKET?.trim();
@@ -63,12 +84,19 @@ function start(room, daily) {
     }
     if (!confirmed) throw new recorder.RecorderError(502, 'Daily has not confirmed recording. Select Start audio recording to check again.');
     if (confirmed.status === 'finished') {
-      const job = await recorder.patchRoomRecording(meeting, { status: 'processing', stopRequestedAt: new Date().toISOString() });
+      const job = await recorder.patchRoomRecording(meeting, { status: 'processing', cloudStage: 'storage', stopRequestedAt: new Date().toISOString() });
       refresh(room, daily);
       return job;
     }
     return recorder.patchRoomRecording(meeting, { status: 'recording' });
   });
+}
+
+async function stopProvider(room, daily) {
+  const response = await daily(recordingPath(room) + '/stop', 'POST', { type: recordingType, instanceId: room.id }, [400, 404]);
+  if (!response && (await list(room, daily)).some(recording => recording.status === 'in-progress')) {
+    throw new recorder.RecorderError(502, 'Daily is still recording. Try stopping the audio again.');
+  }
 }
 
 function stop(room, daily) {
@@ -80,11 +108,8 @@ function stop(room, daily) {
     if (job.status !== 'stopping') {
       await recorder.patchRoomRecording(meeting, { status: 'stopping', stopRequestedAt: new Date().toISOString() });
     }
-    const response = await daily(recordingPath(room) + '/stop', 'POST', { type: recordingType, instanceId: room.id }, [400, 404]);
-    if (!response && (await list(room, daily)).some(recording => recording.status === 'in-progress')) {
-      throw new recorder.RecorderError(502, 'Daily is still recording. Try stopping the audio again.');
-    }
-    const processing = await recorder.patchRoomRecording(meeting, { status: 'processing' });
+    await stopProvider(room, daily);
+    const processing = await recorder.patchRoomRecording(meeting, { status: 'processing', cloudStage: 'storage' });
     refresh(room, daily);
     return processing;
   });
@@ -113,11 +138,11 @@ function recordingKeys(data, prefix, configuration) {
   });
 }
 
-async function renderRecording(meeting, manifest, get) {
+async function renderRecording(meeting, manifest, get, lease) {
   const dir = await fs.mkdtemp(path.join(tmpdir(), 'entomate-room-audio-'));
   try {
     const { durationMs } = manifest;
-    const participantTracks = {};
+    const participantTracks = { ...meeting.recording_job.participantTracks };
     const mixed = [];
     for (const [index, person] of manifest.people.entries()) {
       const track = 'p' + (index + 1);
@@ -136,6 +161,7 @@ async function renderRecording(meeting, manifest, get) {
       const gaps = coverageGaps(clips, durationMs, person.witnessedAt);
       if (!clips.length) {
         participantTracks[track] = { label: person.label, status: 'missing', gaps };
+        await recorder.patchRoomRecording(meeting, { participantTracks: { ...participantTracks } }, lease);
         continue;
       }
       const output = path.join(dir, track + '.webm');
@@ -143,6 +169,7 @@ async function renderRecording(meeting, manifest, get) {
       const playbackFile = await recorder.saveRoomPlayback(meeting, track, await fs.readFile(output));
       participantTracks[track] = { label: person.label, status: gaps.length ? 'partial' : 'saved',
         pieces: 1, durationMs, playbackFile, gaps };
+      await recorder.patchRoomRecording(meeting, { participantTracks: { ...participantTracks } }, lease);
       mixed.push({ file: output, startMs: 0, endMs: durationMs });
     }
     if (!mixed.length) throw new Error('Daily returned no usable microphone audio');
@@ -155,8 +182,7 @@ async function renderRecording(meeting, manifest, get) {
   }
 }
 
-async function processRecording(room, daily) {
-  const meeting = await recorder.roomRecordingJob(room);
+async function processRecording(room, meeting, daily, lease) {
   const job = meeting?.recording_job;
   if (job?.roomCapture !== 'daily' || job.status !== 'processing') return true;
   const recording = (await list(room, daily)).find(item => item.status === 'finished');
@@ -176,42 +202,98 @@ async function processRecording(room, daily) {
     const sessions = (await daily('/meetings/' + encodeURIComponent(recording.mtgSessionId) + '/participants'))?.data ?? [];
     const manifest = readManifest(data, recording, sessions, recordingKeys(data, prefix, configuration));
     if (!manifest) return false;
-    if (!job.participantTracks) {
-      const pending = Object.fromEntries(manifest.people.map(({ label }, index) => ['p' + (index + 1), { label, status: 'processing' }]));
-      await recorder.patchRoomRecording(meeting, { participantTracks: pending });
-    }
-    const saved = await renderRecording(meeting, manifest, get);
+    const pending = Object.fromEntries(manifest.people.map(({ label }, index) => ['p' + (index + 1), { label, status: 'processing' }]));
+    await recorder.patchRoomRecording(meeting, { cloudStage: 'recap', participantTracks: pending }, lease);
+    const saved = await renderRecording(meeting, manifest, get, lease);
     await recorder.patchRoomRecording(meeting, {
-      ...saved, status: 'done', audioKept: true, pieces: 1, finishedAt: new Date().toISOString(),
+      ...saved, status: 'done', cloudStage: 'ready', cloudRetryAt: null, audioKept: true, pieces: 1, finishedAt: new Date().toISOString(),
       roomOffsetMs: Math.max(0, manifest.origin - Date.parse(room.created_at)),
-    });
+    }, lease);
     return true;
   } finally {
     client.destroy();
   }
 }
 
-const attempts = new Map();
-function refresh(room, daily) {
-  const now = Date.now();
-  const last = attempts.get(room.id);
-  if (last && now - last < 8_000) return;
-  attempts.set(room.id, now);
-  setTimeout(() => { if (attempts.get(room.id) === now) attempts.delete(room.id); }, 8_000).unref();
-  void share(room.id + ':import', async () => {
-    const queued = (await recorder.roomRecordingJob(room))?.recording_job;
+async function changeLease(roomId, lease, next) {
+  const { error } = await supabaseAdmin.from('meetings').update(next)
+    .eq('id', roomId).eq('room_audio_lease_id', lease);
+  if (error) throw error;
+}
+
+function recover(roomId = null, provider = daily) {
+  if (!supabaseAdmin || !bucket()) return Promise.resolve(false);
+  return share('cloud-recovery', async () => {
+    const lease = randomUUID();
+    const { data, error } = await supabaseAdmin.rpc('claim_cloud_recording', { p_room: roomId, p_lease: lease });
+    if (error) throw error;
+    const [room] = data || [];
+    if (!room) return false;
+    const heartbeat = setInterval(() => {
+      void changeLease(room.id, lease, { room_audio_lease_until: new Date(Date.now() + leaseMs).toISOString() })
+        .catch(error => log.warn('Cloud audio lease could not renew', { roomId: room.id, code: error.code }));
+    }, 20_000);
+    heartbeat.unref();
     try {
-      if (await processRecording(room, daily)) return;
-    } catch (error) {
-      log.warn('Daily room audio import could not finish', { roomId: room.id, name: error.name, code: error.code });
+      const meeting = await recorder.roomRecordingJob(room);
+      if (!meeting) return false;
+      try {
+        if (meeting.recording_job.status === 'stopping') {
+          await stopProvider(room, provider);
+          await recorder.patchRoomRecording(meeting, { status: 'processing', cloudStage: 'storage' }, lease);
+        }
+        if (await processRecording(room, meeting, provider, lease)) return true;
+      } catch (error) {
+        log.warn('Daily room audio import could not finish', { roomId: room.id, name: error.name, code: error.code });
+      }
+      const attempts = (meeting.recording_job.cloudAttempts || 0) + 1;
+      const retryAt = new Date(Date.now() + Math.min(180_000, 10_000 * 2 ** (attempts - 1))).toISOString();
+      await recorder.patchRoomRecording(meeting, attempts >= maxAttempts
+        ? { status: 'failed', cloudAttempts: attempts, cloudRetryAt: null, cloudResumeStatus: meeting.recording_job.status,
+          error: 'Cloud audio could not finish processing. Try processing it again.' }
+        : { cloudAttempts: attempts, cloudRetryAt: retryAt }, lease);
+      return false;
+    } finally {
+      clearInterval(heartbeat);
+      await changeLease(room.id, lease, { room_audio_lease_id: null, room_audio_lease_until: null });
     }
-    // The processing state also lets opening the recap resume import after a server restart.
-    if (Date.now() - Date.parse(queued?.stopRequestedAt) < 120_000) {
-      setTimeout(() => refresh(room, daily), 10_000).unref();
-    }
-  }).catch(error => {
+  });
+}
+
+function refresh(room, provider = daily) {
+  void recover(room.id, provider).catch(error => {
     log.warn('Daily room audio state is unavailable', { roomId: room.id, name: error.name, code: error.code });
   });
 }
 
-module.exports = { bucket, start, stop, refresh };
+function initialize() {
+  if (!supabaseAdmin || !bucket()) return;
+  const sweep = () => void recover().catch(error => log.warn('Cloud audio recovery sweep failed', { code: error.code }));
+  setInterval(sweep, 10_000).unref();
+  sweep();
+}
+
+async function retry(room, provider = daily) {
+  const meeting = await recorder.roomRecordingJob(room);
+  const job = meeting?.recording_job;
+  if (job?.roomCapture !== 'daily' || job.status !== 'failed' || !job.cloudResumeStatus) {
+    throw new recorder.RecorderError(409, 'This cloud recording does not need to be retried.');
+  }
+  const pending = await recorder.patchRoomRecording(meeting, {
+    status: job.cloudResumeStatus, cloudAttempts: 0, cloudRetryAt: null, cloudResumeStatus: null, error: null,
+  });
+  refresh(room, provider);
+  return pending;
+}
+
+async function recordingReady(room) {
+  const meeting = await recorder.roomRecordingJob(room);
+  const job = meeting?.recording_job;
+  if (job?.roomCapture !== 'daily') return;
+  if (['starting', 'recording'].includes(job.status)) {
+    await recorder.patchRoomRecording(meeting, { status: 'processing', cloudStage: 'storage', stopRequestedAt: new Date().toISOString() });
+  }
+  if (['starting', 'recording', 'stopping', 'processing'].includes(job.status)) refresh(room);
+}
+
+module.exports = { bucket, daily, start, stop, refresh, recover, initialize, retry, recordingReady };

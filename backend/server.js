@@ -430,6 +430,7 @@ if (process.env.NODE_ENV !== 'test') {
     logger.info(`Entomate Backend running on http://localhost:${PORT}`);
     logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
     logger.info(`Health check: http://localhost:${PORT}/health`);
+    require('./services/dailyRoomRecording').initialize();
 
     if (errorTracking.isEnabled()) {
       logger.info('Error tracking: enabled (Sentry)');

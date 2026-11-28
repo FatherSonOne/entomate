@@ -24,6 +24,7 @@ import { recordingSource } from '../../services/recordingProgress'
 import { TrackSaveStatus } from './TrackSaveStatus'
 import { liveRoomsApi } from '../../services/api'
 import { roomParticipantTracks } from '../../services/recordingAudioTracks'
+import { CloudRecordingProgress } from './CloudRecordingProgress'
 
 export interface RecordingStatusProps {
   meetingId: string
@@ -53,18 +54,37 @@ export function RecordingStatus({ meetingId, recordingJob, recoveryUserId, onRef
   const writing = job?.status === 'transcribing' && !retryable
   const rebuilding = canPlay(recordingJob) && isRebuildingTranscript(job)
   const processing = job?.source === 'room' && job.status === 'processing'
-  const waiting = writing || rebuilding || processing || job?.status === 'backup'
+  const cloud = job?.roomCapture === 'daily'
+  const waiting = writing || rebuilding || processing || job?.status === 'stopping' || job?.status === 'backup'
 
   useEffect(() => {
     if (!waiting) return
     const refresh = () => {
-      if (processing) void liveRoomsApi.refreshAudio(meetingId).catch(() => {})
+      if (processing && !cloud) void liveRoomsApi.refreshAudio(meetingId).catch(() => {})
       onRefresh()
     }
-    if (processing) void liveRoomsApi.refreshAudio(meetingId).catch(() => {})
+    if (processing && !cloud) void liveRoomsApi.refreshAudio(meetingId).catch(() => {})
     const timer = window.setInterval(refresh, POLL_MS)
     return () => window.clearInterval(timer)
-  }, [meetingId, processing, waiting, onRefresh])
+  }, [meetingId, cloud, processing, waiting, onRefresh])
+
+  if (cloud && job && job.status !== 'done') {
+    const retry = async () => {
+      setBusy(true)
+      setError(null)
+      try {
+        await liveRoomsApi.retryAudio(meetingId)
+        onRefresh()
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Could not restart cloud audio processing.')
+      } finally { setBusy(false) }
+    }
+    return <>
+      <CloudRecordingProgress status={job.status} stage={job.cloudStage} tracks={Object.values(job.audioTracks || {})}
+        busy={busy} onRetry={job.cloudCanRetry && recoveryUserId && recoveryUserId === job.startedBy ? () => void retry() : undefined} />
+      {error && <p role="alert" className="bs-recstat-err">{error}</p>}
+    </>
+  }
 
   if (processing) {
     return (

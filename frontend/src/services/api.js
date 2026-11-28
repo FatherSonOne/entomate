@@ -258,6 +258,8 @@ export const recordingsApi = {
   discard: (meetingId) => api.delete(`/recordings/${meetingId}`),
   // Signed links to the saved audio, in order; they expire, so never read this from the cache.
   playback: (meetingId, track) => api.get(`/recordings/${meetingId}/playback`, track ? { params: { track }, _noCache: true } : undefined),
+  trackDownload: (id, track) => api.get(`/recordings/${id}/track-downloads/${track}`, { _noCache: true, skipRetry: true }),
+  downloadTracks: (id) => downloadFile(`/recordings/${id}/track-downloads/all`, 'Entomate-aligned-tracks.zip'),
   waveform: (meetingId, signal, track) => api.get(`/recordings/${meetingId}/waveform`, {
     signal, _noCache: true, ...(track ? { params: { track } } : {}),
   }),
@@ -446,6 +448,7 @@ export const liveRoomsApi = {
   startAudio: (id, mimeType) => api.post(`/live-meeting-rooms/${id}/recording/start`, { mimeType }, { skipRetry: true }),
   finishAudio: (id, pieces, labels) => api.post(`/live-meeting-rooms/${id}/recording/finish`, { pieces, labels }, { timeout: 180_000, skipRetry: true }),
   refreshAudio: (id) => api.post(`/live-meeting-rooms/${id}/recording/refresh`, {}, { skipRetry: true }),
+  retryAudio: (id) => api.post(`/live-meeting-rooms/${id}/recording/retry`, {}, { skipRetry: true }),
   lines: (id, lines) => api.post(`/live-meeting-rooms/${id}/lines`, { lines }, { skipRetry: true }),
   insights: (id) => api.get(`/live-meeting-rooms/${id}/insights`, { _noCache: true, skipRetry: true }),
   refreshInsights: (id) => api.post(`/live-meeting-rooms/${id}/insights/refresh`, {}, { skipRetry: true }),

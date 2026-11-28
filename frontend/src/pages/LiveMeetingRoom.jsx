@@ -1,9 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Link2, Mic, MicOff, MonitorUp, Video, VideoOff } from 'lucide-react'
 import { Display, Drawer, Key, Section, Signal, TextInput, TitleRule } from '../components/bench'
 import { MeetingNavigation, MeetingTrail, ROOM, START, WORKSPACE } from '../components/meetings/MeetingNavigation'
 import { LiveMeetingInsights } from '../components/meetings/LiveMeetingInsights'
+import { CloudRecordingProgress } from '../components/meetings/CloudRecordingProgress'
+import { canPip, dressWindow } from '../components/bot/BotLive'
 import { useAuth } from '../contexts/AuthContext'
 import { liveRoomsApi, meetingsApi } from '../services/api'
 import { RoomAudioRecorder } from '../services/roomAudioRecorder'
@@ -74,6 +77,8 @@ export default function LiveMeetingRoom({ guest = false }) {
   const [recordAudio, setRecordAudio] = useState(false)
   const [acceptRecording, setAcceptRecording] = useState(false)
   const [recordingBusy, setRecordingBusy] = useState(false)
+  const [recordingPop, setRecordingPop] = useState(null)
+  const popWindow = useRef(null)
   const capture = useRef(null)
   const guestId = useMemo(() => guest && id ? guestIdentity(id) : undefined, [guest, id])
   const [audioOnly, setAudioOnly] = useState(false)
@@ -107,6 +112,7 @@ export default function LiveMeetingRoom({ guest = false }) {
     mounted.current = true
     return () => {
       mounted.current = false
+      popWindow.current?.close()
       capture.current?.cancel()
       capture.current = null
       const previous = call.current
@@ -195,7 +201,8 @@ export default function LiveMeetingRoom({ guest = false }) {
     if ((!guest && !cloudRecording) || !joined || !recordingEnabled) return undefined
     let active = true
     const poll = () => void (guest ? liveRoomsApi.guest(id, inviteKey) : liveRoomsApi.host(id)).then(next => {
-      if (active) setRoom(current => ({ ...current, roomAudio: next.roomAudio }))
+      if (active) setRoom(current => ({ ...current, roomAudio: next.roomAudio, cloudStage: next.cloudStage,
+        roomTrackProgress: next.roomTrackProgress, cloudCanRetry: next.cloudCanRetry }))
     }).catch(() => {})
     const timer = window.setInterval(poll, 5000)
     return () => { active = false; window.clearInterval(timer) }
@@ -217,8 +224,8 @@ export default function LiveMeetingRoom({ guest = false }) {
     const connection = call.current
     try {
       if (cloudRecording) {
-        const { status } = await liveRoomsApi.startAudio(id)
-        if (mounted.current) setRoom(current => ({ ...current, roomAudio: status }))
+        const { status, cloudStage } = await liveRoomsApi.startAudio(id)
+        if (mounted.current) setRoom(current => ({ ...current, roomAudio: status, cloudStage }))
       } else {
         const recorder = await RoomAudioRecorder.start(id, recordingInputs(Object.values(connection.participants())))
         if (!mounted.current || call.current !== connection) { recorder.cancel(); return }
@@ -236,8 +243,8 @@ export default function LiveMeetingRoom({ guest = false }) {
 
   async function saveAudio() {
     if (cloudRecording) {
-      const { status } = await liveRoomsApi.finishAudio(id)
-      setRoom(current => ({ ...current, roomAudio: status }))
+      const { status, cloudStage } = await liveRoomsApi.finishAudio(id)
+      setRoom(current => ({ ...current, roomAudio: status, cloudStage }))
       return
     }
     const recorder = capture.current
@@ -259,6 +266,48 @@ export default function LiveMeetingRoom({ guest = false }) {
     } finally {
       inAction.current = false
       if (mounted.current) setRecordingBusy(false)
+    }
+  }
+
+  async function retryAudio() {
+    if (recordingBusy || guest || inAction.current) return
+    inAction.current = true
+    setRecordingBusy(true)
+    setError('')
+    try {
+      const { status, cloudStage } = await liveRoomsApi.retryAudio(id)
+      setRoom(current => ({ ...current, roomAudio: status, cloudStage, cloudCanRetry: false }))
+    } catch (err) {
+      setError(err.message || 'Cloud audio processing could not restart.')
+    } finally {
+      inAction.current = false
+      if (mounted.current) setRecordingBusy(false)
+    }
+  }
+
+  async function openRecordingPop() {
+    if (popWindow.current && !popWindow.current.closed) {
+      popWindow.current.focus()
+      return
+    }
+    let win
+    try {
+      win = canPip()
+        ? await window.documentPictureInPicture.requestWindow({ width: 380, height: 300 })
+        : window.open('', 'entomate-cloud-recording', 'popup,width=380,height=300')
+      if (!win) throw new Error('Your browser blocked the recording pop-out.')
+      const root = dressWindow(win, 'Entomate · Cloud recording')
+      popWindow.current = win
+      win.addEventListener('pagehide', () => {
+        if (popWindow.current !== win) return
+        popWindow.current = null
+        setRecordingPop(null)
+      }, { once: true })
+      setRecordingPop(root)
+      setError('')
+    } catch (err) {
+      win?.close()
+      setError(err.message || 'The recording pop-out could not open.')
     }
   }
 
@@ -446,6 +495,8 @@ export default function LiveMeetingRoom({ guest = false }) {
   const guestUrl = room?.inviteKey ? `${window.location.origin}/meet/${id}#${room.inviteKey}` : ''
   const pageTitle = room?.title || (guest ? 'Join a meeting' : 'Start live room')
   const activelyRecording = room?.roomAudio === 'recording'
+  const cloudProgress = cloudRecording && <CloudRecordingProgress status={room.roomAudio} stage={room.cloudStage}
+    tracks={room.roomTrackProgress} onRetry={!guest && room.cloudCanRetry ? retryAudio : undefined} busy={recordingBusy} />
   const connected = new Set(participants.map(person => person.user_id || person.session_id))
   return (
     <div className={guest ? 'bs-tokens bs-skin bs-meeting-guest' : 'bs-meeting-workspace'}>
@@ -498,9 +549,9 @@ export default function LiveMeetingRoom({ guest = false }) {
         <div className="bs-meeting-call-status">
           <Signal tone="live">Live · {participants.length} {participants.length === 1 ? 'person' : 'people'}</Signal>
           {activelyRecording && <Signal tone="live">Recording room audio</Signal>}
-          {cloudRecording && room.roomAudio === 'processing' && <Signal tone="brand">Processing room audio</Signal>}
           {room.withNotes && <Signal tone={transcribing ? 'brand' : 'off'}>{transcribing ? 'Transcribing' : 'Live transcription enabled'}</Signal>}
         </div>
+        {cloudProgress}
         <div className="bs-meeting-controls">
           <Key aria-pressed={Boolean(local?.audio)} onClick={() => call.current?.setLocalAudio(!local?.audio)} icon={local?.audio ? <Mic aria-hidden="true" /> : <MicOff aria-hidden="true" />}>Mic {local?.audio ? 'on' : 'off'}</Key>
           {!audioMode && <Key aria-pressed={Boolean(local?.video)} onClick={() => call.current?.setLocalVideo(!local?.video)} icon={local?.video ? <Video aria-hidden="true" /> : <VideoOff aria-hidden="true" />}>Camera {local?.video ? 'on' : 'off'}</Key>}
@@ -517,6 +568,7 @@ export default function LiveMeetingRoom({ guest = false }) {
             {recordingBusy ? 'Saving room audio…' : 'Stop audio recording'}
           </Key>}
           {!guest && activelyRecording && !cloudRecording && !capture.current && <span>Capture was interrupted. End the room to save any uploaded audio.</span>}
+          {!guest && cloudRecording && <Key onClick={openRecordingPop}>{recordingPop ? 'Focus pop-out' : 'Pop out recording'}</Key>}
           <Key onClick={leave} disabled={busy || recordingBusy}>Leave room</Key>
         </div>
         {shared && <div className="bs-meeting-share"><Track video muted track={liveTrack(shared, 'screenVideo')} />
@@ -531,6 +583,15 @@ export default function LiveMeetingRoom({ guest = false }) {
         </div>
         {caption && <p className="bs-meeting-caption"><b>{caption.speaker}</b> {caption.text}</p>}
       </section>}
+      {recordingPop && createPortal(
+        <section className="bs-tokens bs-skin bs-meeting-workspace p-4" aria-label="Cloud recording controls">
+          <h2>{pageTitle}</h2>
+          {cloudProgress}
+          {['ready', 'starting'].includes(room?.roomAudio) && <Key onClick={startAudio} disabled={recordingBusy || busy}>Start audio recording</Key>}
+          {['recording', 'stopping'].includes(room?.roomAudio) && <Key onClick={stopAudio} disabled={recordingBusy || busy}>Stop audio recording</Key>}
+          {error && <p role="alert">{error}</p>}
+        </section>, recordingPop,
+      )}
       {!guest && joined && room?.withNotes && <LiveMeetingInsights key={id} roomId={id} live
         transcriptRevision={transcriptRevision} beforeRefresh={flush} disabled={busy} />}
       {notesError && <p role="status" className="bs-mut">{notesError}</p>}

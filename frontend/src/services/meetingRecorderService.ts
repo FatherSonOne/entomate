@@ -22,7 +22,7 @@ const AUDIO_BITS_PER_SECOND = 64_000
 const VIDEO_BITS_PER_SECOND = 1_500_000
 
 /** `backup`: recorded beside the bot, which writes the minutes; this audio waits in case it cannot. */
-export type RecordingStatus = 'recording' | 'transcribing' | 'processing' | 'backup' | 'done' | 'failed'
+export type RecordingStatus = 'recording' | 'transcribing' | 'stopping' | 'processing' | 'backup' | 'done' | 'failed'
 /** Which engine is writing (or wrote) the minutes: the Recall bot, or this browser's recording. */
 export type RecordingSource = 'bot' | 'browser' | 'room'
 
@@ -47,6 +47,10 @@ export interface RecordingJob {
   audioTracks?: AudioTracks
   audioGaps?: AudioGap[]
   roomOffsetMs?: number
+  roomCapture?: 'daily'
+  cloudStage?: string
+  cloudCanRetry?: boolean
+  startedBy?: string
   transcriptRebuildAt?: string
   transcriptRebuildError?: string
   transcriptRebuiltAt?: string
@@ -83,7 +87,7 @@ export interface TranscriptRebuildProgress {
 export type RecordingStage = 'transcript' | 'speakers' | 'summary' | 'saving'
 const STAGES: RecordingStage[] = ['transcript', 'speakers', 'summary', 'saving']
 
-const STATUSES: RecordingStatus[] = ['recording', 'transcribing', 'processing', 'backup', 'done', 'failed']
+const STATUSES: RecordingStatus[] = ['recording', 'transcribing', 'stopping', 'processing', 'backup', 'done', 'failed']
 const MODES: RecorderMode[] = ['mic', 'camera', 'tab']
 
 /** Reads `meetings.recording_job` defensively. Null for a meeting not recorded here. */
@@ -117,6 +121,12 @@ export function toRecordingJob(raw: unknown): RecordingJob | null {
     ...(r.source === 'room' ? {
       audioTracks: readAudioTracks(r.participantTracks, roomParticipantTracks(r.participantTracks)),
       roomOffsetMs: typeof r.roomOffsetMs === 'number' && r.roomOffsetMs >= 0 ? r.roomOffsetMs : 0,
+    } : {}),
+    ...(r.source === 'room' && r.roomCapture === 'daily' ? {
+      roomCapture: 'daily' as const,
+      cloudStage: typeof r.cloudStage === 'string' ? r.cloudStage : undefined,
+      cloudCanRetry: r.status === 'failed' && (r.cloudResumeStatus === 'stopping' || r.cloudResumeStatus === 'processing'),
+      startedBy: typeof r.startedBy === 'string' ? r.startedBy : undefined,
     } : {}),
     ...(audioGaps.length ? { audioGaps } : {}),
   }

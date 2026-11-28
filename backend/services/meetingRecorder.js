@@ -442,13 +442,14 @@ async function prepareRoomRecording(room, cloud = false) {
   if (!(await roomRecordingJob(room))) throw new RecorderError(409, 'This room could not be prepared for recording.');
 }
 
-async function patchRoomRecording(meeting, patch) {
+async function patchRoomRecording(meeting, patch, lease) {
   const previous = meeting.recording_job;
   const updatedAt = new Date().toISOString();
   const job = { ...previous, ...patch, updatedAt };
   let request = supabase.from('meetings').update({ recording_job: job, updated_at: updatedAt })
     .eq('id', meeting.id).eq('org_id', meeting.org_id).eq('recording_job->>status', previous.status);
   if (previous.updatedAt) request = request.eq('recording_job->>updatedAt', previous.updatedAt);
+  if (lease) request = request.eq('room_audio_lease_id', lease).gt('room_audio_lease_until', updatedAt);
   const { data, error } = await request.select('id').maybeSingle();
   if (error) throw error;
   if (!data) throw new RecorderError(409, 'Room audio changed. Refresh and try again.');
@@ -945,6 +946,31 @@ async function getPlayback({ orgId, meetingId, track = 'mix' }) {
   return signedPieces(pieces, job.mimeType);
 }
 
+async function alignedDownloads(orgId, meetingId, requestedTrack) {
+  const meeting = await loadPlaybackMeeting(orgId, meetingId);
+  const job = meeting.recording_job;
+  if (job.roomCapture !== 'daily' || job.status !== 'done') {
+    throw new RecorderError(404, 'Aligned downloads are unavailable for this recording.');
+  }
+  const tracks = [['mix', { label: 'Combined', playbackFile: job.playbackFile }],
+    ...Object.entries(job.participantTracks || {}).filter(([key, track]) => /^p[1-9]\d{0,2}$/.test(key) && track?.pieces)];
+  const folder = recordingFolder(orgId, meetingId) + '/';
+  const available = tracks.filter(([key, track]) =>
+    (requestedTrack === 'all' || requestedTrack === key)
+    && typeof track.playbackFile === 'string' && track.playbackFile.startsWith(folder));
+  if (!available.length || (requestedTrack === 'all' && available[0][0] !== 'mix')) {
+    throw new RecorderError(404, 'This aligned track is unavailable.');
+  }
+  return Promise.all(available.map(async ([key, track]) => {
+    const label = String(track.label || 'Participant').replace(/[^\p{L}\p{N} _-]/gu, '').trim().slice(0, 70) || 'Participant';
+    const name = key === 'mix' ? 'Combined.webm' : `${key}-${label}.webm`;
+    const { data, error } = await supabase.storage.from(BUCKET)
+      .createSignedUrl(track.playbackFile, PLAYBACK_FILE_TTL_S, { download: name });
+    if (error || !data?.signedUrl) throw new RecorderError(503, 'The recording download could not be prepared.');
+    return { name, url: data.signedUrl };
+  }));
+}
+
 async function signedPieces(pieces, mimeType, expectedCount) {
   if (!pieces.length || pieces[0].seq !== 0) throw new RecorderError(404, 'There is no recording to play.');
   if (expectedCount && (pieces.length !== expectedCount || pieces.some((piece, index) => piece.seq !== index))) {
@@ -1042,6 +1068,7 @@ module.exports = {
   prepareRoomRecording,
   patchRoomRecording,
   saveRoomPlayback,
+  alignedDownloads,
   startRoomRecording,
   finishRoomRecording,
   botsInCall,
