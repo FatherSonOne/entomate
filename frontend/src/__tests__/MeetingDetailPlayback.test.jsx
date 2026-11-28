@@ -72,7 +72,10 @@ describe('a pressed timecode plays the recording', () => {
     vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
   })
 
-  afterEach(() => { vi.restoreAllMocks() })
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
 
   test('loads and plays from the moment when the audio is not loaded yet', async () => {
     renderPage({ status: 'done', audioKept: true, durationMs: 60_000 })
@@ -238,7 +241,13 @@ describe('a pressed timecode plays the recording', () => {
       comparing: true, custom: true, typed: true, coverageName: 'Date range coverage' },
     { label: 'typed written dates', question: 'What changed about launch between Oct 4–7, 2026 and Nov 18–26, 2026?',
       comparing: true, custom: true, typed: true, corrected: true, coverageName: 'Date range coverage' },
-  ])('$label restores coverage and the exact Before and After links without a second Ask request', async ({ question, comparing, custom, typed, corrected, coverageName }) => {
+    { label: 'relative days', question: 'Compare the last 30 days vs. the previous 30. What changed about launch?',
+      comparing: true, custom: true, typed: true, relative: true, coverageName: 'Date range coverage' },
+  ])('$label restores coverage and the exact Before and After links without a second Ask request', async ({ question, comparing, custom, typed, corrected, relative, coverageName }) => {
+    if (relative) {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      vi.setSystemTime(new Date(2026, 10, 28, 23, 59))
+    }
     const beforeQuote = 'We agreed to launch on Monday.'
     const afterQuote = 'The launch is now scheduled for Friday.'
     const laterRevision = 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb'
@@ -263,10 +272,14 @@ describe('a pressed timecode plays the recording', () => {
         ],
       }
     })
-    const ranges = {
+    const ranges = relative ? {
+      previous: { startDate: '2026-09-29', endDate: '2026-10-28' },
+      current: { startDate: '2026-10-29', endDate: '2026-11-26' },
+    } : {
       previous: { startDate: '2026-10-04', endDate: '2026-10-07' },
       current: { startDate: '2026-11-18', endDate: '2026-11-25' },
     }
+    const draftEnd = relative ? '2026-11-25' : '2026-11-26'
     const recap = { ...(custom ? ranges.current : { startDate: '2026-11-01', endDate: '2026-11-27' }), timeZone: 'America/New_York',
       totalMeetings: 4, reviewedMeetings: 2, meetingsWithoutTranscripts: 1, unindexedMeetings: 1, unsampledMeetings: 0 }
     const previous = { ...recap, ...(custom ? ranges.previous : { startDate: '2026-10-01', endDate: '2026-10-31' }),
@@ -298,9 +311,18 @@ describe('a pressed timecode plays the recording', () => {
       expect(rangeInput('Earlier period', 'Start date')).toHaveValue(ranges.previous.startDate)
       expect(rangeInput('Earlier period', 'End date')).toHaveValue(ranges.previous.endDate)
       expect(rangeInput('Later period', 'Start date')).toHaveValue(ranges.current.startDate)
-      expect(rangeInput('Later period', 'End date')).toHaveValue(corrected ? '2026-11-26' : ranges.current.endDate)
+      expect(rangeInput('Later period', 'End date')).toHaveValue(relative ? '2026-11-27' : corrected ? '2026-11-26' : ranges.current.endDate)
       expect(search.askStream).not.toHaveBeenCalled()
-      if (corrected) fireEvent.change(rangeInput('Later period', 'End date'), { target: { value: ranges.current.endDate } })
+      if (relative) {
+        expect(confirmation).toHaveTextContent('completed calendar days and exclude today')
+        vi.setSystemTime(new Date(2026, 10, 29, 0, 1))
+        fireEvent.change(questionField, { target: { value: 'Unsubmitted question across midnight' } })
+        expect(rangeInput('Earlier period', 'Start date')).toHaveValue(ranges.previous.startDate)
+        expect(rangeInput('Later period', 'Start date')).toHaveValue(ranges.current.startDate)
+        expect(rangeInput('Later period', 'End date')).toHaveValue('2026-11-27')
+      }
+      if (corrected || relative) fireEvent.change(rangeInput('Later period', 'End date'), { target: { value: ranges.current.endDate } })
+      expect(search.askStream).not.toHaveBeenCalled()
       fireEvent.click(within(confirmation).getByRole('button', { name: 'Compare periods' }))
     } else if (custom) {
       fireEvent.click(screen.getByRole('button', { name: 'Compare date ranges' }))
@@ -318,17 +340,17 @@ describe('a pressed timecode plays the recording', () => {
     }
     const coverage = await screen.findByRole('region', { name: coverageName })
     const current = comparing ? within(coverage).getByRole('region', { name: custom ? 'Later period' : 'This month to date' }) : coverage
-    expect(current).toHaveTextContent(custom ? /Nov 18\D+25, 2026/ : /Nov 1\D+27, 2026/)
+    expect(current).toHaveTextContent(relative ? /Oct 29\D+Nov 26, 2026/ : custom ? /Nov 18\D+25, 2026/ : /Nov 1\D+27, 2026/)
     expect(coverage).toHaveTextContent('America/New_York')
     expect(current).toHaveTextContent('2 of 4 meetings reviewed · 1 without transcripts · 1 awaiting indexing')
     if (comparing) {
       const lastMonth = within(coverage).getByRole('region', { name: custom ? 'Earlier period' : 'Last month' })
-      expect(lastMonth).toHaveTextContent(custom ? /Oct 4\D+7, 2026/ : /Oct 1\D+31, 2026/)
+      expect(lastMonth).toHaveTextContent(relative ? /Sep 29\D+Oct 28, 2026/ : custom ? /Oct 4\D+7, 2026/ : /Oct 1\D+31, 2026/)
       expect(lastMonth).toHaveTextContent('3 of 5 meetings reviewed · 1 without transcripts · 1 beyond the review limit')
     }
     expect(screen.getByRole('heading', { name: 'Launch', exact: true })).toBeInTheDocument()
     fireEvent.change(screen.getByRole('textbox', { name: 'Question about your meetings' }), { target: { value: 'Unsubmitted draft' } })
-    if (custom) fireEvent.change(rangeInput('Later period', 'End date'), { target: { value: '2026-11-26' } })
+    if (custom) fireEvent.change(rangeInput('Later period', 'End date'), { target: { value: draftEnd } })
 
     for (const [index, source] of sources.entries()) {
       const linkName = new RegExp(`^${source.role} · ${source.title}`, 'i')
@@ -350,7 +372,7 @@ describe('a pressed timecode plays the recording', () => {
         expect(rangeInput('Earlier period', 'Start date')).toHaveValue(ranges.previous.startDate)
         expect(rangeInput('Earlier period', 'End date')).toHaveValue(ranges.previous.endDate)
         expect(rangeInput('Later period', 'Start date')).toHaveValue(ranges.current.startDate)
-        expect(rangeInput('Later period', 'End date')).toHaveValue('2026-11-26')
+        expect(rangeInput('Later period', 'End date')).toHaveValue(draftEnd)
       }
       if (typed) expect(screen.getByRole('form', { name: 'Confirm date ranges' })).toHaveTextContent(question)
     }
@@ -366,7 +388,7 @@ describe('a pressed timecode plays the recording', () => {
       await waitFor(() => expect(search.askStream).toHaveBeenCalledTimes(2))
       expect(search.askStream).toHaveBeenLastCalledWith(expect.objectContaining({
         question,
-        comparisonRanges: { ...ranges, current: { ...ranges.current, endDate: '2026-11-26' } },
+        comparisonRanges: { ...ranges, current: { ...ranges.current, endDate: draftEnd } },
       }), expect.any(Object))
     }
   })

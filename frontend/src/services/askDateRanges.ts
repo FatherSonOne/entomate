@@ -5,6 +5,11 @@ export interface ComparisonRanges {
   current: DateRange
 }
 
+export interface ComparisonProposal {
+  ranges: ComparisonRanges
+  relative?: 'completed-days' | 'invalid-day-count'
+}
+
 export const EMPTY_RANGES: ComparisonRanges = {
   previous: { startDate: '', endDate: '' },
   current: { startDate: '', endDate: '' },
@@ -97,4 +102,47 @@ export function parseTypedComparison(question: string): ComparisonRanges | null 
   return previous.startDate && current.startDate && previous.startDate > current.startDate
     ? { previous: current, current: previous }
     : { previous, current }
+}
+
+const COUNT = String.raw`([+-]?\d+(?:\.\d+)?)(?![\w/]|\.\d)`
+const LAST_DAYS = String.raw`\blast\s+${COUNT}\s+(?:completed\s+)?days?\b`
+const PREVIOUS = String.raw`\bprevious\s+${COUNT}`
+const DAYS = String.raw`\s+(?:completed\s+)?days?\b`
+const COMPARE = String.raw`\s+(?:vs\.?|versus|compared\s+(?:to|with)|against|with|to|and)\s+(?:the\s+)?`
+const LAST_THEN_PREVIOUS = new RegExp(
+  String.raw`${LAST_DAYS}${COMPARE}${PREVIOUS}(?:${DAYS}|(?=\s*(?:[.,:;!?]|$)|\s+(?:for|on|about|in)\b))`, 'i',
+)
+const PREVIOUS_THEN_LAST = new RegExp(String.raw`${PREVIOUS}(?:${DAYS})?${COMPARE}${LAST_DAYS}`, 'i')
+
+function calendarDaysBefore(today: Date, days: number): string {
+  const date = new Date(today)
+  date.setUTCDate(date.getUTCDate() - days)
+  return Number.isFinite(date.getTime()) ? date.toISOString().slice(0, 10) : ''
+}
+
+function relativeComparison(question: string, timeZone: string, asOf: Date): ComparisonProposal | null {
+  const counts = LAST_THEN_PREVIOUS.exec(question) ?? PREVIOUS_THEN_LAST.exec(question)
+  if (!counts) return null
+  const days = Number(counts[1])
+  const invalid: ComparisonProposal = { ranges: EMPTY_RANGES, relative: 'invalid-day-count' }
+  if (!Number.isSafeInteger(days) || days < 1 || days !== Number(counts[2])) return invalid
+
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone, calendar: 'iso8601', year: 'numeric', month: '2-digit', day: '2-digit',
+  })
+  const { year, month, day } = Object.fromEntries(formatter.formatToParts(asOf).map(({ type, value }) => [type, value]))
+  // Once the local date is known, use UTC solely for calendar arithmetic across DST.
+  const today = new Date(`${year?.padStart(4, '0')}-${month}-${day}T00:00:00Z`)
+  const ranges = {
+    previous: { startDate: calendarDaysBefore(today, days * 2), endDate: calendarDaysBefore(today, days + 1) },
+    current: { startDate: calendarDaysBefore(today, days), endDate: calendarDaysBefore(today, 1) },
+  }
+  return validComparisonRanges(ranges) ? { ranges, relative: 'completed-days' } : invalid
+}
+
+export function proposeComparison(question: string, timeZone: string, asOf = new Date()): ComparisonProposal | null {
+  const relative = relativeComparison(question, timeZone, asOf)
+  if (relative) return relative
+  const ranges = parseTypedComparison(question)
+  return ranges ? { ranges } : null
 }

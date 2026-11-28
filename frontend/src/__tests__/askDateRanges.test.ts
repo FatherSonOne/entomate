@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { EMPTY_RANGES, parseTypedComparison, rangeDates, readComparisonRanges, validComparisonRanges } from '../services/askDateRanges'
+import { EMPTY_RANGES, parseTypedComparison, proposeComparison, rangeDates, readComparisonRanges, validComparisonRanges } from '../services/askDateRanges'
 
 const octoberNovember = {
   previous: { startDate: '2026-10-28', endDate: '2026-10-31' },
@@ -67,5 +67,68 @@ describe('typed Ask comparison', () => {
     'Compare the decisions from the design and engineering teams.',
   ])('leaves existing Ask behavior alone for "%s"', (question) => {
     expect(parseTypedComparison(question)).toBeNull()
+  })
+})
+
+describe('relative Ask comparison', () => {
+  const timeZone = 'America/New_York'
+  const asOf = new Date('2026-11-28T04:59:00Z')
+  const periods = (earlierStart: string, earlierEnd: string, laterStart: string, laterEnd: string) => ({
+    previous: { startDate: earlierStart, endDate: earlierEnd },
+    current: { startDate: laterStart, endDate: laterEnd },
+  })
+
+  test.each([
+    'The last 30 days vs. the previous 30',
+    'Compare the last 30 completed days with the previous 30 days.',
+    'What changed between the previous 30 days and the last 30 days?',
+    'Compare the last 30 days vs the previous 30 for the rollout',
+  ])('proposes two adjacent periods for "%s"', (question) => {
+    expect(proposeComparison(question, timeZone, asOf)).toEqual({
+      ranges: periods('2026-09-28', '2026-10-27', '2026-10-28', '2026-11-26'),
+      relative: 'completed-days',
+    })
+  })
+
+  test('uses the local date and advances the suggestion at local midnight', () => {
+    const question = 'Last 30 days vs. previous 30.'
+    const nextMinute = new Date('2026-11-28T05:00:00Z')
+    const expected = periods('2026-09-29', '2026-10-28', '2026-10-29', '2026-11-27')
+    expect(proposeComparison(question, 'UTC', asOf)?.ranges).toEqual(expected)
+    expect(proposeComparison(question, timeZone, nextMinute)?.ranges).toEqual(expected)
+    expect(proposeComparison(question, timeZone, asOf)?.ranges).not.toEqual(expected)
+  })
+
+  test.each([
+    ['2026-03-10T04:30:00Z', periods('2026-03-06', '2026-03-07', '2026-03-08', '2026-03-09')],
+    ['2026-11-03T05:30:00Z', periods('2026-10-30', '2026-10-31', '2026-11-01', '2026-11-02')],
+    ['2024-03-02T05:10:00Z', periods('2024-02-27', '2024-02-28', '2024-02-29', '2024-03-01')],
+    ['2027-01-02T05:01:00Z', periods('2026-12-29', '2026-12-30', '2026-12-31', '2027-01-01')],
+  ])('subtracts calendar days across boundaries at %s', (instant, expected) => {
+    expect(proposeComparison('Last 2 days vs previous 2 days', timeZone, new Date(instant))?.ranges).toEqual(expected)
+  })
+
+  test('supports single-day periods', () => {
+    expect(proposeComparison('Last 1 day vs previous 1', timeZone, asOf)?.ranges)
+      .toEqual(periods('2026-11-25', '2026-11-25', '2026-11-26', '2026-11-26'))
+  })
+
+  test.each(['0', '-1', '2.5', '9007199254740992', '1000000'])('asks for corrections for an invalid count of %s', (count) => {
+    expect(proposeComparison('Compare last ' + count + ' days vs previous ' + count, timeZone, asOf))
+      .toEqual({ ranges: EMPTY_RANGES, relative: 'invalid-day-count' })
+  })
+
+  test('asks for corrections when the counts differ', () => {
+    expect(proposeComparison('Compare last 30 days vs previous 15', timeZone, asOf))
+      .toEqual({ ranges: EMPTY_RANGES, relative: 'invalid-day-count' })
+  })
+
+  test.each([
+    'What happened in the last 30 days?',
+    'Compare this month to date with all of last month',
+    'Compare last 2 weeks with the previous 2 weeks',
+    'Compare what happened in the last 30 days vs the previous 30 tasks.',
+  ])('keeps ordinary Ask behavior for "%s"', (question) => {
+    expect(proposeComparison(question, timeZone, asOf)).toBeNull()
   })
 })

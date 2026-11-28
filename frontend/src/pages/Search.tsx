@@ -19,7 +19,7 @@ import { useOrgSafe } from '../contexts/OrgContext'
 import { useNotes, useRecentSearches, useSearch } from '../hooks/useSearch'
 import type { UseNotesResult } from '../hooks/useSearch'
 import { searchApi } from '../services/api'
-import { EMPTY_RANGES, parseTypedComparison, rangeDates, readComparisonRanges, validComparisonRanges } from '../services/askDateRanges'
+import { EMPTY_RANGES, proposeComparison, rangeDates, readComparisonRanges, validComparisonRanges } from '../services/askDateRanges'
 import type { ComparisonRanges } from '../services/askDateRanges'
 import {
   GROUPS, groupCount, isFilter, matchCommands, metaLine, readUrlState, resultHref, resultMomentHref, searchEverything,
@@ -65,10 +65,10 @@ function SearchPage({ owner, workspace }: { owner: string | null; workspace?: { 
   const url = readUrlState(params)
   const comparisonParam = params.get('compare')
   const comparisonRanges = useMemo(() => readComparisonRanges(comparisonParam), [comparisonParam])
-  const proposedRanges = useMemo(() => url.ask && comparisonParam === null ? parseTypedComparison(url.q) : null,
-    [url.ask, url.q, comparisonParam])
+  const [timeZone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC')
+  const proposedComparison = useMemo(() => url.ask && comparisonParam === null ? proposeComparison(url.q, timeZone) : null,
+    [url.ask, url.q, comparisonParam, timeZone])
   const comparisonQuestion = url.q !== COMPARISON_QUESTION ? url.q || undefined : undefined
-  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
   const [restored, setRestored] = useState(() => {
     const visit = readSearchVisit(location.key, owner, location.search)
     const returnKey = location.state?.searchReturnKey
@@ -115,8 +115,8 @@ function SearchPage({ owner, workspace }: { owner: string | null; workspace?: { 
 
   // A palette shortcut can enter Ask with a query already in the URL.
   useEffect(() => {
-    if (proposedRanges) setRangeDraft({ ranges: proposedRanges, question: url.q.trim() })
-  }, [proposedRanges, url.q])
+    if (proposedComparison) setRangeDraft({ ...proposedComparison, question: url.q.trim() })
+  }, [proposedComparison, url.q])
 
   useEffect(() => {
     if (!restored) return
@@ -163,9 +163,9 @@ function SearchPage({ owner, workspace }: { owner: string | null; workspace?: { 
     if (t.length < MIN_QUERY) return
     if (!isAsk) { logQuery(t); return }
     if (t.length > MAX_QUESTION) return
-    const ranges = parseTypedComparison(t)
-    if (ranges) {
-      setRangeDraft({ ranges, question: t })
+    const proposal = proposeComparison(t, timeZone)
+    if (proposal) {
+      setRangeDraft({ ...proposal, question: t })
       requestAnimationFrame(() => confirmationRef.current?.focus())
       return
     }
@@ -255,11 +255,12 @@ function SearchPage({ owner, workspace }: { owner: string | null; workspace?: { 
         <div className="bs-srch-compare">
           <Key size="sm" aria-expanded={rangeDraft !== null} aria-controls={rangeDraft ? 'ask-date-ranges' : undefined}
             onClick={() => setRangeDraft(rangeDraft ? null
-              : { ranges: comparisonRanges ?? proposedRanges ?? EMPTY_RANGES, question: comparisonRanges || proposedRanges ? comparisonQuestion : undefined })}>
+              : { ...(proposedComparison ?? { ranges: comparisonRanges ?? EMPTY_RANGES }),
+                question: comparisonRanges || proposedComparison ? comparisonQuestion : undefined })}>
             Compare date ranges
           </Key>
-          {rangeDraft && <ComparisonForm ranges={rangeDraft.ranges} timeZone={timeZone} workspace={workspace}
-            confirmationRef={confirmationRef} typed={!!rangeDraft.question}
+          {rangeDraft && <ComparisonForm draft={rangeDraft} timeZone={timeZone} workspace={workspace}
+            confirmationRef={confirmationRef}
             proposedQuestion={rangeDraft.question !== draft.trim() ? rangeDraft.question : undefined}
             onChange={(ranges) => setRangeDraft({ ...rangeDraft, ranges })} onSubmit={onCompare} />}
         </div>
@@ -275,7 +276,7 @@ function SearchPage({ owner, workspace }: { owner: string | null; workspace?: { 
       </div>}
 
       <div className="bs-srch-main">
-        {isAsk ? (url.ask && !proposedRanges && q.length >= MIN_QUERY && (comparisonParam === null || (comparisonRanges && workspace)) ? (
+        {isAsk ? (url.ask && !proposedComparison && q.length >= MIN_QUERY && (comparisonParam === null || (comparisonRanges && workspace)) ? (
           <AskAnswer key={JSON.stringify([q, comparisonParam])} question={q} workspaceId={workspace?.id} workspaceName={workspace?.name}
             comparisonRanges={comparisonRanges} timeZone={timeZone} showQuestion={q !== COMPARISON_QUESTION && draft.trim() !== q} initial={restoredAnswer} onClip={clip} clipped={notes.clipped}
             linkState={linkState} onLeave={saveReturn} />
@@ -462,26 +463,28 @@ function agentWord(field: string): string {
 
 // ── Ask Entomate ──
 
-function ComparisonForm({ ranges, timeZone, workspace, confirmationRef, typed, proposedQuestion, onChange, onSubmit }: {
-  ranges: ComparisonRanges
+function ComparisonForm({ draft, timeZone, workspace, confirmationRef, proposedQuestion, onChange, onSubmit }: {
+  draft: ComparisonDraft
   timeZone: string
   workspace?: { name?: string } | null
   confirmationRef: React.Ref<HTMLHeadingElement>
-  typed: boolean
   proposedQuestion?: string
   onChange: (ranges: ComparisonRanges) => void
   onSubmit: (e: React.FormEvent) => void
 }): React.ReactElement {
+  const { ranges, relative, question } = draft
   const dates = rangeDates(ranges)
   const valid = validComparisonRanges(ranges)
   const complete = dates.every(Boolean)
   return (
     <form className="bs-srch-compare-form" id="ask-date-ranges" onSubmit={onSubmit}
-      aria-labelledby={typed ? 'ask-confirm-date-ranges' : undefined}>
-      {typed && <h2 className="bs-lbl" id="ask-confirm-date-ranges" tabIndex={-1} ref={confirmationRef}>Confirm date ranges</h2>}
+      aria-labelledby={question ? 'ask-confirm-date-ranges' : undefined}>
+      {question && <h2 className="bs-lbl" id="ask-confirm-date-ranges" tabIndex={-1} ref={confirmationRef}>Confirm date ranges</h2>}
       {proposedQuestion && <p>{proposedQuestion}</p>}
       <p>Both start and end dates are included · {timeZone} · {workspace ? workspace.name || 'Current workspace' : 'Choose a workspace'}</p>
-      {typed && !complete && <p>Fill in the missing dates or correct them below. Include a year for each range when typing dates.</p>}
+      {relative === 'completed-days' && <p>The suggested ranges cover completed calendar days and exclude today.</p>}
+      {relative === 'invalid-day-count' && !complete && <p>Use the same positive whole number of days for both periods, or enter dates below.</p>}
+      {question && !relative && !complete && <p>Fill in the missing dates or correct them below. Include a year for each range when typing dates.</p>}
       <div className="bs-srch-compare-periods">
         {(['previous', 'current'] as const).map((period) => (
           <fieldset key={period}>
