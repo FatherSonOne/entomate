@@ -83,6 +83,26 @@ afterAll(() => {
   global.fetch = priorFetch;
 });
 
+test('Daily room recording storage sets the required API access flag', () => {
+  const originalEnv = jest.replaceProperty(process, 'env', {
+    ...process.env,
+    DAILY_ROOM_RECORDING_BUCKET: 'entomate-private-recordings',
+    DAILY_ROOM_RECORDING_REGION: 'us-east-2',
+    DAILY_ROOM_RECORDING_ROLE_ARN: 'arn:aws:iam::111122223333:role/DailyRecording',
+  });
+  try {
+    const { bucket } = require('../services/dailyRoomRecording');
+    expect(bucket()).toEqual({
+      bucket_name: 'entomate-private-recordings',
+      bucket_region: 'us-east-2',
+      assume_role_arn: 'arn:aws:iam::111122223333:role/DailyRecording',
+      allow_api_access: true,
+    });
+  } finally {
+    originalEnv.restore();
+  }
+});
+
 test('a guest needs the invite secret before learning the room title and must consent before receiving a non-owner token', async () => {
   await request(app).post(`/${roomId}/guest`).send({ inviteKey: visitor }).expect(404);
   const lobby = await request(app).post(`/${roomId}/guest`).send({ inviteKey }).expect(200);
