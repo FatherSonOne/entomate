@@ -538,7 +538,7 @@ function ComparisonForm({ draft, timeZone, workspace, confirmationRef, proposedQ
       {relative === 'invalid-week-count' && !complete && <p>Use the same positive whole number of weeks for both periods, or enter dates below.</p>}
       {relative === 'invalid-month-count' && !complete && <p>Use the same positive whole number of months for both periods, or enter dates below.</p>}
       {question && !relative && !eventBased && !complete && <p>Fill in the missing dates or correct them below. Include a year for each range when typing dates.</p>}
-      {eventWindow === 'invalid' && <p>Use a positive whole number of days, weeks, or months for each period, then submit your question again.</p>}
+      {eventWindow === 'invalid' && <p>Enter each count in digits using positive whole numbers, such as 2 weeks or 1 month, then submit your question again.</p>}
       {eventBased && eventWindow !== 'invalid' && (
         <div className="bs-srch-compare-periods">
           <MilestonePicker key={milestoneName ?? ''} workspaceId={workspace?.id} timeZone={timeZone}

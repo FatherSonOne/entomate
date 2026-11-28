@@ -29,8 +29,12 @@ test.each([
   })
 })
 
-test('resolves two weeks before a milestone and one calendar month after', () => {
-  const proposal = proposeComparison('2 weeks before Security Review vs. 1 month after', 'America/New_York')
+test.each([
+  '2 weeks before Security Review vs. 1 month after',
+  'two weeks before Security Review vs. one month after',
+  'two weeks before Security Review vs. 1 month after',
+])('resolves the mixed windows in %s', (question) => {
+  const proposal = proposeComparison(question, 'America/New_York')
   expect(proposal).toEqual({
     ranges: EMPTY_RANGES, eventBased: true, milestoneName: 'Security Review',
     eventWindow: { before: { count: 2, unit: 'week' }, after: { count: 1, unit: 'month' } },
@@ -41,11 +45,21 @@ test('resolves two weeks before a milestone and one calendar month after', () =>
   })
 })
 
+test('parses hyphenated and space-separated counts before applying the unit', () => {
+  const proposal = proposeComparison('twenty-one days before Security Review vs. NINETY NINE days after', 'America/New_York')
+  expect(proposal?.eventWindow).toEqual({ before: { count: 21, unit: 'day' }, after: { count: 99, unit: 'day' } })
+})
+
+test('uses the entire spelled-out count when it ends in a legacy two-week window', () => {
+  const proposal = proposeComparison('twenty two weeks before Security Review vs. two weeks after', 'America/New_York')
+  expect(proposal?.eventWindow).toEqual({ before: { count: 22, unit: 'week' }, after: { count: 2, unit: 'week' } })
+})
+
 test.each([
   ['2026-01-31', '2026-02-28'],
   ['2024-01-31', '2024-02-29'],
 ])('uses the last day of February for a calendar month after %s', (milestoneDate, endDate) => {
-  const proposal = proposeComparison('1 day before “Security Review v2.1” vs. 1 MONTH after', 'America/New_York')
+  const proposal = proposeComparison('one day before “Security Review v2.1” vs. one MONTH after', 'America/New_York')
   expect(proposal).toMatchObject({ milestoneName: 'Security Review v2.1' })
   expect(eventComparisonRanges(milestoneDate, proposal?.eventWindow).current)
     .toEqual({ startDate: milestoneDate.slice(0, 4) + '-02-01', endDate })
@@ -64,10 +78,19 @@ test.each(['0 days before Security Review vs. 7 days after',
   '30 days before Security Review vs. 1.5 days after',
   '-2 weeks before Security Review vs. 2 weeks after',
   '2 weeks before Security Review vs. 1.5 months after',
+  'minus two weeks before Security Review vs. two weeks after',
+  'one hundred and two weeks before Security Review vs. two weeks after',
+  'two weeks before Security Review vs. one hundred months after',
+  'two weeks before Security Review vs. half a month after',
+  'two weeks before Security Review vs. zero months after',
 ])('requires a correction for %s', (question) => {
   const proposal = proposeComparison(question, 'America/New_York')
   expect(proposal?.eventWindow).toBe('invalid')
   expect(eventComparisonRanges('2026-07-15', proposal?.eventWindow)).toEqual(EMPTY_RANGES)
+})
+
+test('leaves an ordinary milestone question available to Ask', () => {
+  expect(proposeComparison('What did we discuss two weeks before Security Review?', 'America/New_York')).toBeNull()
 })
 
 test('resolves single-day windows at a year boundary and rejects dates beyond the supported calendar', () => {

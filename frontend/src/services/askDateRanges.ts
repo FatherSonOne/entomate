@@ -118,7 +118,8 @@ export function parseTypedComparison(question: string): ComparisonRanges | null 
     : { previous, current }
 }
 
-const COUNT = String.raw`([+-]?\d+(?:\.\d+)?)(?![\w/]|\.\d)`
+const NUMERIC_COUNT = String.raw`[+-]?\d+(?:\.\d+)?(?![\w/]|\.\d)`
+const COUNT = `(${NUMERIC_COUNT})`
 const COMPARE = String.raw`\s+(?:vs\.?|versus|compared\s+(?:to|with)|against|with|to|and)\s+(?:the\s+)?`
 const WINDOW_START = String.raw`(?<![\w./+-])`
 const LAUNCH_COMPARISON = new RegExp(
@@ -133,7 +134,15 @@ const SURROUND_MILESTONE = new RegExp(
 const COMPARE_AROUND_MILESTONE = new RegExp(
   String.raw`${WINDOW_START}(?:two|2)\s+weeks\s+before\s+${MILESTONE_TITLE}${COMPARE}(?:two|2)\s+weeks\s+after\b${MILESTONE_END}`, 'i',
 )
-const WINDOW_LENGTH = String.raw`${COUNT}\s+(day|week|month)s?`
+const SMALL_COUNTS = [
+  'zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine',
+  'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen',
+]
+const TENS = ['twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety']
+// Capture longer number phrases in full so "one hundred twenty" cannot become "twenty".
+const COUNT_WORD = `(?:${[...SMALL_COUNTS, ...TENS].join('|')}|hundred|thousand|million|billion|trillion|minus|negative|point|half|quarter|a)`
+const WORD_COUNT = String.raw`${COUNT_WORD}(?:[\s-]+(?:${COUNT_WORD}|and))*`
+const WINDOW_LENGTH = String.raw`(${NUMERIC_COUNT}|${WORD_COUNT})\s+(day|week|month)s?`
 const CUSTOM_MILESTONE_WINDOW = new RegExp(
   String.raw`${WINDOW_START}${WINDOW_LENGTH}\s+before\s+${MILESTONE_TITLE}${COMPARE}${WINDOW_LENGTH}\s+after\b${MILESTONE_END}`, 'i',
 )
@@ -141,19 +150,37 @@ const CUSTOM_MILESTONE_WINDOW = new RegExp(
 const validWindowCount = (value: number) => Number.isSafeInteger(value) && value > 0
 const cleanMilestoneTitle = (title?: string) => title?.trim().slice(0, 160) || undefined
 
+function parseWindowCount(value: string): number {
+  const numeric = Number(value)
+  if (!Number.isNaN(numeric)) return numeric
+
+  const words = value.toLowerCase().split(/[\s-]+/)
+  const [first = '', second = ''] = words
+  const small = SMALL_COUNTS.indexOf(first)
+  if (small >= 0 && words.length === 1) return small
+
+  const tens = TENS.indexOf(first)
+  if (tens < 0) return NaN
+  const base = (tens + 2) * 10
+  if (words.length === 1) return base
+  const ones = SMALL_COUNTS.indexOf(second)
+  return words.length === 2 && ones > 0 && ones < 10 ? base + ones : NaN
+}
+
 export function eventComparisonProposal(question: string): ComparisonProposal | null {
-  if (LAUNCH_COMPARISON.test(question)) return { ranges: EMPTY_RANGES, eventBased: true }
+  const custom = CUSTOM_MILESTONE_WINDOW.exec(question)
+  const launch = LAUNCH_COMPARISON.exec(question)
+  if (launch && (!custom || launch.index === custom.index)) return { ranges: EMPTY_RANGES, eventBased: true }
   const match = SURROUND_MILESTONE.exec(question) ?? COMPARE_AROUND_MILESTONE.exec(question)
   const legacyName = cleanMilestoneTitle(match?.[1] ?? match?.[2] ?? match?.[3])
-  if (legacyName) return { ranges: EMPTY_RANGES, eventBased: true, milestoneName: legacyName }
+  if (legacyName && (!custom || match?.index === custom.index)) return { ranges: EMPTY_RANGES, eventBased: true, milestoneName: legacyName }
 
-  const custom = CUSTOM_MILESTONE_WINDOW.exec(question)
   if (!custom) return null
   const [, beforeCount, beforeUnit, quoted, curved, plain, afterCount, afterUnit] = custom
   const milestoneName = cleanMilestoneTitle(quoted ?? curved ?? plain)
-  if (!milestoneName || !beforeUnit || !afterUnit) return null
-  const before = { count: Number(beforeCount), unit: beforeUnit.toLowerCase() as CalendarUnit }
-  const after = { count: Number(afterCount), unit: afterUnit.toLowerCase() as CalendarUnit }
+  if (!milestoneName || !beforeCount || !beforeUnit || !afterCount || !afterUnit) return null
+  const before = { count: parseWindowCount(beforeCount), unit: beforeUnit.toLowerCase() as CalendarUnit }
+  const after = { count: parseWindowCount(afterCount), unit: afterUnit.toLowerCase() as CalendarUnit }
   return { ranges: EMPTY_RANGES, eventBased: true, milestoneName,
     eventWindow: validWindowCount(before.count) && validWindowCount(after.count) ? { before, after } : 'invalid' }
 }
