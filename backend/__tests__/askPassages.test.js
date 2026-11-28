@@ -308,7 +308,8 @@ const dateComparison = {
 test.each([
   { label: 'Month-over-month Ask', custom: false },
   { label: 'Custom date comparison', custom: true },
-])('$label keeps coverage for both periods and validates each quote and period', async ({ custom }) => {
+  { label: 'Launch comparison', custom: true, comparisonEvent: { name: 'Beta · Launch', date: '2026-11-12' } },
+])('$label keeps coverage for both periods and validates each quote and period', async ({ custom, comparisonEvent }) => {
   const comparison = custom ? dateComparison : monthComparison;
   const question = custom
     ? 'Compare October 1–24, 2026 with November 19–21, 2026. What changed about launch?'
@@ -337,6 +338,7 @@ test.each([
     question,
     workspaceId: monthlyWorkspace, timeZone: 'America/New_York',
     ...(custom ? { comparisonRanges } : {}),
+    ...(comparisonEvent ? { comparisonEvent } : {}),
   });
   expect(res.status).toBe(200);
   expect(meterAiForOrg).toHaveBeenCalledWith(monthlyWorkspace, expect.anything(), expect.any(Function));
@@ -366,6 +368,17 @@ test.each([
     expect(prompt).toContain('Use the confirmed dates in the comparison coverage as the scope');
     expect(promptData).toMatchObject({ question, comparison: { current: { endDate: '2026-11-20' } } });
   }
+  if (comparisonEvent) expect(promptData.comparisonEvent).toEqual(comparisonEvent);
+});
+
+test('rejects an event without confirmed ranges or a valid event date', async () => {
+  const question = 'The two weeks before launch vs. the two weeks after';
+  await request(app).post('/search/ask/stream').send({ question, comparisonEvent: { name: 'Launch', date: '2026-11-12' } }).expect(400);
+  await request(app).post('/search/ask/stream').send({
+    question, comparisonRanges, comparisonEvent: { name: 'Launch', date: '2026-02-30' },
+  }).expect(400);
+  expect(meterAiForOrg).not.toHaveBeenCalled();
+  expect(supabase.rpc).not.toHaveBeenCalled();
 });
 
 test.each([

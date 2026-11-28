@@ -193,6 +193,21 @@ describe('tasks are limited to the caller\'s org', () => {
 });
 
 
+test('launch milestone discovery only returns dated matches from the requested workspace', async () => {
+  const milestone = { id: TASK_A, title: 'Launch', dueDate: '2026-11-12', ownerId: null, completedAt: null };
+  mockDb.projects[0].settings = { progress: { milestones: [milestone, { ...milestone, id: TASK_B, title: 'Planning' }] } };
+  mockDb.projects[1].settings = { progress: { milestones: [milestone] } };
+  const route = request(app('../routes/projects', '/api/projects'));
+  const path = '/api/projects/launch-milestones';
+  await route.get(path).query({ workspaceId: ORG_B }).expect(403);
+  mockDb.org_members.push({ user_id: USER_A, org_id: ORG_B });
+  const res = await route.get(path).query({ workspaceId: ORG_A }).expect(200);
+  expect(res.body.milestones).toEqual([{
+    id: milestone.id, title: 'Launch', dueDate: '2026-11-12', completedAt: null,
+    projectId: PROJ_A, projectName: 'mine',
+  }]);
+});
+
 describe('project handoff to Pulse', () => {
   const root = '/api/projects/' + PROJ_A + '/handoff';
   const workspaceId = '0ca42b5b-1c03-4270-9d88-14cc4158b72d';

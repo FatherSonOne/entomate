@@ -8,7 +8,7 @@ const { supabase } = require('../config/supabase');
 const ai = require('../config/ai');
 const embeddingService = require('../services/embeddingService');
 const askService = require('../services/askService');
-const { monthlyRecapMode, validComparisonRanges } = require('../services/askMonthlyRecap');
+const { monthlyRecapMode, validCalendarDate, validComparisonRanges } = require('../services/askMonthlyRecap');
 const { searchCache, suggestionCache, withCache } = require('../utils/cache');
 const { authenticate } = require('../middleware/auth');
 const log = require('../utils/log');
@@ -290,7 +290,11 @@ function validAskMeetingIds(ids) {
 }
 
 function meterAsk(req, res, next) {
-  const { question, workspaceId, timeZone = 'UTC', comparisonRanges } = req.body || {};
+  const { question, workspaceId, timeZone = 'UTC', comparisonRanges, comparisonEvent } = req.body || {};
+  if (comparisonEvent !== undefined && (comparisonRanges === undefined || !validCalendarDate(comparisonEvent?.date)
+    || typeof comparisonEvent?.name !== 'string' || !comparisonEvent.name.trim() || comparisonEvent.name.length > 360)) {
+    return res.status(400).json({ error: 'Choose a valid event name and date for the comparison' });
+  }
   if (comparisonRanges === undefined && !monthlyRecapMode(question)) return meterAi(req, res, next);
   if (comparisonRanges !== undefined && !validComparisonRanges(comparisonRanges)) {
     return res.status(400).json({ error: 'Choose two valid, non-overlapping ranges with the earlier period first' });
@@ -304,7 +308,10 @@ function meterAsk(req, res, next) {
     // PostgreSQL and browsers accept IANA time zones. Reject raw offsets.
     if (!/^[a-z][a-z0-9_+\-/]*$/i.test(timeZone)) throw new Error('Invalid time zone');
     const canonicalTimeZone = new Intl.DateTimeFormat('en', { timeZone }).resolvedOptions().timeZone;
-    req.monthlyRecapScope = { orgId, timeZone: canonicalTimeZone, comparisonRanges };
+    req.monthlyRecapScope = {
+      orgId, timeZone: canonicalTimeZone, comparisonRanges,
+      ...(comparisonEvent ? { comparisonEvent: { name: comparisonEvent.name.trim(), date: comparisonEvent.date } } : {}),
+    };
   } catch {
     return res.status(400).json({ error: 'Choose a valid time zone for this question' });
   }

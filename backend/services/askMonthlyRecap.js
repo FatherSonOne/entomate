@@ -79,4 +79,4 @@ const COMPARISON_INSTRUCTIONS = [
   'For kind "recorded", use role "source" and explicitly name the period whose evidence supports the statement. If evidence exists on only one side, report what was recorded and do not infer a change or absence in the other period.',
 ];
 
-module.exports = { monthlyRecapMode, validComparisonRanges, loadMonthlyRecap, MONTHLY_INSTRUCTIONS, COMPARISON_INSTRUCTIONS };
+module.exports = { monthlyRecapMode, validCalendarDate, validComparisonRanges, loadMonthlyRecap, MONTHLY_INSTRUCTIONS, COMPARISON_INSTRUCTIONS };

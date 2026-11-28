@@ -5,10 +5,11 @@ import { vi, describe, test, expect, beforeEach, afterEach } from 'vitest'
 
 const api = vi.hoisted(() => ({ get: vi.fn(), regenerateSummary: vi.fn(async () => ({})), carryForward: vi.fn(() => Promise.resolve(null)) }))
 const search = vi.hoisted(() => ({ askStream: vi.fn(), getHistory: async () => ({ history: [] }) }))
+const listLaunchMilestones = vi.hoisted(() => vi.fn())
 const player = vi.hoisted(() => ({ ready: false, playFrom: vi.fn(), cueAt: vi.fn() }))
 const reports = vi.hoisted(() => ({ downloadMeetingDocument: vi.fn(async () => {}) }))
 const recordings = vi.hoisted(() => ({ rebuildTranscript: vi.fn() }))
-vi.mock('../services/api', () => ({ default: { get: async () => ({ notes: [] }) }, meetingsApi: api, recordingsApi: recordings, integrationsApi: {}, calendarApi: {}, reportsApi: reports, searchApi: search }))
+vi.mock('../services/api', () => ({ default: { get: async () => ({ notes: [] }) }, meetingsApi: api, recordingsApi: recordings, integrationsApi: {}, calendarApi: {}, reportsApi: reports, searchApi: search, projectsApi: { listLaunchMilestones } }))
 vi.mock('../contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 'playback-user' } }) }))
 vi.mock('../contexts/OrgContext', () => ({ useOrgSafe: () => ({ org: { id: 'playback-org' } }) }))
 vi.mock('../components/vc/ToastProvider', () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn() }) }))
@@ -247,6 +248,8 @@ describe('a pressed timecode plays the recording', () => {
       comparing: true, custom: true, typed: true, relative: 'weeks', coverageName: 'Date range coverage' },
     { label: 'relative months', question: 'Compare the last 3 months vs. the previous 3. What changed about launch?',
       comparing: true, custom: true, typed: true, relative: 'months', coverageName: 'Date range coverage' },
+    { label: 'launch milestone comparison', question: 'The two weeks before launch vs. the two weeks after. What changed?',
+      comparing: true, custom: true, typed: true, relative: 'launch', coverageName: 'Date range coverage' },
   ])('$label restores coverage and the exact Before and After links without a second Ask request', async ({ question, comparing, custom, typed, corrected, relative, coverageName }) => {
     const relativeCase = {
       days: {
@@ -274,11 +277,27 @@ describe('a pressed timecode plays the recording', () => {
         previousLabel: /May 1\D+Jul 31, 2026/, currentLabel: /Aug 1\D+Oct 30, 2026/,
         message: 'completed calendar months and exclude the current month',
       },
+      launch: {
+        beforeMidnight: [10, 24], afterMidnight: [10, 25],
+        beforeMeeting: '2026-11-06T18:00:00Z',
+        previous: { startDate: '2026-10-29', endDate: '2026-11-11' },
+        current: { startDate: '2026-11-13', endDate: '2026-11-25' },
+        previewEnd: '2026-11-26', draftEnd: '2026-11-24',
+        previousLabel: /Oct 29\D+Nov 11, 2026/, currentLabel: /Nov 13\D+25, 2026/,
+        message: '14 calendar days on each side and exclude launch day',
+      },
     }[relative]
+    const launch = relative === 'launch'
     if (relativeCase) {
       vi.useFakeTimers({ toFake: ['Date'] })
       vi.setSystemTime(new Date(2026, ...relativeCase.beforeMidnight, 23, 59))
     }
+    if (launch) listLaunchMilestones.mockResolvedValue({ milestones: [
+      { id: 'm-alpha', projectId: 'p-alpha', projectName: 'Alpha', title: 'Launch', dueDate: '2026-11-06', completedAt: null },
+      { id: 'm-beta', projectId: 'p-beta', projectName: 'Beta', title: 'Launch', dueDate: '2026-11-11',
+        completedAt: new Date(2026, 10, 12, 12).toISOString() },
+    ] })
+    const chosenLaunch = 'p-beta:m-beta:completed|2026-11-12'
     const beforeQuote = 'We agreed to launch on Monday.'
     const afterQuote = 'The launch is now scheduled for Friday.'
     const laterRevision = 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb'
@@ -338,6 +357,16 @@ describe('a pressed timecode plays the recording', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Ask Entomate' }))
       const confirmation = screen.getByRole('form', { name: 'Confirm date ranges' })
       await waitFor(() => expect(within(confirmation).getByRole('heading')).toHaveFocus())
+      if (launch) {
+        expect(within(confirmation).getByRole('button', { name: 'Compare periods' })).toBeDisabled()
+        expect(screen.queryByRole('group', { name: 'Earlier period' })).not.toBeInTheDocument()
+        expect(await screen.findByRole('option', { name: /Alpha · Launch · Scheduled date · 2026-11-06/ })).toBeVisible()
+        expect(screen.getByRole('option', { name: /Beta · Launch · Scheduled date · 2026-11-11/ })).toBeVisible()
+        expect(screen.getByRole('option', { name: /Beta · Launch · Marked complete · 2026-11-12/ })).toBeVisible()
+        expect(search.askStream).not.toHaveBeenCalled()
+        expect(listLaunchMilestones).toHaveBeenCalledWith('playback-org', expect.any(AbortSignal))
+        fireEvent.change(screen.getByLabelText('Launch milestone and date'), { target: { value: chosenLaunch } })
+      }
       expect(confirmation).toHaveTextContent(Intl.DateTimeFormat().resolvedOptions().timeZone)
       expect(rangeInput('Earlier period', 'Start date')).toHaveValue(ranges.previous.startDate)
       expect(rangeInput('Earlier period', 'End date')).toHaveValue(ranges.previous.endDate)
@@ -374,6 +403,10 @@ describe('a pressed timecode plays the recording', () => {
     expect(current).toHaveTextContent(relativeCase?.currentLabel ?? (custom ? /Nov 18\D+25, 2026/ : /Nov 1\D+27, 2026/))
     expect(coverage).toHaveTextContent('America/New_York')
     expect(current).toHaveTextContent('2 of 4 meetings reviewed · 1 without transcripts · 1 awaiting indexing')
+    if (launch) {
+      expect(coverage).toHaveTextContent('Beta · Launch · 2026-11-12 · Marked complete')
+      expect(current).toHaveTextContent('This period is incomplete')
+    }
     if (comparing) {
       const lastMonth = within(coverage).getByRole('region', { name: custom ? 'Earlier period' : 'Last month' })
       expect(lastMonth).toHaveTextContent(relativeCase?.previousLabel ?? (custom ? /Oct 4\D+7, 2026/ : /Oct 1\D+31, 2026/))
@@ -406,6 +439,7 @@ describe('a pressed timecode plays the recording', () => {
         expect(rangeInput('Later period', 'End date')).toHaveValue(draftEnd)
       }
       if (typed) expect(screen.getByRole('form', { name: 'Confirm date ranges' })).toHaveTextContent(question)
+      if (launch) expect(screen.getByLabelText('Launch milestone and date')).toHaveValue(chosenLaunch)
     }
     expect(player.cueAt).toHaveBeenCalledWith(22_000)
     expect(player.playFrom).not.toHaveBeenCalled()
@@ -413,6 +447,7 @@ describe('a pressed timecode plays the recording', () => {
     expect(search.askStream).toHaveBeenCalledWith({
       question, workspaceId: 'playback-org', timeZone: expect.any(String),
       ...(custom ? { comparisonRanges: ranges } : {}),
+      ...(launch ? { comparisonEvent: { name: 'Beta · Launch', date: '2026-11-12' } } : {}),
     }, expect.any(Object))
     if (custom) {
       fireEvent.click(screen.getByRole('button', { name: 'Compare periods' }))

@@ -10,6 +10,14 @@ type RelativeUnit = 'day' | 'week' | 'month'
 export interface ComparisonProposal {
   ranges: ComparisonRanges
   relative?: `completed-${RelativeUnit}s` | `invalid-${RelativeUnit}-count`
+  eventBased?: true
+}
+
+export interface ComparisonEvent {
+  name: string
+  date: string
+  source: 'manual' | 'scheduled' | 'completed'
+  key?: string
 }
 
 export const EMPTY_RANGES: ComparisonRanges = {
@@ -20,7 +28,7 @@ export const EMPTY_RANGES: ComparisonRanges = {
 export const rangeDates = ({ previous, current }: ComparisonRanges) =>
   [previous.startDate, previous.endDate, current.startDate, current.endDate]
 
-function isCalendarDate(value: string): boolean {
+export function isCalendarDate(value: string): boolean {
   if (!/^(?!0000)\d{4}-\d{2}-\d{2}$/.test(value)) return false
   const date = new Date(value)
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value
@@ -108,6 +116,11 @@ export function parseTypedComparison(question: string): ComparisonRanges | null 
 
 const COUNT = String.raw`([+-]?\d+(?:\.\d+)?)(?![\w/]|\.\d)`
 const COMPARE = String.raw`\s+(?:vs\.?|versus|compared\s+(?:to|with)|against|with|to|and)\s+(?:the\s+)?`
+const LAUNCH_COMPARISON = new RegExp(
+  String.raw`\b(?:two|2)\s+weeks\s+before\s+(?:the\s+)?launch${COMPARE}(?:two|2)\s+weeks\s+after\b`, 'i',
+)
+
+export const isEventComparison = (question: string) => LAUNCH_COMPARISON.test(question)
 const ELIDED_UNIT = String.raw`(?=\s*(?:[.,:;!?]|$)|\s+(?:for|on|about|in)\b)`
 const LAST_WEEK = String.raw`\blast\s+(?:completed\s+)?week\b`
 const PREVIOUS_WEEK = String.raw`\bprevious\s+(?:completed\s+)?week\b`
@@ -143,6 +156,24 @@ function calendarDayBefore(today: Date, days = 0): string {
   return Number.isFinite(date.getTime()) ? date.toISOString().slice(0, 10) : ''
 }
 
+export function eventComparisonRanges(day: string): ComparisonRanges {
+  if (!isCalendarDate(day)) return EMPTY_RANGES
+  const anchor = new Date(day + 'T00:00:00Z')
+  const ranges = {
+    previous: { startDate: calendarDayBefore(anchor, 14), endDate: calendarDayBefore(anchor, 1) },
+    current: { startDate: calendarDayBefore(anchor, -1), endDate: calendarDayBefore(anchor, -14) },
+  }
+  return validComparisonRanges(ranges) ? ranges : EMPTY_RANGES
+}
+
+export function calendarDateInZone(date: Date, timeZone: string): string {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone, calendar: 'iso8601', year: 'numeric', month: '2-digit', day: '2-digit',
+  })
+  const { year, month, day } = Object.fromEntries(formatter.formatToParts(date).map(({ type, value }) => [type, value]))
+  return `${year?.padStart(4, '0')}-${month}-${day}`
+}
+
 function periodBoundary(today: Date, unit: RelativeUnit, periodsBefore: number): Date {
   const date = new Date(today)
   if (unit === 'month') {
@@ -161,12 +192,8 @@ function relativeComparison(question: string, timeZone: string, asOf: Date): Com
   const invalid: ComparisonProposal = { ranges: EMPTY_RANGES, relative: `invalid-${unit}-count` }
   if (!Number.isSafeInteger(count) || count < 1 || count !== previousCount) return invalid
 
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone, calendar: 'iso8601', year: 'numeric', month: '2-digit', day: '2-digit',
-  })
-  const { year, month, day } = Object.fromEntries(formatter.formatToParts(asOf).map(({ type, value }) => [type, value]))
   // Once the local date is known, use UTC solely for calendar arithmetic across DST.
-  const today = new Date(`${year?.padStart(4, '0')}-${month}-${day}T00:00:00Z`)
+  const today = new Date(calendarDateInZone(asOf, timeZone) + 'T00:00:00Z')
   const end = periodBoundary(today, unit, 0)
   const split = periodBoundary(today, unit, count)
   const start = periodBoundary(today, unit, count * 2)
@@ -178,6 +205,7 @@ function relativeComparison(question: string, timeZone: string, asOf: Date): Com
 }
 
 export function proposeComparison(question: string, timeZone: string, asOf = new Date()): ComparisonProposal | null {
+  if (isEventComparison(question)) return { ranges: EMPTY_RANGES, eventBased: true }
   const relative = relativeComparison(question, timeZone, asOf)
   if (relative) return relative
   const ranges = parseTypedComparison(question)

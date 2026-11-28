@@ -378,6 +378,9 @@ export const projectsApi = {
 
   // List projects
   list: (params = {}) => api.get('/projects', { params }),
+  listLaunchMilestones: (workspaceId, signal) => api.get('/projects/launch-milestones', {
+    params: { workspaceId }, signal, _noCache: true,
+  }),
 
   // Get project by ID
   get: (id) => api.get(`/projects/${id}`),

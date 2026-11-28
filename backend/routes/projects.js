@@ -181,6 +181,27 @@ router.get('/', validate(schemas.list), async (req, res) => {
   }
 });
 
+router.get('/launch-milestones', async (req, res) => {
+  const { workspaceId } = req.query;
+  if (typeof workspaceId !== 'string' || !req.orgIds.includes(workspaceId)) {
+    return res.status(403).json({ error: 'Workspace access required' });
+  }
+  try {
+    const projects = await readAllRows(() => supabase.from('projects').select('id,name,settings')
+      .eq('org_id', workspaceId));
+    const milestones = projects.flatMap((project) => readProgress(project).milestones
+      .filter((item) => /\b(?:launch|release|go[\s-]+live)\b/i.test(project.name + ' ' + item.title))
+      .map(({ id, title, dueDate, completedAt }) => ({
+        id, title, dueDate, completedAt, projectId: project.id, projectName: project.name,
+      })))
+      .sort((a, b) => a.projectName.localeCompare(b.projectName) || a.title.localeCompare(b.title) || a.dueDate.localeCompare(b.dueDate));
+    return res.json({ milestones });
+  } catch (error) {
+    log.error('Error listing launch milestones:', error.message);
+    return res.status(500).json({ error: 'Could not load launch milestones' });
+  }
+});
+
 /**
  * GET /api/projects/:id
  * Get project details with tasks and meetings

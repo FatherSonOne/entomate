@@ -1,10 +1,20 @@
 import { describe, expect, test } from 'vitest'
-import { EMPTY_RANGES, parseTypedComparison, proposeComparison, rangeDates, readComparisonRanges, validComparisonRanges } from '../services/askDateRanges'
+import { EMPTY_RANGES, eventComparisonRanges, parseTypedComparison, proposeComparison, rangeDates, readComparisonRanges, validComparisonRanges } from '../services/askDateRanges'
 
 const octoberNovember = {
   previous: { startDate: '2026-10-28', endDate: '2026-10-31' },
   current: { startDate: '2026-11-12', endDate: '2026-11-27' },
 }
+
+test('opens launch confirmation and resolves 14 calendar days on each side of the selected date', () => {
+  expect(proposeComparison('The two weeks before launch vs. the two weeks after', 'America/New_York'))
+    .toEqual({ ranges: EMPTY_RANGES, eventBased: true })
+  expect(eventComparisonRanges('2026-11-12')).toEqual({
+    previous: { startDate: '2026-10-29', endDate: '2026-11-11' },
+    current: { startDate: '2026-11-13', endDate: '2026-11-26' },
+  })
+  expect(eventComparisonRanges('2026-02-30')).toEqual(EMPTY_RANGES)
+})
 
 describe('typed Ask comparison', () => {
   test.each([
