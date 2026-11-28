@@ -20,7 +20,8 @@ test.each([
 ])('previews unequal day windows for %s', (question, milestoneName) => {
   const proposal = proposeComparison(question, 'America/New_York')
   expect(proposal).toEqual({
-    ranges: EMPTY_RANGES, eventBased: true, milestoneName, eventWindow: { beforeDays: 30, afterDays: 7 },
+    ranges: EMPTY_RANGES, eventBased: true, milestoneName,
+    eventWindow: { before: { count: 30, unit: 'day' }, after: { count: 7, unit: 'day' } },
   })
   expect(eventComparisonRanges('2026-07-15', proposal?.eventWindow)).toEqual({
     previous: { startDate: '2026-06-15', endDate: '2026-07-14' },
@@ -28,9 +29,41 @@ test.each([
   })
 })
 
+test('resolves two weeks before a milestone and one calendar month after', () => {
+  const proposal = proposeComparison('2 weeks before Security Review vs. 1 month after', 'America/New_York')
+  expect(proposal).toEqual({
+    ranges: EMPTY_RANGES, eventBased: true, milestoneName: 'Security Review',
+    eventWindow: { before: { count: 2, unit: 'week' }, after: { count: 1, unit: 'month' } },
+  })
+  expect(eventComparisonRanges('2026-07-15', proposal?.eventWindow)).toEqual({
+    previous: { startDate: '2026-07-01', endDate: '2026-07-14' },
+    current: { startDate: '2026-07-16', endDate: '2026-08-15' },
+  })
+})
+
+test.each([
+  ['2026-01-31', '2026-02-28'],
+  ['2024-01-31', '2024-02-29'],
+])('uses the last day of February for a calendar month after %s', (milestoneDate, endDate) => {
+  const proposal = proposeComparison('1 day before “Security Review v2.1” vs. 1 MONTH after', 'America/New_York')
+  expect(proposal).toMatchObject({ milestoneName: 'Security Review v2.1' })
+  expect(eventComparisonRanges(milestoneDate, proposal?.eventWindow).current)
+    .toEqual({ startDate: milestoneDate.slice(0, 4) + '-02-01', endDate })
+})
+
+test('clamps a month before the milestone and keeps the original day for a multi-month offset', () => {
+  const proposal = proposeComparison('1 month before Security Review vs. 2 months after', 'America/New_York')
+  expect(eventComparisonRanges('2024-03-31', proposal?.eventWindow)).toEqual({
+    previous: { startDate: '2024-02-29', endDate: '2024-03-30' },
+    current: { startDate: '2024-04-01', endDate: '2024-05-31' },
+  })
+})
+
 test.each(['0 days before Security Review vs. 7 days after',
   '-30 days before Security Review vs. 7 days after',
   '30 days before Security Review vs. 1.5 days after',
+  '-2 weeks before Security Review vs. 2 weeks after',
+  '2 weeks before Security Review vs. 1.5 months after',
 ])('requires a correction for %s', (question) => {
   const proposal = proposeComparison(question, 'America/New_York')
   expect(proposal?.eventWindow).toBe('invalid')
@@ -48,6 +81,8 @@ test('resolves single-day windows at a year boundary and rejects dates beyond th
 
 test('opens launch confirmation and resolves 14 calendar days on each side of the selected date', () => {
   expect(proposeComparison('The two weeks before launch vs. the two weeks after', 'America/New_York'))
+    .toEqual({ ranges: EMPTY_RANGES, eventBased: true })
+  expect(proposeComparison('2 weeks before launch vs. 2 weeks after', 'America/New_York'))
     .toEqual({ ranges: EMPTY_RANGES, eventBased: true })
   expect(eventComparisonRanges('2026-11-12')).toEqual({
     previous: { startDate: '2026-10-29', endDate: '2026-11-11' },

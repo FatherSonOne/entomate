@@ -200,11 +200,11 @@ describe('Search and Ask navigation', () => {
     }), { signal: expect.any(AbortSignal), skipRetry: true })
   })
 
-  test('a palette link with an invalid milestone day count cannot run Ask with unconfirmed dates', async () => {
-    const question = '0 days before Security Review vs. 7 days after'
+  test('a palette link with an invalid milestone window cannot run Ask with unconfirmed dates', async () => {
+    const question = '2 weeks before Security Review vs. 0 months after'
     setup('/search?q=' + encodeURIComponent(question) + '&ask=1&compare=2026-06-15,2026-07-14,2026-07-16,2026-07-22')
     const form = await screen.findByRole('form', { name: 'Confirm date ranges' })
-    expect(form).toHaveTextContent('Use a positive whole number of days for each period')
+    expect(form).toHaveTextContent('Use a positive whole number of days, weeks, or months for each period')
     expect(within(form).getByRole('button', { name: 'Compare periods' })).toBeDisabled()
     expect(api.findMilestones).not.toHaveBeenCalled()
     expect(api.askStream).not.toHaveBeenCalled()

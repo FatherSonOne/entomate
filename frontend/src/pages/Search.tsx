@@ -24,7 +24,7 @@ import {
   EMPTY_RANGES, calendarDateInZone, eventComparisonProposal, eventComparisonRanges, proposeComparison,
   rangeDates, readComparisonRanges, validComparisonRanges,
 } from '../services/askDateRanges'
-import type { ComparisonEvent, ComparisonRanges } from '../services/askDateRanges'
+import type { ComparisonEvent, ComparisonRanges, EventWindowLength } from '../services/askDateRanges'
 import {
   GROUPS, groupCount, isFilter, matchCommands, metaLine, readUrlState, resultHref, resultMomentHref, searchEverything,
   shortDate, statusSignal, timecode, writeUrlState,
@@ -505,6 +505,11 @@ function validEventWindow({ eventWindow, event, ranges }: ComparisonDraft): bool
     && ranges.previous.endDate < event.date && event.date < ranges.current.startDate
 }
 
+function eventWindowLabel({ count, unit }: EventWindowLength): string {
+  const label = unit === 'month' ? 'calendar month' : unit
+  return `${count} ${label}${count === 1 ? '' : 's'}`
+}
+
 function ComparisonForm({ draft, timeZone, workspace, confirmationRef, proposedQuestion, onChange, onEventChange, onSubmit }: {
   draft: ComparisonDraft
   timeZone: string
@@ -520,7 +525,6 @@ function ComparisonForm({ draft, timeZone, workspace, confirmationRef, proposedQ
   const valid = validComparisonRanges(ranges)
   const complete = dates.every(Boolean)
   const validWindow = validEventWindow(draft)
-  const dayLabel = (count: number) => count + (count === 1 ? ' day' : ' days')
   return (
     <form className="bs-srch-compare-form" id="ask-date-ranges" onSubmit={onSubmit}
       aria-labelledby={question ? 'ask-confirm-date-ranges' : undefined}>
@@ -534,7 +538,7 @@ function ComparisonForm({ draft, timeZone, workspace, confirmationRef, proposedQ
       {relative === 'invalid-week-count' && !complete && <p>Use the same positive whole number of weeks for both periods, or enter dates below.</p>}
       {relative === 'invalid-month-count' && !complete && <p>Use the same positive whole number of months for both periods, or enter dates below.</p>}
       {question && !relative && !eventBased && !complete && <p>Fill in the missing dates or correct them below. Include a year for each range when typing dates.</p>}
-      {eventWindow === 'invalid' && <p>Use a positive whole number of days for each period, then submit your question again.</p>}
+      {eventWindow === 'invalid' && <p>Use a positive whole number of days, weeks, or months for each period, then submit your question again.</p>}
       {eventBased && eventWindow !== 'invalid' && (
         <div className="bs-srch-compare-periods">
           <MilestonePicker key={milestoneName ?? ''} workspaceId={workspace?.id} timeZone={timeZone}
@@ -543,7 +547,7 @@ function ComparisonForm({ draft, timeZone, workspace, confirmationRef, proposedQ
       )}
       {eventBased && event?.date && eventWindow !== 'invalid' && (
         <p>{eventWindow
-          ? `Suggested windows: ${dayLabel(eventWindow.beforeDays)} before and ${dayLabel(eventWindow.afterDays)} after. Both exclude the milestone date.`
+          ? `Ask suggests ${eventWindowLabel(eventWindow.before)} before and ${eventWindowLabel(eventWindow.after)} after. Both exclude the milestone date.`
           : `The suggested ranges cover 14 calendar days on each side and exclude ${milestoneName ? 'the milestone date' : 'launch day'}.`}</p>
       )}
       {(!eventBased || event?.date) && <div className="bs-srch-compare-periods">

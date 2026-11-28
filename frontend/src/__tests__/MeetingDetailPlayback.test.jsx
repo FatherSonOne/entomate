@@ -261,6 +261,10 @@ describe('a pressed timecode plays the recording', () => {
       comparing: true, custom: true, typed: true, relative: 'milestone-window', named: true, coverageName: 'Date range coverage' },
     { label: 'manual milestone with unequal windows', question: '30 days before Security Review vs. 7 days after',
       comparing: true, custom: true, typed: true, relative: 'milestone-window', named: true, manual: true, coverageName: 'Date range coverage' },
+    { label: 'selected milestone with mixed units', question: '2 weeks before Security Review vs. 1 month after',
+      comparing: true, custom: true, typed: true, relative: 'mixed-milestone-window', named: true, coverageName: 'Date range coverage' },
+    { label: 'manual milestone with mixed units', question: '2 weeks before Security Review vs. 1 month after',
+      comparing: true, custom: true, typed: true, relative: 'mixed-milestone-window', named: true, manual: true, coverageName: 'Date range coverage' },
   ])('$label restores coverage and the exact Before and After links without a second Ask request', async ({ question, comparing, custom, typed, corrected, relative, manual, named, coverageName }) => {
     const relativeCase = {
       days: {
@@ -299,6 +303,7 @@ describe('a pressed timecode plays the recording', () => {
       },
       'milestone-window': {
         beforeMidnight: [10, 24], afterMidnight: [10, 25],
+        scheduledPreview: { earlierStart: '2026-06-14', laterEnd: '2026-07-21' },
         beforeMeeting: '2026-07-10T18:00:00Z', afterMeeting: '2026-07-20T18:00:00Z',
         previous: { startDate: '2026-06-15', endDate: '2026-07-14' },
         current: { startDate: '2026-07-16', endDate: '2026-07-22' },
@@ -306,11 +311,21 @@ describe('a pressed timecode plays the recording', () => {
         previousLabel: /Jun 15\D+Jul 14, 2026/, currentLabel: /Jul 16\D+22, 2026/,
         message: '30 days before and 7 days after. Both exclude the milestone date.',
       },
+      'mixed-milestone-window': {
+        beforeMidnight: [10, 24], afterMidnight: [10, 25],
+        scheduledPreview: { earlierStart: '2026-06-30', laterEnd: '2026-08-14' },
+        beforeMeeting: '2026-07-10T18:00:00Z', afterMeeting: '2026-08-10T18:00:00Z',
+        previous: { startDate: '2026-07-01', endDate: '2026-07-14' },
+        current: { startDate: '2026-07-16', endDate: '2026-08-15' },
+        previewEnd: '2026-08-15', draftEnd: '2026-08-14',
+        previousLabel: /Jul 1\D+14, 2026/, currentLabel: /Jul 16\D+Aug 15, 2026/,
+        message: '2 weeks before and 1 calendar month after. Both exclude the milestone date.',
+      },
     }[relative]
-    const unequalWindows = relative === 'milestone-window'
-    const eventComparison = relative === 'launch' || unequalWindows
-    const eventDate = unequalWindows ? '2026-07-15' : '2026-11-12'
-    const scheduledDate = unequalWindows ? '2026-07-14' : '2026-11-11'
+    const scheduledPreview = relativeCase?.scheduledPreview
+    const eventComparison = relative === 'launch' || !!scheduledPreview
+    const eventDate = scheduledPreview ? '2026-07-15' : '2026-11-12'
+    const scheduledDate = scheduledPreview ? '2026-07-14' : '2026-11-11'
     const milestoneTitle = named ? 'Security Review' : 'Launch'
     const milestoneField = named ? 'Milestone and date' : 'Launch milestone and date'
     const eventFieldPrefix = named ? 'Milestone' : 'Launch'
@@ -402,10 +417,10 @@ describe('a pressed timecode plays the recording', () => {
           else fireEvent.change(nameInput, { target: { value: eventName } })
         }
         const dateField = screen.getByLabelText(manual ? eventFieldPrefix + ' date' : milestoneField)
-        if (unequalWindows) {
+        if (scheduledPreview) {
           fireEvent.change(dateField, { target: { value: manual ? scheduledDate : 'p-beta:m-beta:scheduled|' + scheduledDate } })
-          expect(rangeInput('Earlier period', 'Start date')).toHaveValue('2026-06-14')
-          expect(rangeInput('Later period', 'End date')).toHaveValue('2026-07-21')
+          expect(rangeInput('Earlier period', 'Start date')).toHaveValue(scheduledPreview.earlierStart)
+          expect(rangeInput('Later period', 'End date')).toHaveValue(scheduledPreview.laterEnd)
         }
         fireEvent.change(dateField, { target: { value: manual ? eventDate : selectedMilestone } })
       }
@@ -424,7 +439,7 @@ describe('a pressed timecode plays the recording', () => {
         expect(rangeInput('Later period', 'End date')).toHaveValue(previewEnd)
       }
       if (corrected || relativeCase) fireEvent.change(rangeInput('Later period', 'End date'), { target: { value: ranges.current.endDate } })
-      if (unequalWindows) {
+      if (scheduledPreview) {
         fireEvent.change(rangeInput('Earlier period', 'End date'), { target: { value: eventDate } })
         expect(within(confirmation).getByRole('button', { name: 'Compare periods' })).toBeDisabled()
         expect(confirmation).toHaveTextContent('Keep the earlier period before the milestone date')
@@ -454,7 +469,7 @@ describe('a pressed timecode plays the recording', () => {
     expect(current).toHaveTextContent('2 of 4 meetings reviewed · 1 without transcripts · 1 awaiting indexing')
     if (eventComparison) {
       expect(coverage).toHaveTextContent(eventName + ' · ' + eventDate + (manual ? '' : ' · Marked complete'))
-      if (unequalWindows) expect(current).not.toHaveTextContent('This period is incomplete')
+      if (scheduledPreview) expect(current).not.toHaveTextContent('This period is incomplete')
       else expect(current).toHaveTextContent('This period is incomplete')
     }
     if (comparing) {
@@ -489,6 +504,7 @@ describe('a pressed timecode plays the recording', () => {
         expect(rangeInput('Later period', 'End date')).toHaveValue(draftEnd)
       }
       if (typed) expect(screen.getByRole('form', { name: 'Confirm date ranges' })).toHaveTextContent(question)
+      if (scheduledPreview) expect(screen.getByRole('form', { name: 'Confirm date ranges' })).toHaveTextContent(relativeCase.message)
       if (manual) {
         expect(screen.getByLabelText(eventFieldPrefix + ' name (optional)')).toHaveValue(eventName)
         expect(screen.getByLabelText(eventFieldPrefix + ' date')).toHaveValue(eventDate)

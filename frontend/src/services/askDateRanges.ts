@@ -5,12 +5,13 @@ export interface ComparisonRanges {
   current: DateRange
 }
 
-type RelativeUnit = 'day' | 'week' | 'month'
-interface EventWindow { beforeDays: number; afterDays: number }
+type CalendarUnit = 'day' | 'week' | 'month'
+export interface EventWindowLength { count: number; unit: CalendarUnit }
+interface EventWindow { before: EventWindowLength; after: EventWindowLength }
 
 export interface ComparisonProposal {
   ranges: ComparisonRanges
-  relative?: `completed-${RelativeUnit}s` | `invalid-${RelativeUnit}-count`
+  relative?: `completed-${CalendarUnit}s` | `invalid-${CalendarUnit}-count`
   eventBased?: true
   milestoneName?: string
   eventWindow?: EventWindow | 'invalid'
@@ -119,40 +120,42 @@ export function parseTypedComparison(question: string): ComparisonRanges | null 
 
 const COUNT = String.raw`([+-]?\d+(?:\.\d+)?)(?![\w/]|\.\d)`
 const COMPARE = String.raw`\s+(?:vs\.?|versus|compared\s+(?:to|with)|against|with|to|and)\s+(?:the\s+)?`
+const WINDOW_START = String.raw`(?<![\w./+-])`
 const LAUNCH_COMPARISON = new RegExp(
-  String.raw`\b(?:two|2)\s+weeks\s+before\s+(?:the\s+)?launch${COMPARE}(?:two|2)\s+weeks\s+after\b`, 'i',
+  String.raw`${WINDOW_START}(?:two|2)\s+weeks\s+before\s+(?:the\s+)?launch${COMPARE}(?:two|2)\s+weeks\s+after\b`, 'i',
 )
 
 const MILESTONE_TITLE = String.raw`(?:"([^"\r\n]+)"|“([^”\r\n]+)”|([^.!?;\r\n]+?))`
 const MILESTONE_END = String.raw`(?=\s*(?:[.!?;\r\n]|$))`
 const SURROUND_MILESTONE = new RegExp(
-  String.raw`\b(?:two|2)\s+weeks\s+before\s+and\s+after\s+${MILESTONE_TITLE}${MILESTONE_END}`, 'i',
+  String.raw`${WINDOW_START}(?:two|2)\s+weeks\s+before\s+and\s+after\s+${MILESTONE_TITLE}${MILESTONE_END}`, 'i',
 )
 const COMPARE_AROUND_MILESTONE = new RegExp(
-  String.raw`\b(?:two|2)\s+weeks\s+before\s+${MILESTONE_TITLE}${COMPARE}(?:two|2)\s+weeks\s+after\b${MILESTONE_END}`, 'i',
+  String.raw`${WINDOW_START}(?:two|2)\s+weeks\s+before\s+${MILESTONE_TITLE}${COMPARE}(?:two|2)\s+weeks\s+after\b${MILESTONE_END}`, 'i',
 )
+const WINDOW_LENGTH = String.raw`${COUNT}\s+(day|week|month)s?`
 const CUSTOM_MILESTONE_WINDOW = new RegExp(
-  String.raw`(?<![\w./+-])${COUNT}\s+days?\s+before\s+${MILESTONE_TITLE}${COMPARE}${COUNT}\s+days?\s+after\b${MILESTONE_END}`, 'i',
+  String.raw`${WINDOW_START}${WINDOW_LENGTH}\s+before\s+${MILESTONE_TITLE}${COMPARE}${WINDOW_LENGTH}\s+after\b${MILESTONE_END}`, 'i',
 )
 
-const validDayCount = (value: number) => Number.isSafeInteger(value) && value > 0
+const validWindowCount = (value: number) => Number.isSafeInteger(value) && value > 0
 const cleanMilestoneTitle = (title?: string) => title?.trim().slice(0, 160) || undefined
 
 export function eventComparisonProposal(question: string): ComparisonProposal | null {
-  const custom = CUSTOM_MILESTONE_WINDOW.exec(question)
-  if (custom) {
-    const [, before, quoted, curved, plain, after] = custom
-    const milestoneName = cleanMilestoneTitle(quoted ?? curved ?? plain)
-    if (!milestoneName) return null
-    const beforeDays = Number(before)
-    const afterDays = Number(after)
-    return { ranges: EMPTY_RANGES, eventBased: true, milestoneName,
-      eventWindow: validDayCount(beforeDays) && validDayCount(afterDays) ? { beforeDays, afterDays } : 'invalid' }
-  }
   if (LAUNCH_COMPARISON.test(question)) return { ranges: EMPTY_RANGES, eventBased: true }
   const match = SURROUND_MILESTONE.exec(question) ?? COMPARE_AROUND_MILESTONE.exec(question)
-  const milestoneName = cleanMilestoneTitle(match?.[1] ?? match?.[2] ?? match?.[3])
-  return milestoneName ? { ranges: EMPTY_RANGES, eventBased: true, milestoneName } : null
+  const legacyName = cleanMilestoneTitle(match?.[1] ?? match?.[2] ?? match?.[3])
+  if (legacyName) return { ranges: EMPTY_RANGES, eventBased: true, milestoneName: legacyName }
+
+  const custom = CUSTOM_MILESTONE_WINDOW.exec(question)
+  if (!custom) return null
+  const [, beforeCount, beforeUnit, quoted, curved, plain, afterCount, afterUnit] = custom
+  const milestoneName = cleanMilestoneTitle(quoted ?? curved ?? plain)
+  if (!milestoneName || !beforeUnit || !afterUnit) return null
+  const before = { count: Number(beforeCount), unit: beforeUnit.toLowerCase() as CalendarUnit }
+  const after = { count: Number(afterCount), unit: afterUnit.toLowerCase() as CalendarUnit }
+  return { ranges: EMPTY_RANGES, eventBased: true, milestoneName,
+    eventWindow: validWindowCount(before.count) && validWindowCount(after.count) ? { before, after } : 'invalid' }
 }
 
 const ELIDED_UNIT = String.raw`(?=\s*(?:[.,:;!?]|$)|\s+(?:for|on|about|in)\b)`
@@ -162,7 +165,7 @@ const SINGLE_WEEK_COMPARISON = new RegExp(
   String.raw`${LAST_WEEK}${COMPARE}${PREVIOUS_WEEK}|${PREVIOUS_WEEK}${COMPARE}${LAST_WEEK}`, 'i',
 )
 
-function numberedComparisonPatterns(unit: RelativeUnit) {
+function numberedComparisonPatterns(unit: CalendarUnit) {
   const suffix = String.raw`\s+(?:completed\s+)?${unit}s?\b`
   const last = String.raw`\blast\s+${COUNT}${suffix}`
   const previous = String.raw`\bprevious\s+${COUNT}`
@@ -190,12 +193,24 @@ function calendarDayBefore(today: Date, days = 0): string {
   return Number.isFinite(date.getTime()) ? date.toISOString().slice(0, 10) : ''
 }
 
-export function eventComparisonRanges(day: string, window: ComparisonProposal['eventWindow'] = { beforeDays: 14, afterDays: 14 }): ComparisonRanges {
+function eventWindowBoundary(anchor: Date, { count, unit }: EventWindowLength, direction: -1 | 1): string {
+  if (unit !== 'month') return calendarDayBefore(anchor, -direction * count * (unit === 'week' ? 7 : 1))
+  const boundary = new Date(anchor)
+  // Find the target month's last day before restoring the anchor day.
+  boundary.setUTCMonth(anchor.getUTCMonth() + direction * count + 1, 0)
+  boundary.setUTCDate(Math.min(anchor.getUTCDate(), boundary.getUTCDate()))
+  return calendarDayBefore(boundary)
+}
+
+const TWO_WEEKS: EventWindowLength = { count: 2, unit: 'week' }
+const DEFAULT_EVENT_WINDOW: EventWindow = { before: TWO_WEEKS, after: TWO_WEEKS }
+
+export function eventComparisonRanges(day: string, window: ComparisonProposal['eventWindow'] = DEFAULT_EVENT_WINDOW): ComparisonRanges {
   if (!isCalendarDate(day) || window === 'invalid') return EMPTY_RANGES
   const anchor = new Date(day + 'T00:00:00Z')
   const ranges = {
-    previous: { startDate: calendarDayBefore(anchor, window.beforeDays), endDate: calendarDayBefore(anchor, 1) },
-    current: { startDate: calendarDayBefore(anchor, -1), endDate: calendarDayBefore(anchor, -window.afterDays) },
+    previous: { startDate: eventWindowBoundary(anchor, window.before, -1), endDate: calendarDayBefore(anchor, 1) },
+    current: { startDate: calendarDayBefore(anchor, -1), endDate: eventWindowBoundary(anchor, window.after, 1) },
   }
   return validComparisonRanges(ranges) ? ranges : EMPTY_RANGES
 }
@@ -208,7 +223,7 @@ export function calendarDateInZone(date: Date, timeZone: string): string {
   return `${year?.padStart(4, '0')}-${month}-${day}`
 }
 
-function periodBoundary(today: Date, unit: RelativeUnit, periodsBefore: number): Date {
+function periodBoundary(today: Date, unit: CalendarUnit, periodsBefore: number): Date {
   const date = new Date(today)
   if (unit === 'month') {
     date.setUTCMonth(date.getUTCMonth() - periodsBefore, 1)
