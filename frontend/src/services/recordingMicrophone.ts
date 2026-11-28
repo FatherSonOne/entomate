@@ -30,7 +30,7 @@ export async function measureMicCheck(sample: Blob): Promise<MicCheckLevel | nul
         const end = Math.min(start + windowSamples, data.length)
         let squares = 0
         for (let i = start; i < end; i++) {
-          const value = data[i]
+          const value = data[i] ?? 0
           if (Math.abs(value) >= 0.97) return 'clipping'
           squares += value * value
         }

@@ -91,6 +91,7 @@ interface AudioInput {
   stream: MediaStream
   track: MediaStreamTrack
   node: MediaStreamAudioSourceNode
+  deviceId?: string
 }
 
 interface SourceTrackCapture {
@@ -248,7 +249,7 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
   const [mode, setMode] = useState<RecorderMode>('mic')
   const [withMic, setWithMic] = useState(true)
   const [micMode, setMicMode] = useState<MicMode>('noise-reduction')
-  const [micModeNotice, setMicModeNotice] = useState('')
+  const [micNotice, setMicNotice] = useState('')
   const [splitAudio, setSplitAudio] = useState(false)
   const [audioInputs, setAudioInputs] = useState<MediaDeviceInfo[]>([])
   const [changingInput, setChangingInput] = useState(false)
@@ -326,6 +327,25 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
   const stopping = useRef(false)
   // Read by device 'ended' listeners set up before the meeting id reached state.
   const meetingRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (phase !== 'recording' || !capture.current?.inputs.mic) return
+    const devices = navigator.mediaDevices
+    let revision = 0
+    const refresh = async () => {
+      const request = ++revision
+      try {
+        const list = await devices.enumerateDevices?.()
+        if (list && request === revision) setAudioInputs(list.filter(device => device.kind === 'audioinput'))
+      } catch { /* Reconnecting the last input still works without a device list. */ }
+    }
+    void refresh()
+    devices.addEventListener?.('devicechange', refresh)
+    return () => {
+      revision++
+      devices.removeEventListener?.('devicechange', refresh)
+    }
+  }, [phase, changingInput])
 
   const tabSupported = tabCaptureSupported(typeof navigator === 'undefined' ? undefined : navigator)
   const captionsSupported = speechRecognitionCtor() !== null
@@ -464,6 +484,7 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
     const atMs = Math.round(recordedMs())
     if (unavailable && last?.endMs !== null) {
       current.gaps = { ...current.gaps, [field]: [...gaps, { startMs: atMs, endMs: null }] }
+      if (kind === 'mic') setMicNotice('')
     } else if (!unavailable && last?.endMs === null) {
       const closed = atMs > last.startMs ? [{ startMs: last.startMs, endMs: atMs }] : []
       current.gaps = { ...current.gaps, [field]: [...gaps.slice(0, -1), ...closed] }
@@ -514,11 +535,12 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
     const previous = current?.inputs[kind]
     if (!current || !previous || pendingInput.current || stopping.current) return
     const nextMode = options.micMode
+    const recoveringMic = kind === 'mic' && !nextMode && (previous.track.readyState === 'ended' || previous.track.muted)
     const currentCapture = () => capture.current === current && !stopping.current
     pendingInput.current = true
     setChangingInput(true)
     setError(null)
-    if (kind === 'mic') setMicModeNotice('')
+    if (kind === 'mic') setMicNotice('')
     let replacement: MediaStream | undefined
     let reopeningMic = false
     let restoredMode = false
@@ -535,7 +557,7 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
         // Some browsers fix processing when opening a device and reuse it
         // while any track from that input is live.
         const previousMode = reportedMicMode(previous.track)
-        const deviceId = previous.track.getSettings?.().deviceId
+        const deviceId = previous.deviceId
         const choices = previous.track.getCapabilities?.().noiseSuppression
         if (!previousMode || !deviceId || !choices?.includes(nextMode === 'noise-reduction')) {
           throw new Error('Microphone mode unavailable')
@@ -583,16 +605,19 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
       previous.track.stop()
       current.streams = current.streams.filter(stream => stream !== previous.stream || stream.getVideoTracks().length > 0)
       current.streams.push(replacement)
-      current.inputs[kind] = { stream: replacement, track, node }
+      current.inputs[kind] = { stream: replacement, track, node, deviceId: track.getSettings?.().deviceId ?? options.deviceId }
       replacement = undefined
       if (nextMode && !restoredMode) setMicMode(nextMode)
-      if (restoredMode) setMicModeNotice('This microphone could not switch modes. Recording continues.')
       watchInput(current, kind)
+      if (restoredMode) setMicNotice('This microphone could not switch modes. Recording continues.')
+      if (recoveringMic && !track.muted) setMicNotice(`Microphone reconnected${track.label ? ' · ' + track.label : ''}`)
     } catch (err) {
       if (currentCapture()) {
         if (nextMode) {
-          setMicModeNotice(reopeningMic ? 'The microphone could not restart. Choose a microphone to reconnect.'
+          setMicNotice(reopeningMic ? 'The microphone could not restart. Choose a microphone to reconnect.'
             : 'This microphone could not switch modes. Recording continues.')
+        } else if (recoveringMic) {
+          setMicNotice(`${captureErrorMessage(err, 'mic')} Reconnect the device or choose another microphone.`)
         } else setError(captureErrorMessage(err, kind))
       }
     } finally {
@@ -607,7 +632,7 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
     const sample = micCheckAudio.current
     if (sample && !sample.paused) sample.pause()
     micCheck.clear()
-    setMicModeNotice('')
+    setMicNotice('')
     const captureMode = quick ? 'mic' : mode
     setError(null)
     if (typeof MediaRecorder === 'undefined') {
@@ -640,7 +665,7 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
         const node = audioContext.createMediaStreamSource(new MediaStream([track]))
         node.connect(mix)
         const kind = captureMode === 'tab' && index === 0 ? 'tab' : 'mic'
-        inputs[kind] ??= { stream, track, node }
+        inputs[kind] ??= { stream, track, node, deviceId: track.getSettings?.().deviceId ?? (kind === 'mic' ? audioInputDeviceId : undefined) }
       }
     })
     void audioContext.resume()
@@ -766,11 +791,6 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
       videoRecorder,
       videoChunks,
       preview: opened.video ? new MediaStream([opened.video]) : null,
-    }
-    if (inputs.mic) {
-      void navigator.mediaDevices.enumerateDevices?.().then(devices => {
-        if (mounted.current) setAudioInputs(devices.filter(device => device.kind === 'audioinput'))
-      }).catch(() => {})
     }
     if (captureMode === 'camera') opened.video?.addEventListener('ended', () => void stop(), { once: true })
 
@@ -949,6 +969,8 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
     setUpload(EMPTY_UPLOAD)
     setFailedSources([])
     setSourceUploads({})
+    setAudioInputs([])
+    setMicNotice('')
     setRecoveryProgress({})
     setFinishedTracks(null)
     setElapsedMs(0)
@@ -968,7 +990,9 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
   const micGap = c?.gaps.micAudioGaps?.at(-1)
   const micAvailable = hasAudio(mic?.track)
   const tabAvailable = hasAudio(tab?.track)
-  const currentMic = mic?.track.readyState === 'live' ? mic.track.getSettings?.().deviceId ?? 'default' : ''
+  const micDisconnected = mic?.track.readyState === 'ended'
+  const micNeedsRecovery = micDisconnected || micGap?.endMs === null
+  const currentMic = mic && !micDisconnected ? mic.deviceId ?? 'default' : ''
   const selectedMic = currentMic === 'default' || audioInputs.some(device => device.deviceId === currentMic) ? currentMic : ''
   const inputControls = c && phase === 'recording' && (
     <div className="space-y-2 rounded-lg border border-line px-3 py-2">
@@ -978,14 +1002,16 @@ export function MeetingRecorder({ audioInputDeviceId, recoveryUserId: userId, on
         Tab audio interrupted at {formatClock(tabGap.startMs)}. {paused ? 'Recording is paused.'
           : micAvailable ? 'Microphone is still recording.' : 'No audio source is available.'}
       </p>}
-      {micGap?.endMs === null && <p role="status" className="text-xs text-semantic-error">
-        Microphone interrupted at {formatClock(micGap.startMs)}. {paused ? 'Recording is paused.'
+      {micNeedsRecovery && <p role="status" className="text-xs text-semantic-error">
+        Microphone {micDisconnected ? 'disconnected' : 'interrupted'}{micGap?.endMs === null ? ` at ${formatClock(micGap.startMs)}` : ''}. {paused ? 'Recording is paused.'
           : tabAvailable ? 'Tab audio is still recording.' : 'Choose an available microphone.'}
       </p>}
       {mic && <MicModeSelect value={mic.track.readyState === 'live' ? reportedMicMode(mic.track) : null}
         disabled={changingInput || mic.track.readyState !== 'live'} onChange={next => void changeInput('mic', { micMode: next })} />}
-      {micModeNotice && <p role="status" className="text-xs text-content-secondary">{micModeNotice}</p>}
+      {micNotice && <p role="status" className="text-xs text-content-secondary">{micNotice}</p>}
       <div className="flex flex-wrap items-center gap-2">
+        {mic && micNeedsRecovery && <button type="button" className={SECONDARY} disabled={changingInput}
+          onClick={() => void changeInput('mic', { deviceId: mic.deviceId ?? 'default' })}>Reconnect mic</button>}
         {mic && (
           <label className="flex items-center gap-2 text-sm">
             Microphone
