@@ -139,10 +139,10 @@ describe('Search and Ask navigation', () => {
     }, expect.any(Object))
   })
 
-  test('a palette Ask with unequal relative counts prompts for correction before running', async () => {
-    setup('/search?q=' + encodeURIComponent('Compare the last 30 days vs. the previous 15') + '&ask=1')
+  test.each(['days', 'weeks'])('a palette Ask with unequal counts of %s prompts for correction before running', async (unit) => {
+    setup('/search?q=' + encodeURIComponent('Compare the last 4 ' + unit + ' vs. the previous 2') + '&ask=1')
     const form = await screen.findByRole('form', { name: 'Confirm date ranges' })
-    expect(form).toHaveTextContent('Use the same positive whole number of days for both periods')
+    expect(form).toHaveTextContent('Use the same positive whole number of ' + unit + ' for both periods')
     expect(within(form).getByRole('button', { name: 'Compare periods' })).toBeDisabled()
     expect(api.askStream).not.toHaveBeenCalled()
   })

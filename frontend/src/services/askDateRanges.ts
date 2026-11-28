@@ -7,7 +7,7 @@ export interface ComparisonRanges {
 
 export interface ComparisonProposal {
   ranges: ComparisonRanges
-  relative?: 'completed-days' | 'invalid-day-count'
+  relative?: 'completed-days' | 'completed-weeks' | 'invalid-day-count' | 'invalid-week-count'
 }
 
 export const EMPTY_RANGES: ComparisonRanges = {
@@ -105,14 +105,26 @@ export function parseTypedComparison(question: string): ComparisonRanges | null 
 }
 
 const COUNT = String.raw`([+-]?\d+(?:\.\d+)?)(?![\w/]|\.\d)`
-const LAST_DAYS = String.raw`\blast\s+${COUNT}\s+(?:completed\s+)?days?\b`
-const PREVIOUS = String.raw`\bprevious\s+${COUNT}`
-const DAYS = String.raw`\s+(?:completed\s+)?days?\b`
 const COMPARE = String.raw`\s+(?:vs\.?|versus|compared\s+(?:to|with)|against|with|to|and)\s+(?:the\s+)?`
-const LAST_THEN_PREVIOUS = new RegExp(
-  String.raw`${LAST_DAYS}${COMPARE}${PREVIOUS}(?:${DAYS}|(?=\s*(?:[.,:;!?]|$)|\s+(?:for|on|about|in)\b))`, 'i',
+const ELIDED_UNIT = String.raw`(?=\s*(?:[.,:;!?]|$)|\s+(?:for|on|about|in)\b)`
+const LAST_WEEK = String.raw`\blast\s+(?:completed\s+)?week\b`
+const PREVIOUS_WEEK = String.raw`\bprevious\s+(?:completed\s+)?week\b`
+const SINGLE_WEEK_COMPARISON = new RegExp(
+  String.raw`${LAST_WEEK}${COMPARE}${PREVIOUS_WEEK}|${PREVIOUS_WEEK}${COMPARE}${LAST_WEEK}`, 'i',
 )
-const PREVIOUS_THEN_LAST = new RegExp(String.raw`${PREVIOUS}(?:${DAYS})?${COMPARE}${LAST_DAYS}`, 'i')
+
+function numberedComparisonPatterns(unit: 'day' | 'week') {
+  const suffix = String.raw`\s+(?:completed\s+)?${unit}s?\b`
+  const last = String.raw`\blast\s+${COUNT}${suffix}`
+  const previous = String.raw`\bprevious\s+${COUNT}`
+  return {
+    forward: new RegExp(String.raw`${last}${COMPARE}${previous}(?:${suffix}|${ELIDED_UNIT})`, 'i'),
+    reverse: new RegExp(String.raw`${previous}(?:${suffix})?${COMPARE}${last}`, 'i'),
+  }
+}
+
+const DAY_COMPARISON = numberedComparisonPatterns('day')
+const WEEK_COMPARISON = numberedComparisonPatterns('week')
 
 function calendarDaysBefore(today: Date, days: number): string {
   const date = new Date(today)
@@ -121,11 +133,14 @@ function calendarDaysBefore(today: Date, days: number): string {
 }
 
 function relativeComparison(question: string, timeZone: string, asOf: Date): ComparisonProposal | null {
-  const counts = LAST_THEN_PREVIOUS.exec(question) ?? PREVIOUS_THEN_LAST.exec(question)
-  if (!counts) return null
-  const days = Number(counts[1])
-  const invalid: ComparisonProposal = { ranges: EMPTY_RANGES, relative: 'invalid-day-count' }
-  if (!Number.isSafeInteger(days) || days < 1 || days !== Number(counts[2])) return invalid
+  const singleWeek = SINGLE_WEEK_COMPARISON.test(question)
+  const weeklyCounts = WEEK_COMPARISON.forward.exec(question) ?? WEEK_COMPARISON.reverse.exec(question)
+  const counts = weeklyCounts ?? DAY_COMPARISON.forward.exec(question) ?? DAY_COMPARISON.reverse.exec(question)
+  if (!singleWeek && !counts) return null
+  const weeks = singleWeek || !!weeklyCounts
+  const count = singleWeek ? 1 : Number(counts?.[1])
+  const invalid: ComparisonProposal = { ranges: EMPTY_RANGES, relative: weeks ? 'invalid-week-count' : 'invalid-day-count' }
+  if (!Number.isSafeInteger(count) || count < 1 || (!singleWeek && count !== Number(counts?.[2]))) return invalid
 
   const formatter = new Intl.DateTimeFormat('en-US', {
     timeZone, calendar: 'iso8601', year: 'numeric', month: '2-digit', day: '2-digit',
@@ -133,11 +148,19 @@ function relativeComparison(question: string, timeZone: string, asOf: Date): Com
   const { year, month, day } = Object.fromEntries(formatter.formatToParts(asOf).map(({ type, value }) => [type, value]))
   // Once the local date is known, use UTC solely for calendar arithmetic across DST.
   const today = new Date(`${year?.padStart(4, '0')}-${month}-${day}T00:00:00Z`)
+  const daysSinceBoundary = weeks ? (today.getUTCDay() + 6) % 7 : 0
+  const days = weeks ? count * 7 : count
   const ranges = {
-    previous: { startDate: calendarDaysBefore(today, days * 2), endDate: calendarDaysBefore(today, days + 1) },
-    current: { startDate: calendarDaysBefore(today, days), endDate: calendarDaysBefore(today, 1) },
+    previous: {
+      startDate: calendarDaysBefore(today, daysSinceBoundary + days * 2),
+      endDate: calendarDaysBefore(today, daysSinceBoundary + days + 1),
+    },
+    current: {
+      startDate: calendarDaysBefore(today, daysSinceBoundary + days),
+      endDate: calendarDaysBefore(today, daysSinceBoundary + 1),
+    },
   }
-  return validComparisonRanges(ranges) ? { ranges, relative: 'completed-days' } : invalid
+  return validComparisonRanges(ranges) ? { ranges, relative: weeks ? 'completed-weeks' : 'completed-days' } : invalid
 }
 
 export function proposeComparison(question: string, timeZone: string, asOf = new Date()): ComparisonProposal | null {

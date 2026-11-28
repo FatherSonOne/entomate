@@ -113,6 +113,36 @@ describe('relative Ask comparison', () => {
       .toEqual(periods('2026-11-25', '2026-11-25', '2026-11-26', '2026-11-26'))
   })
 
+  test.each([
+    'Last week vs. the previous week',
+    'Compare the last completed week with the previous completed week.',
+    'What changed between the previous week and the last week?',
+    'Compare the last 1 week with the previous 1.',
+  ])('resolves completed Monday–Sunday weeks for "%s"', (question) => {
+    expect(proposeComparison(question, timeZone, new Date('2026-11-28T15:00:00Z'))).toEqual({
+      ranges: periods('2026-11-09', '2026-11-15', '2026-11-16', '2026-11-22'),
+      relative: 'completed-weeks',
+    })
+  })
+
+  test.each([
+    'Compare the last 2 weeks with the previous 2.',
+    'The previous 2 weeks compared with the last 2 weeks',
+  ])('resolves adjacent multiweek periods for "%s"', (question) => {
+    expect(proposeComparison(question, timeZone, new Date('2026-11-28T15:00:00Z'))?.ranges)
+      .toEqual(periods('2026-10-26', '2026-11-08', '2026-11-09', '2026-11-22'))
+  })
+
+  test.each([
+    ['2026-11-30T04:59:59Z', periods('2026-11-09', '2026-11-15', '2026-11-16', '2026-11-22')],
+    ['2026-11-30T05:00:00Z', periods('2026-11-16', '2026-11-22', '2026-11-23', '2026-11-29')],
+    ['2026-03-09T04:05:00Z', periods('2026-02-23', '2026-03-01', '2026-03-02', '2026-03-08')],
+    ['2026-11-02T05:05:00Z', periods('2026-10-19', '2026-10-25', '2026-10-26', '2026-11-01')],
+    ['2027-01-04T05:05:00Z', periods('2026-12-21', '2026-12-27', '2026-12-28', '2027-01-03')],
+  ])('uses the local Monday boundary at %s', (instant, expected) => {
+    expect(proposeComparison('Last week vs the previous week', timeZone, new Date(instant))?.ranges).toEqual(expected)
+  })
+
   test.each(['0', '-1', '2.5', '9007199254740992', '1000000'])('asks for corrections for an invalid count of %s', (count) => {
     expect(proposeComparison('Compare last ' + count + ' days vs previous ' + count, timeZone, asOf))
       .toEqual({ ranges: EMPTY_RANGES, relative: 'invalid-day-count' })
@@ -124,9 +154,18 @@ describe('relative Ask comparison', () => {
   })
 
   test.each([
+    'Last 0 weeks vs previous 0',
+    'Last 1.5 weeks vs previous 1.5',
+    'Last 2 weeks vs previous 3 weeks',
+  ])('asks for corrections for invalid weekly periods in "%s"', (question) => {
+    expect(proposeComparison(question, timeZone, asOf)).toEqual({ ranges: EMPTY_RANGES, relative: 'invalid-week-count' })
+  })
+
+  test.each([
     'What happened in the last 30 days?',
     'Compare this month to date with all of last month',
-    'Compare last 2 weeks with the previous 2 weeks',
+    'What happened in the last week?',
+    'Compare last 2 weeks with the previous 2 days',
     'Compare what happened in the last 30 days vs the previous 30 tasks.',
   ])('keeps ordinary Ask behavior for "%s"', (question) => {
     expect(proposeComparison(question, timeZone, asOf)).toBeNull()
