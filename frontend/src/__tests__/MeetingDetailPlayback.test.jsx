@@ -281,6 +281,10 @@ describe('a pressed timecode plays the recording', () => {
       comparing: true, custom: true, typed: true, relative: 'two-ambiguous-milestone-windows', named: true, coverageName: 'Date range coverage' },
     { label: 'manual milestone with both counts clarified', question: 'a few weeks before Security Review vs. several days after',
       comparing: true, custom: true, typed: true, relative: 'two-ambiguous-milestone-windows', named: true, manual: true, coverageName: 'Date range coverage' },
+    { label: 'selected milestone with a suggested count', question: 'a couple of weeks before Security Review vs. a few days after',
+      comparing: true, custom: true, typed: true, relative: 'suggested-milestone-window', named: true, coverageName: 'Date range coverage' },
+    { label: 'manual milestone with an edited suggested count', question: 'a couple of weeks before Security Review vs. a few days after',
+      comparing: true, custom: true, typed: true, relative: 'suggested-milestone-window', named: true, manual: true, coverageName: 'Date range coverage' },
   ])('$label restores coverage and the exact Before and After links without a second Ask request', async ({ question, comparing, custom, typed, corrected, relative, manual, named, coverageName }) => {
     const relativeCase = {
       days: {
@@ -369,6 +373,19 @@ describe('a pressed timecode plays the recording', () => {
         previousLabel: /Jun 24\D+Jul 14, 2026/, currentLabel: /Jul 16\D+20, 2026/,
         message: '3 weeks before and 5 days after. Both exclude the milestone date.',
       },
+      'suggested-milestone-window': {
+        beforeMidnight: [10, 24], afterMidnight: [10, 25],
+        clarifyCounts: { after: 5 }, suggestedBefore: manual ? 3 : 2,
+        scheduledPreview: { earlierStart: manual ? '2026-06-23' : '2026-06-30', laterEnd: '2026-07-19' },
+        beforeMeeting: manual ? '2026-06-25T18:00:00Z' : '2026-07-06T18:00:00Z',
+        afterMeeting: '2026-07-17T18:00:00Z',
+        previous: { startDate: manual ? '2026-06-24' : '2026-07-01', endDate: '2026-07-14' },
+        current: { startDate: '2026-07-16', endDate: '2026-07-20' },
+        previewEnd: '2026-07-20', draftEnd: '2026-07-19',
+        previousLabel: manual ? /Jun 24\D+Jul 14, 2026/ : /Jul 1\D+14, 2026/,
+        currentLabel: /Jul 16\D+20, 2026/,
+        message: (manual ? '3' : '2') + ' weeks before and 5 days after. Both exclude the milestone date.',
+      },
     }[relative]
     const scheduledPreview = relativeCase?.scheduledPreview
     const eventComparison = relative === 'launch' || !!scheduledPreview
@@ -443,6 +460,8 @@ describe('a pressed timecode plays the recording', () => {
 
     const rangeInput = (period, field) => within(screen.getByRole('group', { name: period })).getByLabelText(field)
     const clarificationAnswers = Object.entries(relativeCase?.clarifyCounts ?? {})
+    const suggestedBefore = relativeCase?.suggestedBefore
+    const suggestedCountInput = () => screen.getByRole('spinbutton', { name: 'Weeks before Security Review' })
     const countInput = (side) => screen.getByRole('spinbutton', {
       name: 'How many ' + (side === 'before' ? 'weeks before' : 'days after') + ' Security Review should I include?',
     })
@@ -472,7 +491,8 @@ describe('a pressed timecode plays the recording', () => {
         if (scheduledPreview) {
           fireEvent.change(dateField, { target: { value: manual ? scheduledDate : 'p-beta:m-beta:scheduled|' + scheduledDate } })
           const clarifications = manual ? [...clarificationAnswers].reverse() : clarificationAnswers
-          expect(within(confirmation).queryAllByRole('spinbutton')).toHaveLength(clarifications.length)
+          expect(within(confirmation).queryAllByRole('spinbutton')).toHaveLength(clarifications.length + (suggestedBefore ? 1 : 0))
+          if (suggestedBefore) expect(suggestedCountInput()).toHaveValue(2)
           for (const [side, count] of clarifications) {
             const input = countInput(side)
             expect(input).toHaveValue(null)
@@ -485,6 +505,14 @@ describe('a pressed timecode plays the recording', () => {
               expect(confirm).toBeDisabled()
             }
             fireEvent.change(input, { target: { value: String(count) } })
+          }
+          if (suggestedBefore && manual) {
+            expect(rangeInput('Earlier period', 'Start date')).toHaveValue('2026-06-30')
+            fireEvent.change(suggestedCountInput(), { target: { value: '' } })
+            expect(suggestedCountInput()).toHaveValue(null)
+            expect(within(confirmation).getByRole('button', { name: 'Compare periods' })).toBeDisabled()
+            expect(screen.queryByRole('group', { name: 'Earlier period' })).not.toBeInTheDocument()
+            fireEvent.change(suggestedCountInput(), { target: { value: String(suggestedBefore) } })
           }
           expect(rangeInput('Earlier period', 'Start date')).toHaveValue(scheduledPreview.earlierStart)
           expect(rangeInput('Later period', 'End date')).toHaveValue(scheduledPreview.laterEnd)
@@ -573,6 +601,7 @@ describe('a pressed timecode plays the recording', () => {
       if (typed) expect(screen.getByRole('form', { name: 'Confirm date ranges' })).toHaveTextContent(question)
       if (scheduledPreview) expect(screen.getByRole('form', { name: 'Confirm date ranges' })).toHaveTextContent(relativeCase.message)
       for (const [side, count] of clarificationAnswers) expect(countInput(side)).toHaveValue(count)
+      if (suggestedBefore) expect(suggestedCountInput()).toHaveValue(suggestedBefore)
       if (manual) {
         expect(screen.getByLabelText(eventFieldPrefix + ' name (optional)')).toHaveValue(eventName)
         expect(screen.getByLabelText(eventFieldPrefix + ' date')).toHaveValue(eventDate)

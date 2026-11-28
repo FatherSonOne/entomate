@@ -21,7 +21,7 @@ import { useNotes, useRecentSearches, useSearch } from '../hooks/useSearch'
 import type { UseNotesResult } from '../hooks/useSearch'
 import { searchApi } from '../services/api'
 import {
-  EMPTY_RANGES, calendarDateInZone, eventComparisonProposal, eventComparisonRanges, proposeComparison,
+  EMPTY_RANGES, calendarDateInZone, eventComparisonProposal, eventComparisonRanges, eventWindowCount, proposeComparison,
   rangeDates, readComparisonRanges, resolveEventWindow, validComparisonRanges,
 } from '../services/askDateRanges'
 import type { ComparisonEvent, ComparisonRanges, EventWindowLength, EventWindowSide } from '../services/askDateRanges'
@@ -221,7 +221,7 @@ function SearchPage({ owner, workspace }: { owner: string | null; workspace?: { 
     } : previous)
   }
 
-  const changeEventCount = (side: EventWindowSide, count?: number) => {
+  const changeEventCount = (side: EventWindowSide, count: number | null) => {
     setRangeDraft((previous) => {
       if (!previous?.eventBased) return previous
       const clarifiedCounts = { ...previous.clarifiedCounts, [side]: count }
@@ -531,13 +531,13 @@ function ComparisonForm({ draft, timeZone, workspace, confirmationRef, proposedQ
   proposedQuestion?: string
   onChange: (ranges: ComparisonRanges) => void
   onEventChange: (event?: ComparisonEvent) => void
-  onEventCountChange: (side: EventWindowSide, count?: number) => void
+  onEventCountChange: (side: EventWindowSide, count: number | null) => void
   onSubmit: (e: React.FormEvent) => void
 }): React.ReactElement {
   const { ranges, relative, question, eventBased, event, milestoneName, eventWindow, clarifiedCounts } = draft
   const resolvedWindow = resolveEventWindow(eventWindow, clarifiedCounts)
   const sides = (['before', 'after'] as const).filter((side) => eventWindow && eventWindow !== 'invalid'
-    && eventWindow[side].count === null)
+    && (eventWindow[side].count === null || eventWindow[side].editable))
   const dates = rangeDates(ranges)
   const valid = validComparisonRanges(ranges)
   const complete = dates.every(Boolean)
@@ -558,14 +558,20 @@ function ComparisonForm({ draft, timeZone, workspace, confirmationRef, proposedQ
       {eventWindow === 'invalid' && <p>Enter each count in digits using positive whole numbers, such as 2 weeks or 1 month, then submit your question again.</p>}
       {eventWindow && eventWindow !== 'invalid' && sides.length > 0 && (
         <div className="bs-srch-compare-dates">
-          {sides.map((side) => (
-            <label key={side}>
-              How many {eventWindow[side].unit}s {side} {milestoneName} should I include?
-              <TextInput type="number" required min={1} step={1} value={clarifiedCounts?.[side] ?? ''}
-                aria-describedby="ask-event-count-hint"
-                onChange={(e) => onEventCountChange(side, e.target.value ? e.target.valueAsNumber : undefined)} />
-            </label>
-          ))}
+          {sides.map((side) => {
+            const length = eventWindow[side]
+            const units = length.unit + 's'
+            return (
+              <label key={side}>
+                {length.editable
+                  ? `${units.charAt(0).toUpperCase() + units.slice(1)} ${side} ${milestoneName}`
+                  : `How many ${units} ${side} ${milestoneName} should I include?`}
+                <TextInput type="number" required min={1} step={1} value={eventWindowCount(length, clarifiedCounts?.[side]) ?? ''}
+                  aria-describedby="ask-event-count-hint"
+                  onChange={(e) => onEventCountChange(side, e.target.value ? e.target.valueAsNumber : null)} />
+              </label>
+            )
+          })}
           <p id="ask-event-count-hint">Enter a positive whole number.</p>
         </div>
       )}

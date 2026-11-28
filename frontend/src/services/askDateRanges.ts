@@ -8,9 +8,9 @@ export interface ComparisonRanges {
 type CalendarUnit = 'day' | 'week' | 'month'
 export interface EventWindowLength { count: number; unit: CalendarUnit }
 export type EventWindowSide = 'before' | 'after'
-export type EventWindowCounts = Partial<Record<EventWindowSide, number>>
+export type EventWindowCounts = Partial<Record<EventWindowSide, number | null>>
 type EventWindow = Record<EventWindowSide, EventWindowLength>
-type ProposedWindowLength = { count: number | null; unit: CalendarUnit }
+type ProposedWindowLength = { count: number | null; unit: CalendarUnit; editable?: true }
 type EventWindowProposal = Record<EventWindowSide, ProposedWindowLength>
 
 export interface ComparisonProposal {
@@ -145,15 +145,15 @@ const SMALL_COUNTS = [
 ]
 const TENS = ['twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety']
 // Capture longer number phrases in full so "one hundred twenty" cannot become "twenty".
-const COUNT_WORD = `(?:${[...SMALL_COUNTS, ...TENS].join('|')}|hundred|thousand|million|billion|trillion|minus|negative|point|half|quarter|few|several|a)`
-const WORD_COUNT = String.raw`${COUNT_WORD}(?:[\s-]+(?:${COUNT_WORD}|and))*`
+const COUNT_WORD = `(?:${[...SMALL_COUNTS, ...TENS].join('|')}|hundred|thousand|million|billion|trillion|minus|negative|point|half|quarter|few|several|couple|a)`
+const WORD_COUNT = String.raw`${COUNT_WORD}(?:[\s-]+(?:${COUNT_WORD}|and|of))*`
 const WINDOW_LENGTH = String.raw`(${NUMERIC_COUNT}|${WORD_COUNT})\s+(days?|weeks?|months?)`
 const CUSTOM_MILESTONE_WINDOW = new RegExp(
   String.raw`${WINDOW_START}${WINDOW_LENGTH}\s+before\s+${MILESTONE_TITLE}${COMPARE}${WINDOW_LENGTH}\s+after\b${MILESTONE_END}`, 'i',
 )
 
-const validWindowCount = (value: number | undefined): value is number =>
-  value !== undefined && Number.isSafeInteger(value) && value > 0
+const validWindowCount = (value: number | null): value is number =>
+  typeof value === 'number' && Number.isSafeInteger(value) && value > 0
 const cleanMilestoneTitle = (title?: string) => title?.trim().slice(0, 160) || undefined
 
 function parseWindowCount(value: string): number {
@@ -177,6 +177,7 @@ function parseWindowLength(value: string, unit: string): ProposedWindowLength {
   const writtenUnit = unit.toLowerCase()
   const plural = writtenUnit.endsWith('s')
   const calendarUnit = writtenUnit.replace(/s$/, '') as CalendarUnit
+  if (plural && /^a\s+couple\s+of$/i.test(value)) return { count: 2, unit: calendarUnit, editable: true }
   if (plural && /^(?:a\s+few|several)$/i.test(value)) return { count: null, unit: calendarUnit }
   const count = value.toLowerCase() === 'a' && !plural ? 1 : parseWindowCount(value)
   return { count, unit: calendarUnit }
@@ -248,12 +249,16 @@ function eventWindowBoundary(anchor: Date, { count, unit }: EventWindowLength, d
 const TWO_WEEKS: EventWindowLength = { count: 2, unit: 'week' }
 const DEFAULT_EVENT_WINDOW: EventWindow = { before: TWO_WEEKS, after: TWO_WEEKS }
 
+export function eventWindowCount(length: ProposedWindowLength, override?: number | null): number | null {
+  return override !== undefined && (length.editable || length.count === null) ? override : length.count
+}
+
 export function resolveEventWindow(proposal: ComparisonProposal['eventWindow'], counts?: EventWindowCounts): EventWindow | 'invalid' | undefined {
   if (!proposal || proposal === 'invalid') return proposal
-  const before = proposal.before.count ?? counts?.before
-  const after = proposal.after.count ?? counts?.after
+  const before = eventWindowCount(proposal.before, counts?.before)
+  const after = eventWindowCount(proposal.after, counts?.after)
   if (!validWindowCount(before) || !validWindowCount(after)) return 'invalid'
-  return { before: { ...proposal.before, count: before }, after: { ...proposal.after, count: after } }
+  return { before: { count: before, unit: proposal.before.unit }, after: { count: after, unit: proposal.after.unit } }
 }
 
 export function eventComparisonRanges(day: string, proposal?: ComparisonProposal['eventWindow'], counts?: EventWindowCounts): ComparisonRanges {

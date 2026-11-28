@@ -111,6 +111,33 @@ test('requires both counts for a few weeks before and several days after', () =>
   })
 })
 
+test('suggests an editable count for a couple of weeks and waits for the few days', () => {
+  const proposal = proposeComparison('a couple of weeks before Security Review vs. a few days after', 'America/New_York')
+  expect(proposal).toEqual({
+    ranges: EMPTY_RANGES, eventBased: true, milestoneName: 'Security Review',
+    eventWindow: { before: { count: 2, unit: 'week', editable: true }, after: { count: null, unit: 'day' } },
+  })
+  expect(eventComparisonRanges('2026-07-15', proposal?.eventWindow)).toEqual(EMPTY_RANGES)
+  expect(eventComparisonRanges('2026-07-15', proposal?.eventWindow, { after: 5 })).toEqual({
+    previous: { startDate: '2026-07-01', endDate: '2026-07-14' },
+    current: { startDate: '2026-07-16', endDate: '2026-07-20' },
+  })
+  expect(eventComparisonRanges('2026-07-15', proposal?.eventWindow, { before: null, after: 5 })).toEqual(EMPTY_RANGES)
+  expect(eventComparisonRanges('2026-07-15', proposal?.eventWindow, { before: 2.5, after: 5 })).toEqual(EMPTY_RANGES)
+  expect(eventComparisonRanges('2026-07-15', proposal?.eventWindow, { before: 3, after: 5 })).toEqual({
+    previous: { startDate: '2026-06-24', endDate: '2026-07-14' },
+    current: { startDate: '2026-07-16', endDate: '2026-07-20' },
+  })
+})
+
+test('can suggest an editable later count and use calendar months for the window', () => {
+  const proposal = proposeComparison('a day before Security Review vs. a couple of months after', 'America/New_York')
+  expect(eventComparisonRanges('2026-12-31', proposal?.eventWindow)).toEqual({
+    previous: { startDate: '2026-12-30', endDate: '2026-12-30' },
+    current: { startDate: '2027-01-01', endDate: '2027-02-28' },
+  })
+})
+
 test('uses the entire spelled-out count when it ends in a legacy two-week window', () => {
   const proposal = proposeComparison('twenty two weeks before Security Review vs. two weeks after', 'America/New_York')
   expect(proposal?.eventWindow).toEqual({ before: { count: 22, unit: 'week' }, after: { count: 2, unit: 'week' } })
