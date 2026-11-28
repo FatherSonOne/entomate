@@ -5,6 +5,7 @@ import { recordingsApi } from '../../services/api'
 import type { RecordingTrack } from '../../services/recordingAudioTracks'
 
 export interface ClipRange { startMs: number; endMs: number }
+type ClipExportTrack = RecordingTrack | 'adjusted'
 interface SavedClip extends ClipRange { id: string; title: string }
 interface Props {
   meetingId: string
@@ -13,7 +14,7 @@ interface Props {
   durationMs: number
   position: number
   drawing: boolean
-  tracks: { id: RecordingTrack; label: string }[]
+  tracks: { id: ClipExportTrack; label: string }[]
   transcript?: ReadonlyArray<TranscriptSegment> | null
   onRange: (range: ClipRange) => void
   onDraw: () => void
@@ -30,7 +31,7 @@ export function RecordingClips({
   const [clips, setClips] = useState<SavedClip[]>([])
   const [selected, setSelected] = useState<SavedClip | null>(null)
   const [title, setTitle] = useState('')
-  const [track, setTrack] = useState<RecordingTrack>('mix')
+  const [track, setTrack] = useState<ClipExportTrack>('mix')
   const [saving, setSaving] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [error, setError] = useState('')

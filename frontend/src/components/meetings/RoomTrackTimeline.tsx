@@ -18,10 +18,16 @@ interface Props {
   onSeek: (atMs: number) => void
   onSolo: (track: RoomParticipantTrack) => void
   onMute: (track: RoomParticipantTrack) => void
+  muteDisabled?: boolean
+  mixer?: {
+    gains: Partial<Record<RoomParticipantTrack, number>>
+    disabled: boolean
+    setGain: (track: RoomParticipantTrack, gain: number) => void
+  }
 }
 
 export function RoomTrackTimeline({
-  meetingId, tracks, audioTracks, labelOf, durationMs, position, soloed, muted, disabled, onSeek, onSolo, onMute,
+  meetingId, tracks, audioTracks, labelOf, durationMs, position, soloed, muted, disabled, onSeek, onSolo, onMute, muteDisabled, mixer,
 }: Props) {
   const [waveforms, setWaveforms] = useState<Partial<Record<RoomParticipantTrack, string | null>>>({})
   const playable = tracks.filter(track => (audioTracks?.[track]?.durationMs ?? 0) > 0).join(',')
@@ -50,6 +56,7 @@ export function RoomTrackTimeline({
         const label = labelOf(track)
         const available = (info?.durationMs ?? 0) > 0
         const waveform = waveforms[track]
+        const gain = mixer?.gains[track] ?? 0
         const isMuted = muted.has(track)
         const isSoloed = soloed === track
         return (
@@ -60,8 +67,14 @@ export function RoomTrackTimeline({
                 <button type="button" aria-label={`Solo ${label}`} aria-pressed={isSoloed}
                   disabled={disabled} onClick={() => onSolo(track)}>Solo</button>
                 <button type="button" aria-label={`Mute ${label} in Combined`} aria-pressed={isMuted}
-                  disabled={disabled} onClick={() => onMute(track)}>Mute</button>
+                  disabled={disabled || muteDisabled} onClick={() => onMute(track)}>Mute</button>
               </div>}
+              {available && mixer && <label className="bs-recording-track-gain">
+                Volume <output>{gain > 0 ? '+' : ''}{gain} dB</output>
+                <input type="range" min={-24} max={12} step={1} value={gain}
+                  aria-label={label + ' volume'} aria-valuetext={gain + ' decibels'}
+                  disabled={mixer.disabled} onChange={event => mixer.setGain(track, event.currentTarget.valueAsNumber)} />
+              </label>}
             </div>
             <div className="bs-recording-scrub bs-recording-room-lane"
               data-dimmed={soloed ? !isSoloed : isMuted} style={{ '--position': percent(position) } as React.CSSProperties}>

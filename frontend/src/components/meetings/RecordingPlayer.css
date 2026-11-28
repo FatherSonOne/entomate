@@ -489,3 +489,23 @@
   cursor: crosshair;
   touch-action: none;
 }
+
+.bs-recording-track-gain {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 4px;
+  font-size: 11px;
+}
+.bs-recording-track-gain output {
+  color: var(--bs-d-mut);
+  font-variant-numeric: tabular-nums;
+}
+.bs-recording-track-gain input {
+  grid-column: 1 / -1;
+  width: 100%;
+  margin: 0;
+  accent-color: var(--bs-d-brand);
+}
+.bs-recording-room-row:has(.bs-recording-track-gain) .bs-recording-room-lane {
+  height: 83px;
+}

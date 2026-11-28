@@ -5,6 +5,8 @@ import { vi, describe, test, expect, beforeEach, afterEach } from 'vitest'
 const api = vi.hoisted(() => ({
   playback: vi.fn(), waveform: vi.fn(), removeAudio: vi.fn(),
   listClips: vi.fn(), clip: vi.fn(), saveClip: vi.fn(), downloadClip: vi.fn(),
+  recordingMix: vi.fn(), balanceRecordingMix: vi.fn(), previewRecordingMix: vi.fn(),
+  saveRecordingMix: vi.fn(), downloadRecordingMix: vi.fn(),
 }))
 const cacheMock = vi.hoisted(() => ({ invalidate: vi.fn() }))
 vi.mock('../services/api', () => ({ recordingsApi: api, meetingsApi: { renameSpeaker: vi.fn() } }))
@@ -30,6 +32,7 @@ const okFetch = vi.fn(async (url: RequestInfo | URL) => new Response(`audio:${St
 beforeEach(() => {
   vi.clearAllMocks()
   api.playback.mockResolvedValue(PLAYBACK)
+  api.recordingMix.mockResolvedValue({ mix: null })
   vi.stubGlobal('fetch', okFetch)
   URL.createObjectURL = vi.fn(() => 'blob:recording')
   URL.revokeObjectURL = vi.fn()
@@ -242,6 +245,46 @@ describe('RecordingPlayer', () => {
     } finally {
       pause.mockRestore()
       play.mockRestore()
+    }
+  })
+
+  test('balances participant volumes and keeps the same cursor during an adjusted preview', async () => {
+    const gains = { p1: 0, p2: 10 }
+    api.balanceRecordingMix.mockResolvedValue({ gains })
+    api.previewRecordingMix.mockResolvedValue(new Blob(['adjusted']))
+    api.saveRecordingMix.mockResolvedValue({ mix: { gains: { p1: 0, p2: 8 } } })
+    api.playback.mockResolvedValue({ url: 'https://signed.test/combined', durationMs: 60_000 })
+    api.waveform.mockResolvedValue({ peaks: [0.3, 0.4, 0.2] })
+    const pause = vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {})
+    try {
+      render(<RecordingPlayer meetingId={MEETING} durationMs={60_000} roomRecording cloudRoom
+        audioTracks={{ p1: { pieces: 1, durationMs: 60_000, label: 'Host' }, p2: { pieces: 1, durationMs: 60_000, label: 'Guest' } }} />)
+      const source = screen.getByRole('combobox', { name: 'Audio source' })
+      expect(source).toHaveValue('')
+      fireEvent.change(screen.getByRole('slider', { name: 'Playback position' }), { target: { value: '12.25' } })
+      const original = await screen.findByTestId('recording-player') as HTMLAudioElement
+      Object.defineProperty(original, 'duration', { value: 60 })
+      fireEvent.loadedMetadata(original)
+      fireEvent.click(screen.getByRole('button', { name: 'Recap mixer' }))
+      const balance = screen.getByRole('button', { name: 'Balance voices' })
+      await waitFor(() => expect(balance).toBeEnabled())
+      fireEvent.click(balance)
+      const guest = screen.getByRole('slider', { name: 'Guest volume' })
+      await waitFor(() => expect(guest).toHaveValue('10'))
+      fireEvent.click(screen.getByRole('button', { name: 'Preview adjusted mix' }))
+      await waitFor(() => expect(source).toHaveValue('adjusted'))
+      const adjusted = await screen.findByTestId('recording-player') as HTMLAudioElement
+      Object.defineProperty(adjusted, 'duration', { value: 60 })
+      fireEvent.loadedMetadata(adjusted)
+      expect(adjusted.currentTime).toBe(12.25)
+      expect(api.previewRecordingMix).toHaveBeenCalledWith(MEETING, gains)
+      fireEvent.change(guest, { target: { value: '8' } })
+      expect(screen.getByRole('button', { name: 'Refresh adjusted preview' })).toBeEnabled()
+      fireEvent.click(screen.getByRole('button', { name: 'Save adjusted mix' }))
+      expect(await screen.findByText('Adjusted mix saved.')).toBeInTheDocument()
+      expect(api.saveRecordingMix).toHaveBeenCalledWith(MEETING, { p1: 0, p2: 8 })
+    } finally {
+      pause.mockRestore()
     }
   })
 

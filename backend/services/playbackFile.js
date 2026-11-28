@@ -26,7 +26,7 @@ const PEAK_FILTER = 'aresample=8000:async=1:first_pts=0,asetnsamples=n=2000:p=0,
   'astats=metadata=1:reset=1:measure_perchannel=none:measure_overall=Peak_level,' +
   'ametadata=mode=print:key=lavfi.astats.Overall.Peak_level:file=-';
 
-function run(cmd, args, timeoutMs = TIMEOUT_MS, maxStdout = 0) {
+function run(cmd, args, timeoutMs = TIMEOUT_MS, maxStdout = 0, captureStderr = false) {
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
     let stdout = '';
@@ -46,7 +46,7 @@ function run(cmd, args, timeoutMs = TIMEOUT_MS, maxStdout = 0) {
     });
     child.on('close', (code, signal) => {
       clearTimeout(timer);
-      if (code === 0) resolve(stdout);
+      if (code === 0) resolve(captureStderr ? stderr : stdout);
       else reject(new Error(`ffmpeg exited with ${code ?? signal}: ${stderr.trim()}`));
     });
   });
@@ -97,14 +97,16 @@ async function audioDuration(file) {
 }
 
 /** Render seekable mono Opus on the room recording clock. Inputs are local files. */
-async function renderAlignedAudio(clips, durationMs, output) {
-  const filters = clips.map(({ startMs, endMs }, i) => (
+async function renderAlignedAudio(clips, durationMs, output, adjusted = false) {
+  const filters = clips.map(({ startMs, endMs, gainDb }, i) => (
     `[${i}:a:0]asetpts=PTS-STARTPTS,aresample=48000:async=1:first_pts=0,aformat=channel_layouts=mono,` +
     `atrim=duration=${(endMs - startMs) / 1000},adelay=${startMs},` +
+    (gainDb == null ? '' : `volume=${gainDb}dB,`) +
     `apad,atrim=duration=${durationMs / 1000}[a${i}]`
   ));
   const mix = clips.map((_, i) => `[a${i}]`).join('');
-  filters.push(`${mix}amix=inputs=${clips.length}:normalize=0,alimiter=limit=0.95:latency=1[audio]`);
+  const limiter = adjusted ? 'alimiter=limit=0.85:level=0:latency=1' : 'alimiter=limit=0.95:latency=1';
+  filters.push(`${mix}amix=inputs=${clips.length}:normalize=0,${limiter}[audio]`);
   await run('ffmpeg', [
     '-nostdin', '-hide_banner', '-loglevel', 'error', '-protocol_whitelist', 'file', '-y',
     ...clips.flatMap(clip => ['-i', clip.file]), '-filter_complex', filters.join(';'), '-map', '[audio]',
@@ -126,6 +128,17 @@ async function extractTranscriptionClip(input, output, startMs, durationMs) {
     '-nostdin', '-hide_banner', '-loglevel', 'error', '-y', '-ss', String(startMs / 1000), '-i', input,
     '-t', String(durationMs / 1000), '-c:a', 'flac', output,
   ]);
+}
+
+async function measureAudioLoudness(file) {
+  const output = await run('ffmpeg', [
+    '-nostdin', '-hide_banner', '-nostats', '-protocol_whitelist', 'file', '-i', file,
+    '-map', '0:a:0', '-af', 'loudnorm=print_format=json', '-f', 'null', '-',
+  ], TIMEOUT_MS, 0, true);
+  const stats = JSON.parse(output.slice(output.lastIndexOf('{'), output.lastIndexOf('}') + 1));
+  const loudness = Number(stats.input_i);
+  const peak = Number(stats.input_tp);
+  return Number.isFinite(loudness) && loudness >= -55 && Number.isFinite(peak) ? { loudness, peak } : null;
 }
 
 async function exportAudioRange(input, output, startMs, endMs) {
@@ -185,6 +198,6 @@ async function readWaveformPeaksFromAudio(audio) {
 
 module.exports = {
   makeSeekable, extractSpeechAudio, prepareTranscriptionAudio, extractTranscriptionClip, renderAlignedAudio, audioDuration,
-  exportAudioRange,
+  exportAudioRange, measureAudioLoudness,
   readWaveformPeaks, readWaveformPeaksFromAudio,
 };

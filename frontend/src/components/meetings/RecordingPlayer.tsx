@@ -9,6 +9,7 @@ import { readRecordingWaveform, waveformFromPeaks } from '../../services/recordi
 import { recordingSpeakers } from './recordingSpeakers'
 import { RoomAudioStem } from './RoomAudioStem'
 import { RecordingClips, validClipRange, type ClipRange } from './RecordingClips'
+import { RecordingMixer, useRecordingMix } from './RecordingMixer'
 import { RoomTrackTimeline } from './RoomTrackTimeline'
 import { recordingsApi } from '../../services/api'
 import './RecordingPlayer.css'
@@ -44,6 +45,8 @@ export interface RecordingPlayerProps {
   onAudioRemoved?: () => void
 }
 
+type PlayerTrack = PlaybackTrack | 'adjusted'
+
 interface Source extends RecordingAudio {
   url: string
 }
@@ -74,13 +77,15 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
   ref,
 ) {
   const [clipsOpen, setClipsOpen] = useState(Boolean(sharedClipId))
+  const [mixerOpen, setMixerOpen] = useState(false)
+  const adjustedAudio = useRef<Blob | null>(null)
   const [drawingClip, setDrawingClip] = useState(false)
   const [clipRange, setClipRange] = useState<ClipRange>({ startMs: NaN, endMs: NaN })
   const clipDrag = useRef<number | null>(null)
   const mainWaveform = useRef<HTMLDivElement>(null)
   const previewFrame = useRef<number | undefined>(undefined)
   const [source, setSource] = useState<Source | null>(null)
-  const [track, setTrack] = useState<PlaybackTrack | undefined>()
+  const [track, setTrack] = useState<PlayerTrack | undefined>()
   const [loading, setLoading] = useState(false)
   const [progress, setProgress] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -115,7 +120,8 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
 
   const clipId = useId()
   const speakerGradientId = `${clipId}-speakers`
-  const trackDuration = track ? audioTracks?.[track]?.durationMs : durationMs
+  const originalTrack = track === 'adjusted' ? undefined : track
+  const trackDuration = originalTrack ? audioTracks?.[originalTrack]?.durationMs : durationMs
   const effectiveDuration = mediaDuration || finiteDuration(source?.durationMs) || finiteDuration(trackDuration)
   // An incomplete track still uses the full recorded timeline.
   const timelineDuration = track ? Math.max(effectiveDuration, finiteDuration(durationMs)) : effectiveDuration
@@ -134,14 +140,21 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
   const participantTracks = roomParticipantTracks(audioTracks)
   const roomTimeline = !audioRemoved && cloudRoom && participantTracks.length > 0
   const clipDuration = finiteDuration(durationMs)
-  const canClip = !audioRemoved && cloudRoom && clipDuration > 0 && !waveformReplacement
+  const canClip = !audioRemoved && cloudRoom === true && clipDuration > 0 && !waveformReplacement
   const clipShown = canClip && clipsOpen
+  const canMix = canClip && participantTracks.some(name => (audioTracks?.[name]?.durationMs ?? 0) > 0)
+  const mixerShown = canMix && mixerOpen
+  const mixer = useRecordingMix(meetingId, canMix && (mixerShown || clipShown), audio => {
+    const changed = adjustedAudio.current !== audio
+    adjustedAudio.current = audio
+    selectTrack('adjusted', changed)
+  })
   const highlightClip = clipShown && validClipRange(clipRange, clipDuration)
   const filteredMix = roomTimeline && !track && participantTracks.some(name => mutedParticipants.has(name))
   const audibleParticipants = filteredMix
     ? participantTracks.filter(name => (audioTracks?.[name]?.durationMs ?? 0) > 0 && !mutedParticipants.has(name))
     : []
-  const waveformTrack = roomTimeline ? undefined : track
+  const waveformTrack = roomTimeline ? undefined : originalTrack
   const trackKey = waveformTrack ?? 'mix'
   const waveform = audioRemoved ? null : ((!waveformTrack ? savedWaveform : null) ?? waveforms[trackKey] ?? null)
   const availableTracks: PlaybackTrack[] = [
@@ -184,7 +197,7 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
     return () => controller.abort()
   }, [audioRemoved, audioUrl, durationMs, meetingId, waveformTrack, trackKey, waveform])
 
-  const load = async (playbackTrack: PlaybackTrack | undefined, refresh = false): Promise<void> => {
+  const load = async (playbackTrack: PlayerTrack | undefined, refresh = false): Promise<void> => {
     if (request.current || (source && playbackTrack === track && !refresh)) return
     const controller = new AbortController()
     request.current = controller
@@ -192,11 +205,13 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
     setProgress(null)
     setError(null)
     try {
-      const recording = audioUrl
+      const recording = playbackTrack === 'adjusted' && adjustedAudio.current
+        ? { durationMs: clipDuration, blob: adjustedAudio.current, url: undefined }
+        : audioUrl
         ? { url: audioUrl, durationMs: finiteDuration(durationMs), blob: undefined }
         : await loadRecordingAudio(meetingId, fetch, fraction => {
           if (!controller.signal.aborted) setProgress(fraction)
-        }, controller.signal, playbackTrack)
+        }, controller.signal, playbackTrack === 'adjusted' ? undefined : playbackTrack)
       if (controller.signal.aborted) return
       const url = recording.url ?? URL.createObjectURL(recording.blob!)
       setSource({ ...recording, url })
@@ -214,9 +229,9 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
     }
   }
 
-  const switchTrack = (nextTrack: PlaybackTrack | undefined, atMs: number, shouldPlay: boolean, endAtMs?: number): void => {
+  const switchTrack = (nextTrack: PlayerTrack | undefined, atMs: number, shouldPlay: boolean, endAtMs?: number): void => {
     const audio = audioRef.current
-    const endMs = nextTrack ? audioTracks?.[nextTrack]?.durationMs : durationMs
+    const endMs = nextTrack && nextTrack !== 'adjusted' ? audioTracks?.[nextTrack]?.durationMs : durationMs
     pending.current = { atMs: Math.min(atMs, endMs || Infinity), play: shouldPlay, endMs: endAtMs }
     audio?.pause()
     request.current?.abort()
@@ -232,8 +247,8 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
     void load(nextTrack, true)
   }
 
-  const selectTrack = (nextTrack: PlaybackTrack | undefined): void => {
-    if (nextTrack === track) return
+  const selectTrack = (nextTrack: PlayerTrack | undefined, replace = false): void => {
+    if (!replace && nextTrack === track) return
     const audio = audioRef.current
     const ready = audio && mediaReady.current
     switchTrack(nextTrack, ready ? Math.round(audio.currentTime * 1000) : position,
@@ -456,7 +471,7 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
     try {
       if (all) await recordingsApi.downloadTracks(meetingId)
       else {
-        const { name, url } = await recordingsApi.trackDownload(meetingId, track || 'mix')
+        const { name, url } = await recordingsApi.trackDownload(meetingId, originalTrack || 'mix')
         const link = document.createElement('a')
         link.href = url
         link.download = name
@@ -480,9 +495,11 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
           Audio source
           <select className="bs-key" value={track ?? ''} onChange={event => {
             const value = availableTracks.find(name => name === event.currentTarget.value)
-            selectTrack(value)
+            if (event.currentTarget.value === 'adjusted' && adjustedAudio.current) selectTrack('adjusted')
+            else selectTrack(value)
           }}>
             <option value="">Combined</option>
+            {adjustedAudio.current && <option value="adjusted">Adjusted mix</option>}
             {availableTracks.map(name => {
               const coverage = audioTracks?.[name]?.durationMs ?? 0
               return <option key={name} value={name}>{labelOf(name)}
@@ -503,10 +520,12 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
         </ul>
       )}
       {!audioRemoved && cloudRoom && <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Aligned track downloads">
-        <Key size="sm" disabled={downloading} onClick={() => void download(false)}>Download {track ? labelOf(track) : 'Combined'}</Key>
+        <Key size="sm" disabled={downloading} onClick={() => void download(false)}>Download {originalTrack ? labelOf(originalTrack) : 'Combined'}</Key>
         {availableTracks.length > 0 && <Key size="sm" disabled={downloading} onClick={() => void download(true)}>
           {downloading ? 'Preparing download…' : 'Download all tracks (ZIP)'}
         </Key>}
+        {canMix && <Key size="sm" aria-expanded={mixerOpen}
+          onClick={() => setMixerOpen(!mixerOpen)}>Recap mixer</Key>}
         {canClip && <Key size="sm" aria-expanded={clipsOpen} onClick={() => {
           setClipsOpen(!clipsOpen)
           setDrawingClip(false)
@@ -514,9 +533,15 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
         }}>Recap clips</Key>}
         {downloadError && <p className="bs-recording-error" role="alert">{downloadError}</p>}
       </div>}
+      {mixerShown && <RecordingMixer mixer={mixer}
+        source={track === 'adjusted' ? 'adjusted' : track ? 'participant' : 'combined'} onCombined={() => {
+          if (mutedParticipants.size) setMutedParticipants(new Set())
+          selectTrack(undefined)
+        }} />}
       {clipShown && <RecordingClips meetingId={meetingId} sharedClipId={sharedClipId} range={clipRange}
         durationMs={clipDuration} position={position} drawing={drawingClip} transcript={transcriptSegments}
-        tracks={[{ id: 'mix', label: 'Combined' }, ...participantTracks.filter(name => availableTracks.includes(name))
+        tracks={[{ id: 'mix', label: 'Combined' }, ...(mixer.saved ? [{ id: 'adjusted' as const, label: 'Saved adjusted mix' }] : []),
+          ...participantTracks.filter(name => availableTracks.includes(name))
           .map(name => ({ id: name, label: labelOf(name) }))]}
         onRange={setClipRange}
         onCue={cueAt}
@@ -562,6 +587,7 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
         <div className={roomTimeline ? 'bs-recording-room-row' : undefined}>
           {roomTimeline && <div className="bs-recording-room-label">
             <strong>Combined</strong>
+            {track === 'adjusted' && <span>Adjusted mix preview</span>}
             {filteredMix && <span>{audibleParticipants.length ? 'Mutes applied' : 'All tracks muted'}</span>}
           </div>}
           <div className="bs-recording-master-lane">
@@ -653,8 +679,9 @@ export const RecordingPlayer = forwardRef<RecordingPlayerHandle, RecordingPlayer
         </div>
         {roomTimeline && (
           <RoomTrackTimeline meetingId={meetingId} tracks={participantTracks} audioTracks={audioTracks} labelOf={labelOf}
-            durationMs={timelineDuration} position={position} soloed={track}
-            muted={mutedParticipants} disabled={removing} onSeek={seek}
+            durationMs={timelineDuration} position={position} soloed={originalTrack}
+            mixer={mixerShown ? { gains: mixer.gains, setGain: mixer.setGain, disabled: !mixer.loaded || Boolean(mixer.busy) } : undefined}
+            muted={mutedParticipants} muteDisabled={track === 'adjusted'} disabled={removing} onSeek={seek}
             onSolo={name => selectTrack(track === name ? undefined : name)} onMute={toggleParticipantMute} />
         )}
         {!audioRemoved && timelineDuration > 0 && (roomRecording ? participantTracks : ISOLATED_AUDIO_TRACKS).map(name => {

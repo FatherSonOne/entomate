@@ -955,13 +955,17 @@ async function loadAlignedRecording(orgId, meetingId) {
   return meeting;
 }
 
-async function alignedDownloads(orgId, meetingId, requestedTrack) {
+function alignedParticipantTracks(job) {
+  return Object.entries(job.participantTracks || {}).filter(([key, track]) =>
+    /^p[1-9]\d{0,2}$/.test(key) && track?.pieces && track.playbackFile);
+}
+
+async function alignedDownloadSources(orgId, meetingId, requestedTrack) {
   const { recording_job: job } = await loadAlignedRecording(orgId, meetingId);
-  const tracks = [['mix', { label: 'Combined', playbackFile: job.playbackFile }],
-    ...Object.entries(job.participantTracks || {}).filter(([key, track]) => /^p[1-9]\d{0,2}$/.test(key) && track?.pieces)];
+  const tracks = [['mix', { label: 'Combined', playbackFile: job.playbackFile }], ...alignedParticipantTracks(job)];
   const folder = recordingFolder(orgId, meetingId) + '/';
   const available = tracks.filter(([key, track]) =>
-    (requestedTrack === 'all' || requestedTrack === key)
+    (requestedTrack === 'all' || requestedTrack === key || (requestedTrack === 'participants' && key !== 'mix'))
     && typeof track.playbackFile === 'string' && track.playbackFile.startsWith(folder));
   if (!available.length || (requestedTrack === 'all' && available[0][0] !== 'mix')) {
     throw new RecorderError(404, 'This aligned track is unavailable.');
@@ -972,8 +976,13 @@ async function alignedDownloads(orgId, meetingId, requestedTrack) {
     const { data, error } = await supabase.storage.from(BUCKET)
       .createSignedUrl(track.playbackFile, PLAYBACK_FILE_TTL_S, { download: name });
     if (error || !data?.signedUrl) throw new RecorderError(503, 'The recording download could not be prepared.');
-    return { name, url: data.signedUrl };
+    return { track: key, name, url: data.signedUrl };
   }));
+}
+
+async function alignedDownloads(orgId, meetingId, requestedTrack) {
+  if (requestedTrack === 'participants') throw new RecorderError(404, 'This aligned track is unavailable.');
+  return (await alignedDownloadSources(orgId, meetingId, requestedTrack)).map(({ name, url }) => ({ name, url }));
 }
 
 async function signedPieces(pieces, mimeType, expectedCount) {
@@ -1075,6 +1084,8 @@ module.exports = {
   saveRoomPlayback,
   alignedDownloads,
   loadAlignedRecording,
+  alignedDownloadSources,
+  alignedParticipantTracks,
   startRoomRecording,
   finishRoomRecording,
   botsInCall,
