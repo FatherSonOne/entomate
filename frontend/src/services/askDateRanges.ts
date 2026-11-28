@@ -7,14 +7,18 @@ export interface ComparisonRanges {
 
 type CalendarUnit = 'day' | 'week' | 'month'
 export interface EventWindowLength { count: number; unit: CalendarUnit }
-interface EventWindow { before: EventWindowLength; after: EventWindowLength }
+export type EventWindowSide = 'before' | 'after'
+export type EventWindowCounts = Partial<Record<EventWindowSide, number>>
+type EventWindow = Record<EventWindowSide, EventWindowLength>
+type ProposedWindowLength = { count: number | null; unit: CalendarUnit }
+type EventWindowProposal = Record<EventWindowSide, ProposedWindowLength>
 
 export interface ComparisonProposal {
   ranges: ComparisonRanges
   relative?: `completed-${CalendarUnit}s` | `invalid-${CalendarUnit}-count`
   eventBased?: true
   milestoneName?: string
-  eventWindow?: EventWindow | 'invalid'
+  eventWindow?: EventWindowProposal | 'invalid'
 }
 
 export interface ComparisonEvent {
@@ -22,6 +26,7 @@ export interface ComparisonEvent {
   date: string
   source: 'manual' | 'scheduled' | 'completed'
   key?: string
+  clarifiedCounts?: EventWindowCounts
 }
 
 export const EMPTY_RANGES: ComparisonRanges = {
@@ -140,14 +145,15 @@ const SMALL_COUNTS = [
 ]
 const TENS = ['twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety']
 // Capture longer number phrases in full so "one hundred twenty" cannot become "twenty".
-const COUNT_WORD = `(?:${[...SMALL_COUNTS, ...TENS].join('|')}|hundred|thousand|million|billion|trillion|minus|negative|point|half|quarter|a)`
+const COUNT_WORD = `(?:${[...SMALL_COUNTS, ...TENS].join('|')}|hundred|thousand|million|billion|trillion|minus|negative|point|half|quarter|few|a)`
 const WORD_COUNT = String.raw`${COUNT_WORD}(?:[\s-]+(?:${COUNT_WORD}|and))*`
 const WINDOW_LENGTH = String.raw`(${NUMERIC_COUNT}|${WORD_COUNT})\s+(days?|weeks?|months?)`
 const CUSTOM_MILESTONE_WINDOW = new RegExp(
   String.raw`${WINDOW_START}${WINDOW_LENGTH}\s+before\s+${MILESTONE_TITLE}${COMPARE}${WINDOW_LENGTH}\s+after\b${MILESTONE_END}`, 'i',
 )
 
-const validWindowCount = (value: number) => Number.isSafeInteger(value) && value > 0
+const validWindowCount = (value: number | undefined): value is number =>
+  value !== undefined && Number.isSafeInteger(value) && value > 0
 const cleanMilestoneTitle = (title?: string) => title?.trim().slice(0, 160) || undefined
 
 function parseWindowCount(value: string): number {
@@ -167,10 +173,13 @@ function parseWindowCount(value: string): number {
   return words.length === 2 && ones > 0 && ones < 10 ? base + ones : NaN
 }
 
-function parseWindowLength(value: string, unit: string): EventWindowLength {
+function parseWindowLength(value: string, unit: string): ProposedWindowLength {
   const writtenUnit = unit.toLowerCase()
-  const count = value.toLowerCase() === 'a' && !writtenUnit.endsWith('s') ? 1 : parseWindowCount(value)
-  return { count, unit: writtenUnit.replace(/s$/, '') as CalendarUnit }
+  const plural = writtenUnit.endsWith('s')
+  const calendarUnit = writtenUnit.replace(/s$/, '') as CalendarUnit
+  if (plural && /^a\s+few$/i.test(value)) return { count: null, unit: calendarUnit }
+  const count = value.toLowerCase() === 'a' && !plural ? 1 : parseWindowCount(value)
+  return { count, unit: calendarUnit }
 }
 
 export function eventComparisonProposal(question: string): ComparisonProposal | null {
@@ -187,8 +196,9 @@ export function eventComparisonProposal(question: string): ComparisonProposal | 
   if (!milestoneName || !beforeCount || !beforeUnit || !afterCount || !afterUnit) return null
   const before = parseWindowLength(beforeCount, beforeUnit)
   const after = parseWindowLength(afterCount, afterUnit)
+  const valid = [before.count, after.count].every((count) => count === null || validWindowCount(count))
   return { ranges: EMPTY_RANGES, eventBased: true, milestoneName,
-    eventWindow: validWindowCount(before.count) && validWindowCount(after.count) ? { before, after } : 'invalid' }
+    eventWindow: valid ? { before, after } : 'invalid' }
 }
 
 const ELIDED_UNIT = String.raw`(?=\s*(?:[.,:;!?]|$)|\s+(?:for|on|about|in)\b)`
@@ -238,7 +248,16 @@ function eventWindowBoundary(anchor: Date, { count, unit }: EventWindowLength, d
 const TWO_WEEKS: EventWindowLength = { count: 2, unit: 'week' }
 const DEFAULT_EVENT_WINDOW: EventWindow = { before: TWO_WEEKS, after: TWO_WEEKS }
 
-export function eventComparisonRanges(day: string, window: ComparisonProposal['eventWindow'] = DEFAULT_EVENT_WINDOW): ComparisonRanges {
+export function resolveEventWindow(proposal: ComparisonProposal['eventWindow'], counts?: EventWindowCounts): EventWindow | 'invalid' | undefined {
+  if (!proposal || proposal === 'invalid') return proposal
+  const before = proposal.before.count ?? counts?.before
+  const after = proposal.after.count ?? counts?.after
+  if (!validWindowCount(before) || !validWindowCount(after)) return 'invalid'
+  return { before: { ...proposal.before, count: before }, after: { ...proposal.after, count: after } }
+}
+
+export function eventComparisonRanges(day: string, proposal?: ComparisonProposal['eventWindow'], counts?: EventWindowCounts): ComparisonRanges {
+  const window = resolveEventWindow(proposal, counts) ?? DEFAULT_EVENT_WINDOW
   if (!isCalendarDate(day) || window === 'invalid') return EMPTY_RANGES
   const anchor = new Date(day + 'T00:00:00Z')
   const ranges = {

@@ -22,9 +22,9 @@ import type { UseNotesResult } from '../hooks/useSearch'
 import { searchApi } from '../services/api'
 import {
   EMPTY_RANGES, calendarDateInZone, eventComparisonProposal, eventComparisonRanges, proposeComparison,
-  rangeDates, readComparisonRanges, validComparisonRanges,
+  rangeDates, readComparisonRanges, resolveEventWindow, validComparisonRanges,
 } from '../services/askDateRanges'
-import type { ComparisonEvent, ComparisonRanges, EventWindowLength } from '../services/askDateRanges'
+import type { ComparisonEvent, ComparisonRanges, EventWindowLength, EventWindowSide } from '../services/askDateRanges'
 import {
   GROUPS, groupCount, isFilter, matchCommands, metaLine, readUrlState, resultHref, resultMomentHref, searchEverything,
   shortDate, statusSignal, timecode, writeUrlState,
@@ -78,16 +78,16 @@ function SearchPage({ owner, workspace }: { owner: string | null; workspace?: { 
   })
   const historyEvent = location.state?.askEvent as { workspaceId: string; event: ComparisonEvent } | undefined
   const eventProposal = useMemo(() => eventComparisonProposal(url.q), [url.q])
-  const confirmedEvent = comparisonRanges && eventProposal && eventProposal.eventWindow !== 'invalid'
-    ? (historyEvent?.workspaceId === workspace?.id ? historyEvent?.event : undefined) ?? restored?.answer?.event
-    : undefined
+  const savedEvent = (historyEvent?.workspaceId === workspace?.id ? historyEvent?.event : undefined) ?? restored?.answer?.event
+  const confirmedEvent = comparisonRanges && eventProposal && savedEvent
+    && resolveEventWindow(eventProposal.eventWindow, savedEvent.clarifiedCounts) !== 'invalid' ? savedEvent : undefined
   const proposedComparison = useMemo(() => {
     if (!url.ask) return null
     if (eventProposal) return confirmedEvent ? null : eventProposal
     return comparisonParam === null ? proposeComparison(url.q, timeZone) : null
   }, [url.ask, url.q, comparisonParam, timeZone, eventProposal, confirmedEvent])
   const confirmedDraft = {
-    ...(confirmedEvent ? { ...eventProposal, event: confirmedEvent } : {}),
+    ...(confirmedEvent ? { ...eventProposal, event: confirmedEvent, clarifiedCounts: confirmedEvent.clarifiedCounts } : {}),
     ranges: comparisonRanges ?? EMPTY_RANGES,
   }
   const [draft, setDraft] = useState(restored?.draft ?? (comparisonParam === null ? url.q : comparisonQuestion ?? ''))
@@ -202,7 +202,8 @@ function SearchPage({ owner, workspace }: { owner: string | null; workspace?: { 
     if (!rangeDraft || !workspace || !validComparisonRanges(rangeDraft.ranges)) return
     if ((rangeDraft.eventBased && !rangeDraft.event?.date) || !validEventWindow(rangeDraft)) return
     const event = rangeDraft.eventBased && rangeDraft.event
-      ? { ...rangeDraft.event, name: rangeDraft.event.name.trim() || rangeDraft.milestoneName || 'Launch' }
+      ? { ...rangeDraft.event, name: rangeDraft.event.name.trim() || rangeDraft.milestoneName || 'Launch',
+        ...(rangeDraft.clarifiedCounts ? { clarifiedCounts: rangeDraft.clarifiedCounts } : {}) }
       : undefined
     const compare = rangeDates(rangeDraft.ranges).join(',')
     const question = rangeDraft.question ?? COMPARISON_QUESTION
@@ -215,8 +216,18 @@ function SearchPage({ owner, workspace }: { owner: string | null; workspace?: { 
     setRangeDraft((previous) => previous?.eventBased ? {
       ...previous,
       event,
-      ranges: event?.date === previous.event?.date ? previous.ranges : eventComparisonRanges(event?.date ?? '', previous.eventWindow),
+      ranges: event?.date === previous.event?.date ? previous.ranges
+        : eventComparisonRanges(event?.date ?? '', previous.eventWindow, previous.clarifiedCounts),
     } : previous)
+  }
+
+  const changeEventCount = (side: EventWindowSide, count?: number) => {
+    setRangeDraft((previous) => {
+      if (!previous?.eventBased) return previous
+      const clarifiedCounts = { ...previous.clarifiedCounts, [side]: count }
+      return { ...previous, clarifiedCounts,
+        ranges: eventComparisonRanges(previous.event?.date ?? '', previous.eventWindow, clarifiedCounts) }
+    })
   }
 
   const changeMode = (mode: SearchMode) => {
@@ -297,6 +308,7 @@ function SearchPage({ owner, workspace }: { owner: string | null; workspace?: { 
             confirmationRef={confirmationRef}
             proposedQuestion={rangeDraft.question !== draft.trim() ? rangeDraft.question : undefined}
             onEventChange={changeEvent}
+            onEventCountChange={changeEventCount}
             onChange={(ranges) => setRangeDraft({ ...rangeDraft, ranges })} onSubmit={onCompare} />}
         </div>
       )}
@@ -499,9 +511,10 @@ function agentWord(field: string): string {
 
 // ── Ask Entomate ──
 
-function validEventWindow({ eventWindow, event, ranges }: ComparisonDraft): boolean {
-  if (!eventWindow) return true
-  return eventWindow !== 'invalid' && !!event?.date
+function validEventWindow({ eventWindow, clarifiedCounts, event, ranges }: ComparisonDraft): boolean {
+  const window = resolveEventWindow(eventWindow, clarifiedCounts)
+  if (!window) return true
+  return window !== 'invalid' && !!event?.date
     && ranges.previous.endDate < event.date && event.date < ranges.current.startDate
 }
 
@@ -510,7 +523,7 @@ function eventWindowLabel({ count, unit }: EventWindowLength): string {
   return `${count} ${label}${count === 1 ? '' : 's'}`
 }
 
-function ComparisonForm({ draft, timeZone, workspace, confirmationRef, proposedQuestion, onChange, onEventChange, onSubmit }: {
+function ComparisonForm({ draft, timeZone, workspace, confirmationRef, proposedQuestion, onChange, onEventChange, onEventCountChange, onSubmit }: {
   draft: ComparisonDraft
   timeZone: string
   workspace?: { id: string; name?: string } | null
@@ -518,9 +531,13 @@ function ComparisonForm({ draft, timeZone, workspace, confirmationRef, proposedQ
   proposedQuestion?: string
   onChange: (ranges: ComparisonRanges) => void
   onEventChange: (event?: ComparisonEvent) => void
+  onEventCountChange: (side: EventWindowSide, count?: number) => void
   onSubmit: (e: React.FormEvent) => void
 }): React.ReactElement {
-  const { ranges, relative, question, eventBased, event, milestoneName, eventWindow } = draft
+  const { ranges, relative, question, eventBased, event, milestoneName, eventWindow, clarifiedCounts } = draft
+  const resolvedWindow = resolveEventWindow(eventWindow, clarifiedCounts)
+  const sides = (['before', 'after'] as const).filter((side) => eventWindow && eventWindow !== 'invalid'
+    && eventWindow[side].count === null)
   const dates = rangeDates(ranges)
   const valid = validComparisonRanges(ranges)
   const complete = dates.every(Boolean)
@@ -539,18 +556,31 @@ function ComparisonForm({ draft, timeZone, workspace, confirmationRef, proposedQ
       {relative === 'invalid-month-count' && !complete && <p>Use the same positive whole number of months for both periods, or enter dates below.</p>}
       {question && !relative && !eventBased && !complete && <p>Fill in the missing dates or correct them below. Include a year for each range when typing dates.</p>}
       {eventWindow === 'invalid' && <p>Enter each count in digits using positive whole numbers, such as 2 weeks or 1 month, then submit your question again.</p>}
+      {eventWindow && eventWindow !== 'invalid' && sides.length > 0 && (
+        <div className="bs-srch-compare-dates">
+          {sides.map((side) => (
+            <label key={side}>
+              How many {eventWindow[side].unit}s {side} {milestoneName} should I include?
+              <TextInput type="number" required min={1} step={1} value={clarifiedCounts?.[side] ?? ''}
+                aria-describedby="ask-event-count-hint"
+                onChange={(e) => onEventCountChange(side, e.target.value ? e.target.valueAsNumber : undefined)} />
+            </label>
+          ))}
+          <p id="ask-event-count-hint">Enter a positive whole number.</p>
+        </div>
+      )}
       {eventBased && eventWindow !== 'invalid' && (
         <div className="bs-srch-compare-periods">
           <MilestonePicker key={milestoneName ?? ''} workspaceId={workspace?.id} timeZone={timeZone}
             milestoneName={milestoneName} event={event} onChange={onEventChange} />
         </div>
       )}
-      {eventBased && event?.date && eventWindow !== 'invalid' && (
-        <p>{eventWindow
-          ? `Ask suggests ${eventWindowLabel(eventWindow.before)} before and ${eventWindowLabel(eventWindow.after)} after. Both exclude the milestone date.`
+      {eventBased && event?.date && resolvedWindow !== 'invalid' && (
+        <p>{resolvedWindow
+          ? `Ask suggests ${eventWindowLabel(resolvedWindow.before)} before and ${eventWindowLabel(resolvedWindow.after)} after. Both exclude the milestone date.`
           : `The suggested ranges cover 14 calendar days on each side and exclude ${milestoneName ? 'the milestone date' : 'launch day'}.`}</p>
       )}
-      {(!eventBased || event?.date) && <div className="bs-srch-compare-periods">
+      {(!eventBased || (event?.date && resolvedWindow !== 'invalid')) && <div className="bs-srch-compare-periods">
         {(['previous', 'current'] as const).map((period) => (
           <fieldset key={period}>
             <legend>{period === 'previous' ? 'Earlier period' : 'Later period'}</legend>
@@ -571,7 +601,7 @@ function ComparisonForm({ draft, timeZone, workspace, confirmationRef, proposedQ
         <div aria-live="polite">
           {complete && !valid && <p>Enter valid dates with each start on or before its end. The earlier period must end before the later period starts.</p>}
           {complete && valid && !validWindow && <p>Keep the earlier period before the milestone date and the later period after it.</p>}
-          {!complete && eventWindow && event?.date && !eventComparisonRanges(event.date, eventWindow).previous.startDate
+          {!complete && resolvedWindow && resolvedWindow !== 'invalid' && event?.date && !eventComparisonRanges(event.date, resolvedWindow).previous.startDate
             && <p>Choose a different milestone date or use shorter windows to preview valid dates.</p>}
         </div>
       </div>

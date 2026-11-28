@@ -74,6 +74,29 @@ test('supports a single day and clamps an implied month to the last day of the t
   })
 })
 
+test('asks for an exact count for a few weeks while keeping the later month', () => {
+  const proposal = proposeComparison('a few weeks before Security Review vs. a month after', 'America/New_York')
+  expect(proposal).toEqual({
+    ranges: EMPTY_RANGES, eventBased: true, milestoneName: 'Security Review',
+    eventWindow: { before: { count: null, unit: 'week' }, after: { count: 1, unit: 'month' } },
+  })
+  expect(eventComparisonRanges('2026-07-15', proposal?.eventWindow)).toEqual(EMPTY_RANGES)
+  expect(eventComparisonRanges('2026-07-15', proposal?.eventWindow, { before: 0 })).toEqual(EMPTY_RANGES)
+  expect(eventComparisonRanges('2026-07-15', proposal?.eventWindow, { before: 2.5 })).toEqual(EMPTY_RANGES)
+  expect(eventComparisonRanges('2026-07-15', proposal?.eventWindow, { before: 3 })).toEqual({
+    previous: { startDate: '2026-06-24', endDate: '2026-07-14' },
+    current: { startDate: '2026-07-16', endDate: '2026-08-15' },
+  })
+})
+
+test('keeps a known earlier count when the later count needs clarification', () => {
+  const proposal = proposeComparison('a day before Security Review vs. a few days after', 'America/New_York')
+  expect(eventComparisonRanges('2026-07-15', proposal?.eventWindow, { after: 4 })).toEqual({
+    previous: { startDate: '2026-07-14', endDate: '2026-07-14' },
+    current: { startDate: '2026-07-16', endDate: '2026-07-19' },
+  })
+})
+
 test('uses the entire spelled-out count when it ends in a legacy two-week window', () => {
   const proposal = proposeComparison('twenty two weeks before Security Review vs. two weeks after', 'America/New_York')
   expect(proposal?.eventWindow).toEqual({ before: { count: 22, unit: 'week' }, after: { count: 2, unit: 'week' } })

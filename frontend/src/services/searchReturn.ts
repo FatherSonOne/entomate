@@ -1,6 +1,6 @@
 import type { SearchResponse } from './searchEngine'
 import type { PassageAnchor } from './meetingSourceLink'
-import type { ComparisonEvent, ComparisonProposal } from './askDateRanges'
+import type { ComparisonEvent, ComparisonProposal, EventWindowCounts } from './askDateRanges'
 
 export interface AskMeeting { type?: string; id?: string; title?: string; date?: string }
 
@@ -34,7 +34,11 @@ export interface PeriodComparison {
   current: MonthlyRecap
 }
 
-export interface ComparisonDraft extends ComparisonProposal { question?: string; event?: ComparisonEvent }
+export interface ComparisonDraft extends ComparisonProposal {
+  question?: string
+  event?: ComparisonEvent
+  clarifiedCounts?: EventWindowCounts
+}
 
 export interface CompletedAnswer {
   question: string

@@ -213,6 +213,16 @@ describe('Search and Ask navigation', () => {
     expect(api.ask).not.toHaveBeenCalled()
   })
 
+  test('a palette link still asks for clarification when its URL already has range dates', async () => {
+    const question = 'a few weeks before Security Review vs. a month after'
+    setup('/search?q=' + encodeURIComponent(question) + '&ask=1&compare=2026-06-24,2026-07-14,2026-07-16,2026-08-15')
+    const form = await screen.findByRole('form', { name: 'Confirm date ranges' })
+    expect(within(form).getByRole('spinbutton', { name: 'How many weeks before Security Review should I include?' })).toHaveValue(null)
+    expect(within(form).getByRole('button', { name: 'Compare periods' })).toBeDisabled()
+    expect(api.ask).not.toHaveBeenCalled()
+    expect(api.askStream).not.toHaveBeenCalled()
+  })
+
   test('a task title and its evidence are separate and browser Back restores the original view', async () => {
     setup('/search?q=launch&f=action_items')
     const title = await screen.findByRole('link', { name: 'Send launch update' })
