@@ -293,6 +293,10 @@ describe('a pressed timecode plays the recording', () => {
       comparing: true, custom: true, typed: true, relative: 'count-range-milestone-window', named: true, coverageName: 'Date range coverage' },
     { label: 'manual milestone with a three-week count choice', question: 'two to three weeks before Security Review vs. roughly a month after',
       comparing: true, custom: true, typed: true, relative: 'count-range-milestone-window', named: true, manual: true, coverageName: 'Date range coverage' },
+    { label: 'selected milestone with a two-week choice from a dashed range', question: '2–3 weeks before Security Review vs. roughly a month after',
+      comparing: true, custom: true, typed: true, relative: 'count-range-milestone-window', named: true, coverageName: 'Date range coverage' },
+    { label: 'manual milestone with a three-week choice from a dashed range', question: '2–3 weeks before Security Review vs. roughly a month after',
+      comparing: true, custom: true, typed: true, relative: 'count-range-milestone-window', named: true, manual: true, coverageName: 'Date range coverage' },
   ])('$label restores coverage and the exact Before and After links without a second Ask request', async ({ question, comparing, custom, typed, corrected, relative, manual, named, coverageName }) => {
     const relativeCase = {
       days: {

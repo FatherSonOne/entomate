@@ -131,7 +131,7 @@ export function parseTypedComparison(question: string): ComparisonRanges | null 
 const NUMERIC_COUNT = String.raw`[+-]?\d+(?:\.\d+)?(?![\w/]|\.\d)`
 const COUNT = `(${NUMERIC_COUNT})`
 const COMPARE = String.raw`\s+(?:vs\.?|versus|compared\s+(?:to|with)|against|with|to|and)\s+(?:the\s+)?`
-const WINDOW_START = String.raw`(?<![\w./+-])`
+const WINDOW_START = String.raw`(?<![\w./+–—-])`
 const LAUNCH_COMPARISON = new RegExp(
   String.raw`${WINDOW_START}(?:two|2)\s+weeks\s+before\s+(?:the\s+)?launch${COMPARE}(?:two|2)\s+weeks\s+after\b`, 'i',
 )
@@ -153,9 +153,12 @@ const TENS = ['twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty'
 const COUNT_WORD = `(?:${[...SMALL_COUNTS, ...TENS].join('|')}|hundred|thousand|million|billion|trillion|minus|negative|point|half|quarter|few|several|couple|a)`
 const WORD_COUNT = String.raw`${COUNT_WORD}(?:[\s-]+(?:${COUNT_WORD}|and|of))*`
 const WINDOW_COUNT = `(?:${NUMERIC_COUNT}|${WORD_COUNT})`
+const COUNT_DASH = String.raw`\s*[-–—]\s*`
+const DASH_COUNT_RANGE = String.raw`${NUMERIC_COUNT}(?:${COUNT_DASH}${NUMERIC_COUNT})+`
+const DASH_RANGE_BOUNDS = new RegExp(String.raw`^(${NUMERIC_COUNT})${COUNT_DASH}(${NUMERIC_COUNT})$`)
 const APPROXIMATE_PREFIX = String.raw`(?:about|roughly)\s+`
 const APPROXIMATE_START = new RegExp('^' + APPROXIMATE_PREFIX, 'i')
-const WINDOW_LENGTH = String.raw`((?:${APPROXIMATE_PREFIX})?${WINDOW_COUNT}(?:\s+(?:or|to)\s+${WINDOW_COUNT})*)\s+(days?|weeks?|months?)`
+const WINDOW_LENGTH = String.raw`((?:${APPROXIMATE_PREFIX})?(?:${DASH_COUNT_RANGE}|${WINDOW_COUNT}(?:\s+(?:or|to)\s+${WINDOW_COUNT})*))\s+(days?|weeks?|months?)`
 const CUSTOM_MILESTONE_WINDOW = new RegExp(
   String.raw`${WINDOW_START}${WINDOW_LENGTH}\s+before\s+${MILESTONE_TITLE}${COMPARE}${WINDOW_LENGTH}\s+after\b${MILESTONE_END}`, 'i',
 )
@@ -186,7 +189,7 @@ function parseWindowLength(value: string, unit: string): ProposedWindowLength {
   const plural = writtenUnit.endsWith('s')
   const calendarUnit = writtenUnit.replace(/s$/, '') as CalendarUnit
   const countText = value.replace(APPROXIMATE_START, '')
-  const bounds = countText.split(/\s+to\s+/i)
+  const bounds = DASH_RANGE_BOUNDS.exec(countText)?.slice(1) ?? countText.split(/\s+to\s+/i)
   if (bounds.length > 1) {
     const [min = NaN, max = NaN] = bounds.map(parseWindowCount)
     return bounds.length === 2 && validWindowCount(min) && validWindowCount(max) && min <= max

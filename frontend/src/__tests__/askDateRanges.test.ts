@@ -169,7 +169,7 @@ test.each(['two or three', '2 or 3', 'a few'])('asks for a count for about %s we
   expect(eventComparisonRanges('2026-07-15', proposal?.eventWindow)).toEqual(EMPTY_RANGES)
 })
 
-test.each(['two to three', '2 to 3'])('requires an explicit count within %s weeks', (words) => {
+test.each(['two to three', '2 to 3', '2–3', '2-3', '2 — 3'])('requires an explicit count within %s weeks', (words) => {
   const proposal = proposeComparison(words + ' weeks before Security Review vs. roughly a month after', 'America/New_York')
   expect(proposal).toEqual({
     ranges: EMPTY_RANGES, eventBased: true, milestoneName: 'Security Review',
@@ -196,6 +196,14 @@ test('accepts a whole number between the endpoints of a wider count range', () =
   expect(eventComparisonRanges('2026-07-15', proposal?.eventWindow, { before: 4 })).toEqual({
     previous: { startDate: '2026-07-11', endDate: '2026-07-14' },
     current: { startDate: '2026-07-16', endDate: '2026-07-22' },
+  })
+})
+
+test('accepts a dashed count range on the later side', () => {
+  const proposal = proposeComparison('a day before Security Review vs. 2–3 weeks after', 'America/New_York')
+  expect(eventComparisonRanges('2026-07-15', proposal?.eventWindow, { after: 3 })).toEqual({
+    previous: { startDate: '2026-07-14', endDate: '2026-07-14' },
+    current: { startDate: '2026-07-16', endDate: '2026-08-05' },
   })
 })
 
@@ -235,6 +243,9 @@ test.each(['0 days before Security Review vs. 7 days after',
   'three to two weeks before Security Review vs. a month after',
   '0 to 3 weeks before Security Review vs. a month after',
   '2.5 to 3 weeks before Security Review vs. a month after',
+  '3–2 weeks before Security Review vs. a month after',
+  '2--3 weeks before Security Review vs. a month after',
+  '2 – 3 – 4 weeks before Security Review vs. a month after',
   'a weeks before Security Review vs. a month after',
   'a week before Security Review vs. a months after',
 ])('requires a correction for %s', (question) => {
