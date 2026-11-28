@@ -139,7 +139,7 @@ describe('Search and Ask navigation', () => {
     }, expect.any(Object))
   })
 
-  test.each(['days', 'weeks'])('a palette Ask with unequal counts of %s prompts for correction before running', async (unit) => {
+  test.each(['days', 'weeks', 'months'])('a palette Ask with unequal counts of %s prompts for correction before running', async (unit) => {
     setup('/search?q=' + encodeURIComponent('Compare the last 4 ' + unit + ' vs. the previous 2') + '&ask=1')
     const form = await screen.findByRole('form', { name: 'Confirm date ranges' })
     expect(form).toHaveTextContent('Use the same positive whole number of ' + unit + ' for both periods')

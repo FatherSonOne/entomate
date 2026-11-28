@@ -5,9 +5,11 @@ export interface ComparisonRanges {
   current: DateRange
 }
 
+type RelativeUnit = 'day' | 'week' | 'month'
+
 export interface ComparisonProposal {
   ranges: ComparisonRanges
-  relative?: 'completed-days' | 'completed-weeks' | 'invalid-day-count' | 'invalid-week-count'
+  relative?: `completed-${RelativeUnit}s` | `invalid-${RelativeUnit}-count`
 }
 
 export const EMPTY_RANGES: ComparisonRanges = {
@@ -113,34 +115,51 @@ const SINGLE_WEEK_COMPARISON = new RegExp(
   String.raw`${LAST_WEEK}${COMPARE}${PREVIOUS_WEEK}|${PREVIOUS_WEEK}${COMPARE}${LAST_WEEK}`, 'i',
 )
 
-function numberedComparisonPatterns(unit: 'day' | 'week') {
+function numberedComparisonPatterns(unit: RelativeUnit) {
   const suffix = String.raw`\s+(?:completed\s+)?${unit}s?\b`
   const last = String.raw`\blast\s+${COUNT}${suffix}`
   const previous = String.raw`\bprevious\s+${COUNT}`
   return {
+    unit,
     forward: new RegExp(String.raw`${last}${COMPARE}${previous}(?:${suffix}|${ELIDED_UNIT})`, 'i'),
     reverse: new RegExp(String.raw`${previous}(?:${suffix})?${COMPARE}${last}`, 'i'),
   }
 }
 
-const DAY_COMPARISON = numberedComparisonPatterns('day')
-const WEEK_COMPARISON = numberedComparisonPatterns('week')
+const NUMBERED_COMPARISONS = (['month', 'week', 'day'] as const).map(numberedComparisonPatterns)
 
-function calendarDaysBefore(today: Date, days: number): string {
+function readRelativeCounts(question: string) {
+  if (SINGLE_WEEK_COMPARISON.test(question)) return { unit: 'week' as const, count: 1, previousCount: 1 }
+  for (const { unit, forward, reverse } of NUMBERED_COMPARISONS) {
+    const match = forward.exec(question) ?? reverse.exec(question)
+    if (match) return { unit, count: Number(match[1]), previousCount: Number(match[2]) }
+  }
+  return null
+}
+
+function calendarDayBefore(today: Date, days = 0): string {
   const date = new Date(today)
   date.setUTCDate(date.getUTCDate() - days)
   return Number.isFinite(date.getTime()) ? date.toISOString().slice(0, 10) : ''
 }
 
+function periodBoundary(today: Date, unit: RelativeUnit, periodsBefore: number): Date {
+  const date = new Date(today)
+  if (unit === 'month') {
+    date.setUTCMonth(date.getUTCMonth() - periodsBefore, 1)
+  } else {
+    const days = unit === 'week' ? (date.getUTCDay() + 6) % 7 + periodsBefore * 7 : periodsBefore
+    date.setUTCDate(date.getUTCDate() - days)
+  }
+  return date
+}
+
 function relativeComparison(question: string, timeZone: string, asOf: Date): ComparisonProposal | null {
-  const singleWeek = SINGLE_WEEK_COMPARISON.test(question)
-  const weeklyCounts = WEEK_COMPARISON.forward.exec(question) ?? WEEK_COMPARISON.reverse.exec(question)
-  const counts = weeklyCounts ?? DAY_COMPARISON.forward.exec(question) ?? DAY_COMPARISON.reverse.exec(question)
-  if (!singleWeek && !counts) return null
-  const weeks = singleWeek || !!weeklyCounts
-  const count = singleWeek ? 1 : Number(counts?.[1])
-  const invalid: ComparisonProposal = { ranges: EMPTY_RANGES, relative: weeks ? 'invalid-week-count' : 'invalid-day-count' }
-  if (!Number.isSafeInteger(count) || count < 1 || (!singleWeek && count !== Number(counts?.[2]))) return invalid
+  const counts = readRelativeCounts(question)
+  if (!counts) return null
+  const { unit, count, previousCount } = counts
+  const invalid: ComparisonProposal = { ranges: EMPTY_RANGES, relative: `invalid-${unit}-count` }
+  if (!Number.isSafeInteger(count) || count < 1 || count !== previousCount) return invalid
 
   const formatter = new Intl.DateTimeFormat('en-US', {
     timeZone, calendar: 'iso8601', year: 'numeric', month: '2-digit', day: '2-digit',
@@ -148,19 +167,14 @@ function relativeComparison(question: string, timeZone: string, asOf: Date): Com
   const { year, month, day } = Object.fromEntries(formatter.formatToParts(asOf).map(({ type, value }) => [type, value]))
   // Once the local date is known, use UTC solely for calendar arithmetic across DST.
   const today = new Date(`${year?.padStart(4, '0')}-${month}-${day}T00:00:00Z`)
-  const daysSinceBoundary = weeks ? (today.getUTCDay() + 6) % 7 : 0
-  const days = weeks ? count * 7 : count
+  const end = periodBoundary(today, unit, 0)
+  const split = periodBoundary(today, unit, count)
+  const start = periodBoundary(today, unit, count * 2)
   const ranges = {
-    previous: {
-      startDate: calendarDaysBefore(today, daysSinceBoundary + days * 2),
-      endDate: calendarDaysBefore(today, daysSinceBoundary + days + 1),
-    },
-    current: {
-      startDate: calendarDaysBefore(today, daysSinceBoundary + days),
-      endDate: calendarDaysBefore(today, daysSinceBoundary + 1),
-    },
+    previous: { startDate: calendarDayBefore(start), endDate: calendarDayBefore(split, 1) },
+    current: { startDate: calendarDayBefore(split), endDate: calendarDayBefore(end, 1) },
   }
-  return validComparisonRanges(ranges) ? { ranges, relative: weeks ? 'completed-weeks' : 'completed-days' } : invalid
+  return validComparisonRanges(ranges) ? { ranges, relative: `completed-${unit}s` } : invalid
 }
 
 export function proposeComparison(question: string, timeZone: string, asOf = new Date()): ComparisonProposal | null {

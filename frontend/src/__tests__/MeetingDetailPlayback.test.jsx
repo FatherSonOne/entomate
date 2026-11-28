@@ -245,20 +245,48 @@ describe('a pressed timecode plays the recording', () => {
       comparing: true, custom: true, typed: true, relative: 'days', coverageName: 'Date range coverage' },
     { label: 'relative weeks', question: 'What changed about launch last week vs. the previous week?',
       comparing: true, custom: true, typed: true, relative: 'weeks', coverageName: 'Date range coverage' },
+    { label: 'relative months', question: 'Compare the last 3 months vs. the previous 3. What changed about launch?',
+      comparing: true, custom: true, typed: true, relative: 'months', coverageName: 'Date range coverage' },
   ])('$label restores coverage and the exact Before and After links without a second Ask request', async ({ question, comparing, custom, typed, corrected, relative, coverageName }) => {
-    const weekly = relative === 'weeks'
-    if (relative) {
+    const relativeCase = {
+      days: {
+        beforeMidnight: [10, 28], afterMidnight: [10, 29],
+        previous: { startDate: '2026-09-29', endDate: '2026-10-28' },
+        current: { startDate: '2026-10-29', endDate: '2026-11-26' },
+        previewEnd: '2026-11-27', draftEnd: '2026-11-25',
+        previousLabel: /Sep 29\D+Oct 28, 2026/, currentLabel: /Oct 29\D+Nov 26, 2026/,
+        message: 'completed calendar days and exclude today',
+      },
+      weeks: {
+        beforeMidnight: [10, 29], afterMidnight: [10, 30], beforeMeeting: '2026-11-13T18:00:00Z',
+        previous: { startDate: '2026-11-09', endDate: '2026-11-15' },
+        current: { startDate: '2026-11-16', endDate: '2026-11-21' },
+        previewEnd: '2026-11-22', draftEnd: '2026-11-20',
+        previousLabel: /Nov 9\D+15, 2026/, currentLabel: /Nov 16\D+21, 2026/,
+        message: 'completed Monday–Sunday weeks and exclude the current week',
+      },
+      months: {
+        beforeMidnight: [10, 30], afterMidnight: [11, 1],
+        beforeMeeting: '2026-07-17T18:00:00Z', afterMeeting: '2026-10-20T18:00:00Z',
+        previous: { startDate: '2026-05-01', endDate: '2026-07-31' },
+        current: { startDate: '2026-08-01', endDate: '2026-10-30' },
+        previewEnd: '2026-10-31', draftEnd: '2026-10-29',
+        previousLabel: /May 1\D+Jul 31, 2026/, currentLabel: /Aug 1\D+Oct 30, 2026/,
+        message: 'completed calendar months and exclude the current month',
+      },
+    }[relative]
+    if (relativeCase) {
       vi.useFakeTimers({ toFake: ['Date'] })
-      vi.setSystemTime(new Date(2026, 10, weekly ? 29 : 28, 23, 59))
+      vi.setSystemTime(new Date(2026, ...relativeCase.beforeMidnight, 23, 59))
     }
     const beforeQuote = 'We agreed to launch on Monday.'
     const afterQuote = 'The launch is now scheduled for Friday.'
     const laterRevision = 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb'
     const sources = [
-      { id: 'before-m1', title: 'Launch planning', date: weekly ? '2026-11-13T18:00:00Z' : comparing ? '2026-10-06T18:00:00Z' : '2026-11-06T18:00:00Z',
+      { id: 'before-m1', title: 'Launch planning', date: relativeCase?.beforeMeeting ?? (comparing ? '2026-10-06T18:00:00Z' : '2026-11-06T18:00:00Z'),
         speaker: 'Ana', quote: beforeQuote, role: 'before', period: comparing ? 'previous' : undefined,
         atMs: 22_000, passage: { revision: REVISION, kind: 'segment', position: 2 } },
-      { id: 'after-m2', title: 'Launch follow-up', date: '2026-11-20T18:00:00Z', speaker: 'Pat', quote: afterQuote,
+      { id: 'after-m2', title: 'Launch follow-up', date: relativeCase?.afterMeeting ?? '2026-11-20T18:00:00Z', speaker: 'Pat', quote: afterQuote,
         role: 'after', period: comparing ? 'current' : undefined,
         atMs: 22_000, passage: { revision: laterRevision, kind: 'segment', position: 2 } },
     ]
@@ -275,18 +303,14 @@ describe('a pressed timecode plays the recording', () => {
         ],
       }
     })
-    const ranges = weekly ? {
-      previous: { startDate: '2026-11-09', endDate: '2026-11-15' },
-      current: { startDate: '2026-11-16', endDate: '2026-11-21' },
-    } : relative ? {
-      previous: { startDate: '2026-09-29', endDate: '2026-10-28' },
-      current: { startDate: '2026-10-29', endDate: '2026-11-26' },
+    const ranges = relativeCase ? {
+      previous: relativeCase.previous, current: relativeCase.current,
     } : {
       previous: { startDate: '2026-10-04', endDate: '2026-10-07' },
       current: { startDate: '2026-11-18', endDate: '2026-11-25' },
     }
-    const draftEnd = weekly ? '2026-11-20' : relative ? '2026-11-25' : '2026-11-26'
-    const previewEnd = weekly ? '2026-11-22' : relative ? '2026-11-27' : corrected ? '2026-11-26' : ranges.current.endDate
+    const draftEnd = relativeCase?.draftEnd ?? '2026-11-26'
+    const previewEnd = relativeCase?.previewEnd ?? (corrected ? '2026-11-26' : ranges.current.endDate)
     const recap = { ...(custom ? ranges.current : { startDate: '2026-11-01', endDate: '2026-11-27' }), timeZone: 'America/New_York',
       totalMeetings: 4, reviewedMeetings: 2, meetingsWithoutTranscripts: 1, unindexedMeetings: 1, unsampledMeetings: 0 }
     const previous = { ...recap, ...(custom ? ranges.previous : { startDate: '2026-10-01', endDate: '2026-10-31' }),
@@ -320,17 +344,15 @@ describe('a pressed timecode plays the recording', () => {
       expect(rangeInput('Later period', 'Start date')).toHaveValue(ranges.current.startDate)
       expect(rangeInput('Later period', 'End date')).toHaveValue(previewEnd)
       expect(search.askStream).not.toHaveBeenCalled()
-      if (relative) {
-        expect(confirmation).toHaveTextContent(weekly
-          ? 'completed Monday–Sunday weeks and exclude the current week'
-          : 'completed calendar days and exclude today')
-        vi.setSystemTime(new Date(2026, 10, weekly ? 30 : 29, 0, 1))
+      if (relativeCase) {
+        expect(confirmation).toHaveTextContent(relativeCase.message)
+        vi.setSystemTime(new Date(2026, ...relativeCase.afterMidnight, 0, 1))
         fireEvent.change(questionField, { target: { value: 'Unsubmitted question across midnight' } })
         expect(rangeInput('Earlier period', 'Start date')).toHaveValue(ranges.previous.startDate)
         expect(rangeInput('Later period', 'Start date')).toHaveValue(ranges.current.startDate)
         expect(rangeInput('Later period', 'End date')).toHaveValue(previewEnd)
       }
-      if (corrected || relative) fireEvent.change(rangeInput('Later period', 'End date'), { target: { value: ranges.current.endDate } })
+      if (corrected || relativeCase) fireEvent.change(rangeInput('Later period', 'End date'), { target: { value: ranges.current.endDate } })
       expect(search.askStream).not.toHaveBeenCalled()
       fireEvent.click(within(confirmation).getByRole('button', { name: 'Compare periods' }))
     } else if (custom) {
@@ -349,12 +371,12 @@ describe('a pressed timecode plays the recording', () => {
     }
     const coverage = await screen.findByRole('region', { name: coverageName })
     const current = comparing ? within(coverage).getByRole('region', { name: custom ? 'Later period' : 'This month to date' }) : coverage
-    expect(current).toHaveTextContent(weekly ? /Nov 16\D+21, 2026/ : relative ? /Oct 29\D+Nov 26, 2026/ : custom ? /Nov 18\D+25, 2026/ : /Nov 1\D+27, 2026/)
+    expect(current).toHaveTextContent(relativeCase?.currentLabel ?? (custom ? /Nov 18\D+25, 2026/ : /Nov 1\D+27, 2026/))
     expect(coverage).toHaveTextContent('America/New_York')
     expect(current).toHaveTextContent('2 of 4 meetings reviewed · 1 without transcripts · 1 awaiting indexing')
     if (comparing) {
       const lastMonth = within(coverage).getByRole('region', { name: custom ? 'Earlier period' : 'Last month' })
-      expect(lastMonth).toHaveTextContent(weekly ? /Nov 9\D+15, 2026/ : relative ? /Sep 29\D+Oct 28, 2026/ : custom ? /Oct 4\D+7, 2026/ : /Oct 1\D+31, 2026/)
+      expect(lastMonth).toHaveTextContent(relativeCase?.previousLabel ?? (custom ? /Oct 4\D+7, 2026/ : /Oct 1\D+31, 2026/))
       expect(lastMonth).toHaveTextContent('3 of 5 meetings reviewed · 1 without transcripts · 1 beyond the review limit')
     }
     expect(screen.getByRole('heading', { name: 'Launch', exact: true })).toBeInTheDocument()

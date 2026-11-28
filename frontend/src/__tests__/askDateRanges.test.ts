@@ -143,6 +143,28 @@ describe('relative Ask comparison', () => {
     expect(proposeComparison('Last week vs the previous week', timeZone, new Date(instant))?.ranges).toEqual(expected)
   })
 
+  test.each([
+    'The last 3 months vs. the previous 3',
+    'Compare the last 3 completed months with the previous 3 months.',
+    'What changed between the previous 3 months and the last 3 months?',
+  ])('resolves completed calendar months for "%s"', (question) => {
+    expect(proposeComparison(question, timeZone, asOf)).toEqual({
+      ranges: periods('2026-05-01', '2026-07-31', '2026-08-01', '2026-10-31'),
+      relative: 'completed-months',
+    })
+  })
+
+  test.each([
+    ['2026-12-01T04:59:59Z', 3, periods('2026-05-01', '2026-07-31', '2026-08-01', '2026-10-31')],
+    ['2026-12-01T05:00:00Z', 3, periods('2026-06-01', '2026-08-31', '2026-09-01', '2026-11-30')],
+    ['2027-01-31T15:00:00Z', 3, periods('2026-07-01', '2026-09-30', '2026-10-01', '2026-12-31')],
+    ['2024-03-31T15:00:00Z', 1, periods('2024-01-01', '2024-01-31', '2024-02-01', '2024-02-29')],
+    ['2026-03-31T15:00:00Z', 1, periods('2026-01-01', '2026-01-31', '2026-02-01', '2026-02-28')],
+  ])('uses exact month boundaries at %s', (instant, count, expected) => {
+    const question = 'Last ' + count + ' months vs previous ' + count
+    expect(proposeComparison(question, timeZone, new Date(instant))?.ranges).toEqual(expected)
+  })
+
   test.each(['0', '-1', '2.5', '9007199254740992', '1000000'])('asks for corrections for an invalid count of %s', (count) => {
     expect(proposeComparison('Compare last ' + count + ' days vs previous ' + count, timeZone, asOf))
       .toEqual({ ranges: EMPTY_RANGES, relative: 'invalid-day-count' })
@@ -162,9 +184,18 @@ describe('relative Ask comparison', () => {
   })
 
   test.each([
+    'Last 0 months vs previous 0',
+    'Last 1.5 months vs previous 1.5',
+    'Last 3 months vs previous 2 months',
+  ])('asks for corrections for invalid monthly periods in "%s"', (question) => {
+    expect(proposeComparison(question, timeZone, asOf)).toEqual({ ranges: EMPTY_RANGES, relative: 'invalid-month-count' })
+  })
+
+  test.each([
     'What happened in the last 30 days?',
     'Compare this month to date with all of last month',
     'What happened in the last week?',
+    'What happened in the last 3 months?',
     'Compare last 2 weeks with the previous 2 days',
     'Compare what happened in the last 30 days vs the previous 30 tasks.',
   ])('keeps ordinary Ask behavior for "%s"', (question) => {

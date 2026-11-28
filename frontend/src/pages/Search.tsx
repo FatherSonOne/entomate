@@ -484,8 +484,10 @@ function ComparisonForm({ draft, timeZone, workspace, confirmationRef, proposedQ
       <p>Both start and end dates are included · {timeZone} · {workspace ? workspace.name || 'Current workspace' : 'Choose a workspace'}</p>
       {relative === 'completed-days' && <p>The suggested ranges cover completed calendar days and exclude today.</p>}
       {relative === 'completed-weeks' && <p>The suggested ranges cover completed Monday–Sunday weeks and exclude the current week.</p>}
+      {relative === 'completed-months' && <p>The suggested ranges cover completed calendar months and exclude the current month.</p>}
       {relative === 'invalid-day-count' && !complete && <p>Use the same positive whole number of days for both periods, or enter dates below.</p>}
       {relative === 'invalid-week-count' && !complete && <p>Use the same positive whole number of weeks for both periods, or enter dates below.</p>}
+      {relative === 'invalid-month-count' && !complete && <p>Use the same positive whole number of months for both periods, or enter dates below.</p>}
       {question && !relative && !complete && <p>Fill in the missing dates or correct them below. Include a year for each range when typing dates.</p>}
       <div className="bs-srch-compare-periods">
         {(['previous', 'current'] as const).map((period) => (
