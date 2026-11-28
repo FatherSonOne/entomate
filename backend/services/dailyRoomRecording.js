@@ -101,14 +101,16 @@ async function getObject(configuration, client, key, maxBytes) {
   return result.Body;
 }
 
-function matchingKeys(recording, access) {
-  const prefix = recording.s3key;
-  if (typeof prefix !== 'string' || !prefix) throw new Error('Missing Daily recording prefix');
-  const valid = key => typeof key === 'string' && ['/', '-', '.'].some(separator => key.startsWith(prefix + separator));
-  const keyOf = value => typeof value === 'string' ? value : value?.s3key;
-  const eventKey = keyOf(access.dataOutputs?.['event-json']);
-  if (!valid(eventKey)) throw new Error('Missing Daily event log');
-  return { eventKey, tracks: Array.isArray(access.tracks) ? access.tracks.map(keyOf).filter(valid) : [] };
+function recordingKeys(data, prefix, configuration) {
+  const bucketUri = `s3://${configuration.bucket_region}/${configuration.bucket_name}/`;
+  const trackUri = bucketUri + prefix + '-';
+  if (!Array.isArray(data.events)) return [];
+  return data.events.flatMap(({ type, data: event }) => {
+    const uri = event?.uri;
+    return type === 'recording-media-started' && typeof uri === 'string' && uri.startsWith(trackUri)
+      ? [uri.slice(bucketUri.length)]
+      : [];
+  });
 }
 
 async function renderRecording(meeting, manifest, get) {
@@ -159,16 +161,20 @@ async function processRecording(room, daily) {
   if (job?.roomCapture !== 'daily' || job.status !== 'processing') return true;
   const recording = (await list(room, daily)).find(item => item.status === 'finished');
   if (!recording?.mtgSessionId) return false;
-  const access = await daily('/recordings/' + encodeURIComponent(recording.id) + '/access-link');
-  const { eventKey, tracks } = matchingKeys(recording, access);
+  const prefix = recording.s3key;
+  if (typeof prefix !== 'string' || !prefix) throw new Error('Missing Daily recording prefix');
   const configuration = bucket();
   if (!configuration) throw new Error('Daily recording storage is unavailable');
   const client = new S3Client({ region: configuration.bucket_region });
   try {
     const get = (key, max) => getObject(configuration, client, key, max);
-    const data = JSON.parse(await (await get(eventKey, 10_000_000)).transformToString());
+    // Daily stores the raw-track manifest next to the tracks under the recording key.
+    const data = JSON.parse(await (await get(prefix + '.event.json', 10_000_000)).transformToString());
+    if (data.recording?.id !== recording.id || data.recording?.instance_id !== room.id || data.meeting_session_id !== recording.mtgSessionId) {
+      throw new Error('Daily event log does not match the room recording');
+    }
     const sessions = (await daily('/meetings/' + encodeURIComponent(recording.mtgSessionId) + '/participants'))?.data ?? [];
-    const manifest = readManifest(data, recording, sessions, tracks);
+    const manifest = readManifest(data, recording, sessions, recordingKeys(data, prefix, configuration));
     if (!manifest) return false;
     if (!job.participantTracks) {
       const pending = Object.fromEntries(manifest.people.map(({ label }, index) => ['p' + (index + 1), { label, status: 'processing' }]));
